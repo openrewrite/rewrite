@@ -60,3 +60,57 @@ func TestContextLeavesAStatementPatternOnTheRightNode(t *testing.T) {
 	require.True(t, matcher.IsResolved(call))
 	require.Equal(t, "Ready", call.MethodType.Name)
 }
+
+// Context is arbitrary Go, so the target is found by name rather than by
+// counting what precedes it: a comment line declares nothing, an unindented
+// body line is not a declaration, and two declarations can share a line.
+func TestContextTakesAnyShapeOfDeclaration(t *testing.T) {
+	for _, decls := range []string{
+		"// a helper\ntype Wrapped struct{ V int }\n\nfunc Wrap(v Wrapped) Wrapped { return v }",
+		"type Wrapped struct{ V int }\nfunc Wrap(v Wrapped) Wrapped {\nreturn v\n}",
+		"type Wrapped struct{ V int }; type Other int\n\nfunc Wrap(v Wrapped) Wrapped { return v }",
+	} {
+		pat := template.Expression(`Wrap(w)`).Context(decls, "var w Wrapped").Build()
+		call := patternCall(t, pat)
+		require.True(t, matcher.IsResolved(call), "decls %q", decls)
+		require.Equal(t, "Wrap", call.MethodType.Name)
+	}
+}
+
+// The same for a top-level pattern, whose target is whatever comes last.
+func TestContextLeavesATopLevelPatternOnTheRightNode(t *testing.T) {
+	pat := template.TopLevel("func Use() { Wrap(Wrapped{}) }").Context(wrapDecls).Build()
+	call := patternCall(t, pat)
+	require.True(t, matcher.IsResolved(call))
+	require.Equal(t, "Wrap", call.MethodType.Name)
+}
+
+// A template names captures the match is expected to bind. Left unbound, the
+// placeholder identifier would print as source, so there is no result.
+func TestApplyRefusesAnUnboundCapture(t *testing.T) {
+	missing := template.Expr("missing")
+	tmpl := template.ExpressionTemplate(fmt.Sprintf("f(%s)", missing)).Captures(missing).Build()
+
+	require.Nil(t, tmpl.Apply(nil, template.NewMatchResult()))
+	require.Nil(t, tmpl.Apply(nil, nil))
+
+	bound := template.NewMatchResult().Bind(missing, template.Expression("42").Build().Tree(t))
+	require.NotNil(t, tmpl.Apply(nil, bound))
+}
+
+// Applying twice yields two trees sharing no node, so a later edit to one
+// leaves the other and the cached template alone.
+func TestApplyYieldsIndependentTrees(t *testing.T) {
+	tmpl := template.ExpressionTemplate("f(1)").Build()
+	first, second := tmpl.Apply(nil, nil), tmpl.Apply(nil, nil)
+	require.NotNil(t, first)
+	require.NotNil(t, second)
+
+	ids := map[string]bool{}
+	for _, id := range template.NodeIDs(first) {
+		ids[id] = true
+	}
+	for _, id := range template.NodeIDs(second) {
+		require.False(t, ids[id], "the two applications share node %s", id)
+	}
+}

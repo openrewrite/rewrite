@@ -41,3 +41,44 @@ func (p *GoPattern) Tree(t require.TestingT) java.J {
 	require.NoError(t, err)
 	return tree
 }
+
+// MatchViaWalk is MatchesViaWalk keeping the bindings, so a test can hold the
+// hand-written comparisons to what the walk captured as well as its answer.
+func (p *GoPattern) MatchViaWalk(candidate java.J, cursor *visitor.Cursor) *MatchResult {
+	tree, err := p.getTree()
+	if err != nil || tree == nil {
+		return nil
+	}
+	cmp := newPatternComparator(p.captures, cursor, p.mode)
+	cmp.skipFastPath = true
+	return cmp.match(tree, candidate)
+}
+
+// Bindings names what a match bound, for comparing two match results.
+func (m *MatchResult) Bindings() map[string]bool {
+	names := make(map[string]bool, len(m.bindings))
+	for name := range m.bindings {
+		names[name] = true
+	}
+	return names
+}
+
+// NodeIDs lists every node's ID, so a test can show two trees share none.
+func NodeIDs(j java.J) []string {
+	v := &idCollector{}
+	v.Self = v
+	v.Visit(j, nil)
+	return v.ids
+}
+
+type idCollector struct {
+	visitor.GoVisitor
+	ids []string
+}
+
+func (c *idCollector) PreVisit(t java.Tree, p any) java.Tree {
+	if j, ok := t.(java.J); ok {
+		c.ids = append(c.ids, j.GetID().String())
+	}
+	return t
+}

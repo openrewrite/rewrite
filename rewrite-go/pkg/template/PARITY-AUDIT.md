@@ -211,14 +211,16 @@ and `Block` therefore read their own fields, which costs 91ns against the
 walk's 207ns on that call, and 254ns against 1072ns once arguments nest.
 Everything else goes through the walk, so a new node kind needs no work.
 
-`TestFastPathAgreesWithWalk` is what makes hand-written comparison safe here
-in a way it was not before: the walk reaches every field by construction, so
-it is the answer the hand-written cases are held to, under each matching
-mode. Mutating their clauses one at a time, thirteen of seventeen fail a
-test. Of the four that do not, two are slots Go source never fills and the
-RPC peer sends — an identifier's annotations, a call's type parameters — and
-two are type slots on `FieldAccess` and `Binary` that the corpus does not
-attribute.
+`TestFastPathAgreesWithWalk` is what makes the hand-written comparisons safe:
+the walk reaches every field by construction, so it is the answer they are
+held to, under each matching mode, on what they bind as well as what they
+answer.
+
+Mutating their clauses one at a time, twelve of seventeen fail a test. Of the
+five that do not, two are slots Go source never fills and only the RPC peer
+sends — an identifier's annotations, a call's type parameters — one is the
+method type that the declaring-type comparison settles first, and two are
+type slots on `FieldAccess` and `Binary` that no fixture attributes.
 
 Generating the comparison per node type from the model would give the same
 speed without the hand-written half. It is the principled successor to both
@@ -230,14 +232,22 @@ fields: placeholder binding, `java.Literal` (compared by `Source`),
 `java.Empty` (always equal), variadic runs, and the FQN-based
 `java.MethodInvocation` comparison described below.
 
-**Which markers count.** `go_printer.go` reads twelve. Five change the
-keywords or operators emitted and are therefore compared: `ShortVarDecl`,
-`ConstDecl`, `VarKeyword` and `InterfaceMethod` by presence, and `StructTag`
-by the source of the `*java.Literal` it carries. The rest — `Semicolon`,
-`TrailingComma`, `GroupedSpec`, `GroupedImport`, `ImportBlock`,
-`StructTagQuote`, `ChanDirMarker` — move only whitespace and punctuation, as
-does every marker the printer never reads. A test derives this split from the
-printer, so a new marker cannot join the ignored set unexamined.
+**Which markers count.** Six decide what the source says and are compared:
+`ShortVarDecl`, `ConstDecl`, `VarKeyword`, `InterfaceMethod` and `Builtin` by
+presence, and `StructTag` by the source of the `*java.Literal` it carries.
+`Builtin` separates a call to a predeclared function from one to a
+user-defined function of the same name, and the printer never reads it, so
+what reaches the output is the wrong test to apply. The rest carry layout —
+`Semicolon`, `TrailingComma`, `GroupedSpec`, `GroupedImport`, `ImportBlock`,
+`StructTagQuote`, `ChanDirMarker`, `ImplicitForClauses`, `TypeSwitchGuard` —
+or describe the project rather than the file: `GoProject`,
+`GoResolutionResult`.
+
+`TestEveryMarkerIsClassified` reads the marker types back out of the tree
+package and fails on one neither list names, so a marker cannot join the
+ignored set unexamined. A `StructTag` reaches a Go-parsed tree only from the
+RPC peer, this parser reading a tag into `LeadingAnnotations` instead; the
+`json:"a"` against `json:"b"` row above is that field, not the marker.
 
 ### Type attribution
 
@@ -264,15 +274,26 @@ literal keywords by design — two method types compare by name and declaring
 type FQN, and anything else compares by `matcher.GetFullyQualifiedName`, with
 an empty FQN on either side deferring to the mode.
 
-When both sides of a `java.MethodInvocation` resolve, the declaring type FQN
-and method name are compared and `Select` is skipped, so a `fmt.Println`
-pattern still matches source that imported `fmt` under an alias. This is the
-Go reading of the case Python's comparator documents for `os.path.join`
-against a bare `join`.
+When both sides of a `java.MethodInvocation` resolve **and both receivers name
+a package**, the declaring type FQN and method name are compared and the
+receiver is skipped, so a `fmt.Println` pattern still matches source that
+imported `fmt` under an alias. This is the Go reading of the case Python's
+comparator documents for `os.path.join` against a bare `join`.
 
-`Capture.WithType` already declares a type for a capture and feeds it to the
-scaffold preamble. Under either type-matching mode it is now also enforced
-against what the capture matched, which is what its name has always implied.
+The receiver has to name a package for this to be sound. Skipping it wherever
+the declaring types agree would read `one.WriteString` and `two.WriteString`
+as the same call, and would leave a capture written in receiver position
+unbound while still reporting a match — the placeholder then prints into the
+source. Attribution tells the two apart: a value's identifier carries the
+variable it reads, and a package name carries none, being no value.
+
+Under `TypeMatchingStrict` a pattern naming a variable matches nothing, since
+the variable the pattern declares belongs to the pattern's own package.
+Lenient is the mode for patterns that name values.
+
+`Capture.WithType` declares a type for a capture and feeds it to the scaffold
+preamble. Under either type-matching mode it also holds what the capture
+matched to that type, a run absorbed by a variadic capture included.
 
 **Degraded attribution.** A type-comparing match against a package whose
 attribution is incomplete returns false, which reads exactly like source that

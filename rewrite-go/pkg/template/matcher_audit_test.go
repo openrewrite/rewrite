@@ -184,7 +184,7 @@ func fixtureSource(f fixture) string {
 
 // candidateFor parses a fixture as ordinary source and returns the node a
 // pattern of the same kind is built to match.
-func candidateFor(t *testing.T, f fixture) java.J {
+func candidateFor(t testing.TB, f fixture) java.J {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("audit.go", fixtureSource(f))
 	require.NoError(t, err, "fixture %q", f.name)
@@ -284,7 +284,7 @@ func fastPathAgrees(t *testing.T, mode template.TypeMatchingMode) {
 	for i, f := range fixtures {
 		candidates[i] = candidateFor(t, f)
 	}
-	for i, f := range fixtures {
+	for _, f := range fixtures {
 		pat := builderFor(f).TypeMatching(mode).Build()
 		for j, other := range fixtures {
 			if f.kind != other.kind {
@@ -296,7 +296,6 @@ func fastPathAgrees(t *testing.T, mode template.TypeMatchingMode) {
 			if viaWalk != viaFast {
 				t.Errorf("%s: fast path says %v, walk says %v", label, viaFast, viaWalk)
 			}
-			_ = i
 		}
 	}
 }
@@ -342,4 +341,26 @@ func patternParamFQNs(mi *java.MethodInvocation) []string {
 		names = append(names, matcher.GetFullyQualifiedName(p))
 	}
 	return names
+}
+
+func allCalls(t *testing.T, src string) []*java.MethodInvocation {
+	t.Helper()
+	cu, err := parser.NewGoParser().Parse("a.go", src)
+	require.NoError(t, err)
+	f := &allCallFinder{}
+	f.Self = f
+	f.Visit(cu, nil)
+	return f.calls
+}
+
+type allCallFinder struct {
+	visitor.GoVisitor
+	calls []*java.MethodInvocation
+}
+
+func (a *allCallFinder) PreVisit(t java.Tree, p any) java.Tree {
+	if mi, ok := t.(*java.MethodInvocation); ok {
+		a.calls = append(a.calls, mi)
+	}
+	return t
 }

@@ -52,13 +52,18 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 		return nil
 	}
 
-	// Deep-copy the template tree by re-parsing (safe because parseScaffold is cached
-	// and we need a fresh tree to substitute into).
-	// For now, re-parse each time. Optimization: clone the cached tree.
-	fresh, err := parseScaffold(t.code, t.captures, t.imports, t.context, t.kind, t.shared())
-	if err != nil {
-		return nil
+	// A placeholder left unsubstituted prints as the identifier standing in
+	// for it, which would reach the source file.
+	for _, capture := range t.captures {
+		if values == nil || !values.satisfies(capture) {
+			return nil
+		}
 	}
+
+	// Every node gets a new ID, which copies the whole tree: the result shares
+	// nothing with the cached one, and applying to a second site parses and
+	// type-checks neither the template nor the declarations behind it again.
+	fresh := withFreshIDs(templateTree)
 
 	if values != nil {
 		fresh = substitute(fresh, values)
@@ -72,15 +77,10 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 // Instantiate produces the template as a detached node for a recipe that
 // inserts the result somewhere new, where Apply replaces a matched node. Bound
 // values are copied, so a spliced subtree may also stay where it came from.
-// The result carries no leading whitespace. It is nil unless every capture is
-// bound, through Bind for a single subtree or BindList for a run of them
-// within the capture's declared bounds.
+// The result carries no leading whitespace. Like Apply it is nil unless every
+// capture is bound, through Bind for a single subtree or BindList for a run of
+// them within the capture's declared bounds.
 func (t *GoTemplate) Instantiate(values *MatchResult) java.J {
-	for _, capture := range t.captures {
-		if values == nil || !values.satisfies(capture) {
-			return nil
-		}
-	}
 	instantiated := t.Apply(nil, values)
 	if instantiated == nil {
 		return nil

@@ -21,18 +21,11 @@ import (
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
-
-func benchCandidate(b *testing.B, f fixture) java.J {
-	b.Helper()
-	t := &testing.T{}
-	return candidateFor(t, f)
-}
 
 func benchMatch(b *testing.B, pattern string, kind template.ScaffoldKind, candidate fixture) {
 	pat := patternFor(fixture{kind: kind, code: pattern})
-	node := benchCandidate(b, candidate)
+	node := candidateFor(b, candidate)
 	pat.Matches(node, nil) // parse the pattern outside the timed loop
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -65,4 +58,18 @@ func BenchmarkMatchDeep(b *testing.B) {
 	body := strings.Repeat("g(1)\n", 20)
 	code := "func F() {\n" + body + "}"
 	benchMatch(b, code, template.ScaffoldTopLevel, fixture{name: "deep", kind: template.ScaffoldTopLevel, code: code})
+}
+
+// A recipe applies a template once per rewritten node, so the context block
+// behind it is parsed and type-checked on that path or not at all.
+func BenchmarkApplyWithContext(b *testing.B) {
+	tmpl := template.ExpressionTemplate("Wrap(w)").
+		Context("type Wrapped struct{ V int }", "func Wrap(v Wrapped) Wrapped { return v }", "var w Wrapped").
+		Build()
+	tmpl.Apply(nil, nil)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		tmpl.Apply(nil, nil)
+	}
 }

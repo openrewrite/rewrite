@@ -95,13 +95,15 @@ func compareMethodTypes(a, b *java.JavaTypeMethod, mode TypeMatchingMode) (bool,
 	return a.DeclaringType.GetFullyQualifiedName() == b.DeclaringType.GetFullyQualifiedName(), true
 }
 
-// matchByDeclaringType compares two resolved calls by the type declaring them
-// and the name they call, so a pattern naming a package matches source that
-// imported it under an alias — the receiver reads differently, the call does
-// not. Mirrors the case Python's comparator documents for `os.path.join`
-// against a bare `join`.
+// matchByDeclaringType compares two resolved calls whose receiver names a
+// package by the type declaring them and the name they call, so a pattern
+// naming fmt matches source that imported it as f. Mirrors the case Python's
+// comparator documents for `os.path.join` against a bare `join`.
 func (c *patternComparator) matchByDeclaringType(pattern, candidate *java.MethodInvocation) (bool, bool) {
 	if c.mode == TypeMatchingOff || !matcher.IsResolved(pattern) || !matcher.IsResolved(candidate) {
+		return false, false
+	}
+	if !namesPackage(pattern.Select) || !namesPackage(candidate.Select) {
 		return false, false
 	}
 	if matcher.DeclaringTypeFQN(pattern) != matcher.DeclaringTypeFQN(candidate) ||
@@ -109,4 +111,15 @@ func (c *patternComparator) matchByDeclaringType(pattern, candidate *java.Method
 		return false, true
 	}
 	return matchList(c, pattern.Arguments.Elements, candidate.Arguments.Elements), true
+}
+
+// namesPackage reports whether a receiver is an import qualifier rather than a
+// value. Attribution gives a value's identifier the variable it reads; a
+// package name reads no variable, being no value.
+func namesPackage(receiver *java.RightPadded[java.Expression]) bool {
+	if receiver == nil {
+		return false
+	}
+	ident, ok := receiver.Element.(*java.Identifier)
+	return ok && ident.FieldType == nil && !IsPlaceholder(ident.Name)
 }

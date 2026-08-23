@@ -23,14 +23,16 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// semanticMarkers hold what the printer emits as keywords, so two nodes
-// carrying different ones are different source however alike their fields
-// are: `:=` and `const` live here rather than in the tree.
+// semanticMarkers hold what decides the source's meaning rather than its
+// layout, so two nodes carrying different ones are different source however
+// alike their fields are. Go puts `:=`, `const` and a call to a predeclared
+// function here rather than in the tree.
 var semanticMarkers = map[reflect.Type]bool{
 	reflect.TypeOf(golang.ShortVarDecl{}):    true,
 	reflect.TypeOf(golang.ConstDecl{}):       true,
 	reflect.TypeOf(golang.VarKeyword{}):      true,
 	reflect.TypeOf(golang.InterfaceMethod{}): true,
+	reflect.TypeOf(golang.Builtin{}):         true,
 	reflect.TypeOf(golang.StructTag{}):       true,
 }
 
@@ -83,9 +85,9 @@ func hasMatchingMarker(markers java.Markers, t reflect.Type, marker java.Marker)
 	return false
 }
 
-// A StructTag carries the tag it stands for, so presence alone would read
-// `json:"a"` and `json:"b"` as the same field. Every other semantic marker is
-// a bare flag, and its presence is all there is to compare.
+// A StructTag carries the tag it stands for, and reaches a Go-parsed tree
+// only from the RPC peer — this parser reads a tag into LeadingAnnotations.
+// Every other semantic marker is a bare flag, present or not.
 func sameMarkerValue(a, b java.Marker) bool {
 	tag, ok := a.(golang.StructTag)
 	if !ok {

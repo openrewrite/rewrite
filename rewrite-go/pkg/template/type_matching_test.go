@@ -155,8 +155,7 @@ func TestCaptureTypeRefusesAnArgumentOfAnotherType(t *testing.T) {
 	require.Nil(t, capturePattern(template.TypeMatchingLenient).Match(intCall(t), nil))
 }
 
-// Without type matching the declared type is scaffold context only, which is
-// what it has always been.
+// Without type matching the declared type is scaffold context only.
 func TestCaptureTypeIsUnenforcedWhenTypeMatchingIsOff(t *testing.T) {
 	require.NotNil(t, capturePattern(template.TypeMatchingOff).Match(intCall(t), nil))
 }

@@ -39,6 +39,7 @@ type patternComparator struct {
 	// tracking records where a missing attribution decided a comparison, for
 	// Explain. The path is kept only while it is on.
 	tracking          bool
+	noted             bool
 	path              []string
 	inconclusive      int
 	firstInconclusive []string
@@ -173,6 +174,11 @@ func (c *patternComparator) isVariadic(name string) bool {
 // bindRun binds the run a variadic capture absorbed, enforcing structural
 // equality with a prior binding the way bindCapture does for a single node.
 func (c *patternComparator) bindRun(name string, values []java.J) bool {
+	for _, value := range values {
+		if !c.allowsDeclaredType(name, value) {
+			return false
+		}
+	}
 	prev, bound := c.result.listBinding(name)
 	if !bound {
 		c.result.bindList(name, values)

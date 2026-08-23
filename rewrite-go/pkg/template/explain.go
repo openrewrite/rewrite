@@ -17,6 +17,7 @@
 package template
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -30,19 +31,27 @@ import (
 type MatchExplanation struct {
 	Matched bool
 
+	// ParseError is set when the pattern itself did not parse, which is not
+	// the same answer as source that does not match.
+	ParseError error
+
 	// InconclusiveTypes counts the comparisons the mode decided because one
 	// side carried no attribution, rather than because the types differed.
 	InconclusiveTypes int
 
-	// FirstInconclusivePath names the field path of the first of them.
+	// FirstInconclusivePath names the field path of the first of them, empty
+	// at the root.
 	FirstInconclusivePath string
 }
 
 // Explain matches and reports what the match turned on.
 func (p *GoPattern) Explain(candidate java.J, cursor *visitor.Cursor) *MatchExplanation {
 	tree, err := p.getTree()
-	if err != nil || tree == nil {
-		return &MatchExplanation{}
+	if err != nil {
+		return &MatchExplanation{ParseError: err}
+	}
+	if tree == nil {
+		return &MatchExplanation{ParseError: errNoTree}
 	}
 	cmp := newPatternComparator(p.captures, cursor, p.mode)
 	// The walk names the field it is at, which the hand-written comparisons
@@ -60,7 +69,10 @@ func (p *GoPattern) Explain(candidate java.J, cursor *visitor.Cursor) *MatchExpl
 // types themselves.
 func (c *patternComparator) noteInconclusive() {
 	c.inconclusive++
-	if c.firstInconclusive == nil {
+	if !c.noted {
+		c.noted = true
 		c.firstInconclusive = append([]string(nil), c.path...)
 	}
 }
+
+var errNoTree = errors.New("pattern produced no tree")

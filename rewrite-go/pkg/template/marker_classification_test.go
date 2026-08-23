@@ -26,64 +26,76 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// formattingMarkers move whitespace or punctuation. Two nodes differing only
-// in one of these are the same source written out differently.
-var formattingMarkers = map[string]bool{
+// ignoredMarkers carry layout — where the whitespace and punctuation go — or
+// describe the file's project rather than its meaning. Two nodes differing
+// only in one of these are the same source.
+var ignoredMarkers = map[string]bool{
 	"Semicolon": true, "TrailingComma": true, "GroupedSpec": true,
 	"GroupedImport": true, "ImportBlock": true, "StructTagQuote": true,
-	"ChanDirMarker": true, "ImplicitForClauses": true,
+	"ChanDirMarker": true, "ImplicitForClauses": true, "TypeSwitchGuard": true,
+	"GoProject": true, "GoResolutionResult": true,
 }
 
-// printerMarkers reads back the golang markers the printer consults, so the
-// split between what a match reads and what it ignores is derived from what
-// reaches the output rather than restated by hand.
-func printerMarkers(t *testing.T) []string {
+// declaredMarkers reads back every marker the golang tree package declares, so
+// a marker cannot be added without this test asking what a match should do
+// with it. A marker is a struct with an ID method returning a uuid.UUID.
+func declaredMarkers(t *testing.T) []string {
 	t.Helper()
-	file, err := goparser.ParseFile(gotoken.NewFileSet(), "../printer/go_printer.go", nil, 0)
+	pkgs, err := goparser.ParseDir(gotoken.NewFileSet(), "../tree/golang", nil, 0)
 	require.NoError(t, err)
 
-	seen := map[string]bool{}
-	ast.Inspect(file, func(n ast.Node) bool {
-		index, ok := n.(*ast.IndexExpr)
-		if !ok {
-			return true
-		}
-		fn, ok := index.X.(*ast.SelectorExpr)
-		if !ok || fn.Sel.Name != "FindMarker" && fn.Sel.Name != "HasMarker" {
-			return true
-		}
-		if sel, ok := index.Index.(*ast.SelectorExpr); ok {
-			if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "golang" {
-				seen[sel.Sel.Name] = true
+	structs := map[string]bool{}
+	withID := map[string]bool{}
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Files {
+			for _, decl := range file.Decls {
+				switch d := decl.(type) {
+				case *ast.GenDecl:
+					for _, spec := range d.Specs {
+						ts, ok := spec.(*ast.TypeSpec)
+						if !ok {
+							continue
+						}
+						if _, ok := ts.Type.(*ast.StructType); ok && ts.Name.IsExported() {
+							structs[ts.Name.Name] = true
+						}
+					}
+				case *ast.FuncDecl:
+					if d.Name.Name != "ID" || d.Recv == nil || len(d.Recv.List) != 1 {
+						continue
+					}
+					if ident, ok := d.Recv.List[0].Type.(*ast.Ident); ok {
+						withID[ident.Name] = true
+					}
+				}
 			}
 		}
-		return true
-	})
+	}
 
 	var names []string
-	for name := range seen {
-		names = append(names, name)
+	for name := range structs {
+		if withID[name] {
+			names = append(names, name)
+		}
 	}
 	sort.Strings(names)
 	return names
 }
 
-func TestMarkerClassification(t *testing.T) {
-	found := printerMarkers(t)
-	require.NotEmpty(t, found, "no golang markers read out of the printer")
+func TestEveryMarkerIsClassified(t *testing.T) {
+	found := declaredMarkers(t)
+	require.NotEmpty(t, found, "no markers read out of the golang tree package")
 
+	semantic := semanticMarkerNames()
 	for _, name := range found {
-		semantic := semanticMarkerNames()[name]
-		formatting := formattingMarkers[name]
-		require.False(t, semantic && formatting, "marker %q is in both lists", name)
-		require.True(t, semantic || formatting,
-			"the printer reads marker %q but nothing says whether a match should. "+
-				"A marker that changes the keywords or operators printed belongs in "+
-				"semanticMarkers; one that only moves whitespace belongs in "+
-				"formattingMarkers.", name)
+		require.False(t, semantic[name] && ignoredMarkers[name], "marker %q is in both lists", name)
+		require.True(t, semantic[name] || ignoredMarkers[name],
+			"nothing says whether a match should read marker %q. A marker that "+
+				"changes what the source says belongs in semanticMarkers; one that "+
+				"carries layout or project metadata belongs in ignoredMarkers.", name)
 	}
 
-	// StructTag reaches the output through the struct-field printer rather
-	// than a FindMarker call, so its classification is asserted directly.
-	require.True(t, semanticMarkerNames()["StructTag"])
+	for name := range semantic {
+		require.Contains(t, found, name, "semanticMarkers names %q, which is not a marker", name)
+	}
 }

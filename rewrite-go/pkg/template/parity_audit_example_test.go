@@ -26,8 +26,7 @@ import (
 )
 
 // The example under "What recipe authors should know" in PARITY-AUDIT.md,
-// run so that it stays true. The document previously named a builder that
-// does not exist and a placeholder syntax that does not parse.
+// run so that the document's API and placeholder spelling stay real.
 func TestParityAuditExampleMatches(t *testing.T) {
 	x, y := template.Expr("x"), template.Expr("y")
 	before := template.Expression(fmt.Sprintf(`errors.Is(%s, %s)`, x, y)).Captures(x, y).Build()
