@@ -42,6 +42,7 @@ var errorArgs = []struct{ name, expr string }{
 	{"Plain", "Plain{}"},
 	{"MyErrValue", "MyErr{}"},
 	{"Outer", "Outer{}"},
+	{"Wrapped", "Wrapped{}"},
 }
 
 const errorFixture = `package a
@@ -59,6 +60,8 @@ type Inner struct{}
 func (i Inner) Error() string { return "y" }
 
 type Outer struct{ Inner }
+
+type Wrapped struct{ error }
 
 var ErrFoo = &MyErr{}
 
@@ -200,7 +203,8 @@ func TestCaptureTypeConstrainsABarePlaceholderPattern(t *testing.T) {
 	pat := template.Expression(c.String()).Captures(c).Build()
 	for name, want := range map[string]bool{
 		"err": true, "io.EOF": true, "ErrFoo": true, "MyErrValue": true,
-		"string": false, "int": false, "literal": false, "Plain": false, "Outer": false,
+		"string": false, "int": false, "literal": false, "Plain": false,
+		"Outer": false, "Wrapped": false,
 	} {
 		arg := takeArg(t, name).(*java.MethodInvocation).Arguments.Elements[0].Element
 		require.Equal(t, want, pat.Matches(arg, nil), name)
@@ -241,7 +245,9 @@ func TestCaptureTypeAcceptsEveryAttributedValueAsAny(t *testing.T) {
 // Two limits the attributed model imposes, pinned so a model that grows past
 // them fails here. See doc/recipe-authoring.md: Typed captures.
 func TestCaptureTypeMissesAMethodPromotedFromAnEmbeddedField(t *testing.T) {
-	require.False(t, takePattern("error").Matches(takeArg(t, "Outer"), nil), "Outer embeds Inner")
+	pat := takePattern("error")
+	require.False(t, pat.Matches(takeArg(t, "Outer"), nil), "Outer embeds Inner")
+	require.False(t, pat.Matches(takeArg(t, "Wrapped"), nil), "Wrapped embeds error itself")
 }
 
 func TestCaptureTypeReadsAPointerAsItsPointee(t *testing.T) {

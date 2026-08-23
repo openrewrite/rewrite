@@ -379,6 +379,14 @@ four ways doc/recipe-authoring.md lists under "Typed captures" — each a
 property of the type mapper rather than of this comparison, and the first two
 pinned by `capture_type_test.go` so a model that grows past them fails there.
 
+The first of them bounds what a pattern can take over from a hand-written
+visitor. `error` is satisfied by embedding as often as by declaring, so
+`struct{ error }` and a wrapper over a base error type are refused, and a
+recipe converting `err == target` shape checks to a typed capture matches less
+than the code it replaces. `types.NewMethodSet` is where a mapper reads the
+promoted methods; `mapNamed` reads `named.NumMethods`, which is the declared
+ones.
+
 Java is the only peer with the same surface, and Go follows it:
 `JavaTemplateSemanticallyEqual` resolves `#{name:any(FQN)}` to a `JavaType`
 when the template is parsed and matches with
