@@ -32,17 +32,11 @@ import org.openrewrite.marker.SearchResult;
 @EqualsAndHashCode(callSuper = false)
 public class FindUnpinnedBaseImages extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Find unpinned base images";
-    }
+    String displayName = "Find unpinned base images";
 
-    @Override
-    public String getDescription() {
-        return "Finds FROM instructions that use unpinned base images (CIS Docker Benchmark 4.2). " +
-                "Images without an explicit tag default to 'latest', which is not reproducible. " +
-                "Images pinned by digest are considered acceptable.";
-    }
+    String description = "Finds FROM instructions that use unpinned base images (CIS Docker Benchmark 4.2). " +
+            "Images without an explicit tag default to 'latest', which is not reproducible. " +
+            "Images pinned by digest are considered acceptable.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

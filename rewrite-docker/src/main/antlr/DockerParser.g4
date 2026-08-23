@@ -385,11 +385,11 @@ text
     | textElement
     ;
 
-// As `text`, for a value that ends at the next `=` so that `KEY=value` pairs can repeat.
+// As `text`, for a value that ends at the next `=` so that `KEY=value` pairs can repeat. The `=` that
+// binds the pair is not what ends one, so a value written against it may open with `=` of its own:
+// Docker reads `ENV KEY==value` as `KEY` bound to `=value`, the same pair `ENV KEY =value` gives.
 value
-    : valueElement valueElement+
-    | quoted
-    | valueElement
+    : ( {adjacent()}? EQUALS )* ( valueElement valueElement+ | quoted | valueElement )
     ;
 
 // An element of a value that ends at the next `=`, so that `KEY=value` pairs can repeat on one

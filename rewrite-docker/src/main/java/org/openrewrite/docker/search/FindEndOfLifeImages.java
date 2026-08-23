@@ -50,19 +50,13 @@ public class FindEndOfLifeImages extends Recipe {
     @Nullable
     Boolean includeApproaching;
 
-    @Override
-    public String getDisplayName() {
-        return "Find end-of-life Docker images";
-    }
+    String displayName = "Find end-of-life Docker images";
 
-    @Override
-    public String getDescription() {
-        return "Identifies Docker images that have reached end-of-life: the base image of a build " +
-                "stage, an image a `COPY --from` pulls a file out of, and an image a `RUN --mount` " +
-                "mounts files from. " +
-                "Using EOL images poses security risks as they no longer receive security updates. " +
-                "Detected images include EOL versions of Debian, Ubuntu, Alpine, Python, and Node.js.";
-    }
+    String description = "Identifies Docker images that have reached end-of-life: the base image of a build " +
+            "stage, an image a `COPY --from` pulls a file out of, and an image a `RUN --mount` " +
+            "mounts files from. " +
+            "Using EOL images poses security risks as they no longer receive security updates. " +
+            "Detected images include EOL versions of Debian, Ubuntu, Alpine, Python, and Node.js.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
