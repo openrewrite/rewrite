@@ -32,8 +32,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 public interface Docker extends Tree {
@@ -339,44 +339,62 @@ public interface Docker extends Tree {
      */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
     class Arg implements Instruction {
         @EqualsAndHashCode.Include
+        @With
         UUID id;
 
+        @With
         Space prefix;
+
+        @With
         Markers markers;
 
+        @With
         String keyword;
 
+        @With
         List<ArgPair> pairs;
+
+        /**
+         * The one name an {@code ARG} could declare before it could declare several, and its default.
+         * A tree this parser builds never holds them: they are here to receive what was serialized
+         * before the change, which the constructor folds into the single pair they describe. Dropping
+         * them instead would leave such an instruction declaring nothing at all.
+         */
+        @Nullable
+        Literal name;
+
+        @Nullable
+        Argument value;
+
+        public Arg(UUID id, Space prefix, Markers markers, String keyword, List<ArgPair> pairs) {
+            this(id, prefix, markers, keyword, pairs, null, null);
+        }
+
+        @JsonCreator
+        public Arg(@JsonProperty("id") UUID id,
+                   @JsonProperty("prefix") Space prefix,
+                   @JsonProperty("markers") Markers markers,
+                   @JsonProperty("keyword") String keyword,
+                   @JsonProperty("pairs") @Nullable List<ArgPair> pairs,
+                   @JsonProperty("name") @Nullable Literal name,
+                   @JsonProperty("value") @Nullable Argument value) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.keyword = keyword;
+            this.pairs = pairs == null || pairs.isEmpty() ?
+                    (name == null ? emptyList() :
+                            singletonList(new ArgPair(randomId(), Space.EMPTY, Markers.EMPTY, name, value))) :
+                    pairs;
+            this.name = null;
+            this.value = null;
+        }
 
         @Override
         public <P> Docker acceptDocker(DockerVisitor<P> v, P p) {
             return v.visitArg(this, p);
-        }
-
-        /**
-         * Reads an LST serialized before an {@code ARG} could hold more than one name, which carried a
-         * {@code name} and a {@code value} of its own. Such a payload is otherwise read without
-         * complaint - an unknown property is ignored and a missing one is null - and only fails much
-         * later, where something walks the pairs. The name keeps the prefix it was serialized with,
-         * which is where the whitespace before it stood in that model.
-         */
-        @JsonCreator
-        static Arg fromJson(@JsonProperty("id") UUID id,
-                            @JsonProperty("prefix") Space prefix,
-                            @JsonProperty("markers") Markers markers,
-                            @JsonProperty("keyword") String keyword,
-                            @JsonProperty("pairs") @Nullable List<ArgPair> pairs,
-                            @JsonProperty("name") @Nullable Literal name,
-                            @JsonProperty("value") @Nullable Argument value) {
-            if (pairs != null) {
-                return new Arg(id, prefix, markers, keyword, pairs);
-            }
-            requireNonNull(name, "A Docker.Arg needs either pairs or the name of a single build argument");
-            return new Arg(id, prefix, markers, keyword,
-                    singletonList(new ArgPair(randomId(), Space.EMPTY, Markers.EMPTY, name, value)));
         }
 
         @Value
