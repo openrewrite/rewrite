@@ -52,7 +52,7 @@ public class FindStageGraph extends Recipe {
         return new DockerIsoVisitor<ExecutionContext>() {
             @Override
             public Docker.File visitFile(Docker.File file, ExecutionContext ctx) {
-                StageGraph graph = StageGraph.of(file);
+                StageGraph graph = new StageGraph(file);
                 String sourceFile = file.getSourcePath().toString();
                 List<Docker.Stage> stages = file.getStages();
                 for (int i = 0; i < stages.size(); i++) {
@@ -102,32 +102,31 @@ public class FindStageGraph extends Recipe {
     private static class StageGraph {
 
         private final List<@Nullable String> names;
-        private final List<Set<Integer>> references;
+        private final String[] referencedBy;
         private final boolean[] extendsStage;
 
-        private StageGraph(List<@Nullable String> names, List<Set<Integer>> references, boolean[] extendsStage) {
-            this.names = names;
-            this.references = references;
-            this.extendsStage = extendsStage;
-        }
-
-        static StageGraph of(Docker.File file) {
+        StageGraph(Docker.File file) {
             List<Docker.Stage> stages = file.getStages();
-            List<@Nullable String> names = new ArrayList<>(stages.size());
+            names = new ArrayList<>(stages.size());
             for (Docker.Stage stage : stages) {
                 Docker.From.As as = stage.getFrom().getAs();
                 names.add(as == null ? null : as.getName().getText());
             }
 
-            List<Set<Integer>> references = new ArrayList<>(stages.size());
-            boolean[] extendsStage = new boolean[stages.size()];
+            StringJoiner[] referrers = new StringJoiner[stages.size()];
+            Arrays.setAll(referrers, i -> new StringJoiner(","));
+            extendsStage = new boolean[stages.size()];
             for (int i = 0; i < stages.size(); i++) {
                 ReferenceCollector collector = new ReferenceCollector(names, i);
                 collector.visit(stages.get(i), 0);
-                references.add(collector.targets);
+                String name = names.get(i);
+                for (int target : collector.targets) {
+                    referrers[target].add(name == null ? "#" + i : name);
+                }
                 extendsStage[i] = collector.extendsStage;
             }
-            return new StageGraph(names, references, extendsStage);
+            referencedBy = new String[stages.size()];
+            Arrays.setAll(referencedBy, i -> referrers[i].toString());
         }
 
         @Nullable String getName(int stage) {
@@ -140,14 +139,7 @@ public class FindStageGraph extends Recipe {
         }
 
         String getReferencedBy(int stage) {
-            StringJoiner referrers = new StringJoiner(",");
-            for (int i = 0; i < references.size(); i++) {
-                if (references.get(i).contains(stage)) {
-                    String name = names.get(i);
-                    referrers.add(name == null ? "#" + i : name);
-                }
-            }
-            return referrers.toString();
+            return referencedBy[stage];
         }
 
         private static class ReferenceCollector extends DockerIsoVisitor<Integer> {
@@ -166,9 +158,7 @@ public class FindStageGraph extends Recipe {
             public Docker.From visitFrom(Docker.From from, Integer p) {
                 if (from.getTag() == null && from.getDigest() == null) {
                     String plain = ArgumentContents.text(from.getImageName());
-                    if (plain != null) {
-                        extendsStage = reference(plain, stage);
-                    }
+                    extendsStage = plain != null && reference(plain, stage);
                 }
                 return super.visitFrom(from, p);
             }

@@ -26,7 +26,7 @@ public class StageDependencies extends DataTable<StageDependencies.Row> {
     public StageDependencies(Recipe recipe) {
         super(recipe,
                 "Docker build stage dependencies",
-                "Records which build stages of a Dockerfile depend on which others, and which of them the image being built needs.");
+                "Records which build stages of a Dockerfile depend on which others.");
     }
 
     @Value
