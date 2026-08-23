@@ -227,6 +227,32 @@ class ArgTest implements RewriteTest {
         );
     }
 
+    /// The `=` that binds a default is not what ends it, so one written against it opens the default:
+    /// Docker reads `ARG a==1` as `a` bound to `=1`.
+    @Test
+    void aDefaultOpeningWithAnEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM scratch
+              ARG a==1 b==2
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(arg.getPairs()).satisfiesExactly(
+                  a -> {
+                      assertThat(a.getName().getText()).isEqualTo("a");
+                      assertThat(ArgumentContents.text(a.getValue())).isEqualTo("=1");
+                  },
+                  b -> {
+                      assertThat(b.getName().getText()).isEqualTo("b");
+                      assertThat(ArgumentContents.text(b.getValue())).isEqualTo("=2");
+                  });
+            })
+          )
+        );
+    }
+
     @Test
     void emptyDefault() {
         rewriteRun(
