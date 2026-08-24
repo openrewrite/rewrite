@@ -254,9 +254,12 @@ contribute to its API travel inside the one blob that names them.
 
 Nothing about a blob is pinned to the machine that made it. The
 GOOS/GOARCH and toolchain version recorded in it are not checked on
-read; only the binary export format is, and it changes rarely. A blob a
-toolchain can no longer read leaves the template where shipping none
-would: it still applies, carrying no types.
+read; only the binary export format is, and it changes rarely. That
+format reads backward only — a toolchain decodes its own version or
+older — so generate blobs with a toolchain no newer than the oldest one
+expected to read them. A blob a toolchain cannot read leaves the
+template where shipping none would: it still applies, carrying no
+types.
 
 That is harmless on its own and is not harmless with `SourceImports`.
 Dropping a superseded import needs attribution naming the path that

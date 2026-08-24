@@ -72,6 +72,20 @@ func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	assert.Equalf(t, "example.com/foo", got.ModulePath, "ModulePath: want %q", "example.com/foo")
 }
 
+func TestPartialTypeAttributionMarkerRoundTrip(t *testing.T) {
+	id := uuid.MustParse("66666666-7777-8888-9999-aaaaaaaaaaaa")
+	reason := `could not resolve import "strings": cannot decode "strings", export data version 4 is greater than maximum supported version 2`
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{
+		golang.PartialTypeAttribution{Ident: id, Reason: reason}}}
+
+	after := roundTripMarkers(t, before)
+	require.Len(t, after.Entries, 1, "entries")
+	got, ok := after.Entries[0].(golang.PartialTypeAttribution)
+	require.Truef(t, ok, "entry is %T, want golang.PartialTypeAttribution", after.Entries[0])
+	assert.Equal(t, id, got.Ident)
+	assert.Equal(t, reason, got.Reason)
+}
+
 func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 	id := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	mrr := golang.GoResolutionResult{
