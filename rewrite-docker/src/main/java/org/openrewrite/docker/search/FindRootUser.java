@@ -42,11 +42,17 @@ public class FindRootUser extends Recipe {
     @Nullable
     Boolean includeMissingUser;
 
-    String displayName = "Find containers running as root";
+    @Override
+    public String getDisplayName() {
+        return "Find containers running as root";
+    }
 
-    String description = "Finds containers that run as root user (CIS Docker Benchmark 4.1). " +
-            "This includes explicit `USER root` or `USER 0` instructions, " +
-            "and optionally containers with no `USER` instruction in the final stage (which default to root).";
+    @Override
+    public String getDescription() {
+        return "Finds containers that run as root user (CIS Docker Benchmark 4.1). " +
+                "This includes explicit `USER root` or `USER 0` instructions, " +
+                "and optionally containers with no `USER` instruction in the final stage (which default to root).";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

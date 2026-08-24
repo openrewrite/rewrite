@@ -53,10 +53,16 @@ public class CombineRunInstructions extends Recipe {
     @Nullable
     String separator;
 
-    String displayName = "Combine consecutive `RUN` instructions";
+    @Override
+    public String getDisplayName() {
+        return "Combine consecutive `RUN` instructions";
+    }
 
-    String description = "Combines consecutive `RUN` instructions into a single instruction to reduce image layers. " +
-            "Only shell form `RUN` instructions without flags are combined.";
+    @Override
+    public String getDescription() {
+        return "Combines consecutive `RUN` instructions into a single instruction to reduce image layers. " +
+                "Only shell form `RUN` instructions without flags are combined.";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

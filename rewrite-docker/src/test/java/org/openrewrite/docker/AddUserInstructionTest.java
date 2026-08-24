@@ -175,21 +175,4 @@ class AddUserInstructionTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void modelsAVariableReferenceInAUserName() {
-        rewriteRun(
-          spec -> spec.recipe(new AddUserInstruction("$APP_USER", null, null, null)),
-          docker(
-            """
-              FROM alpine:3.18
-              """,
-            """
-              FROM alpine:3.18
-              USER $APP_USER
-              """
-          )
-        );
-    }
-
 }

@@ -77,4 +77,17 @@ class ShellTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void shellWithNoSpaceBeforeBracket() {
+        // SHELL with no space between keyword and opening bracket
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              SHELL["/bin/bash", "-c"]
+              """
+          )
+        );
+    }
 }

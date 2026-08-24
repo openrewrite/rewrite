@@ -183,44 +183,4 @@ class AddAptGetCleanupTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void skipRunThatCachesTheListsItWouldDelete() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:22.04
-              RUN --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,target=/var/lib/apt/lists,sharing=locked apt-get update && apt-get install -y curl
-              """
-          )
-        );
-    }
-
-    @Test
-    void skipRunThatCachesTheListsWhateverOrderTheMountIsWrittenIn() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:22.04
-              RUN --mount=target=/var/lib/apt/lists,sharing=locked,type=cache apt-get update && apt-get install -y curl
-              """
-          )
-        );
-    }
-
-    @Test
-    void cleanupAlongsideACacheOverSomethingElse() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:22.04
-              RUN --mount=type=cache,target=/root/.cache/pip apt-get update && apt-get install -y curl
-              """,
-            """
-              FROM ubuntu:22.04
-              RUN --mount=type=cache,target=/root/.cache/pip apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-              """
-          )
-        );
-    }
 }

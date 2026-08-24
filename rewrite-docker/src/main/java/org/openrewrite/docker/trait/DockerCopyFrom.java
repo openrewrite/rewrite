@@ -23,10 +23,11 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerVisitor;
-import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.tree.Docker;
+import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.trait.VisitFunction2;
 
 import java.util.HashSet;
@@ -34,17 +35,20 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static java.util.Collections.singletonList;
+import static org.openrewrite.Tree.randomId;
+
 /**
- * A trait representing the image reference carried by the {@code --from} flag of a {@code COPY}
- * instruction. Provides the same semantic access to image name, tag, and digest as
- * {@link DockerFrom}, while distinguishing an external image reference
+ * A trait representing the image reference carried by the {@code --from} flag of a
+ * {@code COPY} or {@code ADD} instruction. Provides the same semantic access to image name,
+ * tag, and digest as {@link DockerFrom}, while distinguishing an external image reference
  * (e.g. {@code COPY --from=nginx:latest}) from a reference to an earlier build stage
  * (e.g. {@code COPY --from=builder} or {@code COPY --from=0}). When the value refers to a
  * build stage the image accessors return {@code null}; use {@link #isStageReference()} to
  * disambiguate.
  */
 @RequiredArgsConstructor
-public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
+public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> {
 
     @Getter
     private final Cursor cursor;
@@ -53,8 +57,19 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
     private boolean componentsComputed;
     private Docker.@Nullable Argument @Nullable [] componentsValue;
 
+    private @Nullable List<Docker.Flag> flags() {
+        Docker.Instruction instruction = getTree();
+        if (instruction instanceof Docker.Copy) {
+            return ((Docker.Copy) instruction).getFlags();
+        }
+        if (instruction instanceof Docker.Add) {
+            return ((Docker.Add) instruction).getFlags();
+        }
+        return null;
+    }
+
     private Docker.@Nullable Argument fromArgument() {
-        List<Docker.Flag> flags = getTree().getFlags();
+        List<Docker.Flag> flags = flags();
         if (flags == null) {
             return null;
         }
@@ -79,7 +94,10 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
             return null;
         }
         Docker.Argument arg = fromArgument();
-        return arg == null ? null : ImageReferences.split(arg.getContents(), arg.getPrefix());
+        if (arg == null) {
+            return null;
+        }
+        return ImageReferences.split(arg.getContents(), arg.getPrefix());
     }
 
     /**
@@ -87,8 +105,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
      * or empty if there is no {@code --from} flag.
      */
     public Optional<String> getFromValue() {
-        Docker.Argument arg = fromArgument();
-        return arg == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(arg));
+        return Optional.ofNullable(new Matcher().extractTextWithVariables(fromArgument()));
     }
 
     /**
@@ -107,7 +124,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
         if (arg == null) {
             return false;
         }
-        String value = ArgumentContents.text(arg);
+        String value = new Matcher().extractText(arg);
         if (value == null) {
             return false;
         }
@@ -144,25 +161,77 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
     }
 
     /**
-     * Returns the image name of the referenced external image, or {@code null} if the
-     * {@code --from} names an earlier build stage or is absent.
+     * Returns the image name (without tag or digest), or empty if this is a stage reference
+     * or there is no {@code --from} flag.
      */
     @Override
-    public Docker.@Nullable Argument getImageNameArgument() {
+    public Optional<String> getImageName() {
         Docker.@Nullable Argument[] components = components();
-        return components == null ? null : components[0];
+        return components == null ? Optional.empty() : Optional.ofNullable(new Matcher().extractTextWithVariables(components[0]));
     }
 
+    /**
+     * Returns the tag, or empty if no tag is specified or this is a stage reference.
+     */
     @Override
-    public Docker.@Nullable Argument getTagArgument() {
+    public Optional<String> getTag() {
         Docker.@Nullable Argument[] components = components();
-        return components == null ? null : components[1];
+        return components == null ? Optional.empty() : Optional.ofNullable(new Matcher().extractTextWithVariables(components[1]));
     }
 
+    /**
+     * Returns the digest, or empty if no digest is specified or this is a stage reference.
+     */
     @Override
-    public Docker.@Nullable Argument getDigestArgument() {
+    public Optional<String> getDigest() {
         Docker.@Nullable Argument[] components = components();
-        return components == null ? null : components[2];
+        return components == null ? Optional.empty() : Optional.ofNullable(new Matcher().extractTextWithVariables(components[2]));
+    }
+
+    /**
+     * Returns true if the referenced external image is pinned by digest.
+     */
+    @Override
+    public boolean isDigestPinned() {
+        Docker.@Nullable Argument[] components = components();
+        return components != null && components[2] != null;
+    }
+
+    /**
+     * Returns true if the referenced external image is unpinned (no tag or an explicit
+     * "latest" tag). Stage references and digest-pinned images are considered pinned.
+     */
+    @Override
+    public boolean isUnpinned() {
+        return getUnpinnedReason().isPresent();
+    }
+
+    /**
+     * Returns the reason the referenced external image is unpinned, or empty if it's pinned
+     * or this is a stage reference.
+     */
+    @Override
+    public Optional<UnpinnedReason> getUnpinnedReason() {
+        Docker.@Nullable Argument[] components = components();
+        if (components == null) {
+            return Optional.empty();
+        }
+        if (components[2] != null) {
+            return Optional.empty();
+        }
+        if (components[1] == null) {
+            // A reference whose name is an unresolved environment variable can't be classified;
+            // conservatively treat it as pinned rather than assuming an implicit "latest".
+            if (new Matcher().hasEnvironmentVariables(components[0])) {
+                return Optional.empty();
+            }
+            return Optional.of(UnpinnedReason.IMPLICIT_LATEST);
+        }
+        String tag = new Matcher().extractText(components[1]);
+        if ("latest".equals(tag)) {
+            return Optional.of(UnpinnedReason.EXPLICIT_LATEST);
+        }
+        return Optional.empty();
     }
 
     /**
@@ -170,33 +239,23 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
      * (e.g. {@code "nginx:1.25"}), or unchanged if there is no {@code --from} flag.
      */
     @Override
-    public Docker.Copy withImageReference(String reference) {
+    public Docker.Instruction withImageReference(String reference) {
         Docker.Argument arg = fromArgument();
         if (arg == null) {
             return getTree();
         }
-        return withFromValue(arg.withContents(ImageReferences.contents(reference)));
-    }
-
-    /**
-     * Returns the instruction with the image name of its {@code --from} replaced by
-     * {@code imageName}, preserving any tag and digest. Unchanged for stage references.
-     */
-    @Override
-    public Docker.Copy withImageNameArgument(Docker.Argument imageName) {
-        Docker.@Nullable Argument[] parts = components();
-        Docker.Argument arg = fromArgument();
-        if (parts == null || arg == null) {
-            return getTree();
+        Docker.Argument newValue = arg.withContents(singletonList(
+          new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, reference, null)));
+        List<Docker.Flag> newFlags = ListUtils.map(flags(), f ->
+          "from".equals(f.getName()) ? f.withValue(newValue) : f);
+        Docker.Instruction instruction = getTree();
+        if (instruction instanceof Docker.Copy) {
+            return ((Docker.Copy) instruction).withFlags(newFlags);
         }
-        return withFromValue(arg.withContents(
-          ImageReferences.contents(new Docker.Argument[]{imageName, parts[1], parts[2]})));
-    }
-
-    private Docker.Copy withFromValue(Docker.Argument value) {
-        Docker.Copy copy = getTree();
-        return copy.withFlags(ListUtils.map(copy.getFlags(), f ->
-          "from".equals(f.getName()) ? f.withValue(value) : f));
+        if (instruction instanceof Docker.Add) {
+            return ((Docker.Add) instruction).withFlags(newFlags);
+        }
+        return instruction;
     }
 
     /**
@@ -204,13 +263,55 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
      * {@code tag}, preserving the image name and any digest. Unchanged for stage references.
      */
     @Override
-    public Docker.Copy withTag(String tag) {
+    public Docker.Instruction withTag(String tag) {
         Optional<String> name = getImageName();
         if (!name.isPresent()) {
             return getTree();
         }
         String suffix = getDigest().map(d -> "@" + d).orElse("");
         return withImageReference(name.get() + ":" + tag + suffix);
+    }
+
+    /**
+     * Checks if the image name matches the given glob pattern; always false for stage references.
+     */
+    @Override
+    public boolean imageNameMatches(String pattern) {
+        Docker.@Nullable Argument[] components = components();
+        if (components == null) {
+            return false;
+        }
+        Matcher m = new Matcher();
+        String text = m.extractTextForMatching(components[0]);
+        return m.matchesBidirectional(text, pattern, m.hasEnvironmentVariables(components[0]));
+    }
+
+    /**
+     * Checks if the tag matches the given glob pattern; false for stage references or when absent.
+     */
+    @Override
+    public boolean tagMatches(String pattern) {
+        Docker.@Nullable Argument[] components = components();
+        if (components == null || components[1] == null) {
+            return false;
+        }
+        Matcher m = new Matcher();
+        String text = m.extractTextForMatching(components[1]);
+        return m.matchesBidirectional(text, pattern, m.hasEnvironmentVariables(components[1]));
+    }
+
+    /**
+     * Checks if the digest matches the given glob pattern; false for stage references or when absent.
+     */
+    @Override
+    public boolean digestMatches(String pattern) {
+        Docker.@Nullable Argument[] components = components();
+        if (components == null || components[2] == null) {
+            return false;
+        }
+        Matcher m = new Matcher();
+        String text = m.extractTextForMatching(components[2]);
+        return m.matchesBidirectional(text, pattern, m.hasEnvironmentVariables(components[2]));
     }
 
     /**
@@ -261,7 +362,8 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
 
         @Override
         protected @Nullable DockerCopyFrom test(Cursor cursor) {
-            if (!(cursor.getValue() instanceof Docker.Copy)) {
+            Object value = cursor.getValue();
+            if (!(value instanceof Docker.Copy) && !(value instanceof Docker.Add)) {
                 return null;
             }
             DockerCopyFrom copyFrom = new DockerCopyFrom(cursor);
@@ -297,6 +399,15 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
                         return (Docker) visitor.visit(copyFrom, p);
                     }
                     return super.visitCopy(copy, p);
+                }
+
+                @Override
+                public Docker visitAdd(Docker.Add add, P p) {
+                    DockerCopyFrom copyFrom = test(getCursor());
+                    if (copyFrom != null) {
+                        return (Docker) visitor.visit(copyFrom, p);
+                    }
+                    return super.visitAdd(add, p);
                 }
             };
         }

@@ -32,10 +32,16 @@ import org.openrewrite.marker.SearchResult;
 @EqualsAndHashCode(callSuper = false)
 public class FindMissingHealthcheck extends Recipe {
 
-    String displayName = "Find missing `HEALTHCHECK`";
+    @Override
+    public String getDisplayName() {
+        return "Find missing `HEALTHCHECK`";
+    }
 
-    String description = "Finds Dockerfiles where the final stage is missing a `HEALTHCHECK` instruction (CIS Docker Benchmark 4.6). " +
-            "Health checks help container orchestrators determine if a container is healthy and ready to receive traffic.";
+    @Override
+    public String getDescription() {
+        return "Finds Dockerfiles where the final stage is missing a `HEALTHCHECK` instruction (CIS Docker Benchmark 4.6). " +
+                "Health checks help container orchestrators determine if a container is healthy and ready to receive traffic.";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
