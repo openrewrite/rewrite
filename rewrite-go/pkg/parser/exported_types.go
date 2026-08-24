@@ -343,7 +343,7 @@ func newReferenceImporter(refs []string) *referenceImporter {
 		fset:    token.NewFileSet(),
 		// Wrapped for the panic recovery alone: a dependency's type table has no
 		// tree to carry the failures the wrapper records.
-		def:      &resilientImporter{delegate: importer.Default()},
+		def:      newResilientImporter(importer.Default()),
 		buildCtx: goBuildContext(),
 	}
 	for _, dir := range refs {

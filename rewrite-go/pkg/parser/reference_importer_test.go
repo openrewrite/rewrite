@@ -40,7 +40,7 @@ func (r *recordingFromImporter) ImportFrom(path, srcDir string, _ types.ImportMo
 
 func TestResilientImporterKeepsTheSourceDirectory(t *testing.T) {
 	rec := &recordingFromImporter{}
-	res := &resilientImporter{delegate: rec}
+	res := newResilientImporter(rec)
 
 	from, ok := types.Importer(res).(types.ImporterFrom)
 	require.True(t, ok, "wrapping an ImporterFrom must stay an ImporterFrom")

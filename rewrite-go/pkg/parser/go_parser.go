@@ -161,7 +161,7 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		imp := gp.Importer
 		var resilient *resilientImporter
 		if imp != nil {
-			resilient = &resilientImporter{delegate: imp}
+			resilient = newResilientImporter(imp)
 			imp = resilient
 		}
 		conf := types.Config{
@@ -269,6 +269,10 @@ type resilientImporter struct {
 	seen     map[string]bool
 }
 
+func newResilientImporter(delegate types.Importer) *resilientImporter {
+	return &resilientImporter{delegate: delegate, seen: make(map[string]bool)}
+}
+
 func (r *resilientImporter) Import(path string) (*types.Package, error) {
 	return r.guard(path, func() (*types.Package, error) { return r.delegate.Import(path) })
 }
@@ -291,9 +295,6 @@ func (r *resilientImporter) guard(path string, imp func() (*types.Package, error
 		}
 		if err == nil || r.seen[path] {
 			return
-		}
-		if r.seen == nil {
-			r.seen = make(map[string]bool)
 		}
 		r.seen[path] = true
 		r.failures = append(r.failures, fmt.Sprintf("could not resolve import %q: %s", path, compactCause(err)))
