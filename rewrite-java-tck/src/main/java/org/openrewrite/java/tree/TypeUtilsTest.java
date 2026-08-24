@@ -116,6 +116,30 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void isOverrideProtectedInDifferentPackage() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+              public class Superclass {
+                  protected void foo() { }
+              }
+              """
+          ),
+          java(
+            """
+              package bar;
+              import foo.Superclass;
+              class Clazz extends Superclass {
+                  @Override protected void foo() { }
+              }
+              """,
+            typeIsPresent()
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1759")
     @Test
     void isOverrideParameterizedInterface() {

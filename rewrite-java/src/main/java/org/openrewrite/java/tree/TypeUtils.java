@@ -1048,7 +1048,9 @@ public class TypeUtils {
                 .filter(m -> !m.getFlags().contains(Flag.Private))
                 .filter(m -> !m.getFlags().contains(Flag.Static))
                 // If access level is default then check if subclass package is the same from parent class
-                .filter(m -> m.getFlags().contains(Flag.Public) || m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
+                .filter(m -> m.getFlags().contains(Flag.Public) ||
+                             m.getFlags().contains(Flag.Protected) ||
+                             m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
     }
 
     public static Optional<JavaType.Method> findDeclaredMethod(JavaType.@Nullable FullyQualified clazz, String name, List<JavaType> argumentTypes) {
