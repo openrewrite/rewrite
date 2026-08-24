@@ -208,16 +208,28 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 	return cus, nil
 }
 
+// compactCause reduces an importer's error to its first line, less the phrase
+// that introduces the directories it searched. Those directories name the
+// host's GOROOT, GOPATH and user, and a reason travels in the LST, so two
+// machines have to derive the same one from the same sources.
+func compactCause(err error) string {
+	cause := err.Error()
+	if end := strings.IndexByte(cause, '\n'); end >= 0 {
+		cause = cause[:end]
+	}
+	return strings.TrimSuffix(strings.TrimSpace(cause), " in any of:")
+}
+
 // stubReporter is implemented by importers that resolve some paths to a
 // placeholder package rather than to real symbols.
 type stubReporter interface {
 	IsStub(importPath string) bool
 }
 
-// stubbedImports names the paths the files import that resolved to a
-// placeholder. Asking per file, rather than reading a running total off the
-// importer, keeps one package's stub off a sibling that shares the importer
-// and its cache.
+// stubbedImports names the paths the files import for their symbols that
+// resolved to a placeholder; a blank import asks for none. Asking per file,
+// rather than reading a running total off the importer, keeps one package's
+// stub off a sibling that shares the importer and its cache.
 func stubbedImports(imp types.Importer, asts []*ast.File) []string {
 	reporter, ok := imp.(stubReporter)
 	if !ok {
@@ -227,6 +239,9 @@ func stubbedImports(imp types.Importer, asts []*ast.File) []string {
 	seen := make(map[string]bool)
 	for _, f := range asts {
 		for _, spec := range f.Imports {
+			if spec.Name != nil && spec.Name.Name == "_" {
+				continue
+			}
 			importPath, err := strconv.Unquote(spec.Path.Value)
 			if err != nil || seen[importPath] || !reporter.IsStub(importPath) {
 				continue
@@ -275,7 +290,7 @@ func (r *resilientImporter) guard(path string, imp func() (*types.Package, error
 			r.seen = make(map[string]bool)
 		}
 		r.seen[path] = true
-		r.failures = append(r.failures, fmt.Sprintf("could not resolve import %q: %v", path, err))
+		r.failures = append(r.failures, fmt.Sprintf("could not resolve import %q: %s", path, compactCause(err)))
 	}()
 	return imp()
 }

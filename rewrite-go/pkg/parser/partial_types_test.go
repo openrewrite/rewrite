@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"go/importer"
 	"go/types"
+	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -78,6 +80,8 @@ func TestUndecodableImportCostsOnlyThatImport(t *testing.T) {
 	m := java.FindMarker[golang.PartialTypeAttribution](cu.Markers)
 	require.NotNil(t, m, "a package that lost an import must say so on the tree")
 	assert.Contains(t, m.Reason, "strings")
+	assert.Contains(t, m.Reason, "export data version 4 is greater than maximum supported version 2",
+		"the version mismatch is the whole diagnostic; compacting the cause must not drop it")
 
 	// The rest of the package still attributes: without recovering the import
 	// panic, conf.Check abandons the whole file and Greeter has no type.
@@ -124,6 +128,44 @@ func F() int { return 1 }
 	require.NoError(t, err)
 	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers),
 		"a registered require that the package never imports costs it nothing")
+}
+
+func TestReasonIsIndependentOfTheHostItParsedOn(t *testing.T) {
+	// go/importer reports a miss by listing every directory it searched.
+	gp := parser.NewGoParser()
+	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+
+import "example.com/definitely/not/here"
+
+func F() { here.Do() }
+`}})
+	require.NoError(t, err)
+	m := java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers)
+	require.NotNil(t, m)
+
+	// The reason is serialized into the LST and crosses RPC, so two machines
+	// parsing the same sources have to produce the same tree.
+	assert.NotContains(t, m.Reason, "\n", "a reason spanning lines carries the importer's search path")
+	assert.NotContains(t, m.Reason, runtime.GOROOT())
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		assert.NotContains(t, m.Reason, home)
+	}
+}
+
+func TestBlankImportCostsNoAttribution(t *testing.T) {
+	pi := parser.NewProjectImporter("example.com/app", nil)
+	pi.AddRequire("github.com/lib/pq")
+	gp := parser.NewGoParser()
+	gp.Importer = pi
+	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+
+import _ "github.com/lib/pq"
+
+func F() int { return 1 }
+`}})
+	require.NoError(t, err)
+	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers),
+		"a blank import names no symbol, so a stub in its place costs the file nothing")
 }
 
 func TestFullyAttributedPackageIsUnmarked(t *testing.T) {
