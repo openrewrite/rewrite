@@ -267,7 +267,8 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                             ResolvedPom updatedResolvedPom = mrr.getPom()
                                     .withRequested(updatedPom)
                                     .resolve(ctx, new MavenPomDownloader(
-                                            mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles()));
+                                            mrr.getProjectPoms(), ctx, MavenExecutionContextView.view(ctx).effectiveSettings(mrr),
+                                            mrr.getActiveProfiles()));
                             acc.updatedByPom.put(mrr.getPom().getGav(), mrr.withPom(updatedResolvedPom));
                         }
                     } catch (MavenDownloadingException e) {
@@ -368,7 +369,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                             }
 
                             // Retain managed versions from the old parent that are not managed in the new parent
-                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
                             ResolvedPom oldParent = mpd.download(new GroupArtifactVersion(currentGroupId, currentArtifactId, oldVersion), null, resolvedPom, resolvedPom.getRepositories())
                                     .resolve(emptyList(), mpd, ctx);
                             ResolvedPom newParent = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, resolvedPom, resolvedPom.getRepositories())
