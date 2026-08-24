@@ -113,13 +113,14 @@ func shippedOnly(fsys fs.FS) types.Importer {
 
 // recovering turns a panic out of imp into an error. internal/pkgbits panics on
 // export data newer than the toolchain supports, and a set is supplied by the
-// recipe module, so an importer here reads bytes it did not produce. The panic
-// text names the path already, so callers add whatever context they hold.
+// recipe module, so an importer here reads bytes it did not produce. Only the
+// path is certain to be known here — a panic out of a supplied set says
+// whatever it likes.
 func recovering(imp types.Importer) types.Importer {
 	return importerFunc(func(path string) (pkg *types.Package, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				pkg, err = nil, fmt.Errorf("%v", r)
+				pkg, err = nil, fmt.Errorf("import %q: %v", path, r)
 			}
 		}()
 		return imp.Import(path)

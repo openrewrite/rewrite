@@ -121,6 +121,7 @@ func TestImporterFailsOverBlobFromNewerToolchain(t *testing.T) {
 
 	_, err := imp.Import(shippedPath)
 	require.Error(t, err, "a blob the toolchain cannot decode must report an error, not panic")
+	assert.Contains(t, err.Error(), shippedPath, "the path is the one thing a recovered panic can be sure of")
 	assert.Contains(t, err.Error(), "export data version")
 
 	pkg, err := imp.Import("strings")
