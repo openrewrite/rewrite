@@ -17,7 +17,11 @@
 package exportdata_test
 
 import (
+	"bytes"
+	"encoding/binary"
 	"io/fs"
+	"math"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -96,6 +100,40 @@ func TestImporterFailsOverUnreadableBlob(t *testing.T) {
 			assert.NotNil(t, pkg)
 		})
 	}
+}
+
+// fromNewerToolchain rewrites blob's export-data version word to one no
+// released toolchain supports, standing in for a blob a newer Go generated.
+func fromNewerToolchain(t *testing.T, blob []byte) []byte {
+	t.Helper()
+	// Unified export data starts one byte past the "$$B\n" section marker and
+	// its 'u' format byte, and opens with a little-endian uint32 version.
+	at := bytes.Index(blob, []byte("$$B\nu"))
+	require.GreaterOrEqual(t, at, 0, "no unified export data section")
+	out := bytes.Clone(blob)
+	binary.LittleEndian.PutUint32(out[at+len("$$B\nu"):], math.MaxUint32)
+	return out
+}
+
+func TestImporterFailsOverBlobFromNewerToolchain(t *testing.T) {
+	imp := exportdata.Importer(fstest.MapFS{
+		exportdata.BlobName(shippedPath): {Data: fromNewerToolchain(t, packed(t))}})
+
+	_, err := imp.Import(shippedPath)
+	require.Error(t, err, "a blob the toolchain cannot decode must report an error, not panic")
+	assert.Contains(t, err.Error(), "export data version")
+
+	pkg, err := imp.Import("strings")
+	require.NoError(t, err, "one undecodable blob must not take the stdlib down with it")
+	assert.NotNil(t, pkg)
+}
+
+func TestVerifyReportsBlobFromNewerToolchain(t *testing.T) {
+	err := exportdata.Verify(fstest.MapFS{
+		exportdata.BlobName(shippedPath): {Data: fromNewerToolchain(t, packed(t))}}, shippedPath)
+	require.Error(t, err, "Verify is the gate that catches a mis-versioned blob before it ships")
+	assert.Equal(t, 1, strings.Count(err.Error(), "export data for"), "the path is named once")
+	assert.Contains(t, err.Error(), "export data version")
 }
 
 func TestImporterWithoutBlobDefersToDefault(t *testing.T) {

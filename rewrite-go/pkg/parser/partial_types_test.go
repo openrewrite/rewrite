@@ -1,0 +1,144 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package parser_test
+
+import (
+	"fmt"
+	"go/importer"
+	"go/types"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
+
+// hostileImporter fails one import path — by panicking, as a toolchain too old
+// to decode the export data does, or by returning an error — and resolves the rest.
+type hostileImporter struct {
+	path     string
+	panics   bool
+	delegate types.Importer
+}
+
+func (h hostileImporter) Import(path string) (*types.Package, error) {
+	if path == h.path {
+		if h.panics {
+			panic(fmt.Errorf("cannot decode %q, export data version 4 is greater than maximum supported version 2", path))
+		}
+		return nil, fmt.Errorf("cannot find package %q", path)
+	}
+	return h.delegate.Import(path)
+}
+
+const twoImports = `package p
+
+import (
+	"fmt"
+	"strings"
+)
+
+type Greeter struct{ Name string }
+
+func (g Greeter) Greet() string {
+	return fmt.Sprintf("hi %s", strings.ToUpper(g.Name))
+}
+`
+
+func parseWith(t *testing.T, imp types.Importer) *golang.CompilationUnit {
+	t.Helper()
+	gp := parser.NewGoParser()
+	gp.Importer = imp
+	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "p.go", Content: twoImports}})
+	require.NoError(t, err)
+	require.Len(t, cus, 1)
+	return cus[0]
+}
+
+func TestUndecodableImportCostsOnlyThatImport(t *testing.T) {
+	cu := parseWith(t, hostileImporter{path: "strings", panics: true, delegate: importer.Default()})
+
+	m := java.FindMarker[golang.PartialTypeAttribution](cu.Markers)
+	require.NotNil(t, m, "a package that lost an import must say so on the tree")
+	assert.Contains(t, m.Reason, "strings")
+
+	// The rest of the package still attributes: without recovering the import
+	// panic, conf.Check abandons the whole file and Greeter has no type.
+	assert.NotNil(t, findType(t, cu, "Greeter"), "unrelated declarations must keep their types")
+}
+
+func TestUnresolvableImportIsRecorded(t *testing.T) {
+	cu := parseWith(t, hostileImporter{path: "strings", delegate: importer.Default()})
+
+	m := java.FindMarker[golang.PartialTypeAttribution](cu.Markers)
+	require.NotNil(t, m)
+	assert.Contains(t, m.Reason, "strings")
+}
+
+func TestStubbedRequireIsMarked(t *testing.T) {
+	pi := parser.NewProjectImporter("example.com/app", nil)
+	pi.AddRequire("github.com/nowhere/lib")
+	gp := parser.NewGoParser()
+	gp.Importer = pi
+	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+
+import "github.com/nowhere/lib"
+
+func F() { lib.Do() }
+`}})
+	require.NoError(t, err)
+	require.Len(t, cus, 1)
+
+	m := java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers)
+	require.NotNil(t, m, "a stubbed dependency leaves every one of its symbols missing")
+	assert.Contains(t, m.Reason, "github.com/nowhere/lib")
+	assert.Contains(t, m.Reason, "stub", "the reason separates a stub from an import that failed outright")
+}
+
+func TestPackageWithoutStubbedRequiresIsUnmarked(t *testing.T) {
+	pi := parser.NewProjectImporter("example.com/app", nil)
+	pi.AddRequire("github.com/nowhere/lib")
+	gp := parser.NewGoParser()
+	gp.Importer = pi
+	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+
+func F() int { return 1 }
+`}})
+	require.NoError(t, err)
+	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers),
+		"a registered require that the package never imports costs it nothing")
+}
+
+func TestFullyAttributedPackageIsUnmarked(t *testing.T) {
+	cu := parseWith(t, importer.Default())
+	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cu.Markers),
+		"a package that type-checked completely must be distinguishable from one that did not")
+}
+
+// findType returns the type attributed to the named `type` declaration.
+func findType(t *testing.T, cu *golang.CompilationUnit, name string) java.JavaType {
+	t.Helper()
+	for _, rp := range cu.Statements {
+		if td, ok := rp.Element.(*golang.TypeDecl); ok && td.Name != nil && td.Name.Name == name {
+			return td.Name.Type
+		}
+	}
+	return nil
+}

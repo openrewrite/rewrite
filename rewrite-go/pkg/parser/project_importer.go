@@ -80,9 +80,16 @@ type ProjectImporter struct {
 	// Built by AddReplace from the parsed go.mod replace directives.
 	replaces map[string]replaceTarget
 	cache    map[string]*types.Package
+	// stubs are the paths resolved to a placeholder rather than to real
+	// symbols, so a caller can report what a package could not see.
+	stubs    map[string]bool
 	fset     *token.FileSet
 	fallback types.Importer
 }
+
+// IsStub reports whether importPath resolved to a placeholder package — right
+// path and name, empty scope. Every symbol under such a path is missing.
+func (p *ProjectImporter) IsStub(importPath string) bool { return p.stubs[importPath] }
 
 // replaceTarget mirrors a go.mod `replace ... => newPath [newVersion]`
 // entry. NewVersion is empty when NewPath is a local filesystem path.
@@ -109,6 +116,7 @@ func NewProjectImporter(modulePath string, fallback types.Importer) *ProjectImpo
 		modules:    make(map[string]cacheModule),
 		replaces:   make(map[string]replaceTarget),
 		cache:      make(map[string]*types.Package),
+		stubs:      make(map[string]bool),
 		fset:       token.NewFileSet(),
 		fallback:   fallback,
 	}
@@ -216,6 +224,7 @@ func (p *ProjectImporter) Import(importPath string) (*types.Package, error) {
 			stub := types.NewPackage(importPath, path.Base(importPath))
 			stub.MarkComplete()
 			p.cache[importPath] = stub
+			p.stubs[importPath] = true
 			return stub, nil
 		}
 	}

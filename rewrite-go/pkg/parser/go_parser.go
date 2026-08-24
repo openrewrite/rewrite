@@ -24,6 +24,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"log"
 	"math"
 	"math/big"
 	"path/filepath"
@@ -152,9 +153,20 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		// Used to distinguish generic instantiation from ordinary indexing.
 		Instances: make(map[*ast.Ident]types.Instance),
 	}
+	// Reasons the package lost part of its type attribution. Joined, they are
+	// the PartialTypeAttribution marker's text.
+	var partial []string
 	if !gp.ParseOnly {
+		// Wrapping a nil Importer would hand types.Config an interface holding
+		// a nil pointer, which no longer reads as "resolve no imports".
+		imp := gp.Importer
+		var resilient *resilientImporter
+		if imp != nil {
+			resilient = &resilientImporter{delegate: imp}
+			imp = resilient
+		}
 		conf := types.Config{
-			Importer: gp.Importer,
+			Importer: imp,
 			// Don't fail on type errors — we want partial type info even when
 			// some imports can't be resolved.
 			Error: func(error) {},
@@ -166,7 +178,17 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		if asts[0].Name != nil {
 			pkgName = asts[0].Name.Name
 		}
-		checkTypes(&conf, pkgName, fset, asts, typeInfo)
+		recovered := checkTypes(&conf, pkgName, fset, asts, typeInfo)
+		if resilient != nil {
+			partial = append(partial, resilient.failures...)
+		}
+		partial = append(partial, stubbedImports(gp.Importer, asts)...)
+		if recovered != nil {
+			partial = append(partial, fmt.Sprintf("type check ended early: %v", recovered))
+		}
+		if len(partial) > 0 {
+			log.Printf("type attribution of package %s is partial: %s", pkgName, strings.Join(partial, "; "))
+		}
 	}
 
 	mapper := newTypeMapper()
@@ -181,18 +203,96 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 			typeInfo: typeInfo,
 			mapper:   mapper,
 		}
-		cus = append(cus, ctx.mapFile(asts[i], f.Path))
+		cu := ctx.mapFile(asts[i], f.Path)
+		if len(partial) > 0 {
+			cu.Markers = java.AddMarker(cu.Markers, golang.NewPartialTypeAttribution(strings.Join(partial, "; ")))
+		}
+		cus = append(cus, cu)
 	}
 	return cus, nil
 }
 
-// checkTypes populates typeInfo as far as the type checker gets. Some
+// stubReporter is implemented by importers that resolve some paths to a
+// placeholder package rather than to real symbols.
+type stubReporter interface {
+	IsStub(importPath string) bool
+}
+
+// stubbedImports names the paths the files import that resolved to a
+// placeholder. Asking per file, rather than reading a running total off the
+// importer, keeps one package's stub off a sibling that shares the importer
+// and its cache.
+func stubbedImports(imp types.Importer, asts []*ast.File) []string {
+	reporter, ok := imp.(stubReporter)
+	if !ok {
+		return nil
+	}
+	var reasons []string
+	seen := make(map[string]bool)
+	for _, f := range asts {
+		for _, spec := range f.Imports {
+			importPath, err := strconv.Unquote(spec.Path.Value)
+			if err != nil || seen[importPath] || !reporter.IsStub(importPath) {
+				continue
+			}
+			seen[importPath] = true
+			reasons = append(reasons, fmt.Sprintf("resolved import %q to an empty stub", importPath))
+		}
+	}
+	return reasons
+}
+
+// resilientImporter keeps one import's failure from costing the whole package.
+// A types.Importer that panics — which is how internal/pkgbits reports export
+// data it is too old to decode — would end conf.Check wherever it had got to,
+// leaving every later declaration unattributed.
+type resilientImporter struct {
+	delegate types.Importer
+	failures []string
+	seen     map[string]bool
+}
+
+func (r *resilientImporter) Import(path string) (*types.Package, error) {
+	return r.guard(path, func() (*types.Package, error) { return r.delegate.Import(path) })
+}
+
+// ImportFrom carries srcDir through to a delegate that reads it — go/types
+// passes the importing file's directory, which is what resolves vendored and
+// relative imports.
+func (r *resilientImporter) ImportFrom(path, srcDir string, mode types.ImportMode) (*types.Package, error) {
+	from, ok := r.delegate.(types.ImporterFrom)
+	if !ok {
+		return r.Import(path)
+	}
+	return r.guard(path, func() (*types.Package, error) { return from.ImportFrom(path, srcDir, mode) })
+}
+
+func (r *resilientImporter) guard(path string, imp func() (*types.Package, error)) (pkg *types.Package, err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			pkg, err = nil, fmt.Errorf("%v", rec)
+		}
+		if err == nil || r.seen[path] {
+			return
+		}
+		if r.seen == nil {
+			r.seen = make(map[string]bool)
+		}
+		r.seen[path] = true
+		r.failures = append(r.failures, fmt.Sprintf("could not resolve import %q: %v", path, err))
+	}()
+	return imp()
+}
+
+// checkTypes populates typeInfo as far as the type checker gets, returning what
+// ended the check early, or nil if it ran to completion. Some
 // malformed-but-parseable inputs — a type cycle routed through an alias,
 // for one — make go/types panic rather than report an error, and the LST
 // does not depend on type information being complete.
-func checkTypes(conf *types.Config, pkgName string, fset *token.FileSet, asts []*ast.File, typeInfo *types.Info) {
-	defer func() { recover() }()
+func checkTypes(conf *types.Config, pkgName string, fset *token.FileSet, asts []*ast.File, typeInfo *types.Info) (recovered any) {
+	defer func() { recovered = recover() }()
 	_, _ = conf.Check(pkgName, fset, asts, typeInfo)
+	return nil
 }
 
 // PackageNameOf returns the package clause name of a Go source file, or ""
