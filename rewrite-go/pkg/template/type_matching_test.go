@@ -29,7 +29,7 @@ import (
 
 // firstCall returns the leading call expression in a source file, so a test
 // can state the source it means rather than the tree it produces.
-func firstCall(t *testing.T, src string) *java.MethodInvocation {
+func firstCall(t testing.TB, src string) *java.MethodInvocation {
 	t.Helper()
 	calls := allCalls(t, src)
 	require.NotEmpty(t, calls, "no call in %q", src)
@@ -150,26 +150,10 @@ func TestCaptureTypeRefusesAnArgumentOfAnotherType(t *testing.T) {
 	require.Nil(t, capturePattern(template.TypeMatchingLenient).Match(intCall(t), nil))
 }
 
-// Without type matching the declared type is scaffold context only.
-func TestCaptureTypeIsUnenforcedWhenTypeMatchingIsOff(t *testing.T) {
-	require.NotNil(t, capturePattern(template.TypeMatchingOff).Match(intCall(t), nil))
-}
-
-// A statement carries no type slot, so the attribution is a missing one.
-func TestStatementCaptureWithTypeFollowsTheMode(t *testing.T) {
-	cand := firstStmt(t, `package a
-
-func f(c bool) {
-	if c {
-		return
-	}
-}
-`)
+// See capture_type_test.go for what a declared type constrains.
+func TestCaptureTypeIsEnforcedInEveryMode(t *testing.T) {
 	for _, mode := range allModes {
-		body := template.Stmt("body").WithType("int")
-		pat := template.StatementPattern(fmt.Sprintf("if c {\n%s\n}", body)).
-			Captures(body).Context("var c bool").TypeMatching(mode).Build()
-		require.Equal(t, mode != template.TypeMatchingStrict, pat.Matches(cand, nil), "mode %v", mode)
+		require.Nil(t, capturePattern(mode).Match(intCall(t), nil), "mode %v", mode)
 	}
 }
 

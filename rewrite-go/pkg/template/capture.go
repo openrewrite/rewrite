@@ -71,8 +71,14 @@ func Ident(name string) *Capture {
 	return &Capture{name: name, kind: CaptureName, maxCount: -1}
 }
 
-// The type name is used in the scaffold preamble for type-attributed matching.
+// WithType declares the Go type a capture stands for. The scaffold preamble
+// declares the placeholder with it, so the pattern type-checks, and a match
+// binds only a candidate assignable to it. Only an expression carries a type.
+// See doc/recipe-authoring.md: Typed captures, for what the model cannot see.
 func (c *Capture) WithType(typeName string) *Capture {
+	if c.kind != CaptureExpression {
+		panic(fmt.Sprintf("capture %q: a declared type constrains an expression capture only", c.name))
+	}
 	cp := *c
 	cp.typeName = typeName
 	return &cp

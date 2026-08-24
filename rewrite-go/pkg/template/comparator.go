@@ -29,6 +29,7 @@ import (
 // and a candidate tree, binding placeholder identifiers to captured nodes.
 type patternComparator struct {
 	captures map[string]*Capture
+	declared map[string]java.JavaType
 	result   *MatchResult
 	cursor   *visitor.Cursor
 	mode     TypeMatchingMode
@@ -46,24 +47,25 @@ type patternComparator struct {
 }
 
 // allowsDeclaredType holds a capture to the type it was declared with. The
-// declaration reaches the scaffold preamble either way; reading it here is
-// what makes it a constraint rather than only parse context.
+// declaration is the one type comparison an author writes by hand, so the mode
+// does not switch it off; it decides only the candidate carrying no
+// attribution.
 func (c *patternComparator) allowsDeclaredType(name string, candidate java.J) bool {
-	capture, ok := c.captures[name]
-	if !ok || c.mode == TypeMatchingOff || capture.TypeName() == "" {
+	want, ok := c.declared[name]
+	if !ok {
 		return true
 	}
 	var actual java.JavaType
 	if expr, ok := candidate.(java.Expression); ok {
 		actual = matcher.TypeOfExpression(expr)
 	}
-	if actual == nil {
+	if actual == nil || java.IsUnknown(actual) {
 		if c.tracking {
 			c.noteInconclusive()
 		}
 		return c.mode == TypeMatchingLenient
 	}
-	return matcher.IsAssignableTo(actual, capture.TypeName())
+	return matcher.IsAssignableToType(actual, want)
 }
 
 func (c *patternComparator) matchTypeSlot(pattern, candidate java.JavaType) bool {
@@ -75,15 +77,6 @@ func (c *patternComparator) matchTypeSlot(pattern, candidate java.JavaType) bool
 		c.noteInconclusive()
 	}
 	return result
-}
-
-func newPatternComparator(captures map[string]*Capture, cursor *visitor.Cursor, mode TypeMatchingMode, variadic bool) *patternComparator {
-	return &patternComparator{
-		captures: captures,
-		cursor:   cursor,
-		mode:     mode,
-		variadic: variadic,
-	}
 }
 
 // bindings is the result the comparator fills, built at the first binding:
@@ -217,7 +210,7 @@ func (c *patternComparator) bindRun(name string, values []java.J) bool {
 func structurallyEqual(a, b java.J) bool {
 	// A comparator with no captures meets no placeholder, so a match is
 	// equality.
-	return newPatternComparator(nil, nil, TypeMatchingOff, false).matchNode(a, b)
+	return (&patternComparator{mode: TypeMatchingOff}).matchNode(a, b)
 }
 
 // unparenthesize reads through the parentheses around a node.

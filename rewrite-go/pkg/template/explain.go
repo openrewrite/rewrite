@@ -55,7 +55,7 @@ func (p *GoPattern) Explain(candidate java.J, cursor *visitor.Cursor) *MatchExpl
 	}
 	// Matched is what Match answers, so the explanation is of the behaviour
 	// the caller sees rather than of another path to the same question.
-	cmp := newPatternComparator(p.captures, cursor, p.mode, p.variadic)
+	cmp := p.comparator(cursor)
 	cmp.tracking = true
 	why := &MatchExplanation{
 		Matched:               cmp.match(tree, candidate) != nil,
@@ -66,7 +66,7 @@ func (p *GoPattern) Explain(candidate java.J, cursor *visitor.Cursor) *MatchExpl
 	// Only the walk names the field it is at, so it supplies the path where
 	// the hand-written comparisons decided.
 	if why.InconclusiveTypes > 0 && why.FirstInconclusivePath == "" {
-		walk := newPatternComparator(p.captures, cursor, p.mode, p.variadic)
+		walk := p.comparator(cursor)
 		walk.tracking, walk.skipFastPath = true, true
 		walk.match(tree, candidate)
 		why.FirstInconclusivePath = strings.Join(walk.firstInconclusive, ".")

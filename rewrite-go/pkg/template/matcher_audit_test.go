@@ -290,7 +290,7 @@ func fastPathAgrees(t *testing.T, mode template.TypeMatchingMode) {
 // assert what the pattern was attributed with.
 func patternCall(t *testing.T, pat *template.GoPattern) *java.MethodInvocation {
 	t.Helper()
-	calls := callsIn(t, pat.Tree(t))
+	calls := nodesOf[*java.MethodInvocation](pat.Tree(t))
 	require.NotEmpty(t, calls, "no call in the pattern")
 	return calls[0]
 }
@@ -304,34 +304,21 @@ func patternParamFQNs(mi *java.MethodInvocation) []string {
 }
 
 // allCalls returns every call expression in a source file, in source order.
-func allCalls(t *testing.T, src string) []*java.MethodInvocation {
+func allCalls(t testing.TB, src string) []*java.MethodInvocation {
 	t.Helper()
-	return callsIn(t, parseSource(t, src))
+	return nodesOf[*java.MethodInvocation](parseSource(t, src))
 }
 
-func callsIn(t testing.TB, tree java.J) []*java.MethodInvocation {
-	t.Helper()
-	var calls []*java.MethodInvocation
+// nodesOf returns every node of one kind in a tree, in source order.
+func nodesOf[T java.J](tree java.J) []T {
+	var nodes []T
 	visitor.Walk(tree, func(n java.Tree) bool {
-		if mi, ok := n.(*java.MethodInvocation); ok {
-			calls = append(calls, mi)
+		if node, ok := n.(T); ok {
+			nodes = append(nodes, node)
 		}
 		return true
 	})
-	return calls
-}
-
-func firstStmt(t *testing.T, src string) java.J {
-	t.Helper()
-	cu, err := parser.NewGoParser().Parse("a.go", src)
-	require.NoError(t, err)
-	for _, s := range cu.Statements {
-		if md, ok := s.Element.(*java.MethodDeclaration); ok && md.Body != nil {
-			return md.Body.Statements[0].Element
-		}
-	}
-	t.Fatal("no body")
-	return nil
+	return nodes
 }
 
 func parseSource(t testing.TB, src string) java.J {

@@ -25,7 +25,7 @@ present, what was added in this PR, and what is intentionally deferred.
 | Pattern → template rewrite | `JavaIsoVisitor` + `JavaTemplate.apply` per visit | `template.Rewrite(before, after)` returns a `RewriteVisitor` | ✓ shipped (single-call ergonomic that matches and replaces in one step — Go-side delta over Java) |
 | Context-sensitive parsing | `.contextSensitive()` | not yet | deferred (recipes in the wild rarely flip this on for refactoring; revisit if a real recipe asks) |
 | Named placeholders | `#{name}` substitution by name + type constraint | positional `#{X}` capture-by-name through `*Capture` | ✓ named via `*Capture` already; type constraints are deferred (see below) |
-| Type-checked named placeholders | `#{name:any(java.util.List)}` | not yet | deferred — out-of-scope per the eng review's v1 scope cut |
+| Type-checked named placeholders | `#{name:any(java.util.List)}` | `Capture.WithType("time.Duration")` | ✓ shipped — assignability, with interface satisfaction computed from the two method sets since Go declares none |
 | Cursor-aware insertion | parameter to `.apply(cursor, ...)` | parameter to `.Apply(cursor, ...)` | ✓ shipped — the cursor names the node being replaced, from which `Apply` takes the leading whitespace, whether the result needs parenthesizing against the expression around it, and the level to indent to |
 | Variadic placeholders | n/a | `Capture.Variadic(min, max)` matched by `GoPattern`, expanded by `GoTemplate` | ✓ shipped — Go-side delta over Java. `JavaTemplate` has no variadic placeholder; `Substitutions.maybeExpandVarargsNewArray` flattens a captured varargs `J.NewArray` back into an argument list, which is a Java-language repair rather than a capture kind |
 
@@ -54,20 +54,16 @@ Surface that was already at parity:
 
 These are explicitly out-of-scope per the eng review:
 
-1. **Type-checked named placeholders** (`#{name:any(...)}`). v1 keeps
-   capture-typed placeholders. Rationale: Go's lighter type system makes
-   the constraint syntax less load-bearing for refactor recipes; revisit
-   when a real recipe asks for it.
-2. **`contextSensitive()` parse mode.** JavaTemplate flips this on when
+1. **`contextSensitive()` parse mode.** JavaTemplate flips this on when
    the template references symbols only resolvable from the surrounding
    cursor (e.g. inner-class names). The Go scaffold parser is already
    "context-light" by default (it doesn't attempt to resolve the
    template's own references against the call site's environment), so
    the explicit toggle adds little until Go-specific use cases surface.
-3. **Static imports.** Java's `staticImports` adds `import static …`
+2. **Static imports.** Java's `staticImports` adds `import static …`
    declarations. Go has no static-import concept; the Go template
    compiler ignores the surface entirely.
-4. **Coordinate API surface (`JavaCoordinates`).** Java's
+3. **Coordinate API surface (`JavaCoordinates`).** Java's
    `apply(coordinates, params)` lets recipes splice templates *before* /
    *after* / *replace* a target node. The Go equivalent is the
    pattern-match approach: write a `GoPattern` for the target, write a
@@ -112,7 +108,7 @@ The Java →  Go porting cheat-sheet:
 | `.imports("foo")`                      | `.Imports("foo")`                                        |
 | `.apply(getCursor(), JavaCoordinates.replace(target), arg1, arg2)` | match `target` with a `GoPattern`, then `template.Rewrite(before, after)` — the `RewriteVisitor` does the splice |
 | `#{any()}` as a wildcard placeholder    | a `*Capture` interpolated into the pattern string, which prints as its placeholder |
-| `#{name:any(java.util.List)}`           | not yet — file an issue if you hit this                  |
+| `#{name:any(java.util.List)}`           | `template.Expr("x").WithType("time.Duration")`            |
 
 ### Conclusion
 
@@ -346,9 +342,60 @@ unbound while still reporting a match — the placeholder then prints into the
 source. Attribution tells the two apart: a value's identifier carries the
 variable it reads, and a package name carries none, being no value.
 
-`Capture.WithType` declares a type for a capture and feeds it to the scaffold
-preamble. Under either type-matching mode it also holds what the capture
-matched to that type, a run absorbed by a variadic capture included.
+### The type a capture declares
+
+`Capture.WithType` is the one type comparison an author writes by hand, so it
+is read whatever the mode says about the slots around it — including
+`TypeMatchingOff`, where nothing else is. The mode keeps the question it
+answers everywhere else: a candidate carrying no attribution binds under
+`TypeMatchingLenient` and is refused under the other two.
+
+The constraint is the type the scaffold preamble resolved the placeholder to,
+not the name it was written with. That is what lets an interface be satisfied
+structurally: Go declares no `implements`, and `mapNamed` accordingly leaves
+`Interfaces` empty, so `error` is answered from the candidate's method set and
+a `*MyErr` carrying `Error() string` matches where `io.EOF` does.
+`matcher.IsAssignableToType` is that relation — identity first, then a
+literal's keyword answering for the class of Go types it names, `byte`/`uint8`
+folded, and the method set last. A name the scaffold cannot resolve fails the parse rather
+than silently constraining nothing, and a declared type on anything but an
+expression capture panics, an expression being the only thing that carries one.
+
+The type filters what a match binds, and not what `MatchResult.Bind` does:
+`Instantiate` splices the node an author names, so `WithType("string")` bound
+to an `int` literal emits `errors.New(42)` and says nothing. This is
+`JavaTemplate`'s split too — `Substitutions.substituteTypedPattern` reads the
+declared type to generate the substitution stub and never compares the
+parameter against it — and it is what keeps a hand-built node with no
+attribution bindable, which a recipe supplying a runtime-computed literal
+needs.
+
+A run absorbed by a variadic capture is held to the type element by element,
+and a pattern that is a placeholder alone reaches the comparator to be held
+there too — its kind rejects nothing, so the type is all that is left.
+
+Satisfaction is as exact as the attributed model, which falls short of Go in
+four ways doc/recipe-authoring.md lists under "Typed captures" — each a
+property of the type mapper rather than of this comparison, and the first two
+pinned by `capture_type_test.go` so a model that grows past them fails there.
+
+The first of them bounds what a pattern can take over from a hand-written
+visitor. `error` is satisfied by embedding as often as by declaring, so
+`struct{ error }` and a wrapper over a base error type are refused, and a
+recipe converting `err == target` shape checks to a typed capture matches less
+than the code it replaces. `types.NewMethodSet` is where a mapper reads the
+promoted methods; `mapNamed` reads `named.NumMethods`, which is the declared
+ones.
+
+Java is the only peer with the same surface, and Go follows it:
+`JavaTemplateSemanticallyEqual` resolves `#{name:any(FQN)}` to a `JavaType`
+when the template is parsed and matches with
+`TypeUtils.isAssignableTo(…, INFER)`, with no mode to switch it off and
+`isPseudoType` refusing an unattributed candidate. It also refuses to bind a
+type rather than an expression, which is the rule the panic states earlier.
+JavaScript parses a `typeConstraint` out of its placeholder identifiers in
+`utils.ts` and its comparator never reads it; Python has no typed capture at
+all. Both offer a predicate instead — see "Capture constraints" below.
 
 **Degraded attribution.** A type-comparing match against a package whose
 attribution is incomplete returns false, which reads exactly like source that
@@ -398,6 +445,7 @@ configuration and could not carry a closure regardless. Enforcing
 | Variadic capture | a bounded run anywhere in a list, via `Capture.Variadic(min, max)` | marker-based, whole list | whole argument list only |
 | Match-free template instantiation | `MatchResult.Bind` / `BindList` | — | — |
 | Type-attribution comparison | opt-in, three modes | — | on by default, lenient only |
+| Type-constrained capture | `WithType` filtering a match, assignable, interfaces satisfied structurally | parsed and never read | — |
 
 ### Enforcement
 

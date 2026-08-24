@@ -116,3 +116,36 @@ func benchWalk(b *testing.B, pattern string, candidate fixture) {
 		pat.MatchesViaWalk(node, nil)
 	}
 }
+
+// benchCaptureMatch times a call pattern with one capture against an argument
+// of errorFixture, which a typed capture needs attributed on both sides.
+func benchCaptureMatch(b *testing.B, capture *template.Capture, arg string) {
+	pat := template.Expression(fmt.Sprintf("take(%s)", capture)).Captures(capture).Build()
+	node := takeArg(b, arg)
+	pat.Matches(node, nil) // parse the pattern outside the timed loop
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		pat.Matches(node, nil)
+	}
+}
+
+// A capture that declares no type reads no attribution.
+func BenchmarkMatchCapture(b *testing.B) {
+	benchCaptureMatch(b, template.Expr("v"), "err")
+}
+
+// The declared type and the candidate's are one type, the comparison a typed
+// capture usually makes.
+func BenchmarkMatchTypedCapture(b *testing.B) {
+	benchCaptureMatch(b, template.Expr("v").WithType("error"), "err")
+}
+
+// A concrete type reaches the interface through its method set.
+func BenchmarkMatchTypedCaptureStructural(b *testing.B) {
+	benchCaptureMatch(b, template.Expr("v").WithType("error"), "ErrFoo")
+}
+
+func BenchmarkMatchTypedCaptureMiss(b *testing.B) {
+	benchCaptureMatch(b, template.Expr("v").WithType("error"), "string")
+}
