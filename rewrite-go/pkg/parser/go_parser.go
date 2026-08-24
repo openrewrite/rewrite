@@ -187,6 +187,10 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		}
 	}
 
+	// One string for every compilation unit of the package: they say the same
+	// thing, and each carries it for as long as the tree lives.
+	reason := strings.Join(partial, "; ")
+
 	mapper := newTypeMapper()
 	cus := make([]*golang.CompilationUnit, 0, len(files))
 	for i, f := range files {
@@ -200,8 +204,8 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 			mapper:   mapper,
 		}
 		cu := ctx.mapFile(asts[i], f.Path)
-		if len(partial) > 0 {
-			cu.Markers = java.AddMarker(cu.Markers, golang.NewPartialTypeAttribution(strings.Join(partial, "; ")))
+		if reason != "" {
+			cu.Markers = java.AddMarker(cu.Markers, golang.NewPartialTypeAttribution(reason))
 		}
 		cus = append(cus, cu)
 	}

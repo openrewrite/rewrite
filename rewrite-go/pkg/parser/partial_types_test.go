@@ -64,18 +64,22 @@ func (g Greeter) Greet() string {
 }
 `
 
-func parseWith(t *testing.T, imp types.Importer) *golang.CompilationUnit {
+// parseWith parses src as a whole package resolved through imp, which may be
+// nil for a parser that resolves nothing.
+func parseWith(t *testing.T, imp types.Importer, src string) *golang.CompilationUnit {
 	t.Helper()
 	gp := parser.NewGoParser()
-	gp.Importer = imp
-	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "p.go", Content: twoImports}})
+	if imp != nil {
+		gp.Importer = imp
+	}
+	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "p.go", Content: src}})
 	require.NoError(t, err)
 	require.Len(t, cus, 1)
 	return cus[0]
 }
 
 func TestUndecodableImportCostsOnlyThatImport(t *testing.T) {
-	cu := parseWith(t, hostileImporter{path: "strings", panics: true, delegate: importer.Default()})
+	cu := parseWith(t, hostileImporter{path: "strings", panics: true, delegate: importer.Default()}, twoImports)
 
 	m := java.FindMarker[golang.PartialTypeAttribution](cu.Markers)
 	require.NotNil(t, m, "a package that lost an import must say so on the tree")
@@ -89,7 +93,7 @@ func TestUndecodableImportCostsOnlyThatImport(t *testing.T) {
 }
 
 func TestUnresolvableImportIsRecorded(t *testing.T) {
-	cu := parseWith(t, hostileImporter{path: "strings", delegate: importer.Default()})
+	cu := parseWith(t, hostileImporter{path: "strings", delegate: importer.Default()}, twoImports)
 
 	m := java.FindMarker[golang.PartialTypeAttribution](cu.Markers)
 	require.NotNil(t, m)
@@ -99,18 +103,14 @@ func TestUnresolvableImportIsRecorded(t *testing.T) {
 func TestStubbedRequireIsMarked(t *testing.T) {
 	pi := parser.NewProjectImporter("example.com/app", nil)
 	pi.AddRequire("github.com/nowhere/lib")
-	gp := parser.NewGoParser()
-	gp.Importer = pi
-	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+	cu := parseWith(t, pi, `package app
 
 import "github.com/nowhere/lib"
 
 func F() { lib.Do() }
-`}})
-	require.NoError(t, err)
-	require.Len(t, cus, 1)
+`)
 
-	m := java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers)
+	m := java.FindMarker[golang.PartialTypeAttribution](cu.Markers)
 	require.NotNil(t, m, "a stubbed dependency leaves every one of its symbols missing")
 	assert.Contains(t, m.Reason, "github.com/nowhere/lib")
 	assert.Contains(t, m.Reason, "stub", "the reason separates a stub from an import that failed outright")
@@ -119,28 +119,23 @@ func F() { lib.Do() }
 func TestPackageWithoutStubbedRequiresIsUnmarked(t *testing.T) {
 	pi := parser.NewProjectImporter("example.com/app", nil)
 	pi.AddRequire("github.com/nowhere/lib")
-	gp := parser.NewGoParser()
-	gp.Importer = pi
-	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+	cu := parseWith(t, pi, `package app
 
 func F() int { return 1 }
-`}})
-	require.NoError(t, err)
-	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers),
+`)
+	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cu.Markers),
 		"a registered require that the package never imports costs it nothing")
 }
 
 func TestReasonIsIndependentOfTheHostItParsedOn(t *testing.T) {
 	// go/importer reports a miss by listing every directory it searched.
-	gp := parser.NewGoParser()
-	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+	cu := parseWith(t, nil, `package app
 
 import "example.com/definitely/not/here"
 
 func F() { here.Do() }
-`}})
-	require.NoError(t, err)
-	m := java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers)
+`)
+	m := java.FindMarker[golang.PartialTypeAttribution](cu.Markers)
 	require.NotNil(t, m)
 
 	// The reason is serialized into the LST and crosses RPC, so two machines
@@ -155,16 +150,13 @@ func F() { here.Do() }
 func TestBlankImportCostsNoAttribution(t *testing.T) {
 	pi := parser.NewProjectImporter("example.com/app", nil)
 	pi.AddRequire("github.com/lib/pq")
-	gp := parser.NewGoParser()
-	gp.Importer = pi
-	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+	cu := parseWith(t, pi, `package app
 
 import _ "github.com/lib/pq"
 
 func F() int { return 1 }
-`}})
-	require.NoError(t, err)
-	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers),
+`)
+	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cu.Markers),
 		"a blank import names no symbol, so a stub in its place costs the file nothing")
 }
 
@@ -177,24 +169,21 @@ import "github.com/nowhere/lib"
 
 func Make() lib.T { return lib.New() }
 `)
-	gp := parser.NewGoParser()
-	gp.Importer = pi
-	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+	cu := parseWith(t, pi, `package app
 
 import "example.com/app/b"
 
 func F() { _ = b.Make() }
-`}})
-	require.NoError(t, err)
+`)
 
-	m := java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers)
+	m := java.FindMarker[golang.PartialTypeAttribution](cu.Markers)
 	require.NotNil(t, m, "a type this package uses is missing, whichever import lost it")
 	assert.Contains(t, m.Reason, "github.com/nowhere/lib")
 	assert.Contains(t, m.Reason, "example.com/app/b", "the reason names the import the stub was reached through")
 }
 
 func TestFullyAttributedPackageIsUnmarked(t *testing.T) {
-	cu := parseWith(t, importer.Default())
+	cu := parseWith(t, importer.Default(), twoImports)
 	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cu.Markers),
 		"a package that type-checked completely must be distinguishable from one that did not")
 }
