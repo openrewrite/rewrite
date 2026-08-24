@@ -24,7 +24,6 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
-	"log"
 	"math"
 	"math/big"
 	"path/filepath"
@@ -185,9 +184,6 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		partial = append(partial, stubbedImports(gp.Importer, asts)...)
 		if recovered != nil {
 			partial = append(partial, fmt.Sprintf("type check ended early: %v", recovered))
-		}
-		if len(partial) > 0 {
-			log.Printf("type attribution of package %s is partial: %s", pkgName, strings.Join(partial, "; "))
 		}
 	}
 
