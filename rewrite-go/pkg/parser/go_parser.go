@@ -152,12 +152,11 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		// Used to distinguish generic instantiation from ordinary indexing.
 		Instances: make(map[*ast.Ident]types.Instance),
 	}
-	// Reasons the package lost part of its type attribution. Joined, they are
-	// the PartialTypeAttribution marker's text.
+	// Reasons the package lost part of its type attribution.
 	var partial []string
 	if !gp.ParseOnly {
-		// Wrapping a nil Importer would hand types.Config an interface holding
-		// a nil pointer, which no longer reads as "resolve no imports".
+		// types.Config reads a nil Importer as resolving nothing. Wrapping one
+		// would hand it an interface holding a nil pointer, which reads as set.
 		imp := gp.Importer
 		var resilient *resilientImporter
 		if imp != nil {
@@ -187,8 +186,8 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		}
 	}
 
-	// One string for every compilation unit of the package: they say the same
-	// thing, and each carries it for as long as the tree lives.
+	// Every compilation unit of the package shares one string: they say the
+	// same thing, and each holds it for as long as the tree lives.
 	reason := strings.Join(partial, "; ")
 
 	mapper := newTypeMapper()

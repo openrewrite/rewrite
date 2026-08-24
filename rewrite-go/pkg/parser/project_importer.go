@@ -93,9 +93,8 @@ type ProjectImporter struct {
 // A type a package cannot see costs its importers the same, however many
 // packages back it went missing. Sorted, so one tree comes of one source.
 func (p *ProjectImporter) StubsReachableFrom(importPath string) []string {
-	// Nothing stubbed is nothing reachable, and it is what a build whose
-	// modules all resolved looks like — every package would otherwise walk
-	// its whole import graph to find that out.
+	// An empty stub set proves nothing is reachable, and a build whose
+	// modules all resolved never fills it.
 	if len(p.stubs) == 0 {
 		return nil
 	}

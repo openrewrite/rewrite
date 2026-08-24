@@ -65,7 +65,7 @@ func (g Greeter) Greet() string {
 `
 
 // parseWith parses src as a whole package resolved through imp, which may be
-// nil for a parser that resolves nothing.
+// nil to leave the parser the stdlib importer it defaults to.
 func parseWith(t *testing.T, imp types.Importer, src string) *golang.CompilationUnit {
 	t.Helper()
 	gp := parser.NewGoParser()
@@ -87,8 +87,6 @@ func TestUndecodableImportCostsOnlyThatImport(t *testing.T) {
 	assert.Contains(t, m.Reason, "export data version 4 is greater than maximum supported version 2",
 		"the version mismatch is the whole diagnostic; compacting the cause must not drop it")
 
-	// The rest of the package still attributes: without recovering the import
-	// panic, conf.Check abandons the whole file and Greeter has no type.
 	assert.NotNil(t, findType(t, cu, "Greeter"), "unrelated declarations must keep their types")
 }
 
@@ -138,8 +136,6 @@ func F() { here.Do() }
 	m := java.FindMarker[golang.PartialTypeAttribution](cu.Markers)
 	require.NotNil(t, m)
 
-	// The reason is serialized into the LST and crosses RPC, so two machines
-	// parsing the same sources have to produce the same tree.
 	assert.NotContains(t, m.Reason, "\n", "a reason spanning lines carries the importer's search path")
 	assert.NotContains(t, m.Reason, runtime.GOROOT())
 	if home, err := os.UserHomeDir(); err == nil && home != "" {

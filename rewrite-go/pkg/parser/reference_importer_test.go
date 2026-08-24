@@ -55,8 +55,6 @@ func (panickingImporter) Import(path string) (*types.Package, error) {
 	panic(fmt.Errorf("cannot decode %q, export data version 4 is greater than maximum supported version 2", path))
 }
 
-// One dependency's type table spans many packages, so a stdlib read the
-// toolchain cannot decode must cost the package that named it and no more.
 func TestReferenceImporterReportsAnUndecodableStdlibRead(t *testing.T) {
 	ri := newReferenceImporter(nil)
 	res, ok := ri.def.(*resilientImporter)
