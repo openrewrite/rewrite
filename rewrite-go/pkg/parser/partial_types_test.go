@@ -168,6 +168,31 @@ func F() int { return 1 }
 		"a blank import names no symbol, so a stub in its place costs the file nothing")
 }
 
+func TestStubReachedThroughASiblingPackageIsMarked(t *testing.T) {
+	pi := parser.NewProjectImporter("example.com/app", nil)
+	pi.AddRequire("github.com/nowhere/lib")
+	pi.AddSource("b/b.go", `package b
+
+import "github.com/nowhere/lib"
+
+func Make() lib.T { return lib.New() }
+`)
+	gp := parser.NewGoParser()
+	gp.Importer = pi
+	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+
+import "example.com/app/b"
+
+func F() { _ = b.Make() }
+`}})
+	require.NoError(t, err)
+
+	m := java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers)
+	require.NotNil(t, m, "a type this package uses is missing, whichever import lost it")
+	assert.Contains(t, m.Reason, "github.com/nowhere/lib")
+	assert.Contains(t, m.Reason, "example.com/app/b", "the reason names the import the stub was reached through")
+}
+
 func TestFullyAttributedPackageIsUnmarked(t *testing.T) {
 	cu := parseWith(t, importer.Default())
 	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cu.Markers),

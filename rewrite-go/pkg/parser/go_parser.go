@@ -223,7 +223,7 @@ func compactCause(err error) string {
 // stubReporter is implemented by importers that resolve some paths to a
 // placeholder package rather than to real symbols.
 type stubReporter interface {
-	IsStub(importPath string) bool
+	StubsReachableFrom(importPath string) []string
 }
 
 // stubbedImports names the paths the files import for their symbols that
@@ -243,11 +243,17 @@ func stubbedImports(imp types.Importer, asts []*ast.File) []string {
 				continue
 			}
 			importPath, err := strconv.Unquote(spec.Path.Value)
-			if err != nil || seen[importPath] || !reporter.IsStub(importPath) {
+			if err != nil || seen[importPath] {
 				continue
 			}
 			seen[importPath] = true
-			reasons = append(reasons, fmt.Sprintf("resolved import %q to an empty stub", importPath))
+			for _, stub := range reporter.StubsReachableFrom(importPath) {
+				if stub == importPath {
+					reasons = append(reasons, fmt.Sprintf("resolved import %q to an empty stub", importPath))
+					continue
+				}
+				reasons = append(reasons, fmt.Sprintf("reached empty stub %q through import %q", stub, importPath))
+			}
 		}
 	}
 	return reasons

@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"golang.org/x/mod/module"
@@ -87,9 +88,36 @@ type ProjectImporter struct {
 	fallback types.Importer
 }
 
-// IsStub reports whether importPath resolved to a placeholder package — right
-// path and name, empty scope. Every symbol under such a path is missing.
-func (p *ProjectImporter) IsStub(importPath string) bool { return p.stubs[importPath] }
+// StubsReachableFrom names the placeholder packages — right path and name,
+// empty scope — that importPath either is or reaches through what it imports.
+// A type a package cannot see costs its importers the same, however many
+// packages back it went missing. Sorted, so one tree comes of one source.
+func (p *ProjectImporter) StubsReachableFrom(importPath string) []string {
+	var found []string
+	seen := make(map[string]bool)
+	var walk func(string)
+	walk = func(path string) {
+		if seen[path] {
+			return
+		}
+		seen[path] = true
+		if p.stubs[path] {
+			// A stub carries no imports of its own to walk.
+			found = append(found, path)
+			return
+		}
+		pkg, ok := p.cache[path]
+		if !ok {
+			return
+		}
+		for _, imp := range pkg.Imports() {
+			walk(imp.Path())
+		}
+	}
+	walk(importPath)
+	sort.Strings(found)
+	return found
+}
 
 // replaceTarget mirrors a go.mod `replace ... => newPath [newVersion]`
 // entry. NewVersion is empty when NewPath is a local filesystem path.
