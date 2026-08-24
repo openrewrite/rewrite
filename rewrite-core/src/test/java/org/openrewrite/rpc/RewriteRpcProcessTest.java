@@ -16,6 +16,8 @@
 package org.openrewrite.rpc;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -28,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -164,6 +167,91 @@ class RewriteRpcProcessTest {
                 assertThatThrownBy(process::start)
                         .isInstanceOf(UncheckedIOException.class)
                         .hasMessageContaining(missing));
+    }
+
+    /**
+     * A wedged peer whose grandchild ignores SIGTERM reparents to init when the direct
+     * child is severed. {@link RewriteRpcProcess#shutdown()} must still force-kill it via
+     * the descendant tree captured before the sever, so it can't linger holding a process
+     * slot for the life of a long-running server.
+     */
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void shutdownForceKillsAWedgedPeerAfterSeveringTheDirectChild() throws Exception {
+        Process peerProcess = new ProcessBuilder("sh", "-c",
+                "sh -c 'trap \"\" TERM; sleep 300' & wait").start();
+        RewriteRpcProcess peer = peerWrapping(peerProcess);
+        await(() -> peerProcess.descendants().count() == 2 ? Boolean.TRUE : null);
+        ProcessHandle wedged = peerProcess.children().findFirst().orElseThrow();
+        try {
+            peer.shutdown();
+
+            // SIGKILL is asynchronous, so poll for the reparented survivor to exit.
+            await(() -> wedged.isAlive() ? null : Boolean.TRUE);
+            assertThat(wedged.isAlive()).isFalse();
+        } finally {
+            wedged.descendants().forEach(ProcessHandle::destroyForcibly);
+            wedged.destroyForcibly();
+            peerProcess.destroyForcibly();
+        }
+    }
+
+    /**
+     * {@link RewriteRpcProcess#shutdown()} runs from both an explicit teardown and the JVM
+     * shutdown hook, so a second call must be a safe no-op rather than tripping over the
+     * fields the first call already cleared.
+     */
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void shutdownIsIdempotent() throws Exception {
+        Process peerProcess = new ProcessBuilder("sleep", "300").start();
+        RewriteRpcProcess peer = peerWrapping(peerProcess);
+        try {
+            peer.shutdown();
+            peer.shutdown();
+
+            await(() -> peerProcess.isAlive() ? null : Boolean.TRUE);
+            assertThat(peerProcess.isAlive()).isFalse();
+        } finally {
+            peerProcess.destroyForcibly();
+        }
+    }
+
+    /**
+     * A liveness check that runs while {@link RewriteRpcProcess#shutdown()} is force-killing the
+     * peer must not report the deliberate SIGKILL as a crash.
+     */
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void livenessCheckIsSilentAfterShutdown() throws Exception {
+        Process peerProcess = new ProcessBuilder("sleep", "300").start();
+        RewriteRpcProcess peer = peerWrapping(peerProcess);
+        try {
+            peer.shutdown();
+            await(() -> peerProcess.isAlive() ? null : Boolean.TRUE);
+
+            assertThat(peer.getLivenessCheck()).isNull();
+        } finally {
+            peerProcess.destroyForcibly();
+        }
+    }
+
+    /** An unstarted {@link RewriteRpcProcess} whose {@code process} field is the given spawned tree. */
+    private static RewriteRpcProcess peerWrapping(Process process) {
+        RewriteRpcProcess peer = new RewriteRpcProcess("noop");
+        peer.process = process;
+        return peer;
+    }
+
+    private static <T> T await(Supplier<T> probe) throws InterruptedException {
+        for (int i = 0; i < 100; i++) {
+            T value = probe.get();
+            if (value != null) {
+                return value;
+            }
+            Thread.sleep(50);
+        }
+        throw new AssertionError("Condition never met");
     }
 
     /**
