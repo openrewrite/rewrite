@@ -23,6 +23,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.Validated;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -3972,6 +3973,112 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               .containsPattern("<groupId>org\\.junit\\.jupiter</groupId>\\s*<artifactId>junit-jupiter</artifactId>\\s*<version>5\\.\\d+(\\.\\d+)?</version>")
               .doesNotContain("<groupId>junit</groupId>")
               .actual())
+          )
+        );
+    }
+
+    @Test
+    void childModuleWithUnversionedDependencyOnParentManagedDep() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation", "javax.activation-api",
+            "jakarta.activation", "jakarta.activation-api",
+            "2.1.0", null
+          )),
+          mavenProject("parent-project",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent-project</artifactId>
+                    <version>1.0.0</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child-module</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>javax.activation</groupId>
+                                <artifactId>javax.activation-api</artifactId>
+                                <version>1.2.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent-project</artifactId>
+                    <version>1.0.0</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child-module</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>jakarta.activation</groupId>
+                                <artifactId>jakarta.activation-api</artifactId>
+                                <version>2.1.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            ),
+            mavenProject("child-module",
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent-project</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+                      <artifactId>child-module</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent-project</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+                      <artifactId>child-module</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("child-module/pom.xml").afterRecipe(doc -> {
+                    MavenResolutionResult result = doc.getMarkers()
+                      .findFirst(MavenResolutionResult.class).orElseThrow();
+                    assertThat(result.getPom().getDependencyManagement())
+                      .describedAs("Child should see jakarta.activation:jakarta.activation-api:2.1.0 from parent")
+                      .anyMatch(dep -> "jakarta.activation".equals(dep.getGroupId())
+                                       && "jakarta.activation-api".equals(dep.getArtifactId())
+                                       && "2.1.0".equals(dep.getVersion()));
+                })
+              )
+            )
           )
         );
     }
