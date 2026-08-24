@@ -51,8 +51,9 @@ public class ArgumentContents {
     }
 
     /// Splits the value of a command's flag into its quoted literals, environment variable references
-    /// and the `=` separating a key from a value, as in `--mount=type=bind`. Everything that is not a
-    /// quote or a separator is handed to [#splitVariables(String, Space)], so a variable reference means
+    /// and the separators of an option list: the `=` between a key and its value and the `,` between
+    /// one option and the next, as in `--mount=type=bind,from=alpine`. Everything that is not a quote
+    /// or a separator is handed to [#splitVariables(String, Space)], so a variable reference means
     /// the same thing here as it does in an argument's value.
     public static List<Docker.ArgumentContent> flagValue(String text) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
@@ -73,9 +74,9 @@ public class ArgumentContents {
                 contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text.substring(i + 1, close),
                         c == '"' ? Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE));
                 i = close + 1;
-            } else if (c == '=') {
+            } else if (c == '=' || c == ',') {
                 flushFlagText(current, contents);
-                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "=", null));
+                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, String.valueOf(c), null));
                 i++;
             } else {
                 current.append(c);

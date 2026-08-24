@@ -31,6 +31,7 @@ import org.openrewrite.trait.VisitFunction2;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
@@ -114,7 +115,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
         if (isNonNegativeInteger(value)) {
             return true;
         }
-        return stageNames().contains(value);
+        return stageNames().contains(value.toLowerCase(Locale.ROOT));
     }
 
     private static boolean isNonNegativeInteger(String value) {
@@ -129,6 +130,8 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
         return true;
     }
 
+    /// The `AS` alias of every stage of the file, lowercased as Docker records and looks them up,
+    /// so `COPY --from=Builder` finds `AS builder`.
     private Set<String> stageNames() {
         Docker.File file = cursor.firstEnclosing(Docker.File.class);
         Set<String> names = new HashSet<>();
@@ -136,7 +139,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
             for (Docker.Stage stage : file.getStages()) {
                 Docker.From.As as = stage.getFrom().getAs();
                 if (as != null) {
-                    names.add(as.getName().getText());
+                    names.add(as.getName().getText().toLowerCase(Locale.ROOT));
                 }
             }
         }
