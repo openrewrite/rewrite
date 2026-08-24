@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,8 +68,8 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(user.getUser().getText()).isEqualTo("app");
-                assertThat(user.getGroup().getText()).isEqualTo("group:extra");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("app");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group:extra");
             })
           )
         );
@@ -106,7 +107,7 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(user.getUser().getText()).isEqualTo("app");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("app");
                 var group = (Docker.Literal) user.getGroup().getContents().getFirst();
                 assertThat(group.getText()).isEqualTo("group");
                 assertThat(group.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.SINGLE);
@@ -125,7 +126,7 @@ class UserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(user.getUser().getText()).isEqualTo("app");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("app");
                 assertThat(user.getGroup().getContents()).isEmpty();
             })
           )
@@ -143,7 +144,7 @@ class UserTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(user.getUser().getContents()).isEmpty();
-                assertThat(user.getGroup().getText()).isEqualTo("group");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
             })
           )
         );
@@ -186,18 +187,121 @@ class UserTest implements RewriteTest {
     }
 
     @Test
+    void unpairedQuoteInAUserSpecification() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER 'nobody
+              RUN echo hi
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getFirst();
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("'nobody");
+                assertThat(doc.getStages().getFirst().getInstructions()).hasSize(2);
+            })
+          )
+        );
+    }
+
+    /// With no `# escape=` directive a backtick is the last character of the specification rather than
+    /// a continuation.
+    @Test
+    void aBacktickEndsNoSpecificationWithoutADirective() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine
+              USER root`
+              RUN echo hi
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var instructions = doc.getStages().getFirst().getInstructions();
+                assertThat(instructions).hasSize(2);
+                assertThat(ArgumentContents.text(((Docker.User) instructions.getFirst()).getUser())).isEqualTo("root`");
+                assertThat(instructions.getLast()).isInstanceOf(Docker.Run.class);
+            })
+          )
+        );
+    }
+
+    /// Under a backtick directive it is the backslash that ends nothing.
+    @Test
+    void aBackslashEndsNoSpecificationUnderABacktickDirective() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM alpine
+              USER root\\
+              RUN echo hi
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var instructions = doc.getStages().getFirst().getInstructions();
+                assertThat(instructions).hasSize(2);
+                assertThat(ArgumentContents.text(((Docker.User) instructions.getFirst()).getUser())).isEqualTo("root\\");
+                assertThat(instructions.getLast()).isInstanceOf(Docker.Run.class);
+            })
+          )
+        );
+    }
+
+    /// A continuation that splits a name rather than ending it stays in the name, as in
+    /// `continuationBeforeTheSeparator`.
+    @Test
+    void continuationInsideTheGroup() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER root:gr\\
+              oup
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("root");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("gr\\\noup");
+            })
+          )
+        );
+    }
+
+    @Test
+    void escapeCharactersInsideANameAreText() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              USER ro\\ ot:gr`oup
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("ro\\ ot");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("gr`oup");
+            })
+          )
+        );
+    }
+
+    /// Unlike the same shape in a `FROM`, Docker accepts this: `USER` reads everything after the
+    /// keyword as one specification, so the whitespace the continuation leaves behind is part of the
+    /// value, which is why the user holds it rather than the space around it.
+    /// As in a `FROM`, only an unindented continuation leaves a specification Docker still reads the
+    /// same way: it keeps the indent of the line that follows, and `USER app\<newline>  :group` reaches
+    /// it as the user `app  :group`.
+    @Test
     void continuationBeforeTheSeparator() {
         rewriteRun(
           docker(
             """
               FROM ubuntu:20.04
               USER app\\
-                :group
+              :group
               """,
             spec -> spec.afterRecipe(doc -> {
                 var user = (Docker.User) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(user.getUser().getText()).isEqualTo("app\\\n  ");
-                assertThat(user.getGroup().getText()).isEqualTo("group");
+                assertThat(ArgumentContents.text(user.getUser())).isEqualTo("app");
+                assertThat(ArgumentContents.text(user.getGroup())).isEqualTo("group");
             })
           )
         );

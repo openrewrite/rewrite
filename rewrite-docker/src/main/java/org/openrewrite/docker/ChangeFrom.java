@@ -95,17 +95,11 @@ public class ChangeFrom extends Recipe {
     @Nullable
     String newPlatform;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Docker FROM";
-    }
+    String displayName = "Change Docker FROM";
 
-    @Override
-    public String getDescription() {
-        return "Change the base image in a Dockerfile FROM instruction. " +
-                "Each `*` in an `old*` glob is a positional capture; `$N` in the paired `new*` substitutes capture N. " +
-                "`$0` substitutes the full original value; `\\$` is a literal dollar.";
-    }
+    String description = "Change the base image in a Dockerfile FROM instruction. " +
+            "Each `*` in an `old*` glob is a positional capture; `$N` in the paired `new*` substitutes capture N. " +
+            "`$0` substitutes the full original value; `\\$` is a literal dollar.";
 
     @Override
     public Validated<Object> validate() {
@@ -181,12 +175,12 @@ public class ChangeFrom extends Recipe {
             // all three together, and splitting it would quote each part on its own, so it stays whole.
             if (resolvedNewImageName != null && quoteStyle == null) {
                 Docker.@Nullable Argument[] parts = ImageReferences.split(resolvedNewImageName, Space.EMPTY);
-                resolvedNewImageName = parts[0].getTextWithVariables();
+                resolvedNewImageName = ArgumentContents.textWithVariables(parts[0]);
                 if (resolvedNewTag == null && parts[1] != null) {
-                    resolvedNewTag = parts[1].getTextWithVariables();
+                    resolvedNewTag = ArgumentContents.textWithVariables(parts[1]);
                 }
                 if (resolvedNewDigest == null && parts[2] != null) {
-                    resolvedNewDigest = parts[2].getTextWithVariables();
+                    resolvedNewDigest = ArgumentContents.textWithVariables(parts[2]);
                 }
             }
 
@@ -422,7 +416,7 @@ public class ChangeFrom extends Recipe {
 
     private Docker.Argument updatePlatformValue(Docker.@Nullable Argument existingValue, String platform) {
         if (existingValue != null && !existingValue.getContents().isEmpty()) {
-            return existingValue.withContents(ArgumentContents.of(platform, existingValue.getQuoteStyle()));
+            return existingValue.withContents(ArgumentContents.of(platform, ArgumentContents.quoteStyle(existingValue)));
         }
         // Fallback: create new value
         return createPlatformValue(platform, existingValue != null ? existingValue.getPrefix() : Space.EMPTY);

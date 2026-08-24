@@ -35,16 +35,16 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * A trait representing the image reference carried by the {@code --from} flag of a
- * {@code COPY} or {@code ADD} instruction. Provides the same semantic access to image name,
- * tag, and digest as {@link DockerFrom}, while distinguishing an external image reference
+ * A trait representing the image reference carried by the {@code --from} flag of a {@code COPY}
+ * instruction. Provides the same semantic access to image name, tag, and digest as
+ * {@link DockerFrom}, while distinguishing an external image reference
  * (e.g. {@code COPY --from=nginx:latest}) from a reference to an earlier build stage
  * (e.g. {@code COPY --from=builder} or {@code COPY --from=0}). When the value refers to a
  * build stage the image accessors return {@code null}; use {@link #isStageReference()} to
  * disambiguate.
  */
 @RequiredArgsConstructor
-public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> {
+public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
 
     @Getter
     private final Cursor cursor;
@@ -53,19 +53,8 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
     private boolean componentsComputed;
     private Docker.@Nullable Argument @Nullable [] componentsValue;
 
-    private @Nullable List<Docker.Flag> flags() {
-        Docker.Instruction instruction = getTree();
-        if (instruction instanceof Docker.Copy) {
-            return ((Docker.Copy) instruction).getFlags();
-        }
-        if (instruction instanceof Docker.Add) {
-            return ((Docker.Add) instruction).getFlags();
-        }
-        return null;
-    }
-
     private Docker.@Nullable Argument fromArgument() {
-        List<Docker.Flag> flags = flags();
+        List<Docker.Flag> flags = getTree().getFlags();
         if (flags == null) {
             return null;
         }
@@ -90,10 +79,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
             return null;
         }
         Docker.Argument arg = fromArgument();
-        if (arg == null) {
-            return null;
-        }
-        return ImageReferences.split(arg.getContents(), arg.getPrefix());
+        return arg == null ? null : ImageReferences.split(arg.getContents(), arg.getPrefix());
     }
 
     /**
@@ -102,7 +88,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
      */
     public Optional<String> getFromValue() {
         Docker.Argument arg = fromArgument();
-        return arg == null ? Optional.empty() : Optional.of(arg.getTextWithVariables());
+        return arg == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(arg));
     }
 
     /**
@@ -121,7 +107,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
         if (arg == null) {
             return false;
         }
-        String value = arg.getText();
+        String value = ArgumentContents.text(arg);
         if (value == null) {
             return false;
         }
@@ -184,22 +170,33 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
      * (e.g. {@code "nginx:1.25"}), or unchanged if there is no {@code --from} flag.
      */
     @Override
-    public Docker.Instruction withImageReference(String reference) {
+    public Docker.Copy withImageReference(String reference) {
         Docker.Argument arg = fromArgument();
         if (arg == null) {
             return getTree();
         }
-        Docker.Argument newValue = arg.withContents(ArgumentContents.of(reference, null));
-        List<Docker.Flag> newFlags = ListUtils.map(flags(), f ->
-          "from".equals(f.getName()) ? f.withValue(newValue) : f);
-        Docker.Instruction instruction = getTree();
-        if (instruction instanceof Docker.Copy) {
-            return ((Docker.Copy) instruction).withFlags(newFlags);
+        return withFromValue(arg.withContents(ImageReferences.contents(reference)));
+    }
+
+    /**
+     * Returns the instruction with the image name of its {@code --from} replaced by
+     * {@code imageName}, preserving any tag and digest. Unchanged for stage references.
+     */
+    @Override
+    public Docker.Copy withImageNameArgument(Docker.Argument imageName) {
+        Docker.@Nullable Argument[] parts = components();
+        Docker.Argument arg = fromArgument();
+        if (parts == null || arg == null) {
+            return getTree();
         }
-        if (instruction instanceof Docker.Add) {
-            return ((Docker.Add) instruction).withFlags(newFlags);
-        }
-        return instruction;
+        return withFromValue(arg.withContents(
+          ImageReferences.contents(new Docker.Argument[]{imageName, parts[1], parts[2]})));
+    }
+
+    private Docker.Copy withFromValue(Docker.Argument value) {
+        Docker.Copy copy = getTree();
+        return copy.withFlags(ListUtils.map(copy.getFlags(), f ->
+          "from".equals(f.getName()) ? f.withValue(value) : f));
     }
 
     /**
@@ -207,7 +204,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
      * {@code tag}, preserving the image name and any digest. Unchanged for stage references.
      */
     @Override
-    public Docker.Instruction withTag(String tag) {
+    public Docker.Copy withTag(String tag) {
         Optional<String> name = getImageName();
         if (!name.isPresent()) {
             return getTree();
@@ -264,8 +261,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
 
         @Override
         protected @Nullable DockerCopyFrom test(Cursor cursor) {
-            Object value = cursor.getValue();
-            if (!(value instanceof Docker.Copy) && !(value instanceof Docker.Add)) {
+            if (!(cursor.getValue() instanceof Docker.Copy)) {
                 return null;
             }
             DockerCopyFrom copyFrom = new DockerCopyFrom(cursor);
@@ -301,15 +297,6 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
                         return (Docker) visitor.visit(copyFrom, p);
                     }
                     return super.visitCopy(copy, p);
-                }
-
-                @Override
-                public Docker visitAdd(Docker.Add add, P p) {
-                    DockerCopyFrom copyFrom = test(getCursor());
-                    if (copyFrom != null) {
-                        return (Docker) visitor.visit(copyFrom, p);
-                    }
-                    return super.visitAdd(add, p);
                 }
             };
         }

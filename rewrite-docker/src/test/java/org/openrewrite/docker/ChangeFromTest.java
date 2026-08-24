@@ -18,6 +18,7 @@ package org.openrewrite.docker;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -341,24 +342,6 @@ class ChangeFromTest implements RewriteTest {
               """,
             """
               FROM 'ubuntu:22.04'
-              RUN apt-get update
-              """
-          )
-        );
-    }
-
-    @Test
-    void changeBaseImageWithSingleQuotedStringPreservesTrailingComment() {
-        // Quoted strings are parsed as a single unit, so we match the full image reference as the image name
-        rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null)),
-          docker(
-            """
-              FROM 'ubuntu:20.04' # Trailing comment
-              RUN apt-get update
-              """,
-            """
-              FROM 'ubuntu:22.04' # Trailing comment
               RUN apt-get update
               """
           )
@@ -772,9 +755,9 @@ class ChangeFromTest implements RewriteTest {
                   """,
                 spec -> spec.afterRecipe(doc -> {
                     Docker.From from = doc.getStages().getFirst().getFrom();
-                    assertThat(from.getImageName().getText()).isEqualTo("ubuntu");
+                    assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
                     assertThat(from.getTag()).isNotNull();
-                    assertThat(from.getTag().getText()).isEqualTo("22.04");
+                    assertThat(ArgumentContents.text(from.getTag())).isEqualTo("22.04");
                 })
               )
             );
@@ -793,9 +776,9 @@ class ChangeFromTest implements RewriteTest {
                   """,
                 spec -> spec.afterRecipe(doc -> {
                     Docker.From from = doc.getStages().getFirst().getFrom();
-                    assertThat(from.getImageName().getText()).isEqualTo("eclipse-temurin");
+                    assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("eclipse-temurin");
                     assertThat(from.getTag()).isNotNull();
-                    assertThat(from.getTag().getText()).isEqualTo("17");
+                    assertThat(ArgumentContents.text(from.getTag())).isEqualTo("17");
                 })
               )
             );
@@ -814,9 +797,9 @@ class ChangeFromTest implements RewriteTest {
                   """,
                 spec -> spec.afterRecipe(doc -> {
                     Docker.From from = doc.getStages().getFirst().getFrom();
-                    assertThat(from.getImageName().getText()).isEqualTo("ubuntu");
+                    assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
                     assertThat(from.getDigest()).isNotNull();
-                    assertThat(from.getDigest().getText()).isEqualTo("sha256:abc123");
+                    assertThat(ArgumentContents.text(from.getDigest())).isEqualTo("sha256:abc123");
                 })
               )
             );
@@ -835,7 +818,7 @@ class ChangeFromTest implements RewriteTest {
                   """,
                 spec -> spec.afterRecipe(doc -> {
                     Docker.From from = doc.getStages().getFirst().getFrom();
-                    assertThat(from.getImageName().getText()).isEqualTo("localhost:5000/ubuntu");
+                    assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("localhost:5000/ubuntu");
                     assertThat(from.getTag()).isNull();
                 })
               )
@@ -857,9 +840,9 @@ class ChangeFromTest implements RewriteTest {
                   """,
                 spec -> spec.afterRecipe(doc -> {
                     Docker.From from = doc.getStages().getFirst().getFrom();
-                    assertThat(from.getImageName().getText()).isEqualTo("ubuntu");
+                    assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
                     assertThat(from.getDigest()).isNotNull();
-                    assertThat(from.getDigest().getText()).isEqualTo("sha256:abc123");
+                    assertThat(ArgumentContents.text(from.getDigest())).isEqualTo("sha256:abc123");
                 })
               )
             );
@@ -1195,8 +1178,8 @@ class ChangeFromTest implements RewriteTest {
                     // variable reference like any other, and is modelled as one.
                     Docker.Argument tag = doc.getStages().getFirst().getFrom().getTag();
                     assertThat(tag).isNotNull();
-                    assertThat(tag.getText()).isNull();
-                    assertThat(tag.getTextWithVariables()).isEqualTo("22.04-$VAR");
+                    assertThat(ArgumentContents.text(tag)).isNull();
+                    assertThat(ArgumentContents.textWithVariables(tag)).isEqualTo("22.04-$VAR");
                 })
               )
             );

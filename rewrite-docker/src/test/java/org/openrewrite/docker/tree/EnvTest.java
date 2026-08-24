@@ -16,11 +16,13 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.docker.Assertions.docker;
 
 class EnvTest implements RewriteTest {
@@ -111,7 +113,7 @@ class EnvTest implements RewriteTest {
                 Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
                 assertThat(literal.getText()).isEqualTo("18.0.0");
                 assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(value.getText()).isEqualTo("18.0.0");
+                assertThat(ArgumentContents.text(value)).isEqualTo("18.0.0");
             })
           )
         );
@@ -130,7 +132,7 @@ class EnvTest implements RewriteTest {
                 Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
                 assertThat(literal.getText()).isEqualTo("18.0.0");
                 assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(value.getText()).isEqualTo("18.0.0");
+                assertThat(ArgumentContents.text(value)).isEqualTo("18.0.0");
             })
           )
         );
@@ -150,9 +152,9 @@ class EnvTest implements RewriteTest {
                 Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) value.getContents().getFirst();
                 assertThat(var.getName()).isEqualTo("BASE");
                 assertThat(var.isBraced()).isTrue();
-                assertThat(value.hasEnvironmentVariables()).isTrue();
-                assertThat(value.getText()).isNull();
-                assertThat(value.getTextWithVariables()).isEqualTo("${BASE}-suffix");
+                assertThat(ArgumentContents.containsVariable(value)).isTrue();
+                assertThat(ArgumentContents.text(value)).isNull();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("${BASE}-suffix");
             })
           )
         );
@@ -168,9 +170,9 @@ class EnvTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(doc -> {
                 Docker.Argument value = envValue(doc);
-                assertThat(value.hasEnvironmentVariables()).isTrue();
-                assertThat(value.getText()).isNull();
-                assertThat(value.getTextWithVariables()).isEqualTo("\"/opt/venv/bin:$PATH\"");
+                assertThat(ArgumentContents.containsVariable(value)).isTrue();
+                assertThat(ArgumentContents.text(value)).isNull();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("\"/opt/venv/bin:$PATH\"");
             })
           )
         );
@@ -191,9 +193,9 @@ class EnvTest implements RewriteTest {
                   .filteredOn(Docker.EnvironmentVariable.class::isInstance)
                   .extracting(content -> ((Docker.EnvironmentVariable) content).getName())
                   .containsExactly("path_prefix", "PATH");
-                assertThat(value.hasEnvironmentVariables()).isTrue();
-                assertThat(value.getText()).isNull();
-                assertThat(value.getTextWithVariables()).isEqualTo("\"$path_prefix/bin:$PATH\"");
+                assertThat(ArgumentContents.containsVariable(value)).isTrue();
+                assertThat(ArgumentContents.text(value)).isNull();
+                assertThat(ArgumentContents.textWithVariables(value)).isEqualTo("\"$path_prefix/bin:$PATH\"");
             })
           )
         );
@@ -212,6 +214,155 @@ class EnvTest implements RewriteTest {
                 Docker.Literal literal = (Docker.Literal) value.getContents().getFirst();
                 assertThat(literal.getText()).isEqualTo("\"a title\" and more");
                 assertThat(literal.getQuoteStyle()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void flagValueBindsToItsKey() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV NODE_OPTIONS=--max-old-space-size=4096
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Env.EnvPair pair = assertThat(env.getPairs()).singleElement().actual();
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(pair.getKey().getText()).isEqualTo("NODE_OPTIONS");
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("--max-old-space-size=4096");
+            })
+          )
+        );
+    }
+
+    @Test
+    void flagValuesDoNotSwallowThePairsThatFollowThem() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV NODE_OPTIONS=--max-old-space-size=4096 PIP_OPTIONS=--no-cache-dir
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(env.getPairs())
+                  .extracting(pair -> pair.getKey().getText(), pair -> ArgumentContents.text(pair.getValue()))
+                  .containsExactly(
+                    tuple("NODE_OPTIONS", "--max-old-space-size=4096"),
+                    tuple("PIP_OPTIONS", "--no-cache-dir"));
+            })
+          )
+        );
+    }
+
+    @Test
+    void aValueWrittenAgainstItsKeyMayOpenWithAnEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV GREETING==hello
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Env.EnvPair pair = assertThat(env.getPairs()).singleElement().actual();
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(pair.getKey().getText()).isEqualTo("GREETING");
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("=hello");
+            })
+          )
+        );
+    }
+
+    @Test
+    void onlyTheFirstOfARunOfEqualsBindsThePair() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV GREETING===hello
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Env.EnvPair pair = assertThat(env.getPairs()).singleElement().actual();
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("==hello");
+            })
+          )
+        );
+    }
+
+    @Test
+    void aValueSeparatedFromItsKeyByASpaceIsStillTheLegacyForm() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV GREETING =hello
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Env.EnvPair pair = assertThat(env.getPairs()).singleElement().actual();
+                assertThat(pair.isHasEquals()).isFalse();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("=hello");
+            })
+          )
+        );
+    }
+
+    @Test
+    void bracketedValueBindsToItsKey() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV SEEDS=[a,b] MODE=fast
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(env.getPairs())
+                  .extracting(Docker.Env.EnvPair::isHasEquals, pair -> ArgumentContents.text(pair.getValue()))
+                  .containsExactly(tuple(true, "[a,b]"), tuple(true, "fast"));
+            })
+          )
+        );
+    }
+
+    @Test
+    void aValueSeparatedFromItsKeyIsTheLegacyForm() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV KEY =value
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Env.EnvPair pair = assertThat(env.getPairs()).singleElement().actual();
+                assertThat(pair.isHasEquals()).isFalse();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("=value");
+            })
+          )
+        );
+    }
+
+    @Test
+    void aContinuationDoesNotSeparateAValueFromItsKey() {
+        rewriteRun(
+          docker(
+            """
+              FROM alpine:latest
+              ENV KEY\
+              =value
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var env = (Docker.Env) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Env.EnvPair pair = assertThat(env.getPairs()).singleElement().actual();
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("value");
             })
           )
         );

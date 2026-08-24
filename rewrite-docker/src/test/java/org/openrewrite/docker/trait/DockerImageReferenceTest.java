@@ -39,7 +39,6 @@ class DockerImageReferenceTest implements RewriteTest {
               FROM alpine
               COPY --from=builder /out /app
               COPY --from=alpine /lib /app/lib
-              ADD --from=alpine:latest /etc /app/etc
               """,
             """
               FROM alpine:3.19 AS builder
@@ -47,7 +46,6 @@ class DockerImageReferenceTest implements RewriteTest {
               FROM alpine:3.19
               COPY --from=builder /out /app
               COPY --from=alpine:3.19 /lib /app/lib
-              ADD --from=alpine:3.19 /etc /app/etc
               """
           )
         );

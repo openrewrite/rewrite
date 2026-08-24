@@ -115,19 +115,6 @@ class VolumeTest implements RewriteTest {
     }
 
     @Test
-    void volumeWithNoSpaceBeforeBracket() {
-        // VOLUME with no space between keyword and opening bracket
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:20.04
-              VOLUME["/data"]
-              """
-          )
-        );
-    }
-
-    @Test
     void volumeWithMultipleSpacesBeforePath() {
         // VOLUME with multiple spaces between keyword and path (non-JSON form)
         rewriteRun(

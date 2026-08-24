@@ -368,6 +368,18 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterFromFlag(DockerParser.FromFlagContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitFromFlag(DockerParser.FromFlagContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterExecForm(DockerParser.ExecFormContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -807,18 +819,6 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitValueElement(DockerParser.ValueElementContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterPathElement(DockerParser.PathElementContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitPathElement(DockerParser.PathElementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

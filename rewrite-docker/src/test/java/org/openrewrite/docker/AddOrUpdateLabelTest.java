@@ -319,7 +319,7 @@ class AddOrUpdateLabelTest implements RewriteTest {
           docker(
             """
               FROM ubuntu:22.04
-              LABEL desc="a b" c
+              LABEL desc "a b" c
               """
           )
         );

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.docker.trait;
 
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.trait.SimpleTraitMatcher;
@@ -74,7 +75,7 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
      * @return true if the part matches
      */
     static boolean partMatches(Docker.Argument part, String pattern) {
-        return matchesBidirectional(extractTextForMatching(part), pattern, part.hasEnvironmentVariables());
+        return matchesBidirectional(extractTextForMatching(part), pattern, ArgumentContents.containsVariable(part));
     }
 
     /// As [#partMatches], but for an image name, where a pattern also matches a name that spells
@@ -89,6 +90,6 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
         String text = extractTextForMatching(imageName);
         ImageName name = ImageName.parse(text);
         ImageName patternName = ImageName.parse(pattern);
-        return matchesBidirectional(name.getCanonical(), patternName.getCanonical(), imageName.hasEnvironmentVariables());
+        return matchesBidirectional(name.getCanonical(), patternName.getCanonical(), ArgumentContents.containsVariable(imageName));
     }
 }

@@ -73,7 +73,7 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
         }
         for (Docker.Flag flag : from.getFlags()) {
             if ("platform".equals(flag.getName()) && flag.getValue() != null) {
-                return flag.getValue().getTextWithVariables();
+                return ArgumentContents.textWithVariables(flag.getValue());
             }
         }
         return null;
@@ -90,21 +90,12 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
     }
 
     /**
-     * Returns true if this is the special "scratch" base image.
-     *
-     * @return true if the image is "scratch"
-     */
-    public boolean isScratch() {
-        return "scratch".equals(getTree().getImageName().getText());
-    }
-
-    /**
      * Returns the quote style used for the image name, if any.
      *
      * @return The quote style, or null if unquoted
      */
     public Docker.Literal.@Nullable QuoteStyle getQuoteStyle() {
-        return getTree().getImageName().getQuoteStyle();
+        return ArgumentContents.quoteStyle(getTree().getImageName());
     }
 
     /**
@@ -127,6 +118,15 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
     public Docker.From withTag(String tag) {
         return getTree().withTag(new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
                 ArgumentContents.of(tag, getQuoteStyle())));
+    }
+
+    /**
+     * Returns the FROM instruction with its image name replaced by {@code imageName}, preserving
+     * any tag and digest.
+     */
+    @Override
+    public Docker.From withImageNameArgument(Docker.Argument imageName) {
+        return getTree().withImageName(imageName);
     }
 
     /**

@@ -45,15 +45,9 @@ public class FindExposedPorts extends Recipe {
     @Nullable
     String portPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Find exposed ports";
-    }
+    String displayName = "Find exposed ports";
 
-    @Override
-    public String getDescription() {
-        return "Find all `EXPOSE` instructions in Dockerfiles and report the exposed ports.";
-    }
+    String description = "Find all `EXPOSE` instructions in Dockerfiles and report the exposed ports.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -17,6 +17,27 @@ options {
         Token next = _input.LT(1);
         return previous != null && next != null && previous.getStopIndex() + 1 == next.getStartIndex();
     }
+
+    /**
+     * Whether the next token stands against the previous one on the logical line, i.e. with nothing but
+     * a line continuation between them. Docker joins the lines a continuation holds together, and drops
+     * a comment line while doing so, before it reads what they say, so `ENV K\<newline>=v` binds the
+     * same key to the same value that `ENV K=v` does.
+     */
+    private boolean bound() {
+        Token previous = _input.LT(-1);
+        Token next = _input.LT(1);
+        if (previous == null || next == null) {
+            return false;
+        }
+        for (int i = previous.getTokenIndex() + 1; i < next.getTokenIndex(); i++) {
+            int type = _input.get(i).getType();
+            if (type != LINE_CONTINUATION && type != COMMENT) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 // Root rule
@@ -149,13 +170,20 @@ maintainerInstruction
 
 // Common elements
 flags
-    : flag+
+    : ( flag | fromFlag )+
     ;
 
 // Flag token captures entire flag: --name or --name=value
 // The lexer handles stopping at whitespace, so no greedy parsing issues
 flag
     : FLAG
+    ;
+
+// The --from of a COPY holds the same name:tag@digest reference a FROM does, split by the
+// same rule. FLAG_END is the whitespace that ends the reference, without which this rule would
+// carry on into the flags and paths that follow it.
+fromFlag
+    : FROM_FLAG imageReference? FLAG_END?
     ;
 
 execForm
@@ -184,8 +212,10 @@ heredoc
 // For single heredoc: just "<<EOF" or "<<EOF /dest" (for COPY/ADD)
 // For multi heredoc: "<<EOF1 cat >file1 && <<EOF2 cat >file2"
 // Elements are shell command text and, for COPY/ADD, the destination path.
+// Docker reads a heredoc from any word of the line, so a marker need not open it: `cat >>/f <<EOF`
+// redirects before it says what it is reading.
 heredocPreamble
-    : HEREDOC_START textElement* ( HEREDOC_START textElement* )*
+    : textElement* ( HEREDOC_START textElement* )+
     ;
 
 // A single heredoc body (content + closing marker)
@@ -218,8 +248,6 @@ jsonString
 // reference or a registry port belongs to the part that holds it.
 imageReference
     : imageName ( COLON tag? )? ( AT digest? )?
-    | COLON tag? ( AT digest? )?
-    | AT digest?
     ;
 
 // Nothing but a separator, `AS` or the next instruction can follow a part of a reference, so the
@@ -249,9 +277,11 @@ labelPairs
     : labelPair+
     ;
 
+// A `key=value` pair or the legacy `key value` one. The `=` of a pair is written hard against its
+// key, which is what tells the two forms apart: Docker reads `LABEL k =v` as the legacy form with a
+// value of `=v` rather than as `k` bound to `v`.
 labelPair
-    : labelKey EQUALS value    // New format: key=value
-    | labelKey text            // Old format: key value, the rest of the line
+    : labelKey ( {bound()}? EQUALS value | text )
     ;
 
 // Label key - instruction keywords become UNQUOTED_TEXT since they're not at line start
@@ -276,9 +306,9 @@ envPairs
     : envPair+
     ;
 
+// As `labelPair`: `ENV KEY=value` or the legacy `ENV KEY value`, which takes the rest of the line
 envPair
-    : envKey EQUALS value  // New form: KEY=value (no = in value)
-    | envKey text          // Old form: KEY value (rest of line, can have =)
+    : envKey ( {bound()}? EQUALS value | text )
     ;
 
 // Env key - instruction keywords become UNQUOTED_TEXT (not at line start)
@@ -298,7 +328,7 @@ copyPaths
 // by the paths of a COPY/ADD and those of a VOLUME.
 pathArgument
     : quoted
-    | pathElement ( {adjacent()}? pathElement )*
+    | textElement ( {adjacent()}? textElement )*
     ;
 
 path
@@ -355,15 +385,17 @@ text
     | textElement
     ;
 
-// As `text`, for a value that ends at the next `=` so that `KEY=value` pairs can repeat.
+// As `text`, for a value that ends at the next `=` so that `KEY=value` pairs can repeat. The `=` that
+// binds the pair is not what ends one, so a value written against it may open with `=` of its own:
+// Docker reads `ENV KEY==value` as `KEY` bound to `=value`, the same pair `ENV KEY =value` gives.
 value
-    : valueElement valueElement+
-    | quoted
-    | valueElement
+    : ( {adjacent()}? EQUALS )* ( valueElement valueElement+ | quoted | valueElement )
     ;
 
 // An element of a value that ends at the next `=`, so that `KEY=value` pairs can repeat on one
-// instruction. Shared by LABEL k=v and ENV K=V.
+// instruction. Shared by LABEL k=v and ENV K=V. Everything a `textElement` admits but the `=` itself:
+// a value is written hard against its key, so `ENV K=--flag` and `ENV K=[a,b]` are values like any
+// other, and only the separator can end one.
 valueElement
     : UNQUOTED_TEXT
     | DOUBLE_QUOTED_STRING
@@ -373,34 +405,19 @@ valueElement
     | BACKTICK_SUBST  // Allow `command` in values
     | SPECIAL_VAR     // Allow $!, $$, $?, etc. in values
     | DOLLAR          // Allow lone $ in values (e.g., $'hello' ANSI-C quoting)
-    // NOTE: EQUALS is explicitly NOT included to allow multiple key=value pairs
-    ;
-
-// An element of a path. Whitespace separates paths, so `=` and `,` are ordinary characters here rather
-// than the separators they are in a value list.
-pathElement
-    : valueElement
-    | EQUALS
-    | COMMA
+    | FLAG            // Allow --option or --option=value as a value
+    | DASH_DASH       // Allow -- as a value
+    | LBRACKET        // Allow [ in values
+    | RBRACKET        // Allow ] in values
+    | COMMA           // Allow , in values
     ;
 
 // Generic text element - used for paths, image names, arg values, shell form and heredoc preambles.
 // Instruction keywords and contextual keywords (AS, CMD, NONE) become UNQUOTED_TEXT
-// when not in their specific contexts.
+// when not in their specific contexts. Outside a value list nothing separates a pair, so `=` is an
+// ordinary character here.
 textElement
-    : UNQUOTED_TEXT
-    | DOUBLE_QUOTED_STRING
-    | SINGLE_QUOTED_STRING
-    | ENV_VAR
-    | COMMAND_SUBST   // Allow $(command) in text
-    | BACKTICK_SUBST  // Allow `command` in text
-    | SPECIAL_VAR     // Allow $!, $$, $?, etc. in text
-    | DOLLAR          // Allow lone $ in text (e.g., $'hello' ANSI-C quoting)
-    | EQUALS     // Allow = in shell form text (e.g., ENV_VAR=value in RUN commands)
-    | FLAG       // Allow --option or --option=value in text
-    | DASH_DASH  // Allow -- in shell form text (e.g., --option in shell commands)
-    | LBRACKET   // Allow [ in text (e.g., shell test expressions)
-    | RBRACKET   // Allow ] in text
-    | COMMA      // Allow , in text
+    : valueElement
+    | EQUALS
     ;
 

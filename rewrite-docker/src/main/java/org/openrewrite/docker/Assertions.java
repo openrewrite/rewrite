@@ -22,6 +22,8 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.docker.tree.Comment;
+import org.openrewrite.docker.internal.ArgumentContents;
+import org.openrewrite.docker.internal.Heredocs;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.StringUtils;
@@ -35,6 +37,7 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 public class Assertions {
@@ -244,7 +247,10 @@ public class Assertions {
     }
 
     private static class WellFormedVisitor extends DockerIsoVisitor<List<String>> {
-        private static final Pattern HEREDOC_MARKER = Pattern.compile("<<-?([A-Za-z_][A-Za-z0-9_]*)");
+        // The lookarounds keep a here-string out: `<<<'x'` redirects a word rather than opening a heredoc,
+        // and its last two '<' would otherwise read as a marker naming the word that follows them.
+        private static final Pattern HEREDOC_MARKER =
+                Pattern.compile("(?<!<)<<(?!<)(-?(?:[A-Za-z_][A-Za-z0-9_]*|'[^'\\r\\n]*'|\"[^\"\\r\\n]*\")+)");
 
         private final Set<UUID> ids = new HashSet<>();
 
@@ -416,10 +422,16 @@ public class Assertions {
                 violations.add("expected the preamble " + quoted(form.getPreamble()) + " to open one heredoc per" +
                         " body, but it opens " + markers.size() + " for " + form.getBodies().size() + " bodies");
             }
+            if (!form.getBodies().isEmpty() &&
+                    !form.getBodies().get(0).getPrefix().getWhitespace().contains("\n")) {
+                violations.add("expected the heredoc opened by the preamble " + quoted(form.getPreamble()) +
+                        " to begin on the line after it");
+            }
             for (int i = 0; i < form.getBodies().size(); i++) {
                 Docker.HeredocBody body = form.getBodies().get(i);
-                if (i < markers.size() && !markers.get(i).equals(body.getClosing())) {
-                    violations.add("expected the heredoc opened by " + quoted(markers.get(i)) + " to close with it," +
+                if (i < markers.size() && !Heredocs.closes(markers.get(i), body.getClosing())) {
+                    String name = Heredocs.delimiter(markers.get(i));
+                    violations.add("expected the heredoc opened by " + quoted(name) + " to close with it," +
                             " but it closes with " + quoted(body.getClosing()));
                 }
                 if (!body.getOpening().startsWith("<<")) {
@@ -439,9 +451,12 @@ public class Assertions {
         public Docker.Argument visitArgument(Docker.Argument argument, List<String> violations) {
             List<Docker.ArgumentContent> contents = argument.getContents();
             for (int i = 1; i < contents.size(); i++) {
+                if (i + 1 == contents.size() && isEmptyLiteral(contents.get(i))) {
+                    continue;
+                }
                 Space prefix = contents.get(i).getPrefix();
                 if (!prefix.getWhitespace().isEmpty() || !prefix.getComments().isEmpty()) {
-                    violations.add("expected the contents of the argument " + quoted(argument.getTextWithVariables()) +
+                    violations.add("expected the contents of the argument " + quoted(ArgumentContents.textWithVariables(argument)) +
                             " to be contiguous, but one is preceded by " + quoted(prefix.toString()));
                 }
             }
@@ -451,11 +466,46 @@ public class Assertions {
         @Override
         public Docker.Literal visitLiteral(Docker.Literal literal, List<String> violations) {
             Docker.Literal.QuoteStyle style = literal.getQuoteStyle();
+            if (style == null) {
+                outerWhitespace(literal, violations);
+            }
             if (style != null && hasUnescapedQuote(literal.getText(), style)) {
                 violations.add("expected the quoted literal " + quoted(literal.getText()) + " to hold no unescaped " +
                         quoteOf(style) + ", which ends the string when it is read back");
             }
             return super.visitLiteral(literal, violations);
+        }
+
+        /// An empty content closing an argument is the one place whitespace between contents is not that
+        /// argument's text: it is what a part reaching a separator has to write back, and the separator
+        /// has no prefix of its own to hold it.
+        private static boolean isEmptyLiteral(Docker.ArgumentContent content) {
+            return content instanceof Docker.Literal && ((Docker.Literal) content).getText().isEmpty();
+        }
+
+        /// A literal whose text runs into the whitespace around it hands every recipe reading its value
+        /// the formatting too. Only where the value itself begins and ends is formatting: whitespace
+        /// where two contents meet is the value's own text, as the space in `"pre $V post"` is.
+        private void outerWhitespace(Docker.Literal literal, List<String> violations) {
+            String text = literal.getText();
+            if (text.isEmpty()) {
+                return;
+            }
+            List<Docker.ArgumentContent> value = valueItIsPartOf(literal);
+            if ((value.get(0) == literal && Character.isWhitespace(text.charAt(0))) ||
+                    (value.get(value.size() - 1) == literal &&
+                            Character.isWhitespace(text.charAt(text.length() - 1)))) {
+                violations.add("expected the literal " + quoted(text) + " to hold only its value, but it starts or" +
+                        " ends with whitespace that belongs in the space around it");
+            }
+        }
+
+        /// The contents the literal shares its value with, which is the literal alone where it is a whole
+        /// value of its own, as an `ARG`'s name and an `ENV`'s key are.
+        private List<Docker.ArgumentContent> valueItIsPartOf(Docker.Literal literal) {
+            Object parent = getCursor().getParentTreeCursor().getValue();
+            return parent instanceof Docker.Argument ? ((Docker.Argument) parent).getContents() :
+                    singletonList(literal);
         }
 
         /// Recipes that copy a subtree, as combining or adding instructions do, hand the same element
@@ -562,13 +612,14 @@ public class Assertions {
         }
 
         /// A single quoted string has no escape processing at all, so any quote of its own style ends
-        /// it; a double quoted one can hold an escaped quote.
+        /// it; a double quoted one can hold an escaped quote. A literal does not know which of `\\` and
+        /// `` ` `` its file's `# escape=` directive named, so either one counts here.
         private static boolean hasUnescapedQuote(String text, Docker.Literal.QuoteStyle style) {
             boolean escapable = style == Docker.Literal.QuoteStyle.DOUBLE;
             char quote = quoteOf(style);
             for (int i = 0; i < text.length(); i++) {
                 char c = text.charAt(i);
-                if (escapable && c == '\\') {
+                if (escapable && (c == '\\' || c == '`')) {
                     i++;
                 } else if (c == quote) {
                     return true;

@@ -27,6 +27,7 @@ import org.openrewrite.docker.internal.grammar.DockerParserBaseVisitor;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
@@ -133,24 +134,35 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         List<Docker.Flag> flags = ctx.flags() != null ? convertFlags(ctx.flags()) : null;
 
-        DockerParser.ImageReferenceContext reference = ctx.imageReference();
-        TerminalNode colon = reference.COLON();
-        TerminalNode at = reference.AT();
-        Docker.Argument imageName = separatedPart(reference.imageName(), colon != null ? colon : at);
+        Docker.@Nullable Argument[] reference = imageReferenceParts(ctx.imageReference());
+
+        Docker.From.As as = ctx.AS() != null ? visitFromAs(ctx) : null;
+
+        return new Docker.From(randomId(), prefix, Markers.EMPTY, fromKeyword, flags, reference[0], reference[1], reference[2], as);
+    }
+
+    /// The `{imageName, tag, digest}` a reference splits into, or an empty name where the reference is
+    /// absent, as it is in the `--from=` of a `COPY` that names nothing. Shared by `FROM` and by the
+    /// `--from` of a `COPY`/`ADD`, which the grammar splits by the same `imageReference` rule.
+    private Docker.@Nullable Argument[] imageReferenceParts(DockerParser.@Nullable ImageReferenceContext ctx) {
+        if (ctx == null) {
+            return new Docker.@Nullable Argument[]{
+                    new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, emptyList()), null, null};
+        }
+        TerminalNode colon = ctx.COLON();
+        TerminalNode at = ctx.AT();
+        Docker.Argument imageName = separatedPart(ctx.imageName(), colon != null ? colon : at);
         Docker.Argument tag = null;
         if (colon != null) {
             skip(colon.getSymbol());
-            tag = separatedPart(reference.tag(), at);
+            tag = separatedPart(ctx.tag(), at);
         }
         Docker.Argument digest = null;
         if (at != null) {
             skip(at.getSymbol());
-            digest = separatedPart(reference.digest(), null);
+            digest = separatedPart(ctx.digest(), null);
         }
-
-        Docker.From.As as = ctx.AS() != null ? visitFromAs(ctx) : null;
-
-        return new Docker.From(randomId(), prefix, Markers.EMPTY, fromKeyword, flags, imageName, tag, digest, as);
+        return new Docker.@Nullable Argument[]{imageName, tag, digest};
     }
 
     private Docker.From.As visitFromAs(DockerParser.FromInstructionContext ctx) {
@@ -178,20 +190,27 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         );
     }
 
-    /// One part of a value the grammar split on a separator, an image reference or a `USER` specification,
-    /// reaching up to the separator that follows it so that a line continuation written before that
-    /// separator stays with the part. A part can be absent while its separator is present, as in
-    /// `FROM alpine:` or `USER root:`, and is then empty rather than missing, which keeps the separator
-    /// in the printed source.
+    /// One part of a value the grammar split on a separator, an image reference or a `USER` specification.
+    /// A part can be absent while its separator is present, as in `FROM alpine:` or `USER root:`, and is
+    /// then empty rather than missing, which keeps the separator in the printed source. Whitespace
+    /// written before the separator is formatting the printer has to write back, and the separator has
+    /// no prefix of its own to hold it, so it becomes the prefix of an empty content closing the part
+    /// rather than text the part does not mean.
     private Docker.Argument separatedPart(@Nullable ParserRuleContext ctx, @Nullable TerminalNode separator) {
         if (ctx == null) {
             Space prefix = separator == null ? Space.EMPTY : prefix(separator.getSymbol());
             return new Docker.Argument(randomId(), prefix, Markers.EMPTY, emptyList());
         }
         Space prefix = prefix(ctx);
-        int stopIndex = separator == null ? ctx.getStop().getStopIndex() : separator.getSymbol().getStartIndex() - 1;
-        List<Docker.ArgumentContent> contents = parseText(ctx, stopIndex);
-        advanceCursor(stopIndex + 1);
+        List<Docker.ArgumentContent> contents = parseText(ctx);
+        advanceCursor(ctx.getStop().getStopIndex() + 1);
+        if (separator != null) {
+            Space beforeSeparator = prefix(separator.getSymbol());
+            if (!beforeSeparator.isEmpty()) {
+                contents = ListUtils.concat(contents,
+                        new Docker.Literal(randomId(), beforeSeparator, Markers.EMPTY, "", null));
+            }
+        }
         return new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
     }
 
@@ -200,19 +219,13 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
     /// anywhere else the quotes are part of the text. Environment variable references are always split
     /// out, since their value cannot be resolved from the source.
     private List<Docker.ArgumentContent> parseText(@Nullable ParserRuleContext textCtx) {
-        return parseText(textCtx, -1);
-    }
-
-    /// As {@link #parseText(ParserRuleContext)}, reading up to {@code stopIndex} when the value
-    /// continues past its last token, as it does when whitespace precedes an image reference separator.
-    private List<Docker.ArgumentContent> parseText(@Nullable ParserRuleContext textCtx, int stopIndex) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         if (textCtx == null || textCtx.getChildCount() == 0) {
             return contents;
         }
 
         Token quoted = quotedValue(textCtx);
-        if (quoted != null && stopIndex <= quoted.getStopIndex()) {
+        if (quoted != null) {
             Docker.Literal.QuoteStyle quoteStyle = quoted.getType() == DockerLexer.DOUBLE_QUOTED_STRING ?
                     Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE;
             String text = quoted.getText();
@@ -229,7 +242,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         Space prefix = prefix(textCtx.getStart());
         int startIndex = textCtx.getStart().getStartIndex();
-        int endIndex = Math.max(stopIndex, textCtx.getStop().getStopIndex());
+        int endIndex = textCtx.getStop().getStopIndex();
         skip(textCtx.getStop());
         contents.addAll(ArgumentContents.splitVariables(sourceText(startIndex, endIndex), prefix));
         return contents;
@@ -934,10 +947,29 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
     private List<Docker.Flag> convertFlags(DockerParser.FlagsContext ctx) {
         List<Docker.Flag> flags = new ArrayList<>();
-        for (DockerParser.FlagContext flagCtx : ctx.flag()) {
-            flags.add(parseFlag(flagCtx.FLAG().getSymbol()));
+        for (ParseTree child : ctx.children) {
+            if (child instanceof DockerParser.FlagContext) {
+                flags.add(parseFlag(((DockerParser.FlagContext) child).FLAG().getSymbol()));
+            } else if (child instanceof DockerParser.FromFlagContext) {
+                flags.add(parseFromFlag((DockerParser.FromFlagContext) child));
+            }
         }
         return flags;
+    }
+
+    /// The `--from` of a `COPY`, whose value the `FLAG_IMAGE_REF` lexer mode splits by the
+    /// same rule that splits the reference of a `FROM`. A flag holds one value, so the parts are
+    /// flattened back into it with their separators, the form [ImageReferences] reads them from.
+    private Docker.Flag parseFromFlag(DockerParser.FromFlagContext ctx) {
+        Token token = ctx.FROM_FLAG().getSymbol();
+        Space flagPrefix = prefix(token);
+        String tokenText = token.getText();
+        skip(token);
+
+        String flagName = tokenText.substring(2, tokenText.indexOf('='));
+        Docker.Argument value = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
+                ImageReferences.contents(imageReferenceParts(ctx.imageReference())));
+        return new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, value);
     }
 
     /**
@@ -961,70 +993,13 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             flagName = flagContent.substring(0, equalsIdx);
             String valueText = flagContent.substring(equalsIdx + 1);
 
-            List<Docker.ArgumentContent> contents = parseFlagValue(valueText);
+            List<Docker.ArgumentContent> contents = ArgumentContents.flagValue(valueText);
             flagValue = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, contents);
         } else {
             flagName = flagContent;
         }
 
         return new Docker.Flag(randomId(), flagPrefix, Markers.EMPTY, flagName, flagValue);
-    }
-
-    /// Splits the value of a command's flag into its quoted literals, environment variable references
-    /// and the `=` separating a key from a value, as in `--mount=type=bind`. Everything that is not a
-    /// quote or a separator is handed to [ArgumentContents#splitVariables(String, Space)], so a variable reference means
-    /// the same thing here as it does in an argument's value.
-    private List<Docker.ArgumentContent> parseFlagValue(String text) {
-        List<Docker.ArgumentContent> contents = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        int i = 0;
-
-        while (i < text.length()) {
-            char c = text.charAt(i);
-
-            if (c == '"' || c == '\'') {
-                int close = findClosingQuote(text, i);
-                if (close < 0) {
-                    current.append(c);
-                    i++;
-                    continue;
-                }
-                flushFlagText(current, contents);
-                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text.substring(i + 1, close),
-                        c == '"' ? Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE));
-                i = close + 1;
-            } else if (c == '=') {
-                flushFlagText(current, contents);
-                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "=", null));
-                i++;
-            } else {
-                current.append(c);
-                i++;
-            }
-        }
-        flushFlagText(current, contents);
-
-        return contents.isEmpty() ? singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null)) : contents;
-    }
-
-    private void flushFlagText(StringBuilder current, List<Docker.ArgumentContent> contents) {
-        if (current.length() > 0) {
-            contents.addAll(ArgumentContents.splitVariables(current.toString(), Space.EMPTY));
-            current.setLength(0);
-        }
-    }
-
-    private static int findClosingQuote(String text, int openIndex) {
-        char quote = text.charAt(openIndex);
-        for (int i = openIndex + 1; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (quote == '"' && c == '\\') {
-                i++;
-            } else if (c == quote) {
-                return i;
-            }
-        }
-        return -1;
     }
 
     private Docker.ShellForm visitShellFormContext(DockerParser.ShellFormContext ctx) {
@@ -1131,6 +1106,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             // Track if we've seen the first HEREDOC_START (for destination extraction)
             boolean seenFirstHeredocStart = false;
             int heredocStartCount = 0;
+            List<String> openings = new ArrayList<>();
 
             // Collect all tokens in the preamble (HEREDOC_START and preambleElements)
             for (int i = 0; i < preambleCtx.getChildCount(); i++) {
@@ -1140,6 +1116,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
                     if (tn.getSymbol().getType() == DockerLexer.HEREDOC_START) {
                         heredocStartCount++;
                         seenFirstHeredocStart = true;
+                        openings.add(tn.getText());
                     }
                     // Add whitespace prefix if any
                     Space tokenPrefix = prefix(tn.getSymbol());
@@ -1168,15 +1145,13 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
             String preamble = preambleBuilder.toString();
 
-            // Skip the NEWLINE after the preamble
-            if (c.NEWLINE() != null) {
-                skip(c.NEWLINE().getSymbol());
-            }
+            // The NEWLINE that ends the preamble is deliberately not consumed here; it is the
+            // prefix of the first body, which is where a CRLF line ending survives the round trip.
 
             // Parse each heredoc body
             List<Docker.HeredocBody> bodies = new ArrayList<>();
-            for (DockerParser.HeredocBodyContext bodyCtx : c.heredocBody()) {
-                bodies.add(visitHeredocBodyContext(bodyCtx));
+            for (int i = 0; i < c.heredocBody().size(); i++) {
+                bodies.add(visitHeredocBodyContext(c.heredocBody(i), i < openings.size() ? openings.get(i) : null));
             }
 
             return new Docker.HeredocForm(randomId(), prefix, Markers.EMPTY, preamble, destination, bodies);
@@ -1194,10 +1169,10 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
 
         // Create a literal for the element
         Docker.Literal.QuoteStyle quoteStyle = null;
-        if (ctx.DOUBLE_QUOTED_STRING() != null) {
+        if (token.getType() == DockerLexer.DOUBLE_QUOTED_STRING) {
             quoteStyle = Docker.Literal.QuoteStyle.DOUBLE;
             text = text.substring(1, text.length() - 1); // Remove quotes
-        } else if (ctx.SINGLE_QUOTED_STRING() != null) {
+        } else if (token.getType() == DockerLexer.SINGLE_QUOTED_STRING) {
             quoteStyle = Docker.Literal.QuoteStyle.SINGLE;
             text = text.substring(1, text.length() - 1); // Remove quotes
         }
@@ -1206,7 +1181,7 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
         return new Docker.Argument(randomId(), argPrefix, Markers.EMPTY, contents);
     }
 
-    private Docker.HeredocBody visitHeredocBodyContext(DockerParser.HeredocBodyContext ctx) {
+    private Docker.HeredocBody visitHeredocBodyContext(DockerParser.HeredocBodyContext ctx, @Nullable String opening) {
         Space prefix = prefix(ctx.getStart());
 
         // Collect content lines from heredocContent
@@ -1215,14 +1190,13 @@ public class DockerParserVisitor extends DockerParserBaseVisitor<Docker> {
             collectHeredocContent(ctx.heredocContent(), contentLines);
         }
 
-        // Get closing marker (UNQUOTED_TEXT) - this is also the opening marker name without <<
+        // The closing marker is the whole line that closed the body, which a "<<-" heredoc allows to be
+        // indented with tabs, so it is not always the text of the marker that opened it
         String closing = ctx.heredocEnd().UNQUOTED_TEXT().getText();
         skip(ctx.heredocEnd().UNQUOTED_TEXT().getSymbol());
 
-        // The opening marker is "<<" + closing (we reconstruct it for the model)
-        String opening = "<<" + closing;
-
-        return new Docker.HeredocBody(randomId(), prefix, Markers.EMPTY, opening, contentLines, closing);
+        return new Docker.HeredocBody(randomId(), prefix, Markers.EMPTY,
+                opening == null ? "<<" + closing : opening, contentLines, closing);
     }
 
     /**

@@ -125,12 +125,12 @@ class UseExecFormEntrypointTest implements RewriteTest {
             """
               FROM ubuntu:22.04
               ENTRYPOINT /app/server
-              CMD --config /etc/app.conf
+              CMD serve --config /etc/app.conf
               """,
             """
               FROM ubuntu:22.04
               ENTRYPOINT ["/app/server"]
-              CMD ["--config", "/etc/app.conf"]
+              CMD ["serve", "--config", "/etc/app.conf"]
               """
           )
         );
@@ -144,12 +144,12 @@ class UseExecFormEntrypointTest implements RewriteTest {
             """
               FROM ubuntu:22.04
               ENTRYPOINT /app/server
-              CMD --config /etc/app.conf
+              CMD serve --config /etc/app.conf
               """,
             """
               FROM ubuntu:22.04
               ENTRYPOINT ["/app/server"]
-              CMD --config /etc/app.conf
+              CMD serve --config /etc/app.conf
               """
           )
         );
@@ -163,12 +163,12 @@ class UseExecFormEntrypointTest implements RewriteTest {
             """
               FROM ubuntu:22.04
               ENTRYPOINT /app/server
-              CMD --config /etc/app.conf
+              CMD serve --config /etc/app.conf
               """,
             """
               FROM ubuntu:22.04
               ENTRYPOINT /app/server
-              CMD ["--config", "/etc/app.conf"]
+              CMD ["serve", "--config", "/etc/app.conf"]
               """
           )
         );

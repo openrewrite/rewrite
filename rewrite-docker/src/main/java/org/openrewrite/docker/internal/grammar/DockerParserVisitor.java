@@ -194,6 +194,12 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitFlag(DockerParser.FlagContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link DockerParser#fromFlag}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitFromFlag(DockerParser.FromFlagContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link DockerParser#execForm}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -415,12 +421,6 @@ public interface DockerParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitValueElement(DockerParser.ValueElementContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link DockerParser#pathElement}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitPathElement(DockerParser.PathElementContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link DockerParser#textElement}.
 	 * @param ctx the parse tree

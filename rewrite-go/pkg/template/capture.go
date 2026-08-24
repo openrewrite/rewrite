@@ -71,8 +71,14 @@ func Ident(name string) *Capture {
 	return &Capture{name: name, kind: CaptureName, maxCount: -1}
 }
 
-// The type name is used in the scaffold preamble for type-attributed matching.
+// WithType declares the Go type a capture stands for. The scaffold preamble
+// declares the placeholder with it, so the pattern type-checks, and a match
+// binds only a candidate assignable to it. Only an expression carries a type.
+// See doc/recipe-authoring.md: Typed captures, for what the model cannot see.
 func (c *Capture) WithType(typeName string) *Capture {
+	if c.kind != CaptureExpression {
+		panic(fmt.Sprintf("capture %q: a declared type constrains an expression capture only", c.name))
+	}
 	cp := *c
 	cp.typeName = typeName
 	return &cp
@@ -99,6 +105,17 @@ func (c *Capture) Variadic(min, max int) *Capture {
 // bounds. A capture that is not variadic bounds nothing, admitting any run.
 func (c *Capture) allowsCount(n int) bool {
 	return n >= c.minCount && (c.maxCount < 0 || n <= c.maxCount)
+}
+
+// anyVariadic reports whether a run has to be looked for at all, which is a
+// property of the pattern rather than of the list being compared.
+func anyVariadic(captures map[string]*Capture) bool {
+	for _, c := range captures {
+		if c.IsVariadic() {
+			return true
+		}
+	}
+	return false
 }
 
 func captureMap(captures []*Capture) map[string]*Capture {

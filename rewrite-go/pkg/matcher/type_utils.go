@@ -90,6 +90,71 @@ func isAssignableToFQN(t java.JavaType, fqn string, visited map[java.JavaType]bo
 	return false
 }
 
+// IsAssignableToType reports whether a value of type from may be used where to
+// is wanted. Go satisfies an interface by carrying its methods and declares it
+// nowhere, so an interface target is answered from the two method sets.
+func IsAssignableToType(from, to java.JavaType) bool {
+	if from == nil || to == nil || java.IsUnknown(from) || java.IsUnknown(to) {
+		return false
+	}
+	if IsSameGoType(from, to) {
+		return true
+	}
+	// A literal's keyword names a class of Go types, so it answers to any of
+	// them by name — and, carrying no method set, to no interface but the
+	// empty one.
+	if (isLiteralKeyword(from) || isLiteralKeyword(to)) && SharesGoTypeName(from, to) {
+		return true
+	}
+	// An interface is the only target a Go value reaches without being it,
+	// whether by carrying its methods or by a relation a peer model recorded.
+	if iface := AsClass(to); iface != nil && iface.Kind == "Interface" {
+		fqn := GetFullyQualifiedName(to)
+		return hasMethodSet(from, iface.Methods) || (fqn != "" && IsAssignableTo(from, fqn))
+	}
+	return false
+}
+
+// hasMethodSet reports whether from carries every method of an interface. The
+// empty one asks for nothing, which is what makes `any` a target every
+// attributed type reaches.
+func hasMethodSet(from java.JavaType, methods []*java.JavaTypeMethod) bool {
+	if len(methods) == 0 {
+		return true
+	}
+	cls := AsClass(from)
+	if cls == nil {
+		return false
+	}
+	for _, want := range methods {
+		if !hasMethod(cls, want) {
+			return false
+		}
+	}
+	return true
+}
+
+func hasMethod(cls *java.JavaTypeClass, want *java.JavaTypeMethod) bool {
+	for _, have := range cls.Methods {
+		if have.Name == want.Name && sameSignature(have, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func sameSignature(a, b *java.JavaTypeMethod) bool {
+	if len(a.ParameterTypes) != len(b.ParameterTypes) {
+		return false
+	}
+	for i := range a.ParameterTypes {
+		if !IsSameGoType(a.ParameterTypes[i], b.ParameterTypes[i]) {
+			return false
+		}
+	}
+	return IsSameGoType(a.ReturnType, b.ReturnType)
+}
+
 // Implements checks if the type implements the given interface FQN.
 // Unlike IsAssignableTo, this returns false if the type IS the interface.
 func Implements(t java.JavaType, interfaceFQN string) bool {
@@ -149,6 +214,20 @@ func GoTypeNames(t java.JavaType) []string {
 		}
 	}
 	return []string{GetFullyQualifiedName(t)}
+}
+
+// SharesGoTypeName reports whether two attributed types name a Go type in
+// common, a literal `1` sharing one with an `int` and with an `int32`.
+func SharesGoTypeName(a, b java.JavaType) bool {
+	others := GoTypeNames(b)
+	for _, name := range GoTypeNames(a) {
+		for _, other := range others {
+			if name != "" && name == other {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func anyGoTypeName(t java.JavaType, in map[string]bool) bool {

@@ -431,7 +431,135 @@ class CopyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void fromFlagValueIsSplitOnItsSeparators() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --from=host:5000/img:1.2@sha256:abc /build /app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getFlags()).hasSize(1);
+                Docker.Flag from = copy.getFlags().getFirst();
+                assertThat(from.getName()).isEqualTo("from");
+                assertThat(from.getValue()).isNotNull();
+                assertThat(from.getValue().getContents()).map(CopyTest::literal)
+                  .containsExactly("host:5000/img", ":", "1.2", "@", "sha256:abc");
+            })
+          )
+        );
+    }
+
+    @Test
+    void onlyTheFromFlagCarriesAnImageReference() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --chown=1:2 --from=nginx:1.25 /build /app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getFlags()).map(Docker.Flag::getName).containsExactly("chown", "from");
+                assertThat(copy.getFlags().getFirst().getValue().getContents()).map(CopyTest::literal)
+                  .containsExactly("1:2");
+                assertThat(copy.getFlags().getLast().getValue().getContents()).map(CopyTest::literal)
+                  .containsExactly("nginx", ":", "1.25");
+            })
+          )
+        );
+    }
+
+    @Test
+    void whatFollowsAFromFlagIsNotPartOfItsValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM golang AS build
+              FROM ubuntu:20.04
+              COPY --from=build --link /target/ /
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getLast().getInstructions().getLast();
+                assertThat(copy.getFlags()).map(Docker.Flag::getName).containsExactly("from", "link");
+                assertThat(copy.getFlags().getFirst().getValue().getContents()).map(CopyTest::literal)
+                  .containsExactly("build");
+                assertThat(copy.getFlags().getLast().getValue()).isNull();
+                assertThat(copy.getShellForm()).isNotNull();
+                assertThat(copy.getShellForm().getSources()).map(CopyTest::text).containsExactly("/target/");
+                assertThat(text(copy.getShellForm().getDestination())).isEqualTo("/");
+            })
+          )
+        );
+    }
+
+    @Test
+    void aLineContinuationEndsAFromFlagValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --from=nginx:1.25\\
+                /build /app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getFlags().getFirst().getValue().getContents()).map(CopyTest::literal)
+                  .containsExactly("nginx", ":", "1.25");
+            })
+          )
+        );
+    }
+
+    @Test
+    void aPaddedLineContinuationEndsAFromFlagValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --from=nginx:1.25\\  \s
+                /build /app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getFlags().getFirst().getValue().getContents()).map(CopyTest::literal)
+                  .containsExactly("nginx", ":", "1.25");
+            })
+          )
+        );
+    }
+
+    @Test
+    void aCommentAfterTheContinuationEndingAFromFlagValueIsAComment() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              COPY --from=nginx:1.25\\
+              # the built assets
+                /build /app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(copy.getFlags().getFirst().getValue().getContents()).map(CopyTest::literal)
+                  .containsExactly("nginx", ":", "1.25");
+                var form = (Docker.CopyShellForm) copy.getForm();
+                assertThat(form.getPrefix().getComments()).singleElement()
+                  .satisfies(comment -> assertThat(comment.getText()).isEqualTo("# the built assets"));
+                assertThat(form.getSources()).map(CopyTest::text).containsExactly("/build");
+                assertThat(text(form.getDestination())).isEqualTo("/app");
+            })
+          )
+        );
+    }
+
     private static String text(Docker.Argument argument) {
-        return ((Docker.Literal) argument.getContents().getFirst()).getText();
+        return literal(argument.getContents().getFirst());
+    }
+
+    private static String literal(Docker.ArgumentContent content) {
+        return ((Docker.Literal) content).getText();
     }
 }

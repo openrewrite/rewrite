@@ -27,9 +27,9 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Builds the contents of a {@link Docker.Argument} from text. Both the parser and recipes that
- * synthesize values go through here, so a value a recipe writes is modelled the same way as one
- * read back from the printed Dockerfile.
+ * Builds the contents of a {@link Docker.Argument} from text, and reads them back out. Both the
+ * parser and recipes that synthesize values go through here, so a value a recipe writes is modelled
+ * the same way as one read back from the printed Dockerfile.
  */
 public class ArgumentContents {
     private ArgumentContents() {
@@ -48,6 +48,63 @@ public class ArgumentContents {
             return splitVariables('"' + text + '"', Space.EMPTY);
         }
         return splitVariables(text, Space.EMPTY);
+    }
+
+    /// Splits the value of a command's flag into its quoted literals, environment variable references
+    /// and the `=` separating a key from a value, as in `--mount=type=bind`. Everything that is not a
+    /// quote or a separator is handed to [#splitVariables(String, Space)], so a variable reference means
+    /// the same thing here as it does in an argument's value.
+    public static List<Docker.ArgumentContent> flagValue(String text) {
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int i = 0;
+
+        while (i < text.length()) {
+            char c = text.charAt(i);
+
+            if (c == '"' || c == '\'') {
+                int close = findClosingQuote(text, i);
+                if (close < 0) {
+                    current.append(c);
+                    i++;
+                    continue;
+                }
+                flushFlagText(current, contents);
+                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text.substring(i + 1, close),
+                        c == '"' ? Docker.Literal.QuoteStyle.DOUBLE : Docker.Literal.QuoteStyle.SINGLE));
+                i = close + 1;
+            } else if (c == '=') {
+                flushFlagText(current, contents);
+                contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "=", null));
+                i++;
+            } else {
+                current.append(c);
+                i++;
+            }
+        }
+        flushFlagText(current, contents);
+
+        return contents.isEmpty() ? singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "", null)) : contents;
+    }
+
+    private static void flushFlagText(StringBuilder current, List<Docker.ArgumentContent> contents) {
+        if (current.length() > 0) {
+            contents.addAll(splitVariables(current.toString(), Space.EMPTY));
+            current.setLength(0);
+        }
+    }
+
+    private static int findClosingQuote(String text, int openIndex) {
+        char quote = text.charAt(openIndex);
+        for (int i = openIndex + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote == '"' && c == '\\') {
+                i++;
+            } else if (c == quote) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /// Splits environment variable references out of a value's text. Token boundaries are no guide here:
@@ -116,6 +173,58 @@ public class ArgumentContents {
                     Markers.EMPTY, current.toString(), null));
         }
         return contents;
+    }
+
+    /// @return The text of every content of `argument`, or `null` if an environment variable
+    /// reference makes it impossible to resolve statically.
+    public static @Nullable String text(Docker.Argument argument) {
+        StringBuilder text = new StringBuilder();
+        for (Docker.ArgumentContent content : argument.getContents()) {
+            if (content instanceof Docker.EnvironmentVariable) {
+                return null;
+            }
+            if (content instanceof Docker.Literal) {
+                text.append(((Docker.Literal) content).getText());
+            }
+        }
+        return text.toString();
+    }
+
+    /// @return As [#text], but rendering environment variable references in their original
+    /// `$VAR` or `${VAR}` form rather than giving up.
+    public static String textWithVariables(Docker.Argument argument) {
+        StringBuilder text = new StringBuilder();
+        for (Docker.ArgumentContent content : argument.getContents()) {
+            if (content instanceof Docker.Literal) {
+                text.append(((Docker.Literal) content).getText());
+            } else if (content instanceof Docker.EnvironmentVariable) {
+                Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
+                text.append(env.isBraced() ? "${" + env.getName() + "}" : "$" + env.getName());
+            }
+        }
+        return text.toString();
+    }
+
+    /// @return The quote style of the first quoted literal in `argument`, or `null` if none is quoted.
+    public static Docker.Literal.@Nullable QuoteStyle quoteStyle(Docker.Argument argument) {
+        for (Docker.ArgumentContent content : argument.getContents()) {
+            if (content instanceof Docker.Literal) {
+                Docker.Literal.QuoteStyle style = ((Docker.Literal) content).getQuoteStyle();
+                if (style != null) {
+                    return style;
+                }
+            }
+        }
+        return null;
+    }
+
+    public static boolean containsVariable(Docker.Argument argument) {
+        for (Docker.ArgumentContent content : argument.getContents()) {
+            if (content instanceof Docker.EnvironmentVariable) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean containsVariable(String text) {

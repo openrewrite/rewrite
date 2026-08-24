@@ -377,6 +377,24 @@ class AssertionsTest implements RewriteTest {
     }
 
     @Test
+    void catchesAHeredocBodyPulledOntoThePreambleLine() {
+        assertMalformed(
+          """
+            FROM alpine
+            RUN <<EOF
+            echo hi
+            EOF
+            """,
+          new DockerIsoVisitor<>() {
+              @Override
+              public Docker.HeredocForm visitHeredocForm(Docker.HeredocForm form, ExecutionContext ctx) {
+                  return form.withBodies(ListUtils.map(form.getBodies(), body -> body.withPrefix(Space.EMPTY)));
+              }
+          },
+          "expected the heredoc opened by the preamble \"<<EOF\" to begin on the line after it");
+    }
+
+    @Test
     void catchesAHeredocLineThatSwallowsTheNextOne() {
         assertMalformed(
           """
@@ -558,6 +576,63 @@ class AssertionsTest implements RewriteTest {
               }
           },
           "to hold no unescaped '");
+    }
+
+    @Test
+    void catchesALiteralHoldingTheWhitespaceAroundIt() {
+        assertMalformed(
+          """
+            FROM alpine
+            WORKDIR /app
+            """,
+          new DockerIsoVisitor<>() {
+              @Override
+              public Docker.Literal visitLiteral(Docker.Literal literal, ExecutionContext ctx) {
+                  return literal.withText(literal.getText() + " ");
+              }
+          },
+          "to hold only its value, but it starts or ends with whitespace");
+    }
+
+    /// An ARG's name, like an ENV's key, is a whole value of its own rather than one content of an
+    /// argument, and the check reaches it just the same.
+    @Test
+    void catchesAValueOfItsOwnHoldingTheWhitespaceAroundIt() {
+        assertMalformed(
+          """
+            FROM alpine
+            ARG VERSION=1
+            """,
+          new DockerIsoVisitor<>() {
+              @Override
+              public Docker.Arg visitArg(Docker.Arg arg, ExecutionContext ctx) {
+                  return arg.withName(arg.getName().withText(arg.getName().getText() + " "));
+              }
+          },
+          "to hold only its value, but it starts or ends with whitespace");
+    }
+
+    @Test
+    void catchesWhitespaceAroundAValueThatASeparatorSplitIntoParts() {
+        assertMalformed(
+          """
+            FROM ubuntu:22.04
+            """,
+          new DockerIsoVisitor<>() {
+              @Override
+              public Docker.From visitFrom(Docker.From from, ExecutionContext ctx) {
+                  return from.withImageName(from.getImageName().withContents(ListUtils.mapFirst(
+                    from.getImageName().getContents(),
+                    content -> ((Docker.Literal) content).withText(" ubuntu"))));
+              }
+          },
+          "to hold only its value, but it starts or ends with whitespace");
+    }
+
+    /// A quoted literal's quotes delimit it, so whitespace inside them is what the value means.
+    @Test
+    void acceptsAQuotedLiteralHoldingWhitespaceOfItsOwn() {
+        Assertions.assertWellFormed(parse("FROM alpine\nENV KEY=\" value \"\n"));
     }
 
     /// An ONBUILD's instruction, and a HEALTHCHECK's CMD, correctly sit on the same line as the
