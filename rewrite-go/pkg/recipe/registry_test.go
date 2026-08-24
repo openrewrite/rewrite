@@ -69,7 +69,8 @@ func TestRegisterResolvesCompositeChildren(t *testing.T) {
 	for _, child := range []string{"com.example.Composite$Keep", "com.example.Composite$Negate"} {
 		reg, ok := r.FindRecipe(child)
 		require.Truef(t, ok, "expected child recipe %q to resolve via FindRecipe", child)
-		inst := reg.Constructor(nil)
+		inst, err := reg.Constructor(nil)
+		require.NoErrorf(t, err, "expected child recipe %q constructor to succeed", child)
 		require.NotNilf(t, inst, "expected child recipe %q constructor to return an instance", child)
 		assert.Equalf(t, inst.Name(), child, "child %q resolved to instance with name", child)
 	}
