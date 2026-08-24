@@ -81,24 +81,33 @@ type ProjectImporter struct {
 	// Built by AddReplace from the parsed go.mod replace directives.
 	replaces map[string]replaceTarget
 	cache    map[string]*types.Package
-	// stubs are the paths resolved to a placeholder rather than to real
-	// symbols, so a caller can report what a package could not see.
-	stubs    map[string]bool
+	// degraded maps an import path to what its package lost, so a caller can
+	// report what a package could not see.
+	degraded map[string]string
+	// checking is the stack of packages whose type check is in progress, so a
+	// failure deep in the graph is charged to the package that asked for it.
+	checking []string
 	fset     *token.FileSet
 	fallback types.Importer
 }
 
-// StubsReachableFrom names the placeholder packages — right path and name,
-// empty scope — that importPath either is or reaches through what it imports.
-// A type a package cannot see costs its importers the same, however many
-// packages back it went missing. Sorted, so one tree comes of one source.
-func (p *ProjectImporter) StubsReachableFrom(importPath string) []string {
-	// An empty stub set proves nothing is reachable, and a build whose
-	// modules all resolved never fills it.
-	if len(p.stubs) == 0 {
+// DegradedImport is a package carrying less than its source would, and why.
+type DegradedImport struct {
+	Path   string
+	Reason string
+}
+
+// DegradedReachableFrom names the degraded packages importPath either is or
+// reaches through what it imports. A type a package cannot see costs its
+// importers the same, however many packages back it went missing. Sorted, so
+// one tree comes of one source.
+func (p *ProjectImporter) DegradedReachableFrom(importPath string) []DegradedImport {
+	// An empty set proves nothing is reachable, and a build that resolved
+	// everything never fills it.
+	if len(p.degraded) == 0 {
 		return nil
 	}
-	var found []string
+	var found []DegradedImport
 	seen := make(map[string]bool)
 	var walk func(string)
 	walk = func(path string) {
@@ -106,9 +115,8 @@ func (p *ProjectImporter) StubsReachableFrom(importPath string) []string {
 			return
 		}
 		seen[path] = true
-		if p.stubs[path] {
-			// A stub carries no imports of its own to walk.
-			found = append(found, path)
+		if reason, ok := p.degraded[path]; ok {
+			found = append(found, DegradedImport{Path: path, Reason: reason})
 			return
 		}
 		pkg, ok := p.cache[path]
@@ -120,7 +128,7 @@ func (p *ProjectImporter) StubsReachableFrom(importPath string) []string {
 		}
 	}
 	walk(importPath)
-	sort.Strings(found)
+	sort.Slice(found, func(i, j int) bool { return found[i].Path < found[j].Path })
 	return found
 }
 
@@ -149,7 +157,7 @@ func NewProjectImporter(modulePath string, fallback types.Importer) *ProjectImpo
 		modules:    make(map[string]cacheModule),
 		replaces:   make(map[string]replaceTarget),
 		cache:      make(map[string]*types.Package),
-		stubs:      make(map[string]bool),
+		degraded:   make(map[string]string),
 		fset:       token.NewFileSet(),
 		fallback:   fallback,
 	}
@@ -219,7 +227,25 @@ func (p *ProjectImporter) AddSource(relPath, content string) {
 	p.sources[importPath] = append(p.sources[importPath], projectFile{path: relPath, content: content})
 }
 
-func (p *ProjectImporter) Import(importPath string) (*types.Package, error) {
+func (p *ProjectImporter) Import(importPath string) (pkg *types.Package, err error) {
+	// Import recurses into itself for every sibling and vendored package, so
+	// it is the one edge a panic from any depth passes through. Recovering
+	// here costs the package that could not be read, and leaves the one being
+	// checked to finish with whatever else it resolved.
+	defer func() {
+		rec := recover()
+		if rec == nil {
+			return
+		}
+		pkg, err = nil, fmt.Errorf("%v", rec)
+		// A panic reaching a top-level import is reported by the caller that
+		// wrapped this importer; only a deeper one needs charging to the
+		// package whose check it interrupted.
+		if len(p.checking) > 0 {
+			owner := p.checking[len(p.checking)-1]
+			p.degraded[owner] = fmt.Sprintf("lost import %q: %s", importPath, compactCause(err))
+		}
+	}()
 	if cached, ok := p.cache[importPath]; ok {
 		return cached, nil
 	}
@@ -257,7 +283,7 @@ func (p *ProjectImporter) Import(importPath string) (*types.Package, error) {
 			stub := types.NewPackage(importPath, path.Base(importPath))
 			stub.MarkComplete()
 			p.cache[importPath] = stub
-			p.stubs[importPath] = true
+			p.degraded[importPath] = "an empty stub"
 			return stub, nil
 		}
 	}
@@ -481,6 +507,8 @@ func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (
 	// the checker fills it in from the parsed files, same as conf.Check.
 	pkg := types.NewPackage(importPath, "")
 	p.cache[importPath] = pkg
+	p.checking = append(p.checking, importPath)
+	defer func() { p.checking = p.checking[:len(p.checking)-1] }()
 	_ = types.NewChecker(&conf, p.fset, pkg, info).Files(asts)
 	return pkg, nil
 }

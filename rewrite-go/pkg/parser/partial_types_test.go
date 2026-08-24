@@ -178,6 +178,47 @@ func F() { _ = b.Make() }
 	assert.Contains(t, m.Reason, "example.com/app/b", "the reason names the import the stub was reached through")
 }
 
+// panicAtImport stands in for a toolchain that cannot decode the export data
+// it is handed, which internal/pkgbits reports by panicking.
+type panicAtImport struct{ path string }
+
+func (b panicAtImport) Import(path string) (*types.Package, error) {
+	if path == b.path {
+		panic(fmt.Errorf("cannot decode %q, export data version 4 is greater than maximum supported version 2", path))
+	}
+	return importer.Default().Import(path)
+}
+
+func TestPanicUnderASiblingCostsOnlyWhatItLost(t *testing.T) {
+	pi := parser.NewProjectImporter("example.com/app", panicAtImport{path: "boom"})
+	pi.AddSource("b/b.go", `package b
+
+import "boom"
+
+type Helper struct{ Name string }
+
+func Use() boom.T { return nil }
+`)
+	gp := parser.NewGoParser()
+	gp.Importer = pi
+	cus, err := gp.ParsePackage([]parser.FileInput{{Path: "a.go", Content: `package app
+
+import "example.com/app/b"
+
+func F() *b.Helper { return &b.Helper{} }
+`}})
+	require.NoError(t, err)
+
+	sibling, err := pi.Import("example.com/app/b")
+	require.NoError(t, err, "the sibling resolves; only what it could not decode is missing")
+	assert.Contains(t, sibling.Scope().Names(), "Helper",
+		"a panic under the sibling must not cost the declarations that type-checked")
+
+	m := java.FindMarker[golang.PartialTypeAttribution](cus[0].Markers)
+	require.NotNil(t, m, "what a sibling lost is lost here too")
+	assert.Contains(t, m.Reason, "boom")
+}
+
 func TestFullyAttributedPackageIsUnmarked(t *testing.T) {
 	cu := parseWith(t, importer.Default(), twoImports)
 	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](cu.Markers),

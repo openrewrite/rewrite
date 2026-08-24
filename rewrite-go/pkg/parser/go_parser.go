@@ -180,7 +180,7 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		if resilient != nil {
 			partial = append(partial, resilient.failures...)
 		}
-		partial = append(partial, stubbedImports(gp.Importer, asts)...)
+		partial = append(partial, degradedImports(gp.Importer, asts)...)
 		if recovered != nil {
 			partial = append(partial, fmt.Sprintf("type check ended early: %v", recovered))
 		}
@@ -223,18 +223,18 @@ func compactCause(err error) string {
 	return strings.TrimSuffix(strings.TrimSpace(cause), " in any of:")
 }
 
-// stubReporter is implemented by importers that resolve some paths to a
-// placeholder package rather than to real symbols.
-type stubReporter interface {
-	StubsReachableFrom(importPath string) []string
+// degradeReporter is implemented by importers that can name the degraded
+// packages an import path reaches.
+type degradeReporter interface {
+	DegradedReachableFrom(importPath string) []DegradedImport
 }
 
-// stubbedImports names the paths the files import for their symbols that
-// resolved to a placeholder; a blank import asks for none. Asking per file,
+// degradedImports names what the files import for their symbols that lost
+// something; a blank import asks for none. Asking per file,
 // rather than reading a running total off the importer, keeps one package's
-// stub off a sibling that shares the importer and its cache.
-func stubbedImports(imp types.Importer, asts []*ast.File) []string {
-	reporter, ok := imp.(stubReporter)
+// loss off a sibling that shares the importer and its cache.
+func degradedImports(imp types.Importer, asts []*ast.File) []string {
+	reporter, ok := imp.(degradeReporter)
 	if !ok {
 		return nil
 	}
@@ -250,12 +250,12 @@ func stubbedImports(imp types.Importer, asts []*ast.File) []string {
 				continue
 			}
 			seen[importPath] = true
-			for _, stub := range reporter.StubsReachableFrom(importPath) {
-				if stub == importPath {
-					reasons = append(reasons, fmt.Sprintf("resolved import %q to an empty stub", importPath))
+			for _, d := range reporter.DegradedReachableFrom(importPath) {
+				if d.Path == importPath {
+					reasons = append(reasons, fmt.Sprintf("import %q: %s", d.Path, d.Reason))
 					continue
 				}
-				reasons = append(reasons, fmt.Sprintf("reached empty stub %q through import %q", stub, importPath))
+				reasons = append(reasons, fmt.Sprintf("import %q reaches %q: %s", importPath, d.Path, d.Reason))
 			}
 		}
 	}
