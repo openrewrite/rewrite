@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +35,25 @@ class MaintainerTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 var maintainer = (Docker.Maintainer) doc.getStages().getFirst().getInstructions().getFirst();
                 assertThat(((Docker.Literal) maintainer.getText().getContents().getFirst()).getText()).isEqualTo("John Doe <john@example.com>");
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedMaintainer() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              MAINTAINER "John Doe"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var maintainer = (Docker.Maintainer) doc.getStages().getFirst().getInstructions().getFirst();
+                Docker.Literal literal = (Docker.Literal) maintainer.getText().getContents().getFirst();
+                assertThat(literal.getText()).isEqualTo("John Doe");
+                assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(ArgumentContents.text(maintainer.getText())).isEqualTo("John Doe");
             })
           )
         );

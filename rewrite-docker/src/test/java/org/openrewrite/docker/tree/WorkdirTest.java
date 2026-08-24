@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +35,43 @@ class WorkdirTest implements RewriteTest {
             spec -> spec.afterRecipe(doc -> {
                 var workdir = (Docker.Workdir) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(((Docker.Literal) workdir.getPath().getContents().getFirst()).getText()).isEqualTo("/app");
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedPath() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              WORKDIR "/app dir"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var workdir = (Docker.Workdir) doc.getStages().getFirst().getInstructions().getLast();
+                Docker.Literal literal = (Docker.Literal) workdir.getPath().getContents().getFirst();
+                assertThat(literal.getText()).isEqualTo("/app dir");
+                assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(ArgumentContents.text(workdir.getPath())).isEqualTo("/app dir");
+            })
+          )
+        );
+    }
+
+    @Test
+    void pathWithEnvironmentVariable() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              WORKDIR /app/$SUB
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var workdir = (Docker.Workdir) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(ArgumentContents.containsVariable(workdir.getPath())).isTrue();
+                assertThat(ArgumentContents.text(workdir.getPath())).isNull();
+                assertThat(ArgumentContents.textWithVariables(workdir.getPath())).isEqualTo("/app/$SUB");
             })
           )
         );

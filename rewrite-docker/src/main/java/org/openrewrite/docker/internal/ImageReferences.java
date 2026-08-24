@@ -26,9 +26,14 @@ import java.util.List;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Splits a parsed image reference (the {@code name:tag@digest} form used by {@code FROM} and by
- * the {@code --from} flag of {@code COPY}/{@code ADD}) into its component {@link Docker.Argument}s.
- * Shared by the parser and the trait layer to keep a single source of truth.
+ * Translates between the two forms an image reference takes: the {@code {imageName, tag, digest}}
+ * parts a caller works in, and the flat contents of one {@link Docker.Argument}, where the {@code :}
+ * and {@code @} separating those parts are contents of their own.
+ * <p>
+ * That is the form the {@code IMAGE_REF} and {@code FLAG_IMAGE_REF} lexer modes leave a parsed
+ * reference in, so a reference a recipe supplies as text is modelled here the same way a parsed one
+ * is, and reading the parts back needs no knowledge of which colon separates a tag: a colon inside a
+ * quoted name, a variable reference or a registry port is never a content of its own.
  */
 public final class ImageReferences {
 
@@ -36,99 +41,110 @@ public final class ImageReferences {
     }
 
     /**
-     * Splits image reference contents into {@code {imageName, tag, digest}}, with {@code tag} and
-     * {@code digest} null when absent. A single quoted string is kept intact as the image name.
+     * Splits a reference a recipe supplied as text, such as {@code "nginx:1.25"}, into
+     * {@code {imageName, tag, digest}}.
+     */
+    public static Docker.@Nullable Argument[] split(String reference, Space prefix) {
+        return split(contents(reference), prefix);
+    }
+
+    /**
+     * Groups contents into {@code {imageName, tag, digest}}, with {@code tag} and {@code digest}
+     * null where the reference does not carry them, and empty where it ends in a dangling separator.
      */
     public static Docker.@Nullable Argument[] split(List<Docker.ArgumentContent> contents, Space prefix) {
-        if (contents.size() == 1 && contents.get(0) instanceof Docker.Literal && ((Docker.Literal) contents.get(0)).isQuoted()) {
-            Docker.Argument imageName = new Docker.Argument(randomId(), prefix, Markers.EMPTY, contents);
-            return new Docker.@Nullable Argument[]{imageName, null, null};
-        }
-
-        List<Docker.ArgumentContent> imageNameContents = new ArrayList<>();
-        List<Docker.ArgumentContent> tagContents = new ArrayList<>();
-        List<Docker.ArgumentContent> digestContents = new ArrayList<>();
-
-        boolean foundColon = false;
-        boolean foundAt = false;
+        List<Docker.ArgumentContent> imageName = new ArrayList<>();
+        List<Docker.ArgumentContent> tag = null;
+        List<Docker.ArgumentContent> digest = null;
+        List<Docker.ArgumentContent> part = imageName;
 
         for (Docker.ArgumentContent content : contents) {
-            if (content instanceof Docker.Literal && !((Docker.Literal) content).isQuoted()) {
-                String text = ((Docker.Literal) content).getText();
-
-                int atIndex = text.indexOf('@');
-                int colonIndex = tagColonIndex(text);
-
-                if (atIndex >= 0 && !foundAt) {
-                    foundAt = true;
-                    String beforeAt = text.substring(0, atIndex);
-                    String digestPart = text.substring(atIndex + 1);
-
-                    int colonInBeforeAt = tagColonIndex(beforeAt);
-                    if (colonInBeforeAt >= 0 && !foundColon) {
-                        foundColon = true;
-                        String imagePart = beforeAt.substring(0, colonInBeforeAt);
-                        String tagPart = beforeAt.substring(colonInBeforeAt + 1);
-
-                        if (!imagePart.isEmpty()) {
-                            imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, imagePart, null));
-                        }
-                        if (!tagPart.isEmpty()) {
-                            tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tagPart, null));
-                        }
-                    } else {
-                        if (!beforeAt.isEmpty()) {
-                            if (foundColon) {
-                                tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, beforeAt, null));
-                            } else {
-                                imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, beforeAt, null));
-                            }
-                        }
-                    }
-                    if (!digestPart.isEmpty()) {
-                        digestContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, digestPart, null));
-                    }
-                } else if (colonIndex >= 0 && !foundColon && !foundAt) {
-                    foundColon = true;
-                    String imagePart = text.substring(0, colonIndex);
-                    String tagPart = text.substring(colonIndex + 1);
-
-                    if (!imagePart.isEmpty()) {
-                        imageNameContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, imagePart, null));
-                    }
-                    if (!tagPart.isEmpty()) {
-                        tagContents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tagPart, null));
-                    }
-                } else {
-                    if (foundAt) {
-                        digestContents.add(content);
-                    } else if (foundColon) {
-                        tagContents.add(content);
-                    } else {
-                        imageNameContents.add(content);
-                    }
-                }
+            if (digest == null && isSeparator(content, '@')) {
+                part = digest = new ArrayList<>();
+            } else if (tag == null && digest == null && isSeparator(content, ':')) {
+                part = tag = new ArrayList<>();
             } else {
-                if (foundAt) {
-                    digestContents.add(content);
-                } else if (foundColon) {
-                    tagContents.add(content);
-                } else {
-                    imageNameContents.add(content);
-                }
+                part.add(content);
             }
         }
 
-        Docker.Argument imageName = new Docker.Argument(randomId(), prefix, Markers.EMPTY, imageNameContents);
-        Docker.Argument tag = tagContents.isEmpty() ? null :
-                new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, tagContents);
-        Docker.Argument digest = digestContents.isEmpty() ? null :
-                new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digestContents);
-
-        return new Docker.@Nullable Argument[]{imageName, tag, digest};
+        return new Docker.@Nullable Argument[]{
+                new Docker.Argument(randomId(), prefix, Markers.EMPTY, imageName),
+                tag == null ? null : new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, tag),
+                digest == null ? null : new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digest)};
     }
 
-    private static int tagColonIndex(String text) {
-        return text.indexOf(':', text.lastIndexOf('/') + 1);
+    /**
+     * The contents of a reference given as text. Environment variable references are split out
+     * first, so a colon inside {@code ${VAR:-default}} separates nothing.
+     */
+    public static List<Docker.ArgumentContent> contents(String reference) {
+        List<Docker.ArgumentContent> contents = new ArrayList<>();
+        boolean tagged = false;
+        boolean digested = false;
+
+        for (Docker.ArgumentContent content : ArgumentContents.of(reference, null)) {
+            if (!(content instanceof Docker.Literal)) {
+                contents.add(content);
+                continue;
+            }
+            String text = ((Docker.Literal) content).getText();
+            int separator;
+            while (!digested && (separator = separatorIndex(text, tagged)) >= 0) {
+                addText(contents, text.substring(0, separator));
+                digested = text.charAt(separator) == '@';
+                tagged = true;
+                contents.add(separator(text.charAt(separator)));
+                text = text.substring(separator + 1);
+            }
+            addText(contents, text);
+        }
+        return contents;
+    }
+
+    /**
+     * The contents of a reference held as its parts, the inverse of {@link #split(List, Space)}.
+     */
+    public static List<Docker.ArgumentContent> contents(Docker.@Nullable Argument[] parts) {
+        List<Docker.ArgumentContent> contents = new ArrayList<>(parts[0].getContents());
+        if (parts[1] != null) {
+            contents.add(separator(':'));
+            contents.addAll(parts[1].getContents());
+        }
+        if (parts[2] != null) {
+            contents.add(separator('@'));
+            contents.addAll(parts[2].getContents());
+        }
+        return contents;
+    }
+
+    /// The index of the first separator still to come, or `-1` when the text holds none. A colon
+    /// before the last `/` is a registry port rather than a tag separator, and one after the tag
+    /// belongs to the tag.
+    private static int separatorIndex(String text, boolean tagged) {
+        int at = text.indexOf('@');
+        if (tagged) {
+            return at;
+        }
+        int colon = text.indexOf(':', text.lastIndexOf('/') + 1);
+        if (at >= 0 && colon >= 0) {
+            return Math.min(at, colon);
+        }
+        return at >= 0 ? at : colon;
+    }
+
+    private static Docker.Literal separator(char separator) {
+        return new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, String.valueOf(separator), null);
+    }
+
+    private static boolean isSeparator(Docker.ArgumentContent content, char separator) {
+        return content instanceof Docker.Literal && !((Docker.Literal) content).isQuoted() &&
+                String.valueOf(separator).equals(((Docker.Literal) content).getText());
+    }
+
+    private static void addText(List<Docker.ArgumentContent> contents, String text) {
+        if (!text.isEmpty()) {
+            contents.add(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null));
+        }
     }
 }

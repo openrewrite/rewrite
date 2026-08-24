@@ -39,7 +39,6 @@ class DockerImageReferenceTest implements RewriteTest {
               FROM alpine
               COPY --from=builder /out /app
               COPY --from=alpine /lib /app/lib
-              ADD --from=alpine:latest /etc /app/etc
               """,
             """
               FROM alpine:3.19 AS builder
@@ -47,7 +46,6 @@ class DockerImageReferenceTest implements RewriteTest {
               FROM alpine:3.19
               COPY --from=builder /out /app
               COPY --from=alpine:3.19 /lib /app/lib
-              ADD --from=alpine:3.19 /etc /app/etc
               """
           )
         );
@@ -114,6 +112,26 @@ class DockerImageReferenceTest implements RewriteTest {
             """
               FROM nginx:1.27
               COPY --from=nginx:1.27 /web /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void modelsAVariableReferenceARecipeWrites() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerImageReference.Matcher().imageName("nginx").asVisitor((ref, ctx) ->
+              "$VERSION".equals(ref.getTag().orElse(null)) ? ref.getTree() : ref.withTag("$VERSION"))
+          )),
+          docker(
+            """
+              FROM nginx:1.20
+              COPY --from=nginx:1.25 /web /app
+              """,
+            """
+              FROM nginx:$VERSION
+              COPY --from=nginx:$VERSION /web /app
               """
           )
         );

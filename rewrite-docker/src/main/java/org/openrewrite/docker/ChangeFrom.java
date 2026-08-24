@@ -19,7 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.docker.internal.ArgumentContents;
+import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.trait.DockerFrom;
+import org.openrewrite.docker.trait.ImageName;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
@@ -30,7 +33,6 @@ import java.util.List;
 import java.util.Objects;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -93,17 +95,11 @@ public class ChangeFrom extends Recipe {
     @Nullable
     String newPlatform;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Docker FROM";
-    }
+    String displayName = "Change Docker FROM";
 
-    @Override
-    public String getDescription() {
-        return "Change the base image in a Dockerfile FROM instruction. " +
-                "Each `*` in an `old*` glob is a positional capture; `$N` in the paired `new*` substitutes capture N. " +
-                "`$0` substitutes the full original value; `\\$` is a literal dollar.";
-    }
+    String description = "Change the base image in a Dockerfile FROM instruction. " +
+            "Each `*` in an `old*` glob is a positional capture; `$N` in the paired `new*` substitutes capture N. " +
+            "`$0` substitutes the full original value; `\\$` is a literal dollar.";
 
     @Override
     public Validated<Object> validate() {
@@ -119,8 +115,7 @@ public class ChangeFrom extends Recipe {
         validated = validateBackrefs(validated, "newImageName", newImageName, oldImageName);
         validated = validateBackrefs(validated, "newTag", newTag, oldTag);
         validated = validateBackrefs(validated, "newDigest", newDigest, oldDigest);
-        validated = validateBackrefs(validated, "newPlatform", newPlatform, oldPlatform);
-        return validated;
+        return validateBackrefs(validated, "newPlatform", newPlatform, oldPlatform);
     }
 
     private static Validated<Object> validateBackrefs(Validated<Object> validated, String field,
@@ -168,10 +163,26 @@ public class ChangeFrom extends Recipe {
             String currentPlatform = image.getPlatform();
 
             // Resolve $N backrefs against captures from the paired old-field glob
-            String resolvedNewImageName = resolve(newImageName, currentImageName, oldImageName);
+            String resolvedNewImageName = resolveImageName(newImageName, currentImageName, oldImageName);
             String resolvedNewTag = resolve(newTag, currentTag, oldTag);
             String resolvedNewDigest = resolve(newDigest, currentDigest, oldDigest);
             String resolvedNewPlatform = resolve(newPlatform, currentPlatform, oldPlatform);
+
+            Docker.Literal.QuoteStyle quoteStyle = image.getQuoteStyle();
+
+            // A new name carrying a tag or digest belongs in the fields the parser would put them in, so
+            // that reading the result back finds the same tree. A quoted reference is one literal holding
+            // all three together, and splitting it would quote each part on its own, so it stays whole.
+            if (resolvedNewImageName != null && quoteStyle == null) {
+                Docker.@Nullable Argument[] parts = ImageReferences.split(resolvedNewImageName, Space.EMPTY);
+                resolvedNewImageName = ArgumentContents.textWithVariables(parts[0]);
+                if (resolvedNewTag == null && parts[1] != null) {
+                    resolvedNewTag = ArgumentContents.textWithVariables(parts[1]);
+                }
+                if (resolvedNewDigest == null && parts[2] != null) {
+                    resolvedNewDigest = ArgumentContents.textWithVariables(parts[2]);
+                }
+            }
 
             boolean imageNameChanged = resolvedNewImageName != null && !currentImageName.equals(resolvedNewImageName);
             boolean tagChanged = resolvedNewTag != null && !resolvedNewTag.equals(currentTag == null ? "" : currentTag);
@@ -195,15 +206,10 @@ public class ChangeFrom extends Recipe {
                 }
             }
 
-            // Get quote style from original
-            Docker.Literal.QuoteStyle quoteStyle = image.getQuoteStyle();
-
-            // Check if the original was a single content item (e.g., a single quoted string)
-            boolean wasSingleContent = f.getImageName().getContents().size() == 1 &&
+            boolean wasSingleQuotedReference = quoteStyle != null && f.getImageName().getContents().size() == 1 &&
                     f.getTag() == null && f.getDigest() == null;
 
-            if (wasSingleContent) {
-                // Keep as a single content item (don't split)
+            if (wasSingleQuotedReference) {
                 String imagePart = resolvedNewImageName != null ? resolvedNewImageName : currentImageName;
                 StringBuilder sb = new StringBuilder(imagePart);
                 // For tag: null=keep existing, ""=remove, value=set
@@ -222,15 +228,13 @@ public class ChangeFrom extends Recipe {
                 } else if (currentDigest != null) {
                     sb.append("@").append(currentDigest);
                 }
-                Docker.ArgumentContent newContent = createContent(sb.toString(), quoteStyle);
-                Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newContent));
+                Docker.Argument newImageArg = f.getImageName().withContents(ArgumentContents.of(sb.toString(), quoteStyle));
                 return result.withImageName(newImageArg);
             }
 
             // Update image name: null=keep, value=set
             if (resolvedNewImageName != null) {
-                Docker.ArgumentContent newImageContent = createContent(resolvedNewImageName, quoteStyle);
-                Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newImageContent));
+                Docker.Argument newImageArg = f.getImageName().withContents(ArgumentContents.of(resolvedNewImageName, quoteStyle));
                 result = result.withImageName(newImageArg);
             }
 
@@ -239,8 +243,8 @@ public class ChangeFrom extends Recipe {
                 if (resolvedNewTag.isEmpty()) {
                     result = result.withTag(null);
                 } else {
-                    Docker.ArgumentContent newTagContent = createContent(resolvedNewTag, quoteStyle);
-                    Docker.Argument newTagArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newTagContent));
+                    Docker.Argument newTagArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
+                            ArgumentContents.of(resolvedNewTag, quoteStyle));
                     result = result.withTag(newTagArg);
                 }
             }
@@ -250,8 +254,8 @@ public class ChangeFrom extends Recipe {
                 if (resolvedNewDigest.isEmpty()) {
                     result = result.withDigest(null);
                 } else {
-                    Docker.ArgumentContent newDigestContent = createContent(resolvedNewDigest, quoteStyle);
-                    Docker.Argument newDigestArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newDigestContent));
+                    Docker.Argument newDigestArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
+                            ArgumentContents.of(resolvedNewDigest, quoteStyle));
                     result = result.withDigest(newDigestArg);
                 }
             }
@@ -265,6 +269,22 @@ public class ChangeFrom extends Recipe {
             return null;
         }
         List<String> captures = extractCaptures(originalText, oldPattern);
+        return applyBackrefs(template, originalText == null ? "" : originalText, captures);
+    }
+
+    /// As [#resolve], for the image name, where the pattern may have matched a spelling other than
+    /// the one written, as `ubuntu*` matches `docker.io/library/ubuntu`. Capturing from the
+    /// spelling they were matched in keeps `$N` standing for what it selected.
+    private static @Nullable String resolveImageName(@Nullable String template, @Nullable String originalText, String oldPattern) {
+        if (template == null) {
+            return null;
+        }
+        List<String> captures = extractCaptures(originalText, oldPattern);
+        if (captures.isEmpty() && originalText != null && oldPattern.indexOf('*') >= 0) {
+            captures = extractCaptures(
+                    ImageName.parse(originalText).getCanonical(),
+                    ImageName.parse(oldPattern).getCanonical());
+        }
         return applyBackrefs(template, originalText == null ? "" : originalText, captures);
     }
 
@@ -364,10 +384,6 @@ public class ChangeFrom extends Recipe {
         return highest;
     }
 
-    private Docker.ArgumentContent createContent(String text, Docker.Literal.@Nullable QuoteStyle quoteStyle) {
-        return new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle);
-    }
-
     private Docker.From updatePlatformFlag(Docker.From from, @Nullable String platform) {
         List<Docker.Flag> oldFlags = from.getFlags();
 
@@ -400,12 +416,7 @@ public class ChangeFrom extends Recipe {
 
     private Docker.Argument updatePlatformValue(Docker.@Nullable Argument existingValue, String platform) {
         if (existingValue != null && !existingValue.getContents().isEmpty()) {
-            // Update existing value using withers
-            Docker.ArgumentContent firstContent = existingValue.getContents().get(0);
-            if (firstContent instanceof Docker.Literal) {
-                Docker.Literal updated = ((Docker.Literal) firstContent).withText(platform);
-                return existingValue.withContents(singletonList(updated));
-            }
+            return existingValue.withContents(ArgumentContents.of(platform, ArgumentContents.quoteStyle(existingValue)));
         }
         // Fallback: create new value
         return createPlatformValue(platform, existingValue != null ? existingValue.getPrefix() : Space.EMPTY);
@@ -416,13 +427,7 @@ public class ChangeFrom extends Recipe {
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                singletonList(new Docker.Literal(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        platform,
-                        null
-                ))
+                ArgumentContents.of(platform, null)
         );
     }
 }

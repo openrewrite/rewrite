@@ -16,9 +16,11 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.docker.Assertions.docker;
 
 class LabelTest implements RewriteTest {
@@ -144,5 +146,214 @@ class LabelTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void environmentVariableValue() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL version=$VAL
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(ArgumentContents.text(pair.getKey())).isEqualTo("version");
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) pair.getValue().getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("VAL");
+                assertThat(var.isBraced()).isFalse();
+                assertThat(ArgumentContents.containsVariable(pair.getValue())).isTrue();
+                assertThat(ArgumentContents.text(pair.getValue())).isNull();
+                assertThat(ArgumentContents.textWithVariables(pair.getValue())).isEqualTo("$VAL");
+            })
+          )
+        );
+    }
+
+    @Test
+    void bracedEnvironmentVariableWithSuffix() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL version=${BASE}-suffix
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(pair.getValue().getContents()).hasSize(2);
+                assertThat(ArgumentContents.textWithVariables(pair.getValue())).isEqualTo("${BASE}-suffix");
+            })
+          )
+        );
+    }
+
+    @Test
+    void multiplePairsWithEnvironmentVariable() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL a=1 b=$X c=3
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(label.getPairs()).hasSize(3);
+                assertThat(label.getPairs()).allSatisfy(pair -> assertThat(pair.isHasEquals()).isTrue());
+                assertThat(ArgumentContents.textWithVariables(label.getPairs().get(0).getValue())).isEqualTo("1");
+                assertThat(ArgumentContents.textWithVariables(label.getPairs().get(1).getValue())).isEqualTo("$X");
+                assertThat(ArgumentContents.textWithVariables(label.getPairs().get(2).getValue())).isEqualTo("3");
+            })
+          )
+        );
+    }
+
+    @Test
+    void oldFormatValueKeepsSpacesBetweenWords() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author John Doe
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isFalse();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("John Doe");
+            })
+          )
+        );
+    }
+
+    @Test
+    void oldFormatValueIsOneLiteralHoldingSourceText() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author "John Doe" of ACME
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isFalse();
+                assertThat(pair.getValue().getContents()).hasSize(1);
+                assertThat(ArgumentContents.quoteStyle(pair.getValue())).isNull();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("\"John Doe\" of ACME");
+            })
+          )
+        );
+    }
+
+    @Test
+    void singleQuotedSectionOfAValueDoesNotExpand() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author 'John $D' of ACME
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.getValue().getContents()).hasSize(1);
+                assertThat(ArgumentContents.containsVariable(pair.getValue())).isFalse();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("'John $D' of ACME");
+            })
+          )
+        );
+    }
+
+    @Test
+    void theEscapeCharacterHoldsAQuoteInsideAValue() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM ubuntu:20.04
+              LABEL author="John `"Doe`" Smith"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(ArgumentContents.quoteStyle(pair.getValue())).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("John `\"Doe`\" Smith");
+            })
+          )
+        );
+    }
+
+    @Test
+    void flagValueBindsToItsKey() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL build.args=--no-cache
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(ArgumentContents.text(pair.getKey())).isEqualTo("build.args");
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("--no-cache");
+            })
+          )
+        );
+    }
+
+    @Test
+    void aValueSeparatedFromItsKeyIsTheLegacyForm() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author =John
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isFalse();
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("=John");
+            })
+          )
+        );
+    }
+
+    @Test
+    void aValueWrittenAgainstItsKeyMayOpenWithAnEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author==John
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Label.LabelPair pair = onlyPair(doc);
+                assertThat(pair.isHasEquals()).isTrue();
+                assertThat(ArgumentContents.text(pair.getKey())).isEqualTo("author");
+                assertThat(ArgumentContents.text(pair.getValue())).isEqualTo("=John");
+            })
+          )
+        );
+    }
+
+    @Test
+    void pairsRepeatWhenTheirValuesOpenWithAnEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:20.04
+              LABEL author==John build==2
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
+                assertThat(label.getPairs())
+                  .extracting(pair -> ArgumentContents.text(pair.getKey()), pair -> ArgumentContents.text(pair.getValue()))
+                  .containsExactly(tuple("author", "=John"), tuple("build", "=2"));
+            })
+          )
+        );
+    }
+
+    private static Docker.Label.LabelPair onlyPair(Docker.File doc) {
+        var label = (Docker.Label) doc.getStages().getFirst().getInstructions().getLast();
+        return assertThat(label.getPairs()).singleElement().actual();
     }
 }

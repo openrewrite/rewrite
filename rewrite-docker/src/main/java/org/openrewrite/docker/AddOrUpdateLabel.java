@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
@@ -57,15 +58,9 @@ public class AddOrUpdateLabel extends Recipe {
     @Nullable
     String stageName;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Docker LABEL instruction";
-    }
+    String displayName = "Add Docker LABEL instruction";
 
-    @Override
-    public String getDescription() {
-        return "Adds or updates a LABEL instruction in a Dockerfile. By default, adds to the final stage only.";
-    }
+    String description = "Adds or updates a LABEL instruction in a Dockerfile. By default, adds to the final stage only.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -86,10 +81,11 @@ public class AddOrUpdateLabel extends Recipe {
 
         @Override
         public Docker.Label.LabelPair visitLabelPair(Docker.Label.LabelPair pair, ExecutionContext ctx) {
-            if (key.equals(extractText(pair.getKey()))) {
+            if (key.equals(ArgumentContents.textWithVariables(pair.getKey()))) {
                 boolean shouldOverwrite = overwriteExisting == null || overwriteExisting;
-                return shouldOverwrite && !value.equals(extractText(pair.getValue())) ?
-                        pair.withValue(createArgument(value, pair.getValue())) : pair;
+                return shouldOverwrite && !value.equals(ArgumentContents.textWithVariables(pair.getValue())) ?
+                        pair.withValue(createArgument(value, pair.getValue())
+                                .withPrefix(pair.getValue().getPrefix())) : pair;
             }
             return super.visitLabelPair(pair, ctx);
         }
@@ -123,7 +119,7 @@ public class AddOrUpdateLabel extends Recipe {
             return new DockerIsoVisitor<AtomicBoolean>() {
                 @Override
                 public Docker.Label.LabelPair visitLabelPair(Docker.Label.LabelPair pair, AtomicBoolean matchFound) {
-                    if (!matchFound.get() && key.equals(extractText(pair.getKey()))) {
+                    if (!matchFound.get() && key.equals(ArgumentContents.textWithVariables(pair.getKey()))) {
                         matchFound.set(true);
                     }
                     return pair;
@@ -155,46 +151,12 @@ public class AddOrUpdateLabel extends Recipe {
         }
     }
 
-    private static @Nullable String extractText(Docker.@Nullable Argument arg) {
-        if (arg == null) {
-            return null;
-        }
-        StringBuilder builder = new StringBuilder();
-        for (Docker.ArgumentContent content : arg.getContents()) {
-            if (content instanceof Docker.Literal) {
-                builder.append(((Docker.Literal) content).getText());
-            } else if (content instanceof Docker.EnvironmentVariable) {
-                Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
-                // Include the variable reference as-is (e.g., ${VAR} or $VAR)
-                if (env.isBraced()) {
-                    builder.append("${").append(env.getName()).append("}");
-                } else {
-                    builder.append("$").append(env.getName());
-                }
-            }
-        }
-        return builder.toString();
-    }
-
     private static Docker.Argument createArgument(String text, Docker.@Nullable Argument original) {
-        // Quote if contains spaces or special characters
-        boolean needsQuotes = text.contains(" ") || text.contains("=");
-        Docker.ArgumentContent content;
-        if (needsQuotes) {
-            // Preserve quote style from original if available
-            Docker.Literal.QuoteStyle quoteStyle = Docker.Literal.QuoteStyle.DOUBLE;
-            if (original != null) {
-                for (Docker.ArgumentContent c : original.getContents()) {
-                    if (c instanceof Docker.Literal && ((Docker.Literal) c).isQuoted()) {
-                        quoteStyle = ((Docker.Literal) c).getQuoteStyle();
-                        break;
-                    }
-                }
-            }
-            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle);
-        } else {
-            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null);
+        Docker.Literal.@Nullable QuoteStyle quoteStyle = null;
+        if (text.contains(" ") || text.contains("=")) {
+            Docker.Literal.QuoteStyle originalStyle = original == null ? null : ArgumentContents.quoteStyle(original);
+            quoteStyle = originalStyle == null ? Docker.Literal.QuoteStyle.DOUBLE : originalStyle;
         }
-        return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(content));
+        return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, ArgumentContents.of(text, quoteStyle));
     }
 }

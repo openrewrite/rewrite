@@ -18,6 +18,8 @@ package org.openrewrite.docker;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.docker.internal.ArgumentContents;
+import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -340,24 +342,6 @@ class ChangeFromTest implements RewriteTest {
               """,
             """
               FROM 'ubuntu:22.04'
-              RUN apt-get update
-              """
-          )
-        );
-    }
-
-    @Test
-    void changeBaseImageWithSingleQuotedStringPreservesTrailingComment() {
-        // Quoted strings are parsed as a single unit, so we match the full image reference as the image name
-        rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null)),
-          docker(
-            """
-              FROM 'ubuntu:20.04' # Trailing comment
-              RUN apt-get update
-              """,
-            """
-              FROM 'ubuntu:22.04' # Trailing comment
               RUN apt-get update
               """
           )
@@ -768,7 +752,75 @@ class ChangeFromTest implements RewriteTest {
                 """
                   FROM ubuntu:22.04
                   RUN apt-get update
-                  """
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    Docker.From from = doc.getStages().getFirst().getFrom();
+                    assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                    assertThat(from.getTag()).isNotNull();
+                    assertThat(ArgumentContents.text(from.getTag())).isEqualTo("22.04");
+                })
+              )
+            );
+        }
+
+        @Test
+        void newImageNameCarryingATagFillsTheTagField() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "eclipse-temurin:17", null, null, null)),
+              docker(
+                """
+                  FROM ubuntu
+                  """,
+                """
+                  FROM eclipse-temurin:17
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    Docker.From from = doc.getStages().getFirst().getFrom();
+                    assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("eclipse-temurin");
+                    assertThat(from.getTag()).isNotNull();
+                    assertThat(ArgumentContents.text(from.getTag())).isEqualTo("17");
+                })
+              )
+            );
+        }
+
+        @Test
+        void newImageNameCarryingADigestFillsTheDigestField() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "ubuntu@sha256:abc123", null, null, null)),
+              docker(
+                """
+                  FROM ubuntu
+                  """,
+                """
+                  FROM ubuntu@sha256:abc123
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    Docker.From from = doc.getStages().getFirst().getFrom();
+                    assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                    assertThat(from.getDigest()).isNotNull();
+                    assertThat(ArgumentContents.text(from.getDigest())).isEqualTo("sha256:abc123");
+                })
+              )
+            );
+        }
+
+        @Test
+        void newImageNameKeepsARegistryPortInTheName() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "localhost:5000/ubuntu", null, null, null)),
+              docker(
+                """
+                  FROM ubuntu
+                  """,
+                """
+                  FROM localhost:5000/ubuntu
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    Docker.From from = doc.getStages().getFirst().getFrom();
+                    assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("localhost:5000/ubuntu");
+                    assertThat(from.getTag()).isNull();
+                })
               )
             );
         }
@@ -785,7 +837,13 @@ class ChangeFromTest implements RewriteTest {
                 """
                   FROM ubuntu@sha256:abc123
                   RUN apt-get update
-                  """
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    Docker.From from = doc.getStages().getFirst().getFrom();
+                    assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                    assertThat(from.getDigest()).isNotNull();
+                    assertThat(ArgumentContents.text(from.getDigest())).isEqualTo("sha256:abc123");
+                })
               )
             );
         }
@@ -966,6 +1024,67 @@ class ChangeFromTest implements RewriteTest {
     }
 
     @Nested
+    class Registries implements RewriteTest {
+
+        @Test
+        void aShortPatternMatchesAFullyQualifiedName() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null)),
+              docker(
+                """
+                  FROM docker.io/library/ubuntu:20.04
+                  """,
+                """
+                  FROM docker.io/library/ubuntu:22.04
+                  """
+              )
+            );
+        }
+
+        @Test
+        void aFullyQualifiedPatternMatchesAShortName() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("docker.io/library/ubuntu", null, null, null, null, "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  """
+              )
+            );
+        }
+
+        @Test
+        void anOrganizationIsNotTakenForARegistry() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubi9-minimal", null, null, null, null, "9.5", null, null)),
+              docker(
+                """
+                  FROM redhat/ubi9-minimal:9.4
+                  """
+              )
+            );
+        }
+
+        @Test
+        void captureFromTheSpellingThatMatched() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubun*", null, null, null, "alpine-$1", "22.04", null, null)),
+              docker(
+                """
+                  FROM docker.io/library/ubuntu:20.04
+                  """,
+                """
+                  FROM alpine-tu:22.04
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class Captures implements RewriteTest {
 
         @Test
@@ -1053,7 +1172,15 @@ class ChangeFromTest implements RewriteTest {
                   """,
                 """
                   FROM ubuntu:22.04-$VAR
-                  """
+                  """,
+                spec -> spec.afterRecipe(doc -> {
+                    // "\$" only stops $VAR being read as a capture reference; what it writes is a
+                    // variable reference like any other, and is modelled as one.
+                    Docker.Argument tag = doc.getStages().getFirst().getFrom().getTag();
+                    assertThat(tag).isNotNull();
+                    assertThat(ArgumentContents.text(tag)).isNull();
+                    assertThat(ArgumentContents.textWithVariables(tag)).isEqualTo("22.04-$VAR");
+                })
               )
             );
         }

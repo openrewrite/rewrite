@@ -16,6 +16,7 @@
 package org.openrewrite.docker.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -290,6 +291,289 @@ class FromTest implements RewriteTest {
 
                 assertThat(from.getDigest()).isNotNull();
                 assertThat(((Docker.Literal) from.getDigest().getContents().getFirst()).getText()).isEqualTo("sha256:abc123");
+            })
+          )
+        );
+    }
+
+    @Test
+    void registryPortIsNotATag() {
+        rewriteRun(
+          docker(
+            """
+              FROM localhost:5000/my/app
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("localhost:5000/my/app");
+                assertThat(from.getTag()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void registryPortWithTagAndDigest() {
+        rewriteRun(
+          docker(
+            """
+              FROM localhost:5000/my/app:1.2.3@sha256:abc123
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("localhost:5000/my/app");
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("1.2.3");
+                assertThat(((Docker.Literal) from.getDigest().getContents().getFirst()).getText()).isEqualTo("sha256:abc123");
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedImageReferenceKeepsItsColon() {
+        rewriteRun(
+          docker(
+            """
+              FROM "ubuntu:22.04"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                Docker.Literal imageName = (Docker.Literal) from.getImageName().getContents().getFirst();
+                assertThat(imageName.getText()).isEqualTo("ubuntu:22.04");
+                assertThat(imageName.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+                assertThat(from.getTag()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedTagKeepsItsQuoteStyle() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu:"22.04"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(((Docker.Literal) from.getImageName().getContents().getFirst()).getText()).isEqualTo("ubuntu");
+                Docker.Literal tag = (Docker.Literal) from.getTag().getContents().getFirst();
+                assertThat(tag.getText()).isEqualTo("22.04");
+                assertThat(tag.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
+            })
+          )
+        );
+    }
+
+    /// A continuation joins the lines it spans, and Docker keeps the indent of the line that follows
+    /// it, so only an unindented continuation leaves an image reference Docker still reads as one:
+    /// `FROM ubuntu\<newline>  :22.04` reaches it as `FROM ubuntu  :22.04`, two arguments where FROM
+    /// takes one or three.
+    @Test
+    void continuationBeforeTagSeparator() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu\\
+              :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
+    /// Whitespace may sit between the escape character and the newline it ends the line with.
+    @Test
+    void continuationPaddedWithSpacesBeforeTagSeparator() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu\\  \s
+              :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
+    @Test
+    void anEscapeDirectiveBehindAnotherDirective() {
+        rewriteRun(
+          docker(
+            """
+              # syntax=docker/dockerfile:1
+              # escape=`
+              FROM ubuntu`
+              :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                assertThat(ArgumentContents.text(from.getTag())).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
+    /// A backtick ends a line only under an `# escape=` directive, which is how a Windows Dockerfile
+    /// writes a path without escaping every separator.
+    @Test
+    void backtickContinuationBeforeTagSeparator() {
+        rewriteRun(
+          docker(
+            """
+              # escape=`
+              FROM ubuntu`
+              :22.04
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                assertThat(((Docker.Literal) from.getTag().getContents().getFirst()).getText()).isEqualTo("22.04");
+            })
+          )
+        );
+    }
+
+    @Test
+    void continuationBeforeTheDigestSeparator() {
+        rewriteRun(
+          docker(
+            """
+              FROM ubuntu\\
+              @sha256:0000000000000000000000000000000000000000000000000000000000000000
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getFirst().getFrom();
+                assertThat(ArgumentContents.text(from.getImageName())).isEqualTo("ubuntu");
+                assertThat(ArgumentContents.text(from.getDigest()))
+                  .isEqualTo("sha256:0000000000000000000000000000000000000000000000000000000000000000");
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedImageReferenceWithVariableStaysWhole() {
+        rewriteRun(
+          docker(
+            """
+              ARG TAG=22.04
+              FROM "ubuntu:${TAG}"
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.From from = doc.getStages().getLast().getFrom();
+                assertThat(ArgumentContents.textWithVariables(from.getImageName())).isEqualTo("\"ubuntu:${TAG}\"");
+                assertThat(from.getTag()).isNull();
+                assertThat(ArgumentContents.containsVariable(from.getImageName())).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void lowercaseArgReferenceInTag() {
+        rewriteRun(
+          docker(
+            """
+              ARG java_version=17
+              FROM eclipse-temurin:${java_version}
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument tag = doc.getStages().getLast().getFrom().getTag();
+                assertThat(tag).isNotNull();
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) tag.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("java_version");
+                assertThat(var.isBraced()).isTrue();
+                assertThat(ArgumentContents.containsVariable(tag)).isTrue();
+                assertThat(ArgumentContents.text(tag)).isNull();
+                assertThat(ArgumentContents.textWithVariables(tag)).isEqualTo("${java_version}");
+            })
+          )
+        );
+    }
+
+    @Test
+    void unbracedLowercaseArgReferenceInTag() {
+        rewriteRun(
+          docker(
+            """
+              ARG java_version=17
+              FROM eclipse-temurin:$java_version
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument tag = doc.getStages().getLast().getFrom().getTag();
+                assertThat(tag).isNotNull();
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) tag.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("java_version");
+                assertThat(var.isBraced()).isFalse();
+                assertThat(ArgumentContents.text(tag)).isNull();
+                assertThat(ArgumentContents.textWithVariables(tag)).isEqualTo("$java_version");
+            })
+          )
+        );
+    }
+
+    @Test
+    void mixedCaseArgReferenceInTag() {
+        rewriteRun(
+          docker(
+            """
+              ARG Java_Version=17
+              FROM eclipse-temurin:${Java_Version}
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument tag = doc.getStages().getLast().getFrom().getTag();
+                assertThat(tag).isNotNull();
+                assertThat(((Docker.EnvironmentVariable) tag.getContents().getFirst()).getName()).isEqualTo("Java_Version");
+                assertThat(ArgumentContents.text(tag)).isNull();
+                assertThat(ArgumentContents.textWithVariables(tag)).isEqualTo("${Java_Version}");
+            })
+          )
+        );
+    }
+
+    @Test
+    void lowercaseVariableInPlatformFlag() {
+        rewriteRun(
+          docker(
+            """
+              FROM --platform=$target_platform alpine:latest
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument flagValue = doc.getStages().getFirst().getFrom().getFlags().getFirst().getValue();
+                assertThat(flagValue).isNotNull();
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) flagValue.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("target_platform");
+                assertThat(ArgumentContents.text(flagValue)).isNull();
+                assertThat(ArgumentContents.textWithVariables(flagValue)).isEqualTo("$target_platform");
+            })
+          )
+        );
+    }
+
+    @Test
+    void platformFlagKeepsVariableDefault() {
+        rewriteRun(
+          docker(
+            """
+              FROM --platform=${TARGETPLATFORM:-linux/amd64} alpine:latest
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Docker.Argument flagValue = doc.getStages().getFirst().getFrom().getFlags().getFirst().getValue();
+                assertThat(flagValue).isNotNull();
+                Docker.EnvironmentVariable var = (Docker.EnvironmentVariable) flagValue.getContents().getFirst();
+                assertThat(var.getName()).isEqualTo("TARGETPLATFORM:-linux/amd64");
+                assertThat(var.isBraced()).isTrue();
+                assertThat(ArgumentContents.textWithVariables(flagValue)).isEqualTo("${TARGETPLATFORM:-linux/amd64}");
             })
           )
         );

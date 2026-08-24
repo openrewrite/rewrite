@@ -37,8 +37,8 @@ class FindBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,stageName,imageName,tag,digest,platform
-              Dockerfile,,ubuntu,22.04,,
+              sourceFile,stageName,imageName,tag,digest,platform,registry
+              Dockerfile,,ubuntu,22.04,,,docker.io
               """
           ),
           docker(
@@ -55,14 +55,41 @@ class FindBaseImagesTest implements RewriteTest {
     }
 
     @Test
+    void recordsTheRegistryAnImageIsPulledFrom() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
+            //language=csv
+            """
+              sourceFile,stageName,imageName,tag,digest,platform,registry
+              Dockerfile,,"mcr.microsoft.com/windows/servercore",ltsc2022,,,mcr.microsoft.com
+              Dockerfile,,redhat/ubi9-minimal,9.4,,,docker.io
+              Dockerfile,,"registry.example.com:5000/app",1.2,,,"registry.example.com:5000"
+              """
+          ),
+          docker(
+            """
+              FROM mcr.microsoft.com/windows/servercore:ltsc2022
+              FROM redhat/ubi9-minimal:9.4
+              FROM registry.example.com:5000/app:1.2
+              """,
+            """
+              ~~(mcr.microsoft.com/windows/servercore:ltsc2022)~~>FROM mcr.microsoft.com/windows/servercore:ltsc2022
+              ~~(redhat/ubi9-minimal:9.4)~~>FROM redhat/ubi9-minimal:9.4
+              ~~(registry.example.com:5000/app:1.2)~~>FROM registry.example.com:5000/app:1.2
+              """
+          )
+        );
+    }
+
+    @Test
     void findBaseImageWithPattern() {
         rewriteRun(
           spec -> spec.recipe(new FindBaseImages("ubuntu*", null, null, null))
             .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
-                sourceFile,stageName,imageName,tag,digest,platform
-                Dockerfile,,ubuntu,22.04,,
+                sourceFile,stageName,imageName,tag,digest,platform,registry
+                Dockerfile,,ubuntu,22.04,,,docker.io
                 """
             ),
           docker(
@@ -97,8 +124,8 @@ class FindBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,stageName,imageName,tag,digest,platform
-              Dockerfile,,ubuntu,,sha256:abc123,
+              sourceFile,stageName,imageName,tag,digest,platform,registry
+              Dockerfile,,ubuntu,,sha256:abc123,,docker.io
               """
           ),
           docker(
@@ -120,8 +147,8 @@ class FindBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,stageName,imageName,tag,digest,platform
-              Dockerfile,,ubuntu,22.04,,linux/amd64
+              sourceFile,stageName,imageName,tag,digest,platform,registry
+              Dockerfile,,ubuntu,22.04,,linux/amd64,docker.io
               """
           ),
           docker(
@@ -143,8 +170,8 @@ class FindBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,stageName,imageName,tag,digest,platform
-              Dockerfile,builder,golang,1.21,,
+              sourceFile,stageName,imageName,tag,digest,platform,registry
+              Dockerfile,builder,golang,1.21,,,docker.io
               """
           ),
           docker(
@@ -166,9 +193,9 @@ class FindBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,stageName,imageName,tag,digest,platform
-              Dockerfile,builder,golang,1.21,,
-              Dockerfile,,alpine,latest,,
+              sourceFile,stageName,imageName,tag,digest,platform,registry
+              Dockerfile,builder,golang,1.21,,,docker.io
+              Dockerfile,,alpine,latest,,,docker.io
               """
           ),
           docker(
@@ -197,8 +224,8 @@ class FindBaseImagesTest implements RewriteTest {
             .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
-                sourceFile,stageName,imageName,tag,digest,platform
-                Dockerfile,,alpine,latest,,
+                sourceFile,stageName,imageName,tag,digest,platform,registry
+                Dockerfile,,alpine,latest,,,docker.io
                 """
             ),
           docker(
@@ -226,8 +253,8 @@ class FindBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,stageName,imageName,tag,digest,platform
-              Dockerfile,base,ubuntu,22.04,,linux/arm64
+              sourceFile,stageName,imageName,tag,digest,platform,registry
+              Dockerfile,base,ubuntu,22.04,,linux/arm64,docker.io
               """
           ),
           docker(
@@ -249,8 +276,8 @@ class FindBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,stageName,imageName,tag,digest,platform
-              Dockerfile,,ubuntu,,,
+              sourceFile,stageName,imageName,tag,digest,platform,registry
+              Dockerfile,,ubuntu,,,,docker.io
               """
           ),
           docker(
@@ -272,8 +299,8 @@ class FindBaseImagesTest implements RewriteTest {
           spec -> spec.dataTableAsCsv(BaseImages.class.getName(),
             //language=csv
             """
-              sourceFile,stageName,imageName,tag,digest,platform
-              Dockerfile,,"${BASE_IMAGE}","${BASE_TAG}",,
+              sourceFile,stageName,imageName,tag,digest,platform,registry
+              Dockerfile,,"${BASE_IMAGE}","${BASE_TAG}",,,docker.io
               """
           ),
           docker(
@@ -300,8 +327,8 @@ class FindBaseImagesTest implements RewriteTest {
             .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
-                sourceFile,stageName,imageName,tag,digest,platform
-                Dockerfile,,ubuntu,22.04,,
+                sourceFile,stageName,imageName,tag,digest,platform,registry
+                Dockerfile,,ubuntu,22.04,,,docker.io
                 """
             ),
           docker(
@@ -326,8 +353,8 @@ class FindBaseImagesTest implements RewriteTest {
             .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
-                sourceFile,stageName,imageName,tag,digest,platform
-                Dockerfile,,ubuntu,,sha256:abc123,
+                sourceFile,stageName,imageName,tag,digest,platform,registry
+                Dockerfile,,ubuntu,,sha256:abc123,,docker.io
                 """
             ),
           docker(
@@ -350,8 +377,8 @@ class FindBaseImagesTest implements RewriteTest {
             .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
-                sourceFile,stageName,imageName,tag,digest,platform
-                Dockerfile,,ubuntu,22.04,,linux/arm64
+                sourceFile,stageName,imageName,tag,digest,platform,registry
+                Dockerfile,,ubuntu,22.04,,linux/arm64,docker.io
                 """
             ),
           docker(
@@ -374,8 +401,8 @@ class FindBaseImagesTest implements RewriteTest {
             .dataTableAsCsv(BaseImages.class.getName(),
               //language=csv
               """
-                sourceFile,stageName,imageName,tag,digest,platform
-                Dockerfile,,ubuntu,22.04,,linux/amd64
+                sourceFile,stageName,imageName,tag,digest,platform,registry
+                Dockerfile,,ubuntu,22.04,,linux/amd64,docker.io
                 """
             ),
           docker(

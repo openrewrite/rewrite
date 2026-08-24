@@ -23,18 +23,19 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.table.EolDockerImages;
-import org.openrewrite.docker.trait.DockerFrom;
+import org.openrewrite.docker.trait.DockerImageReference;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.marker.SearchResult;
 
 import java.time.LocalDate;
 
 /**
- * Finds Docker base images that have reached end-of-life.
+ * Finds Docker images that have reached end-of-life, whether a stage's base image or an image a
+ * {@code COPY --from} pulls a file out of.
  * <p>
- * Using EOL base images poses security risks as they no longer receive security patches.
+ * Using EOL images poses security risks as they no longer receive security patches.
  * This recipe identifies common EOL images including Debian, Ubuntu, Alpine, Python,
- * and Node.js base images.
+ * and Node.js images.
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -49,17 +50,12 @@ public class FindEndOfLifeImages extends Recipe {
     @Nullable
     Boolean includeApproaching;
 
-    @Override
-    public String getDisplayName() {
-        return "Find end-of-life Docker base images";
-    }
+    String displayName = "Find end-of-life Docker images";
 
-    @Override
-    public String getDescription() {
-        return "Identifies Docker base images that have reached end-of-life. " +
-                "Using EOL images poses security risks as they no longer receive security updates. " +
-                "Detected images include EOL versions of Debian, Ubuntu, Alpine, Python, and Node.js.";
-    }
+    String description = "Identifies Docker images that have reached end-of-life, both the base image of a build " +
+            "stage and an image a `COPY --from` pulls a file out of. " +
+            "Using EOL images poses security risks as they no longer receive security updates. " +
+            "Detected images include EOL versions of Debian, Ubuntu, Alpine, Python, and Node.js.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -67,25 +63,25 @@ public class FindEndOfLifeImages extends Recipe {
         LocalDate cutoffDate = checkApproaching ?
                 LocalDate.now().plusMonths(6) : LocalDate.now();
 
-        return new DockerFrom.Matcher()
+        return new DockerImageReference.Matcher()
                 .excludeScratch()
                 .asVisitor((image, ctx) -> {
                     String imageName = image.getImageName().orElse(null);
                     String tag = image.getTag().orElse(null);
-                    Docker.From from = image.getTree();
+                    Docker.Instruction instruction = image.getTree();
 
                     if (imageName == null || tag == null) {
-                        return from;
+                        return instruction;
                     }
 
                     EolImage eol = EolImage.findMatch(imageName, tag);
                     if (eol == null) {
-                        return from;
+                        return instruction;
                     }
 
                     // Check if EOL date is before cutoff
                     if (eol.getEolDate().isAfter(cutoffDate)) {
-                        return from;
+                        return instruction;
                     }
 
                     String stageName = image.getStageName();
@@ -105,7 +101,7 @@ public class FindEndOfLifeImages extends Recipe {
                     String message = String.format("EOL: %s:%s (ended %s, suggest %s)",
                             imageName, tag, eol.getEolDate(), eol.getSuggestedReplacement());
 
-                    return SearchResult.found(from, message);
+                    return SearchResult.found(instruction, message);
                 });
     }
 }

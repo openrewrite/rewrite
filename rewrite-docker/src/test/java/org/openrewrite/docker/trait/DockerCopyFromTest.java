@@ -16,7 +16,9 @@
 package org.openrewrite.docker.trait;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
@@ -57,12 +59,10 @@ class DockerCopyFromTest implements RewriteTest {
             """
               FROM ubuntu
               COPY --from=alpine /lib /app/lib
-              ADD --from=alpine:latest /etc /app/etc
               """,
             """
               FROM ubuntu
               COPY --from=alpine:3.19 /lib /app/lib
-              ADD --from=alpine:3.19 /etc /app/etc
               """
           )
         );
@@ -197,7 +197,7 @@ class DockerCopyFromTest implements RewriteTest {
     }
 
     @Test
-    void decomposesDigestInAddFrom() {
+    void decomposesDigestInCopyFrom() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
@@ -212,11 +212,11 @@ class DockerCopyFromTest implements RewriteTest {
           docker(
             """
               FROM alpine
-              ADD --from=alpine@sha256:abc123 /out /app
+              COPY --from=alpine@sha256:abc123 /out /app
               """,
             """
               FROM alpine
-              ~~>ADD --from=alpine@sha256:abc123 /out /app
+              ~~>COPY --from=alpine@sha256:abc123 /out /app
               """
           )
         );
@@ -316,6 +316,56 @@ class DockerCopyFromTest implements RewriteTest {
     }
 
     @Test
+    void decomposesTheRegistryOfAnExternalImage() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().excludeStageReferences().asVisitor((image, ctx) -> {
+                assertThat(image.getRegistry()).contains("registry.example.com:5000");
+                assertThat(image.getImage().map(ImageName::getRepository)).contains("app");
+                assertThat(image.getCanonicalImageName()).contains("registry.example.com:5000/app");
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM alpine
+              COPY --from=registry.example.com:5000/app:1.2 /out /app
+              """,
+            """
+              FROM alpine
+              ~~>COPY --from=registry.example.com:5000/app:1.2 /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void aStageReferenceHasNoRegistry() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.isStageReference()).isTrue();
+                assertThat(image.getImage()).isEmpty();
+                assertThat(image.getRegistry()).isEmpty();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM alpine AS builder
+              FROM alpine
+              COPY --from=builder /out /app
+              """,
+            """
+              FROM alpine AS builder
+              FROM alpine
+              ~~>COPY --from=builder /out /app
+              """
+          )
+        );
+    }
+
+    @Test
     void registryPortWithTag() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
@@ -355,6 +405,126 @@ class DockerCopyFromTest implements RewriteTest {
             """
               FROM alpine
               COPY --from=${BUILDER_IMAGE} /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void stageReferenceFollowedByAnotherFlag() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.getFromValue()).contains("build");
+                assertThat(image.isStageReference()).isTrue();
+                assertThat(image.getImageName()).isEmpty();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM golang AS build
+              COPY --from=build --link /target/ /
+              """,
+            """
+              FROM golang AS build
+              ~~>COPY --from=build --link /target/ /
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedValueKeepsItsColon() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.getImageName()).contains("alpine:3");
+                assertThat(image.getTag()).isEmpty();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM ubuntu
+              COPY --from="alpine:3" /out /app
+              """,
+            """
+              FROM ubuntu
+              ~~>COPY --from="alpine:3" /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void variableTagIsSplitFromItsVariableImageName() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.getImageName()).contains("${IMAGE}");
+                assertThat(image.getTag()).contains("${TAG}");
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM ubuntu
+              COPY --from=${IMAGE}:${TAG} /out /app
+              """,
+            """
+              FROM ubuntu
+              ~~>COPY --from=${IMAGE}:${TAG} /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void aReferenceARecipeWroteIsReadBackAsItsParts() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().imageName("nginx").asVisitor((image, ctx) -> {
+                Docker.Instruction updated = image.withImageReference("registry.example.com:5000/nginx:1.25@sha256:abc");
+                DockerCopyFrom reread = new DockerCopyFrom(new Cursor(image.getCursor().getParentOrThrow(), updated));
+                assertThat(reread.getImageName()).contains("registry.example.com:5000/nginx");
+                assertThat(reread.getTag()).contains("1.25");
+                assertThat(reread.getDigest()).contains("sha256:abc");
+                return updated;
+            })
+          )),
+          docker(
+            """
+              FROM ubuntu
+              COPY --from=nginx /out /app
+              """,
+            """
+              FROM ubuntu
+              COPY --from=registry.example.com:5000/nginx:1.25@sha256:abc /out /app
+              """
+          )
+        );
+    }
+
+    @Test
+    void variableDefaultIsNotATag() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new DockerCopyFrom.Matcher().asVisitor((image, ctx) -> {
+                assertThat(image.getImageName()).contains("${BUILDER:-golang:1.24}");
+                assertThat(image.getTag()).isEmpty();
+                assertThat(image.isStageReference()).isFalse();
+                return SearchResult.found(image.getTree());
+            })
+          )),
+          docker(
+            """
+              FROM ubuntu
+              COPY --from=${BUILDER:-golang:1.24} /out /app
+              """,
+            """
+              FROM ubuntu
+              ~~>COPY --from=${BUILDER:-golang:1.24} /out /app
               """
           )
         );
