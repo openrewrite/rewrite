@@ -59,7 +59,7 @@ import static org.openrewrite.internal.StringUtils.readFully;
  */
 public class RewriteRpcProcess extends Thread {
 
-    // Java 9+ Process/ProcessHandle reflection so this Java 8 module can reap a wedged peer's descendants.
+    // Reflected: these Java 9+ APIs aren't visible to this Java 8 module.
     private static final @Nullable Method PROCESS_DESCENDANTS;
     private static final @Nullable Method PROCESS_HANDLE_DESTROY_FORCIBLY;
 
@@ -70,7 +70,7 @@ public class RewriteRpcProcess extends Thread {
             descendants = Process.class.getMethod("descendants");
             destroyForcibly = Class.forName("java.lang.ProcessHandle").getMethod("destroyForcibly");
         } catch (Exception ignored) {
-            // Descendant reaping needs the Java 9+ ProcessHandle API; on Java 8 only the direct child is destroyed.
+            // Java 8 has no ProcessHandle; only the direct child is destroyed.
         }
         PROCESS_DESCENDANTS = descendants;
         PROCESS_HANDLE_DESTROY_FORCIBLY = destroyForcibly;
@@ -84,8 +84,7 @@ public class RewriteRpcProcess extends Thread {
     @Setter
     private @Nullable Path workingDirectory;
 
-    // Package-private so same-package tests can drive shutdown() against a spawned tree without reflection.
-    // Volatile so a shutdown() running on the JVM hook thread reliably sees the spawned process.
+    // Package-private for tests; volatile for the JVM-hook shutdown() read.
     @Nullable
     volatile Process process;
 
@@ -156,7 +155,7 @@ public class RewriteRpcProcess extends Thread {
             // of the log file.  Instead we drain stderr in a daemon thread.
             Process p = pb.start();
             stderrDrainThread = drainStderr(p, stderrRedirect);
-            // Publish process last so its volatile store also releases the stderrDrainThread write.
+            // Publish process last so its volatile write also releases stderrDrainThread.
             process = p;
         } catch (IOException e) {
             // Record the failure so start() can surface it instead of busy-waiting forever
@@ -192,7 +191,7 @@ public class RewriteRpcProcess extends Thread {
     }
 
     public @Nullable RuntimeException getLivenessCheck() {
-        // A deliberate shutdown SIGKILLs the peer, so don't misreport that as a crash.
+        // Don't report our own shutdown SIGKILL as a crash.
         if (shutDown.get() || process == null) {
             return null;
         }
@@ -253,7 +252,7 @@ public class RewriteRpcProcess extends Thread {
         try {
             Runtime.getRuntime().addShutdownHook(shutdownHook);
         } catch (IllegalStateException e) {
-            // JVM shutdown began before the hook could register; reap now so the peer can't linger.
+            // JVM already shutting down; reap now so the peer can't linger.
             shutdownHook = null;
             shutdown();
             throw new IllegalStateException(
@@ -275,12 +274,11 @@ public class RewriteRpcProcess extends Thread {
     }
 
     public void shutdown() {
-        // Run the teardown once even if the explicit caller and the JVM shutdown hook race.
+        // Run once, even if an explicit caller and the JVM hook race.
         if (!shutDown.compareAndSet(false, true)) {
             return;
         }
-        // Capture the descendants while still connected so a wedged peer that reparents to init
-        // once the direct child is killed can still be force-killed by pid.
+        // Snapshot descendants while connected; they reparent to init once the child is killed.
         List<Object> descendants = captureDescendants(process);
         if (rssSamplerThread != null) {
             rssSamplerThread.interrupt();
@@ -294,14 +292,13 @@ public class RewriteRpcProcess extends Thread {
             }
             shutdownHook = null;
         }
-        // Force-kill the direct child; a wedged peer may never honor a graceful signal.
+        // Force-kill the direct child; a wedged peer may not exit gracefully.
         if (process != null) {
             process.destroyForcibly();
         }
-        // Force-kill any descendant the direct child would otherwise orphan, using handles captured
-        // before the kill severed the tree; empty on Java 8 or for a single-process peer.
+        // Force-kill the descendants captured above; empty on Java 8 or a single-process peer.
         destroyDescendantsForcibly(descendants);
-        // Wait for the drain thread to close its stderrRedirect handle so Windows can delete or reopen the file (see run()).
+        // Join the drain so Windows can delete/reopen the stderrRedirect file (see run()).
         if (stderrDrainThread != null) {
             try {
                 stderrDrainThread.join(TimeUnit.SECONDS.toMillis(2));
@@ -312,10 +309,7 @@ public class RewriteRpcProcess extends Thread {
         }
     }
 
-    /**
-     * The direct child's descendants as Java 9+ {@code ProcessHandle}s captured before shutdown
-     * severs the tree, empty on Java 8 or when the handles cannot be obtained.
-     */
+    /** The peer's descendants as {@code ProcessHandle}s, empty on Java 8 or if unobtainable. */
     private static List<Object> captureDescendants(@Nullable Process p) {
         if (p == null || PROCESS_DESCENDANTS == null) {
             return Collections.emptyList();
@@ -329,7 +323,7 @@ public class RewriteRpcProcess extends Thread {
         }
     }
 
-    /** Force-kill each captured handle, ignoring any that can no longer be reached; a no-op on Java 8 or an empty list. */
+    /** Force-kill each captured handle, skipping any already gone. */
     private static void destroyDescendantsForcibly(List<Object> descendants) {
         if (PROCESS_HANDLE_DESTROY_FORCIBLY == null) {
             return;
@@ -338,7 +332,7 @@ public class RewriteRpcProcess extends Thread {
             try {
                 PROCESS_HANDLE_DESTROY_FORCIBLY.invoke(handle);
             } catch (Exception ignored) {
-                // Best-effort force-kill; a handle we can't reach is no worse than before.
+                // Best-effort; skip a handle we can't reach.
             }
         }
     }
