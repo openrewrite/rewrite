@@ -26,32 +26,23 @@ import java.util.List;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Translates between the two forms an image reference takes: the {@code {imageName, tag, digest}}
- * parts a caller works in, and the flat contents of one {@link Docker.Argument}, where the {@code :}
- * and {@code @} separating those parts are contents of their own.
- * <p>
- * That is the form the {@code IMAGE_REF} and {@code FLAG_IMAGE_REF} lexer modes leave a parsed
- * reference in, so a reference a recipe supplies as text is modelled here the same way a parsed one
- * is, and reading the parts back needs no knowledge of which colon separates a tag: a colon inside a
- * quoted name, a variable reference or a registry port is never a content of its own.
+ * Translates between the two forms an image reference takes: the {@code {imageName, tag, digest}} parts
+ * a caller works in, and the flat contents of one {@link Docker.Argument}, where the {@code :} and
+ * {@code @} separating those parts are contents of their own - the form the {@code IMAGE_REF} lexer
+ * modes leave a parsed reference in. A colon inside a quoted name, a variable reference or a registry
+ * port is never a content of its own, so reading the parts back needs no knowledge of which separates.
  */
 public final class ImageReferences {
 
     private ImageReferences() {
     }
 
-    /**
-     * Splits a reference a recipe supplied as text, such as {@code "nginx:1.25"}, into
-     * {@code {imageName, tag, digest}}.
-     */
     public static Docker.@Nullable Argument[] split(String reference, Space prefix) {
         return split(contents(reference), prefix);
     }
 
-    /**
-     * Groups contents into {@code {imageName, tag, digest}}, with {@code tag} and {@code digest}
-     * null where the reference does not carry them, and empty where it ends in a dangling separator.
-     */
+    /// `tag` and `digest` are null where the reference does not carry them, and empty where it ends in
+    /// a dangling separator.
     public static Docker.@Nullable Argument[] split(List<Docker.ArgumentContent> contents, Space prefix) {
         List<Docker.ArgumentContent> imageName = new ArrayList<>();
         List<Docker.ArgumentContent> tag = null;
@@ -74,10 +65,8 @@ public final class ImageReferences {
                 digest == null ? null : new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, digest)};
     }
 
-    /**
-     * The contents of a reference given as text. Environment variable references are split out
-     * first, so a colon inside {@code ${VAR:-default}} separates nothing.
-     */
+    /// Environment variable references are split out first, so a colon inside `${VAR:-default}`
+    /// separates nothing.
     public static List<Docker.ArgumentContent> contents(String reference) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         boolean tagged = false;
@@ -102,9 +91,6 @@ public final class ImageReferences {
         return contents;
     }
 
-    /**
-     * The contents of a reference held as its parts, the inverse of {@link #split(List, Space)}.
-     */
     public static List<Docker.ArgumentContent> contents(Docker.@Nullable Argument[] parts) {
         List<Docker.ArgumentContent> contents = new ArrayList<>(parts[0].getContents());
         if (parts[1] != null) {
@@ -118,9 +104,8 @@ public final class ImageReferences {
         return contents;
     }
 
-    /// The index of the first separator still to come, or `-1` when the text holds none. A colon
-    /// before the last `/` is a registry port rather than a tag separator, and one after the tag
-    /// belongs to the tag.
+    /// A colon before the last `/` is a registry port rather than a tag separator, and one after the
+    /// tag belongs to the tag.
     private static int separatorIndex(String text, boolean tagged) {
         int at = text.indexOf('@');
         if (tagged) {

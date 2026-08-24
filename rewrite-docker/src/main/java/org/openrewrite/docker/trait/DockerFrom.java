@@ -36,9 +36,7 @@ import java.util.Optional;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * A trait representing a Docker base image from a FROM instruction.
- * Provides semantic access to image name, tag, digest, platform, and stage name,
- * along with matching capabilities that handle environment variables.
+ * The base image of a {@code FROM} instruction, along with its platform flag and stage name.
  */
 @RequiredArgsConstructor
 public class DockerFrom implements DockerImageReference<Docker.From> {
@@ -61,11 +59,6 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
         return getTree().getDigest();
     }
 
-    /**
-     * Returns the platform flag value, or null if not specified.
-     *
-     * @return The platform (e.g., "linux/amd64"), or null
-     */
     public @Nullable String getPlatform() {
         Docker.From from = getTree();
         if (from.getFlags() == null) {
@@ -79,30 +72,16 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
         return null;
     }
 
-    /**
-     * Returns the stage name (AS alias), or null if not specified.
-     *
-     * @return The stage name, or null
-     */
     public @Nullable String getStageName() {
         Docker.From.As as = getTree().getAs();
         return as != null ? as.getName().getText() : null;
     }
 
-    /**
-     * Returns the quote style used for the image name, if any.
-     *
-     * @return The quote style, or null if unquoted
-     */
     public Docker.Literal.@Nullable QuoteStyle getQuoteStyle() {
         return ArgumentContents.quoteStyle(getTree().getImageName());
     }
 
-    /**
-     * Returns the FROM instruction with its image reference replaced by {@code reference}
-     * (e.g. {@code "nginx:1.25"}), decomposing it into the structured image name, tag, and
-     * digest while preserving the original prefix.
-     */
+    /// Decomposes `reference` into image name, tag and digest, keeping the original prefix.
     @Override
     public Docker.From withImageReference(String reference) {
         Docker.From from = getTree();
@@ -110,28 +89,17 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
         return from.withImageName(parts[0]).withTag(parts[1]).withDigest(parts[2]);
     }
 
-    /**
-     * Returns the FROM instruction with the tag of its image reference replaced by {@code tag},
-     * preserving the image name and any digest.
-     */
     @Override
     public Docker.From withTag(String tag) {
         return getTree().withTag(new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
                 ArgumentContents.of(tag, getQuoteStyle())));
     }
 
-    /**
-     * Returns the FROM instruction with its image name replaced by {@code imageName}, preserving
-     * any tag and digest.
-     */
     @Override
     public Docker.From withImageNameArgument(Docker.Argument imageName) {
         return getTree().withImageName(imageName);
     }
 
-    /**
-     * Matcher for DockerImage traits with builder-style configuration.
-     */
     public static class Matcher extends DockerTraitMatcher<DockerFrom> {
         private @Nullable String imageNamePattern;
         private @Nullable String tagPattern;
@@ -140,70 +108,36 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
         private boolean excludeScratch;
         private boolean onlyUnpinned;
 
-        /**
-         * Only match images with names matching this glob pattern.
-         *
-         * @param pattern The glob pattern for image name
-         * @return this matcher for chaining
-         */
         @Contract("_ -> this")
         public Matcher imageName(String pattern) {
             this.imageNamePattern = pattern;
             return this;
         }
 
-        /**
-         * Only match images with tags matching this glob pattern.
-         *
-         * @param pattern The glob pattern for tag
-         * @return this matcher for chaining
-         */
         @Contract("_ -> this")
         public Matcher tag(String pattern) {
             this.tagPattern = pattern;
             return this;
         }
 
-        /**
-         * Only match images with digests matching this glob pattern.
-         *
-         * @param pattern The glob pattern for digest
-         * @return this matcher for chaining
-         */
         @Contract("_ -> this")
         public Matcher digest(String pattern) {
             this.digestPattern = pattern;
             return this;
         }
 
-        /**
-         * Only match images with platform flags matching this glob pattern.
-         *
-         * @param pattern The glob pattern for platform
-         * @return this matcher for chaining
-         */
         @Contract("_ -> this")
         public Matcher platform(String pattern) {
             this.platformPattern = pattern;
             return this;
         }
 
-        /**
-         * Exclude the special "scratch" base image from matches.
-         *
-         * @return this matcher for chaining
-         */
         @Contract("-> this")
         public Matcher excludeScratch() {
             this.excludeScratch = true;
             return this;
         }
 
-        /**
-         * Only match unpinned images (no tag, "latest" tag, or no digest).
-         *
-         * @return this matcher for chaining
-         */
         @Contract("-> this")
         public Matcher onlyUnpinned() {
             this.onlyUnpinned = true;
@@ -219,7 +153,6 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
             Docker.From from = (Docker.From) value;
             DockerFrom image = new DockerFrom(cursor);
 
-            // Check exclusions
             if (excludeScratch && image.isScratch()) {
                 return null;
             }
@@ -228,12 +161,10 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
                 return null;
             }
 
-            // Check image name pattern
             if (imageNamePattern != null && !image.imageNameMatches(imageNamePattern)) {
                 return null;
             }
 
-            // Check tag pattern
             if (tagPattern != null) {
                 if (from.getTag() == null) {
                     return null;
@@ -243,7 +174,6 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
                 }
             }
 
-            // Check digest pattern
             if (digestPattern != null) {
                 if (from.getDigest() == null) {
                     return null;
@@ -253,7 +183,6 @@ public class DockerFrom implements DockerImageReference<Docker.From> {
                 }
             }
 
-            // Check platform pattern
             if (platformPattern != null) {
                 String platform = image.getPlatform();
                 if (platform == null || !StringUtils.matchesGlob(platform, platformPattern)) {

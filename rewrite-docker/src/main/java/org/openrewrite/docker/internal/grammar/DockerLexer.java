@@ -137,27 +137,18 @@ public class DockerLexer extends Lexer {
 	}
 
 
-	    // Use a queue (FIFO) for heredoc markers so they are matched in order of declaration
 	    private Queue<String> heredocIdentifiers = new LinkedList<String>();
-	    // Whether an instruction keyword is recognized here, i.e. at the start of a logical line
 	    private boolean atLineStart = true;
-	    // Whether the CMD or NONE that a HEALTHCHECK takes is still to come
 	    private boolean afterHealthcheck = false;
-	    // Whether the flags of a COPY are still being read, where --from carries an image reference
 	    private boolean copyFlags = false;
-	    // Whether a parser directive is still recognized here, and whether a comment is
 	    private boolean atFileHead = true;
 	    private boolean atLineHead = true;
-	    // Named by an '# escape=' directive, and unlike the flags below not scoped to a line
+	    // Named by an '# escape=' directive, and unlike the flags above not scoped to a line
 	    private char escapeChar = '\\';
 
-	    // Each flag above holds over a region of one logical line, so each is one question about the token
-	    // just matched: does that token still belong to the region, or is it the first one past its end?
-	    // Asking it here, once per flag, is what stops a rule added later from silently widening a region
-	    // by forgetting to close it - a rule that is not named below ends every region it is not part of.
-	    // emit() runs after the matched rule's action and commands, so _type is the type the token ends up
-	    // with (an instruction off line start has become UNQUOTED_TEXT) and _mode is the mode after any
-	    // push or pop, which is the mode the next token will be read in.
+	    // Every line-scoped flag is answered here, so a rule added later cannot widen a region by forgetting
+	    // to close it. emit() runs after the rule's action and commands, so _type is the type the token ended
+	    // up with and _mode is the mode the next token will be read in.
 	    @Override
 	    public Token emit() {
 	        boolean lineEnded = endsLine();
@@ -170,15 +161,13 @@ public class DockerLexer extends Lexer {
 	        return super.emit();
 	    }
 
-	    // A newline ends the logical line, except in the body of a heredoc, where it only separates content
-	    // lines. A parser directive ends one too, because it matches its own trailing newline.
+	    // In a heredoc body a newline only separates content lines; a parser directive matches its own.
 	    private boolean endsLine() {
 	        return _type == PARSER_DIRECTIVE || _type == NEWLINE && _mode != HEREDOC;
 	    }
 
-	    // Nothing hidden stands between the start of a line and the instruction on it. ONBUILD and
-	    // HEALTHCHECK each take a second instruction, and the flags of a HEALTHCHECK and their values stand
-	    // between it and the CMD or NONE it takes, so neither ends the position an instruction is read in.
+	    // ONBUILD and HEALTHCHECK each take a second instruction, and a HEALTHCHECK's flags stand between it
+	    // and the CMD or NONE it takes.
 	    private boolean continuesLineStart() {
 	        switch (_type) {
 	            case WS: case LINE_CONTINUATION: case COMMENT:
@@ -192,8 +181,7 @@ public class DockerLexer extends Lexer {
 	        }
 	    }
 
-	    // The flag section of a COPY reaches to the first of its paths. FLAG_IMAGE_REF holds the
-	    // value of a --from, which is part of the section rather than the end of it.
+	    // The flag section of a COPY reaches to the first of its paths, the value of a --from included.
 	    private boolean continuesCopyFlags() {
 	        if (_mode == FLAG_IMAGE_REF) {
 	            return true;
@@ -207,20 +195,19 @@ public class DockerLexer extends Lexer {
 	        }
 	    }
 
-	    // A written line, unlike the logical one atLineStart holds to, ends at a continuation as well - the
-	    // FLAG_END form included, which is how a continuation closing the value of a --from reaches here.
+	    // A written line, unlike the logical one atLineStart holds to, ends at a continuation as well.
 	    private boolean beginsLineHead() {
 	        return _type == NEWLINE && _mode != HEREDOC || _type == LINE_CONTINUATION || _type == PARSER_DIRECTIVE ||
 	               _type == FLAG_END && getText().endsWith("\n");
 	    }
 
-	    // Docker gives up on directives at the first comment, blank line or instruction
+	    // Docker gives up on directives at the first comment, blank line or instruction.
 	    private boolean continuesFileHead() {
 	        return _type == PARSER_DIRECTIVE || _type == WS;
 	    }
 
-	    // Docker takes only '\' or '`' here and fails the build on anything else, a second escape
-	    // directive included; we read such a file on with the last value that was one of the two.
+	    // Docker fails the build on anything but '\' or '`', a second escape directive included; we read on
+	    // with the last value that was one of the two.
 	    private char declaredEscape() {
 	        String directive = getText();
 	        int equals = directive.indexOf('=');
@@ -231,9 +218,8 @@ public class DockerLexer extends Lexer {
 	        return value.length() == 1 && (value.charAt(0) == '\\' || value.charAt(0) == '`') ? value.charAt(0) : escapeChar;
 	    }
 
-	    // Both rules that open a heredoc queue its marker exactly as written after the '<<', dash and all,
-	    // because the dash is the only thing that tells the rule matching the terminator whether a line
-	    // indented with tabs closes this body.
+	    // The dash is queued along with the marker because it is what tells the terminator rule whether a
+	    // line indented with tabs closes this body.
 	    private void pushHeredocMarker() {
 	        heredocIdentifiers.add(getText().substring(2));
 	    }
@@ -247,7 +233,6 @@ public class DockerLexer extends Lexer {
 	        }
 	    }
 
-	    // Whether what follows the '--' that both flag rules begin with is the '--from=' of a COPY
 	    private boolean atFromFlag() {
 	        if (!copyFlags) {
 	            return false;
@@ -510,9 +495,8 @@ public class DockerLexer extends Lexer {
 
 			  if(!heredocIdentifiers.isEmpty() && Heredocs.closes(heredocIdentifiers.peek(), getText())) {
 			      setType(UNQUOTED_TEXT);
-			      heredocIdentifiers.poll();  // Remove from front of queue (FIFO)
-			      // Only pop mode when all heredoc markers have been matched
-			      if(heredocIdentifiers.isEmpty()) {
+			      heredocIdentifiers.poll();
+			          if(heredocIdentifiers.isEmpty()) {
 			          popMode();
 			      }
 			  }

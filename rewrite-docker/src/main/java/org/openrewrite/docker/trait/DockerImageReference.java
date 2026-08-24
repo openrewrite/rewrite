@@ -31,64 +31,45 @@ import java.util.Optional;
 import static org.openrewrite.docker.trait.DockerTraitMatcher.partMatches;
 
 /**
- * A trait representing an image reference anywhere in a Dockerfile: the base image of a
- * {@code FROM} instruction (see {@link DockerFrom}) or the image carried by the {@code --from}
- * flag of a {@code COPY} instruction (see {@link DockerCopyFrom}).
- * <p>
- * This is the common contract shared by both concrete traits, providing semantic access to
- * the image name, tag, and digest, pinning classification, glob matching, and the ability to
- * update the reference. Location-specific concepts (platform, stage name, {@code scratch},
- * stage references) live on the concrete traits.
- * <p>
- * Use {@link Matcher} to find and update image references regardless of where they occur.
+ * An image reference anywhere in a Dockerfile: the base image of a {@code FROM} (see
+ * {@link DockerFrom}) or the image carried by the {@code --from} of a {@code COPY} (see
+ * {@link DockerCopyFrom}). Location-specific concepts such as platform, stage name and
+ * {@code scratch} live on the concrete traits.
  *
- * @param <T> The instruction type carrying the image reference ({@link Docker.From} for a
- *            {@code FROM}, or {@link Docker.Copy} for a {@code COPY}).
+ * @param <T> The instruction type carrying the image reference.
  */
 public interface DockerImageReference<T extends Docker.Instruction> extends Trait<T> {
 
     /**
-     * Returns the image name as it appears in the tree, or {@code null} where the instruction does
-     * not name an image at all: a {@code COPY} without a {@code --from} flag, or one whose
-     * {@code --from} names an earlier build stage. The tag and digest are {@code null} whenever
-     * this is.
+     * The image name as written, or {@code null} where the instruction names no image at all: a
+     * {@code COPY} without a {@code --from}, or one whose {@code --from} names an earlier stage.
+     * The tag and digest are {@code null} whenever this is.
      */
     Docker.@Nullable Argument getImageNameArgument();
 
-    /**
-     * Returns the tag as it appears in the tree, or {@code null} if the reference has none.
-     */
     Docker.@Nullable Argument getTagArgument();
 
-    /**
-     * Returns the digest as it appears in the tree, or {@code null} if the reference has none.
-     */
     Docker.@Nullable Argument getDigestArgument();
 
-    /**
-     * Returns the image name (without tag or digest), or empty if the reference does not
-     * resolve to an external image (e.g. a build-stage reference). Environment variable
-     * references are preserved in their original form.
-     */
+    /// The image name without tag or digest, with environment variable references left as written.
     default Optional<String> getImageName() {
         Docker.Argument imageName = getImageNameArgument();
         return imageName == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(imageName));
     }
 
-    /// As [#getImageName()], but decomposed into the registry the image is pulled from and the path
-    /// within that registry, which also gives the other spellings of the same image.
+    /// As [#getImageName()], decomposed into registry and path, which also gives the other spellings
+    /// of the same image.
     default Optional<ImageName> getImage() {
         return getImageName().map(ImageName::parse);
     }
 
-    /// The registry as written, or empty where the name does not write one; for the registry an
-    /// image is pulled from either way, see [ImageName#getResolvedRegistry()].
+    /// The registry as written; for the one an image is pulled from either way, see
+    /// [ImageName#getResolvedRegistry()].
     default Optional<String> getRegistry() {
         return getImage().map(ImageName::getRegistry);
     }
 
-    /// The shortest name that resolves to the same image, so `docker.io/library/ubuntu` reads as
-    /// `ubuntu`.
+    /// The shortest name that resolves to the same image, so `docker.io/library/ubuntu` reads as `ubuntu`.
     default Optional<String> getFamiliarImageName() {
         return getImage().map(ImageName::getFamiliar);
     }
@@ -98,41 +79,27 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
         return getImage().map(ImageName::getCanonical);
     }
 
-    /**
-     * Returns the tag, or empty if no tag is specified.
-     */
     default Optional<String> getTag() {
         Docker.Argument tag = getTagArgument();
         return tag == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(tag));
     }
 
-    /**
-     * Returns the digest, or empty if no digest is specified.
-     */
     default Optional<String> getDigest() {
         Docker.Argument digest = getDigestArgument();
         return digest == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(digest));
     }
 
-    /**
-     * Returns true if the referenced image is pinned by digest, whatever its tag.
-     */
+    /// Pinned by digest, whatever its tag.
     default boolean isDigestPinned() {
         return getDigestArgument() != null;
     }
 
-    /**
-     * Returns true if the referenced image is unpinned (no tag or an explicit "latest" tag).
-     */
     default boolean isUnpinned() {
         return getUnpinnedReason().isPresent();
     }
 
-    /**
-     * Returns the reason the referenced image is unpinned, or empty if it is pinned. An image
-     * carrying a digest is pinned whatever its tag, and one whose name is an unresolved
-     * environment variable cannot be classified, so it is conservatively taken to be pinned.
-     */
+    /// Empty if pinned. A name that is an unresolved environment variable cannot be classified, so it
+    /// is conservatively taken to be pinned.
     default Optional<UnpinnedReason> getUnpinnedReason() {
         Docker.Argument imageName = getImageNameArgument();
         if (imageName == null || getDigestArgument() != null) {
@@ -151,53 +118,34 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
         return Optional.empty();
     }
 
-    /// Checks if the image name matches the given glob pattern, in whichever spelling the pattern
-    /// was written: `ubuntu` matches `docker.io/library/ubuntu` and the other way round.
+    /// Matches in whichever spelling the pattern was written: `ubuntu` matches
+    /// `docker.io/library/ubuntu` and the other way round.
     default boolean imageNameMatches(String pattern) {
         Docker.Argument imageName = getImageNameArgument();
         return imageName != null && DockerTraitMatcher.imageNameMatches(imageName, pattern);
     }
 
-    /**
-     * Checks if the tag matches the given glob pattern; false if no tag is specified.
-     */
     default boolean tagMatches(String pattern) {
         Docker.Argument tag = getTagArgument();
         return tag != null && partMatches(tag, pattern);
     }
 
-    /**
-     * Checks if the digest matches the given glob pattern; false if no digest is specified.
-     */
     default boolean digestMatches(String pattern) {
         Docker.Argument digest = getDigestArgument();
         return digest != null && partMatches(digest, pattern);
     }
 
-    /**
-     * Returns the instruction with its image reference replaced by {@code reference}
-     * (e.g. {@code "nginx:1.25"}).
-     */
+    /// The instruction with its image reference replaced, as by `nginx:1.25`.
     T withImageReference(String reference);
 
-    /**
-     * Returns the instruction with the tag of its image reference replaced by {@code tag},
-     * preserving the image name and any digest.
-     */
+    /// The instruction with its tag replaced, keeping the image name and any digest.
     T withTag(String tag);
 
-    /**
-     * Returns the instruction with its image name replaced by {@code imageName}, preserving any
-     * tag and digest. Takes an argument rather than a string so that a name holding an environment
-     * variable reference can be edited without flattening it back into text.
-     */
+    /// Takes an argument rather than a string so that a name holding an environment variable reference
+    /// can be edited without flattening it back into text.
     T withImageNameArgument(Docker.Argument imageName);
 
-    /**
-     * Returns the name of the build stage this reference stands in - the {@code AS} alias of the
-     * stage's {@code FROM}, which for a {@code FROM} is its own - or {@code null} where the stage
-     * is unnamed.
-     */
+    /// The `AS` alias of the stage this reference stands in, which for a `FROM` is its own.
     default @Nullable String getStageName() {
         Docker.Stage stage = getCursor().firstEnclosing(Docker.Stage.class);
         if (stage == null) {
@@ -207,37 +155,21 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
         return as == null ? null : as.getName().getText();
     }
 
-    /**
-     * Returns true if the reference names the special {@code scratch} image, which is not an image
-     * that can be pulled, updated or scanned.
-     */
+    /// The special `scratch` image, which cannot be pulled, updated or scanned.
     default boolean isScratch() {
         Docker.Argument imageName = getImageNameArgument();
         return imageName != null && "scratch".equals(ArgumentContents.text(imageName));
     }
 
-    /**
-     * Reasons why an image may be considered unpinned.
-     */
     enum UnpinnedReason {
-        /**
-         * No tag specified, which defaults to "latest".
-         */
         IMPLICIT_LATEST,
-        /**
-         * Explicit "latest" tag specified.
-         */
         EXPLICIT_LATEST
     }
 
     /**
-     * Matcher that finds image references in {@code FROM} and {@code COPY --from} alike,
-     * yielding the shared {@link DockerImageReference} contract.
-     * Build-stage references (e.g. {@code COPY --from=builder}) are not images and are skipped.
-     * <p>
-     * Only the options common to all locations are offered here; use {@link DockerFrom.Matcher}
-     * or {@link DockerCopyFrom.Matcher} directly for location-specific options such as
-     * {@code platform}, {@code excludeScratch}, or {@code onlyUnpinned}.
+     * Finds image references in {@code FROM} and {@code COPY --from} alike, skipping build-stage
+     * references. Offers only the options common to both; use {@link DockerFrom.Matcher} or
+     * {@link DockerCopyFrom.Matcher} for location-specific ones.
      */
     class Matcher extends DockerTraitMatcher<DockerImageReference<?>> {
         private @Nullable String imageNamePattern;
@@ -245,36 +177,25 @@ public interface DockerImageReference<T extends Docker.Instruction> extends Trai
         private @Nullable String digestPattern;
         private boolean excludeScratch;
 
-        /**
-         * Only match images with names matching this glob pattern.
-         */
         @Contract("_ -> this")
         public Matcher imageName(String pattern) {
             this.imageNamePattern = pattern;
             return this;
         }
 
-        /**
-         * Only match images with tags matching this glob pattern.
-         */
         @Contract("_ -> this")
         public Matcher tag(String pattern) {
             this.tagPattern = pattern;
             return this;
         }
 
-        /**
-         * Only match images with digests matching this glob pattern.
-         */
         @Contract("_ -> this")
         public Matcher digest(String pattern) {
             this.digestPattern = pattern;
             return this;
         }
 
-        /**
-         * Exclude the special {@code scratch} image, which cannot be pulled, updated or scanned.
-         */
+        /// Exclude the special `scratch` image.
         @Contract("-> this")
         public Matcher excludeScratch() {
             this.excludeScratch = true;

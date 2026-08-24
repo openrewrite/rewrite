@@ -74,8 +74,7 @@ public class ReplaceMaintainerWithLabel extends Recipe {
         };
     }
 
-    /// The index of the last `MAINTAINER` of the stage, the one whose author the image ends up with, or -1 when
-    /// the stage has none.
+    /// The last `MAINTAINER` of the stage is the one whose author the image ends up with.
     private static int lastMaintainer(Docker.Stage stage) {
         List<Docker.Instruction> instructions = stage.getInstructions();
         for (int i = instructions.size() - 1; i >= 0; i--) {
@@ -116,8 +115,8 @@ public class ReplaceMaintainerWithLabel extends Recipe {
                 labelKeyword(maintainer.getKeyword()), singletonList(pair));
     }
 
-    /// A `MAINTAINER` is taken as it stands while a label value is read by the shell, so a value the shell would
-    /// not give back unchanged becomes a double quoted string with what the shell reads escaped.
+    /// A `MAINTAINER` is taken as it stands while a label value is read by the shell, so one the shell would
+    /// not give back unchanged is quoted and escaped.
     private static List<Docker.ArgumentContent> value(String text) {
         StringBuilder escaped = new StringBuilder();
         boolean quote = false;
@@ -137,8 +136,7 @@ public class ReplaceMaintainerWithLabel extends Recipe {
                 ArgumentContents.of(text, null);
     }
 
-    /// `LABEL` in the casing the `MAINTAINER` it replaces was written in, so a file writing its instructions in
-    /// lowercase keeps doing so.
+    /// `LABEL` in the casing the `MAINTAINER` it replaces was written in.
     private static String labelKeyword(String maintainer) {
         return maintainer.equals(maintainer.toLowerCase(Locale.ROOT)) ? "label" : "LABEL";
     }

@@ -22,20 +22,12 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 
 /**
- * Base class for Docker trait matchers providing shared utilities for working with
- * Docker AST elements.
+ * Base class for Docker trait matchers, holding the glob matching they share.
  *
  * @param <U> The trait type this matcher produces
  */
 abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher<U> {
 
-    /**
-     * Extracts text from a Docker argument, replacing environment variables with wildcards
-     * for glob matching purposes.
-     *
-     * @param arg The argument to extract text from
-     * @return Text with environment variables replaced by '*'
-     */
     static String extractTextForMatching(Docker.Argument arg) {
         StringBuilder sb = new StringBuilder();
         for (Docker.ArgumentContent content : arg.getContents()) {
@@ -48,16 +40,8 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
         return sb.toString();
     }
 
-    /**
-     * Performs bidirectional glob matching when environment variables are present.
-     * When the text contains wildcards (from env vars), we need to check if either
-     * the pattern matches the text OR the text (as a pattern) matches the pattern.
-     *
-     * @param text       The text to match (may contain wildcards from env vars)
-     * @param pattern    The glob pattern to match against
-     * @param hasEnvVars Whether the original text contained environment variables
-     * @return true if there's a match in either direction
-     */
+    /// A text holding an environment variable stands as a wildcard, so it is matched in both
+    /// directions: either may be the pattern the other answers to.
     static boolean matchesBidirectional(String text, String pattern, boolean hasEnvVars) {
         if (hasEnvVars) {
             return StringUtils.matchesGlob(text, pattern) ||
@@ -66,23 +50,12 @@ abstract class DockerTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher
         return StringUtils.matchesGlob(text, pattern);
     }
 
-    /**
-     * Checks whether one part of an image reference matches a glob pattern, treating any
-     * environment variable it contains as a wildcard.
-     *
-     * @param part    The image name, tag or digest to match
-     * @param pattern The glob pattern to match against
-     * @return true if the part matches
-     */
     static boolean partMatches(Docker.Argument part, String pattern) {
         return matchesBidirectional(extractTextForMatching(part), pattern, ArgumentContents.containsVariable(part));
     }
 
-    /// As [#partMatches], but for an image name, where a pattern also matches a name that spells
-    /// the same image differently: `ubuntu` matches `docker.io/library/ubuntu`, and the other way
-    /// round. Both are compared canonically, which fills in the registry and namespace a name
-    /// leaves out rather than dropping the ones a pattern writes; familiarizing them instead would
-    /// widen `docker.io/*` to `*`, matching every image on every registry.
+    /// As [#partMatches], but a pattern also matches a name that spells the same image differently.
+    /// Both are compared canonically; familiarizing them instead would widen `docker.io/*` to `*`.
     static boolean imageNameMatches(Docker.Argument imageName, String pattern) {
         if (partMatches(imageName, pattern)) {
             return true;

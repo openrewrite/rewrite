@@ -67,9 +67,8 @@ public class LowerCaseStageNames extends Recipe {
         return renames;
     }
 
-    /// The `FROM` instructions whose image name is a reference to a renamed stage rather than an image of that
-    /// name. Only a stage declared earlier in the file can be built on, so a name that no stage before this one
-    /// carries is an image.
+    /// Only a stage declared earlier in the file can be built on, so a name that no stage before this one
+    /// carries is an image rather than a reference to a renamed stage.
     private static Set<UUID> referencingFroms(Docker.File file, Map<String, String> renames) {
         Set<UUID> referencing = new HashSet<>();
         Set<String> declared = new HashSet<>();
@@ -116,9 +115,8 @@ public class LowerCaseStageNames extends Recipe {
             return f;
         }
 
-        /// A `RUN` mounts an earlier stage with `--mount=type=bind,from=<stage>`, so the name it uses has to be
-        /// renamed along with the rest. The flag holds the `=` and `,` of an option list as contents of their
-        /// own, which leaves the name a content too, renamed where it sits rather than by rebuilding the value.
+        /// A `RUN --mount=type=bind,from=<stage>` names a stage too. The flag holds the `=` and `,` of its
+        /// option list as contents of their own, so the name is renamed where it sits.
         @Override
         public Docker.Run visitRun(Docker.Run run, ExecutionContext ctx) {
             Docker.Run r = super.visitRun(run, ctx);

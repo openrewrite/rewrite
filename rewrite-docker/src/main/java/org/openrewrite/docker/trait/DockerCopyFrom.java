@@ -36,13 +36,9 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * A trait representing the image reference carried by the {@code --from} flag of a {@code COPY}
- * instruction. Provides the same semantic access to image name, tag, and digest as
- * {@link DockerFrom}, while distinguishing an external image reference
- * (e.g. {@code COPY --from=nginx:latest}) from a reference to an earlier build stage
- * (e.g. {@code COPY --from=builder} or {@code COPY --from=0}). When the value refers to a
- * build stage the image accessors return {@code null}; use {@link #isStageReference()} to
- * disambiguate.
+ * The image reference carried by the {@code --from} of a {@code COPY}. Where that value names an
+ * earlier build stage rather than an external image the image accessors return {@code null}; use
+ * {@link #isStageReference()} to tell the two apart.
  */
 @RequiredArgsConstructor
 public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
@@ -83,19 +79,12 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
         return arg == null ? null : ImageReferences.split(arg.getContents(), arg.getPrefix());
     }
 
-    /**
-     * Returns the raw {@code --from} value with environment variable references preserved,
-     * or empty if there is no {@code --from} flag.
-     */
     public Optional<String> getFromValue() {
         Docker.Argument arg = fromArgument();
         return arg == null ? Optional.empty() : Optional.of(ArgumentContents.textWithVariables(arg));
     }
 
-    /**
-     * Returns true if the {@code --from} value refers to an earlier build stage (by name or
-     * numeric index) rather than an external image.
-     */
+    /// A stage named by its `AS` alias or by its numeric index, rather than an external image.
     public boolean isStageReference() {
         if (stageReference == null) {
             stageReference = computeStageReference();
@@ -146,10 +135,6 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
         return names;
     }
 
-    /**
-     * Returns the image name of the referenced external image, or {@code null} if the
-     * {@code --from} names an earlier build stage or is absent.
-     */
     @Override
     public Docker.@Nullable Argument getImageNameArgument() {
         Docker.@Nullable Argument[] components = components();
@@ -168,10 +153,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
         return components == null ? null : components[2];
     }
 
-    /**
-     * Returns the instruction with its {@code --from} value replaced by {@code reference}
-     * (e.g. {@code "nginx:1.25"}), or unchanged if there is no {@code --from} flag.
-     */
+    /// Unchanged where there is no `--from` flag.
     @Override
     public Docker.Copy withImageReference(String reference) {
         Docker.Argument arg = fromArgument();
@@ -181,10 +163,6 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
         return withFromValue(arg.withContents(ImageReferences.contents(reference)));
     }
 
-    /**
-     * Returns the instruction with the image name of its {@code --from} replaced by
-     * {@code imageName}, preserving any tag and digest. Unchanged for stage references.
-     */
     @Override
     public Docker.Copy withImageNameArgument(Docker.Argument imageName) {
         Docker.@Nullable Argument[] parts = components();
@@ -202,10 +180,6 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
           "from".equals(f.getName()) ? f.withValue(value) : f));
     }
 
-    /**
-     * Returns the instruction with the tag of its external image reference replaced by
-     * {@code tag}, preserving the image name and any digest. Unchanged for stage references.
-     */
     @Override
     public Docker.Copy withTag(String tag) {
         Optional<String> name = getImageName();
@@ -216,46 +190,31 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Copy> {
         return withImageReference(name.get() + ":" + tag + suffix);
     }
 
-    /**
-     * Matcher for {@link DockerCopyFrom} traits with builder-style configuration.
-     */
     public static class Matcher extends DockerTraitMatcher<DockerCopyFrom> {
         private @Nullable String imageNamePattern;
         private @Nullable String tagPattern;
         private @Nullable String digestPattern;
         private boolean excludeStageReferences;
 
-        /**
-         * Only match images with names matching this glob pattern.
-         */
         @Contract("_ -> this")
         public Matcher imageName(String pattern) {
             this.imageNamePattern = pattern;
             return this;
         }
 
-        /**
-         * Only match images with tags matching this glob pattern.
-         */
         @Contract("_ -> this")
         public Matcher tag(String pattern) {
             this.tagPattern = pattern;
             return this;
         }
 
-        /**
-         * Only match images with digests matching this glob pattern.
-         */
         @Contract("_ -> this")
         public Matcher digest(String pattern) {
             this.digestPattern = pattern;
             return this;
         }
 
-        /**
-         * Exclude {@code --from} values that reference an earlier build stage, matching only
-         * external image references.
-         */
+        /// Match only external image references.
         @Contract("-> this")
         public Matcher excludeStageReferences() {
             this.excludeStageReferences = true;

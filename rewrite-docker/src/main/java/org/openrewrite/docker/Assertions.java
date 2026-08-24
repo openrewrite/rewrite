@@ -110,17 +110,14 @@ public class Assertions {
         return sf;
     }
 
-    /// Line continuations are whitespace to a Dockerfile, so the `\` or `` ` `` that introduces one is
-    /// not text sitting where only formatting belongs.
+    /// Line continuations are whitespace to a Dockerfile, so the `\` that introduces one is not text.
     private static boolean isWhitespace(String text) {
         return LINE_CONTINUATION.matcher(text).replaceAll("").trim().isEmpty();
     }
 
-    /// A tree prints losslessly by construction, so printing alone cannot tell whether its elements
-    /// mean what they say. Reading the printed source back and comparing what the two trees model
-    /// catches a tree that prints correctly but holds the wrong thing: an image reference whose tag
-    /// sits in its name, a value whose variable reference is only text, an exec form whose arguments
-    /// have lost their quotes.
+    /// A tree prints losslessly by construction, so printing alone cannot tell whether its elements mean
+    /// what they say. Reading the printed source back and comparing the two trees catches one that prints
+    /// correctly but holds the wrong thing, as an image reference whose tag sits in its name does.
     private static void assertReparsesToTheSameTree(SourceFile sf) {
         String printed = sf.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
         List<SourceFile> reparsed = DockerParser.builder().build()
@@ -138,8 +135,7 @@ public class Assertions {
         }
     }
 
-    /// Everything a tree models apart from its formatting, so that comparing two trees compares what
-    /// they mean rather than what they print.
+    /// Everything a tree models apart from its formatting.
     private static String semantics(Tree tree) {
         return new DockerIsoVisitor<StringBuilder>() {
             @Override
@@ -236,9 +232,7 @@ public class Assertions {
     /// A recipe that assembles a tree by hand can leave it holding what the printer cannot express, or
     /// can express only by changing what the source means: a subtree copied without fresh ids, an
     /// instruction that does not start its own line, a flag whose name already carries its dashes.
-    /// Unlike [TypeValidation#allowNonWhitespaceInWhitespace] and [TypeValidation#parseAndPrintEquality]
-    /// there is no flag to turn these off, because a tree that cannot print what it models is never
-    /// what a test meant to assert.
+    /// There is no flag to turn these off, unlike [TypeValidation#parseAndPrintEquality].
     static void assertWellFormed(SourceFile sf) {
         List<String> violations = new WellFormedVisitor().reduce(sf, new ArrayList<>());
         if (!violations.isEmpty()) {
@@ -254,8 +248,8 @@ public class Assertions {
 
         private final Set<UUID> ids = new HashSet<>();
 
-        /// The one [Space] that nothing follows, and so the one whose trailing comment needs no newline
-        /// after it. A [Space] holding comments is never a flyweight, so reference identity is enough.
+        /// The one [Space] whose trailing comment needs no newline after it. A [Space] holding comments
+        /// is never a flyweight, so reference identity is enough.
         private @Nullable Space eof;
 
         @Override
@@ -477,15 +471,14 @@ public class Assertions {
         }
 
         /// An empty content closing an argument is the one place whitespace between contents is not that
-        /// argument's text: it is what a part reaching a separator has to write back, and the separator
-        /// has no prefix of its own to hold it.
+        /// argument's text; see `DockerParserVisitor`.
         private static boolean isEmptyLiteral(Docker.ArgumentContent content) {
             return content instanceof Docker.Literal && ((Docker.Literal) content).getText().isEmpty();
         }
 
         /// A literal whose text runs into the whitespace around it hands every recipe reading its value
-        /// the formatting too. Only where the value itself begins and ends is formatting: whitespace
-        /// where two contents meet is the value's own text, as the space in `"pre $V post"` is.
+        /// the formatting too. Whitespace where two contents meet is the value's own text, as the space
+        /// in `"pre $V post"` is.
         private void outerWhitespace(Docker.Literal literal, List<String> violations) {
             String text = literal.getText();
             if (text.isEmpty()) {
@@ -500,17 +493,15 @@ public class Assertions {
             }
         }
 
-        /// The contents the literal shares its value with, which is the literal alone where it is a whole
-        /// value of its own, as an `ARG`'s name and an `ENV`'s key are.
+        /// The literal alone where it is a whole value of its own, as an `ARG`'s name is.
         private List<Docker.ArgumentContent> valueItIsPartOf(Docker.Literal literal) {
             Object parent = getCursor().getParentTreeCursor().getValue();
             return parent instanceof Docker.Argument ? ((Docker.Argument) parent).getContents() :
                     singletonList(literal);
         }
 
-        /// Recipes that copy a subtree, as combining or adding instructions do, hand the same element
-        /// to two parents. The tree still prints, but any visitor that navigates by id, and any recipe
-        /// that edits one of the two, sees both.
+        /// A subtree copied without fresh ids still prints, but any visitor that navigates by id, and
+        /// any recipe that edits one of the two, sees both.
         private void uniqueId(UUID id, Class<?> type, List<String> violations) {
             if (!ids.add(id)) {
                 violations.add("expected every element to have its own id, but a " + type.getSimpleName() +
@@ -519,10 +510,8 @@ public class Assertions {
         }
 
         /// Every element that has a keyword spells it the same as its own type, so the type is the
-        /// expectation and a new instruction is checked without anyone remembering to add it here.
-        /// Dockerfile keywords are case insensitive, so a lower case keyword is the one the source
-        /// wrote. Anything else is a keyword that no longer says what its element is, or one holding
-        /// whitespace the printer expects to find on whatever follows it.
+        /// expectation and a new instruction is checked without anyone adding it here. Dockerfile
+        /// keywords are case insensitive, so a lower case keyword is the one the source wrote.
         private void keyword(String keyword, Class<?> type, List<String> violations) {
             String element = type.getSimpleName();
             if (!element.equalsIgnoreCase(keyword)) {
@@ -531,8 +520,7 @@ public class Assertions {
             }
         }
 
-        /// An instruction the printer writes straight after the one before it, as a recipe that
-        /// inserts an instruction without a prefix does, prints as `FROM alpineRUN x`.
+        /// An instruction inserted without a prefix prints as `FROM alpineRUN x`.
         private void startsItsOwnLine(Docker d, List<String> violations) {
             if (!containsNewline(d.getPrefix())) {
                 violations.add("expected the " + d.getClass().getSimpleName() + " to start its own line, but its" +
@@ -554,8 +542,7 @@ public class Assertions {
             }
         }
 
-        /// JSON array elements are the one place a Dockerfile is not shell, and an element that loses
-        /// its quotes prints a JSON array that Docker refuses to read.
+        /// A JSON array element that loses its quotes prints an array Docker refuses to read.
         private void doubleQuoted(Docker.Literal literal, List<String> violations) {
             if (literal.getQuoteStyle() != Docker.Literal.QuoteStyle.DOUBLE) {
                 violations.add("expected the JSON array element " + quoted(literal.getText()) +
@@ -563,8 +550,7 @@ public class Assertions {
             }
         }
 
-        /// A [Docker.Port] prints its text and models its fields, so the two can disagree without the
-        /// printed source ever saying so.
+        /// A [Docker.Port] prints its text and models its fields, so the two can disagree silently.
         private void portModelsItsText(Docker.Port port, List<String> violations) {
             String text = port.getText();
             String ports = text;
@@ -611,9 +597,9 @@ public class Assertions {
             return port != null && (port < 0 || port > 65535);
         }
 
-        /// A single quoted string has no escape processing at all, so any quote of its own style ends
-        /// it; a double quoted one can hold an escaped quote. A literal does not know which of `\\` and
-        /// `` ` `` its file's `# escape=` directive named, so either one counts here.
+        /// A single quoted string has no escape processing, so any quote of its own style ends it; a
+        /// double quoted one can hold an escaped quote. A literal does not know which escape character
+        /// its file declared, so either counts here.
         private static boolean hasUnescapedQuote(String text, Docker.Literal.QuoteStyle style) {
             boolean escapable = style == Docker.Literal.QuoteStyle.DOUBLE;
             char quote = quoteOf(style);
@@ -632,9 +618,9 @@ public class Assertions {
             return style == Docker.Literal.QuoteStyle.DOUBLE ? '"' : '\'';
         }
 
-        /// [Space#getLastWhitespace()] and [Space#getIndent()] answer with the last comment's prefix
-        /// when a [Space] holds comments, but [org.openrewrite.docker.internal.DockerPrinter] writes
-        /// comments before the whitespace, so the text abutting the next token is always the whitespace.
+        /// [Space#getLastWhitespace()] answers with the last comment's prefix when a [Space] holds
+        /// comments, but [org.openrewrite.docker.internal.DockerPrinter] writes comments before the
+        /// whitespace, so the text abutting the next token is always the whitespace.
         private static boolean containsNewline(Space space) {
             return space.getWhitespace().indexOf('\n') >= 0;
         }

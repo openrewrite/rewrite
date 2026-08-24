@@ -71,17 +71,9 @@ public class UseKeyValueEnvAndLabel extends Recipe {
         };
     }
 
-    /// The value as the `key=value` form has to write it, a single word that the shell reads as the value the
-    /// legacy form gives, or null when no such word can be built from the source.
-    ///
-    /// The legacy form separates its key from its value with whitespace, so a value written hard against its key
-    /// is not one. It is either a pair whose value opens with an `=`, which the grammar hands back whole because
-    /// a value cannot start with one, or a single word that Docker refuses outright, as it does `ENV KEY"value"`.
-    ///
-    /// A value that opens with an `=` and would be written unquoted cannot be given the `key=value` form at all.
-    /// `ENV KEY =value` binds `KEY` to `=value` and so does `ENV KEY==value`, but the grammar reads the second
-    /// back as the legacy form with a value of `==value`, so the conversion would leave a tree that no longer
-    /// models what it prints. Quoting the value instead puts a `"` after the `=` and is read back as written.
+    /// The value as the `key=value` form has to write it, or null when no such word can be built from the source.
+    /// A value written hard against its key is not the legacy form at all. One that opens with an `=` cannot be
+    /// converted unquoted: `ENV KEY==value` reads back as the legacy form with a value of `==value`.
     private static Docker.@Nullable Argument singleWord(Docker.Argument value) {
         if (value.getPrefix().getWhitespace().isEmpty()) {
             return null;
@@ -106,8 +98,7 @@ public class UseKeyValueEnvAndLabel extends Recipe {
     }
 
     /// Whether the shell reads `text` as one word, which it does when every space it holds is quoted or escaped.
-    /// A value whose quotes never close is not one, so it takes the conservative path rather than one that
-    /// assumes what the missing quote would have closed.
+    /// A value whose quotes never close is not one.
     private static boolean isSingleWord(String text) {
         boolean singleQuoted = false;
         boolean doubleQuoted = false;

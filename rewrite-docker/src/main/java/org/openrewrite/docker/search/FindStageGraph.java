@@ -71,8 +71,7 @@ public class FindStageGraph extends Recipe {
         };
     }
 
-    /// @return The registry the stage's base image is pulled from, or `null` where nothing is pulled
-    /// (`FROM scratch`) or where the name is spelled by a build argument that leaves the registry unknown.
+    /// @return `null` where nothing is pulled (`FROM scratch`) or where a build argument spells the name.
     private static @Nullable String registry(Docker.From from) {
         String plain = ArgumentContents.text(from.getImageName());
         if (SCRATCH.equals(plain)) {
@@ -96,9 +95,6 @@ public class FindStageGraph extends Recipe {
         return image.toString();
     }
 
-    /**
-     * Which build stages of a Dockerfile name which other stages.
-     */
     private static class StageGraph {
 
         private final List<@Nullable String> names;
@@ -181,9 +177,8 @@ public class FindStageGraph extends Recipe {
                 return super.visitFlag(flag, p);
             }
 
-            /// The value of one option of a flag holding a list of them, as a `RUN --mount` does. The `,` between two
-            /// options and the `=` binding a key to its value are contents of their own, so an option's value is the
-            /// run of contents up to the next `,`. Quoting an option whole keeps it in a single literal instead.
+            /// The `,` between two options and the `=` binding a key to its value are contents of their own,
+            /// so an option's value is the run of contents up to the next `,`.
             private static @Nullable String option(List<Docker.ArgumentContent> contents, String key) {
                 for (int i = 0; i < contents.size(); i++) {
                     if (i != 0 && !separator(contents.get(i - 1), ',')) {
@@ -223,10 +218,9 @@ public class FindStageGraph extends Recipe {
                 return content instanceof Docker.Literal && key.equalsIgnoreCase(((Docker.Literal) content).getText());
             }
 
-            /// A `FROM` sees only the stages declared before it, but a `--from` is resolved once the whole file is read,
-            /// so it reaches later stages too; hence `limit`. Searching backwards leaves a duplicated name at its last
-            /// declaration, as it is for Docker. A name a build argument spells, or a position rather than a name,
-            /// resolves to nothing rather than to a guess.
+            /// A `FROM` sees only the stages declared before it, but a `--from` is resolved once the whole
+            /// file is read, so it reaches later stages too; hence `limit`. Searching backwards leaves a
+            /// duplicated name at its last declaration, as it is for Docker.
             private boolean reference(String value, int limit) {
                 if (value.indexOf('$') >= 0 || StringUtils.isNumeric(value)) {
                     return false;

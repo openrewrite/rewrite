@@ -52,7 +52,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Adds BuildKit cache mounts to RUN instructions that invoke a package manager, so that the
+ * Adds BuildKit cache mounts to {@code RUN} instructions that invoke a package manager, so that the
  * downloads a build makes are kept outside the image layer and reused by the next build.
  */
 @Value
@@ -179,10 +179,8 @@ public class UseBuildKitCacheMounts extends Recipe {
             Pattern.CASE_INSENSITIVE);
     private static final Pattern FRONTEND_VERSION = Pattern.compile("^(\\d+)\\.(\\d+)");
 
-    /// A `# syntax=` directive names the frontend that builds the file, and `RUN --mount=type=cache` is only
-    /// stable from `docker/dockerfile:1.2` onwards. A file that pins an older one is left alone; a file that
-    /// pins nothing is built by the daemon's own frontend, which on any Docker that still receives updates is
-    /// BuildKit.
+    /// `RUN --mount=type=cache` is only stable from `docker/dockerfile:1.2` onwards, so a file whose
+    /// `# syntax=` directive pins an older frontend is left alone. One that pins nothing gets BuildKit.
     private static boolean supportsCacheMounts(Docker.File file) {
         String frontendTag = frontendTag(file);
         if (frontendTag == null) {
@@ -197,9 +195,8 @@ public class UseBuildKitCacheMounts extends Recipe {
         return major > 1 || (major == 1 && minor >= 2);
     }
 
-    /// A directive is only read at the head of the file, where the leading comments of the file sit in the
-    /// prefix of whichever element the parser reached first. Every one of them is read, because a `syntax`
-    /// directive may be preceded by another directive such as `escape`.
+    /// The leading comments of a file sit in the prefix of whichever element the parser reached first.
+    /// Every one is read, because a `syntax` directive may be preceded by an `escape` one.
     private static @Nullable String frontendTag(Docker.File file) {
         List<Space> spaces = new ArrayList<>();
         spaces.add(file.getPrefix());
@@ -221,10 +218,9 @@ public class UseBuildKitCacheMounts extends Recipe {
         return null;
     }
 
-    /// What the instructions of a stage say, up to the `RUN` being looked at, about where a package manager's
-    /// cache lives and what is already there: a cache mount starts out empty and hides whatever the image has
-    /// at its target, and the target this recipe knows is the one a root user with an untouched environment
-    /// would use.
+    /// What the instructions of a stage say, up to the `RUN` being looked at, about where a package
+    /// manager's cache lives and what is already there. A cache mount starts out empty and hides whatever
+    /// the image has at its target.
     private static class Stage {
         private final Map<String, String> environment = new HashMap<>();
         private final List<String> writtenPaths = new ArrayList<>();
@@ -271,8 +267,8 @@ public class UseBuildKitCacheMounts extends Recipe {
             writtenPaths.add(path.endsWith("/") ? path.substring(0, path.length() - 1) : path);
         }
 
-        /// Whether the stage has already put something at `target`, which a mount over it would hide, as a
-        /// `COPY` of a `settings.xml` into `/root/.m2` does.
+        /// A mount hides whatever the stage has already put at `target`, as a `COPY` of a `settings.xml`
+        /// into `/root/.m2` does.
         private boolean holds(String target) {
             for (String path : writtenPaths) {
                 if (path.equals(target) || path.startsWith(target + "/") || target.startsWith(path + "/")) {
@@ -283,9 +279,8 @@ public class UseBuildKitCacheMounts extends Recipe {
         }
     }
 
-    /// What a base image says about where a cache lives, which a Dockerfile building on it does not repeat.
-    /// The official `gradle` image ships a `GRADLE_USER_HOME` outside `/root`, so a mount at the directory
-    /// this recipe would otherwise assume is not the one Gradle reads.
+    /// What a base image says about where a cache lives, which a Dockerfile building on it does not
+    /// repeat: the official `gradle` image ships a `GRADLE_USER_HOME` outside `/root`.
     private static final Map<String, String[]> BASE_IMAGE_ENVIRONMENT = singletonMap(
             "gradle", new String[]{"GRADLE_USER_HOME", "/home/gradle/.gradle"});
 
@@ -374,8 +369,8 @@ public class UseBuildKitCacheMounts extends Recipe {
         return detected;
     }
 
-    /// A command may move a cache for the length of its own line, as `YARN_CACHE_FOLDER=$(mktemp -d) yarn install`
-    /// does, which reads the same as the stage having set it.
+    /// A command may move a cache for the length of its own line, as
+    /// `YARN_CACHE_FOLDER=$(mktemp -d) yarn install` does.
     private static void assign(String word, Map<String, String> environment) {
         int equals = word.indexOf('=');
         if (equals > 0) {
@@ -396,10 +391,9 @@ public class UseBuildKitCacheMounts extends Recipe {
     private static final Pattern ENVIRONMENT_ASSIGNMENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*=.*");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
-    /// The words of each command a shell would run in turn, so that a package manager is recognized by the
-    /// command it heads rather than by appearing anywhere in the text, and each command of a chain is read.
-    /// A separator inside a quoted string separates nothing, so the words of `echo "build && test"` are one
-    /// command headed by `echo` rather than two.
+    /// The words of each command a shell would run in turn, so a package manager is recognized by the
+    /// command it heads rather than by appearing anywhere in the text. A separator inside a quoted string
+    /// separates nothing, so `echo "build && test"` is one command.
     private static List<List<String>> shellCommands(String text) {
         List<List<String>> commands = new ArrayList<>();
         for (String command : splitOnSeparators(text)) {
@@ -446,8 +440,7 @@ public class UseBuildKitCacheMounts extends Recipe {
         return commands;
     }
 
-    /// A line continuation is whitespace to Docker, so the `\\` or `` ` `` that introduces one is not a word
-    /// of the command it continues.
+    /// A line continuation is whitespace to Docker, so what introduces one is not a word of the command.
     private static boolean isContinuation(String word) {
         return word.length() == 1 && (word.charAt(0) == '\\' || word.charAt(0) == '`');
     }
@@ -475,15 +468,13 @@ public class UseBuildKitCacheMounts extends Recipe {
         return targets;
     }
 
-    /// What a command does to delete a directory, which leaves a mount over it holding nothing the next
-    /// build could use.
+    /// Deleting a directory leaves a mount over it holding nothing the next build could use.
     private static Pattern removalOf(String path) {
         return Pattern.compile("rm\\s+(-\\S+\\s+)*\\S*" + Pattern.quote(path));
     }
 
-    /// A directory a package manager downloads into, and the environment variables that move it, each paired
-    /// with the value this recipe's target assumes. A variable paired with `null` moves the directory whatever
-    /// it is set to.
+    /// A directory a package manager downloads into, and the environment variables that move it, each
+    /// paired with the value this recipe's target assumes. One paired with `null` moves it whatever it says.
     static class Target {
         final String path;
         final String[][] variables;
@@ -617,16 +608,14 @@ public class UseBuildKitCacheMounts extends Recipe {
         private final String[][] subcommands;
         final Target[] targets;
 
-        /// Arguments that tell this package manager not to cache at all, so that a mount over its cache
-        /// directory would keep nothing.
+        /// Arguments that tell this package manager not to cache at all.
         private final String[] cacheDisablingArguments;
 
-        /// What a command does to empty the cache it has just filled, such as `npm cache clean`, or to fill
-        /// somewhere else, such as assigning `YARN_CACHE_FOLDER`.
+        /// Empties the cache just filled, as `npm cache clean` does, or fills somewhere else.
         private final @Nullable Pattern cacheDefeatedBy;
 
         /// What a command must also do for the mount to be filled rather than merely hiding what the image
-        /// already has at the target: an `apt-get install` only reads package lists another command wrote.
+        /// has at the target: an `apt-get install` only reads package lists another command wrote.
         private final @Nullable Pattern cacheFilledBy;
 
         private final boolean locked;
@@ -654,9 +643,8 @@ public class UseBuildKitCacheMounts extends Recipe {
                             words.subList(0, subcommand.length).equals(Arrays.asList(subcommand)));
         }
 
-        /// Whether a mount over this package manager's cache would in fact be filled by the command: not so
-        /// for a command told to install into the image from what it downloads, one that turns caching off,
-        /// one that empties the cache it just filled, or one that reads a directory the empty cache would hide.
+        /// Not so for a command told to install into the image from what it downloads, one that turns
+        /// caching off, one that empties the cache it just filled, or one that reads what the mount hides.
         boolean caches(List<String> arguments, String commandText) {
             for (String argument : arguments) {
                 for (String disabling : cacheDisablingArguments) {

@@ -27,18 +27,15 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Builds the contents of a {@link Docker.Argument} from text, and reads them back out. Both the
- * parser and recipes that synthesize values go through here, so a value a recipe writes is modelled
- * the same way as one read back from the printed Dockerfile.
+ * Builds the contents of a {@link Docker.Argument} from text, and reads them back out. Both the parser
+ * and recipes that synthesize values go through here, so the two model a value the same way.
  */
 public class ArgumentContents {
     private ArgumentContents() {
     }
 
-    /// The contents of a value whose text is {@code text} and whose quote style, if the value is a
-    /// single quoted string, is {@code quoteStyle}. Single quotes never expand, so such a value is
-    /// always one literal. Double quotes do, and a value holding a reference is no longer one
-    /// literal, which puts its quotes into the text.
+    /// Single quotes never expand, so such a value is always one literal. Double quotes do, and a value
+    /// holding a reference is no longer one literal, which puts its quotes into the text.
     public static List<Docker.ArgumentContent> of(String text, Docker.Literal.@Nullable QuoteStyle quoteStyle) {
         if (quoteStyle == Docker.Literal.QuoteStyle.SINGLE ||
                 (quoteStyle == Docker.Literal.QuoteStyle.DOUBLE && !containsVariable(text))) {
@@ -50,11 +47,9 @@ public class ArgumentContents {
         return splitVariables(text, Space.EMPTY);
     }
 
-    /// Splits the value of a command's flag into its quoted literals, environment variable references
-    /// and the separators of an option list: the `=` between a key and its value and the `,` between
-    /// one option and the next, as in `--mount=type=bind,from=alpine`. Everything that is not a quote
-    /// or a separator is handed to [#splitVariables(String, Space)], so a variable reference means
-    /// the same thing here as it does in an argument's value.
+    /// Splits a flag's value into quoted literals, variable references and the separators of an option
+    /// list: the `=` between a key and its value and the `,` between options, as in
+    /// `--mount=type=bind,from=alpine`.
     public static List<Docker.ArgumentContent> flagValue(String text) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -108,9 +103,9 @@ public class ArgumentContents {
         return -1;
     }
 
-    /// Splits environment variable references out of a value's text. Token boundaries are no guide here:
-    /// the lexer emits `--name=value` as a single token, so a reference can sit inside one. What counts
-    /// as a reference mirrors the lexer's `ENV_VAR` and `SPECIAL_VAR` rules, so `$$` and `$1` stay text.
+    /// Token boundaries are no guide here: the lexer emits `--name=value` as a single token, so a
+    /// reference can sit inside one. What counts as one mirrors the lexer's `ENV_VAR` and `SPECIAL_VAR`
+    /// rules, so `$$` and `$1` stay text.
     public static List<Docker.ArgumentContent> splitVariables(String text, Space prefix) {
         List<Docker.ArgumentContent> contents = new ArrayList<>();
         StringBuilder current = new StringBuilder();

@@ -16,26 +16,18 @@
 package org.openrewrite.docker.internal;
 
 /**
- * Where the body of a heredoc ends.
- * <p>
- * A heredoc opened with {@code <<-} may be closed by a delimiter line indented with tabs, so that the
- * body of one written inside an indented block reads as part of it; one opened with plain {@code <<}
- * is closed only by a line that is the delimiter and nothing else, and an indented copy of it is
- * content. The lexer decides where to leave heredoc mode by this rule and
- * {@code org.openrewrite.docker.Assertions} reads that decision back off the parsed tree, so both ask
- * it here rather than each spelling out its own idea of what closes a body.
+ * Where the body of a heredoc ends. A {@code <<-} heredoc may be closed by a delimiter line indented
+ * with tabs; a plain {@code <<} one only by a line that is the delimiter and nothing else. Both the
+ * lexer and {@code org.openrewrite.docker.Assertions} ask here rather than each spelling out its own
+ * idea of what closes a body.
  */
 public final class Heredocs {
 
     private Heredocs() {
     }
 
-    /**
-     * Whether a line of a heredoc body closes it.
-     *
-     * @param marker the marker as written after {@code <<}, so {@code "EOF"} or {@code "-EOF"}
-     * @param line   a whole line of the body, without its newline
-     */
+    /// @param marker the marker as written after `<<`, so `EOF` or `-EOF`
+    /// @param line   a whole line of the body, without its newline
     public static boolean closes(String marker, String line) {
         String delimiter = delimiter(marker);
         if (marker.startsWith("-")) {
@@ -48,16 +40,9 @@ public final class Heredocs {
         return line.equals(delimiter);
     }
 
-    /**
-     * The delimiter a marker names, which is the marker without its {@code -} and with the quotes taken
-     * off. Docker puts the marker through the same quote removal a shell word gets, so {@code <<'EOF'},
-     * {@code <<"EOF"} and {@code <<EOF} all name {@code EOF}; what the quotes say is that the body is
-     * not to have its variables expanded, which is no part of the name the terminator line carries.
-     * Quote removal is what a shell does, so only the quote that opened a run of them closes it and a
-     * quote of the other kind inside that run is part of the name: {@code <<"it's"} names {@code it's}.
-     *
-     * @param marker the marker as written after {@code <<}, so {@code "EOF"}, {@code "-EOF"} or {@code "'EOF'"}
-     */
+    /// The marker without its `-` and with the quotes taken off, so `<<'EOF'`, `<<"EOF"` and `<<EOF`
+    /// all name `EOF`. Quote removal is what a shell does, so only the quote that opened a run of them
+    /// closes it and one of the other kind inside that run is part of the name: `<<"it's"` names `it's`.
     public static String delimiter(String marker) {
         String name = marker.startsWith("-") ? marker.substring(1) : marker;
         StringBuilder unquoted = new StringBuilder(name.length());
