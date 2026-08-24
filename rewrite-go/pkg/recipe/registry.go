@@ -84,13 +84,8 @@ func NewRegistry() *Registry {
 	}
 }
 
-// The prototype is used to extract the recipe descriptor. A constructor is
-// automatically derived via reflection: it creates a new instance of the
-// prototype's type and sets exported fields from the options map. Option
-// names are mapped to field names by capitalizing the first letter
-// (e.g., option "oldName" sets field "OldName").
-//
-// For recipes without options, the prototype itself is returned.
+// The prototype supplies the recipe descriptor and the concrete type that
+// newReflectConstructor instantiates, zero-valued, once per prepared run.
 func (r *Registry) Register(prototype Recipe, categories ...CategoryDescriptor) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

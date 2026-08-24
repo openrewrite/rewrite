@@ -42,9 +42,9 @@ func (e *OptionBindError) Error() string {
 // coerceOption converts a recipe option value to the declared type of the field
 // it binds to. Options are JSON-decoded into `any`, so a number is a float64
 // whatever the field's width, and the Moderne CLI declares -P as a
-// Map<String, Object>, making every command-line option a string. Accepted
-// conversions mirror Jackson (reached via RecipeLoader's convertValue fallback,
-// not RecipeIntrospectionUtils.convert) and C#'s Convert.ChangeType.
+// Map<String, Object>, making every command-line option a string. Conversions
+// are drawn from Jackson (reached via RecipeLoader's convertValue fallback, not
+// RecipeIntrospectionUtils.convert) and C#'s Convert.ChangeType.
 func coerceOption(val any, t reflect.Type) (reflect.Value, bool) {
 	if val == nil {
 		return reflect.Zero(t), true
@@ -66,6 +66,7 @@ func coerceOption(val any, t reflect.Type) (reflect.Value, bool) {
 
 	switch t.Kind() {
 	case reflect.Bool:
+		// Only a string spelling: a number's truthiness is ambiguous.
 		if s, ok := val.(string); ok {
 			if b, err := strconv.ParseBool(s); err == nil {
 				return reflect.ValueOf(b).Convert(t), true
@@ -103,8 +104,10 @@ func coerceOption(val any, t reflect.Type) (reflect.Value, bool) {
 	return reflect.Value{}, false
 }
 
-// asInt64 accepts an integer's wire forms: a decimal string, a json.Number
-// holding the literal digits, and a float64 that represents the value exactly.
+// asInt64 accepts an integer's wire forms — a decimal string and a json.Number
+// holding the literal digits — plus the numeric types an in-process caller
+// passes directly. RecipeConstructor is exported and takes map[string]any, so
+// both origins reach here.
 func asInt64(val any) (int64, bool) {
 	switch x := val.(type) {
 	case string:
@@ -113,13 +116,22 @@ func asInt64(val any) (int64, bool) {
 	case json.Number:
 		n, err := strconv.ParseInt(string(x), 10, 64)
 		return n, err == nil
-	case float64:
-		// Compare before converting: a float64 outside int64's range converts
-		// to an implementation-defined value rather than saturating.
-		if x != math.Trunc(x) || x < math.MinInt64 || x >= math.MaxInt64 {
-			return 0, false
+	}
+	v := reflect.ValueOf(val)
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int(), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if u := v.Uint(); u <= math.MaxInt64 {
+			return int64(u), true
 		}
-		return int64(x), true
+	case reflect.Float32, reflect.Float64:
+		// Compare before converting: a float outside int64's range converts to
+		// an implementation-defined value rather than saturating.
+		f := v.Float()
+		if f == math.Trunc(f) && f >= math.MinInt64 && f < math.MaxInt64 {
+			return int64(f), true
+		}
 	}
 	return 0, false
 }
@@ -133,11 +145,20 @@ func asUint64(val any) (uint64, bool) {
 	case json.Number:
 		n, err := strconv.ParseUint(string(x), 10, 64)
 		return n, err == nil
-	case float64:
-		if x != math.Trunc(x) || x < 0 || x >= math.MaxUint64 {
-			return 0, false
+	}
+	v := reflect.ValueOf(val)
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if n := v.Int(); n >= 0 {
+			return uint64(n), true
 		}
-		return uint64(x), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return v.Uint(), true
+	case reflect.Float32, reflect.Float64:
+		f := v.Float()
+		if f == math.Trunc(f) && f >= 0 && f < math.MaxUint64 {
+			return uint64(f), true
+		}
 	}
 	return 0, false
 }
@@ -150,8 +171,15 @@ func asFloat64(val any) (float64, bool) {
 	case json.Number:
 		f, err := strconv.ParseFloat(string(x), 64)
 		return f, err == nil
-	case float64:
-		return x, true
+	}
+	v := reflect.ValueOf(val)
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(v.Int()), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(v.Uint()), true
+	case reflect.Float32, reflect.Float64:
+		return v.Float(), true
 	}
 	return 0, false
 }
@@ -167,8 +195,15 @@ func asString(val any) (string, bool) {
 		return string(x), true
 	case bool:
 		return strconv.FormatBool(x), true
-	case float64:
-		return strconv.FormatFloat(x, 'f', -1, 64), true
+	}
+	v := reflect.ValueOf(val)
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.FormatInt(v.Int(), 10), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.FormatUint(v.Uint(), 10), true
+	case reflect.Float32, reflect.Float64:
+		return strconv.FormatFloat(v.Float(), 'f', -1, 64), true
 	}
 	return "", false
 }

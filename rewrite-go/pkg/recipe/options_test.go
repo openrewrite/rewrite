@@ -213,3 +213,45 @@ func TestBindIgnoresEmptyOptionName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "hi", r.Text)
 }
+
+func TestBindGoNativeNumericOptions(t *testing.T) {
+	tests := []struct {
+		name   string
+		option string
+		value  any
+		got    func(*optionsRecipe) any
+		want   any
+	}{
+		{"int to int8", "small", 42, func(r *optionsRecipe) any { return r.Small }, int8(42)},
+		{"int to uint64", "big", 42, func(r *optionsRecipe) any { return r.Big }, uint64(42)},
+		{"int to float64", "ratio", 42, func(r *optionsRecipe) any { return r.Ratio }, float64(42)},
+		{"int to string", "text", 42, func(r *optionsRecipe) any { return r.Text }, "42"},
+		{"int64 to int", "count", int64(42), func(r *optionsRecipe) any { return r.Count }, 42},
+		{"uint8 to int", "count", uint8(42), func(r *optionsRecipe) any { return r.Count }, 42},
+		{"float32 to float64", "ratio", float32(1.5), func(r *optionsRecipe) any { return r.Ratio }, 1.5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := bind(t, map[string]any{tt.option: tt.value})
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, tt.got(r))
+		})
+	}
+}
+
+func TestBindRejectsOutOfRangeGoNativeNumbers(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		option string
+		value  any
+	}{
+		{"negative int to uint", "unsigned", -1},
+		{"int overflowing int8", "small", 300},
+		{"uint64 overflowing int64", "count", uint64(math.MaxUint64)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := bind(t, map[string]any{tt.option: tt.value})
+			require.Error(t, err)
+		})
+	}
+}
