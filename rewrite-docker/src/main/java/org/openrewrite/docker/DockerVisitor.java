@@ -32,8 +32,7 @@ public class DockerVisitor<P> extends TreeVisitor<Docker, P> {
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withGlobalArgs(ListUtils.map(d.getGlobalArgs(), arg -> (Docker.Arg) visit(arg, p)));
-        d = d.withStages(ListUtils.map(d.getStages(), stage -> (Docker.Stage) visit(stage, p)));
-        return d.withEof(visitSpace(d.getEof(), p));
+        return d.withStages(ListUtils.map(d.getStages(), stage -> (Docker.Stage) visit(stage, p)));
     }
 
     public Docker visitStage(Docker.Stage stage, P p) {

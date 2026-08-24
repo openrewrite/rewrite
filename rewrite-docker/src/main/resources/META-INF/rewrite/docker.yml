@@ -61,6 +61,3 @@ tags:
 recipeList:
   - org.openrewrite.docker.CombineRunInstructions
   - org.openrewrite.docker.AddAptGetCleanup
-  # Left out on purpose: a cache mount changes how a build resolves its dependencies, and hides
-  # whatever the base image holds at the directory it covers, which is a diff worth reading.
-  # - org.openrewrite.docker.UseBuildKitCacheMounts

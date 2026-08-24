@@ -22,7 +22,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.tree.Docker;
 import java.util.regex.Pattern;
 
@@ -50,9 +49,6 @@ public class AddAptGetCleanup extends Recipe {
     // Pattern to check if cleanup is already present
     private static final Pattern CLEANUP_PATTERN = Pattern.compile("rm\\s+(-[a-zA-Z]+\\s+)*/var/lib/apt/lists");
 
-    private static final Pattern CACHE_MOUNT_TYPE = Pattern.compile("(?:^|,)type=cache(?:,|$)");
-    private static final Pattern APT_MOUNT_TARGET = Pattern.compile("(?:^|,)target=(?:/var/lib/apt/lists|/var/cache/apt)/?(?:,|$)");
-
     @Option(displayName = "Cleanup command",
             description = "The cleanup command to append. Defaults to ' && rm -rf /var/lib/apt/lists/*'.",
             example = " && apt-get clean && rm -rf /var/lib/apt/lists/*",
@@ -60,12 +56,16 @@ public class AddAptGetCleanup extends Recipe {
     @Nullable
     String cleanupCommand;
 
-    String displayName = "Add apt-get cleanup";
+    @Override
+    public String getDisplayName() {
+        return "Add apt-get cleanup";
+    }
 
-    String description = "Adds cleanup commands to apt-get RUN instructions to reduce Docker image size. " +
-            "By default, adds 'rm -rf /var/lib/apt/lists/*' to remove cached package lists. " +
-            "A `RUN` that mounts a BuildKit cache over an apt directory is left alone, since deleting " +
-            "the package lists is what such a mount is there to avoid.";
+    @Override
+    public String getDescription() {
+        return "Adds cleanup commands to apt-get RUN instructions to reduce Docker image size. " +
+                "By default, adds 'rm -rf /var/lib/apt/lists/*' to remove cached package lists.";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -75,9 +75,6 @@ public class AddAptGetCleanup extends Recipe {
             @Override
             public Docker.Run visitRun(Docker.Run run, ExecutionContext ctx) {
                 Docker.Run r = super.visitRun(run, ctx);
-                if (cachesAptDirectory(r)) {
-                    return r;
-                }
                 if (r.getCommand() instanceof Docker.ShellForm) {
                     Docker.ShellForm shellForm = (Docker.ShellForm) r.getCommand();
                     String commandText = shellForm.getArgument().getText();
@@ -87,21 +84,6 @@ public class AddAptGetCleanup extends Recipe {
                 }
                 return r;
 
-            }
-
-            private boolean cachesAptDirectory(Docker.Run run) {
-                if (run.getFlags() == null) {
-                    return false;
-                }
-                for (Docker.Flag flag : run.getFlags()) {
-                    if ("mount".equals(flag.getName()) && flag.getValue() != null) {
-                        String value = ArgumentContents.textWithVariables(flag.getValue());
-                        if (CACHE_MOUNT_TYPE.matcher(value).find() && APT_MOUNT_TARGET.matcher(value).find()) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
             }
         };
     }

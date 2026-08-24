@@ -58,9 +58,5 @@ public class BaseImages extends DataTable<BaseImages.Row> {
                 description = "The platform flag value, if specified.")
         @Nullable
         String platform;
-
-        @Column(displayName = "Registry",
-                description = "The registry the image is pulled from, `docker.io` when the image name does not name one.")
-        String registry;
     }
 }

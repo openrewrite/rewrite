@@ -54,11 +54,17 @@ public class ReplaceAddWithCopy extends Recipe {
             ".tar.xz", ".txz", ".tar.lz", ".tlz", ".tar.lzma", ".tar.zst"
     ));
 
-    String displayName = "Replace `ADD` with `COPY`";
+    @Override
+    public String getDisplayName() {
+        return "Replace `ADD` with `COPY`";
+    }
 
-    String description = "Replaces `ADD` instructions with `COPY` where appropriate. " +
-            "`ADD` is only kept when the source is a URL or a tar archive that should be auto-extracted. " +
-            "Using `COPY` is preferred for transparency (CIS Docker Benchmark 4.9).";
+    @Override
+    public String getDescription() {
+        return "Replaces `ADD` instructions with `COPY` where appropriate. " +
+                "`ADD` is only kept when the source is a URL or a tar archive that should be auto-extracted. " +
+                "Using `COPY` is preferred for transparency (CIS Docker Benchmark 4.9).";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

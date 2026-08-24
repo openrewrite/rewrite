@@ -24,7 +24,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.table.BaseImages;
 import org.openrewrite.docker.trait.DockerFrom;
-import org.openrewrite.docker.trait.ImageName;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.marker.SearchResult;
 
@@ -62,9 +61,15 @@ public class FindBaseImages extends Recipe {
     @Nullable
     String platformPattern;
 
-    String displayName = "Find Docker base images";
+    @Override
+    public String getDisplayName() {
+        return "Find Docker base images";
+    }
 
-    String description = "Find all base images (`FROM` instructions) in Dockerfiles.";
+    @Override
+    public String getDescription() {
+        return "Find all base images (`FROM` instructions) in Dockerfiles.";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -100,8 +105,7 @@ public class FindBaseImages extends Recipe {
                     imageName,
                     tag,
                     digest,
-                    platform,
-                    image.getImage().map(ImageName::getResolvedRegistry).orElse(ImageName.DOCKER_HUB)
+                    platform
             ));
 
             // Build message with image reference

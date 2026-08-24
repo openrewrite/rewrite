@@ -35,11 +35,11 @@ public class DockerParser extends Parser {
 		PARSER_DIRECTIVE=1, COMMENT=2, FROM=3, RUN=4, CMD=5, NONE=6, LABEL=7,
 		EXPOSE=8, ENV=9, ADD=10, COPY=11, ENTRYPOINT=12, VOLUME=13, USER=14, WORKDIR=15,
 		ARG=16, ONBUILD=17, STOPSIGNAL=18, HEALTHCHECK=19, SHELL=20, MAINTAINER=21,
-		HEREDOC_START=22, LINE_CONTINUATION=23, LBRACKET=24, RBRACKET=25, COMMA=26,
-		EQUALS=27, FLAG=28, FROM_FLAG=29, DASH_DASH=30, DOUBLE_QUOTED_STRING=31,
-		SINGLE_QUOTED_STRING=32, ENV_VAR=33, SPECIAL_VAR=34, COMMAND_SUBST=35,
-		BACKTICK_SUBST=36, DOLLAR=37, UNQUOTED_TEXT=38, WS=39, NEWLINE=40, COLON=41,
-		AT=42, AS=43, FLAG_END=44, HP_LINE_CONTINUATION=45, HP_WS=46, HEREDOC_CONTENT=47;
+		AS=22, HEREDOC_START=23, LINE_CONTINUATION=24, LBRACKET=25, RBRACKET=26,
+		COMMA=27, EQUALS=28, FLAG=29, DASH_DASH=30, DOUBLE_QUOTED_STRING=31, SINGLE_QUOTED_STRING=32,
+		ENV_VAR=33, SPECIAL_VAR=34, COMMAND_SUBST=35, BACKTICK_SUBST=36, DOLLAR=37,
+		UNQUOTED_TEXT=38, WS=39, NEWLINE=40, HP_LINE_CONTINUATION=41, HP_WS=42,
+		HP_COMMENT=43, HP_LINE_COMMENT=44, HEREDOC_CONTENT=45, H_NEWLINE=46;
 	public static final int
 		RULE_dockerfile = 0, RULE_parserDirective = 1, RULE_globalArgs = 2, RULE_stage = 3,
 		RULE_stageInstruction = 4, RULE_instruction = 5, RULE_fromInstruction = 6,
@@ -49,17 +49,19 @@ public class DockerParser extends Parser {
 		RULE_userInstruction = 16, RULE_workdirInstruction = 17, RULE_argInstruction = 18,
 		RULE_onbuildInstruction = 19, RULE_stopsignalInstruction = 20, RULE_healthcheckInstruction = 21,
 		RULE_healthcheckOptions = 22, RULE_healthcheckOption = 23, RULE_shellInstruction = 24,
-		RULE_maintainerInstruction = 25, RULE_flags = 26, RULE_flag = 27, RULE_fromFlag = 28,
-		RULE_execForm = 29, RULE_shellForm = 30, RULE_shellFormText = 31, RULE_heredoc = 32,
-		RULE_heredocPreamble = 33, RULE_heredocBody = 34, RULE_heredocContent = 35,
-		RULE_heredocEnd = 36, RULE_jsonArray = 37, RULE_jsonArrayElements = 38,
-		RULE_jsonString = 39, RULE_imageReference = 40, RULE_imageName = 41, RULE_tag = 42,
-		RULE_digest = 43, RULE_stageName = 44, RULE_labelPairs = 45, RULE_labelPair = 46,
-		RULE_labelKey = 47, RULE_portList = 48, RULE_port = 49, RULE_envPairs = 50,
-		RULE_envPair = 51, RULE_envKey = 52, RULE_copyPaths = 53, RULE_pathArgument = 54,
-		RULE_path = 55, RULE_userSpec = 56, RULE_user = 57, RULE_group = 58, RULE_argName = 59,
-		RULE_argValue = 60, RULE_signal = 61, RULE_quoted = 62, RULE_text = 63,
-		RULE_value = 64, RULE_valueElement = 65, RULE_textElement = 66;
+		RULE_maintainerInstruction = 25, RULE_flags = 26, RULE_flag = 27, RULE_execForm = 28,
+		RULE_shellForm = 29, RULE_shellFormText = 30, RULE_shellFormTextElement = 31,
+		RULE_heredoc = 32, RULE_heredocPreamble = 33, RULE_preambleElement = 34,
+		RULE_heredocBody = 35, RULE_heredocContent = 36, RULE_heredocEnd = 37,
+		RULE_jsonArray = 38, RULE_jsonArrayElements = 39, RULE_jsonString = 40,
+		RULE_imageName = 41, RULE_stageName = 42, RULE_labelPairs = 43, RULE_labelPair = 44,
+		RULE_labelKey = 45, RULE_labelValue = 46, RULE_labelOldValue = 47, RULE_labelOldValueElement = 48,
+		RULE_portList = 49, RULE_port = 50, RULE_envPairs = 51, RULE_envPair = 52,
+		RULE_envKey = 53, RULE_envValueEquals = 54, RULE_envValueSpace = 55, RULE_envTextEquals = 56,
+		RULE_envTextElementEquals = 57, RULE_sourceList = 58, RULE_sourcePath = 59,
+		RULE_destination = 60, RULE_destinationPath = 61, RULE_path = 62, RULE_pathList = 63,
+		RULE_volumePath = 64, RULE_userSpec = 65, RULE_argName = 66, RULE_argValue = 67,
+		RULE_signal = 68, RULE_text = 69, RULE_textElement = 70;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"dockerfile", "parserDirective", "globalArgs", "stage", "stageInstruction",
@@ -68,14 +70,15 @@ public class DockerParser extends Parser {
 			"copyInstruction", "entrypointInstruction", "volumeInstruction", "userInstruction",
 			"workdirInstruction", "argInstruction", "onbuildInstruction", "stopsignalInstruction",
 			"healthcheckInstruction", "healthcheckOptions", "healthcheckOption",
-			"shellInstruction", "maintainerInstruction", "flags", "flag", "fromFlag",
-			"execForm", "shellForm", "shellFormText", "heredoc", "heredocPreamble",
-			"heredocBody", "heredocContent", "heredocEnd", "jsonArray", "jsonArrayElements",
-			"jsonString", "imageReference", "imageName", "tag", "digest", "stageName",
-			"labelPairs", "labelPair", "labelKey", "portList", "port", "envPairs",
-			"envPair", "envKey", "copyPaths", "pathArgument", "path", "userSpec",
-			"user", "group", "argName", "argValue", "signal", "quoted", "text", "value",
-			"valueElement", "textElement"
+			"shellInstruction", "maintainerInstruction", "flags", "flag", "execForm",
+			"shellForm", "shellFormText", "shellFormTextElement", "heredoc", "heredocPreamble",
+			"preambleElement", "heredocBody", "heredocContent", "heredocEnd", "jsonArray",
+			"jsonArrayElements", "jsonString", "imageName", "stageName", "labelPairs",
+			"labelPair", "labelKey", "labelValue", "labelOldValue", "labelOldValueElement",
+			"portList", "port", "envPairs", "envPair", "envKey", "envValueEquals",
+			"envValueSpace", "envTextEquals", "envTextElementEquals", "sourceList",
+			"sourcePath", "destination", "destinationPath", "path", "pathList", "volumePath",
+			"userSpec", "argName", "argValue", "signal", "text", "textElement"
 		};
 	}
 	public static final String[] ruleNames = makeRuleNames();
@@ -85,8 +88,9 @@ public class DockerParser extends Parser {
 			null, null, null, "'FROM'", "'RUN'", "'CMD'", "'NONE'", "'LABEL'", "'EXPOSE'",
 			"'ENV'", "'ADD'", "'COPY'", "'ENTRYPOINT'", "'VOLUME'", "'USER'", "'WORKDIR'",
 			"'ARG'", "'ONBUILD'", "'STOPSIGNAL'", "'HEALTHCHECK'", "'SHELL'", "'MAINTAINER'",
-			null, null, "'['", "']'", "','", "'='", null, null, "'--'", null, null,
-			null, null, null, null, null, null, null, null, null, null, "'AS'"
+			"'AS'", null, null, "'['", "']'", "','", "'='", null, "'--'", null, null,
+			null, null, null, null, "'$'", null, null, null, null, null, null, null,
+			null, "'\\n'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
@@ -95,11 +99,11 @@ public class DockerParser extends Parser {
 			null, "PARSER_DIRECTIVE", "COMMENT", "FROM", "RUN", "CMD", "NONE", "LABEL",
 			"EXPOSE", "ENV", "ADD", "COPY", "ENTRYPOINT", "VOLUME", "USER", "WORKDIR",
 			"ARG", "ONBUILD", "STOPSIGNAL", "HEALTHCHECK", "SHELL", "MAINTAINER",
-			"HEREDOC_START", "LINE_CONTINUATION", "LBRACKET", "RBRACKET", "COMMA",
-			"EQUALS", "FLAG", "FROM_FLAG", "DASH_DASH", "DOUBLE_QUOTED_STRING", "SINGLE_QUOTED_STRING",
+			"AS", "HEREDOC_START", "LINE_CONTINUATION", "LBRACKET", "RBRACKET", "COMMA",
+			"EQUALS", "FLAG", "DASH_DASH", "DOUBLE_QUOTED_STRING", "SINGLE_QUOTED_STRING",
 			"ENV_VAR", "SPECIAL_VAR", "COMMAND_SUBST", "BACKTICK_SUBST", "DOLLAR",
-			"UNQUOTED_TEXT", "WS", "NEWLINE", "COLON", "AT", "AS", "FLAG_END", "HP_LINE_CONTINUATION",
-			"HP_WS", "HEREDOC_CONTENT"
+			"UNQUOTED_TEXT", "WS", "NEWLINE", "HP_LINE_CONTINUATION", "HP_WS", "HP_COMMENT",
+			"HP_LINE_COMMENT", "HEREDOC_CONTENT", "H_NEWLINE"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
@@ -147,38 +151,6 @@ public class DockerParser extends Parser {
 
 	@Override
 	public ATN getATN() { return _ATN; }
-
-
-	    /**
-	     * Whether the next token follows the previous one with nothing between them. Whitespace is on the
-	     * hidden channel, so this is how a rule states that its elements are one unbroken run of source.
-	     */
-	    private boolean adjacent() {
-	        Token previous = _input.LT(-1);
-	        Token next = _input.LT(1);
-	        return previous != null && next != null && previous.getStopIndex() + 1 == next.getStartIndex();
-	    }
-
-	    /**
-	     * Whether the next token stands against the previous one on the logical line, i.e. with nothing but
-	     * a line continuation between them. Docker joins the lines a continuation holds together, and drops
-	     * a comment line while doing so, before it reads what they say, so `ENV K\<newline>=v` binds the
-	     * same key to the same value that `ENV K=v` does.
-	     */
-	    private boolean bound() {
-	        Token previous = _input.LT(-1);
-	        Token next = _input.LT(1);
-	        if (previous == null || next == null) {
-	            return false;
-	        }
-	        for (int i = previous.getTokenIndex() + 1; i < next.getTokenIndex(); i++) {
-	            int type = _input.get(i).getType();
-	            if (type != LINE_CONTINUATION && type != COMMENT) {
-	                return false;
-	            }
-	        }
-	        return true;
-	    }
 
 	public DockerParser(TokenStream input) {
 		super(input);
@@ -229,37 +201,37 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(137);
+			setState(145);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==PARSER_DIRECTIVE) {
 				{
 				{
-				setState(134);
+				setState(142);
 				parserDirective();
 				}
 				}
-				setState(139);
+				setState(147);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(140);
+			setState(148);
 			globalArgs();
-			setState(142);
+			setState(150);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
 				{
 				{
-				setState(141);
+				setState(149);
 				stage();
 				}
 				}
-				setState(144);
+				setState(152);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==FROM );
-			setState(146);
+			setState(154);
 			match(EOF);
 			}
 		}
@@ -302,7 +274,7 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(148);
+			setState(156);
 			match(PARSER_DIRECTIVE);
 			}
 		}
@@ -351,17 +323,17 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(153);
+			setState(161);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==ARG) {
 				{
 				{
-				setState(150);
+				setState(158);
 				argInstruction();
 				}
 				}
-				setState(155);
+				setState(163);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
@@ -415,19 +387,19 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(156);
+			setState(164);
 			fromInstruction();
-			setState(160);
+			setState(168);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 4194224L) != 0)) {
 				{
 				{
-				setState(157);
+				setState(165);
 				stageInstruction();
 				}
 				}
-				setState(162);
+				setState(170);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
@@ -520,125 +492,125 @@ public class DockerParser extends Parser {
 		StageInstructionContext _localctx = new StageInstructionContext(_ctx, getState());
 		enterRule(_localctx, 8, RULE_stageInstruction);
 		try {
-			setState(180);
+			setState(188);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case RUN:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(163);
+				setState(171);
 				runInstruction();
 				}
 				break;
 			case CMD:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(164);
+				setState(172);
 				cmdInstruction();
 				}
 				break;
 			case LABEL:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(165);
+				setState(173);
 				labelInstruction();
 				}
 				break;
 			case EXPOSE:
 				enterOuterAlt(_localctx, 4);
 				{
-				setState(166);
+				setState(174);
 				exposeInstruction();
 				}
 				break;
 			case ENV:
 				enterOuterAlt(_localctx, 5);
 				{
-				setState(167);
+				setState(175);
 				envInstruction();
 				}
 				break;
 			case ADD:
 				enterOuterAlt(_localctx, 6);
 				{
-				setState(168);
+				setState(176);
 				addInstruction();
 				}
 				break;
 			case COPY:
 				enterOuterAlt(_localctx, 7);
 				{
-				setState(169);
+				setState(177);
 				copyInstruction();
 				}
 				break;
 			case ENTRYPOINT:
 				enterOuterAlt(_localctx, 8);
 				{
-				setState(170);
+				setState(178);
 				entrypointInstruction();
 				}
 				break;
 			case VOLUME:
 				enterOuterAlt(_localctx, 9);
 				{
-				setState(171);
+				setState(179);
 				volumeInstruction();
 				}
 				break;
 			case USER:
 				enterOuterAlt(_localctx, 10);
 				{
-				setState(172);
+				setState(180);
 				userInstruction();
 				}
 				break;
 			case WORKDIR:
 				enterOuterAlt(_localctx, 11);
 				{
-				setState(173);
+				setState(181);
 				workdirInstruction();
 				}
 				break;
 			case ARG:
 				enterOuterAlt(_localctx, 12);
 				{
-				setState(174);
+				setState(182);
 				argInstruction();
 				}
 				break;
 			case ONBUILD:
 				enterOuterAlt(_localctx, 13);
 				{
-				setState(175);
+				setState(183);
 				onbuildInstruction();
 				}
 				break;
 			case STOPSIGNAL:
 				enterOuterAlt(_localctx, 14);
 				{
-				setState(176);
+				setState(184);
 				stopsignalInstruction();
 				}
 				break;
 			case HEALTHCHECK:
 				enterOuterAlt(_localctx, 15);
 				{
-				setState(177);
+				setState(185);
 				healthcheckInstruction();
 				}
 				break;
 			case SHELL:
 				enterOuterAlt(_localctx, 16);
 				{
-				setState(178);
+				setState(186);
 				shellInstruction();
 				}
 				break;
 			case MAINTAINER:
 				enterOuterAlt(_localctx, 17);
 				{
-				setState(179);
+				setState(187);
 				maintainerInstruction();
 				}
 				break;
@@ -688,13 +660,13 @@ public class DockerParser extends Parser {
 		InstructionContext _localctx = new InstructionContext(_ctx, getState());
 		enterRule(_localctx, 10, RULE_instruction);
 		try {
-			setState(184);
+			setState(192);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case FROM:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(182);
+				setState(190);
 				fromInstruction();
 				}
 				break;
@@ -717,7 +689,7 @@ public class DockerParser extends Parser {
 			case MAINTAINER:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(183);
+				setState(191);
 				stageInstruction();
 				}
 				break;
@@ -739,8 +711,8 @@ public class DockerParser extends Parser {
 	@SuppressWarnings("CheckReturnValue")
 	public static class FromInstructionContext extends ParserRuleContext {
 		public TerminalNode FROM() { return getToken(DockerParser.FROM, 0); }
-		public ImageReferenceContext imageReference() {
-			return getRuleContext(ImageReferenceContext.class,0);
+		public ImageNameContext imageName() {
+			return getRuleContext(ImageNameContext.class,0);
 		}
 		public FlagsContext flags() {
 			return getRuleContext(FlagsContext.class,0);
@@ -775,28 +747,28 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(186);
+			setState(194);
 			match(FROM);
-			setState(188);
+			setState(196);
 			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,6,_ctx) ) {
 			case 1:
 				{
-				setState(187);
+				setState(195);
 				flags();
 				}
 				break;
 			}
-			setState(190);
-			imageReference();
-			setState(193);
+			setState(198);
+			imageName();
+			setState(201);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==AS) {
 				{
-				setState(191);
+				setState(199);
 				match(AS);
-				setState(192);
+				setState(200);
 				stageName();
 				}
 			}
@@ -854,36 +826,36 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(195);
+			setState(203);
 			match(RUN);
-			setState(197);
+			setState(205);
 			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,8,_ctx) ) {
 			case 1:
 				{
-				setState(196);
+				setState(204);
 				flags();
 				}
 				break;
 			}
-			setState(202);
+			setState(210);
 			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,9,_ctx) ) {
 			case 1:
 				{
-				setState(199);
+				setState(207);
 				execForm();
 				}
 				break;
 			case 2:
 				{
-				setState(200);
+				setState(208);
 				shellForm();
 				}
 				break;
 			case 3:
 				{
-				setState(201);
+				setState(209);
 				heredoc();
 				}
 				break;
@@ -935,20 +907,20 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(204);
+			setState(212);
 			match(CMD);
-			setState(207);
+			setState(215);
 			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,10,_ctx) ) {
 			case 1:
 				{
-				setState(205);
+				setState(213);
 				execForm();
 				}
 				break;
 			case 2:
 				{
-				setState(206);
+				setState(214);
 				shellForm();
 				}
 				break;
@@ -997,9 +969,9 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(209);
+			setState(217);
 			match(LABEL);
-			setState(210);
+			setState(218);
 			labelPairs();
 			}
 		}
@@ -1045,9 +1017,9 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(212);
+			setState(220);
 			match(EXPOSE);
-			setState(213);
+			setState(221);
 			portList();
 			}
 		}
@@ -1093,9 +1065,9 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(215);
+			setState(223);
 			match(ENV);
-			setState(216);
+			setState(224);
 			envPairs();
 			}
 		}
@@ -1119,8 +1091,11 @@ public class DockerParser extends Parser {
 		public JsonArrayContext jsonArray() {
 			return getRuleContext(JsonArrayContext.class,0);
 		}
-		public CopyPathsContext copyPaths() {
-			return getRuleContext(CopyPathsContext.class,0);
+		public SourceListContext sourceList() {
+			return getRuleContext(SourceListContext.class,0);
+		}
+		public DestinationContext destination() {
+			return getRuleContext(DestinationContext.class,0);
 		}
 		public FlagsContext flags() {
 			return getRuleContext(FlagsContext.class,0);
@@ -1147,42 +1122,53 @@ public class DockerParser extends Parser {
 	public final AddInstructionContext addInstruction() throws RecognitionException {
 		AddInstructionContext _localctx = new AddInstructionContext(_ctx, getState());
 		enterRule(_localctx, 24, RULE_addInstruction);
+		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(218);
+			setState(226);
 			match(ADD);
-			setState(220);
+			setState(228);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,11,_ctx) ) {
-			case 1:
+			_la = _input.LA(1);
+			if (_la==FLAG) {
 				{
-				setState(219);
+				setState(227);
 				flags();
 				}
-				break;
 			}
-			setState(225);
+
+			setState(235);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,12,_ctx) ) {
-			case 1:
+			switch (_input.LA(1)) {
+			case HEREDOC_START:
 				{
-				setState(222);
+				setState(230);
 				heredoc();
 				}
 				break;
-			case 2:
+			case LBRACKET:
 				{
-				setState(223);
+				setState(231);
 				jsonArray();
 				}
 				break;
-			case 3:
+			case DOUBLE_QUOTED_STRING:
+			case SINGLE_QUOTED_STRING:
+			case ENV_VAR:
+			case SPECIAL_VAR:
+			case COMMAND_SUBST:
+			case BACKTICK_SUBST:
+			case UNQUOTED_TEXT:
 				{
-				setState(224);
-				copyPaths();
+				setState(232);
+				sourceList();
+				setState(233);
+				destination();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 			}
 		}
@@ -1206,8 +1192,11 @@ public class DockerParser extends Parser {
 		public JsonArrayContext jsonArray() {
 			return getRuleContext(JsonArrayContext.class,0);
 		}
-		public CopyPathsContext copyPaths() {
-			return getRuleContext(CopyPathsContext.class,0);
+		public SourceListContext sourceList() {
+			return getRuleContext(SourceListContext.class,0);
+		}
+		public DestinationContext destination() {
+			return getRuleContext(DestinationContext.class,0);
 		}
 		public FlagsContext flags() {
 			return getRuleContext(FlagsContext.class,0);
@@ -1234,42 +1223,53 @@ public class DockerParser extends Parser {
 	public final CopyInstructionContext copyInstruction() throws RecognitionException {
 		CopyInstructionContext _localctx = new CopyInstructionContext(_ctx, getState());
 		enterRule(_localctx, 26, RULE_copyInstruction);
+		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(227);
+			setState(237);
 			match(COPY);
-			setState(229);
+			setState(239);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,13,_ctx) ) {
-			case 1:
+			_la = _input.LA(1);
+			if (_la==FLAG) {
 				{
-				setState(228);
+				setState(238);
 				flags();
 				}
-				break;
 			}
-			setState(234);
+
+			setState(246);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,14,_ctx) ) {
-			case 1:
+			switch (_input.LA(1)) {
+			case HEREDOC_START:
 				{
-				setState(231);
+				setState(241);
 				heredoc();
 				}
 				break;
-			case 2:
+			case LBRACKET:
 				{
-				setState(232);
+				setState(242);
 				jsonArray();
 				}
 				break;
-			case 3:
+			case DOUBLE_QUOTED_STRING:
+			case SINGLE_QUOTED_STRING:
+			case ENV_VAR:
+			case SPECIAL_VAR:
+			case COMMAND_SUBST:
+			case BACKTICK_SUBST:
+			case UNQUOTED_TEXT:
 				{
-				setState(233);
-				copyPaths();
+				setState(243);
+				sourceList();
+				setState(244);
+				destination();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 			}
 		}
@@ -1318,20 +1318,20 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(236);
+			setState(248);
 			match(ENTRYPOINT);
-			setState(239);
+			setState(251);
 			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,15,_ctx) ) {
 			case 1:
 				{
-				setState(237);
+				setState(249);
 				execForm();
 				}
 				break;
 			case 2:
 				{
-				setState(238);
+				setState(250);
 				shellForm();
 				}
 				break;
@@ -1355,11 +1355,8 @@ public class DockerParser extends Parser {
 		public JsonArrayContext jsonArray() {
 			return getRuleContext(JsonArrayContext.class,0);
 		}
-		public List<PathArgumentContext> pathArgument() {
-			return getRuleContexts(PathArgumentContext.class);
-		}
-		public PathArgumentContext pathArgument(int i) {
-			return getRuleContext(PathArgumentContext.class,i);
+		public PathListContext pathList() {
+			return getRuleContext(PathListContext.class,0);
 		}
 		public VolumeInstructionContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1383,39 +1380,34 @@ public class DockerParser extends Parser {
 	public final VolumeInstructionContext volumeInstruction() throws RecognitionException {
 		VolumeInstructionContext _localctx = new VolumeInstructionContext(_ctx, getState());
 		enterRule(_localctx, 30, RULE_volumeInstruction);
-		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(241);
+			setState(253);
 			match(VOLUME);
-			setState(248);
+			setState(256);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,17,_ctx) ) {
-			case 1:
+			switch (_input.LA(1)) {
+			case LBRACKET:
 				{
-				setState(242);
+				setState(254);
 				jsonArray();
 				}
 				break;
-			case 2:
+			case DOUBLE_QUOTED_STRING:
+			case SINGLE_QUOTED_STRING:
+			case ENV_VAR:
+			case SPECIAL_VAR:
+			case COMMAND_SUBST:
+			case BACKTICK_SUBST:
+			case UNQUOTED_TEXT:
 				{
-				setState(244);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				do {
-					{
-					{
-					setState(243);
-					pathArgument();
-					}
-					}
-					setState(246);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 549202165760L) != 0) );
+				setState(255);
+				pathList();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 			}
 		}
@@ -1461,9 +1453,9 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(250);
+			setState(258);
 			match(USER);
-			setState(251);
+			setState(259);
 			userSpec();
 			}
 		}
@@ -1509,9 +1501,9 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(253);
+			setState(261);
 			match(WORKDIR);
-			setState(254);
+			setState(262);
 			path();
 			}
 		}
@@ -1562,18 +1554,18 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(256);
+			setState(264);
 			match(ARG);
-			setState(257);
+			setState(265);
 			argName();
-			setState(260);
+			setState(268);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==EQUALS) {
 				{
-				setState(258);
+				setState(266);
 				match(EQUALS);
-				setState(259);
+				setState(267);
 				argValue();
 				}
 			}
@@ -1622,9 +1614,9 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(262);
+			setState(270);
 			match(ONBUILD);
-			setState(263);
+			setState(271);
 			instruction();
 			}
 		}
@@ -1670,9 +1662,9 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(265);
+			setState(273);
 			match(STOPSIGNAL);
-			setState(266);
+			setState(274);
 			signal();
 			}
 		}
@@ -1725,47 +1717,47 @@ public class DockerParser extends Parser {
 		enterRule(_localctx, 42, RULE_healthcheckInstruction);
 		int _la;
 		try {
-			setState(279);
+			setState(287);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,21,_ctx) ) {
+			switch ( getInterpreter().adaptivePredict(_input,20,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(268);
+				setState(276);
 				match(HEALTHCHECK);
-				setState(269);
+				setState(277);
 				match(NONE);
 				}
 				break;
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(270);
+				setState(278);
 				match(HEALTHCHECK);
-				setState(272);
+				setState(280);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==FLAG) {
 					{
-					setState(271);
+					setState(279);
 					healthcheckOptions();
 					}
 				}
 
-				setState(274);
+				setState(282);
 				match(CMD);
-				setState(277);
+				setState(285);
 				_errHandler.sync(this);
-				switch ( getInterpreter().adaptivePredict(_input,20,_ctx) ) {
+				switch ( getInterpreter().adaptivePredict(_input,19,_ctx) ) {
 				case 1:
 					{
-					setState(275);
+					setState(283);
 					execForm();
 					}
 					break;
 				case 2:
 					{
-					setState(276);
+					setState(284);
 					shellForm();
 					}
 					break;
@@ -1819,17 +1811,17 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(282);
+			setState(290);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
 				{
 				{
-				setState(281);
+				setState(289);
 				healthcheckOption();
 				}
 				}
-				setState(284);
+				setState(292);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==FLAG );
@@ -1874,7 +1866,7 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(286);
+			setState(294);
 			match(FLAG);
 			}
 		}
@@ -1920,9 +1912,9 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(288);
+			setState(296);
 			match(SHELL);
-			setState(289);
+			setState(297);
 			jsonArray();
 			}
 		}
@@ -1968,9 +1960,9 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(291);
+			setState(299);
 			match(MAINTAINER);
-			setState(292);
+			setState(300);
 			text();
 			}
 		}
@@ -1992,12 +1984,6 @@ public class DockerParser extends Parser {
 		}
 		public FlagContext flag(int i) {
 			return getRuleContext(FlagContext.class,i);
-		}
-		public List<FromFlagContext> fromFlag() {
-			return getRuleContexts(FromFlagContext.class);
-		}
-		public FromFlagContext fromFlag(int i) {
-			return getRuleContext(FromFlagContext.class,i);
 		}
 		public FlagsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2025,39 +2011,25 @@ public class DockerParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(296);
+			setState(303);
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
 				switch (_alt) {
 				case 1:
 					{
-					setState(296);
-					_errHandler.sync(this);
-					switch (_input.LA(1)) {
-					case FLAG:
-						{
-						setState(294);
-						flag();
-						}
-						break;
-					case FROM_FLAG:
-						{
-						setState(295);
-						fromFlag();
-						}
-						break;
-					default:
-						throw new NoViableAltException(this);
+					{
+					setState(302);
+					flag();
 					}
 					}
 					break;
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(298);
+				setState(305);
 				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,24,_ctx);
+				_alt = getInterpreter().adaptivePredict(_input,22,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
 			}
 		}
@@ -2100,76 +2072,8 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(300);
-			match(FLAG);
-			}
-		}
-		catch (RecognitionException re) {
-			_localctx.exception = re;
-			_errHandler.reportError(this, re);
-			_errHandler.recover(this, re);
-		}
-		finally {
-			exitRule();
-		}
-		return _localctx;
-	}
-
-	@SuppressWarnings("CheckReturnValue")
-	public static class FromFlagContext extends ParserRuleContext {
-		public TerminalNode FROM_FLAG() { return getToken(DockerParser.FROM_FLAG, 0); }
-		public ImageReferenceContext imageReference() {
-			return getRuleContext(ImageReferenceContext.class,0);
-		}
-		public TerminalNode FLAG_END() { return getToken(DockerParser.FLAG_END, 0); }
-		public FromFlagContext(ParserRuleContext parent, int invokingState) {
-			super(parent, invokingState);
-		}
-		@Override public int getRuleIndex() { return RULE_fromFlag; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterFromFlag(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitFromFlag(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitFromFlag(this);
-			else return visitor.visitChildren(this);
-		}
-	}
-
-	public final FromFlagContext fromFlag() throws RecognitionException {
-		FromFlagContext _localctx = new FromFlagContext(_ctx, getState());
-		enterRule(_localctx, 56, RULE_fromFlag);
-		int _la;
-		try {
-			enterOuterAlt(_localctx, 1);
-			{
-			setState(302);
-			match(FROM_FLAG);
-			setState(304);
-			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,25,_ctx) ) {
-			case 1:
-				{
-				setState(303);
-				imageReference();
-				}
-				break;
-			}
 			setState(307);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==FLAG_END) {
-				{
-				setState(306);
-				match(FLAG_END);
-				}
-			}
-
+			match(FLAG);
 			}
 		}
 		catch (RecognitionException re) {
@@ -2209,7 +2113,7 @@ public class DockerParser extends Parser {
 
 	public final ExecFormContext execForm() throws RecognitionException {
 		ExecFormContext _localctx = new ExecFormContext(_ctx, getState());
-		enterRule(_localctx, 58, RULE_execForm);
+		enterRule(_localctx, 56, RULE_execForm);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
@@ -2254,7 +2158,7 @@ public class DockerParser extends Parser {
 
 	public final ShellFormContext shellForm() throws RecognitionException {
 		ShellFormContext _localctx = new ShellFormContext(_ctx, getState());
-		enterRule(_localctx, 60, RULE_shellForm);
+		enterRule(_localctx, 58, RULE_shellForm);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
@@ -2275,11 +2179,11 @@ public class DockerParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class ShellFormTextContext extends ParserRuleContext {
-		public List<TextElementContext> textElement() {
-			return getRuleContexts(TextElementContext.class);
+		public List<ShellFormTextElementContext> shellFormTextElement() {
+			return getRuleContexts(ShellFormTextElementContext.class);
 		}
-		public TextElementContext textElement(int i) {
-			return getRuleContext(TextElementContext.class,i);
+		public ShellFormTextElementContext shellFormTextElement(int i) {
+			return getRuleContext(ShellFormTextElementContext.class,i);
 		}
 		public ShellFormTextContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2302,7 +2206,7 @@ public class DockerParser extends Parser {
 
 	public final ShellFormTextContext shellFormText() throws RecognitionException {
 		ShellFormTextContext _localctx = new ShellFormTextContext(_ctx, getState());
-		enterRule(_localctx, 62, RULE_shellFormText);
+		enterRule(_localctx, 60, RULE_shellFormText);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
@@ -2314,13 +2218,78 @@ public class DockerParser extends Parser {
 				{
 				{
 				setState(313);
-				textElement();
+				shellFormTextElement();
 				}
 				}
 				setState(316);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 549202165760L) != 0) );
+			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 549722259456L) != 0) );
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class ShellFormTextElementContext extends ParserRuleContext {
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
+		public TerminalNode COMMAND_SUBST() { return getToken(DockerParser.COMMAND_SUBST, 0); }
+		public TerminalNode BACKTICK_SUBST() { return getToken(DockerParser.BACKTICK_SUBST, 0); }
+		public TerminalNode SPECIAL_VAR() { return getToken(DockerParser.SPECIAL_VAR, 0); }
+		public TerminalNode DOLLAR() { return getToken(DockerParser.DOLLAR, 0); }
+		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
+		public TerminalNode FLAG() { return getToken(DockerParser.FLAG, 0); }
+		public TerminalNode DASH_DASH() { return getToken(DockerParser.DASH_DASH, 0); }
+		public TerminalNode LBRACKET() { return getToken(DockerParser.LBRACKET, 0); }
+		public TerminalNode RBRACKET() { return getToken(DockerParser.RBRACKET, 0); }
+		public TerminalNode COMMA() { return getToken(DockerParser.COMMA, 0); }
+		public ShellFormTextElementContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_shellFormTextElement; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterShellFormTextElement(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitShellFormTextElement(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitShellFormTextElement(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final ShellFormTextElementContext shellFormTextElement() throws RecognitionException {
+		ShellFormTextElementContext _localctx = new ShellFormTextElementContext(_ctx, getState());
+		enterRule(_localctx, 62, RULE_shellFormTextElement);
+		int _la;
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(318);
+			_la = _input.LA(1);
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 549722259456L) != 0)) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -2372,24 +2341,24 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(318);
+			setState(320);
 			heredocPreamble();
-			setState(319);
-			match(NEWLINE);
 			setState(321);
+			match(NEWLINE);
+			setState(323);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
 				{
 				{
-				setState(320);
+				setState(322);
 				heredocBody();
 				}
 				}
-				setState(323);
+				setState(325);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 142111877890048L) != 0) );
+			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 36558761623552L) != 0) );
 			}
 		}
 		catch (RecognitionException re) {
@@ -2405,15 +2374,15 @@ public class DockerParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class HeredocPreambleContext extends ParserRuleContext {
-		public List<TextElementContext> textElement() {
-			return getRuleContexts(TextElementContext.class);
-		}
-		public TextElementContext textElement(int i) {
-			return getRuleContext(TextElementContext.class,i);
-		}
 		public List<TerminalNode> HEREDOC_START() { return getTokens(DockerParser.HEREDOC_START); }
 		public TerminalNode HEREDOC_START(int i) {
 			return getToken(DockerParser.HEREDOC_START, i);
+		}
+		public List<PreambleElementContext> preambleElement() {
+			return getRuleContexts(PreambleElementContext.class);
+		}
+		public PreambleElementContext preambleElement(int i) {
+			return getRuleContext(PreambleElementContext.class,i);
 		}
 		public HeredocPreambleContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2441,48 +2410,115 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(328);
+			setState(327);
+			match(HEREDOC_START);
+			setState(331);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 549202165760L) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 549722259456L) != 0)) {
 				{
 				{
-				setState(325);
-				textElement();
+				setState(328);
+				preambleElement();
 				}
 				}
-				setState(330);
+				setState(333);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(338);
+			setState(343);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			do {
+			while (_la==HEREDOC_START) {
 				{
 				{
-				setState(331);
+				setState(334);
 				match(HEREDOC_START);
-				setState(335);
+				setState(338);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 549202165760L) != 0)) {
+				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 549722259456L) != 0)) {
 					{
 					{
-					setState(332);
-					textElement();
+					setState(335);
+					preambleElement();
 					}
 					}
-					setState(337);
+					setState(340);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				}
 				}
 				}
-				setState(340);
+				setState(345);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-			} while ( _la==HEREDOC_START );
+			}
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class PreambleElementContext extends ParserRuleContext {
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
+		public TerminalNode COMMAND_SUBST() { return getToken(DockerParser.COMMAND_SUBST, 0); }
+		public TerminalNode BACKTICK_SUBST() { return getToken(DockerParser.BACKTICK_SUBST, 0); }
+		public TerminalNode SPECIAL_VAR() { return getToken(DockerParser.SPECIAL_VAR, 0); }
+		public TerminalNode DOLLAR() { return getToken(DockerParser.DOLLAR, 0); }
+		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
+		public TerminalNode FLAG() { return getToken(DockerParser.FLAG, 0); }
+		public TerminalNode DASH_DASH() { return getToken(DockerParser.DASH_DASH, 0); }
+		public TerminalNode LBRACKET() { return getToken(DockerParser.LBRACKET, 0); }
+		public TerminalNode RBRACKET() { return getToken(DockerParser.RBRACKET, 0); }
+		public TerminalNode COMMA() { return getToken(DockerParser.COMMA, 0); }
+		public PreambleElementContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_preambleElement; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterPreambleElement(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitPreambleElement(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitPreambleElement(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final PreambleElementContext preambleElement() throws RecognitionException {
+		PreambleElementContext _localctx = new PreambleElementContext(_ctx, getState());
+		enterRule(_localctx, 68, RULE_preambleElement);
+		int _la;
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(346);
+			_la = _input.LA(1);
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 549722259456L) != 0)) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -2525,13 +2561,13 @@ public class DockerParser extends Parser {
 
 	public final HeredocBodyContext heredocBody() throws RecognitionException {
 		HeredocBodyContext _localctx = new HeredocBodyContext(_ctx, getState());
-		enterRule(_localctx, 68, RULE_heredocBody);
+		enterRule(_localctx, 70, RULE_heredocBody);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(342);
+			setState(348);
 			heredocContent();
-			setState(343);
+			setState(349);
 			heredocEnd();
 			}
 		}
@@ -2577,18 +2613,18 @@ public class DockerParser extends Parser {
 
 	public final HeredocContentContext heredocContent() throws RecognitionException {
 		HeredocContentContext _localctx = new HeredocContentContext(_ctx, getState());
-		enterRule(_localctx, 70, RULE_heredocContent);
+		enterRule(_localctx, 72, RULE_heredocContent);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(348);
+			setState(354);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==NEWLINE || _la==HEREDOC_CONTENT) {
 				{
 				{
-				setState(345);
+				setState(351);
 				_la = _input.LA(1);
 				if ( !(_la==NEWLINE || _la==HEREDOC_CONTENT) ) {
 				_errHandler.recoverInline(this);
@@ -2600,7 +2636,7 @@ public class DockerParser extends Parser {
 				}
 				}
 				}
-				setState(350);
+				setState(356);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
@@ -2641,11 +2677,11 @@ public class DockerParser extends Parser {
 
 	public final HeredocEndContext heredocEnd() throws RecognitionException {
 		HeredocEndContext _localctx = new HeredocEndContext(_ctx, getState());
-		enterRule(_localctx, 72, RULE_heredocEnd);
+		enterRule(_localctx, 74, RULE_heredocEnd);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(351);
+			setState(357);
 			match(UNQUOTED_TEXT);
 			}
 		}
@@ -2688,24 +2724,24 @@ public class DockerParser extends Parser {
 
 	public final JsonArrayContext jsonArray() throws RecognitionException {
 		JsonArrayContext _localctx = new JsonArrayContext(_ctx, getState());
-		enterRule(_localctx, 74, RULE_jsonArray);
+		enterRule(_localctx, 76, RULE_jsonArray);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(353);
+			setState(359);
 			match(LBRACKET);
-			setState(355);
+			setState(361);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==DOUBLE_QUOTED_STRING) {
 				{
-				setState(354);
+				setState(360);
 				jsonArrayElements();
 				}
 			}
 
-			setState(357);
+			setState(363);
 			match(RBRACKET);
 			}
 		}
@@ -2753,26 +2789,26 @@ public class DockerParser extends Parser {
 
 	public final JsonArrayElementsContext jsonArrayElements() throws RecognitionException {
 		JsonArrayElementsContext _localctx = new JsonArrayElementsContext(_ctx, getState());
-		enterRule(_localctx, 76, RULE_jsonArrayElements);
+		enterRule(_localctx, 78, RULE_jsonArrayElements);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(359);
+			setState(365);
 			jsonString();
-			setState(364);
+			setState(370);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(360);
+				setState(366);
 				match(COMMA);
-				setState(361);
+				setState(367);
 				jsonString();
 				}
 				}
-				setState(366);
+				setState(372);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
@@ -2813,11 +2849,11 @@ public class DockerParser extends Parser {
 
 	public final JsonStringContext jsonString() throws RecognitionException {
 		JsonStringContext _localctx = new JsonStringContext(_ctx, getState());
-		enterRule(_localctx, 78, RULE_jsonString);
+		enterRule(_localctx, 80, RULE_jsonString);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(367);
+			setState(373);
 			match(DOUBLE_QUOTED_STRING);
 			}
 		}
@@ -2833,109 +2869,9 @@ public class DockerParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ImageReferenceContext extends ParserRuleContext {
-		public ImageNameContext imageName() {
-			return getRuleContext(ImageNameContext.class,0);
-		}
-		public TerminalNode COLON() { return getToken(DockerParser.COLON, 0); }
-		public TerminalNode AT() { return getToken(DockerParser.AT, 0); }
-		public TagContext tag() {
-			return getRuleContext(TagContext.class,0);
-		}
-		public DigestContext digest() {
-			return getRuleContext(DigestContext.class,0);
-		}
-		public ImageReferenceContext(ParserRuleContext parent, int invokingState) {
-			super(parent, invokingState);
-		}
-		@Override public int getRuleIndex() { return RULE_imageReference; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterImageReference(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitImageReference(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitImageReference(this);
-			else return visitor.visitChildren(this);
-		}
-	}
-
-	public final ImageReferenceContext imageReference() throws RecognitionException {
-		ImageReferenceContext _localctx = new ImageReferenceContext(_ctx, getState());
-		enterRule(_localctx, 80, RULE_imageReference);
-		int _la;
-		try {
-			enterOuterAlt(_localctx, 1);
-			{
-			setState(369);
-			imageName();
-			setState(374);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==COLON) {
-				{
-				setState(370);
-				match(COLON);
-				setState(372);
-				_errHandler.sync(this);
-				switch ( getInterpreter().adaptivePredict(_input,35,_ctx) ) {
-				case 1:
-					{
-					setState(371);
-					tag();
-					}
-					break;
-				}
-				}
-			}
-
-			setState(380);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			if (_la==AT) {
-				{
-				setState(376);
-				match(AT);
-				setState(378);
-				_errHandler.sync(this);
-				switch ( getInterpreter().adaptivePredict(_input,37,_ctx) ) {
-				case 1:
-					{
-					setState(377);
-					digest();
-					}
-					break;
-				}
-				}
-			}
-
-			}
-		}
-		catch (RecognitionException re) {
-			_localctx.exception = re;
-			_errHandler.reportError(this, re);
-			_errHandler.recover(this, re);
-		}
-		finally {
-			exitRule();
-		}
-		return _localctx;
-	}
-
-	@SuppressWarnings("CheckReturnValue")
 	public static class ImageNameContext extends ParserRuleContext {
-		public QuotedContext quoted() {
-			return getRuleContext(QuotedContext.class,0);
-		}
-		public List<TextElementContext> textElement() {
-			return getRuleContexts(TextElementContext.class);
-		}
-		public TextElementContext textElement(int i) {
-			return getRuleContext(TextElementContext.class,i);
+		public TextContext text() {
+			return getRuleContext(TextContext.class,0);
 		}
 		public ImageNameContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2960,280 +2896,10 @@ public class DockerParser extends Parser {
 		ImageNameContext _localctx = new ImageNameContext(_ctx, getState());
 		enterRule(_localctx, 82, RULE_imageName);
 		try {
-			int _alt;
-			setState(388);
-			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,40,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(382);
-				quoted();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(384);
-				_errHandler.sync(this);
-				_alt = 1;
-				do {
-					switch (_alt) {
-					case 1:
-						{
-						{
-						setState(383);
-						textElement();
-						}
-						}
-						break;
-					default:
-						throw new NoViableAltException(this);
-					}
-					setState(386);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,39,_ctx);
-				} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
-				}
-				break;
-			}
-		}
-		catch (RecognitionException re) {
-			_localctx.exception = re;
-			_errHandler.reportError(this, re);
-			_errHandler.recover(this, re);
-		}
-		finally {
-			exitRule();
-		}
-		return _localctx;
-	}
-
-	@SuppressWarnings("CheckReturnValue")
-	public static class TagContext extends ParserRuleContext {
-		public QuotedContext quoted() {
-			return getRuleContext(QuotedContext.class,0);
-		}
-		public List<TextElementContext> textElement() {
-			return getRuleContexts(TextElementContext.class);
-		}
-		public TextElementContext textElement(int i) {
-			return getRuleContext(TextElementContext.class,i);
-		}
-		public List<TerminalNode> COLON() { return getTokens(DockerParser.COLON); }
-		public TerminalNode COLON(int i) {
-			return getToken(DockerParser.COLON, i);
-		}
-		public TagContext(ParserRuleContext parent, int invokingState) {
-			super(parent, invokingState);
-		}
-		@Override public int getRuleIndex() { return RULE_tag; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterTag(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitTag(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitTag(this);
-			else return visitor.visitChildren(this);
-		}
-	}
-
-	public final TagContext tag() throws RecognitionException {
-		TagContext _localctx = new TagContext(_ctx, getState());
-		enterRule(_localctx, 84, RULE_tag);
-		try {
-			int _alt;
-			setState(397);
-			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,43,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(390);
-				quoted();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(393);
-				_errHandler.sync(this);
-				_alt = 1;
-				do {
-					switch (_alt) {
-					case 1:
-						{
-						setState(393);
-						_errHandler.sync(this);
-						switch (_input.LA(1)) {
-						case LBRACKET:
-						case RBRACKET:
-						case COMMA:
-						case EQUALS:
-						case FLAG:
-						case DASH_DASH:
-						case DOUBLE_QUOTED_STRING:
-						case SINGLE_QUOTED_STRING:
-						case ENV_VAR:
-						case SPECIAL_VAR:
-						case COMMAND_SUBST:
-						case BACKTICK_SUBST:
-						case DOLLAR:
-						case UNQUOTED_TEXT:
-							{
-							setState(391);
-							textElement();
-							}
-							break;
-						case COLON:
-							{
-							setState(392);
-							match(COLON);
-							}
-							break;
-						default:
-							throw new NoViableAltException(this);
-						}
-						}
-						break;
-					default:
-						throw new NoViableAltException(this);
-					}
-					setState(395);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,42,_ctx);
-				} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
-				}
-				break;
-			}
-		}
-		catch (RecognitionException re) {
-			_localctx.exception = re;
-			_errHandler.reportError(this, re);
-			_errHandler.recover(this, re);
-		}
-		finally {
-			exitRule();
-		}
-		return _localctx;
-	}
-
-	@SuppressWarnings("CheckReturnValue")
-	public static class DigestContext extends ParserRuleContext {
-		public QuotedContext quoted() {
-			return getRuleContext(QuotedContext.class,0);
-		}
-		public List<TextElementContext> textElement() {
-			return getRuleContexts(TextElementContext.class);
-		}
-		public TextElementContext textElement(int i) {
-			return getRuleContext(TextElementContext.class,i);
-		}
-		public List<TerminalNode> COLON() { return getTokens(DockerParser.COLON); }
-		public TerminalNode COLON(int i) {
-			return getToken(DockerParser.COLON, i);
-		}
-		public List<TerminalNode> AT() { return getTokens(DockerParser.AT); }
-		public TerminalNode AT(int i) {
-			return getToken(DockerParser.AT, i);
-		}
-		public DigestContext(ParserRuleContext parent, int invokingState) {
-			super(parent, invokingState);
-		}
-		@Override public int getRuleIndex() { return RULE_digest; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterDigest(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitDigest(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitDigest(this);
-			else return visitor.visitChildren(this);
-		}
-	}
-
-	public final DigestContext digest() throws RecognitionException {
-		DigestContext _localctx = new DigestContext(_ctx, getState());
-		enterRule(_localctx, 86, RULE_digest);
-		try {
-			int _alt;
-			setState(407);
-			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,46,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(399);
-				quoted();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(403);
-				_errHandler.sync(this);
-				_alt = 1;
-				do {
-					switch (_alt) {
-					case 1:
-						{
-						setState(403);
-						_errHandler.sync(this);
-						switch (_input.LA(1)) {
-						case LBRACKET:
-						case RBRACKET:
-						case COMMA:
-						case EQUALS:
-						case FLAG:
-						case DASH_DASH:
-						case DOUBLE_QUOTED_STRING:
-						case SINGLE_QUOTED_STRING:
-						case ENV_VAR:
-						case SPECIAL_VAR:
-						case COMMAND_SUBST:
-						case BACKTICK_SUBST:
-						case DOLLAR:
-						case UNQUOTED_TEXT:
-							{
-							setState(400);
-							textElement();
-							}
-							break;
-						case COLON:
-							{
-							setState(401);
-							match(COLON);
-							}
-							break;
-						case AT:
-							{
-							setState(402);
-							match(AT);
-							}
-							break;
-						default:
-							throw new NoViableAltException(this);
-						}
-						}
-						break;
-					default:
-						throw new NoViableAltException(this);
-					}
-					setState(405);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,45,_ctx);
-				} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
-				}
-				break;
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(375);
+			text();
 			}
 		}
 		catch (RecognitionException re) {
@@ -3271,11 +2937,11 @@ public class DockerParser extends Parser {
 
 	public final StageNameContext stageName() throws RecognitionException {
 		StageNameContext _localctx = new StageNameContext(_ctx, getState());
-		enterRule(_localctx, 88, RULE_stageName);
+		enterRule(_localctx, 84, RULE_stageName);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(409);
+			setState(377);
 			match(UNQUOTED_TEXT);
 			}
 		}
@@ -3319,22 +2985,22 @@ public class DockerParser extends Parser {
 
 	public final LabelPairsContext labelPairs() throws RecognitionException {
 		LabelPairsContext _localctx = new LabelPairsContext(_ctx, getState());
-		enterRule(_localctx, 90, RULE_labelPairs);
+		enterRule(_localctx, 86, RULE_labelPairs);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(412);
+			setState(380);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
 				{
 				{
-				setState(411);
+				setState(379);
 				labelPair();
 				}
 				}
-				setState(414);
+				setState(382);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 281320357888L) != 0) );
@@ -3357,11 +3023,11 @@ public class DockerParser extends Parser {
 			return getRuleContext(LabelKeyContext.class,0);
 		}
 		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
-		public ValueContext value() {
-			return getRuleContext(ValueContext.class,0);
+		public LabelValueContext labelValue() {
+			return getRuleContext(LabelValueContext.class,0);
 		}
-		public TextContext text() {
-			return getRuleContext(TextContext.class,0);
+		public LabelOldValueContext labelOldValue() {
+			return getRuleContext(LabelOldValueContext.class,0);
 		}
 		public LabelPairContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3384,32 +3050,31 @@ public class DockerParser extends Parser {
 
 	public final LabelPairContext labelPair() throws RecognitionException {
 		LabelPairContext _localctx = new LabelPairContext(_ctx, getState());
-		enterRule(_localctx, 92, RULE_labelPair);
+		enterRule(_localctx, 88, RULE_labelPair);
 		try {
-			enterOuterAlt(_localctx, 1);
-			{
-			setState(416);
-			labelKey();
-			setState(421);
+			setState(391);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,48,_ctx) ) {
+			switch ( getInterpreter().adaptivePredict(_input,32,_ctx) ) {
 			case 1:
+				enterOuterAlt(_localctx, 1);
 				{
-				setState(417);
-				if (!(bound())) throw new FailedPredicateException(this, "bound()");
-				setState(418);
+				setState(384);
+				labelKey();
+				setState(385);
 				match(EQUALS);
-				setState(419);
-				value();
+				setState(386);
+				labelValue();
 				}
 				break;
 			case 2:
+				enterOuterAlt(_localctx, 2);
 				{
-				setState(420);
-				text();
+				setState(388);
+				labelKey();
+				setState(389);
+				labelOldValue();
 				}
 				break;
-			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -3425,10 +3090,9 @@ public class DockerParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class LabelKeyContext extends ParserRuleContext {
-		public QuotedContext quoted() {
-			return getRuleContext(QuotedContext.class,0);
-		}
 		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
 		public LabelKeyContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3450,28 +3114,207 @@ public class DockerParser extends Parser {
 
 	public final LabelKeyContext labelKey() throws RecognitionException {
 		LabelKeyContext _localctx = new LabelKeyContext(_ctx, getState());
-		enterRule(_localctx, 94, RULE_labelKey);
+		enterRule(_localctx, 90, RULE_labelKey);
+		int _la;
 		try {
-			setState(425);
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(393);
+			_la = _input.LA(1);
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 281320357888L) != 0)) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class LabelValueContext extends ParserRuleContext {
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public LabelValueContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_labelValue; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterLabelValue(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitLabelValue(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitLabelValue(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final LabelValueContext labelValue() throws RecognitionException {
+		LabelValueContext _localctx = new LabelValueContext(_ctx, getState());
+		enterRule(_localctx, 92, RULE_labelValue);
+		int _la;
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(395);
+			_la = _input.LA(1);
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 281320357888L) != 0)) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class LabelOldValueContext extends ParserRuleContext {
+		public List<LabelOldValueElementContext> labelOldValueElement() {
+			return getRuleContexts(LabelOldValueElementContext.class);
+		}
+		public LabelOldValueElementContext labelOldValueElement(int i) {
+			return getRuleContext(LabelOldValueElementContext.class,i);
+		}
+		public LabelOldValueContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_labelOldValue; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterLabelOldValue(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitLabelOldValue(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitLabelOldValue(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final LabelOldValueContext labelOldValue() throws RecognitionException {
+		LabelOldValueContext _localctx = new LabelOldValueContext(_ctx, getState());
+		enterRule(_localctx, 94, RULE_labelOldValue);
+		try {
+			int _alt;
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(398);
 			_errHandler.sync(this);
-			switch (_input.LA(1)) {
-			case DOUBLE_QUOTED_STRING:
-			case SINGLE_QUOTED_STRING:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(423);
-				quoted();
+			_alt = 1;
+			do {
+				switch (_alt) {
+				case 1:
+					{
+					{
+					setState(397);
+					labelOldValueElement();
+					}
+					}
+					break;
+				default:
+					throw new NoViableAltException(this);
 				}
-				break;
-			case UNQUOTED_TEXT:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(424);
-				match(UNQUOTED_TEXT);
-				}
-				break;
-			default:
-				throw new NoViableAltException(this);
+				setState(400);
+				_errHandler.sync(this);
+				_alt = getInterpreter().adaptivePredict(_input,33,_ctx);
+			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class LabelOldValueElementContext extends ParserRuleContext {
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
+		public TerminalNode COMMAND_SUBST() { return getToken(DockerParser.COMMAND_SUBST, 0); }
+		public TerminalNode BACKTICK_SUBST() { return getToken(DockerParser.BACKTICK_SUBST, 0); }
+		public TerminalNode SPECIAL_VAR() { return getToken(DockerParser.SPECIAL_VAR, 0); }
+		public TerminalNode DOLLAR() { return getToken(DockerParser.DOLLAR, 0); }
+		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
+		public TerminalNode FLAG() { return getToken(DockerParser.FLAG, 0); }
+		public TerminalNode DASH_DASH() { return getToken(DockerParser.DASH_DASH, 0); }
+		public TerminalNode LBRACKET() { return getToken(DockerParser.LBRACKET, 0); }
+		public TerminalNode RBRACKET() { return getToken(DockerParser.RBRACKET, 0); }
+		public TerminalNode COMMA() { return getToken(DockerParser.COMMA, 0); }
+		public LabelOldValueElementContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_labelOldValueElement; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterLabelOldValueElement(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitLabelOldValueElement(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitLabelOldValueElement(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final LabelOldValueElementContext labelOldValueElement() throws RecognitionException {
+		LabelOldValueElementContext _localctx = new LabelOldValueElementContext(_ctx, getState());
+		enterRule(_localctx, 96, RULE_labelOldValueElement);
+		int _la;
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(402);
+			_la = _input.LA(1);
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 549722259456L) != 0)) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -3514,22 +3357,22 @@ public class DockerParser extends Parser {
 
 	public final PortListContext portList() throws RecognitionException {
 		PortListContext _localctx = new PortListContext(_ctx, getState());
-		enterRule(_localctx, 96, RULE_portList);
+		enterRule(_localctx, 98, RULE_portList);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(428);
+			setState(405);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
 				{
 				{
-				setState(427);
+				setState(404);
 				port();
 				}
 				}
-				setState(430);
+				setState(407);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 403726925824L) != 0) );
@@ -3574,12 +3417,12 @@ public class DockerParser extends Parser {
 
 	public final PortContext port() throws RecognitionException {
 		PortContext _localctx = new PortContext(_ctx, getState());
-		enterRule(_localctx, 98, RULE_port);
+		enterRule(_localctx, 100, RULE_port);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(432);
+			setState(409);
 			_la = _input.LA(1);
 			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 403726925824L) != 0)) ) {
 			_errHandler.recoverInline(this);
@@ -3631,22 +3474,22 @@ public class DockerParser extends Parser {
 
 	public final EnvPairsContext envPairs() throws RecognitionException {
 		EnvPairsContext _localctx = new EnvPairsContext(_ctx, getState());
-		enterRule(_localctx, 100, RULE_envPairs);
+		enterRule(_localctx, 102, RULE_envPairs);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(435);
+			setState(412);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
 				{
 				{
-				setState(434);
+				setState(411);
 				envPair();
 				}
 				}
-				setState(437);
+				setState(414);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==UNQUOTED_TEXT );
@@ -3669,11 +3512,11 @@ public class DockerParser extends Parser {
 			return getRuleContext(EnvKeyContext.class,0);
 		}
 		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
-		public ValueContext value() {
-			return getRuleContext(ValueContext.class,0);
+		public EnvValueEqualsContext envValueEquals() {
+			return getRuleContext(EnvValueEqualsContext.class,0);
 		}
-		public TextContext text() {
-			return getRuleContext(TextContext.class,0);
+		public EnvValueSpaceContext envValueSpace() {
+			return getRuleContext(EnvValueSpaceContext.class,0);
 		}
 		public EnvPairContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3696,32 +3539,31 @@ public class DockerParser extends Parser {
 
 	public final EnvPairContext envPair() throws RecognitionException {
 		EnvPairContext _localctx = new EnvPairContext(_ctx, getState());
-		enterRule(_localctx, 102, RULE_envPair);
+		enterRule(_localctx, 104, RULE_envPair);
 		try {
-			enterOuterAlt(_localctx, 1);
-			{
-			setState(439);
-			envKey();
-			setState(444);
+			setState(423);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,52,_ctx) ) {
+			switch ( getInterpreter().adaptivePredict(_input,36,_ctx) ) {
 			case 1:
+				enterOuterAlt(_localctx, 1);
 				{
-				setState(440);
-				if (!(bound())) throw new FailedPredicateException(this, "bound()");
-				setState(441);
+				setState(416);
+				envKey();
+				setState(417);
 				match(EQUALS);
-				setState(442);
-				value();
+				setState(418);
+				envValueEquals();
 				}
 				break;
 			case 2:
+				enterOuterAlt(_localctx, 2);
 				{
-				setState(443);
-				text();
+				setState(420);
+				envKey();
+				setState(421);
+				envValueSpace();
 				}
 				break;
-			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -3759,11 +3601,11 @@ public class DockerParser extends Parser {
 
 	public final EnvKeyContext envKey() throws RecognitionException {
 		EnvKeyContext _localctx = new EnvKeyContext(_ctx, getState());
-		enterRule(_localctx, 104, RULE_envKey);
+		enterRule(_localctx, 106, RULE_envKey);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(446);
+			setState(425);
 			match(UNQUOTED_TEXT);
 			}
 		}
@@ -3779,55 +3621,37 @@ public class DockerParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class CopyPathsContext extends ParserRuleContext {
-		public List<PathArgumentContext> pathArgument() {
-			return getRuleContexts(PathArgumentContext.class);
+	public static class EnvValueEqualsContext extends ParserRuleContext {
+		public EnvTextEqualsContext envTextEquals() {
+			return getRuleContext(EnvTextEqualsContext.class,0);
 		}
-		public PathArgumentContext pathArgument(int i) {
-			return getRuleContext(PathArgumentContext.class,i);
-		}
-		public CopyPathsContext(ParserRuleContext parent, int invokingState) {
+		public EnvValueEqualsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_copyPaths; }
+		@Override public int getRuleIndex() { return RULE_envValueEquals; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterCopyPaths(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvValueEquals(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitCopyPaths(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvValueEquals(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitCopyPaths(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvValueEquals(this);
 			else return visitor.visitChildren(this);
 		}
 	}
 
-	public final CopyPathsContext copyPaths() throws RecognitionException {
-		CopyPathsContext _localctx = new CopyPathsContext(_ctx, getState());
-		enterRule(_localctx, 106, RULE_copyPaths);
-		int _la;
+	public final EnvValueEqualsContext envValueEquals() throws RecognitionException {
+		EnvValueEqualsContext _localctx = new EnvValueEqualsContext(_ctx, getState());
+		enterRule(_localctx, 108, RULE_envValueEquals);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(448);
-			pathArgument();
-			setState(450);
-			_errHandler.sync(this);
-			_la = _input.LA(1);
-			do {
-				{
-				{
-				setState(449);
-				pathArgument();
-				}
-				}
-				setState(452);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 549202165760L) != 0) );
+			setState(427);
+			envTextEquals();
 			}
 		}
 		catch (RecognitionException re) {
@@ -3842,75 +3666,391 @@ public class DockerParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class PathArgumentContext extends ParserRuleContext {
-		public QuotedContext quoted() {
-			return getRuleContext(QuotedContext.class,0);
+	public static class EnvValueSpaceContext extends ParserRuleContext {
+		public TextContext text() {
+			return getRuleContext(TextContext.class,0);
 		}
-		public List<TextElementContext> textElement() {
-			return getRuleContexts(TextElementContext.class);
-		}
-		public TextElementContext textElement(int i) {
-			return getRuleContext(TextElementContext.class,i);
-		}
-		public PathArgumentContext(ParserRuleContext parent, int invokingState) {
+		public EnvValueSpaceContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_pathArgument; }
+		@Override public int getRuleIndex() { return RULE_envValueSpace; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterPathArgument(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvValueSpace(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitPathArgument(this);
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvValueSpace(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitPathArgument(this);
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvValueSpace(this);
 			else return visitor.visitChildren(this);
 		}
 	}
 
-	public final PathArgumentContext pathArgument() throws RecognitionException {
-		PathArgumentContext _localctx = new PathArgumentContext(_ctx, getState());
-		enterRule(_localctx, 108, RULE_pathArgument);
+	public final EnvValueSpaceContext envValueSpace() throws RecognitionException {
+		EnvValueSpaceContext _localctx = new EnvValueSpaceContext(_ctx, getState());
+		enterRule(_localctx, 110, RULE_envValueSpace);
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(429);
+			text();
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class EnvTextEqualsContext extends ParserRuleContext {
+		public List<EnvTextElementEqualsContext> envTextElementEquals() {
+			return getRuleContexts(EnvTextElementEqualsContext.class);
+		}
+		public EnvTextElementEqualsContext envTextElementEquals(int i) {
+			return getRuleContext(EnvTextElementEqualsContext.class,i);
+		}
+		public EnvTextEqualsContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_envTextEquals; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvTextEquals(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvTextEquals(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvTextEquals(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final EnvTextEqualsContext envTextEquals() throws RecognitionException {
+		EnvTextEqualsContext _localctx = new EnvTextEqualsContext(_ctx, getState());
+		enterRule(_localctx, 112, RULE_envTextEquals);
 		try {
 			int _alt;
-			setState(463);
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(432);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,55,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(454);
-				quoted();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(455);
-				textElement();
-				setState(460);
-				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,54,_ctx);
-				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-					if ( _alt==1 ) {
-						{
-						{
-						setState(456);
-						if (!(adjacent())) throw new FailedPredicateException(this, "adjacent()");
-						setState(457);
-						textElement();
-						}
-						}
+			_alt = 1;
+			do {
+				switch (_alt) {
+				case 1:
+					{
+					{
+					setState(431);
+					envTextElementEquals();
 					}
-					setState(462);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,54,_ctx);
+					}
+					break;
+				default:
+					throw new NoViableAltException(this);
 				}
+				setState(434);
+				_errHandler.sync(this);
+				_alt = getInterpreter().adaptivePredict(_input,37,_ctx);
+			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class EnvTextElementEqualsContext extends ParserRuleContext {
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
+		public TerminalNode COMMAND_SUBST() { return getToken(DockerParser.COMMAND_SUBST, 0); }
+		public TerminalNode BACKTICK_SUBST() { return getToken(DockerParser.BACKTICK_SUBST, 0); }
+		public TerminalNode SPECIAL_VAR() { return getToken(DockerParser.SPECIAL_VAR, 0); }
+		public TerminalNode DOLLAR() { return getToken(DockerParser.DOLLAR, 0); }
+		public EnvTextElementEqualsContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_envTextElementEquals; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterEnvTextElementEquals(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitEnvTextElementEquals(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitEnvTextElementEquals(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final EnvTextElementEqualsContext envTextElementEquals() throws RecognitionException {
+		EnvTextElementEqualsContext _localctx = new EnvTextElementEqualsContext(_ctx, getState());
+		enterRule(_localctx, 114, RULE_envTextElementEquals);
+		int _la;
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(436);
+			_la = _input.LA(1);
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 547608330240L) != 0)) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class SourceListContext extends ParserRuleContext {
+		public List<SourcePathContext> sourcePath() {
+			return getRuleContexts(SourcePathContext.class);
+		}
+		public SourcePathContext sourcePath(int i) {
+			return getRuleContext(SourcePathContext.class,i);
+		}
+		public SourceListContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_sourceList; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterSourceList(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitSourceList(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitSourceList(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final SourceListContext sourceList() throws RecognitionException {
+		SourceListContext _localctx = new SourceListContext(_ctx, getState());
+		enterRule(_localctx, 116, RULE_sourceList);
+		try {
+			int _alt;
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(439);
+			_errHandler.sync(this);
+			_alt = 1;
+			do {
+				switch (_alt) {
+				case 1:
+					{
+					{
+					setState(438);
+					sourcePath();
+					}
+					}
+					break;
+				default:
+					throw new NoViableAltException(this);
 				}
-				break;
+				setState(441);
+				_errHandler.sync(this);
+				_alt = getInterpreter().adaptivePredict(_input,38,_ctx);
+			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class SourcePathContext extends ParserRuleContext {
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
+		public TerminalNode COMMAND_SUBST() { return getToken(DockerParser.COMMAND_SUBST, 0); }
+		public TerminalNode BACKTICK_SUBST() { return getToken(DockerParser.BACKTICK_SUBST, 0); }
+		public TerminalNode SPECIAL_VAR() { return getToken(DockerParser.SPECIAL_VAR, 0); }
+		public SourcePathContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_sourcePath; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterSourcePath(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitSourcePath(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitSourcePath(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final SourcePathContext sourcePath() throws RecognitionException {
+		SourcePathContext _localctx = new SourcePathContext(_ctx, getState());
+		enterRule(_localctx, 118, RULE_sourcePath);
+		int _la;
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(443);
+			_la = _input.LA(1);
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 410169376768L) != 0)) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class DestinationContext extends ParserRuleContext {
+		public DestinationPathContext destinationPath() {
+			return getRuleContext(DestinationPathContext.class,0);
+		}
+		public DestinationContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_destination; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterDestination(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitDestination(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitDestination(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final DestinationContext destination() throws RecognitionException {
+		DestinationContext _localctx = new DestinationContext(_ctx, getState());
+		enterRule(_localctx, 120, RULE_destination);
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(445);
+			destinationPath();
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class DestinationPathContext extends ParserRuleContext {
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
+		public TerminalNode COMMAND_SUBST() { return getToken(DockerParser.COMMAND_SUBST, 0); }
+		public TerminalNode BACKTICK_SUBST() { return getToken(DockerParser.BACKTICK_SUBST, 0); }
+		public TerminalNode SPECIAL_VAR() { return getToken(DockerParser.SPECIAL_VAR, 0); }
+		public DestinationPathContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_destinationPath; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterDestinationPath(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitDestinationPath(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitDestinationPath(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final DestinationPathContext destinationPath() throws RecognitionException {
+		DestinationPathContext _localctx = new DestinationPathContext(_ctx, getState());
+		enterRule(_localctx, 122, RULE_destinationPath);
+		int _la;
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(447);
+			_la = _input.LA(1);
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 410169376768L) != 0)) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -3950,11 +4090,11 @@ public class DockerParser extends Parser {
 
 	public final PathContext path() throws RecognitionException {
 		PathContext _localctx = new PathContext(_ctx, getState());
-		enterRule(_localctx, 110, RULE_path);
+		enterRule(_localctx, 124, RULE_path);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(465);
+			setState(449);
 			text();
 			}
 		}
@@ -3970,13 +4110,128 @@ public class DockerParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class UserSpecContext extends ParserRuleContext {
-		public UserContext user() {
-			return getRuleContext(UserContext.class,0);
+	public static class PathListContext extends ParserRuleContext {
+		public List<VolumePathContext> volumePath() {
+			return getRuleContexts(VolumePathContext.class);
 		}
-		public TerminalNode COLON() { return getToken(DockerParser.COLON, 0); }
-		public GroupContext group() {
-			return getRuleContext(GroupContext.class,0);
+		public VolumePathContext volumePath(int i) {
+			return getRuleContext(VolumePathContext.class,i);
+		}
+		public PathListContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_pathList; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterPathList(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitPathList(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitPathList(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final PathListContext pathList() throws RecognitionException {
+		PathListContext _localctx = new PathListContext(_ctx, getState());
+		enterRule(_localctx, 126, RULE_pathList);
+		int _la;
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(452);
+			_errHandler.sync(this);
+			_la = _input.LA(1);
+			do {
+				{
+				{
+				setState(451);
+				volumePath();
+				}
+				}
+				setState(454);
+				_errHandler.sync(this);
+				_la = _input.LA(1);
+			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 410169376768L) != 0) );
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class VolumePathContext extends ParserRuleContext {
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
+		public TerminalNode COMMAND_SUBST() { return getToken(DockerParser.COMMAND_SUBST, 0); }
+		public TerminalNode BACKTICK_SUBST() { return getToken(DockerParser.BACKTICK_SUBST, 0); }
+		public TerminalNode SPECIAL_VAR() { return getToken(DockerParser.SPECIAL_VAR, 0); }
+		public VolumePathContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_volumePath; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterVolumePath(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitVolumePath(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitVolumePath(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final VolumePathContext volumePath() throws RecognitionException {
+		VolumePathContext _localctx = new VolumePathContext(_ctx, getState());
+		enterRule(_localctx, 128, RULE_volumePath);
+		int _la;
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(456);
+			_la = _input.LA(1);
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 410169376768L) != 0)) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	@SuppressWarnings("CheckReturnValue")
+	public static class UserSpecContext extends ParserRuleContext {
+		public TextContext text() {
+			return getRuleContext(TextContext.class,0);
 		}
 		public UserSpecContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3999,256 +4254,12 @@ public class DockerParser extends Parser {
 
 	public final UserSpecContext userSpec() throws RecognitionException {
 		UserSpecContext _localctx = new UserSpecContext(_ctx, getState());
-		enterRule(_localctx, 112, RULE_userSpec);
-		int _la;
+		enterRule(_localctx, 130, RULE_userSpec);
 		try {
-			setState(478);
-			_errHandler.sync(this);
-			switch (_input.LA(1)) {
-			case LBRACKET:
-			case RBRACKET:
-			case COMMA:
-			case EQUALS:
-			case FLAG:
-			case DASH_DASH:
-			case DOUBLE_QUOTED_STRING:
-			case SINGLE_QUOTED_STRING:
-			case ENV_VAR:
-			case SPECIAL_VAR:
-			case COMMAND_SUBST:
-			case BACKTICK_SUBST:
-			case DOLLAR:
-			case UNQUOTED_TEXT:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(467);
-				user();
-				setState(472);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==COLON) {
-					{
-					setState(468);
-					match(COLON);
-					setState(470);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-					if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 2748225421312L) != 0)) {
-						{
-						setState(469);
-						group();
-						}
-					}
-
-					}
-				}
-
-				}
-				break;
-			case COLON:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(474);
-				match(COLON);
-				setState(476);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 2748225421312L) != 0)) {
-					{
-					setState(475);
-					group();
-					}
-				}
-
-				}
-				break;
-			default:
-				throw new NoViableAltException(this);
-			}
-		}
-		catch (RecognitionException re) {
-			_localctx.exception = re;
-			_errHandler.reportError(this, re);
-			_errHandler.recover(this, re);
-		}
-		finally {
-			exitRule();
-		}
-		return _localctx;
-	}
-
-	@SuppressWarnings("CheckReturnValue")
-	public static class UserContext extends ParserRuleContext {
-		public QuotedContext quoted() {
-			return getRuleContext(QuotedContext.class,0);
-		}
-		public List<TextElementContext> textElement() {
-			return getRuleContexts(TextElementContext.class);
-		}
-		public TextElementContext textElement(int i) {
-			return getRuleContext(TextElementContext.class,i);
-		}
-		public UserContext(ParserRuleContext parent, int invokingState) {
-			super(parent, invokingState);
-		}
-		@Override public int getRuleIndex() { return RULE_user; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterUser(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitUser(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitUser(this);
-			else return visitor.visitChildren(this);
-		}
-	}
-
-	public final UserContext user() throws RecognitionException {
-		UserContext _localctx = new UserContext(_ctx, getState());
-		enterRule(_localctx, 114, RULE_user);
-		int _la;
-		try {
-			setState(486);
-			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,61,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(480);
-				quoted();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(482);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				do {
-					{
-					{
-					setState(481);
-					textElement();
-					}
-					}
-					setState(484);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 549202165760L) != 0) );
-				}
-				break;
-			}
-		}
-		catch (RecognitionException re) {
-			_localctx.exception = re;
-			_errHandler.reportError(this, re);
-			_errHandler.recover(this, re);
-		}
-		finally {
-			exitRule();
-		}
-		return _localctx;
-	}
-
-	@SuppressWarnings("CheckReturnValue")
-	public static class GroupContext extends ParserRuleContext {
-		public QuotedContext quoted() {
-			return getRuleContext(QuotedContext.class,0);
-		}
-		public List<TextElementContext> textElement() {
-			return getRuleContexts(TextElementContext.class);
-		}
-		public TextElementContext textElement(int i) {
-			return getRuleContext(TextElementContext.class,i);
-		}
-		public List<TerminalNode> COLON() { return getTokens(DockerParser.COLON); }
-		public TerminalNode COLON(int i) {
-			return getToken(DockerParser.COLON, i);
-		}
-		public GroupContext(ParserRuleContext parent, int invokingState) {
-			super(parent, invokingState);
-		}
-		@Override public int getRuleIndex() { return RULE_group; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterGroup(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitGroup(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitGroup(this);
-			else return visitor.visitChildren(this);
-		}
-	}
-
-	public final GroupContext group() throws RecognitionException {
-		GroupContext _localctx = new GroupContext(_ctx, getState());
-		enterRule(_localctx, 116, RULE_group);
-		int _la;
-		try {
-			setState(495);
-			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,64,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(488);
-				quoted();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(491);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				do {
-					{
-					setState(491);
-					_errHandler.sync(this);
-					switch (_input.LA(1)) {
-					case LBRACKET:
-					case RBRACKET:
-					case COMMA:
-					case EQUALS:
-					case FLAG:
-					case DASH_DASH:
-					case DOUBLE_QUOTED_STRING:
-					case SINGLE_QUOTED_STRING:
-					case ENV_VAR:
-					case SPECIAL_VAR:
-					case COMMAND_SUBST:
-					case BACKTICK_SUBST:
-					case DOLLAR:
-					case UNQUOTED_TEXT:
-						{
-						setState(489);
-						textElement();
-						}
-						break;
-					case COLON:
-						{
-						setState(490);
-						match(COLON);
-						}
-						break;
-					default:
-						throw new NoViableAltException(this);
-					}
-					}
-					setState(493);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-				} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 2748225421312L) != 0) );
-				}
-				break;
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(458);
+			text();
 			}
 		}
 		catch (RecognitionException re) {
@@ -4286,11 +4297,11 @@ public class DockerParser extends Parser {
 
 	public final ArgNameContext argName() throws RecognitionException {
 		ArgNameContext _localctx = new ArgNameContext(_ctx, getState());
-		enterRule(_localctx, 118, RULE_argName);
+		enterRule(_localctx, 132, RULE_argName);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(497);
+			setState(460);
 			match(UNQUOTED_TEXT);
 			}
 		}
@@ -4331,11 +4342,11 @@ public class DockerParser extends Parser {
 
 	public final ArgValueContext argValue() throws RecognitionException {
 		ArgValueContext _localctx = new ArgValueContext(_ctx, getState());
-		enterRule(_localctx, 120, RULE_argValue);
+		enterRule(_localctx, 134, RULE_argValue);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(499);
+			setState(462);
 			text();
 			}
 		}
@@ -4374,65 +4385,12 @@ public class DockerParser extends Parser {
 
 	public final SignalContext signal() throws RecognitionException {
 		SignalContext _localctx = new SignalContext(_ctx, getState());
-		enterRule(_localctx, 122, RULE_signal);
+		enterRule(_localctx, 136, RULE_signal);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(501);
+			setState(464);
 			match(UNQUOTED_TEXT);
-			}
-		}
-		catch (RecognitionException re) {
-			_localctx.exception = re;
-			_errHandler.reportError(this, re);
-			_errHandler.recover(this, re);
-		}
-		finally {
-			exitRule();
-		}
-		return _localctx;
-	}
-
-	@SuppressWarnings("CheckReturnValue")
-	public static class QuotedContext extends ParserRuleContext {
-		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
-		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
-		public QuotedContext(ParserRuleContext parent, int invokingState) {
-			super(parent, invokingState);
-		}
-		@Override public int getRuleIndex() { return RULE_quoted; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterQuoted(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitQuoted(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitQuoted(this);
-			else return visitor.visitChildren(this);
-		}
-	}
-
-	public final QuotedContext quoted() throws RecognitionException {
-		QuotedContext _localctx = new QuotedContext(_ctx, getState());
-		enterRule(_localctx, 124, RULE_quoted);
-		int _la;
-		try {
-			enterOuterAlt(_localctx, 1);
-			{
-			setState(503);
-			_la = _input.LA(1);
-			if ( !(_la==DOUBLE_QUOTED_STRING || _la==SINGLE_QUOTED_STRING) ) {
-			_errHandler.recoverInline(this);
-			}
-			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
-				_errHandler.reportMatch(this);
-				consume();
-			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -4453,9 +4411,6 @@ public class DockerParser extends Parser {
 		}
 		public TextElementContext textElement(int i) {
 			return getRuleContext(TextElementContext.class,i);
-		}
-		public QuotedContext quoted() {
-			return getRuleContext(QuotedContext.class,0);
 		}
 		public TextContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -4478,231 +4433,31 @@ public class DockerParser extends Parser {
 
 	public final TextContext text() throws RecognitionException {
 		TextContext _localctx = new TextContext(_ctx, getState());
-		enterRule(_localctx, 126, RULE_text);
-		try {
-			int _alt;
-			setState(513);
-			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,66,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(505);
-				textElement();
-				setState(507);
-				_errHandler.sync(this);
-				_alt = 1;
-				do {
-					switch (_alt) {
-					case 1:
-						{
-						{
-						setState(506);
-						textElement();
-						}
-						}
-						break;
-					default:
-						throw new NoViableAltException(this);
-					}
-					setState(509);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,65,_ctx);
-				} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(511);
-				quoted();
-				}
-				break;
-			case 3:
-				enterOuterAlt(_localctx, 3);
-				{
-				setState(512);
-				textElement();
-				}
-				break;
-			}
-		}
-		catch (RecognitionException re) {
-			_localctx.exception = re;
-			_errHandler.reportError(this, re);
-			_errHandler.recover(this, re);
-		}
-		finally {
-			exitRule();
-		}
-		return _localctx;
-	}
-
-	@SuppressWarnings("CheckReturnValue")
-	public static class ValueContext extends ParserRuleContext {
-		public List<ValueElementContext> valueElement() {
-			return getRuleContexts(ValueElementContext.class);
-		}
-		public ValueElementContext valueElement(int i) {
-			return getRuleContext(ValueElementContext.class,i);
-		}
-		public QuotedContext quoted() {
-			return getRuleContext(QuotedContext.class,0);
-		}
-		public List<TerminalNode> EQUALS() { return getTokens(DockerParser.EQUALS); }
-		public TerminalNode EQUALS(int i) {
-			return getToken(DockerParser.EQUALS, i);
-		}
-		public ValueContext(ParserRuleContext parent, int invokingState) {
-			super(parent, invokingState);
-		}
-		@Override public int getRuleIndex() { return RULE_value; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterValue(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitValue(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitValue(this);
-			else return visitor.visitChildren(this);
-		}
-	}
-
-	public final ValueContext value() throws RecognitionException {
-		ValueContext _localctx = new ValueContext(_ctx, getState());
-		enterRule(_localctx, 128, RULE_value);
+		enterRule(_localctx, 138, RULE_text);
 		try {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(519);
+			setState(467);
 			_errHandler.sync(this);
-			_alt = getInterpreter().adaptivePredict(_input,67,_ctx);
-			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-				if ( _alt==1 ) {
+			_alt = 1;
+			do {
+				switch (_alt) {
+				case 1:
 					{
 					{
-					setState(515);
-					if (!(adjacent())) throw new FailedPredicateException(this, "adjacent()");
-					setState(516);
-					match(EQUALS);
+					setState(466);
+					textElement();
 					}
 					}
+					break;
+				default:
+					throw new NoViableAltException(this);
 				}
-				setState(521);
+				setState(469);
 				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,67,_ctx);
-			}
-			setState(530);
-			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,69,_ctx) ) {
-			case 1:
-				{
-				setState(522);
-				valueElement();
-				setState(524);
-				_errHandler.sync(this);
-				_alt = 1;
-				do {
-					switch (_alt) {
-					case 1:
-						{
-						{
-						setState(523);
-						valueElement();
-						}
-						}
-						break;
-					default:
-						throw new NoViableAltException(this);
-					}
-					setState(526);
-					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,68,_ctx);
-				} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
-				}
-				break;
-			case 2:
-				{
-				setState(528);
-				quoted();
-				}
-				break;
-			case 3:
-				{
-				setState(529);
-				valueElement();
-				}
-				break;
-			}
-			}
-		}
-		catch (RecognitionException re) {
-			_localctx.exception = re;
-			_errHandler.reportError(this, re);
-			_errHandler.recover(this, re);
-		}
-		finally {
-			exitRule();
-		}
-		return _localctx;
-	}
-
-	@SuppressWarnings("CheckReturnValue")
-	public static class ValueElementContext extends ParserRuleContext {
-		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
-		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
-		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
-		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
-		public TerminalNode COMMAND_SUBST() { return getToken(DockerParser.COMMAND_SUBST, 0); }
-		public TerminalNode BACKTICK_SUBST() { return getToken(DockerParser.BACKTICK_SUBST, 0); }
-		public TerminalNode SPECIAL_VAR() { return getToken(DockerParser.SPECIAL_VAR, 0); }
-		public TerminalNode DOLLAR() { return getToken(DockerParser.DOLLAR, 0); }
-		public TerminalNode FLAG() { return getToken(DockerParser.FLAG, 0); }
-		public TerminalNode DASH_DASH() { return getToken(DockerParser.DASH_DASH, 0); }
-		public TerminalNode LBRACKET() { return getToken(DockerParser.LBRACKET, 0); }
-		public TerminalNode RBRACKET() { return getToken(DockerParser.RBRACKET, 0); }
-		public TerminalNode COMMA() { return getToken(DockerParser.COMMA, 0); }
-		public ValueElementContext(ParserRuleContext parent, int invokingState) {
-			super(parent, invokingState);
-		}
-		@Override public int getRuleIndex() { return RULE_valueElement; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).enterValueElement(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof DockerParserListener ) ((DockerParserListener)listener).exitValueElement(this);
-		}
-		@Override
-		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof DockerParserVisitor ) return ((DockerParserVisitor<? extends T>)visitor).visitValueElement(this);
-			else return visitor.visitChildren(this);
-		}
-	}
-
-	public final ValueElementContext valueElement() throws RecognitionException {
-		ValueElementContext _localctx = new ValueElementContext(_ctx, getState());
-		enterRule(_localctx, 130, RULE_valueElement);
-		int _la;
-		try {
-			enterOuterAlt(_localctx, 1);
-			{
-			setState(532);
-			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 549067948032L) != 0)) ) {
-			_errHandler.recoverInline(this);
-			}
-			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
-				_errHandler.reportMatch(this);
-				consume();
-			}
+				_alt = getInterpreter().adaptivePredict(_input,40,_ctx);
+			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
 			}
 		}
 		catch (RecognitionException re) {
@@ -4718,10 +4473,20 @@ public class DockerParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class TextElementContext extends ParserRuleContext {
-		public ValueElementContext valueElement() {
-			return getRuleContext(ValueElementContext.class,0);
-		}
+		public TerminalNode UNQUOTED_TEXT() { return getToken(DockerParser.UNQUOTED_TEXT, 0); }
+		public TerminalNode DOUBLE_QUOTED_STRING() { return getToken(DockerParser.DOUBLE_QUOTED_STRING, 0); }
+		public TerminalNode SINGLE_QUOTED_STRING() { return getToken(DockerParser.SINGLE_QUOTED_STRING, 0); }
+		public TerminalNode ENV_VAR() { return getToken(DockerParser.ENV_VAR, 0); }
+		public TerminalNode COMMAND_SUBST() { return getToken(DockerParser.COMMAND_SUBST, 0); }
+		public TerminalNode BACKTICK_SUBST() { return getToken(DockerParser.BACKTICK_SUBST, 0); }
+		public TerminalNode SPECIAL_VAR() { return getToken(DockerParser.SPECIAL_VAR, 0); }
+		public TerminalNode DOLLAR() { return getToken(DockerParser.DOLLAR, 0); }
 		public TerminalNode EQUALS() { return getToken(DockerParser.EQUALS, 0); }
+		public TerminalNode FLAG() { return getToken(DockerParser.FLAG, 0); }
+		public TerminalNode DASH_DASH() { return getToken(DockerParser.DASH_DASH, 0); }
+		public TerminalNode LBRACKET() { return getToken(DockerParser.LBRACKET, 0); }
+		public TerminalNode RBRACKET() { return getToken(DockerParser.RBRACKET, 0); }
+		public TerminalNode COMMA() { return getToken(DockerParser.COMMA, 0); }
 		public TextElementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -4743,39 +4508,21 @@ public class DockerParser extends Parser {
 
 	public final TextElementContext textElement() throws RecognitionException {
 		TextElementContext _localctx = new TextElementContext(_ctx, getState());
-		enterRule(_localctx, 132, RULE_textElement);
+		enterRule(_localctx, 140, RULE_textElement);
+		int _la;
 		try {
-			setState(536);
-			_errHandler.sync(this);
-			switch (_input.LA(1)) {
-			case LBRACKET:
-			case RBRACKET:
-			case COMMA:
-			case FLAG:
-			case DASH_DASH:
-			case DOUBLE_QUOTED_STRING:
-			case SINGLE_QUOTED_STRING:
-			case ENV_VAR:
-			case SPECIAL_VAR:
-			case COMMAND_SUBST:
-			case BACKTICK_SUBST:
-			case DOLLAR:
-			case UNQUOTED_TEXT:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(534);
-				valueElement();
-				}
-				break;
-			case EQUALS:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(535);
-				match(EQUALS);
-				}
-				break;
-			default:
-				throw new NoViableAltException(this);
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(471);
+			_la = _input.LA(1);
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 549722259456L) != 0)) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -4789,50 +4536,8 @@ public class DockerParser extends Parser {
 		return _localctx;
 	}
 
-	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
-		switch (ruleIndex) {
-		case 46:
-			return labelPair_sempred((LabelPairContext)_localctx, predIndex);
-		case 51:
-			return envPair_sempred((EnvPairContext)_localctx, predIndex);
-		case 54:
-			return pathArgument_sempred((PathArgumentContext)_localctx, predIndex);
-		case 64:
-			return value_sempred((ValueContext)_localctx, predIndex);
-		}
-		return true;
-	}
-	private boolean labelPair_sempred(LabelPairContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 0:
-			return bound();
-		}
-		return true;
-	}
-	private boolean envPair_sempred(EnvPairContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 1:
-			return bound();
-		}
-		return true;
-	}
-	private boolean pathArgument_sempred(PathArgumentContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 2:
-			return adjacent();
-		}
-		return true;
-	}
-	private boolean value_sempred(ValueContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 3:
-			return adjacent();
-		}
-		return true;
-	}
-
 	public static final String _serializedATN =
-		"\u0004\u0001/\u021b\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
+		"\u0004\u0001.\u01da\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
 		"\u0002\u0007\u0002\u0002\u0003\u0007\u0003\u0002\u0004\u0007\u0004\u0002"+
 		"\u0005\u0007\u0005\u0002\u0006\u0007\u0006\u0002\u0007\u0007\u0007\u0002"+
 		"\b\u0007\b\u0002\t\u0007\t\u0002\n\u0007\n\u0002\u000b\u0007\u000b\u0002"+
@@ -4849,331 +4554,272 @@ public class DockerParser extends Parser {
 		"2\u00072\u00023\u00073\u00024\u00074\u00025\u00075\u00026\u00076\u0002"+
 		"7\u00077\u00028\u00078\u00029\u00079\u0002:\u0007:\u0002;\u0007;\u0002"+
 		"<\u0007<\u0002=\u0007=\u0002>\u0007>\u0002?\u0007?\u0002@\u0007@\u0002"+
-		"A\u0007A\u0002B\u0007B\u0001\u0000\u0005\u0000\u0088\b\u0000\n\u0000\f"+
-		"\u0000\u008b\t\u0000\u0001\u0000\u0001\u0000\u0004\u0000\u008f\b\u0000"+
-		"\u000b\u0000\f\u0000\u0090\u0001\u0000\u0001\u0000\u0001\u0001\u0001\u0001"+
-		"\u0001\u0002\u0005\u0002\u0098\b\u0002\n\u0002\f\u0002\u009b\t\u0002\u0001"+
-		"\u0003\u0001\u0003\u0005\u0003\u009f\b\u0003\n\u0003\f\u0003\u00a2\t\u0003"+
+		"A\u0007A\u0002B\u0007B\u0002C\u0007C\u0002D\u0007D\u0002E\u0007E\u0002"+
+		"F\u0007F\u0001\u0000\u0005\u0000\u0090\b\u0000\n\u0000\f\u0000\u0093\t"+
+		"\u0000\u0001\u0000\u0001\u0000\u0004\u0000\u0097\b\u0000\u000b\u0000\f"+
+		"\u0000\u0098\u0001\u0000\u0001\u0000\u0001\u0001\u0001\u0001\u0001\u0002"+
+		"\u0005\u0002\u00a0\b\u0002\n\u0002\f\u0002\u00a3\t\u0002\u0001\u0003\u0001"+
+		"\u0003\u0005\u0003\u00a7\b\u0003\n\u0003\f\u0003\u00aa\t\u0003\u0001\u0004"+
 		"\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004"+
 		"\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004"+
-		"\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004\u0003\u0004"+
-		"\u00b5\b\u0004\u0001\u0005\u0001\u0005\u0003\u0005\u00b9\b\u0005\u0001"+
-		"\u0006\u0001\u0006\u0003\u0006\u00bd\b\u0006\u0001\u0006\u0001\u0006\u0001"+
-		"\u0006\u0003\u0006\u00c2\b\u0006\u0001\u0007\u0001\u0007\u0003\u0007\u00c6"+
-		"\b\u0007\u0001\u0007\u0001\u0007\u0001\u0007\u0003\u0007\u00cb\b\u0007"+
-		"\u0001\b\u0001\b\u0001\b\u0003\b\u00d0\b\b\u0001\t\u0001\t\u0001\t\u0001"+
-		"\n\u0001\n\u0001\n\u0001\u000b\u0001\u000b\u0001\u000b\u0001\f\u0001\f"+
-		"\u0003\f\u00dd\b\f\u0001\f\u0001\f\u0001\f\u0003\f\u00e2\b\f\u0001\r\u0001"+
-		"\r\u0003\r\u00e6\b\r\u0001\r\u0001\r\u0001\r\u0003\r\u00eb\b\r\u0001\u000e"+
-		"\u0001\u000e\u0001\u000e\u0003\u000e\u00f0\b\u000e\u0001\u000f\u0001\u000f"+
-		"\u0001\u000f\u0004\u000f\u00f5\b\u000f\u000b\u000f\f\u000f\u00f6\u0003"+
-		"\u000f\u00f9\b\u000f\u0001\u0010\u0001\u0010\u0001\u0010\u0001\u0011\u0001"+
-		"\u0011\u0001\u0011\u0001\u0012\u0001\u0012\u0001\u0012\u0001\u0012\u0003"+
-		"\u0012\u0105\b\u0012\u0001\u0013\u0001\u0013\u0001\u0013\u0001\u0014\u0001"+
-		"\u0014\u0001\u0014\u0001\u0015\u0001\u0015\u0001\u0015\u0001\u0015\u0003"+
-		"\u0015\u0111\b\u0015\u0001\u0015\u0001\u0015\u0001\u0015\u0003\u0015\u0116"+
-		"\b\u0015\u0003\u0015\u0118\b\u0015\u0001\u0016\u0004\u0016\u011b\b\u0016"+
-		"\u000b\u0016\f\u0016\u011c\u0001\u0017\u0001\u0017\u0001\u0018\u0001\u0018"+
-		"\u0001\u0018\u0001\u0019\u0001\u0019\u0001\u0019\u0001\u001a\u0001\u001a"+
-		"\u0004\u001a\u0129\b\u001a\u000b\u001a\f\u001a\u012a\u0001\u001b\u0001"+
-		"\u001b\u0001\u001c\u0001\u001c\u0003\u001c\u0131\b\u001c\u0001\u001c\u0003"+
-		"\u001c\u0134\b\u001c\u0001\u001d\u0001\u001d\u0001\u001e\u0001\u001e\u0001"+
-		"\u001f\u0004\u001f\u013b\b\u001f\u000b\u001f\f\u001f\u013c\u0001 \u0001"+
-		" \u0001 \u0004 \u0142\b \u000b \f \u0143\u0001!\u0005!\u0147\b!\n!\f!"+
-		"\u014a\t!\u0001!\u0001!\u0005!\u014e\b!\n!\f!\u0151\t!\u0004!\u0153\b"+
-		"!\u000b!\f!\u0154\u0001\"\u0001\"\u0001\"\u0001#\u0005#\u015b\b#\n#\f"+
-		"#\u015e\t#\u0001$\u0001$\u0001%\u0001%\u0003%\u0164\b%\u0001%\u0001%\u0001"+
-		"&\u0001&\u0001&\u0005&\u016b\b&\n&\f&\u016e\t&\u0001\'\u0001\'\u0001("+
-		"\u0001(\u0001(\u0003(\u0175\b(\u0003(\u0177\b(\u0001(\u0001(\u0003(\u017b"+
-		"\b(\u0003(\u017d\b(\u0001)\u0001)\u0004)\u0181\b)\u000b)\f)\u0182\u0003"+
-		")\u0185\b)\u0001*\u0001*\u0001*\u0004*\u018a\b*\u000b*\f*\u018b\u0003"+
-		"*\u018e\b*\u0001+\u0001+\u0001+\u0001+\u0004+\u0194\b+\u000b+\f+\u0195"+
-		"\u0003+\u0198\b+\u0001,\u0001,\u0001-\u0004-\u019d\b-\u000b-\f-\u019e"+
-		"\u0001.\u0001.\u0001.\u0001.\u0001.\u0003.\u01a6\b.\u0001/\u0001/\u0003"+
-		"/\u01aa\b/\u00010\u00040\u01ad\b0\u000b0\f0\u01ae\u00011\u00011\u0001"+
-		"2\u00042\u01b4\b2\u000b2\f2\u01b5\u00013\u00013\u00013\u00013\u00013\u0003"+
-		"3\u01bd\b3\u00014\u00014\u00015\u00015\u00045\u01c3\b5\u000b5\f5\u01c4"+
-		"\u00016\u00016\u00016\u00016\u00056\u01cb\b6\n6\f6\u01ce\t6\u00036\u01d0"+
-		"\b6\u00017\u00017\u00018\u00018\u00018\u00038\u01d7\b8\u00038\u01d9\b"+
-		"8\u00018\u00018\u00038\u01dd\b8\u00038\u01df\b8\u00019\u00019\u00049\u01e3"+
-		"\b9\u000b9\f9\u01e4\u00039\u01e7\b9\u0001:\u0001:\u0001:\u0004:\u01ec"+
-		"\b:\u000b:\f:\u01ed\u0003:\u01f0\b:\u0001;\u0001;\u0001<\u0001<\u0001"+
-		"=\u0001=\u0001>\u0001>\u0001?\u0001?\u0004?\u01fc\b?\u000b?\f?\u01fd\u0001"+
-		"?\u0001?\u0003?\u0202\b?\u0001@\u0001@\u0005@\u0206\b@\n@\f@\u0209\t@"+
-		"\u0001@\u0001@\u0004@\u020d\b@\u000b@\f@\u020e\u0001@\u0001@\u0003@\u0213"+
-		"\b@\u0001A\u0001A\u0001B\u0001B\u0003B\u0219\bB\u0001B\u0000\u0000C\u0000"+
-		"\u0002\u0004\u0006\b\n\f\u000e\u0010\u0012\u0014\u0016\u0018\u001a\u001c"+
-		"\u001e \"$&(*,.02468:<>@BDFHJLNPRTVXZ\\^`bdfhjlnprtvxz|~\u0080\u0082\u0084"+
-		"\u0000\u0004\u0002\u0000((//\u0002\u0000!$&&\u0001\u0000\u001f \u0003"+
-		"\u0000\u0018\u001a\u001c\u001c\u001e&\u0233\u0000\u0089\u0001\u0000\u0000"+
-		"\u0000\u0002\u0094\u0001\u0000\u0000\u0000\u0004\u0099\u0001\u0000\u0000"+
-		"\u0000\u0006\u009c\u0001\u0000\u0000\u0000\b\u00b4\u0001\u0000\u0000\u0000"+
-		"\n\u00b8\u0001\u0000\u0000\u0000\f\u00ba\u0001\u0000\u0000\u0000\u000e"+
-		"\u00c3\u0001\u0000\u0000\u0000\u0010\u00cc\u0001\u0000\u0000\u0000\u0012"+
-		"\u00d1\u0001\u0000\u0000\u0000\u0014\u00d4\u0001\u0000\u0000\u0000\u0016"+
-		"\u00d7\u0001\u0000\u0000\u0000\u0018\u00da\u0001\u0000\u0000\u0000\u001a"+
-		"\u00e3\u0001\u0000\u0000\u0000\u001c\u00ec\u0001\u0000\u0000\u0000\u001e"+
-		"\u00f1\u0001\u0000\u0000\u0000 \u00fa\u0001\u0000\u0000\u0000\"\u00fd"+
-		"\u0001\u0000\u0000\u0000$\u0100\u0001\u0000\u0000\u0000&\u0106\u0001\u0000"+
-		"\u0000\u0000(\u0109\u0001\u0000\u0000\u0000*\u0117\u0001\u0000\u0000\u0000"+
-		",\u011a\u0001\u0000\u0000\u0000.\u011e\u0001\u0000\u0000\u00000\u0120"+
-		"\u0001\u0000\u0000\u00002\u0123\u0001\u0000\u0000\u00004\u0128\u0001\u0000"+
-		"\u0000\u00006\u012c\u0001\u0000\u0000\u00008\u012e\u0001\u0000\u0000\u0000"+
-		":\u0135\u0001\u0000\u0000\u0000<\u0137\u0001\u0000\u0000\u0000>\u013a"+
-		"\u0001\u0000\u0000\u0000@\u013e\u0001\u0000\u0000\u0000B\u0148\u0001\u0000"+
-		"\u0000\u0000D\u0156\u0001\u0000\u0000\u0000F\u015c\u0001\u0000\u0000\u0000"+
-		"H\u015f\u0001\u0000\u0000\u0000J\u0161\u0001\u0000\u0000\u0000L\u0167"+
-		"\u0001\u0000\u0000\u0000N\u016f\u0001\u0000\u0000\u0000P\u0171\u0001\u0000"+
-		"\u0000\u0000R\u0184\u0001\u0000\u0000\u0000T\u018d\u0001\u0000\u0000\u0000"+
-		"V\u0197\u0001\u0000\u0000\u0000X\u0199\u0001\u0000\u0000\u0000Z\u019c"+
-		"\u0001\u0000\u0000\u0000\\\u01a0\u0001\u0000\u0000\u0000^\u01a9\u0001"+
-		"\u0000\u0000\u0000`\u01ac\u0001\u0000\u0000\u0000b\u01b0\u0001\u0000\u0000"+
-		"\u0000d\u01b3\u0001\u0000\u0000\u0000f\u01b7\u0001\u0000\u0000\u0000h"+
-		"\u01be\u0001\u0000\u0000\u0000j\u01c0\u0001\u0000\u0000\u0000l\u01cf\u0001"+
-		"\u0000\u0000\u0000n\u01d1\u0001\u0000\u0000\u0000p\u01de\u0001\u0000\u0000"+
-		"\u0000r\u01e6\u0001\u0000\u0000\u0000t\u01ef\u0001\u0000\u0000\u0000v"+
-		"\u01f1\u0001\u0000\u0000\u0000x\u01f3\u0001\u0000\u0000\u0000z\u01f5\u0001"+
-		"\u0000\u0000\u0000|\u01f7\u0001\u0000\u0000\u0000~\u0201\u0001\u0000\u0000"+
-		"\u0000\u0080\u0207\u0001\u0000\u0000\u0000\u0082\u0214\u0001\u0000\u0000"+
-		"\u0000\u0084\u0218\u0001\u0000\u0000\u0000\u0086\u0088\u0003\u0002\u0001"+
-		"\u0000\u0087\u0086\u0001\u0000\u0000\u0000\u0088\u008b\u0001\u0000\u0000"+
-		"\u0000\u0089\u0087\u0001\u0000\u0000\u0000\u0089\u008a\u0001\u0000\u0000"+
-		"\u0000\u008a\u008c\u0001\u0000\u0000\u0000\u008b\u0089\u0001\u0000\u0000"+
-		"\u0000\u008c\u008e\u0003\u0004\u0002\u0000\u008d\u008f\u0003\u0006\u0003"+
-		"\u0000\u008e\u008d\u0001\u0000\u0000\u0000\u008f\u0090\u0001\u0000\u0000"+
-		"\u0000\u0090\u008e\u0001\u0000\u0000\u0000\u0090\u0091\u0001\u0000\u0000"+
-		"\u0000\u0091\u0092\u0001\u0000\u0000\u0000\u0092\u0093\u0005\u0000\u0000"+
-		"\u0001\u0093\u0001\u0001\u0000\u0000\u0000\u0094\u0095\u0005\u0001\u0000"+
-		"\u0000\u0095\u0003\u0001\u0000\u0000\u0000\u0096\u0098\u0003$\u0012\u0000"+
-		"\u0097\u0096\u0001\u0000\u0000\u0000\u0098\u009b\u0001\u0000\u0000\u0000"+
-		"\u0099\u0097\u0001\u0000\u0000\u0000\u0099\u009a\u0001\u0000\u0000\u0000"+
-		"\u009a\u0005\u0001\u0000\u0000\u0000\u009b\u0099\u0001\u0000\u0000\u0000"+
-		"\u009c\u00a0\u0003\f\u0006\u0000\u009d\u009f\u0003\b\u0004\u0000\u009e"+
-		"\u009d\u0001\u0000\u0000\u0000\u009f\u00a2\u0001\u0000\u0000\u0000\u00a0"+
-		"\u009e\u0001\u0000\u0000\u0000\u00a0\u00a1\u0001\u0000\u0000\u0000\u00a1"+
-		"\u0007\u0001\u0000\u0000\u0000\u00a2\u00a0\u0001\u0000\u0000\u0000\u00a3"+
-		"\u00b5\u0003\u000e\u0007\u0000\u00a4\u00b5\u0003\u0010\b\u0000\u00a5\u00b5"+
-		"\u0003\u0012\t\u0000\u00a6\u00b5\u0003\u0014\n\u0000\u00a7\u00b5\u0003"+
-		"\u0016\u000b\u0000\u00a8\u00b5\u0003\u0018\f\u0000\u00a9\u00b5\u0003\u001a"+
-		"\r\u0000\u00aa\u00b5\u0003\u001c\u000e\u0000\u00ab\u00b5\u0003\u001e\u000f"+
-		"\u0000\u00ac\u00b5\u0003 \u0010\u0000\u00ad\u00b5\u0003\"\u0011\u0000"+
-		"\u00ae\u00b5\u0003$\u0012\u0000\u00af\u00b5\u0003&\u0013\u0000\u00b0\u00b5"+
-		"\u0003(\u0014\u0000\u00b1\u00b5\u0003*\u0015\u0000\u00b2\u00b5\u00030"+
-		"\u0018\u0000\u00b3\u00b5\u00032\u0019\u0000\u00b4\u00a3\u0001\u0000\u0000"+
-		"\u0000\u00b4\u00a4\u0001\u0000\u0000\u0000\u00b4\u00a5\u0001\u0000\u0000"+
-		"\u0000\u00b4\u00a6\u0001\u0000\u0000\u0000\u00b4\u00a7\u0001\u0000\u0000"+
-		"\u0000\u00b4\u00a8\u0001\u0000\u0000\u0000\u00b4\u00a9\u0001\u0000\u0000"+
-		"\u0000\u00b4\u00aa\u0001\u0000\u0000\u0000\u00b4\u00ab\u0001\u0000\u0000"+
-		"\u0000\u00b4\u00ac\u0001\u0000\u0000\u0000\u00b4\u00ad\u0001\u0000\u0000"+
-		"\u0000\u00b4\u00ae\u0001\u0000\u0000\u0000\u00b4\u00af\u0001\u0000\u0000"+
-		"\u0000\u00b4\u00b0\u0001\u0000\u0000\u0000\u00b4\u00b1\u0001\u0000\u0000"+
-		"\u0000\u00b4\u00b2\u0001\u0000\u0000\u0000\u00b4\u00b3\u0001\u0000\u0000"+
-		"\u0000\u00b5\t\u0001\u0000\u0000\u0000\u00b6\u00b9\u0003\f\u0006\u0000"+
-		"\u00b7\u00b9\u0003\b\u0004\u0000\u00b8\u00b6\u0001\u0000\u0000\u0000\u00b8"+
-		"\u00b7\u0001\u0000\u0000\u0000\u00b9\u000b\u0001\u0000\u0000\u0000\u00ba"+
-		"\u00bc\u0005\u0003\u0000\u0000\u00bb\u00bd\u00034\u001a\u0000\u00bc\u00bb"+
-		"\u0001\u0000\u0000\u0000\u00bc\u00bd\u0001\u0000\u0000\u0000\u00bd\u00be"+
-		"\u0001\u0000\u0000\u0000\u00be\u00c1\u0003P(\u0000\u00bf\u00c0\u0005+"+
-		"\u0000\u0000\u00c0\u00c2\u0003X,\u0000\u00c1\u00bf\u0001\u0000\u0000\u0000"+
-		"\u00c1\u00c2\u0001\u0000\u0000\u0000\u00c2\r\u0001\u0000\u0000\u0000\u00c3"+
-		"\u00c5\u0005\u0004\u0000\u0000\u00c4\u00c6\u00034\u001a\u0000\u00c5\u00c4"+
-		"\u0001\u0000\u0000\u0000\u00c5\u00c6\u0001\u0000\u0000\u0000\u00c6\u00ca"+
-		"\u0001\u0000\u0000\u0000\u00c7\u00cb\u0003:\u001d\u0000\u00c8\u00cb\u0003"+
-		"<\u001e\u0000\u00c9\u00cb\u0003@ \u0000\u00ca\u00c7\u0001\u0000\u0000"+
-		"\u0000\u00ca\u00c8\u0001\u0000\u0000\u0000\u00ca\u00c9\u0001\u0000\u0000"+
-		"\u0000\u00cb\u000f\u0001\u0000\u0000\u0000\u00cc\u00cf\u0005\u0005\u0000"+
-		"\u0000\u00cd\u00d0\u0003:\u001d\u0000\u00ce\u00d0\u0003<\u001e\u0000\u00cf"+
-		"\u00cd\u0001\u0000\u0000\u0000\u00cf\u00ce\u0001\u0000\u0000\u0000\u00d0"+
-		"\u0011\u0001\u0000\u0000\u0000\u00d1\u00d2\u0005\u0007\u0000\u0000\u00d2"+
-		"\u00d3\u0003Z-\u0000\u00d3\u0013\u0001\u0000\u0000\u0000\u00d4\u00d5\u0005"+
-		"\b\u0000\u0000\u00d5\u00d6\u0003`0\u0000\u00d6\u0015\u0001\u0000\u0000"+
-		"\u0000\u00d7\u00d8\u0005\t\u0000\u0000\u00d8\u00d9\u0003d2\u0000\u00d9"+
-		"\u0017\u0001\u0000\u0000\u0000\u00da\u00dc\u0005\n\u0000\u0000\u00db\u00dd"+
-		"\u00034\u001a\u0000\u00dc\u00db\u0001\u0000\u0000\u0000\u00dc\u00dd\u0001"+
-		"\u0000\u0000\u0000\u00dd\u00e1\u0001\u0000\u0000\u0000\u00de\u00e2\u0003"+
-		"@ \u0000\u00df\u00e2\u0003J%\u0000\u00e0\u00e2\u0003j5\u0000\u00e1\u00de"+
-		"\u0001\u0000\u0000\u0000\u00e1\u00df\u0001\u0000\u0000\u0000\u00e1\u00e0"+
-		"\u0001\u0000\u0000\u0000\u00e2\u0019\u0001\u0000\u0000\u0000\u00e3\u00e5"+
-		"\u0005\u000b\u0000\u0000\u00e4\u00e6\u00034\u001a\u0000\u00e5\u00e4\u0001"+
-		"\u0000\u0000\u0000\u00e5\u00e6\u0001\u0000\u0000\u0000\u00e6\u00ea\u0001"+
-		"\u0000\u0000\u0000\u00e7\u00eb\u0003@ \u0000\u00e8\u00eb\u0003J%\u0000"+
-		"\u00e9\u00eb\u0003j5\u0000\u00ea\u00e7\u0001\u0000\u0000\u0000\u00ea\u00e8"+
-		"\u0001\u0000\u0000\u0000\u00ea\u00e9\u0001\u0000\u0000\u0000\u00eb\u001b"+
-		"\u0001\u0000\u0000\u0000\u00ec\u00ef\u0005\f\u0000\u0000\u00ed\u00f0\u0003"+
-		":\u001d\u0000\u00ee\u00f0\u0003<\u001e\u0000\u00ef\u00ed\u0001\u0000\u0000"+
-		"\u0000\u00ef\u00ee\u0001\u0000\u0000\u0000\u00f0\u001d\u0001\u0000\u0000"+
-		"\u0000\u00f1\u00f8\u0005\r\u0000\u0000\u00f2\u00f9\u0003J%\u0000\u00f3"+
-		"\u00f5\u0003l6\u0000\u00f4\u00f3\u0001\u0000\u0000\u0000\u00f5\u00f6\u0001"+
-		"\u0000\u0000\u0000\u00f6\u00f4\u0001\u0000\u0000\u0000\u00f6\u00f7\u0001"+
-		"\u0000\u0000\u0000\u00f7\u00f9\u0001\u0000\u0000\u0000\u00f8\u00f2\u0001"+
-		"\u0000\u0000\u0000\u00f8\u00f4\u0001\u0000\u0000\u0000\u00f9\u001f\u0001"+
-		"\u0000\u0000\u0000\u00fa\u00fb\u0005\u000e\u0000\u0000\u00fb\u00fc\u0003"+
-		"p8\u0000\u00fc!\u0001\u0000\u0000\u0000\u00fd\u00fe\u0005\u000f\u0000"+
-		"\u0000\u00fe\u00ff\u0003n7\u0000\u00ff#\u0001\u0000\u0000\u0000\u0100"+
-		"\u0101\u0005\u0010\u0000\u0000\u0101\u0104\u0003v;\u0000\u0102\u0103\u0005"+
-		"\u001b\u0000\u0000\u0103\u0105\u0003x<\u0000\u0104\u0102\u0001\u0000\u0000"+
-		"\u0000\u0104\u0105\u0001\u0000\u0000\u0000\u0105%\u0001\u0000\u0000\u0000"+
-		"\u0106\u0107\u0005\u0011\u0000\u0000\u0107\u0108\u0003\n\u0005\u0000\u0108"+
-		"\'\u0001\u0000\u0000\u0000\u0109\u010a\u0005\u0012\u0000\u0000\u010a\u010b"+
-		"\u0003z=\u0000\u010b)\u0001\u0000\u0000\u0000\u010c\u010d\u0005\u0013"+
-		"\u0000\u0000\u010d\u0118\u0005\u0006\u0000\u0000\u010e\u0110\u0005\u0013"+
-		"\u0000\u0000\u010f\u0111\u0003,\u0016\u0000\u0110\u010f\u0001\u0000\u0000"+
-		"\u0000\u0110\u0111\u0001\u0000\u0000\u0000\u0111\u0112\u0001\u0000\u0000"+
-		"\u0000\u0112\u0115\u0005\u0005\u0000\u0000\u0113\u0116\u0003:\u001d\u0000"+
-		"\u0114\u0116\u0003<\u001e\u0000\u0115\u0113\u0001\u0000\u0000\u0000\u0115"+
-		"\u0114\u0001\u0000\u0000\u0000\u0116\u0118\u0001\u0000\u0000\u0000\u0117"+
-		"\u010c\u0001\u0000\u0000\u0000\u0117\u010e\u0001\u0000\u0000\u0000\u0118"+
-		"+\u0001\u0000\u0000\u0000\u0119\u011b\u0003.\u0017\u0000\u011a\u0119\u0001"+
-		"\u0000\u0000\u0000\u011b\u011c\u0001\u0000\u0000\u0000\u011c\u011a\u0001"+
-		"\u0000\u0000\u0000\u011c\u011d\u0001\u0000\u0000\u0000\u011d-\u0001\u0000"+
-		"\u0000\u0000\u011e\u011f\u0005\u001c\u0000\u0000\u011f/\u0001\u0000\u0000"+
-		"\u0000\u0120\u0121\u0005\u0014\u0000\u0000\u0121\u0122\u0003J%\u0000\u0122"+
-		"1\u0001\u0000\u0000\u0000\u0123\u0124\u0005\u0015\u0000\u0000\u0124\u0125"+
-		"\u0003~?\u0000\u01253\u0001\u0000\u0000\u0000\u0126\u0129\u00036\u001b"+
-		"\u0000\u0127\u0129\u00038\u001c\u0000\u0128\u0126\u0001\u0000\u0000\u0000"+
-		"\u0128\u0127\u0001\u0000\u0000\u0000\u0129\u012a\u0001\u0000\u0000\u0000"+
-		"\u012a\u0128\u0001\u0000\u0000\u0000\u012a\u012b\u0001\u0000\u0000\u0000"+
-		"\u012b5\u0001\u0000\u0000\u0000\u012c\u012d\u0005\u001c\u0000\u0000\u012d"+
-		"7\u0001\u0000\u0000\u0000\u012e\u0130\u0005\u001d\u0000\u0000\u012f\u0131"+
-		"\u0003P(\u0000\u0130\u012f\u0001\u0000\u0000\u0000\u0130\u0131\u0001\u0000"+
-		"\u0000\u0000\u0131\u0133\u0001\u0000\u0000\u0000\u0132\u0134\u0005,\u0000"+
-		"\u0000\u0133\u0132\u0001\u0000\u0000\u0000\u0133\u0134\u0001\u0000\u0000"+
-		"\u0000\u01349\u0001\u0000\u0000\u0000\u0135\u0136\u0003J%\u0000\u0136"+
-		";\u0001\u0000\u0000\u0000\u0137\u0138\u0003>\u001f\u0000\u0138=\u0001"+
-		"\u0000\u0000\u0000\u0139\u013b\u0003\u0084B\u0000\u013a\u0139\u0001\u0000"+
-		"\u0000\u0000\u013b\u013c\u0001\u0000\u0000\u0000\u013c\u013a\u0001\u0000"+
-		"\u0000\u0000\u013c\u013d\u0001\u0000\u0000\u0000\u013d?\u0001\u0000\u0000"+
-		"\u0000\u013e\u013f\u0003B!\u0000\u013f\u0141\u0005(\u0000\u0000\u0140"+
-		"\u0142\u0003D\"\u0000\u0141\u0140\u0001\u0000\u0000\u0000\u0142\u0143"+
-		"\u0001\u0000\u0000\u0000\u0143\u0141\u0001\u0000\u0000\u0000\u0143\u0144"+
-		"\u0001\u0000\u0000\u0000\u0144A\u0001\u0000\u0000\u0000\u0145\u0147\u0003"+
-		"\u0084B\u0000\u0146\u0145\u0001\u0000\u0000\u0000\u0147\u014a\u0001\u0000"+
-		"\u0000\u0000\u0148\u0146\u0001\u0000\u0000\u0000\u0148\u0149\u0001\u0000"+
-		"\u0000\u0000\u0149\u0152\u0001\u0000\u0000\u0000\u014a\u0148\u0001\u0000"+
-		"\u0000\u0000\u014b\u014f\u0005\u0016\u0000\u0000\u014c\u014e\u0003\u0084"+
-		"B\u0000\u014d\u014c\u0001\u0000\u0000\u0000\u014e\u0151\u0001\u0000\u0000"+
-		"\u0000\u014f\u014d\u0001\u0000\u0000\u0000\u014f\u0150\u0001\u0000\u0000"+
-		"\u0000\u0150\u0153\u0001\u0000\u0000\u0000\u0151\u014f\u0001\u0000\u0000"+
-		"\u0000\u0152\u014b\u0001\u0000\u0000\u0000\u0153\u0154\u0001\u0000\u0000"+
-		"\u0000\u0154\u0152\u0001\u0000\u0000\u0000\u0154\u0155\u0001\u0000\u0000"+
-		"\u0000\u0155C\u0001\u0000\u0000\u0000\u0156\u0157\u0003F#\u0000\u0157"+
-		"\u0158\u0003H$\u0000\u0158E\u0001\u0000\u0000\u0000\u0159\u015b\u0007"+
-		"\u0000\u0000\u0000\u015a\u0159\u0001\u0000\u0000\u0000\u015b\u015e\u0001"+
-		"\u0000\u0000\u0000\u015c\u015a\u0001\u0000\u0000\u0000\u015c\u015d\u0001"+
-		"\u0000\u0000\u0000\u015dG\u0001\u0000\u0000\u0000\u015e\u015c\u0001\u0000"+
-		"\u0000\u0000\u015f\u0160\u0005&\u0000\u0000\u0160I\u0001\u0000\u0000\u0000"+
-		"\u0161\u0163\u0005\u0018\u0000\u0000\u0162\u0164\u0003L&\u0000\u0163\u0162"+
-		"\u0001\u0000\u0000\u0000\u0163\u0164\u0001\u0000\u0000\u0000\u0164\u0165"+
-		"\u0001\u0000\u0000\u0000\u0165\u0166\u0005\u0019\u0000\u0000\u0166K\u0001"+
-		"\u0000\u0000\u0000\u0167\u016c\u0003N\'\u0000\u0168\u0169\u0005\u001a"+
-		"\u0000\u0000\u0169\u016b\u0003N\'\u0000\u016a\u0168\u0001\u0000\u0000"+
-		"\u0000\u016b\u016e\u0001\u0000\u0000\u0000\u016c\u016a\u0001\u0000\u0000"+
-		"\u0000\u016c\u016d\u0001\u0000\u0000\u0000\u016dM\u0001\u0000\u0000\u0000"+
-		"\u016e\u016c\u0001\u0000\u0000\u0000\u016f\u0170\u0005\u001f\u0000\u0000"+
-		"\u0170O\u0001\u0000\u0000\u0000\u0171\u0176\u0003R)\u0000\u0172\u0174"+
-		"\u0005)\u0000\u0000\u0173\u0175\u0003T*\u0000\u0174\u0173\u0001\u0000"+
-		"\u0000\u0000\u0174\u0175\u0001\u0000\u0000\u0000\u0175\u0177\u0001\u0000"+
-		"\u0000\u0000\u0176\u0172\u0001\u0000\u0000\u0000\u0176\u0177\u0001\u0000"+
-		"\u0000\u0000\u0177\u017c\u0001\u0000\u0000\u0000\u0178\u017a\u0005*\u0000"+
-		"\u0000\u0179\u017b\u0003V+\u0000\u017a\u0179\u0001\u0000\u0000\u0000\u017a"+
-		"\u017b\u0001\u0000\u0000\u0000\u017b\u017d\u0001\u0000\u0000\u0000\u017c"+
-		"\u0178\u0001\u0000\u0000\u0000\u017c\u017d\u0001\u0000\u0000\u0000\u017d"+
-		"Q\u0001\u0000\u0000\u0000\u017e\u0185\u0003|>\u0000\u017f\u0181\u0003"+
-		"\u0084B\u0000\u0180\u017f\u0001\u0000\u0000\u0000\u0181\u0182\u0001\u0000"+
-		"\u0000\u0000\u0182\u0180\u0001\u0000\u0000\u0000\u0182\u0183\u0001\u0000"+
-		"\u0000\u0000\u0183\u0185\u0001\u0000\u0000\u0000\u0184\u017e\u0001\u0000"+
-		"\u0000\u0000\u0184\u0180\u0001\u0000\u0000\u0000\u0185S\u0001\u0000\u0000"+
-		"\u0000\u0186\u018e\u0003|>\u0000\u0187\u018a\u0003\u0084B\u0000\u0188"+
-		"\u018a\u0005)\u0000\u0000\u0189\u0187\u0001\u0000\u0000\u0000\u0189\u0188"+
-		"\u0001\u0000\u0000\u0000\u018a\u018b\u0001\u0000\u0000\u0000\u018b\u0189"+
-		"\u0001\u0000\u0000\u0000\u018b\u018c\u0001\u0000\u0000\u0000\u018c\u018e"+
-		"\u0001\u0000\u0000\u0000\u018d\u0186\u0001\u0000\u0000\u0000\u018d\u0189"+
-		"\u0001\u0000\u0000\u0000\u018eU\u0001\u0000\u0000\u0000\u018f\u0198\u0003"+
-		"|>\u0000\u0190\u0194\u0003\u0084B\u0000\u0191\u0194\u0005)\u0000\u0000"+
-		"\u0192\u0194\u0005*\u0000\u0000\u0193\u0190\u0001\u0000\u0000\u0000\u0193"+
-		"\u0191\u0001\u0000\u0000\u0000\u0193\u0192\u0001\u0000\u0000\u0000\u0194"+
-		"\u0195\u0001\u0000\u0000\u0000\u0195\u0193\u0001\u0000\u0000\u0000\u0195"+
-		"\u0196\u0001\u0000\u0000\u0000\u0196\u0198\u0001\u0000\u0000\u0000\u0197"+
-		"\u018f\u0001\u0000\u0000\u0000\u0197\u0193\u0001\u0000\u0000\u0000\u0198"+
-		"W\u0001\u0000\u0000\u0000\u0199\u019a\u0005&\u0000\u0000\u019aY\u0001"+
-		"\u0000\u0000\u0000\u019b\u019d\u0003\\.\u0000\u019c\u019b\u0001\u0000"+
-		"\u0000\u0000\u019d\u019e\u0001\u0000\u0000\u0000\u019e\u019c\u0001\u0000"+
-		"\u0000\u0000\u019e\u019f\u0001\u0000\u0000\u0000\u019f[\u0001\u0000\u0000"+
-		"\u0000\u01a0\u01a5\u0003^/\u0000\u01a1\u01a2\u0004.\u0000\u0000\u01a2"+
-		"\u01a3\u0005\u001b\u0000\u0000\u01a3\u01a6\u0003\u0080@\u0000\u01a4\u01a6"+
-		"\u0003~?\u0000\u01a5\u01a1\u0001\u0000\u0000\u0000\u01a5\u01a4\u0001\u0000"+
-		"\u0000\u0000\u01a6]\u0001\u0000\u0000\u0000\u01a7\u01aa\u0003|>\u0000"+
-		"\u01a8\u01aa\u0005&\u0000\u0000\u01a9\u01a7\u0001\u0000\u0000\u0000\u01a9"+
-		"\u01a8\u0001\u0000\u0000\u0000\u01aa_\u0001\u0000\u0000\u0000\u01ab\u01ad"+
-		"\u0003b1\u0000\u01ac\u01ab\u0001\u0000\u0000\u0000\u01ad\u01ae\u0001\u0000"+
-		"\u0000\u0000\u01ae\u01ac\u0001\u0000\u0000\u0000\u01ae\u01af\u0001\u0000"+
-		"\u0000\u0000\u01afa\u0001\u0000\u0000\u0000\u01b0\u01b1\u0007\u0001\u0000"+
-		"\u0000\u01b1c\u0001\u0000\u0000\u0000\u01b2\u01b4\u0003f3\u0000\u01b3"+
-		"\u01b2\u0001\u0000\u0000\u0000\u01b4\u01b5\u0001\u0000\u0000\u0000\u01b5"+
-		"\u01b3\u0001\u0000\u0000\u0000\u01b5\u01b6\u0001\u0000\u0000\u0000\u01b6"+
-		"e\u0001\u0000\u0000\u0000\u01b7\u01bc\u0003h4\u0000\u01b8\u01b9\u0004"+
-		"3\u0001\u0000\u01b9\u01ba\u0005\u001b\u0000\u0000\u01ba\u01bd\u0003\u0080"+
-		"@\u0000\u01bb\u01bd\u0003~?\u0000\u01bc\u01b8\u0001\u0000\u0000\u0000"+
-		"\u01bc\u01bb\u0001\u0000\u0000\u0000\u01bdg\u0001\u0000\u0000\u0000\u01be"+
-		"\u01bf\u0005&\u0000\u0000\u01bfi\u0001\u0000\u0000\u0000\u01c0\u01c2\u0003"+
-		"l6\u0000\u01c1\u01c3\u0003l6\u0000\u01c2\u01c1\u0001\u0000\u0000\u0000"+
-		"\u01c3\u01c4\u0001\u0000\u0000\u0000\u01c4\u01c2\u0001\u0000\u0000\u0000"+
-		"\u01c4\u01c5\u0001\u0000\u0000\u0000\u01c5k\u0001\u0000\u0000\u0000\u01c6"+
-		"\u01d0\u0003|>\u0000\u01c7\u01cc\u0003\u0084B\u0000\u01c8\u01c9\u0004"+
-		"6\u0002\u0000\u01c9\u01cb\u0003\u0084B\u0000\u01ca\u01c8\u0001\u0000\u0000"+
-		"\u0000\u01cb\u01ce\u0001\u0000\u0000\u0000\u01cc\u01ca\u0001\u0000\u0000"+
-		"\u0000\u01cc\u01cd\u0001\u0000\u0000\u0000\u01cd\u01d0\u0001\u0000\u0000"+
-		"\u0000\u01ce\u01cc\u0001\u0000\u0000\u0000\u01cf\u01c6\u0001\u0000\u0000"+
-		"\u0000\u01cf\u01c7\u0001\u0000\u0000\u0000\u01d0m\u0001\u0000\u0000\u0000"+
-		"\u01d1\u01d2\u0003~?\u0000\u01d2o\u0001\u0000\u0000\u0000\u01d3\u01d8"+
-		"\u0003r9\u0000\u01d4\u01d6\u0005)\u0000\u0000\u01d5\u01d7\u0003t:\u0000"+
-		"\u01d6\u01d5\u0001\u0000\u0000\u0000\u01d6\u01d7\u0001\u0000\u0000\u0000"+
-		"\u01d7\u01d9\u0001\u0000\u0000\u0000\u01d8\u01d4\u0001\u0000\u0000\u0000"+
-		"\u01d8\u01d9\u0001\u0000\u0000\u0000\u01d9\u01df\u0001\u0000\u0000\u0000"+
-		"\u01da\u01dc\u0005)\u0000\u0000\u01db\u01dd\u0003t:\u0000\u01dc\u01db"+
-		"\u0001\u0000\u0000\u0000\u01dc\u01dd\u0001\u0000\u0000\u0000\u01dd\u01df"+
-		"\u0001\u0000\u0000\u0000\u01de\u01d3\u0001\u0000\u0000\u0000\u01de\u01da"+
-		"\u0001\u0000\u0000\u0000\u01dfq\u0001\u0000\u0000\u0000\u01e0\u01e7\u0003"+
-		"|>\u0000\u01e1\u01e3\u0003\u0084B\u0000\u01e2\u01e1\u0001\u0000\u0000"+
-		"\u0000\u01e3\u01e4\u0001\u0000\u0000\u0000\u01e4\u01e2\u0001\u0000\u0000"+
-		"\u0000\u01e4\u01e5\u0001\u0000\u0000\u0000\u01e5\u01e7\u0001\u0000\u0000"+
-		"\u0000\u01e6\u01e0\u0001\u0000\u0000\u0000\u01e6\u01e2\u0001\u0000\u0000"+
-		"\u0000\u01e7s\u0001\u0000\u0000\u0000\u01e8\u01f0\u0003|>\u0000\u01e9"+
-		"\u01ec\u0003\u0084B\u0000\u01ea\u01ec\u0005)\u0000\u0000\u01eb\u01e9\u0001"+
-		"\u0000\u0000\u0000\u01eb\u01ea\u0001\u0000\u0000\u0000\u01ec\u01ed\u0001"+
-		"\u0000\u0000\u0000\u01ed\u01eb\u0001\u0000\u0000\u0000\u01ed\u01ee\u0001"+
-		"\u0000\u0000\u0000\u01ee\u01f0\u0001\u0000\u0000\u0000\u01ef\u01e8\u0001"+
-		"\u0000\u0000\u0000\u01ef\u01eb\u0001\u0000\u0000\u0000\u01f0u\u0001\u0000"+
-		"\u0000\u0000\u01f1\u01f2\u0005&\u0000\u0000\u01f2w\u0001\u0000\u0000\u0000"+
-		"\u01f3\u01f4\u0003~?\u0000\u01f4y\u0001\u0000\u0000\u0000\u01f5\u01f6"+
-		"\u0005&\u0000\u0000\u01f6{\u0001\u0000\u0000\u0000\u01f7\u01f8\u0007\u0002"+
-		"\u0000\u0000\u01f8}\u0001\u0000\u0000\u0000\u01f9\u01fb\u0003\u0084B\u0000"+
-		"\u01fa\u01fc\u0003\u0084B\u0000\u01fb\u01fa\u0001\u0000\u0000\u0000\u01fc"+
-		"\u01fd\u0001\u0000\u0000\u0000\u01fd\u01fb\u0001\u0000\u0000\u0000\u01fd"+
-		"\u01fe\u0001\u0000\u0000\u0000\u01fe\u0202\u0001\u0000\u0000\u0000\u01ff"+
-		"\u0202\u0003|>\u0000\u0200\u0202\u0003\u0084B\u0000\u0201\u01f9\u0001"+
-		"\u0000\u0000\u0000\u0201\u01ff\u0001\u0000\u0000\u0000\u0201\u0200\u0001"+
-		"\u0000\u0000\u0000\u0202\u007f\u0001\u0000\u0000\u0000\u0203\u0204\u0004"+
-		"@\u0003\u0000\u0204\u0206\u0005\u001b\u0000\u0000\u0205\u0203\u0001\u0000"+
-		"\u0000\u0000\u0206\u0209\u0001\u0000\u0000\u0000\u0207\u0205\u0001\u0000"+
-		"\u0000\u0000\u0207\u0208\u0001\u0000\u0000\u0000\u0208\u0212\u0001\u0000"+
-		"\u0000\u0000\u0209\u0207\u0001\u0000\u0000\u0000\u020a\u020c\u0003\u0082"+
-		"A\u0000\u020b\u020d\u0003\u0082A\u0000\u020c\u020b\u0001\u0000\u0000\u0000"+
-		"\u020d\u020e\u0001\u0000\u0000\u0000\u020e\u020c\u0001\u0000\u0000\u0000"+
-		"\u020e\u020f\u0001\u0000\u0000\u0000\u020f\u0213\u0001\u0000\u0000\u0000"+
-		"\u0210\u0213\u0003|>\u0000\u0211\u0213\u0003\u0082A\u0000\u0212\u020a"+
-		"\u0001\u0000\u0000\u0000\u0212\u0210\u0001\u0000\u0000\u0000\u0212\u0211"+
-		"\u0001\u0000\u0000\u0000\u0213\u0081\u0001\u0000\u0000\u0000\u0214\u0215"+
-		"\u0007\u0003\u0000\u0000\u0215\u0083\u0001\u0000\u0000\u0000\u0216\u0219"+
-		"\u0003\u0082A\u0000\u0217\u0219\u0005\u001b\u0000\u0000\u0218\u0216\u0001"+
-		"\u0000\u0000\u0000\u0218\u0217\u0001\u0000\u0000\u0000\u0219\u0085\u0001"+
-		"\u0000\u0000\u0000G\u0089\u0090\u0099\u00a0\u00b4\u00b8\u00bc\u00c1\u00c5"+
-		"\u00ca\u00cf\u00dc\u00e1\u00e5\u00ea\u00ef\u00f6\u00f8\u0104\u0110\u0115"+
-		"\u0117\u011c\u0128\u012a\u0130\u0133\u013c\u0143\u0148\u014f\u0154\u015c"+
-		"\u0163\u016c\u0174\u0176\u017a\u017c\u0182\u0184\u0189\u018b\u018d\u0193"+
-		"\u0195\u0197\u019e\u01a5\u01a9\u01ae\u01b5\u01bc\u01c4\u01cc\u01cf\u01d6"+
-		"\u01d8\u01dc\u01de\u01e4\u01e6\u01eb\u01ed\u01ef\u01fd\u0201\u0207\u020e"+
-		"\u0212\u0218";
+		"\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004\u0003\u0004\u00bd\b\u0004"+
+		"\u0001\u0005\u0001\u0005\u0003\u0005\u00c1\b\u0005\u0001\u0006\u0001\u0006"+
+		"\u0003\u0006\u00c5\b\u0006\u0001\u0006\u0001\u0006\u0001\u0006\u0003\u0006"+
+		"\u00ca\b\u0006\u0001\u0007\u0001\u0007\u0003\u0007\u00ce\b\u0007\u0001"+
+		"\u0007\u0001\u0007\u0001\u0007\u0003\u0007\u00d3\b\u0007\u0001\b\u0001"+
+		"\b\u0001\b\u0003\b\u00d8\b\b\u0001\t\u0001\t\u0001\t\u0001\n\u0001\n\u0001"+
+		"\n\u0001\u000b\u0001\u000b\u0001\u000b\u0001\f\u0001\f\u0003\f\u00e5\b"+
+		"\f\u0001\f\u0001\f\u0001\f\u0001\f\u0001\f\u0003\f\u00ec\b\f\u0001\r\u0001"+
+		"\r\u0003\r\u00f0\b\r\u0001\r\u0001\r\u0001\r\u0001\r\u0001\r\u0003\r\u00f7"+
+		"\b\r\u0001\u000e\u0001\u000e\u0001\u000e\u0003\u000e\u00fc\b\u000e\u0001"+
+		"\u000f\u0001\u000f\u0001\u000f\u0003\u000f\u0101\b\u000f\u0001\u0010\u0001"+
+		"\u0010\u0001\u0010\u0001\u0011\u0001\u0011\u0001\u0011\u0001\u0012\u0001"+
+		"\u0012\u0001\u0012\u0001\u0012\u0003\u0012\u010d\b\u0012\u0001\u0013\u0001"+
+		"\u0013\u0001\u0013\u0001\u0014\u0001\u0014\u0001\u0014\u0001\u0015\u0001"+
+		"\u0015\u0001\u0015\u0001\u0015\u0003\u0015\u0119\b\u0015\u0001\u0015\u0001"+
+		"\u0015\u0001\u0015\u0003\u0015\u011e\b\u0015\u0003\u0015\u0120\b\u0015"+
+		"\u0001\u0016\u0004\u0016\u0123\b\u0016\u000b\u0016\f\u0016\u0124\u0001"+
+		"\u0017\u0001\u0017\u0001\u0018\u0001\u0018\u0001\u0018\u0001\u0019\u0001"+
+		"\u0019\u0001\u0019\u0001\u001a\u0004\u001a\u0130\b\u001a\u000b\u001a\f"+
+		"\u001a\u0131\u0001\u001b\u0001\u001b\u0001\u001c\u0001\u001c\u0001\u001d"+
+		"\u0001\u001d\u0001\u001e\u0004\u001e\u013b\b\u001e\u000b\u001e\f\u001e"+
+		"\u013c\u0001\u001f\u0001\u001f\u0001 \u0001 \u0001 \u0004 \u0144\b \u000b"+
+		" \f \u0145\u0001!\u0001!\u0005!\u014a\b!\n!\f!\u014d\t!\u0001!\u0001!"+
+		"\u0005!\u0151\b!\n!\f!\u0154\t!\u0005!\u0156\b!\n!\f!\u0159\t!\u0001\""+
+		"\u0001\"\u0001#\u0001#\u0001#\u0001$\u0005$\u0161\b$\n$\f$\u0164\t$\u0001"+
+		"%\u0001%\u0001&\u0001&\u0003&\u016a\b&\u0001&\u0001&\u0001\'\u0001\'\u0001"+
+		"\'\u0005\'\u0171\b\'\n\'\f\'\u0174\t\'\u0001(\u0001(\u0001)\u0001)\u0001"+
+		"*\u0001*\u0001+\u0004+\u017d\b+\u000b+\f+\u017e\u0001,\u0001,\u0001,\u0001"+
+		",\u0001,\u0001,\u0001,\u0003,\u0188\b,\u0001-\u0001-\u0001.\u0001.\u0001"+
+		"/\u0004/\u018f\b/\u000b/\f/\u0190\u00010\u00010\u00011\u00041\u0196\b"+
+		"1\u000b1\f1\u0197\u00012\u00012\u00013\u00043\u019d\b3\u000b3\f3\u019e"+
+		"\u00014\u00014\u00014\u00014\u00014\u00014\u00014\u00034\u01a8\b4\u0001"+
+		"5\u00015\u00016\u00016\u00017\u00017\u00018\u00048\u01b1\b8\u000b8\f8"+
+		"\u01b2\u00019\u00019\u0001:\u0004:\u01b8\b:\u000b:\f:\u01b9\u0001;\u0001"+
+		";\u0001<\u0001<\u0001=\u0001=\u0001>\u0001>\u0001?\u0004?\u01c5\b?\u000b"+
+		"?\f?\u01c6\u0001@\u0001@\u0001A\u0001A\u0001B\u0001B\u0001C\u0001C\u0001"+
+		"D\u0001D\u0001E\u0004E\u01d4\bE\u000bE\fE\u01d5\u0001F\u0001F\u0001F\u0000"+
+		"\u0000G\u0000\u0002\u0004\u0006\b\n\f\u000e\u0010\u0012\u0014\u0016\u0018"+
+		"\u001a\u001c\u001e \"$&(*,.02468:<>@BDFHJLNPRTVXZ\\^`bdfhjlnprtvxz|~\u0080"+
+		"\u0082\u0084\u0086\u0088\u008a\u008c\u0000\u0006\u0001\u0000\u0019&\u0002"+
+		"\u0000((--\u0002\u0000\u001f &&\u0002\u0000!$&&\u0001\u0000\u001f&\u0002"+
+		"\u0000\u001f$&&\u01cd\u0000\u0091\u0001\u0000\u0000\u0000\u0002\u009c"+
+		"\u0001\u0000\u0000\u0000\u0004\u00a1\u0001\u0000\u0000\u0000\u0006\u00a4"+
+		"\u0001\u0000\u0000\u0000\b\u00bc\u0001\u0000\u0000\u0000\n\u00c0\u0001"+
+		"\u0000\u0000\u0000\f\u00c2\u0001\u0000\u0000\u0000\u000e\u00cb\u0001\u0000"+
+		"\u0000\u0000\u0010\u00d4\u0001\u0000\u0000\u0000\u0012\u00d9\u0001\u0000"+
+		"\u0000\u0000\u0014\u00dc\u0001\u0000\u0000\u0000\u0016\u00df\u0001\u0000"+
+		"\u0000\u0000\u0018\u00e2\u0001\u0000\u0000\u0000\u001a\u00ed\u0001\u0000"+
+		"\u0000\u0000\u001c\u00f8\u0001\u0000\u0000\u0000\u001e\u00fd\u0001\u0000"+
+		"\u0000\u0000 \u0102\u0001\u0000\u0000\u0000\"\u0105\u0001\u0000\u0000"+
+		"\u0000$\u0108\u0001\u0000\u0000\u0000&\u010e\u0001\u0000\u0000\u0000("+
+		"\u0111\u0001\u0000\u0000\u0000*\u011f\u0001\u0000\u0000\u0000,\u0122\u0001"+
+		"\u0000\u0000\u0000.\u0126\u0001\u0000\u0000\u00000\u0128\u0001\u0000\u0000"+
+		"\u00002\u012b\u0001\u0000\u0000\u00004\u012f\u0001\u0000\u0000\u00006"+
+		"\u0133\u0001\u0000\u0000\u00008\u0135\u0001\u0000\u0000\u0000:\u0137\u0001"+
+		"\u0000\u0000\u0000<\u013a\u0001\u0000\u0000\u0000>\u013e\u0001\u0000\u0000"+
+		"\u0000@\u0140\u0001\u0000\u0000\u0000B\u0147\u0001\u0000\u0000\u0000D"+
+		"\u015a\u0001\u0000\u0000\u0000F\u015c\u0001\u0000\u0000\u0000H\u0162\u0001"+
+		"\u0000\u0000\u0000J\u0165\u0001\u0000\u0000\u0000L\u0167\u0001\u0000\u0000"+
+		"\u0000N\u016d\u0001\u0000\u0000\u0000P\u0175\u0001\u0000\u0000\u0000R"+
+		"\u0177\u0001\u0000\u0000\u0000T\u0179\u0001\u0000\u0000\u0000V\u017c\u0001"+
+		"\u0000\u0000\u0000X\u0187\u0001\u0000\u0000\u0000Z\u0189\u0001\u0000\u0000"+
+		"\u0000\\\u018b\u0001\u0000\u0000\u0000^\u018e\u0001\u0000\u0000\u0000"+
+		"`\u0192\u0001\u0000\u0000\u0000b\u0195\u0001\u0000\u0000\u0000d\u0199"+
+		"\u0001\u0000\u0000\u0000f\u019c\u0001\u0000\u0000\u0000h\u01a7\u0001\u0000"+
+		"\u0000\u0000j\u01a9\u0001\u0000\u0000\u0000l\u01ab\u0001\u0000\u0000\u0000"+
+		"n\u01ad\u0001\u0000\u0000\u0000p\u01b0\u0001\u0000\u0000\u0000r\u01b4"+
+		"\u0001\u0000\u0000\u0000t\u01b7\u0001\u0000\u0000\u0000v\u01bb\u0001\u0000"+
+		"\u0000\u0000x\u01bd\u0001\u0000\u0000\u0000z\u01bf\u0001\u0000\u0000\u0000"+
+		"|\u01c1\u0001\u0000\u0000\u0000~\u01c4\u0001\u0000\u0000\u0000\u0080\u01c8"+
+		"\u0001\u0000\u0000\u0000\u0082\u01ca\u0001\u0000\u0000\u0000\u0084\u01cc"+
+		"\u0001\u0000\u0000\u0000\u0086\u01ce\u0001\u0000\u0000\u0000\u0088\u01d0"+
+		"\u0001\u0000\u0000\u0000\u008a\u01d3\u0001\u0000\u0000\u0000\u008c\u01d7"+
+		"\u0001\u0000\u0000\u0000\u008e\u0090\u0003\u0002\u0001\u0000\u008f\u008e"+
+		"\u0001\u0000\u0000\u0000\u0090\u0093\u0001\u0000\u0000\u0000\u0091\u008f"+
+		"\u0001\u0000\u0000\u0000\u0091\u0092\u0001\u0000\u0000\u0000\u0092\u0094"+
+		"\u0001\u0000\u0000\u0000\u0093\u0091\u0001\u0000\u0000\u0000\u0094\u0096"+
+		"\u0003\u0004\u0002\u0000\u0095\u0097\u0003\u0006\u0003\u0000\u0096\u0095"+
+		"\u0001\u0000\u0000\u0000\u0097\u0098\u0001\u0000\u0000\u0000\u0098\u0096"+
+		"\u0001\u0000\u0000\u0000\u0098\u0099\u0001\u0000\u0000\u0000\u0099\u009a"+
+		"\u0001\u0000\u0000\u0000\u009a\u009b\u0005\u0000\u0000\u0001\u009b\u0001"+
+		"\u0001\u0000\u0000\u0000\u009c\u009d\u0005\u0001\u0000\u0000\u009d\u0003"+
+		"\u0001\u0000\u0000\u0000\u009e\u00a0\u0003$\u0012\u0000\u009f\u009e\u0001"+
+		"\u0000\u0000\u0000\u00a0\u00a3\u0001\u0000\u0000\u0000\u00a1\u009f\u0001"+
+		"\u0000\u0000\u0000\u00a1\u00a2\u0001\u0000\u0000\u0000\u00a2\u0005\u0001"+
+		"\u0000\u0000\u0000\u00a3\u00a1\u0001\u0000\u0000\u0000\u00a4\u00a8\u0003"+
+		"\f\u0006\u0000\u00a5\u00a7\u0003\b\u0004\u0000\u00a6\u00a5\u0001\u0000"+
+		"\u0000\u0000\u00a7\u00aa\u0001\u0000\u0000\u0000\u00a8\u00a6\u0001\u0000"+
+		"\u0000\u0000\u00a8\u00a9\u0001\u0000\u0000\u0000\u00a9\u0007\u0001\u0000"+
+		"\u0000\u0000\u00aa\u00a8\u0001\u0000\u0000\u0000\u00ab\u00bd\u0003\u000e"+
+		"\u0007\u0000\u00ac\u00bd\u0003\u0010\b\u0000\u00ad\u00bd\u0003\u0012\t"+
+		"\u0000\u00ae\u00bd\u0003\u0014\n\u0000\u00af\u00bd\u0003\u0016\u000b\u0000"+
+		"\u00b0\u00bd\u0003\u0018\f\u0000\u00b1\u00bd\u0003\u001a\r\u0000\u00b2"+
+		"\u00bd\u0003\u001c\u000e\u0000\u00b3\u00bd\u0003\u001e\u000f\u0000\u00b4"+
+		"\u00bd\u0003 \u0010\u0000\u00b5\u00bd\u0003\"\u0011\u0000\u00b6\u00bd"+
+		"\u0003$\u0012\u0000\u00b7\u00bd\u0003&\u0013\u0000\u00b8\u00bd\u0003("+
+		"\u0014\u0000\u00b9\u00bd\u0003*\u0015\u0000\u00ba\u00bd\u00030\u0018\u0000"+
+		"\u00bb\u00bd\u00032\u0019\u0000\u00bc\u00ab\u0001\u0000\u0000\u0000\u00bc"+
+		"\u00ac\u0001\u0000\u0000\u0000\u00bc\u00ad\u0001\u0000\u0000\u0000\u00bc"+
+		"\u00ae\u0001\u0000\u0000\u0000\u00bc\u00af\u0001\u0000\u0000\u0000\u00bc"+
+		"\u00b0\u0001\u0000\u0000\u0000\u00bc\u00b1\u0001\u0000\u0000\u0000\u00bc"+
+		"\u00b2\u0001\u0000\u0000\u0000\u00bc\u00b3\u0001\u0000\u0000\u0000\u00bc"+
+		"\u00b4\u0001\u0000\u0000\u0000\u00bc\u00b5\u0001\u0000\u0000\u0000\u00bc"+
+		"\u00b6\u0001\u0000\u0000\u0000\u00bc\u00b7\u0001\u0000\u0000\u0000\u00bc"+
+		"\u00b8\u0001\u0000\u0000\u0000\u00bc\u00b9\u0001\u0000\u0000\u0000\u00bc"+
+		"\u00ba\u0001\u0000\u0000\u0000\u00bc\u00bb\u0001\u0000\u0000\u0000\u00bd"+
+		"\t\u0001\u0000\u0000\u0000\u00be\u00c1\u0003\f\u0006\u0000\u00bf\u00c1"+
+		"\u0003\b\u0004\u0000\u00c0\u00be\u0001\u0000\u0000\u0000\u00c0\u00bf\u0001"+
+		"\u0000\u0000\u0000\u00c1\u000b\u0001\u0000\u0000\u0000\u00c2\u00c4\u0005"+
+		"\u0003\u0000\u0000\u00c3\u00c5\u00034\u001a\u0000\u00c4\u00c3\u0001\u0000"+
+		"\u0000\u0000\u00c4\u00c5\u0001\u0000\u0000\u0000\u00c5\u00c6\u0001\u0000"+
+		"\u0000\u0000\u00c6\u00c9\u0003R)\u0000\u00c7\u00c8\u0005\u0016\u0000\u0000"+
+		"\u00c8\u00ca\u0003T*\u0000\u00c9\u00c7\u0001\u0000\u0000\u0000\u00c9\u00ca"+
+		"\u0001\u0000\u0000\u0000\u00ca\r\u0001\u0000\u0000\u0000\u00cb\u00cd\u0005"+
+		"\u0004\u0000\u0000\u00cc\u00ce\u00034\u001a\u0000\u00cd\u00cc\u0001\u0000"+
+		"\u0000\u0000\u00cd\u00ce\u0001\u0000\u0000\u0000\u00ce\u00d2\u0001\u0000"+
+		"\u0000\u0000\u00cf\u00d3\u00038\u001c\u0000\u00d0\u00d3\u0003:\u001d\u0000"+
+		"\u00d1\u00d3\u0003@ \u0000\u00d2\u00cf\u0001\u0000\u0000\u0000\u00d2\u00d0"+
+		"\u0001\u0000\u0000\u0000\u00d2\u00d1\u0001\u0000\u0000\u0000\u00d3\u000f"+
+		"\u0001\u0000\u0000\u0000\u00d4\u00d7\u0005\u0005\u0000\u0000\u00d5\u00d8"+
+		"\u00038\u001c\u0000\u00d6\u00d8\u0003:\u001d\u0000\u00d7\u00d5\u0001\u0000"+
+		"\u0000\u0000\u00d7\u00d6\u0001\u0000\u0000\u0000\u00d8\u0011\u0001\u0000"+
+		"\u0000\u0000\u00d9\u00da\u0005\u0007\u0000\u0000\u00da\u00db\u0003V+\u0000"+
+		"\u00db\u0013\u0001\u0000\u0000\u0000\u00dc\u00dd\u0005\b\u0000\u0000\u00dd"+
+		"\u00de\u0003b1\u0000\u00de\u0015\u0001\u0000\u0000\u0000\u00df\u00e0\u0005"+
+		"\t\u0000\u0000\u00e0\u00e1\u0003f3\u0000\u00e1\u0017\u0001\u0000\u0000"+
+		"\u0000\u00e2\u00e4\u0005\n\u0000\u0000\u00e3\u00e5\u00034\u001a\u0000"+
+		"\u00e4\u00e3\u0001\u0000\u0000\u0000\u00e4\u00e5\u0001\u0000\u0000\u0000"+
+		"\u00e5\u00eb\u0001\u0000\u0000\u0000\u00e6\u00ec\u0003@ \u0000\u00e7\u00ec"+
+		"\u0003L&\u0000\u00e8\u00e9\u0003t:\u0000\u00e9\u00ea\u0003x<\u0000\u00ea"+
+		"\u00ec\u0001\u0000\u0000\u0000\u00eb\u00e6\u0001\u0000\u0000\u0000\u00eb"+
+		"\u00e7\u0001\u0000\u0000\u0000\u00eb\u00e8\u0001\u0000\u0000\u0000\u00ec"+
+		"\u0019\u0001\u0000\u0000\u0000\u00ed\u00ef\u0005\u000b\u0000\u0000\u00ee"+
+		"\u00f0\u00034\u001a\u0000\u00ef\u00ee\u0001\u0000\u0000\u0000\u00ef\u00f0"+
+		"\u0001\u0000\u0000\u0000\u00f0\u00f6\u0001\u0000\u0000\u0000\u00f1\u00f7"+
+		"\u0003@ \u0000\u00f2\u00f7\u0003L&\u0000\u00f3\u00f4\u0003t:\u0000\u00f4"+
+		"\u00f5\u0003x<\u0000\u00f5\u00f7\u0001\u0000\u0000\u0000\u00f6\u00f1\u0001"+
+		"\u0000\u0000\u0000\u00f6\u00f2\u0001\u0000\u0000\u0000\u00f6\u00f3\u0001"+
+		"\u0000\u0000\u0000\u00f7\u001b\u0001\u0000\u0000\u0000\u00f8\u00fb\u0005"+
+		"\f\u0000\u0000\u00f9\u00fc\u00038\u001c\u0000\u00fa\u00fc\u0003:\u001d"+
+		"\u0000\u00fb\u00f9\u0001\u0000\u0000\u0000\u00fb\u00fa\u0001\u0000\u0000"+
+		"\u0000\u00fc\u001d\u0001\u0000\u0000\u0000\u00fd\u0100\u0005\r\u0000\u0000"+
+		"\u00fe\u0101\u0003L&\u0000\u00ff\u0101\u0003~?\u0000\u0100\u00fe\u0001"+
+		"\u0000\u0000\u0000\u0100\u00ff\u0001\u0000\u0000\u0000\u0101\u001f\u0001"+
+		"\u0000\u0000\u0000\u0102\u0103\u0005\u000e\u0000\u0000\u0103\u0104\u0003"+
+		"\u0082A\u0000\u0104!\u0001\u0000\u0000\u0000\u0105\u0106\u0005\u000f\u0000"+
+		"\u0000\u0106\u0107\u0003|>\u0000\u0107#\u0001\u0000\u0000\u0000\u0108"+
+		"\u0109\u0005\u0010\u0000\u0000\u0109\u010c\u0003\u0084B\u0000\u010a\u010b"+
+		"\u0005\u001c\u0000\u0000\u010b\u010d\u0003\u0086C\u0000\u010c\u010a\u0001"+
+		"\u0000\u0000\u0000\u010c\u010d\u0001\u0000\u0000\u0000\u010d%\u0001\u0000"+
+		"\u0000\u0000\u010e\u010f\u0005\u0011\u0000\u0000\u010f\u0110\u0003\n\u0005"+
+		"\u0000\u0110\'\u0001\u0000\u0000\u0000\u0111\u0112\u0005\u0012\u0000\u0000"+
+		"\u0112\u0113\u0003\u0088D\u0000\u0113)\u0001\u0000\u0000\u0000\u0114\u0115"+
+		"\u0005\u0013\u0000\u0000\u0115\u0120\u0005\u0006\u0000\u0000\u0116\u0118"+
+		"\u0005\u0013\u0000\u0000\u0117\u0119\u0003,\u0016\u0000\u0118\u0117\u0001"+
+		"\u0000\u0000\u0000\u0118\u0119\u0001\u0000\u0000\u0000\u0119\u011a\u0001"+
+		"\u0000\u0000\u0000\u011a\u011d\u0005\u0005\u0000\u0000\u011b\u011e\u0003"+
+		"8\u001c\u0000\u011c\u011e\u0003:\u001d\u0000\u011d\u011b\u0001\u0000\u0000"+
+		"\u0000\u011d\u011c\u0001\u0000\u0000\u0000\u011e\u0120\u0001\u0000\u0000"+
+		"\u0000\u011f\u0114\u0001\u0000\u0000\u0000\u011f\u0116\u0001\u0000\u0000"+
+		"\u0000\u0120+\u0001\u0000\u0000\u0000\u0121\u0123\u0003.\u0017\u0000\u0122"+
+		"\u0121\u0001\u0000\u0000\u0000\u0123\u0124\u0001\u0000\u0000\u0000\u0124"+
+		"\u0122\u0001\u0000\u0000\u0000\u0124\u0125\u0001\u0000\u0000\u0000\u0125"+
+		"-\u0001\u0000\u0000\u0000\u0126\u0127\u0005\u001d\u0000\u0000\u0127/\u0001"+
+		"\u0000\u0000\u0000\u0128\u0129\u0005\u0014\u0000\u0000\u0129\u012a\u0003"+
+		"L&\u0000\u012a1\u0001\u0000\u0000\u0000\u012b\u012c\u0005\u0015\u0000"+
+		"\u0000\u012c\u012d\u0003\u008aE\u0000\u012d3\u0001\u0000\u0000\u0000\u012e"+
+		"\u0130\u00036\u001b\u0000\u012f\u012e\u0001\u0000\u0000\u0000\u0130\u0131"+
+		"\u0001\u0000\u0000\u0000\u0131\u012f\u0001\u0000\u0000\u0000\u0131\u0132"+
+		"\u0001\u0000\u0000\u0000\u01325\u0001\u0000\u0000\u0000\u0133\u0134\u0005"+
+		"\u001d\u0000\u0000\u01347\u0001\u0000\u0000\u0000\u0135\u0136\u0003L&"+
+		"\u0000\u01369\u0001\u0000\u0000\u0000\u0137\u0138\u0003<\u001e\u0000\u0138"+
+		";\u0001\u0000\u0000\u0000\u0139\u013b\u0003>\u001f\u0000\u013a\u0139\u0001"+
+		"\u0000\u0000\u0000\u013b\u013c\u0001\u0000\u0000\u0000\u013c\u013a\u0001"+
+		"\u0000\u0000\u0000\u013c\u013d\u0001\u0000\u0000\u0000\u013d=\u0001\u0000"+
+		"\u0000\u0000\u013e\u013f\u0007\u0000\u0000\u0000\u013f?\u0001\u0000\u0000"+
+		"\u0000\u0140\u0141\u0003B!\u0000\u0141\u0143\u0005(\u0000\u0000\u0142"+
+		"\u0144\u0003F#\u0000\u0143\u0142\u0001\u0000\u0000\u0000\u0144\u0145\u0001"+
+		"\u0000\u0000\u0000\u0145\u0143\u0001\u0000\u0000\u0000\u0145\u0146\u0001"+
+		"\u0000\u0000\u0000\u0146A\u0001\u0000\u0000\u0000\u0147\u014b\u0005\u0017"+
+		"\u0000\u0000\u0148\u014a\u0003D\"\u0000\u0149\u0148\u0001\u0000\u0000"+
+		"\u0000\u014a\u014d\u0001\u0000\u0000\u0000\u014b\u0149\u0001\u0000\u0000"+
+		"\u0000\u014b\u014c\u0001\u0000\u0000\u0000\u014c\u0157\u0001\u0000\u0000"+
+		"\u0000\u014d\u014b\u0001\u0000\u0000\u0000\u014e\u0152\u0005\u0017\u0000"+
+		"\u0000\u014f\u0151\u0003D\"\u0000\u0150\u014f\u0001\u0000\u0000\u0000"+
+		"\u0151\u0154\u0001\u0000\u0000\u0000\u0152\u0150\u0001\u0000\u0000\u0000"+
+		"\u0152\u0153\u0001\u0000\u0000\u0000\u0153\u0156\u0001\u0000\u0000\u0000"+
+		"\u0154\u0152\u0001\u0000\u0000\u0000\u0155\u014e\u0001\u0000\u0000\u0000"+
+		"\u0156\u0159\u0001\u0000\u0000\u0000\u0157\u0155\u0001\u0000\u0000\u0000"+
+		"\u0157\u0158\u0001\u0000\u0000\u0000\u0158C\u0001\u0000\u0000\u0000\u0159"+
+		"\u0157\u0001\u0000\u0000\u0000\u015a\u015b\u0007\u0000\u0000\u0000\u015b"+
+		"E\u0001\u0000\u0000\u0000\u015c\u015d\u0003H$\u0000\u015d\u015e\u0003"+
+		"J%\u0000\u015eG\u0001\u0000\u0000\u0000\u015f\u0161\u0007\u0001\u0000"+
+		"\u0000\u0160\u015f\u0001\u0000\u0000\u0000\u0161\u0164\u0001\u0000\u0000"+
+		"\u0000\u0162\u0160\u0001\u0000\u0000\u0000\u0162\u0163\u0001\u0000\u0000"+
+		"\u0000\u0163I\u0001\u0000\u0000\u0000\u0164\u0162\u0001\u0000\u0000\u0000"+
+		"\u0165\u0166\u0005&\u0000\u0000\u0166K\u0001\u0000\u0000\u0000\u0167\u0169"+
+		"\u0005\u0019\u0000\u0000\u0168\u016a\u0003N\'\u0000\u0169\u0168\u0001"+
+		"\u0000\u0000\u0000\u0169\u016a\u0001\u0000\u0000\u0000\u016a\u016b\u0001"+
+		"\u0000\u0000\u0000\u016b\u016c\u0005\u001a\u0000\u0000\u016cM\u0001\u0000"+
+		"\u0000\u0000\u016d\u0172\u0003P(\u0000\u016e\u016f\u0005\u001b\u0000\u0000"+
+		"\u016f\u0171\u0003P(\u0000\u0170\u016e\u0001\u0000\u0000\u0000\u0171\u0174"+
+		"\u0001\u0000\u0000\u0000\u0172\u0170\u0001\u0000\u0000\u0000\u0172\u0173"+
+		"\u0001\u0000\u0000\u0000\u0173O\u0001\u0000\u0000\u0000\u0174\u0172\u0001"+
+		"\u0000\u0000\u0000\u0175\u0176\u0005\u001f\u0000\u0000\u0176Q\u0001\u0000"+
+		"\u0000\u0000\u0177\u0178\u0003\u008aE\u0000\u0178S\u0001\u0000\u0000\u0000"+
+		"\u0179\u017a\u0005&\u0000\u0000\u017aU\u0001\u0000\u0000\u0000\u017b\u017d"+
+		"\u0003X,\u0000\u017c\u017b\u0001\u0000\u0000\u0000\u017d\u017e\u0001\u0000"+
+		"\u0000\u0000\u017e\u017c\u0001\u0000\u0000\u0000\u017e\u017f\u0001\u0000"+
+		"\u0000\u0000\u017fW\u0001\u0000\u0000\u0000\u0180\u0181\u0003Z-\u0000"+
+		"\u0181\u0182\u0005\u001c\u0000\u0000\u0182\u0183\u0003\\.\u0000\u0183"+
+		"\u0188\u0001\u0000\u0000\u0000\u0184\u0185\u0003Z-\u0000\u0185\u0186\u0003"+
+		"^/\u0000\u0186\u0188\u0001\u0000\u0000\u0000\u0187\u0180\u0001\u0000\u0000"+
+		"\u0000\u0187\u0184\u0001\u0000\u0000\u0000\u0188Y\u0001\u0000\u0000\u0000"+
+		"\u0189\u018a\u0007\u0002\u0000\u0000\u018a[\u0001\u0000\u0000\u0000\u018b"+
+		"\u018c\u0007\u0002\u0000\u0000\u018c]\u0001\u0000\u0000\u0000\u018d\u018f"+
+		"\u0003`0\u0000\u018e\u018d\u0001\u0000\u0000\u0000\u018f\u0190\u0001\u0000"+
+		"\u0000\u0000\u0190\u018e\u0001\u0000\u0000\u0000\u0190\u0191\u0001\u0000"+
+		"\u0000\u0000\u0191_\u0001\u0000\u0000\u0000\u0192\u0193\u0007\u0000\u0000"+
+		"\u0000\u0193a\u0001\u0000\u0000\u0000\u0194\u0196\u0003d2\u0000\u0195"+
+		"\u0194\u0001\u0000\u0000\u0000\u0196\u0197\u0001\u0000\u0000\u0000\u0197"+
+		"\u0195\u0001\u0000\u0000\u0000\u0197\u0198\u0001\u0000\u0000\u0000\u0198"+
+		"c\u0001\u0000\u0000\u0000\u0199\u019a\u0007\u0003\u0000\u0000\u019ae\u0001"+
+		"\u0000\u0000\u0000\u019b\u019d\u0003h4\u0000\u019c\u019b\u0001\u0000\u0000"+
+		"\u0000\u019d\u019e\u0001\u0000\u0000\u0000\u019e\u019c\u0001\u0000\u0000"+
+		"\u0000\u019e\u019f\u0001\u0000\u0000\u0000\u019fg\u0001\u0000\u0000\u0000"+
+		"\u01a0\u01a1\u0003j5\u0000\u01a1\u01a2\u0005\u001c\u0000\u0000\u01a2\u01a3"+
+		"\u0003l6\u0000\u01a3\u01a8\u0001\u0000\u0000\u0000\u01a4\u01a5\u0003j"+
+		"5\u0000\u01a5\u01a6\u0003n7\u0000\u01a6\u01a8\u0001\u0000\u0000\u0000"+
+		"\u01a7\u01a0\u0001\u0000\u0000\u0000\u01a7\u01a4\u0001\u0000\u0000\u0000"+
+		"\u01a8i\u0001\u0000\u0000\u0000\u01a9\u01aa\u0005&\u0000\u0000\u01aak"+
+		"\u0001\u0000\u0000\u0000\u01ab\u01ac\u0003p8\u0000\u01acm\u0001\u0000"+
+		"\u0000\u0000\u01ad\u01ae\u0003\u008aE\u0000\u01aeo\u0001\u0000\u0000\u0000"+
+		"\u01af\u01b1\u0003r9\u0000\u01b0\u01af\u0001\u0000\u0000\u0000\u01b1\u01b2"+
+		"\u0001\u0000\u0000\u0000\u01b2\u01b0\u0001\u0000\u0000\u0000\u01b2\u01b3"+
+		"\u0001\u0000\u0000\u0000\u01b3q\u0001\u0000\u0000\u0000\u01b4\u01b5\u0007"+
+		"\u0004\u0000\u0000\u01b5s\u0001\u0000\u0000\u0000\u01b6\u01b8\u0003v;"+
+		"\u0000\u01b7\u01b6\u0001\u0000\u0000\u0000\u01b8\u01b9\u0001\u0000\u0000"+
+		"\u0000\u01b9\u01b7\u0001\u0000\u0000\u0000\u01b9\u01ba\u0001\u0000\u0000"+
+		"\u0000\u01bau\u0001\u0000\u0000\u0000\u01bb\u01bc\u0007\u0005\u0000\u0000"+
+		"\u01bcw\u0001\u0000\u0000\u0000\u01bd\u01be\u0003z=\u0000\u01bey\u0001"+
+		"\u0000\u0000\u0000\u01bf\u01c0\u0007\u0005\u0000\u0000\u01c0{\u0001\u0000"+
+		"\u0000\u0000\u01c1\u01c2\u0003\u008aE\u0000\u01c2}\u0001\u0000\u0000\u0000"+
+		"\u01c3\u01c5\u0003\u0080@\u0000\u01c4\u01c3\u0001\u0000\u0000\u0000\u01c5"+
+		"\u01c6\u0001\u0000\u0000\u0000\u01c6\u01c4\u0001\u0000\u0000\u0000\u01c6"+
+		"\u01c7\u0001\u0000\u0000\u0000\u01c7\u007f\u0001\u0000\u0000\u0000\u01c8"+
+		"\u01c9\u0007\u0005\u0000\u0000\u01c9\u0081\u0001\u0000\u0000\u0000\u01ca"+
+		"\u01cb\u0003\u008aE\u0000\u01cb\u0083\u0001\u0000\u0000\u0000\u01cc\u01cd"+
+		"\u0005&\u0000\u0000\u01cd\u0085\u0001\u0000\u0000\u0000\u01ce\u01cf\u0003"+
+		"\u008aE\u0000\u01cf\u0087\u0001\u0000\u0000\u0000\u01d0\u01d1\u0005&\u0000"+
+		"\u0000\u01d1\u0089\u0001\u0000\u0000\u0000\u01d2\u01d4\u0003\u008cF\u0000"+
+		"\u01d3\u01d2\u0001\u0000\u0000\u0000\u01d4\u01d5\u0001\u0000\u0000\u0000"+
+		"\u01d5\u01d3\u0001\u0000\u0000\u0000\u01d5\u01d6\u0001\u0000\u0000\u0000"+
+		"\u01d6\u008b\u0001\u0000\u0000\u0000\u01d7\u01d8\u0007\u0000\u0000\u0000"+
+		"\u01d8\u008d\u0001\u0000\u0000\u0000)\u0091\u0098\u00a1\u00a8\u00bc\u00c0"+
+		"\u00c4\u00c9\u00cd\u00d2\u00d7\u00e4\u00eb\u00ef\u00f6\u00fb\u0100\u010c"+
+		"\u0118\u011d\u011f\u0124\u0131\u013c\u0145\u014b\u0152\u0157\u0162\u0169"+
+		"\u0172\u017e\u0187\u0190\u0197\u019e\u01a7\u01b2\u01b9\u01c6\u01d5";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

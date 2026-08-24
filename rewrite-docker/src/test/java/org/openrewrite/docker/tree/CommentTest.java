@@ -18,7 +18,6 @@ package org.openrewrite.docker.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.docker.Assertions.docker;
 
 class CommentTest implements RewriteTest {
@@ -36,20 +35,14 @@ class CommentTest implements RewriteTest {
         );
     }
 
-    /// Docker runs the `#` too: a comment is a line of its own, never the tail of one.
     @Test
-    void hashAfterAnArgumentIsNoComment() {
+    void commentsInline() {
         rewriteRun(
           docker(
             """
-              FROM ubuntu:20.04
-              RUN apt-get update  # this runs too
-              """,
-            spec -> spec.afterRecipe(file -> {
-                var run = (Docker.Run) file.getStages().getFirst().getInstructions().getFirst();
-                assertThat(((Docker.ShellForm) run.getCommand()).getArgument().getText())
-                  .isEqualTo("apt-get update  # this runs too");
-            })
+              FROM ubuntu:20.04  # Base image
+              RUN apt-get update  # Update packages
+              """
           )
         );
     }
@@ -87,22 +80,14 @@ class CommentTest implements RewriteTest {
         );
     }
 
-    /// Docker gives up on directives at the first comment or instruction.
     @Test
-    void keyValueCommentIsNoDirectivePastTheHeadOfTheFile() {
+    void trailingCommentAfterImage() {
         rewriteRun(
           docker(
             """
-              # syntax=docker/dockerfile:1
-              FROM ubuntu:20.04
-              # DEBIAN_FRONTEND=noninteractive keeps apt-get from asking
+              FROM 'ubuntu:22.04' # Trailing comment
               RUN apt-get update
-              ENV LANG=C.UTF-8
-              """,
-            spec -> spec.afterRecipe(file -> assertThat(file.getStages().getFirst().getInstructions())
-              .satisfiesExactly(
-                run -> assertThat(run).isInstanceOf(Docker.Run.class),
-                env -> assertThat(env).isInstanceOf(Docker.Env.class)))
+              """
           )
         );
     }

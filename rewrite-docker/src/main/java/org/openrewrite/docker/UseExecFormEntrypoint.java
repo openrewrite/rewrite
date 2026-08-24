@@ -69,11 +69,17 @@ public class UseExecFormEntrypoint extends Recipe {
     @Nullable
     Boolean convertCmd;
 
-    String displayName = "Use exec form for `ENTRYPOINT` and `CMD`";
+    @Override
+    public String getDisplayName() {
+        return "Use exec form for `ENTRYPOINT` and `CMD`";
+    }
 
-    String description = "Converts shell form `ENTRYPOINT` and `CMD` instructions to exec form (JSON array). " +
-            "Exec form is preferred because it runs the command as PID 1, allowing it to receive " +
-            "Unix signals properly. Shell form wraps commands in `/bin/sh -c` which can cause signal handling issues.";
+    @Override
+    public String getDescription() {
+        return "Converts shell form `ENTRYPOINT` and `CMD` instructions to exec form (JSON array). " +
+                "Exec form is preferred because it runs the command as PID 1, allowing it to receive " +
+                "Unix signals properly. Shell form wraps commands in `/bin/sh -c` which can cause signal handling issues.";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

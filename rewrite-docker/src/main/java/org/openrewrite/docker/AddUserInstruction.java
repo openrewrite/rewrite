@@ -22,7 +22,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.docker.internal.ArgumentContents;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
@@ -30,6 +29,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.List;
 
+import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -67,10 +67,16 @@ public class AddUserInstruction extends Recipe {
     @Nullable
     Boolean skipIfUserExists;
 
-    String displayName = "Add `USER` instruction";
+    @Override
+    public String getDisplayName() {
+        return "Add `USER` instruction";
+    }
 
-    String description = "Adds a `USER` instruction to run the container as a non-root user (CIS Docker Benchmark 4.1). " +
-            "By default, adds to the final stage only and skips if a `USER` instruction already exists.";
+    @Override
+    public String getDescription() {
+        return "Adds a `USER` instruction to run the container as a non-root user (CIS Docker Benchmark 4.1). " +
+                "By default, adds to the final stage only and skips if a `USER` instruction already exists.";
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -170,11 +176,18 @@ public class AddUserInstruction extends Recipe {
             }
 
             private Docker.Argument createArgument(String text, Space prefix) {
+                Docker.ArgumentContent content = new Docker.Literal(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        text,
+                        null
+                );
                 return new Docker.Argument(
                         randomId(),
                         prefix,
                         Markers.EMPTY,
-                        ArgumentContents.of(text, null)
+                        singletonList(content)
                 );
             }
         };
