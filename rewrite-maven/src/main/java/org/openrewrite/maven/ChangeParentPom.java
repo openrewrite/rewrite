@@ -181,6 +181,11 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
          */
         final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> updatedByPom = new ConcurrentHashMap<>();
 
+        /**
+         * The same markers as {@link #updatedByPom}, but also declaring the dependency management that the
+         * edit phase restores in the changed pom. Descendants resolve against this view; filled on demand in
+         * the edit phase, as it depends on the new parent's own model.
+         */
         final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> restoredByPom = new ConcurrentHashMap<>();
     }
 
