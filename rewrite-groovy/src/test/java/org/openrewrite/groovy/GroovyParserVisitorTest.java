@@ -90,4 +90,25 @@ class GroovyParserVisitorTest {
           "Initializer should be on the NamedVariable");
     }
 
+    @Test
+    void leadingCommentRemainsOnFirstStatement() {
+        String source = """
+          /*
+           * License header
+           */
+          plugins {
+              id 'java'
+          }
+          """;
+        G.CompilationUnit cu = GroovyParser.builder().build()
+          .parse(new InMemoryExecutionContext(), source)
+          .map(G.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        assertEquals(source, cu.printAll());
+        assertTrue(cu.getPrefix().getComments().isEmpty());
+        assertFalse(cu.getStatements().get(0).getComments().isEmpty());
+    }
+
 }

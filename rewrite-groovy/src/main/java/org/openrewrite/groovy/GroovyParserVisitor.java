@@ -247,7 +247,7 @@ public class GroovyParserVisitor {
                     continue;
                 }
                 JRightPadded<Statement> statement = convertTopLevelStatement(unit, entry.getValue());
-                if (statements.isEmpty() && pkg == null) {
+                if (statements.isEmpty() && pkg == null && statement.getElement() instanceof J.Import) {
                     prefix = statement.getElement().getPrefix();
                     statement = statement.withElement(statement.getElement().withPrefix(EMPTY));
                 }

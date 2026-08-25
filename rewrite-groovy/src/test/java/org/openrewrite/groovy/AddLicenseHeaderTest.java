@@ -61,4 +61,18 @@ class AddLicenseHeaderTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5762")
+    @Test
+    void dontChangeCommentOnlySource() {
+        rewriteRun(
+          groovy(
+            """
+              /*
+               * My license header
+               */
+              """
+          )
+        );
+    }
 }
