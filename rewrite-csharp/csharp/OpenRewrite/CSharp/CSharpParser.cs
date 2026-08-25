@@ -4021,6 +4021,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var firstSemiPrefix = ExtractSpaceBefore(node.FirstSemicolonToken);
         _cursor = node.FirstSemicolonToken.Span.End;
 
+        if (init.Count == 0)
+        {
+            var empty = new Empty(Guid.NewGuid(), firstSemiPrefix, Markers.Empty);
+            init.Add(new JRightPadded<Statement>(empty, Space.Empty, Markers.Empty));
+        }
+
         // Parse condition
         Expression? condExpr = null;
         if (node.Condition != null)
