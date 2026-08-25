@@ -464,7 +464,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
             return true;
         }
-        return innerExpression.getType() == JavaType.Primitive.Boolean;
+        return isBooleanValued(innerExpression);
     }
 
     /**
@@ -510,15 +510,6 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     private boolean isBooleanValued(Expression expression) {
-        if (expression.getType() == JavaType.Primitive.Boolean) {
-            return true;
-        }
-        if (expression instanceof J.Literal) {
-            return ((J.Literal) expression).getValue() instanceof Boolean;
-        }
-        if (expression instanceof J.Unary) {
-            return ((J.Unary) expression).getOperator() == J.Unary.Type.Not;
-        }
         if (expression instanceof J.Binary) {
             J.Binary binary = (J.Binary) expression;
             switch (binary.getOperator()) {
@@ -540,6 +531,12 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             J tree = ((J.Parentheses<?>) expression).getTree();
             return tree instanceof Expression && isBooleanValued((Expression) tree);
         }
-        return false;
+        if (expression instanceof J.Unary) {
+            return ((J.Unary) expression).getOperator() == J.Unary.Type.Not;
+        }
+        if (expression instanceof J.Literal) {
+            return ((J.Literal) expression).getValue() instanceof Boolean;
+        }
+        return expression.getType() == JavaType.Primitive.Boolean;
     }
 }

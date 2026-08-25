@@ -136,6 +136,19 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void doubleNegationOfShortCircuitChainPreserved() {
+        rewriteRun(
+          javascript(
+            """
+              function isElement(sources) {
+                  return !!(sources && sources.nodeName && sources.nodeType === 1);
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void simplifyBooleanLiterals() {
         rewriteRun(
           javascript(
