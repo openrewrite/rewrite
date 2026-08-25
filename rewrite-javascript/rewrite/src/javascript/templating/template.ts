@@ -142,11 +142,11 @@ export class TemplateBuilder {
  *
  * @example
  * // Generate a literal AST node
- * const result = template`2`.apply(cursor, coordinates);
+ * const result = await template`2`.apply(node, cursor);
  *
  * @example
  * // Generate an AST node with a parameter
- * const result = template`${capture()}`.apply(cursor, coordinates);
+ * const result = await template`${capture()}`.apply(node, cursor);
  *
  * @example
  * // Access properties of captured nodes in templates
@@ -154,10 +154,10 @@ export class TemplateBuilder {
  * const pat = pattern`foo(${method})`;
  * const tmpl = template`bar(${method.name})`; // Access the 'name' property
  *
- * const match = await pat.match(someNode);
+ * const match = await pat.match(someNode, cursor);
  * if (match) {
  *     // The template will insert just the 'name' subtree from the captured method
- *     const result = await tmpl.apply(cursor, someNode, match);
+ *     const result = await tmpl.apply(someNode, cursor, { values: match });
  * }
  *
  * @example
@@ -383,7 +383,7 @@ export class Template {
  * @example
  * // Simple template with literal
  * const tmpl = template`console.log("hello")`;
- * const result = await tmpl.apply(cursor, node);
+ * const result = await tmpl.apply(node, cursor);
  *
  * @example
  * // Template with capture - matches captured value from pattern
@@ -391,9 +391,9 @@ export class Template {
  * const pat = pattern`foo(${expr})`;
  * const tmpl = template`bar(${expr})`;
  *
- * const match = await pat.match(node);
+ * const match = await pat.match(node, cursor);
  * if (match) {
- *     const result = await tmpl.apply(cursor, node, match);
+ *     const result = await tmpl.apply(node, cursor, { values: match });
  * }
  *
  * @example

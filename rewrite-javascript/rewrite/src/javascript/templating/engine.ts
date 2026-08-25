@@ -17,7 +17,7 @@ import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
-import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
+import {CaptureMarker, dedupeIds, PlaceholderUtils, randomizeIds, WRAPPER_FUNCTION_NAME} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {JavaCoordinates} from './template';
@@ -260,12 +260,18 @@ export class TemplateEngine {
             substitutions.set(placeholder, parameters[i]);
         }
 
+        // Before substitution, so that substituted captures keep the ids they had in the source tree
+        const freshAst = await randomizeIds(ast);
+
         // Unsubstitute placeholders with actual parameter values and match results
         const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap);
-        const unsubstitutedAst = (await visitor.visit(ast, null))!;
+        const unsubstitutedAst = (await visitor.visit(freshAst, null))!;
+
+        // Catches the capture that was spliced in more than once, which `randomizeIds` cannot see
+        const dedupedAst = await dedupeIds(unsubstitutedAst);
 
         // Apply the template to the current AST
-        return new TemplateApplier(cursor, coordinates, unsubstitutedAst).apply();
+        return new TemplateApplier(cursor, coordinates, dedupedAst).apply();
     }
 
     /**

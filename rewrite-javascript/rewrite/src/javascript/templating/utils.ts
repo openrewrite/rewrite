@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 import {Cursor} from '../..';
-import {J} from '../../java';
+import {J, NameTree} from '../../java';
 import {JS} from '../index';
+import {JavaScriptVisitor} from '../visitor';
 import {Marker, Markers} from '../../markers';
 import {randomId} from '../../uuid';
 import {ConstraintFunction, VariadicOptions} from './types';
@@ -114,6 +115,43 @@ export function generateCacheKey(
         contextStatements.join(';'),
         JSON.stringify(dependencies)
     ].join('::');
+}
+
+abstract class IdVisitor extends JavaScriptVisitor<any> {
+    // `JavaVisitor.visitTypeName` is a no-op stub, which leaves annotation names unreachable
+    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: any): Promise<N> {
+        return (await this.visit(nameTree, p)) as N;
+    }
+}
+
+class RandomizeIdVisitor extends IdVisitor {
+    protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
+        return {...tree, id: randomId()};
+    }
+}
+
+class DedupeIdVisitor extends IdVisitor {
+    private readonly seen = new Set<string>();
+
+    protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
+        if (this.seen.has(tree.id)) {
+            const id = randomId();
+            this.seen.add(id);
+            return {...tree, id};
+        }
+        this.seen.add(tree.id);
+        return tree;
+    }
+}
+
+/** Structural copy of `tree` with a fresh `id` on every `Tree` node; counterpart of Java's `RandomizeIdVisitor`. */
+export function randomizeIds<T extends J>(tree: T): Promise<T> {
+    return new RandomizeIdVisitor().visit(tree, null) as Promise<T>;
+}
+
+/** Copy of `tree` with duplicate `Tree` ids resolved within it, keeping the first occurrence on its original id. */
+export function dedupeIds<T extends J>(tree: T): Promise<T> {
+    return new DedupeIdVisitor().visit(tree, null) as Promise<T>;
 }
 
 /**
