@@ -332,6 +332,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
     private static boolean isNumericLiteral(Expression expression) {
         return expression instanceof J.Literal &&
+                expression.getType() instanceof JavaType.Primitive &&
                 ((JavaType.Primitive) expression.getType()).isNumeric();
     }
 
