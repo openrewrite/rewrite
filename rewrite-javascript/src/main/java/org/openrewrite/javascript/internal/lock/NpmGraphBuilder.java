@@ -24,6 +24,8 @@ import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static org.openrewrite.javascript.internal.LockFileRegeneration.Reason.RESOLUTION_REQUIRED;
 import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
@@ -68,7 +70,7 @@ public final class NpmGraphBuilder {
     }
 
     public NpmGraphBuilder(Registry registry, boolean autoInstallPeers) {
-        this(registry, autoInstallPeers, Collections.emptyMap());
+        this(registry, autoInstallPeers, emptyMap());
     }
 
     public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions) {
@@ -138,8 +140,8 @@ public final class NpmGraphBuilder {
         Map<String, ResolvedNode> nodes = new LinkedHashMap<>();
         for (Map.Entry<String, VersionManifest> e : manifests.entrySet()) {
             String nodeKey = e.getKey();
-            Map<String, String> edges = new LinkedHashMap<>(nodeEdges.getOrDefault(nodeKey, Collections.emptyMap()));
-            edges.putAll(nodeOptionalEdges.getOrDefault(nodeKey, Collections.emptyMap()));
+            Map<String, String> edges = new LinkedHashMap<>(nodeEdges.getOrDefault(nodeKey, emptyMap()));
+            edges.putAll(nodeOptionalEdges.getOrDefault(nodeKey, emptyMap()));
             nodes.put(nodeKey, new ResolvedNode(e.getValue(), edges,
                     flags.dev.contains(nodeKey), flags.optional.contains(nodeKey), flags.devOptional.contains(nodeKey)));
         }
@@ -167,7 +169,7 @@ public final class NpmGraphBuilder {
     private String select(String name, String range,
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
                           Deque<String[]> work) {
-        String deduped = Semver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range, NODE);
+        String deduped = Semver.maxSatisfying(chosen.getOrDefault(name, emptySet()), range, NODE);
         if (deduped != null) {
             return deduped;
         }
@@ -190,7 +192,7 @@ public final class NpmGraphBuilder {
 
     /** The highest already-locked version of {@code name} that {@code range} admits, or {@code null}. */
     private @Nullable String lockedSatisfying(String name, String range) {
-        return Semver.maxSatisfying(lockedVersions.getOrDefault(name, Collections.emptySet()), range, NODE);
+        return Semver.maxSatisfying(lockedVersions.getOrDefault(name, emptySet()), range, NODE);
     }
 
     /**
@@ -219,7 +221,7 @@ public final class NpmGraphBuilder {
      */
     private String selectAlias(String aliasName, String realName, String range, Map<String, Set<String>> chosen,
                                Map<String, VersionManifest> manifests, Deque<String[]> work) {
-        String deduped = Semver.maxSatisfying(chosen.getOrDefault(aliasName, Collections.emptySet()), range, NODE);
+        String deduped = Semver.maxSatisfying(chosen.getOrDefault(aliasName, emptySet()), range, NODE);
         if (deduped != null) {
             return deduped;
         }
@@ -248,7 +250,7 @@ public final class NpmGraphBuilder {
                 range = alias.range;
             }
         }
-        return Semver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range, NODE);
+        return Semver.maxSatisfying(chosen.getOrDefault(name, emptySet()), range, NODE);
     }
 
     /** Parse an {@code npm:<name>@<range>} alias, or {@code null} when the target is not a registry range. */
@@ -317,7 +319,7 @@ public final class NpmGraphBuilder {
             }
         }
         for (Map.Entry<String, String> alias : aliases.entrySet()) {
-            for (String version : chosen.getOrDefault(alias.getKey(), Collections.emptySet())) {
+            for (String version : chosen.getOrDefault(alias.getKey(), emptySet())) {
                 VersionManifest m = manifests.get(ResolutionGraph.key(alias.getKey(), version));
                 if (m != null && notEmpty(m.getPeerDependencies())) {
                     throw new EngineFailure(RESOLUTION_REQUIRED, alias.getValue(), alias.getValue() +
@@ -453,7 +455,7 @@ public final class NpmGraphBuilder {
                 resolvePeer(rootRequirer(decl), peer.getKey(), peer.getValue(), null, chosen, missing);
             }
         }
-        return missing.isEmpty() ? Collections.emptySet() : installMissingPeers(missing, manifests, chosen, declared);
+        return missing.isEmpty() ? emptySet() : installMissingPeers(missing, manifests, chosen, declared);
     }
 
     /**
@@ -463,7 +465,7 @@ public final class NpmGraphBuilder {
      */
     private void resolvePeer(String requirer, String peerName, String range, @Nullable JsonNode meta,
                              Map<String, Set<String>> chosen, List<String[]> missing) {
-        Set<String> resolved = chosen.getOrDefault(peerName, Collections.emptySet());
+        Set<String> resolved = chosen.getOrDefault(peerName, emptySet());
         if (resolved.isEmpty()) {
             if (isOptionalPeer(meta, peerName)) {
                 return;

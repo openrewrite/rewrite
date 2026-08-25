@@ -27,7 +27,6 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,6 +35,9 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
+
+import static java.util.Collections.emptySet;
+import static java.util.Collections.sort;
 
 /**
  * Byte-exact patcher for a Yarn Berry {@code yarn.lock} (the {@code __metadata:}-headed YAML format). The file
@@ -185,7 +187,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         if (meta != null && meta.isObject() && meta.size() > 0) {
             List<String> names = new ArrayList<>();
             meta.fieldNames().forEachRemaining(names::add);
-            Collections.sort(names);
+            sort(names);
             body.append("  peerDependenciesMeta:\n");
             for (String name : names) {
                 JsonNode entry = meta.get(name);
@@ -318,7 +320,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         if (depsEntry == null || !(depsEntry.getValue() instanceof Yaml.Mapping)) {
             return;
         }
-        Set<String> keep = newDeps == null ? Collections.emptySet() : newDeps.keySet();
+        Set<String> keep = newDeps == null ? emptySet() : newDeps.keySet();
         for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) depsEntry.getValue()).getEntries()) {
             String name = LockYaml.keyOf(dep);
             if (name != null && !keep.contains(name)) {
@@ -333,7 +335,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         if (depsEntry == null || !(depsEntry.getValue() instanceof Yaml.Mapping)) {
             return body;
         }
-        Set<String> keep = newDeps == null ? Collections.emptySet() : newDeps.keySet();
+        Set<String> keep = newDeps == null ? emptySet() : newDeps.keySet();
         List<Yaml.Mapping.Entry> survivors = new ArrayList<>();
         for (Yaml.Mapping.Entry dep : ((Yaml.Mapping) depsEntry.getValue()).getEntries()) {
             if (keep.contains(LockYaml.keyOf(dep))) {

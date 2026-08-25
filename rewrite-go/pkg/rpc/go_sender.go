@@ -149,6 +149,8 @@ func (s *GoSender) VisitGoUnary(u *golang.Unary, p any) java.J {
 	}, func(v any) { sendLeftPadded(s, v, q) })
 	q.GetAndSend(u, func(v any) any { return v.(*golang.Unary).Expression },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(u, func(v any) any { return AsRef(v.(*golang.Unary).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return u
 }
 
@@ -201,6 +203,8 @@ func (s *GoSender) VisitComposite(c *golang.Composite, p any) java.J {
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(c, func(v any) any { return v.(*golang.Composite).Elements },
 		func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(c, func(v any) any { return AsRef(v.(*golang.Composite).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return c
 }
 
@@ -525,6 +529,13 @@ func (s *GoSender) sendParseError(pe *java.ParseError, q *SendQueue) {
 	q.GetAndSend(pe, func(_ any) any { return nil }, nil) // checksum
 	q.GetAndSend(pe, func(_ any) any { return nil }, nil) // fileAttributes
 	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).Text }, nil)
+}
+
+func (s *GoSender) VisitSelect(sel *golang.Select, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(sel, func(v any) any { return v.(*golang.Select).Body },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return sel
 }
 
 func (s *GoSender) VisitIndexList(il *golang.IndexList, p any) java.J {

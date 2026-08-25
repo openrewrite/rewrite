@@ -325,3 +325,45 @@ func TestNewRecipePreservesFormatting(t *testing.T) {
 		`),
 	)
 }
+
+func TestNewRecipeWithSourceImportsKeepsVersionedPathImport(t *testing.T) {
+	// Declaring SourceImports runs the import cleanup over the whole file,
+	// including imports the recipe never touches.
+	r := NewRecipe(
+		RecipeName("test.RenameX"),
+		WithDisplayName("Rename x to y"),
+		WithBefore(`x`),
+		WithAfter(`y`, SourceImports("fmt")),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			import (
+				"fmt"
+
+				"gopkg.in/yaml.v3"
+			)
+
+			func load(b []byte, out any) error {
+				fmt.Println(x)
+				return yaml.Unmarshal(b, out)
+			}
+		`, `
+			package main
+
+			import (
+				"fmt"
+
+				"gopkg.in/yaml.v3"
+			)
+
+			func load(b []byte, out any) error {
+				fmt.Println(y)
+				return yaml.Unmarshal(b, out)
+			}
+		`),
+	)
+}

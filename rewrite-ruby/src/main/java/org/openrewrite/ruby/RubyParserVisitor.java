@@ -1421,12 +1421,12 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         String name = str(node.name);
 
         // `x[i]` is an index, but `x&.[](i)` is an ordinary call to the same method
-        if (name.equals("[]") && node.receiver != null && written("[", node.receiver)) {
+        if ("[]".equals(name) && node.receiver != null && written("[", node.receiver)) {
             Space prefix = prefix(node);
             return arrayAccess(prefix, node.receiver,
                     node.arguments == null ? new Nodes.Node[0] : node.arguments.arguments);
         }
-        if (name.equals("[]=") && node.receiver != null && node.arguments != null) {
+        if ("[]=".equals(name) && node.receiver != null && node.arguments != null) {
             return indexAssignment(node);
         }
         if (node.isAttributeWrite() && node.receiver != null && name.endsWith("=") &&
@@ -1465,7 +1465,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         }
 
         J.Identifier methodName = identifier(name);
-        if (name.equals("new")) {
+        if ("new".equals(name)) {
             return new J.NewClass(
                     randomId(),
                     prefix,
@@ -1590,7 +1590,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Space prefix = prefix(node);
         String operator = name.endsWith("@") ? name.substring(0, name.length() - 1) : name;
         Markers markers = Markers.EMPTY;
-        if (operator.equals("!") && peekKeyword("not")) {
+        if ("!".equals(operator) && peekKeyword("not")) {
             operator = "not";
             markers = markers.add(new EnglishOperator(randomId()));
         }

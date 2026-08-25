@@ -248,6 +248,7 @@ type Composite struct {
 	Markers  java.Markers
 	TypeExpr java.Expression                 // nil for untyped composite literals
 	Elements java.Container[java.Expression] // Before = space between TypeExpr and `{`, empty when untyped; last After = space before `}`
+	Type     java.JavaType
 }
 
 func (*Composite) IsTree()       {}
@@ -977,6 +978,39 @@ func (n *CommClause) WithMarkers(markers java.Markers) *CommClause {
 	return &c
 }
 
+// Select is Go's `select { ... }` statement. It looks like a `switch` but is a
+// distinct construct with no Java equivalent, so it is not mapped to java.Switch:
+// its clauses are golang.CommClause, which are not java.Case, and a JavaVisitor
+// walking java.Switch.getCases() must never encounter them.
+type Select struct {
+	ID      uuid.UUID
+	Prefix  java.Space
+	Markers java.Markers
+	Body    *java.Block // contains CommClause clauses
+}
+
+func (*Select) IsTree()      {}
+func (*Select) IsJ()         {}
+func (*Select) IsStatement() {}
+
+func (n *Select) WithPrefix(prefix java.Space) *Select {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Select) WithMarkers(markers java.Markers) *Select {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // Used for Go function literals which are parsed as MethodDeclaration (a Statement)
 // but can appear in return statements, assignments, and call arguments.
 // ExpressionStatement wraps an Expression standing in statement
@@ -1010,9 +1044,9 @@ func (n *ExpressionStatement) WithMarkers(markers java.Markers) *ExpressionState
 	return &c
 }
 
-// TypeAssertion is Go's postfix `x.(T)`, where J.TypeCast is a prefix
-// cast. The left expression is right-padded, so its padding holds what
-// stands before the dot — a space, or a comment.
+// TypeAssertion is Go's postfix `x.(T)`, which reads an interface's dynamic
+// type where J.TypeCast converts. The left expression is right-padded, so its
+// padding holds what stands before the dot — a space, or a comment.
 type TypeAssertion struct {
 	ID           uuid.UUID
 	Prefix       java.Space
@@ -1150,6 +1184,7 @@ type Unary struct {
 	Markers    java.Markers
 	Operator   java.LeftPadded[UnaryOperator] // Before = space before the operator token
 	Expression java.Expression
+	Type       java.JavaType
 }
 
 func (*Unary) IsTree()       {}
@@ -1323,13 +1358,6 @@ func (n *Variadic) WithMarkers(markers java.Markers) *Variadic {
 	c.Markers = markers
 	return &c
 }
-
-// SelectStmt is a marker on Switch indicating it's a `select` statement instead of `switch`.
-type SelectStmt struct {
-	Ident uuid.UUID
-}
-
-func (s SelectStmt) ID() uuid.UUID { return s.Ident }
 
 // TypeSwitchGuard is a marker on Switch indicating it's a type switch with
 // a type assertion guard like `switch x.(type)` or `switch v := x.(type)`.

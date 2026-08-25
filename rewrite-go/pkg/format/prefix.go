@@ -87,3 +87,14 @@ func transformPrefix(t java.Tree, f func(java.Space) java.Space) java.Tree {
 	}
 	return withPrefix(t, next)
 }
+
+// PrefixOf returns t's own leading whitespace. Callers outside layout need it
+// to move whitespace between a node and one that comes to enclose it.
+func PrefixOf(t java.Tree) java.Space {
+	return getPrefix(t)
+}
+
+// WithPrefix returns t carrying s as its leading whitespace.
+func WithPrefix(t java.Tree, s java.Space) java.Tree {
+	return transformPrefix(t, func(java.Space) java.Space { return s })
+}

@@ -1533,12 +1533,50 @@ func (n *Parentheses) WithMarkers(markers Markers) *Parentheses {
 	return &c
 }
 
+// ParenthesizedTypeTree is a type written in parentheses, such as the `(*T)` of
+// `(*T)(nil)`. Go spells a parenthesized type and a parenthesized expression
+// alike, so only the position tells them apart; the separate node is what keeps
+// a type a TypeTree in slots such as TypeCast.Clazz, which Java bounds to one.
+type ParenthesizedTypeTree struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Annotations []*Annotation
+	Type        *Parentheses // the parentheses, and the type they enclose
+}
+
+func (*ParenthesizedTypeTree) IsTree()       {}
+func (*ParenthesizedTypeTree) IsJ()          {}
+func (*ParenthesizedTypeTree) IsExpression() {}
+
+func (n *ParenthesizedTypeTree) WithPrefix(prefix Space) *ParenthesizedTypeTree {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ParenthesizedTypeTree) WithMarkers(markers Markers) *ParenthesizedTypeTree {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// TypeCast is Go's conversion `T(x)`. J's own cast is the mirror image — Java
+// parenthesizes the type ahead of the operand — so Clazz holds the type, where
+// J.TypeCast.getType reads it, and the parentheses it carries stand after that
+// type: its Prefix leads the `(`, its After the `)`.
 type TypeCast struct {
 	ID      uuid.UUID
 	Prefix  Space
 	Markers Markers
-	Clazz   *ControlParentheses // the type in parentheses
-	Expr    Expression          // the expression being cast/asserted
+	Clazz   *ControlParentheses // the type, and the parentheses following it
+	Expr    Expression          // the operand being converted
 }
 
 func (*TypeCast) IsTree()       {}

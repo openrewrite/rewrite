@@ -159,6 +159,7 @@ func (r *GoReceiver) VisitGoUnary(u *golang.Unary, p any) java.J {
 	u = &c
 	u.Operator = receiveLeftPaddedEnum(r, q, u.Operator, golang.ParseUnaryOperator)
 	u.Expression = receiveValue(q, u.Expression, func(e java.Expression) any { return r.Visit(e, q) })
+	u.Type = r.receiveType(u.Type, q)
 	return u
 }
 
@@ -205,6 +206,7 @@ func (r *GoReceiver) VisitComposite(comp *golang.Composite, p any) java.J {
 	comp = &c
 	comp.TypeExpr = receiveValue(q, comp.TypeExpr, func(e java.Expression) any { return r.Visit(e, q) })
 	comp.Elements = receiveContainer[java.Expression](r, q, comp.Elements)
+	comp.Type = r.receiveType(comp.Type, q)
 	return comp
 }
 
@@ -479,6 +481,14 @@ func (r *GoReceiver) VisitCommClause(cc *golang.CommClause, p any) java.J {
 		cc.Body = after
 	}
 	return cc
+}
+
+func (r *GoReceiver) VisitSelect(sel *golang.Select, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *sel // shallow copy to avoid mutating remoteObjects baseline
+	sel = &c
+	sel.Body = receiveValue(q, sel.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	return sel
 }
 
 func (r *GoReceiver) VisitIndexList(il *golang.IndexList, p any) java.J {

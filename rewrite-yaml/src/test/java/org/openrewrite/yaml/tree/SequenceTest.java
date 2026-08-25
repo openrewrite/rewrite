@@ -31,12 +31,11 @@ class SequenceTest implements RewriteTest {
               - apples
               - oranges
               """,
-            spec -> spec.afterRecipe(y -> {
+            spec -> spec.afterRecipe(y ->
                 assertThat(((Yaml.Sequence) (y.getDocuments().getFirst().getBlock())).getEntries().stream()
                   .map(Yaml.Sequence.Entry::getBlock)
                   .map(block -> ((Yaml.Scalar) block).getValue()))
-                  .containsExactly("apples", "oranges");
-            })
+                  .containsExactly("apples", "oranges"))
           )
         );
     }

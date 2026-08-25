@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,18 +24,23 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+/**
+ * Marks a {@link org.openrewrite.java.tree.J.MethodInvocation} of one of Go's predeclared functions —
+ * {@code len}, {@code copy}, {@code append} and friends. They have no signature to attribute, so the marker is
+ * what separates them from a call to a user-defined function of the same name.
+ */
 @Value
 @With
-public class SelectStmt implements Marker, RpcCodec<SelectStmt> {
+public class Builtin implements Marker, RpcCodec<Builtin> {
     UUID id;
 
     @Override
-    public void rpcSend(SelectStmt after, RpcSendQueue q) {
+    public void rpcSend(Builtin after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
     }
 
     @Override
-    public SelectStmt rpcReceive(SelectStmt before, RpcReceiveQueue q) {
+    public Builtin rpcReceive(Builtin before, RpcReceiveQueue q) {
         return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
     }
 }

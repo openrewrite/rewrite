@@ -22,6 +22,8 @@ import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.openrewrite.javascript.internal.lock.YarnLock.unwrap;
 
 /**
@@ -62,8 +64,8 @@ final class YarnClassicLockDiff {
         List<Block> orphaned = new ArrayList<>();
         for (String name : names) {
             matchName(graph, root, selectors, name,
-                    nodesByName.getOrDefault(name, Collections.emptyList()),
-                    lock.blocksByName.getOrDefault(name, Collections.emptyList()),
+                    nodesByName.getOrDefault(name, emptyList()),
+                    lock.blocksByName.getOrDefault(name, emptyList()),
                     edits, fresh, orphaned);
         }
         for (String nodeKey : fresh) {
@@ -205,7 +207,7 @@ final class YarnClassicLockDiff {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " has an optionalDependencies section, which is not yet patched");
         }
-        Set<String> newDeps = m.getDependencies() == null ? Collections.emptySet() : m.getDependencies().keySet();
+        Set<String> newDeps = m.getDependencies() == null ? emptySet() : m.getDependencies().keySet();
         if (!block.depNames.containsAll(newDeps)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " gains a dependency edge on upgrade, which is not yet patched");
@@ -456,7 +458,7 @@ final class YarnClassicLockDiff {
                     optionalSection = false;
                     inDeps = false;
                 } else if (headerTokens != null) {
-                    if (line.equals("  dependencies:") || line.equals("  optionalDependencies:")) {
+                    if ("  dependencies:".equals(line) || "  optionalDependencies:".equals(line)) {
                         inDeps = true;
                         optionalSection |= line.contains("optional");
                     } else if (inDeps && line.startsWith("    ")) {

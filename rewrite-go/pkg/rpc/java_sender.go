@@ -655,6 +655,29 @@ func (s *JavaSender) VisitParentheses(parens *java.Parentheses, p any) java.J {
 	return parens
 }
 
+func (s *JavaSender) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, p any) java.J {
+	q := p.(*SendQueue)
+	// annotations (list)
+	q.GetAndSendList(ptt,
+		func(v any) []any {
+			annots := v.(*java.ParenthesizedTypeTree).Annotations
+			if annots == nil {
+				return nil
+			}
+			result := make([]any, len(annots))
+			for i, a := range annots {
+				result[i] = a
+			}
+			return result
+		},
+		func(v any) any { return extractID(v) },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	// parenthesizedType
+	q.GetAndSend(ptt, func(v any) any { return v.(*java.ParenthesizedTypeTree).Type },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return ptt
+}
+
 func (s *JavaSender) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(tc, func(v any) any { return v.(*java.TypeCast).Clazz },

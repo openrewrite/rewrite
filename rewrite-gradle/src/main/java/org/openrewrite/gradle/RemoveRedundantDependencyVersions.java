@@ -393,7 +393,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                        m = GradleMultiDependency.matcher()
+                        return GradleMultiDependency.matcher()
                                 .groupId(groupPattern)
                                 .artifactId(artifactPattern)
                                 .get(getCursor())
@@ -432,7 +432,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     }
                                     return gradleDependency.getTree();
                                 })).orElse(m);
-                        return m;
                     }
 
                     private @Nullable String getSpringBootVersionFromPlugin() {

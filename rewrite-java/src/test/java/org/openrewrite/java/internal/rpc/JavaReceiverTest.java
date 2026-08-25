@@ -33,6 +33,7 @@ import org.openrewrite.rpc.RpcSendQueue;
 import java.nio.file.Path;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaReceiverTest {
@@ -55,18 +56,18 @@ class JavaReceiverTest {
         // given
         JavaType.Method methodType = new JavaType.Method(
                 null, 0, null, "foo", null,
-                Collections.emptyList(), Collections.emptyList(),
-                Collections.emptyList(), Collections.emptyList(),
+                emptyList(), emptyList(),
+                emptyList(), emptyList(),
                 null, null
         );
         J.Identifier name = new J.Identifier(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                Collections.emptyList(), "foo", methodType, null
+                emptyList(), "foo", methodType, null
         );
         J.MethodInvocation original = new J.MethodInvocation(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY,
                 null, null, name,
-                JContainer.build(Space.EMPTY, Collections.emptyList(), Markers.EMPTY),
+                JContainer.build(Space.EMPTY, emptyList(), Markers.EMPTY),
                 methodType
         );
 
@@ -88,17 +89,17 @@ class JavaReceiverTest {
         JavaType.ShallowClass sharedType = JavaType.ShallowClass.build("java.util.List");
         J.Identifier a = new J.Identifier(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                Collections.emptyList(), "a", sharedType, null
+                emptyList(), "a", sharedType, null
         );
         J.Identifier b = new J.Identifier(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                Collections.emptyList(), "b", sharedType, null
+                emptyList(), "b", sharedType, null
         );
         J.MethodInvocation original = new J.MethodInvocation(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY,
                 null, null,
                 new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                        Collections.emptyList(), "foo", null, null),
+                        emptyList(), "foo", null, null),
                 JContainer.build(Space.EMPTY,
                         new ArrayList<>(List.of(JRightPadded.build((Expression) a), JRightPadded.build((Expression) b))),
                         Markers.EMPTY),

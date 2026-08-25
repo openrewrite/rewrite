@@ -1193,7 +1193,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         Symbol.MethodSymbol nodeSym = jcMethod.sym;
 
         J.MethodDeclaration.IdentifierWithAnnotations name;
-        if ("<init>".equals(node.getName().toString())) {
+        if ("<init>".contentEquals(node.getName())) {
             String owner = null;
             if (nodeSym == null) {
                 for (Tree tree : getCurrentPath()) {
@@ -2411,9 +2411,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         boolean afterFirstModifier = false;
         boolean inComment = false;
         boolean inMultilineComment = false;
+        int multilineCommentStart = -1;
         int afterLastModifierPosition = cursor;
         int lastAnnotationPosition = cursor;
-        boolean noSpace = false;
 
         int keywordStartIdx = -1;
         for (int i = cursor; i < source.length(); i++) {
@@ -2433,24 +2433,28 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             char c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1) {
+            if (c == '/' && source.length() > i + 1 && !inComment && !inMultilineComment) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
                     inMultilineComment = true;
+                    multilineCommentStart = i;
                 } else if (next == '/') {
                     inComment = true;
                 }
             }
 
-            if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
+            // The closing `/` cannot be part of the opener, so `/*/` does not terminate a block comment.
+            if (inMultilineComment && c == '/' && i >= multilineCommentStart + 3 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
-                // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
-                if (Character.isWhitespace(c) || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
+                // Modifiers end at whitespace, at a type parameter list's `<`, or at an adjacent annotation's `@`
+                boolean beforeAnnotation = !Character.isWhitespace(c) && c != '<' &&
+                        i + 1 < source.length() && source.charAt(i + 1) == '@';
+                if (Character.isWhitespace(c) || c == '<' || beforeAnnotation) {
                     if (keywordStartIdx != -1) {
-                        Modifier matching = MODIFIER_BY_KEYWORD.get(source.substring(keywordStartIdx, noSpace ? i + 1 : i));
+                        Modifier matching = MODIFIER_BY_KEYWORD.get(source.substring(keywordStartIdx, beforeAnnotation ? i + 1 : i));
                         keywordStartIdx = -1;
 
                         if (matching == null) {
@@ -2542,6 +2546,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> annotations = new ArrayList<>();
         boolean inComment = false;
         boolean inMultilineComment = false;
+        int multilineCommentStart = -1;
         for (int i = cursor; i <= maxAnnotationPosition && i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
@@ -2554,16 +2559,18 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             char c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1) {
+            if (c == '/' && source.length() > i + 1 && !inComment && !inMultilineComment) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
                     inMultilineComment = true;
+                    multilineCommentStart = i;
                 } else if (next == '/') {
                     inComment = true;
                 }
             }
 
-            if (inMultilineComment && c == '/' && i > 0 && source.charAt(i - 1) == '*') {
+            // The closing `/` cannot be part of the opener, so `/*/` does not terminate a block comment.
+            if (inMultilineComment && c == '/' && i >= multilineCommentStart + 3 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;

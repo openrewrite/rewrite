@@ -188,7 +188,7 @@ func TestHasSourcePathMatchesGoMod(t *testing.T) {
 func TestUsesMethodMatchesInvocationInTree(t *testing.T) {
 	// given a compilation unit containing fmt.Println(...)
 	mi := &java.MethodInvocation{
-		Select: &java.RightPadded[java.Expression]{Element: &java.Identifier{Name: "fmt"}},
+		Select: &java.RightPadded[java.Expression]{Element: &java.Identifier{Name: "fmt", Type: &java.JavaTypeClass{FullyQualifiedName: "fmt"}}},
 		Name:   &java.Identifier{Name: "Println"},
 	}
 	cu := &golang.CompilationUnit{
@@ -248,4 +248,21 @@ func TestAndRequiresAtLeastTwoOperands(t *testing.T) {
 		}
 	}()
 	And(&recordingVisitor{})
+}
+
+func TestUsesTypeIgnoresUnattributedNodes(t *testing.T) {
+	// given a node whose attribution produced no type
+	unattributed := &java.Identifier{Name: "tr", Type: java.UnknownType}
+	cu := &golang.CompilationUnit{
+		Statements: []java.RightPadded[java.Statement]{
+			{Element: &java.MethodInvocation{Name: unattributed}},
+		},
+	}
+
+	// when gating on a pattern that matches any name
+	editor := &recordingVisitor{}
+	Check(UsesType("*"), editor).Visit(cu, nil)
+
+	// then the editor does not run
+	assert.Equal(t, 0, editor.calls, "editor calls")
 }

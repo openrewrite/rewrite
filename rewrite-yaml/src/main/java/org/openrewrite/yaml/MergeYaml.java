@@ -160,7 +160,7 @@ public class MergeYaml extends Recipe {
                             @Language("yml") String snippet;
                             if (incoming instanceof Yaml.Mapping) {
                                 // Use two spaces as indent, the `MergeYamlVisitor` recipe will take care for proper indenting by calling `autoformat`,
-                                snippet = valueKey + ":\n  " + yaml.replaceAll("\n", "\n  ");
+                                snippet = valueKey + ":\n  " + yaml.replace("\n", "\n  ");
                             } else {
                                 // If there is no space between the colon and the value it will not be interpreted as a mapping
                                 snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);

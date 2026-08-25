@@ -137,8 +137,8 @@ public final class Assertions {
      * Walk {@code root} and assert that the first {@link J.Identifier} whose
      * {@code simpleName} equals {@code name} carries a non-null
      * {@link JavaType.FullyQualified} type whose fully-qualified name equals
-     * {@code expectedFqn}. Use this for class/struct/parameterized types; for
-     * primitives use {@link #expectPrimitiveType(Tree, String, String)}.
+     * {@code expectedFqn}. Go's basic types are attributed under their own Go
+     * names, so this covers them too: {@code "int32"}, {@code "string"}.
      *
      * @throws AssertionError when no such identifier exists, its type is
      *                       null, or the type is not fully qualified.
@@ -159,31 +159,6 @@ public final class Assertions {
         String got = ((JavaType.FullyQualified) finder.type).getFullyQualifiedName();
         if (!got.equals(expectedFqn)) {
             throw new AssertionError("expectType(\"" + name + "\"): FQN = \"" + got + "\", want \"" + expectedFqn + "\"");
-        }
-    }
-
-    /**
-     * Walk {@code root} and assert that the first {@link J.Identifier} whose
-     * {@code simpleName} equals {@code name} carries a {@link JavaType.Primitive}
-     * whose keyword equals {@code expectedKeyword} (e.g. {@code "int"},
-     * {@code "String"}, {@code "boolean"}).
-     */
-    public static void expectPrimitiveType(Tree root, String name, String expectedKeyword) {
-        IdentifierTypeFinder finder = new IdentifierTypeFinder(name);
-        finder.visit(root, 0);
-        if (!finder.found) {
-            throw new AssertionError("expectPrimitiveType(\"" + name + "\"): no identifier with that name in tree");
-        }
-        if (finder.type == null) {
-            throw new AssertionError("expectPrimitiveType(\"" + name + "\"): identifier has null type");
-        }
-        if (!(finder.type instanceof JavaType.Primitive)) {
-            throw new AssertionError("expectPrimitiveType(\"" + name + "\"): identifier type is " +
-                    finder.type.getClass().getSimpleName() + ", want Primitive");
-        }
-        String got = ((JavaType.Primitive) finder.type).getKeyword();
-        if (!got.equals(expectedKeyword)) {
-            throw new AssertionError("expectPrimitiveType(\"" + name + "\"): keyword = \"" + got + "\", want \"" + expectedKeyword + "\"");
         }
     }
 

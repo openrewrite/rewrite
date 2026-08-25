@@ -31,8 +31,8 @@ import {fromVisitor, RecipeSpec, SourceSpec} from "../../../src/test";
 import {MinimumViableSpacingVisitor} from "../../../src/javascript/format";
 import {JavaScriptParser, JavaScriptVisitor, JS, typescript} from "../../../src/javascript";
 import {create as produce} from "mutative";
-import {mapAsync, ParserInput, SourceFile} from "../../../src";
-import {J} from "../../../src/java";
+import {emptyMarkers, mapAsync, ParserInput, randomId, SourceFile} from "../../../src";
+import {emptySpace, J} from "../../../src/java";
 
 class RemoveSpacesVisitor<P> extends JavaScriptVisitor<P> {
     override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
@@ -164,5 +164,44 @@ describe('MinimumViableSpacingVisitor', () => {
                 // @formatter:on
             ))
     });
-});
 
+    test('optional catch binding', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescriptWithSpacesRemoved(
+                `try { doWork() } catch { recover() }`,
+                `try{doWork()}catch{recover()}`,
+                // @formatter:on
+            ))
+    });
+
+    test('catch parameter with a modifier and no variables', async () => {
+        const modifier: J.Modifier = {
+            kind: J.Kind.Modifier,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            keyword: "const",
+            type: J.ModifierType.LanguageExtension,
+            annotations: []
+        };
+
+        class AddModifierVisitor<P> extends JavaScriptVisitor<P> {
+            override async visitVariableDeclarations(v: J.VariableDeclarations, p: P): Promise<J | undefined> {
+                const ret = await super.visitVariableDeclarations(v, p) as J.VariableDeclarations;
+                return ret.variables.length === 0 ? produce(ret, draft => {
+                    // a modifier is what makes the visitor go looking for a first variable
+                    draft.modifiers = [modifier];
+                }) : ret;
+            }
+        }
+
+        const parser = new JavaScriptParser({});
+        for await (const cu of parser.parse({text: `try { } catch { }`, sourcePath: "a.ts"})) {
+            const withModifier = (await new AddModifierVisitor().visit<JS.CompilationUnit>(cu, undefined))!;
+            const formatted = await new MinimumViableSpacingVisitor().visit(withModifier, undefined);
+            expect(formatted).toBeDefined();
+        }
+    });
+});

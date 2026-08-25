@@ -338,10 +338,12 @@ type referenceImporter struct {
 
 func newReferenceImporter(refs []string) *referenceImporter {
 	ri := &referenceImporter{
-		modDirs:  map[string]string{},
-		cache:    map[string]*types.Package{},
-		fset:     token.NewFileSet(),
-		def:      importer.Default(),
+		modDirs: map[string]string{},
+		cache:   map[string]*types.Package{},
+		fset:    token.NewFileSet(),
+		// Wrapped for the panic recovery alone: a dependency's type table has no
+		// tree to carry the failures the wrapper records.
+		def:      newResilientImporter(importer.Default()),
 		buildCtx: goBuildContext(),
 	}
 	for _, dir := range refs {

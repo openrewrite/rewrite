@@ -33,7 +33,7 @@ class FindTypeMappingsTest implements RewriteTest {
     @Test
     void findTypeMappings() {
         rewriteRun(
-          spec -> spec.dataTable(Row.class, table -> {
+          spec -> spec.dataTable(Row.class, table ->
               assertThat(table.stream()
                 .map(row -> "%-3s%-38s%-15s%d%s".formatted(row.getCompilationUnitName(), row.getTreeName(), row.getTypeName(), row.getCount(),
                   row.getNearestNonNullTreeName() == null ? "" : "  " + row.getNearestNonNullTreeName()))
@@ -53,8 +53,7 @@ class FindTypeMappingsTest implements RewriteTest {
                     J  J$ParameterizedType                   Parameterized  2
                     J  J$VariableDeclarations$NamedVariable  Variable       1
                     """
-                );
-          }),
+                )),
           java(
             """
               import java.util.ArrayList;

@@ -55,12 +55,51 @@ func (v *AutoFormatVisitor) Visit(t java.Tree, p any) java.Tree {
 	if t == nil {
 		return nil
 	}
-	v.DoAfterVisit(NewMinimumViableSpacingVisitor(v.stopAfter))
-	v.DoAfterVisit(NewDocCommentVisitor(v.stopAfter))
-	v.DoAfterVisit(NewBinarySpacingVisitor(v.stopAfter))
-	v.DoAfterVisit(NewSpacesVisitor(v.stopAfter))
-	v.DoAfterVisit(NewTabsAndIndentsVisitor(v.stopAfter))
-	v.DoAfterVisit(NewBlankLinesVisitor(v.stopAfter))
-	v.DoAfterVisit(NewRemoveTrailingWhitespaceVisitor(v.stopAfter))
+	for _, member := range []visitor.AfterVisitor{
+		NewMinimumViableSpacingVisitor(v.stopAfter),
+		NewDocCommentVisitor(v.stopAfter),
+		NewBinarySpacingVisitor(v.stopAfter),
+		NewSpacesVisitor(v.stopAfter),
+		NewTabsAndIndentsVisitor(v.stopAfter),
+		NewBlankLinesVisitor(v.stopAfter),
+		NewRemoveTrailingWhitespaceVisitor(v.stopAfter),
+	} {
+		v.DoAfterVisit(withCursor(member, v.Cursor()))
+	}
 	return t
+}
+
+// withCursor hands a member visitor the ancestors above the subtree.
+func withCursor(v visitor.AfterVisitor, c *visitor.Cursor) visitor.AfterVisitor {
+	if c == nil {
+		return v
+	}
+	if seedable, ok := v.(interface{ SetCursor(*visitor.Cursor) }); ok {
+		seedable.SetCursor(c)
+	}
+	return v
+}
+
+// AutoFormat lays out t and returns the result. Pass the cursor of t's parent
+// when t is a subtree of a larger file; pass nil when t is the file.
+func AutoFormat(t java.Tree, p any, stopAfter java.Tree, cursor *visitor.Cursor) java.Tree {
+	if t == nil {
+		return nil
+	}
+	v := NewAutoFormatVisitor(stopAfter)
+	v.SetCursor(cursor)
+	out := v.Visit(t, p)
+	if out == nil {
+		return t
+	}
+	return visitor.DrainAfterVisits(v, out, p)
+}
+
+// MaybeAutoFormat lays out after only when it is not before, leaving layout
+// alone for a visit that changed nothing.
+func MaybeAutoFormat(before, after java.Tree, p any, stopAfter java.Tree, cursor *visitor.Cursor) java.Tree {
+	if any(before) == any(after) {
+		return after
+	}
+	return AutoFormat(after, p, stopAfter, cursor)
 }

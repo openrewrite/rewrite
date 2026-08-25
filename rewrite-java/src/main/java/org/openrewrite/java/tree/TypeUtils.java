@@ -403,11 +403,11 @@ public class TypeUtils {
         }
 
         JavaType.FullyQualified[] toFq = to.stream()
-                .map(e -> (JavaType.FullyQualified) e)
+                .map(JavaType.FullyQualified.class::cast)
                 .sorted(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName))
                 .toArray(JavaType.FullyQualified[]::new);
         JavaType.FullyQualified[] fromFq = from.stream()
-                .map(e -> (JavaType.FullyQualified) e)
+                .map(JavaType.FullyQualified.class::cast)
                 .sorted(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName))
                 .toArray(JavaType.FullyQualified[]::new);
         for (int i = 0; i < toFq.length; i++) {
@@ -1048,7 +1048,16 @@ public class TypeUtils {
                 .filter(m -> !m.getFlags().contains(Flag.Private))
                 .filter(m -> !m.getFlags().contains(Flag.Static))
                 // If access level is default then check if subclass package is the same from parent class
-                .filter(m -> m.getFlags().contains(Flag.Public) || m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
+                // A protected method is overridable from any package, but only by a class; an interface
+                // does not inherit the protected members of java.lang.Object (JLS 9.2).
+                .filter(m -> m.getFlags().contains(Flag.Public) ||
+                             (m.getFlags().contains(Flag.Protected) && !isInterface(dt)) ||
+                             m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
+    }
+
+    private static boolean isInterface(JavaType.FullyQualified type) {
+        return type.getKind() == JavaType.FullyQualified.Kind.Interface ||
+               type.getKind() == JavaType.FullyQualified.Kind.Annotation;
     }
 
     public static Optional<JavaType.Method> findDeclaredMethod(JavaType.@Nullable FullyQualified clazz, String name, List<JavaType> argumentTypes) {

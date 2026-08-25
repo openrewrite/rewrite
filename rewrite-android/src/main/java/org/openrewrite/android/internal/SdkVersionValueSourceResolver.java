@@ -27,6 +27,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.unmodifiableSet;
+
 /**
  * Resolves the value-source kind of an SDK assignment's right-hand side.
  * See {@link SdkVersionValueSource} for the categories.
@@ -50,7 +52,7 @@ public final class SdkVersionValueSourceResolver {
     }
 
     private static Set<String> unmodifiable(String... names) {
-        return java.util.Collections.unmodifiableSet(new HashSet<>(Arrays.asList(names)));
+        return unmodifiableSet(new HashSet<>(Arrays.asList(names)));
     }
 
     /**

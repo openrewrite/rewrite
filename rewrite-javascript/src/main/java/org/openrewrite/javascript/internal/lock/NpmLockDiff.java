@@ -25,6 +25,8 @@ import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.*;
 
+import static java.util.Collections.*;
+
 /**
  * Diffs a freshly resolved {@link ResolutionGraph} against the existing {@code package-lock.json} and expresses
  * the difference as {@link PackageEdit}s for {@link NpmLockPatcher} — so untouched entries keep their bytes and
@@ -94,7 +96,7 @@ final class NpmLockDiff {
         for (Map.Entry<String, List<String>> e : graphSlots.entrySet()) {
             String slot = e.getKey();
             List<String> nodeKeys = new ArrayList<>(e.getValue());
-            List<String> lockKeys = new ArrayList<>(lock.keysBySlot.getOrDefault(slot, Collections.emptyList()));
+            List<String> lockKeys = new ArrayList<>(lock.keysBySlot.getOrDefault(slot, emptyList()));
 
             // The root's directly-declared version claims the top-level slot, as npm hoists root directs.
             String declared = root.getResolved().get(slot);
@@ -238,7 +240,7 @@ final class NpmLockDiff {
             deepestFirst.add(parentDir.isEmpty() ? NM : parentDir + NM);
             cursor = nm < 0 ? "" : trimTrailingSlash(cursor.substring(0, nm));
         }
-        Collections.reverse(deepestFirst);
+        reverse(deepestFirst);
         return deepestFirst;
     }
 
@@ -547,10 +549,10 @@ final class NpmLockDiff {
     /** How a moved entry's dependency edge set changed: drops orphan-prune, gains graft the full new map. */
     private static EdgeDelta edgeDelta(String slot, JsonNode entry, VersionManifest m) {
         Set<String> oldEdges = fieldKeys(entry.get("dependencies"));
-        Set<String> newEdges = m.getDependencies() == null ? Collections.emptySet() : m.getDependencies().keySet();
+        Set<String> newEdges = m.getDependencies() == null ? emptySet() : m.getDependencies().keySet();
         Set<String> oldOptional = fieldKeys(entry.get("optionalDependencies"));
         Set<String> newOptional = m.getOptionalDependencies() == null ?
-                Collections.emptySet() : m.getOptionalDependencies().keySet();
+                emptySet() : m.getOptionalDependencies().keySet();
         if (!oldOptional.equals(newOptional)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, slot,
                     slot + " changed its optionalDependencies on upgrade (not yet patched)");
@@ -583,7 +585,7 @@ final class NpmLockDiff {
         boolean any = false;
 
         Map<String, String> oldEngines = stringMap(entry.get("engines"));
-        Map<String, String> newEngines = m.getEngines() == null ? Collections.emptyMap() : m.getEngines();
+        Map<String, String> newEngines = m.getEngines() == null ? emptyMap() : m.getEngines();
         if (!oldEngines.equals(newEngines)) {
             b.engines(newEngines.isEmpty() ? null : newEngines).enginesChanged(true);
             any = true;
@@ -629,7 +631,7 @@ final class NpmLockDiff {
         }
 
         Map<String, String> oldPeers = stringMap(entry.get("peerDependencies"));
-        Map<String, String> newPeers = m.getPeerDependencies() == null ? Collections.emptyMap() : m.getPeerDependencies();
+        Map<String, String> newPeers = m.getPeerDependencies() == null ? emptyMap() : m.getPeerDependencies();
         if (!oldPeers.equals(newPeers)) {
             b.peerDependencies(newPeers.isEmpty() ? null : newPeers).peerDependenciesChanged(true);
             any = true;
@@ -910,7 +912,7 @@ final class NpmLockDiff {
                 return scope.getKey();
             }
         }
-        if (root.getDeclared().getOrDefault("peerDependencies", Collections.emptyMap()).containsKey(slot)) {
+        if (root.getDeclared().getOrDefault("peerDependencies", emptyMap()).containsKey(slot)) {
             return "peerDependencies";
         }
         return "dependencies";
@@ -936,7 +938,7 @@ final class NpmLockDiff {
 
     private static Set<String> fieldKeys(@Nullable JsonNode obj) {
         if (obj == null || !obj.isObject()) {
-            return Collections.emptySet();
+            return emptySet();
         }
         Set<String> keys = new LinkedHashSet<>();
         obj.fieldNames().forEachRemaining(keys::add);
@@ -945,7 +947,7 @@ final class NpmLockDiff {
 
     private static Map<String, String> stringMap(@Nullable JsonNode obj) {
         if (obj == null || !obj.isObject()) {
-            return Collections.emptyMap();
+            return emptyMap();
         }
         Map<String, String> map = new LinkedHashMap<>();
         obj.fields().forEachRemaining(f -> map.put(f.getKey(), f.getValue().asText()));

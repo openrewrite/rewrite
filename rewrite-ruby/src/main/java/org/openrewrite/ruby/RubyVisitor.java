@@ -67,8 +67,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             return null;
         }
         b = b.withBreak((J.Break) jBreak);
-        b = b.withValue((Expression) visit(b.getValue(), p));
-        return b;
+        return b.withValue((Expression) visit(b.getValue(), p));
     }
 
     public Rb visitCompilationUnit(Rb.CompilationUnit compilationUnit, P p) {
@@ -78,15 +77,13 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         c = c.getPadding().withStatements(ListUtils.map(c.getPadding().getStatements(), statement ->
                 visitRightPadded(statement, RubyRightPadded.Location.COMPILATION_UNIT_STATEMENT_SUFFIX, p)));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
-        c = c.withDataSection((Rb.DataSection) visit(c.getDataSection(), p));
-        return c;
+        return c.withDataSection((Rb.DataSection) visit(c.getDataSection(), p));
     }
 
     public J visitDataSection(Rb.DataSection dataSection, P p) {
         Rb.DataSection d = dataSection;
         d = d.withPrefix(visitSpace(d.getPrefix(), RubySpace.Location.DATA_SECTION_PREFIX, p));
-        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
-        return d;
+        return d.withMarkers(visitMarkers(d.getMarkers(), p));
     }
 
     public J visitAlias(Rb.Alias alias, P p) {
@@ -100,8 +97,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             a = (Rb.Alias) temp;
         }
         a = a.withNewName(visitAndCast(a.getNewName(), p));
-        a = a.withExistingName(visitAndCast(a.getExistingName(), p));
-        return a;
+        return a.withExistingName(visitAndCast(a.getExistingName(), p));
     }
 
     public J visitArray(Rb.Array array, P p) {
@@ -115,8 +111,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             l = (Rb.Array) temp;
         }
         l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), RubyContainer.Location.ARRAY_ELEMENTS, p));
-        l = l.withType(visitType(l.getType(), p));
-        return l;
+        return l.withType(visitType(l.getType(), p));
     }
 
     public J visitAssignmentOperation(Rb.AssignmentOperation assignOp, P p) {
@@ -138,8 +133,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         a = a.withVariable(visitAndCast(a.getVariable(), p));
         a = a.getPadding().withOperator(visitLeftPadded(a.getPadding().getOperator(), JLeftPadded.Location.ASSIGNMENT_OPERATION_OPERATOR, p));
         a = a.withAssignment(visitAndCast(a.getAssignment(), p));
-        a = a.withType(visitType(a.getType(), p));
-        return a;
+        return a.withType(visitType(a.getType(), p));
     }
 
     public J visitPreExecution(Rb.PreExecution begin, P p) {
@@ -152,8 +146,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         } else {
             b = (Rb.PreExecution) temp;
         }
-        b = b.withBlock((J.Block) visit(b.getBlock(), p));
-        return b;
+        return b.withBlock((J.Block) visit(b.getBlock(), p));
     }
 
     public J visitBegin(Rb.Begin begin, P p) {
@@ -167,8 +160,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             b = (Rb.Begin) temp;
         }
         b = b.withBody((J.Block) visit(b.getBody(), p));
-        b = b.withType(visitType(b.getType(), p));
-        return b;
+        return b.withType(visitType(b.getType(), p));
     }
 
     public J visitBinary(Rb.Binary binary, P p) {
@@ -184,8 +176,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         b = b.withLeft(visitAndCast(b.getLeft(), p));
         b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
         b = b.withRight(visitAndCast(b.getRight(), p));
-        b = b.withType(visitType(b.getType(), p));
-        return b;
+        return b.withType(visitType(b.getType(), p));
     }
 
     public J visitBlock(Rb.Block block, P p) {
@@ -200,8 +191,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         }
         b = b.getPadding().withParameters(visitContainer(b.getPadding().getParameters(),
                 RubyContainer.Location.BLOCK_PARAMETERS, p));
-        b = b.withBody((J.Block) visit(b.getBody(), p));
-        return b;
+        return b.withBody((J.Block) visit(b.getBody(), p));
     }
 
     public J visitBlockArgument(Rb.BlockArgument blockArgument, P p) {
@@ -215,8 +205,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             b = (Rb.BlockArgument) temp;
         }
         b = b.withArgument((Expression) visit(b.getArgument(), p));
-        b = b.withType(visitType(b.getType(), p));
-        return b;
+        return b.withType(visitType(b.getType(), p));
     }
 
     public J visitBooleanCheck(Rb.BooleanCheck booleanCheck, P p) {
@@ -231,8 +220,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         }
         b = b.withLeft((Expression) visit(b.getLeft(), p));
         b = b.withPattern((J.Case) visit(b.getPattern(), p));
-        b = b.withType(visitType(b.getType(), p));
-        return b;
+        return b.withType(visitType(b.getType(), p));
     }
 
     public J visitClassMethod(Rb.ClassMethod classMethod, P p) {
@@ -246,9 +234,8 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             c = (Rb.ClassMethod) temp;
         }
         c = c.withReceiver((Expression) visit(c.getReceiver(), p));
-        c = c.getPadding().withMethod(visitLeftPadded(c.getPadding().getMethod(),
+        return c.getPadding().withMethod(visitLeftPadded(c.getPadding().getMethod(),
                 JLeftPadded.Location.LANGUAGE_EXTENSION, p));
-        return c;
     }
 
     public J visitDelimitedArray(Rb.DelimitedArray delimitedArray, P p) {
@@ -263,8 +250,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         }
         da = da.getPadding().withElements(visitContainer(da.getPadding().getElements(),
                 RubyContainer.Location.DELIMITED_ARRAY_ELEMENTS, p));
-        da = da.withType(visitType(da.getType(), p));
-        return da;
+        return da.withType(visitType(da.getType(), p));
     }
 
     public J visitComplexString(Rb.ComplexString complexString, P p) {
@@ -278,8 +264,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             ds = (Rb.ComplexString) temp;
         }
         ds = ds.withStrings(ListUtils.map(ds.getStrings(), s -> visit(s, p)));
-        ds = ds.withType(visitType(ds.getType(), p));
-        return ds;
+        return ds.withType(visitType(ds.getType(), p));
     }
 
     public J visitComplexStringValue(Rb.ComplexString.Value value, P p) {
@@ -292,8 +277,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             v = (Rb.ComplexString.Value) temp;
         }
         v = v.withTree(visit(v.getTree(), p));
-        v = v.withAfter(visitSpace(v.getAfter(), RubySpace.Location.COMPLEX_STRING_VALUE_SUFFIX, p));
-        return v;
+        return v.withAfter(visitSpace(v.getAfter(), RubySpace.Location.COMPLEX_STRING_VALUE_SUFFIX, p));
     }
 
     public J visitPostExecution(Rb.PostExecution end, P p) {
@@ -306,8 +290,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         } else {
             e = (Rb.PostExecution) temp;
         }
-        e = e.withBlock((J.Block) visit(e.getBlock(), p));
-        return e;
+        return e.withBlock((J.Block) visit(e.getBlock(), p));
     }
 
     public J visitExpressionTypeTree(Rb.ExpressionTypeTree expressionTypeTree, P p) {
@@ -320,8 +303,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         } else {
             s = (Rb.ExpressionTypeTree) temp;
         }
-        s = s.withReference(visit(s.getReference(), p));
-        return s;
+        return s.withReference(visit(s.getReference(), p));
     }
 
     public J visitHash(Rb.Hash hash, P p) {
@@ -336,8 +318,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         }
         h = h.getPadding().withPairs(visitContainer(h.getPadding().getPairs(),
                 RubyContainer.Location.HASH_ELEMENTS, p));
-        h = h.withType(visitType(h.getType(), p));
-        return h;
+        return h.withType(visitType(h.getType(), p));
     }
 
     public J visitHeredoc(Rb.Heredoc heredoc, P p) {
@@ -352,8 +333,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         }
         h = h.withValue((J.Literal) visit(h.getValue(), p));
         h = h.withEnd(visitSpace(h.getEnd(), RubySpace.Location.HEREDOC_END, p));
-        h = h.withType(visitType(h.getType(), p));
-        return h;
+        return h.withType(visitType(h.getType(), p));
     }
 
     public J visitKeyValue(Rb.Hash.KeyValue keyValue, P p) {
@@ -370,8 +350,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         k = k.getPadding().withSeparator(visitLeftPadded(k.getPadding().getSeparator(),
                 JLeftPadded.Location.LANGUAGE_EXTENSION, p));
         k = k.withValue((Expression) visit(k.getValue(), p));
-        k = k.withType(visitType(k.getType(), p));
-        return k;
+        return k.withType(visitType(k.getType(), p));
     }
 
     public J visitModule(Rb.Module module, P p) {
@@ -385,8 +364,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             m = (Rb.Module) temp;
         }
         m = m.withName(visitAndCast(m.getName(), p));
-        m = m.withBlock((J.Block) visit(m.getBlock(), p));
-        return m;
+        return m.withBlock((J.Block) visit(m.getBlock(), p));
     }
 
     public J visitMultipleAssignment(Rb.MultipleAssignment multipleAssignment, P p) {
@@ -401,9 +379,8 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         }
         m = m.getPadding().withAssignments(visitContainer(m.getPadding().getAssignments(),
                 RubyContainer.Location.MULTIPLE_ASSIGNMENT_ASSIGNMENTS, p));
-        m = m.getPadding().withInitializers(visitContainer(m.getPadding().getInitializers(),
+        return m.getPadding().withInitializers(visitContainer(m.getPadding().getInitializers(),
                 RubyContainer.Location.MULTIPLE_ASSIGNMENT_INITIALIZERS, p));
-        return m;
     }
 
     public J visitNext(Rb.Next next, P p) {
@@ -422,8 +399,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             return null;
         }
         n = n.withNext((J.Continue) jNext);
-        n = n.withValue((Expression) visit(n.getValue(), p));
-        return n;
+        return n.withValue((Expression) visit(n.getValue(), p));
     }
 
     public J visitNumericDomain(Rb.NumericDomain numericDomain, P p) {
@@ -438,8 +414,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         }
         n = n.getPadding().withValue(visitRightPadded(n.getPadding().getValue(),
                 JRightPadded.Location.LANGUAGE_EXTENSION, p));
-        n = n.withType(visitType(n.getType(), p));
-        return n;
+        return n.withType(visitType(n.getType(), p));
     }
 
     public J visitOpenEigenclass(Rb.OpenEigenclass openEigenclass, P p) {
@@ -454,8 +429,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         }
         o = o.getPadding().withEigenclass(visitLeftPadded(o.getPadding().getEigenclass(),
                 JLeftPadded.Location.LANGUAGE_EXTENSION, p));
-        o = o.withBody((J.Block) visit(o.getBody(), p));
-        return o;
+        return o.withBody((J.Block) visit(o.getBody(), p));
     }
 
     public J visitUndef(Rb.Undef undef, P p) {
@@ -468,9 +442,8 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         } else {
             u = (Rb.Undef) temp;
         }
-        u = u.getPadding().withNames(visitContainer(u.getPadding().getNames(),
+        return u.getPadding().withNames(visitContainer(u.getPadding().getNames(),
                 RubyContainer.Location.UNDEF_NAMES, p));
-        return u;
     }
 
     public J visitPatternBinding(Rb.PatternBinding patternBinding, P p) {
@@ -484,9 +457,8 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             b = (Rb.PatternBinding) temp;
         }
         b = b.withPattern(visitAndCast(b.getPattern(), p));
-        b = b.getPadding().withName(visitLeftPadded(b.getPadding().getName(),
+        return b.getPadding().withName(visitLeftPadded(b.getPadding().getName(),
                 JLeftPadded.Location.LANGUAGE_EXTENSION, p));
-        return b;
     }
 
     public J visitPatternGuard(Rb.PatternGuard patternGuard, P p) {
@@ -500,9 +472,8 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             g = (Rb.PatternGuard) temp;
         }
         g = g.withPattern(visitAndCast(g.getPattern(), p));
-        g = g.getPadding().withCondition(visitLeftPadded(g.getPadding().getCondition(),
+        return g.getPadding().withCondition(visitLeftPadded(g.getPadding().getCondition(),
                 JLeftPadded.Location.LANGUAGE_EXTENSION, p));
-        return g;
     }
 
     public J visitRedo(Rb.Redo redo, P p) {
@@ -529,8 +500,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             r = (Rb.Rescue) temp;
         }
         r = r.withTry((J.Try) visitNonNull(r.getTry(), p));
-        r = r.withElse((J.Block) visit(r.getElse(), p));
-        return r;
+        return r.withElse((J.Block) visit(r.getElse(), p));
     }
 
     public J visitRetry(Rb.Retry retry, P p) {
@@ -558,8 +528,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         }
         r = r.withLeft((Expression) visit(r.getLeft(), p));
         r = r.withPattern((J.Case) visit(r.getPattern(), p));
-        r = r.withType(visitType(r.getType(), p));
-        return r;
+        return r.withType(visitType(r.getType(), p));
     }
 
     public J visitSplat(Rb.Splat splat, P p) {
@@ -573,8 +542,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             s = (Rb.Splat) temp;
         }
         s = s.withValue((Expression) visitNonNull(s.getValue(), p));
-        s = s.withType(visitType(s.getType(), p));
-        return s;
+        return s.withType(visitType(s.getType(), p));
     }
 
     public J visitStructPattern(Rb.StructPattern structPattern, P p) {
@@ -588,9 +556,8 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             s = (Rb.StructPattern) temp;
         }
         s = s.withConstant(visitAndCast(s.getConstant(), p));
-        s = s.getPadding().withPattern(visitContainer(s.getPadding().getPattern(),
+        return s.getPadding().withPattern(visitContainer(s.getPadding().getPattern(),
                 RubyContainer.Location.STRUCT_PATTERN_ELEMENT, p));
-        return s;
     }
 
     public J visitSubArrayIndex(Rb.SubArrayIndex subArrayIndex, P p) {
@@ -604,9 +571,8 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             s = (Rb.SubArrayIndex) temp;
         }
         s = s.withStartIndex((Expression) visitNonNull(s.getStartIndex(), p));
-        s = s.getPadding().withLength(visitLeftPadded(s.getPadding().getLength(),
+        return s.getPadding().withLength(visitLeftPadded(s.getPadding().getLength(),
                 JLeftPadded.Location.LANGUAGE_EXTENSION, p));
-        return s;
     }
 
     public J visitSymbol(Rb.Symbol symbol, P p) {
@@ -620,8 +586,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             s = (Rb.Symbol) temp;
         }
         s = s.withName((Expression) visit(s.getName(), p));
-        s = s.withType(visitType(s.getType(), p));
-        return s;
+        return s.withType(visitType(s.getType(), p));
     }
 
     public J visitUnary(Rb.Unary binary, P p) {
@@ -635,8 +600,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
             u = (Rb.Unary) temp;
         }
         u = u.withExpression((Expression) visit(u.getExpression(), p));
-        u = u.withType(visitType(u.getType(), p));
-        return u;
+        return u.withType(visitType(u.getType(), p));
     }
 
     public J visitYield(Rb.Yield yield, P p) {
@@ -649,8 +613,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         } else {
             y = (Rb.Yield) temp;
         }
-        y = y.getPadding().withData(visitContainer(y.getPadding().getData(),
+        return y.getPadding().withData(visitContainer(y.getPadding().getData(),
                 RubyContainer.Location.YIELD_DATA, p));
-        return y;
     }
 }
