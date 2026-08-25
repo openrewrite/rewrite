@@ -1391,12 +1391,65 @@ m() {}
     */
     m() {}
 }
+`),
+            // An interior line sitting at the margin travels with it, column zero included.
+            //language=typescript
+            typescript(
+`class A {
+/**
+* flush
+ */
+m() {}
+}
+`,
+`class A {
+    /**
+    * flush
+     */
+    m() {}
+}
+`),
+            //language=typescript
+            typescript(
+`class A {
+\t/*
+    aligned with spaces
+\t*/
+\tm() {}
+}
+`,
+`class A {
+    /*
+    aligned with spaces
+    */
+    m() {}
+}
+`),
+            //language=typescript
+            typescript(
+`class A {
+/**
+ * one
+
+ * two
+ */
+m() {}
+}
+`,
+`class A {
+    /**
+     * one
+
+     * two
+     */
+    m() {}
+}
 `)
             // @formatter:on
         );
     });
 
-    test('leaves comment interiors alone when their column is unknown or already at zero', () => {
+    test('leaves comment interiors alone when their column is unknown, clamping out-dents at column zero', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
         return spec.rewriteRun(

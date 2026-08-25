@@ -83,13 +83,19 @@ function shiftIndent(indent: string, oldMargin: string, newMargin: string): stri
     if (indent.startsWith(oldMargin)) {
         return newMargin + indent.substring(oldMargin.length);
     }
-    // No margin to swap out, so shift by the delta the margin moved, clamped at column 0.
+    // The shift below counts characters, which stand in for columns only while all three indents
+    // use a single whitespace character; without a tab width, a line mixing them stays put.
+    if (new Set(indent + oldMargin + newMargin).size > 1) {
+        return indent;
+    }
     const delta = newMargin.length - oldMargin.length;
     return delta < 0 ? indent.substring(Math.min(-delta, indent.length)) : newMargin.substring(0, delta) + indent;
 }
 
 function reindentComment(comment: TextComment, oldMargin: string, newMargin: string): TextComment {
-    const text = comment.text.replace(/\n([ \t]*)/g, (_match, indent: string) => "\n" + shiftIndent(indent, oldMargin, newMargin));
+    // A blank line has no content to align, and indenting it would only add trailing whitespace.
+    const text = comment.text.replace(/\n([ \t]*)/g, (match, indent: string, offset: number, full: string) =>
+        "\n\r".includes(full[offset + match.length]) ? match : "\n" + shiftIndent(indent, oldMargin, newMargin));
     return text === comment.text ? comment : {...comment, text};
 }
 
