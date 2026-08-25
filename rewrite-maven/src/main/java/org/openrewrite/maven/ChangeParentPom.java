@@ -500,7 +500,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
      * {@code UpdateMavenModel} re-resolves a pom and its modules but never its parent, so the ancestor must be
      * supplied already re-resolved here. Returns {@code null} when no ancestor is being changed.
      */
-    private @Nullable MavenResolutionResult reparentOntoChangedAncestor(
+    private static @Nullable MavenResolutionResult reparentOntoChangedAncestor(
             MavenResolutionResult mrr, Accumulator acc, ExecutionContext ctx) {
         MavenResolutionResult parent = mrr.getParent();
         if (parent == null) {
@@ -519,42 +519,51 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
     }
 
     /**
-     * The changed pom re-resolved as it will look once the edit phase has restored the dependency management
-     * that the new parent no longer provides, so that a descendant re-parented onto it does not resolve to no
-     * version at all for a dependency it declares without one.
+     * The changed pom as its descendants need to see it: resolved against the new parent, and declaring the
+     * dependency management that the edit phase restores in it. A descendant resolved against the unrestored
+     * view would find no version at all for a dependency it declares without one.
      */
-    private MavenResolutionResult withRestoredManagement(MavenResolutionResult before, MavenResolutionResult updated, Accumulator acc, ExecutionContext ctx) {
-        MavenResolutionResult restored = acc.restoredByPom.get(updated.getPom().getGav());
-        if (restored != null) {
-            return restored;
+    private static MavenResolutionResult withRestoredManagement(MavenResolutionResult original, MavenResolutionResult withNewParent,
+                                                                Accumulator acc, ExecutionContext ctx) {
+        ResolvedGroupArtifactVersion gav = withNewParent.getPom().getGav();
+        MavenResolutionResult restored = acc.restoredByPom.get(gav);
+        if (restored == null) {
+            restored = restoreManagement(original, withNewParent, ctx);
+            acc.restoredByPom.put(gav, restored);
         }
-        restored = updated;
-        Parent newParentRef = updated.getPom().getRequested().getParent();
-        if (newParentRef != null) {
-            try {
-                MavenPomDownloader mpd = new MavenPomDownloader(updated.getProjectPoms(), ctx, updated.getMavenSettings(), updated.getActiveProfiles());
-                ResolvedPom newParent = mpd.download(newParentRef.getGav(), null, updated.getPom(), updated.getPom().getRepositories())
-                        .resolve(emptyList(), mpd, ctx);
-                // Read off the pre-change resolution; the post-change one no longer holds the dropped entries
-                List<ResolvedManagedDependency> toRestore = getDependenciesUnmanagedByNewParent(before, newParent);
-                if (!toRestore.isEmpty()) {
-                    Pom requested = updated.getPom().getRequested();
-                    List<ManagedDependency> managed = new ArrayList<>(requested.getDependencyManagement());
-                    for (ResolvedManagedDependency dep : toRestore) {
-                        managed.add(new ManagedDependency.Defined(dep.getGav(),
-                                dep.getScope() == null ? null : dep.getScope().toString().toLowerCase(),
-                                dep.getType(), dep.getClassifier(), null));
-                    }
-                    restored = updated.withPom(updated.getPom()
-                            .withRequested(requested.withDependencyManagement(managed))
-                            .resolve(ctx, mpd));
-                }
-            } catch (MavenDownloadingException e) {
-                // The changed pom's own edit reports the failure; descendants keep the unrestored view
-            }
-        }
-        acc.restoredByPom.put(updated.getPom().getGav(), restored);
         return restored;
+    }
+
+    private static MavenResolutionResult restoreManagement(MavenResolutionResult original, MavenResolutionResult withNewParent, ExecutionContext ctx) {
+        Parent parentRef = withNewParent.getPom().getRequested().getParent();
+        if (parentRef == null) {
+            return withNewParent;
+        }
+
+        ResolvedPom pom = withNewParent.getPom();
+        MavenPomDownloader downloader = new MavenPomDownloader(withNewParent.getProjectPoms(), ctx, withNewParent.getMavenSettings(), withNewParent.getActiveProfiles());
+        try {
+            ResolvedPom newParent = downloader.download(parentRef.getGav(), null, pom, pom.getRepositories())
+                    .resolve(emptyList(), downloader, ctx);
+            // Read off the original resolution; the one against the new parent no longer holds the dropped entries
+            List<ResolvedManagedDependency> dropped = getDependenciesUnmanagedByNewParent(original, newParent);
+            if (dropped.isEmpty()) {
+                return withNewParent;
+            }
+
+            List<ManagedDependency> managed = new ArrayList<>(pom.getRequested().getDependencyManagement());
+            for (ResolvedManagedDependency dep : dropped) {
+                managed.add(new ManagedDependency.Defined(dep.getGav(),
+                        dep.getScope() == null ? null : dep.getScope().toString().toLowerCase(),
+                        dep.getType(), dep.getClassifier(), null));
+            }
+            return withNewParent.withPom(pom
+                    .withRequested(pom.getRequested().withDependencyManagement(managed))
+                    .resolve(ctx, downloader));
+        } catch (MavenDownloadingException e) {
+            // The changed pom's own edit reports the failure; descendants keep the unrestored view
+            return withNewParent;
+        }
     }
 
     /**
