@@ -24,7 +24,6 @@ import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
 import org.openrewrite.groovy.service.GroovyAutoFormatService;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
@@ -179,34 +178,6 @@ public interface G extends J {
         @With
         @Getter
         Space eof;
-
-        @Override
-        public List<Comment> getComments() {
-            // Groovy stores source-file comments on the first statement, or in EOF for comment-only sources.
-            if (!prefix.getComments().isEmpty()) {
-                return prefix.getComments();
-            }
-            if (!statements.isEmpty()) {
-                return statements.get(0).getElement().getComments();
-            }
-            return eof.getComments();
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public <J2 extends J> J2 withComments(List<Comment> comments) {
-            if (!prefix.getComments().isEmpty()) {
-                return (J2) withPrefix(prefix.withComments(comments));
-            }
-            if (!statements.isEmpty() && !statements.get(0).getElement().getComments().isEmpty()) {
-                return (J2) withStatements(ListUtils.mapFirst(getStatements(),
-                        statement -> statement.withComments(comments)));
-            }
-            if (statements.isEmpty() && !eof.getComments().isEmpty()) {
-                return (J2) withEof(eof.withComments(comments));
-            }
-            return (J2) withPrefix(prefix.withComments(comments));
-        }
 
         @Override
         @Transient

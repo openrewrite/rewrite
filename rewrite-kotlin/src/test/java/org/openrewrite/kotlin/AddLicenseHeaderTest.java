@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy;
+package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.java.AddLicenseHeader;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.groovy.Assertions.groovy;
+import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlinScript;
 
 class AddLicenseHeaderTest implements RewriteTest {
 
@@ -33,83 +33,43 @@ class AddLicenseHeaderTest implements RewriteTest {
     @Test
     void addLicenseHeader() {
         rewriteRun(
-          groovy(
+          kotlin(
             """
-              println "Hello"
+              class Test
               """,
             """
               /*
                * My license header
                */
-              println "Hello"
+              class Test
               """
           )
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/5762")
     @Test
     void dontChangeExistingHeader() {
         rewriteRun(
-          groovy(
+          kotlin(
             """
               /*
                * My license header
                */
-              println "Hello"
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/5762")
-    @Test
-    void dontChangeExistingHeaderOnClass() {
-        rewriteRun(
-          groovy(
-            """
-              /*
-               * My license header
-               */
-              class Test {
-              }
+              class Test
               """
           )
         );
     }
 
     @Test
-    void addLicenseHeaderToClassWithPackage() {
+    void dontChangeExistingHeaderInScript() {
         rewriteRun(
-          groovy(
-            """
-              package com.sample
-
-              class Test {
-              }
-              """,
+          kotlinScript(
             """
               /*
                * My license header
                */
-              package com.sample
-
-              class Test {
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/5762")
-    @Test
-    void dontChangeCommentOnlySource() {
-        rewriteRun(
-          groovy(
-            """
-              /*
-               * My license header
-               */
+              println("Hello")
               """
           )
         );
