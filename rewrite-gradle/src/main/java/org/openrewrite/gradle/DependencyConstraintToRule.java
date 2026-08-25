@@ -370,8 +370,7 @@ public class DependencyConstraintToRule extends Recipe {
                     J.MethodInvocation m = GradleParser.builder()
                             .build()
                             .parse(ctx,
-                                    "\n" +
-                                            "configurations.all {\n" +
+                                    "configurations.all {\n" +
                                             "    resolutionStrategy.eachDependency { details ->\n" +
                                             "    }\n" +
                                             "}")
@@ -380,7 +379,8 @@ public class DependencyConstraintToRule extends Recipe {
                             .map(it -> it.get(0))
                             .map(J.MethodInvocation.class::cast)
                             .findFirst()
-                            .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
+                            .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"))
+                            .withPrefix(Space.format("\n"));
                     List<Statement> newStatements = ListUtils.insert(cu.getStatements(), m, insertionIndex);
                     if (insertionIndex == 0) {
                         newStatements = ListUtils.map(newStatements, (i, stat) ->

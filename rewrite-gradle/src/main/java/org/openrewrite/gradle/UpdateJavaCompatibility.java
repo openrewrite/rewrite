@@ -192,10 +192,11 @@ public class UpdateJavaCompatibility extends Recipe {
     private G.CompilationUnit addGroovyCompatibilityType(G.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
         if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
             G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build()
-                    .parse(ctx, "\n" + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
+                    .parse(ctx, targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
-            c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+            c = c.withStatements(ListUtils.concatAll(c.getStatements(),
+                    ListUtils.mapFirst(sourceFile.getStatements(), s -> s.withPrefix(Space.format("\n")))));
         }
         return c;
     }
