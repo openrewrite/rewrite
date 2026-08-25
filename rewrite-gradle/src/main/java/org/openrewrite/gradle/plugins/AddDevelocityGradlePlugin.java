@@ -33,6 +33,7 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -415,9 +416,9 @@ public class AddDevelocityGradlePlugin extends ScanningRecipe<AddDevelocityGradl
         boolean versionIsAtLeast3_17 = versionComparator.compare(null, newVersion, "3.17") >= 0;
         StringBuilder ge;
         if (versionIsAtLeast3_17) {
-            ge = new StringBuilder("\ndevelocity {\n");
+            ge = new StringBuilder("develocity {\n");
         } else {
-            ge = new StringBuilder("\ngradleEnterprise {\n");
+            ge = new StringBuilder("gradleEnterprise {\n");
         }
         if (server != null && !server.isEmpty()) {
             ge.append(indent).append("server = '").append(server).append("'\n");
@@ -471,7 +472,7 @@ public class AddDevelocityGradlePlugin extends ScanningRecipe<AddDevelocityGradl
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 
-        return (J.MethodInvocation) cu.getStatements().get(0);
+        return ((J.MethodInvocation) cu.getStatements().get(0)).withPrefix(Space.format("\n"));
     }
 
     private J.@Nullable MethodInvocation kotlinEnterpriseDsl(String newVersion, VersionComparator versionComparator, String indent, ExecutionContext ctx) {
