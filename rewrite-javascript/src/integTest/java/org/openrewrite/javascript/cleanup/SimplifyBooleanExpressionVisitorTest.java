@@ -24,6 +24,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.javascript.Assertions.javascript;
+import static org.openrewrite.javascript.Assertions.typescript;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("JSUnusedLocalSymbols")
@@ -59,6 +60,76 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               const x = "hello";
               const y = !(!x);
+              """
+          )
+        );
+    }
+
+    @Test
+    void orFalsePreservedForNonBooleanOperand() {
+        rewriteRun(
+          javascript(
+            """
+              function f(o) {
+                  o.withCredentials = o.value || false;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void andTruePreservedForNonBooleanOperand() {
+        rewriteRun(
+          javascript(
+            """
+              function f(o) {
+                  o.value = o.value && true;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void orTruePreservedForNonBooleanOperand() {
+        rewriteRun(
+          javascript(
+            """
+              function f(o) {
+                  o.value = o.value || true;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void andFalsePreservedForNonBooleanOperand() {
+        rewriteRun(
+          javascript(
+            """
+              function f(o) {
+                  o.value = o.value && false;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void orFalseSimplifiedForBooleanTypedOperand() {
+        rewriteRun(
+          typescript(
+            """
+              function f(b: boolean) {
+                  const c = b || false;
+              }
+              """,
+            """
+              function f(b: boolean) {
+                  const c = b;
+              }
               """
           )
         );
