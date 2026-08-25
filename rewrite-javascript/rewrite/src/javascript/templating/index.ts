@@ -67,6 +67,19 @@ export {
     template
 } from './template';
 
+// Precedence utilities, so hand-written visitors need not carry their own parenthesization
+export {
+    Precedence,
+    precedenceOf,
+    slotConstraints,
+    requiredPrecedence,
+    maybeParenthesize,
+    parenthesize,
+    startsWithObjectLiteral,
+    startsWithDeclarationToken
+} from './precedence';
+export type {SlotConstraints} from './precedence';
+
 // Export engine utilities (for testing)
 export {
     clearTemplateCache
