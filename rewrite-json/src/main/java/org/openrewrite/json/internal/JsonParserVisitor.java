@@ -29,7 +29,9 @@ import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -48,6 +50,10 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
     private int cursor = 0;
     private int codePointCursor = 0;
+
+    // Keys repeat across a document, so each distinct key string is retained once. Not String.intern(),
+    // whose table is JVM-global and loses throughput at this volume.
+    private final Map<String, String> keyInterner = new HashMap<>();
 
     public JsonParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
@@ -120,14 +126,19 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     public JsonKey visitKey(JSON5Parser.KeyContext ctx) {
         if (ctx.IDENTIFIER() != null) {
             return convert(ctx.IDENTIFIER(), (ident, fmt) ->
-                    new Json.Identifier(randomId(), fmt, Markers.EMPTY, ctx.IDENTIFIER().getText()));
+                    new Json.Identifier(randomId(), fmt, Markers.EMPTY, internKey(ctx.IDENTIFIER().getText())));
         }
 
         return convert(ctx.STRING(), (str, prefix) -> {
-            String source = str.getText();
+            String source = internKey(str.getText());
             return new Json.Literal(randomId(), prefix, Markers.EMPTY, source,
-                    source.substring(1, source.length() - 1));
+                    internKey(source.substring(1, source.length() - 1)));
         });
+    }
+
+    private String internKey(String key) {
+        String canonical = keyInterner.putIfAbsent(key, key);
+        return canonical == null ? key : canonical;
     }
 
     @Override

@@ -18,6 +18,7 @@ package org.openrewrite.json;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonKey;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -25,6 +26,7 @@ import org.openrewrite.tree.ParseError;
 
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -371,6 +373,49 @@ class JsonParserTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void repeatedKeysShareStringInstances() {
+        rewriteRun(
+          json(
+            """
+              {
+                "deps": [
+                  {"name": "a", "version": "1.0"},
+                  {"name": "b", "version": "2.0"}
+                ],
+                unquoted: {unquoted: "nested"}
+              }
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                List<JsonKey> keys = new ArrayList<>();
+                new JsonIsoVisitor<Integer>() {
+                    @Override
+                    public Json.Member visitMember(Json.Member member, Integer p) {
+                        keys.add(member.getKey());
+                        return super.visitMember(member, p);
+                    }
+                }.visit(doc, 0);
+
+                List<Json.Literal> name = keys.stream()
+                  .filter(Json.Literal.class::isInstance)
+                  .map(Json.Literal.class::cast)
+                  .filter(k -> "\"name\"".equals(k.getSource()))
+                  .toList();
+                assertThat(name).hasSize(2);
+                assertThat(name.get(0).getSource()).isSameAs(name.get(1).getSource());
+                assertThat(name.get(0).getValue()).isSameAs(name.get(1).getValue());
+
+                List<Json.Identifier> unquoted = keys.stream()
+                  .filter(Json.Identifier.class::isInstance)
+                  .map(Json.Identifier.class::cast)
+                  .toList();
+                assertThat(unquoted).hasSize(2);
+                assertThat(unquoted.get(0).getName()).isSameAs(unquoted.get(1).getName());
+            })
           )
         );
     }
