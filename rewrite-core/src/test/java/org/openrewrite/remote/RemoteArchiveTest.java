@@ -16,6 +16,7 @@
 package org.openrewrite.remote;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
@@ -28,8 +29,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.*;
+import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,6 +105,56 @@ class RemoteArchiveTest {
         }
 
         executorService.shutdown();
+    }
+
+    @Test
+    void cachesExtractedFileNotEntireArchive(@TempDir Path cacheDir) throws Exception {
+        URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-7.6-bin.zip"));
+        long archiveSize = Files.size(Path.of(distributionUrl.toURI()));
+
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(cacheDir));
+
+        RemoteArchive remoteArchive = Remote
+          .builder(Path.of("gradle/wrapper/gradle-wrapper.jar"))
+          .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+
+        long extractedSize = getInputStreamSize(remoteArchive.getInputStream(ctx));
+        assertThat(extractedSize).isGreaterThan(50_000);
+
+        try (Stream<Path> cached = Files.list(cacheDir)) {
+            long cachedBytes = cached.filter(Files::isRegularFile).mapToLong(p -> p.toFile().length()).sum();
+            assertThat(cachedBytes)
+              .as("only the extracted entry should be cached, not the whole archive")
+              .isEqualTo(extractedSize)
+              .isLessThan(archiveSize);
+        }
+    }
+
+    @Test
+    void distinctCacheEntriesPerExtractedPath(@TempDir Path cacheDir) throws Exception {
+        URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-7.6-bin.zip"));
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(cacheDir));
+
+        // Two different members extracted from the same archive URI: the plugins wrapper jar and the shared wrapper jar.
+        long pluginJar = getInputStreamSize(Remote
+          .builder(Path.of("plugin.jar"))
+          .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar")
+          .getInputStream(ctx));
+        long sharedJar = getInputStreamSize(Remote
+          .builder(Path.of("shared.jar"))
+          .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/lib\\/gradle-wrapper-shared-.*\\.jar")
+          .getInputStream(ctx));
+
+        assertThat(pluginJar)
+          .as("each path must extract its own member, not a shared cache entry")
+          .isNotEqualTo(sharedJar);
+        try (Stream<Path> cached = Files.list(cacheDir)) {
+            assertThat(cached.filter(Files::isRegularFile).count())
+              .as("the same archive URI with different paths must produce distinct cache entries")
+              .isEqualTo(2);
+        }
     }
 
     @Test
