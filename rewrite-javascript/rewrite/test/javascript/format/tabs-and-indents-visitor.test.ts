@@ -1334,4 +1334,104 @@ const { data, error } = await (
             // @formatter:on
         )
     })
+
+    test('re-indents multi-line comment interiors along with the delimiter', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`function outer() {
+}
+\t/**
+\t * Does a thing.
+\t * @public
+\t */
+\tfunction helper() {}
+`,
+`function outer() {
+}
+/**
+ * Does a thing.
+ * @public
+ */
+function helper() {}
+`),
+            //language=typescript
+            typescript(
+`class A {
+/**
+ * Doc.
+ */
+m() {}
+}
+`,
+`class A {
+    /**
+     * Doc.
+     */
+    m() {}
+}
+`),
+            //language=typescript
+            typescript(
+`class A {
+        /*
+          a
+            b
+        */
+        m() {}
+}
+`,
+`class A {
+    /*
+      a
+        b
+    */
+    m() {}
+}
+`)
+            // @formatter:on
+        );
+    });
+
+    test('leaves comment interiors alone when their column is unknown or already at zero', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`class A {
+        // a line comment
+        m() {} /* trailing
+   still trailing */
+}
+`,
+`class A {
+    // a line comment
+    m() {} /* trailing
+   still trailing */
+}
+`),
+            //language=typescript
+            typescript(
+`class A {
+        /**
+* flush left
+         */
+        m() {}
+}
+`,
+`class A {
+    /**
+* flush left
+     */
+    m() {}
+}
+`)
+            // @formatter:on
+        );
+    });
 });

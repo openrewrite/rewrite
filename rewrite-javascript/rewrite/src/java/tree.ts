@@ -789,6 +789,10 @@ export function isSpace(tree: any): tree is J.Space {
         tree.kind === J.Kind.Space;
 }
 
+/**
+ * Builds a comment-free Space. Assigning one over an existing prefix silently drops the comments
+ * that prefix carried; to change only the whitespace and keep them, use `replaceLastWhitespace`.
+ */
 export function space(whitespace: string): J.Space {
     return {
         kind: J.Kind.Space,
