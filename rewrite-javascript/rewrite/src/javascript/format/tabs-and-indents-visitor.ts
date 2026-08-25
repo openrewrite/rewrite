@@ -22,7 +22,6 @@ import {
     lastWhitespace,
     normalizeSpaceIndent,
     replaceIndentAfterLastNewline,
-    replaceLastWhitespace,
     spaceContainsNewline,
     stripLeadingIndent
 } from "../../java";
@@ -395,12 +394,12 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     private normalizeBlockEnd(block: J.Block, myIndent: number): J.Block {
-        const effectiveLastWs = lastWhitespace(block.end);
-        if (!effectiveLastWs.includes("\n")) {
+        if (!spaceContainsNewline(block.end)) {
             return block;
         }
-        return produce(block, draft => {
-            draft.end = replaceLastWhitespace(draft.end, ws => replaceIndentAfterLastNewline(ws, this.indentString(myIndent)));
+        const end = normalizeSpaceIndent(block.end, this.indentString(myIndent), this.indentString(myIndent + this.indentSize));
+        return end === block.end ? block : produce(block, draft => {
+            draft.end = end;
         });
     }
 
@@ -440,12 +439,14 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         // Normalize the last element's after whitespace (closing delimiter like `)`)
         // The closing delimiter should align with the parent's indent level
         if (container.elements.length > 0) {
-            const effectiveLastWs = lastWhitespace(container.elements[container.elements.length - 1].after);
-            if (effectiveLastWs.includes("\n")) {
-                return produce(container, draft => {
-                    const lastDraft = draft.elements[draft.elements.length - 1];
-                    lastDraft.after = replaceLastWhitespace(lastDraft.after, ws => replaceIndentAfterLastNewline(ws, this.indentString(parentIndent)));
-                });
+            const last = container.elements[container.elements.length - 1];
+            if (spaceContainsNewline(last.after)) {
+                const after = normalizeSpaceIndent(last.after, this.indentString(parentIndent), this.indentString(parentIndent + this.indentSize));
+                if (after !== last.after) {
+                    return produce(container, draft => {
+                        draft.elements[draft.elements.length - 1].after = after;
+                    });
+                }
             }
         }
 
