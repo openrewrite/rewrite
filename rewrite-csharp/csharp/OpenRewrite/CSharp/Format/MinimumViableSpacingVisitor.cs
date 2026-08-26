@@ -30,6 +30,18 @@ namespace OpenRewrite.CSharp.Format;
 /// </summary>
 public class MinimumViableSpacingVisitor : CSharpVisitor<int>
 {
+    public override J VisitAnnotatedStatement(AnnotatedStatement annotatedStatement, int p)
+    {
+        var a = (AnnotatedStatement)base.VisitAnnotatedStatement(annotatedStatement, p);
+
+        if (a.AttributeLists.Count > 0)
+        {
+            a = a.WithStatement((Statement)EnsureSpace(a.Statement));
+        }
+
+        return a;
+    }
+
     public override J VisitClassDeclaration(ClassDeclaration classDecl, int p)
     {
         var c = (ClassDeclaration)base.VisitClassDeclaration(classDecl, p);
