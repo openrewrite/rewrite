@@ -782,6 +782,9 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if mrr, err := goparser.ParseGoMod(r.sourcePath, r.source); err == nil && mrr != nil && mrr.ModulePath != "" {
+			// No go.sum on this path (sources arrive as strings), so the require
+			// block is the only build list available.
+			mrr.ResolvedDependencies, mrr.ResolutionSource = goparser.DeriveBuildList(mrr.GoVersion, mrr.Requires, mrr.Replaces, nil)
 			gm.Markers.Entries = append(gm.Markers.Entries, *mrr)
 		}
 		goModByIdx[r.idx] = gm
@@ -2512,11 +2515,25 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		moduleDir := filepath.Dir(modPath)
 		var buildList []golang.GoResolvedDependency
 		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
-			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
+			s.logger.Printf("ParseProject: module resolution failed for %s, falling back to vendor/go.mod: %v", moduleDir, rerr)
+			// vendor/modules.txt is authoritative for a vendored build and is the only
+			// offline source of the package->module map, so it outranks go.mod.
+			if vendored, verr := os.ReadFile(filepath.Join(moduleDir, "vendor", "modules.txt")); verr == nil {
+				vendorMods, vendorPkgs := goparser.ParseVendorModules(string(vendored))
+				mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, vendorMods)
+				mrr.PackageModules = vendorPkgs
+				mrr.ResolutionSource = golang.ResolutionVendor
+			} else {
+				mrr.ResolvedDependencies, mrr.ResolutionSource = goparser.DeriveBuildList(mrr.GoVersion, mrr.Requires, mrr.Replaces, mrr.ResolvedDependencies)
+			}
+			// Each build-list member's own go.mod is already in the module cache when
+			// the repo has been built here, and its requires are that module's edges.
+			mrr.ResolvedDependencies = goparser.AttachCachedEdges(goparser.GoModCacheDir(), mrr.ResolvedDependencies)
 		} else {
 			buildList = resolved
 			mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, resolved)
 			mrr.PackageModules = pkgs
+			mrr.ResolutionSource = golang.ResolutionToolchain
 		}
 		mods[filepath.Dir(modPath)] = &modCtx{
 			dir:       filepath.Dir(modPath),

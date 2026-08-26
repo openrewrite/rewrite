@@ -118,6 +118,7 @@ func sendGoResolutionResult(m golang.GoResolutionResult, q *SendQueue) {
 			q.GetAndSend(d, func(y any) any { return emptyAsNil(y.(golang.GoResolvedDependency).ReplacePath) }, nil)
 			q.GetAndSend(d, func(y any) any { return emptyAsNil(y.(golang.GoResolvedDependency).ReplaceVersion) }, nil)
 			q.GetAndSend(d, func(y any) any { return emptyAsNil(y.(golang.GoResolvedDependency).ModuleGoVersion) }, nil)
+			q.GetAndSend(d, func(y any) any { return y.(golang.GoResolvedDependency).Selected }, nil)
 			q.GetAndSendListAsRef(d,
 				func(y any) []any { return moduleRefSlice(y.(golang.GoResolvedDependency).Deps) },
 				func(y any) any {
@@ -141,6 +142,8 @@ func sendGoResolutionResult(m golang.GoResolutionResult, q *SendQueue) {
 			q.GetAndSend(p, func(y any) any { return emptyAsNil(y.(golang.GoPackageModule).Version) }, nil)
 			q.GetAndSend(p, func(y any) any { return y.(golang.GoPackageModule).Standard }, nil)
 		})
+
+	q.GetAndSend(m, func(x any) any { return string(x.(golang.GoResolutionResult).ResolutionSource) }, nil)
 }
 
 // receiveGoResolutionResult mirrors Java's
@@ -163,6 +166,8 @@ func receiveGoResolutionResult(before golang.GoResolutionResult, q *ReceiveQueue
 	before.Retracts = recvRetracts(q, before.Retracts)
 	before.ResolvedDependencies = recvResolvedDeps(q, before.ResolvedDependencies)
 	before.PackageModules = recvPackageModules(q, before.PackageModules)
+	before.ResolutionSource = golang.GoResolutionSource(
+		receiveScalar[string](q, string(before.ResolutionSource)))
 	return before
 }
 
@@ -254,6 +259,7 @@ func recvResolvedDeps(q *ReceiveQueue, before []golang.GoResolvedDependency) []g
 		d.ReplacePath = receiveNullableString(q, d.ReplacePath)
 		d.ReplaceVersion = receiveNullableString(q, d.ReplaceVersion)
 		d.ModuleGoVersion = receiveNullableString(q, d.ModuleGoVersion)
+		d.Selected = receiveScalar[bool](q, d.Selected)
 		d.Deps = recvModuleRefs(q, d.Deps)
 		return d
 	})

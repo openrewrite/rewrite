@@ -210,8 +210,8 @@ func runGo(dir string, args ...string) ([]byte, error) {
 // go.sum-derived hash rows, keyed by module@version. Build-list nodes are
 // authoritative (they carry the selected version, indirect/main flags, replace
 // info and graph edges) and inherit the go.sum content hashes for their version.
-// go.sum rows whose version is not in the selected build list (stale/extra
-// hashes) are preserved. Pure function — unit-testable without the toolchain.
+// go.sum rows outside the build list are preserved, unselected. Pure function —
+// unit-testable without the toolchain.
 func MergeResolvedDependencies(fromSum, fromList []golang.GoResolvedDependency) []golang.GoResolvedDependency {
 	key := func(d golang.GoResolvedDependency) string { return d.ModulePath + "@" + d.Version }
 	sumByKey := make(map[string]golang.GoResolvedDependency, len(fromSum))
@@ -226,11 +226,13 @@ func MergeResolvedDependencies(fromSum, fromList []golang.GoResolvedDependency) 
 			m.ModuleHash = s.ModuleHash
 			m.GoModHash = s.GoModHash
 		}
+		m.Selected = true
 		out = append(out, m)
 		seen[k] = true
 	}
 	for _, s := range fromSum {
 		if !seen[key(s)] {
+			s.Selected = false
 			out = append(out, s)
 		}
 	}
