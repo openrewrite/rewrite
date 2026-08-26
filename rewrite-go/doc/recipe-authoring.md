@@ -172,7 +172,12 @@ Type attribution depth depends on how the parser is constructed:
 | `parser.NewGoParser()` (default) | ✓ | (single file only) | ✗ | ✗ |
 | `goparser.NewProjectImporter(modulePath, fallback)` + `AddSource(...)` | ✓ | ✓ (cross-file) | stub (typed) | ✗ |
 | `+ SetProjectRoot(rootDir)` | ✓ | ✓ | stub | ✓ if `<rootDir>/vendor/<path>/` exists |
+| `+ AddModule(path, cachePath, version)` | ✓ | ✓ | ✓ from `$GOMODCACHE` | ✓ (wins) |
 | `+ AddReplace(old, new, version)` | ✓ | ✓ | redirected to `new` (vendor or local) | ✓ |
+
+A module reachable through none of these still resolves to a typed
+stub — a package with the right path and an empty scope — so an import
+of it names something even though its symbols do not.
 
 For Java-side parsing through RPC, build the parser with
 `GolangParser.builder().module("...").goMod(content).build()`. The
@@ -249,9 +254,12 @@ contribute to its API travel inside the one blob that names them.
 
 Nothing about a blob is pinned to the machine that made it. The
 GOOS/GOARCH and toolchain version recorded in it are not checked on
-read; only the binary export format is, and it changes rarely. A blob a
-toolchain can no longer read leaves the template where shipping none
-would: it still applies, carrying no types.
+read; only the binary export format is, and it changes rarely. That
+format reads backward only — a toolchain decodes its own version or
+older — so generate blobs with a toolchain no newer than the oldest one
+expected to read them. A blob a toolchain cannot read leaves the
+template where shipping none would: it still applies, carrying no
+types.
 
 That is harmless on its own and is not harmless with `SourceImports`.
 Dropping a superseded import needs attribution naming the path that
@@ -357,6 +365,34 @@ your recipe imports `pkg/recipe/golang` (which most do), services are
 registered before any test or RPC dispatch runs. Looking up a missing
 service panics with a clear message.
 
+## The names types carry
+
+Every type is attributed under the name Go spells it with, so a pattern
+and a signature share one vocabulary:
+
+| Go | attributed as |
+|---|---|
+| `int`, `int32`, `uint8`, `float64`, `complex128`, `string`, `bool` | `JavaType.Class` with that name |
+| `byte`, `rune` | their own names, kept apart from `uint8` and `int32` |
+| an untyped constant | `untyped int`, `untyped string`, ... |
+| `any`, `interface{}` | `any` |
+| `map[K]V`, `chan T` | `map` / `chan` parameterized over K, V |
+| a builtin call (`append`, `len`, ...) | a method of `builtin` |
+| `unsafe.Pointer` | `unsafe.Pointer` |
+| an anonymous `struct{...}` / `interface{...}` | members, but no name |
+
+`byte` and `uint8` are one Go type spelled two ways, as are `rune` and
+`int32`; compare two types for identity with `matcher.IsSameGoType`
+rather than by name. `matcher.IsInt`, `IsNumeric`, `IsString` and
+`IsBool` classify without caring which spelling arrived.
+
+The one exception is a literal, which carries a `JavaType.Primitive`
+keyword instead: `J.Literal#type` is declared `JavaType.Primitive` on
+the Java side and `withType` drops anything else, and the LST
+deserializer reads the keyword to reconstruct the value. The `matcher`
+predicates above read both vocabularies, so a literal answers them the
+same way a variable of its type does.
+
 ## Asserting types in tests
 
 Two helpers exist on both sides for common type assertions:
@@ -366,8 +402,8 @@ Two helpers exist on both sides for common type assertions:
 ```go
 import . "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 
-ExpectType(t, cu, "p", "main.Point")          // class/struct types
-ExpectPrimitiveType(t, cu, "x", "int")         // primitives
+ExpectType(t, cu, "p", "main.Point")          // any type, by its Go name
+ExpectType(t, cu, "x", "int32")               // basic types included
 ExpectMethodType(t, cu, "Println", "fmt")      // method's declaring FQN
 ```
 
@@ -375,7 +411,7 @@ ExpectMethodType(t, cu, "Println", "fmt")      // method's declaring FQN
 
 ```java
 expectType(cu, "p", "main.Point");
-expectPrimitiveType(cu, "x", "int");
+expectType(cu, "x", "int32");
 expectMethodType(cu, "Println", "fmt");
 ```
 
@@ -383,6 +419,60 @@ Both walk the tree, find the first identifier (or method) matching the
 name, and assert on its attributed type. Throw `AssertionError` with a
 descriptive message on mismatch — drop them straight into an
 `afterRecipe(cu -> ...)` lambda.
+
+## Typed captures
+
+`Capture.WithType` declares the Go type a capture stands for. The
+scaffold declares the placeholder with it, so the pattern type-checks,
+and the match binds only a subtree whose attributed type is assignable
+to it:
+
+```go
+e := template.Expr("e").WithType("error")
+pat := template.Expression(fmt.Sprintf("%s == nil", e)).Captures(e).Build()
+```
+
+That matches `err == nil` and refuses `s == nil` where `s` is a
+`*string`. Assignability follows Go's rule as far as the attributed model
+records it, so an interface is satisfied by a type carrying its methods:
+a concrete `*MyErr` answers to `error` the way `io.EOF` does. `errors.Is`
+takes two `error` arguments, so this is the guard that makes
+`err == io.EOF` → `errors.Is(err, io.EOF)` a rewrite a pattern can state
+safely.
+
+Four rules bound it:
+
+- **A declared type is read whatever `TypeMatching` says.** The mode
+  governs the type slots a pattern did not ask about; this is one it did.
+- **A candidate the parser could not attribute is the mode's decision.**
+  `TypeMatchingLenient` binds it; the other two refuse. A template parsed
+  alone attributes only the stdlib (see "Module context for type
+  attribution"), so a typed capture against an unattributed tree no-ops
+  by default — `GoPattern.Explain` counts what it refused for want of
+  attribution, which tells that apart from source that differs.
+- **The type filters a match, not a bind.** `MatchResult.Bind` splices
+  the node you name, so `Instantiate` will emit `errors.New(42)` for a
+  capture declared `string`. Hand-built nodes are yours to get right.
+- **Only an expression carries a type.** `WithType` on a `Stmt`, `Ident`
+  or `TypeExpr` capture panics, and a type name the pattern uses but
+  cannot resolve fails the parse rather than constraining nothing. Name
+  it through `Imports`, `Context` or `ExportData`.
+
+Four limits come from what the model carries, all of them worth knowing
+before a recipe leans on a typed capture as a safety guard:
+
+- **A method promoted from an embedded field is not in the embedding
+  type's method set** (`named.NumMethods` is what a type declares). So
+  `struct{ Inner }` does not answer to an interface `Inner` satisfies,
+  and the capture under-matches.
+- **`*T` and `T` are one attributed type.** A capture declared `error`
+  binds a `MyErr{}` whose `Error()` has a pointer receiver, which Go
+  would reject — the one direction in which the guard over-matches.
+- **A variadic `...T` parameter is recorded as `[]T`** with no flag to
+  tell the two apart, so an interface method that is variadic is
+  satisfied by one taking a slice.
+- **A type that export data names but does not describe carries no
+  method set**, so it satisfies an interface only by being it.
 
 ## Variadic captures
 

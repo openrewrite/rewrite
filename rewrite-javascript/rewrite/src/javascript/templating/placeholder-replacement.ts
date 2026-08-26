@@ -20,6 +20,7 @@ import {JavaScriptVisitor} from '../visitor';
 import {create as produce} from 'mutative';
 import {PlaceholderUtils} from './utils';
 import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
+import {enclosingTree, maybeParenthesize} from './precedence';
 import {Parameter} from './types';
 
 /**
@@ -40,7 +41,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         if (tree.kind !== JS.Kind.BindingElement && this.isPlaceholder(tree)) {
             const replacement = this.replacePlaceholder(tree);
             if (replacement !== tree) {
-                return replacement as R;
+                // `this.cursor` is still the enclosing template node: `super.visit()` has not pushed this one
+                return maybeParenthesize(enclosingTree(parent ?? this.cursor), tree.id, replacement, true) as R;
             }
         }
 

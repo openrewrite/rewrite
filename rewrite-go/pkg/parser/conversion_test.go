@@ -17,6 +17,7 @@
 package parser_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,12 +94,13 @@ func TestConversionCarriesTheTypeItNames(t *testing.T) {
 	for _, tc := range []struct{ conversion, want string }{
 		{"time.Duration(n)", "time.Duration"},
 		{"MyInt(3)", "main.MyInt"},
-		{"string(b)", "String"},
+		{"string(b)", "string"},
 		{"[]byte(s)", "byte[]"},
+		{"(*MyInt)(q)", "main.MyInt"},
 	} {
 		t.Run(tc.conversion, func(t *testing.T) {
 			src := "package main\n\nimport \"time\"\n\ntype MyInt int\n\n" +
-				"func f(n int64, b []byte, s string) {\n\t_ = " + tc.conversion + "\n}\n"
+				"func f(n int64, b []byte, s string, q *MyInt) {\n\t_ = " + tc.conversion + "\n}\n"
 
 			got := matcher.TypeOfExpression(collect(t, src).conversion(t))
 
@@ -126,6 +128,57 @@ func TestConversionToAnUnnamedTypeRoundTrips(t *testing.T) {
 
 			assert.Equal(t, src, printer.Print(cu))
 			require.Len(t, collect(t, src).conversions, 1, "not read as a conversion")
+		})
+	}
+}
+
+// Printing cannot tell a parenthesized type from a parenthesized expression, so
+// the node the parser builds is what this pins down.
+func TestParenthesizedConversionTypeIsATypeTree(t *testing.T) {
+	for _, tc := range []struct{ conversion, inner string }{
+		{"(*T)(p)", "*golang.PointerType"},
+		{"(func())(fn)", "*golang.FuncType"},
+		{"(<-chan int)(rc)", "*golang.Channel"},
+		{"(map[string]int)(m)", "*golang.MapType"},
+	} {
+		t.Run(tc.conversion, func(t *testing.T) {
+			src := "package main\n\ntype T struct{}\n\n" +
+				"func f(p *T, fn func(), rc <-chan int, m map[string]int) {\n" +
+				"\t_ = " + tc.conversion + "\n}\n"
+
+			clazz := collect(t, src).conversion(t).Clazz.Tree.Element
+
+			ptt, ok := clazz.(*java.ParenthesizedTypeTree)
+			require.True(t, ok, "conversion type is %T, not a ParenthesizedTypeTree", clazz)
+			assert.Equal(t, tc.inner, fmt.Sprintf("%T", ptt.Type.Tree.Element))
+			assert.Equal(t, src, printer.Print(parseGo(t, src)))
+		})
+	}
+}
+
+// `var _ I = (*T)(nil)` is Go's idiomatic compile-time assertion that *T
+// implements I.
+func TestInterfaceSatisfactionAssertionRoundTrips(t *testing.T) {
+	src := "package main\n\ntype I interface {\n\tM()\n}\n\ntype T struct{}\n\n" +
+		"func (t *T) M() {\n}\n\nvar _ I = (*T)(nil)\n"
+
+	assert.Equal(t, src, printer.Print(parseGo(t, src)))
+	require.Len(t, collect(t, src).conversions, 1, "not read as a conversion")
+}
+
+// A parenthesized type is legal in these declaration positions too, not only in
+// a conversion.
+func TestParenthesizedTypeRoundTripsOutsideAConversion(t *testing.T) {
+	for _, decl := range []string{
+		"var x (int) = 5",
+		"var y (*T) = nil",
+		"var m map[(string)](int)",
+		"type A (int)",
+	} {
+		t.Run(decl, func(t *testing.T) {
+			src := "package main\n\ntype T struct{}\n\n" + decl + "\n"
+
+			assert.Equal(t, src, printer.Print(parseGo(t, src)))
 		})
 	}
 }

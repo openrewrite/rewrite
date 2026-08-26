@@ -17,9 +17,10 @@ import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
-import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
+import {CaptureMarker, PlaceholderUtils, randomizeIds, retainIds, treeIds, WRAPPER_FUNCTION_NAME} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
+import {maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
 import {JavaCoordinates} from './template';
 import {maybeAutoFormat} from '../format';
 import {isExpression, isStatement} from '../parser-utils';
@@ -260,12 +261,26 @@ export class TemplateEngine {
             substitutions.set(placeholder, parameters[i]);
         }
 
+        // Before substitution, so that ids carried over from the source tree survive this pass
+        const fresh = await randomizeIds(ast);
+
         // Unsubstitute placeholders with actual parameter values and match results
         const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap);
-        const unsubstitutedAst = (await visitor.visit(ast, null))!;
+        const unsubstitutedAst = (await visitor.visit(fresh.tree, null))!;
+
+        // An id may only be kept where the node answering to it is leaving the tree, which is the
+        // subtree this application replaces. A parameter named twice, or spliced in from somewhere
+        // that stays, would otherwise put one id in two places.
+        const retainable = new Set(fresh.ids);
+        if (coordinates.tree) {
+            for (const id of await treeIds(coordinates.tree as J)) {
+                retainable.add(id);
+            }
+        }
+        const uniqueAst = await retainIds(unsubstitutedAst, retainable);
 
         // Apply the template to the current AST
-        return new TemplateApplier(cursor, coordinates, unsubstitutedAst).apply();
+        return new TemplateApplier(cursor, coordinates, uniqueAst).apply();
     }
 
     /**
@@ -677,8 +692,41 @@ export class TemplateApplier {
         }
 
         const originalTree = tree as J;
-        const resultToUse = this.wrapTree(originalTree, this.ast);
+        let resultToUse = this.wrapTree(originalTree, this.ast);
+        const slot = this.replacedSlot(originalTree);
+        if (slot) {
+            // `format` substitutes the target's prefix, so decide against the prefix that will print
+            resultToUse = maybeParenthesize(slot[0], slot[1], {...resultToUse, prefix: originalTree.prefix});
+        }
         return this.format(resultToUse, originalTree);
+    }
+
+    /** The node holding the tree being replaced and the id it holds it under, per the cursor. */
+    private replacedSlot(originalTree: J): [J, string] | undefined {
+        const frames: J[] = [];
+        for (let c: Cursor | undefined = this.cursor; c && frames.length < 2; c = c.parent) {
+            if (isTree(c.value)) {
+                frames.push(c.value as J);
+            }
+        }
+        if (frames.length === 0) {
+            return undefined;
+        }
+
+        // The visitor may sit on the node holding what is being replaced rather than on it
+        if (requiredPrecedence(frames[0], originalTree.id) !== undefined) {
+            return [frames[0], originalTree.id];
+        }
+        if (frames.length < 2) {
+            return undefined;
+        }
+        if (requiredPrecedence(frames[1], originalTree.id) !== undefined) {
+            return [frames[1], originalTree.id];
+        }
+        // A chained rule rewrites the previous rule's detached result, leaving the cursor on the node
+        // that result stands in for; a wrong guess here only ever adds parentheses, never drops them
+        return frames[0].id !== originalTree.id && requiredPrecedence(frames[1], frames[0].id) !== undefined ?
+            [frames[1], frames[0].id] : undefined;
     }
 
     private async format(resultToUse: J, originalTree: J) {
@@ -721,14 +769,16 @@ export class TemplateApplier {
 
             // Determine context and wrap if needed
             if (parentExpectsStatement && originalIsStatement) {
+                const needsGrouping = resultIsExpression && startsWithDeclarationToken(resultToUse);
                 // Statement context: wrap in ExpressionStatement if result is not a statement
-                if (!resultIsStatement && resultIsExpression) {
+                if (needsGrouping || (!resultIsStatement && resultIsExpression)) {
+                    const expression = needsGrouping ? parenthesize(resultToUse) : resultToUse;
                     resultToUse = {
                         kind: JS.Kind.ExpressionStatement,
                         id: randomId(),
-                        prefix: resultToUse.prefix,
-                        markers: resultToUse.markers,
-                        expression: { ...resultToUse, prefix: emptySpace }
+                        prefix: expression.prefix,
+                        markers: expression.markers,
+                        expression: { ...expression, prefix: emptySpace }
                     } as JS.ExpressionStatement;
                 }
             } else if (!parentExpectsStatement) {

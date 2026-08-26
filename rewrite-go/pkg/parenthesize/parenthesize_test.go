@@ -34,6 +34,11 @@ type unwrapper struct {
 }
 
 func (u *unwrapper) Visit(t java.Tree, p any) java.Tree {
+	// A parenthesized type holds its parentheses in a slot typed for them, so it
+	// comes off whole.
+	if ptt, ok := t.(*java.ParenthesizedTypeTree); ok {
+		return format.WithPrefix(u.Visit(ptt.Type.Tree.Element, p), ptt.Prefix)
+	}
 	out := u.GoVisitor.Visit(t, p)
 	if parens, ok := out.(*java.Parentheses); ok {
 		return format.WithPrefix(parens.Tree.Element, parens.Prefix)

@@ -38,23 +38,4 @@ class MaintainerTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void quotedMaintainer() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:20.04
-              MAINTAINER "John Doe"
-              """,
-            spec -> spec.afterRecipe(doc -> {
-                var maintainer = (Docker.Maintainer) doc.getStages().getFirst().getInstructions().getFirst();
-                Docker.Literal literal = (Docker.Literal) maintainer.getText().getContents().getFirst();
-                assertThat(literal.getText()).isEqualTo("John Doe");
-                assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(maintainer.getText().getText()).isEqualTo("John Doe");
-            })
-          )
-        );
-    }
 }

@@ -404,6 +404,18 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterShellFormTextElement(DockerParser.ShellFormTextElementContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitShellFormTextElement(DockerParser.ShellFormTextElementContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterHeredoc(DockerParser.HeredocContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -423,6 +435,18 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitHeredocPreamble(DockerParser.HeredocPreambleContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterPreambleElement(DockerParser.PreambleElementContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitPreambleElement(DockerParser.PreambleElementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -500,18 +524,6 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterImageReference(DockerParser.ImageReferenceContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitImageReference(DockerParser.ImageReferenceContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
 	@Override public void enterImageName(DockerParser.ImageNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -519,30 +531,6 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitImageName(DockerParser.ImageNameContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterTag(DockerParser.TagContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitTag(DockerParser.TagContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterDigest(DockerParser.DigestContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitDigest(DockerParser.DigestContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -591,6 +579,42 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitLabelKey(DockerParser.LabelKeyContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterLabelValue(DockerParser.LabelValueContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitLabelValue(DockerParser.LabelValueContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterLabelOldValue(DockerParser.LabelOldValueContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitLabelOldValue(DockerParser.LabelOldValueContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterLabelOldValueElement(DockerParser.LabelOldValueElementContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitLabelOldValueElement(DockerParser.LabelOldValueElementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -656,25 +680,97 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterCopyPaths(DockerParser.CopyPathsContext ctx) { }
+	@Override public void enterEnvValueEquals(DockerParser.EnvValueEqualsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitCopyPaths(DockerParser.CopyPathsContext ctx) { }
+	@Override public void exitEnvValueEquals(DockerParser.EnvValueEqualsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterPathArgument(DockerParser.PathArgumentContext ctx) { }
+	@Override public void enterEnvValueSpace(DockerParser.EnvValueSpaceContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitPathArgument(DockerParser.PathArgumentContext ctx) { }
+	@Override public void exitEnvValueSpace(DockerParser.EnvValueSpaceContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterEnvTextEquals(DockerParser.EnvTextEqualsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitEnvTextEquals(DockerParser.EnvTextEqualsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterEnvTextElementEquals(DockerParser.EnvTextElementEqualsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitEnvTextElementEquals(DockerParser.EnvTextElementEqualsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSourceList(DockerParser.SourceListContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSourceList(DockerParser.SourceListContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSourcePath(DockerParser.SourcePathContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSourcePath(DockerParser.SourcePathContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterDestination(DockerParser.DestinationContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitDestination(DockerParser.DestinationContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterDestinationPath(DockerParser.DestinationPathContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitDestinationPath(DockerParser.DestinationPathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -764,18 +860,6 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterQuoted(DockerParser.QuotedContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitQuoted(DockerParser.QuotedContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
 	@Override public void enterText(DockerParser.TextContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -783,42 +867,6 @@ public class DockerParserBaseListener implements DockerParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitText(DockerParser.TextContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterValue(DockerParser.ValueContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitValue(DockerParser.ValueContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterValueElement(DockerParser.ValueElementContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitValueElement(DockerParser.ValueElementContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterPathElement(DockerParser.PathElementContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitPathElement(DockerParser.PathElementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

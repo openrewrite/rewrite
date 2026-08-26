@@ -56,6 +56,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -118,6 +119,15 @@ public class GoRewriteRpc extends RewriteRpc {
     }
 
     /**
+     * Parser options forwarded to the Go server with every parse request, carrying
+     * this context's {@link ExecutionContext#REQUIRE_PRINT_EQUALS_INPUT} setting.
+     */
+    public static Map<String, String> parseOptions(ExecutionContext ctx) {
+        return Collections.singletonMap(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                String.valueOf(ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)));
+    }
+
+    /**
      * Parse a batch of Go source inputs with project (module) context.
      * The Go server constructs a {@code ProjectImporter} from the module
      * path + go.mod content, registers every input as a sibling, and uses
@@ -157,7 +167,8 @@ public class GoRewriteRpc extends RewriteRpc {
                 mappedInputs,
                 relativeTo != null ? relativeTo.toString() : null,
                 module,
-                goModContent
+                goModContent,
+                parseOptions(ctx)
         ), ParseResponse.class);
         if (ids.size() != inputList.size()) {
             throw new IllegalStateException("Parse response size " + ids.size() + " != input size " + inputList.size());
@@ -266,7 +277,7 @@ public class GoRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, base), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, base, parseOptions(ctx)), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 

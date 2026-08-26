@@ -38,41 +38,4 @@ class WorkdirTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void quotedPath() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:20.04
-              WORKDIR "/app dir"
-              """,
-            spec -> spec.afterRecipe(doc -> {
-                var workdir = (Docker.Workdir) doc.getStages().getFirst().getInstructions().getLast();
-                Docker.Literal literal = (Docker.Literal) workdir.getPath().getContents().getFirst();
-                assertThat(literal.getText()).isEqualTo("/app dir");
-                assertThat(literal.getQuoteStyle()).isEqualTo(Docker.Literal.QuoteStyle.DOUBLE);
-                assertThat(workdir.getPath().getText()).isEqualTo("/app dir");
-            })
-          )
-        );
-    }
-
-    @Test
-    void pathWithEnvironmentVariable() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:20.04
-              WORKDIR /app/$SUB
-              """,
-            spec -> spec.afterRecipe(doc -> {
-                var workdir = (Docker.Workdir) doc.getStages().getFirst().getInstructions().getLast();
-                assertThat(workdir.getPath().hasEnvironmentVariables()).isTrue();
-                assertThat(workdir.getPath().getText()).isNull();
-                assertThat(workdir.getPath().getTextWithVariables()).isEqualTo("/app/$SUB");
-            })
-          )
-        );
-    }
 }

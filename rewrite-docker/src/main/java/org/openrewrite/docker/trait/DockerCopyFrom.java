@@ -105,8 +105,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
      * or empty if there is no {@code --from} flag.
      */
     public Optional<String> getFromValue() {
-        Docker.Argument arg = fromArgument();
-        return arg == null ? Optional.empty() : Optional.of(arg.getTextWithVariables());
+        return Optional.ofNullable(new Matcher().extractTextWithVariables(fromArgument()));
     }
 
     /**
@@ -125,7 +124,7 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
         if (arg == null) {
             return false;
         }
-        String value = arg.getText();
+        String value = new Matcher().extractText(arg);
         if (value == null) {
             return false;
         }
@@ -162,25 +161,77 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
     }
 
     /**
-     * Returns the image name of the referenced external image, or {@code null} if the
-     * {@code --from} names an earlier build stage or is absent.
+     * Returns the image name (without tag or digest), or empty if this is a stage reference
+     * or there is no {@code --from} flag.
      */
     @Override
-    public Docker.@Nullable Argument getImageNameArgument() {
+    public Optional<String> getImageName() {
         Docker.@Nullable Argument[] components = components();
-        return components == null ? null : components[0];
+        return components == null ? Optional.empty() : Optional.ofNullable(new Matcher().extractTextWithVariables(components[0]));
     }
 
+    /**
+     * Returns the tag, or empty if no tag is specified or this is a stage reference.
+     */
     @Override
-    public Docker.@Nullable Argument getTagArgument() {
+    public Optional<String> getTag() {
         Docker.@Nullable Argument[] components = components();
-        return components == null ? null : components[1];
+        return components == null ? Optional.empty() : Optional.ofNullable(new Matcher().extractTextWithVariables(components[1]));
     }
 
+    /**
+     * Returns the digest, or empty if no digest is specified or this is a stage reference.
+     */
     @Override
-    public Docker.@Nullable Argument getDigestArgument() {
+    public Optional<String> getDigest() {
         Docker.@Nullable Argument[] components = components();
-        return components == null ? null : components[2];
+        return components == null ? Optional.empty() : Optional.ofNullable(new Matcher().extractTextWithVariables(components[2]));
+    }
+
+    /**
+     * Returns true if the referenced external image is pinned by digest.
+     */
+    @Override
+    public boolean isDigestPinned() {
+        Docker.@Nullable Argument[] components = components();
+        return components != null && components[2] != null;
+    }
+
+    /**
+     * Returns true if the referenced external image is unpinned (no tag or an explicit
+     * "latest" tag). Stage references and digest-pinned images are considered pinned.
+     */
+    @Override
+    public boolean isUnpinned() {
+        return getUnpinnedReason().isPresent();
+    }
+
+    /**
+     * Returns the reason the referenced external image is unpinned, or empty if it's pinned
+     * or this is a stage reference.
+     */
+    @Override
+    public Optional<UnpinnedReason> getUnpinnedReason() {
+        Docker.@Nullable Argument[] components = components();
+        if (components == null) {
+            return Optional.empty();
+        }
+        if (components[2] != null) {
+            return Optional.empty();
+        }
+        if (components[1] == null) {
+            // A reference whose name is an unresolved environment variable can't be classified;
+            // conservatively treat it as pinned rather than assuming an implicit "latest".
+            if (new Matcher().hasEnvironmentVariables(components[0])) {
+                return Optional.empty();
+            }
+            return Optional.of(UnpinnedReason.IMPLICIT_LATEST);
+        }
+        String tag = new Matcher().extractText(components[1]);
+        if ("latest".equals(tag)) {
+            return Optional.of(UnpinnedReason.EXPLICIT_LATEST);
+        }
+        return Optional.empty();
     }
 
     /**
@@ -219,6 +270,48 @@ public class DockerCopyFrom implements DockerImageReference<Docker.Instruction> 
         }
         String suffix = getDigest().map(d -> "@" + d).orElse("");
         return withImageReference(name.get() + ":" + tag + suffix);
+    }
+
+    /**
+     * Checks if the image name matches the given glob pattern; always false for stage references.
+     */
+    @Override
+    public boolean imageNameMatches(String pattern) {
+        Docker.@Nullable Argument[] components = components();
+        if (components == null) {
+            return false;
+        }
+        Matcher m = new Matcher();
+        String text = m.extractTextForMatching(components[0]);
+        return m.matchesBidirectional(text, pattern, m.hasEnvironmentVariables(components[0]));
+    }
+
+    /**
+     * Checks if the tag matches the given glob pattern; false for stage references or when absent.
+     */
+    @Override
+    public boolean tagMatches(String pattern) {
+        Docker.@Nullable Argument[] components = components();
+        if (components == null || components[1] == null) {
+            return false;
+        }
+        Matcher m = new Matcher();
+        String text = m.extractTextForMatching(components[1]);
+        return m.matchesBidirectional(text, pattern, m.hasEnvironmentVariables(components[1]));
+    }
+
+    /**
+     * Checks if the digest matches the given glob pattern; false for stage references or when absent.
+     */
+    @Override
+    public boolean digestMatches(String pattern) {
+        Docker.@Nullable Argument[] components = components();
+        if (components == null || components[2] == null) {
+            return false;
+        }
+        Matcher m = new Matcher();
+        String text = m.extractTextForMatching(components[2]);
+        return m.matchesBidirectional(text, pattern, m.hasEnvironmentVariables(components[2]));
     }
 
     /**

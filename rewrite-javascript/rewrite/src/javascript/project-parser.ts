@@ -545,6 +545,12 @@ export class ProjectParser {
             }
         }
 
+        // A project inside an ignored directory is invisible to git; the walk is what
+        // discovers it.
+        if (files.length === 0) {
+            return this.discoverFilesWithWalk();
+        }
+
         // Filter by our exclusion patterns and accepted file types
         return files.filter(file => this.isAcceptedFile(file, this.gitExclusions));
     }
@@ -658,10 +664,20 @@ export class ProjectParser {
     }
 
     /**
-     * Checks if the project is a git repository.
+     * Checks whether a git work tree encloses the project, which for a project below the
+     * repository root is an ancestor directory. A linked work tree or submodule has `.git`
+     * as a file, so presence rather than kind is what counts.
      */
     private isGitRepository(): boolean {
-        return fs.existsSync(path.join(this.projectPath, ".git"));
+        let dir = this.projectPath;
+        while (!fs.existsSync(path.join(dir, ".git"))) {
+            const parent = path.dirname(dir);
+            if (parent === dir) {
+                return false;
+            }
+            dir = parent;
+        }
+        return true;
     }
 
     /**

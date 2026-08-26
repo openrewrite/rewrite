@@ -481,6 +481,156 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
+    @Issue("https://docs.gradle.org/current/userguide/building_java_projects.html#sec:compiling_with_release")
+    @Test
+    void releasePropertyGetsUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              tasks.withType(JavaCompile) {
+                  options.release.set(8)
+              }
+
+              compileJava {
+                  options.release.set(8)
+              }
+
+              compileJava.options.release.set(8)
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              tasks.withType(JavaCompile) {
+                  options.release.set(11)
+              }
+
+              compileJava {
+                  options.release.set(11)
+              }
+
+              compileJava.options.release.set(11)
+              """
+          )
+        );
+    }
+
+    @Issue("https://docs.gradle.org/current/userguide/building_java_projects.html#sec:compiling_with_release")
+    @Test
+    void releasePropertyGetsUpdatedInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              tasks.withType(JavaCompile::class) {
+                  if (JavaVersion.current().isJava9Compatible) {
+                      options.release.set(8)
+                  } else {
+                      sourceCompatibility = "1.8"
+                      targetCompatibility = "1.8"
+                  }
+              }
+
+              tasks.named<JavaCompile>("compileJava") {
+                  options.release.set(8)
+              }
+              """,
+            """
+              plugins {
+                  java
+              }
+
+              tasks.withType(JavaCompile::class) {
+                  if (JavaVersion.current().isJava9Compatible) {
+                      options.release.set(11)
+                  } else {
+                      sourceCompatibility = "11"
+                      targetCompatibility = "11"
+                  }
+              }
+
+              tasks.named<JavaCompile>("compileJava") {
+                  options.release.set(11)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void compatibilityFromLocalVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  def javaVersion = JavaVersion.VERSION_1_8
+                  sourceCompatibility = javaVersion
+                  targetCompatibility = javaVersion
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  def javaVersion = JavaVersion.VERSION_11
+                  sourceCompatibility = javaVersion
+                  targetCompatibility = javaVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void onlyUpdateVariablesFeedingCompatibility() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              def someOtherVersion = JavaVersion.VERSION_1_8
+
+              java {
+                  sourceCompatibility = JavaVersion.VERSION_1_8
+                  targetCompatibility = JavaVersion.VERSION_1_8
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              def someOtherVersion = JavaVersion.VERSION_1_8
+
+              java {
+                  sourceCompatibility = JavaVersion.VERSION_11
+                  targetCompatibility = JavaVersion.VERSION_11
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void updateExisitingSourceCompatibilityInKotlinDSL() {
         rewriteRun(

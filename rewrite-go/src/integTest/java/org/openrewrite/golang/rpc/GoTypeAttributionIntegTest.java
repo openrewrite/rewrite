@@ -145,7 +145,10 @@ class GoTypeAttributionIntegTest implements RewriteTest {
                             }.visit(cu, new InMemoryExecutionContext());
                             // Printing goes back over RPC, so the Go layout has to come out of the Java-side tree.
                             assertThat(conversions).containsExactly("string(b)");
-                            assertThat(conversionTypes).containsExactly(JavaType.Primitive.String);
+                            // A conversion names a Go type, spelled as Go spells it.
+                            assertThat(conversionTypes).singleElement()
+                                    .isInstanceOfSatisfying(JavaType.FullyQualified.class,
+                                            fq -> assertThat(fq.getFullyQualifiedName()).isEqualTo("string"));
                             assertThat(builtins).containsExactly("len");
                         })
                 )

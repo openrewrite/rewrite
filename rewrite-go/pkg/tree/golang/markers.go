@@ -77,3 +77,18 @@ func (m ImplicitForClauses) ID() uuid.UUID { return m.Ident }
 func NewImplicitForClauses() ImplicitForClauses {
 	return ImplicitForClauses{Ident: uuid.New()}
 }
+
+// PartialTypeAttribution marks a CompilationUnit whose package did not
+// type-check completely, so an absent type means "not resolved here" rather
+// than "no such type". Reason names what was lost. Mirrors
+// org.openrewrite.golang.marker.PartialTypeAttribution.
+type PartialTypeAttribution struct {
+	Ident  uuid.UUID
+	Reason string
+}
+
+func (m PartialTypeAttribution) ID() uuid.UUID { return m.Ident }
+
+func NewPartialTypeAttribution(reason string) PartialTypeAttribution {
+	return PartialTypeAttribution{Ident: uuid.New(), Reason: reason}
+}
