@@ -2515,6 +2515,10 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * code with typeExpression.
      */
     override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.VariableDeclarations) {
+            return this.kindMismatch();
+        }
+
         const otherVariableDeclarations = other as J.VariableDeclarations;
 
         // Visit leading annotations
@@ -2573,6 +2577,10 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * code with returnTypeExpression.
      */
     override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.MethodDeclaration) {
+            return this.kindMismatch();
+        }
+
         const otherMethodDeclaration = other as J.MethodDeclaration;
 
         // Visit leading annotations
