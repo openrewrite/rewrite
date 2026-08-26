@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:OptIn(org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi::class)
+@file:OptIn(
+    org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi::class,
+    org.jetbrains.kotlin.config.CompilerConfiguration.Internals::class,
+)
 package org.openrewrite.kotlin.recipe.internal
 
 import com.tschuchort.compiletesting.KotlinCompilation
