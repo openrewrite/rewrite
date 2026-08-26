@@ -579,7 +579,7 @@ export class Pattern {
  * @example
  * const x = capture('x');
  * const pat = pattern`foo(${x})`;
- * const match = await pat.match(someNode);
+ * const match = await pat.match(someNode, cursor);
  * if (match) {
  *     const captured = match.get('x');  // Get by name
  *     // or
@@ -590,7 +590,7 @@ export class Pattern {
  * // Variadic captures return arrays
  * const args = capture({ variadic: true });
  * const pat = pattern`foo(${args})`;
- * const match = await pat.match(methodInvocation);
+ * const match = await pat.match(methodInvocation, cursor);
  * if (match) {
  *     const capturedArgs = match.get(args);  // Returns J[] for variadic captures
  * }

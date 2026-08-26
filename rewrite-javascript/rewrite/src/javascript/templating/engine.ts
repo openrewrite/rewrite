@@ -17,7 +17,7 @@ import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
-import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
+import {CaptureMarker, PlaceholderUtils, randomizeIds, retainIds, treeIds, WRAPPER_FUNCTION_NAME} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {JavaCoordinates} from './template';
@@ -260,12 +260,26 @@ export class TemplateEngine {
             substitutions.set(placeholder, parameters[i]);
         }
 
+        // Before substitution, so that ids carried over from the source tree survive this pass
+        const fresh = await randomizeIds(ast);
+
         // Unsubstitute placeholders with actual parameter values and match results
         const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap);
-        const unsubstitutedAst = (await visitor.visit(ast, null))!;
+        const unsubstitutedAst = (await visitor.visit(fresh.tree, null))!;
+
+        // An id may only be kept where the node answering to it is leaving the tree, which is the
+        // subtree this application replaces. A parameter named twice, or spliced in from somewhere
+        // that stays, would otherwise put one id in two places.
+        const retainable = new Set(fresh.ids);
+        if (coordinates.tree) {
+            for (const id of await treeIds(coordinates.tree as J)) {
+                retainable.add(id);
+            }
+        }
+        const uniqueAst = await retainIds(unsubstitutedAst, retainable);
 
         // Apply the template to the current AST
-        return new TemplateApplier(cursor, coordinates, unsubstitutedAst).apply();
+        return new TemplateApplier(cursor, coordinates, uniqueAst).apply();
     }
 
     /**
