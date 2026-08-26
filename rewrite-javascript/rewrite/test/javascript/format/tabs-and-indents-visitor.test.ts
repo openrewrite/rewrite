@@ -1361,22 +1361,6 @@ function helper() {}
             //language=typescript
             typescript(
 `class A {
-/**
- * Doc.
- */
-m() {}
-}
-`,
-`class A {
-    /**
-     * Doc.
-     */
-    m() {}
-}
-`),
-            //language=typescript
-            typescript(
-`class A {
         /*
           a
             b
