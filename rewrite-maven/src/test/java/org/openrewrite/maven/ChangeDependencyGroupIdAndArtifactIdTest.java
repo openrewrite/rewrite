@@ -3982,6 +3982,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "com.squareup.okhttp3", "mockwebserver", null, "mockwebserver3", null, null)),
+          //language=xml
           pomXml(
             """
               <project>
@@ -4041,6 +4042,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "javax.servlet", "javax.servlet-api", "jakarta.servlet", "jakarta.servlet-api", null, null)),
+          //language=xml
           pomXml(
             """
               <project>
@@ -4220,6 +4222,80 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   """
               )
             )
+          )
+        );
+    }
+
+    // The `No version provided` marker below is a pre-existing limitation of `maybeUpdateModel()`, which does not
+    // apply profile dependency management; the rename itself covers both the dependency and its managed coordinates.
+    @Issue("https://github.com/openrewrite/rewrite/issues/8462")
+    @Test
+    void renameManagedDependencyWithoutVersionWhenDependencyManagementIsInAProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "com.squareup.okhttp3", "mockwebserver", null, "mockwebserver3", null, null)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                      <profile>
+                          <id>default</id>
+                          <activation>
+                              <activeByDefault>true</activeByDefault>
+                          </activation>
+                          <dependencyManagement>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>com.squareup.okhttp3</groupId>
+                                      <artifactId>mockwebserver</artifactId>
+                                      <version>4.8.1</version>
+                                  </dependency>
+                              </dependencies>
+                          </dependencyManagement>
+                      </profile>
+                  </profiles>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.squareup.okhttp3</groupId>
+                          <artifactId>mockwebserver</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <profiles>
+                      <profile>
+                          <id>default</id>
+                          <activation>
+                              <activeByDefault>true</activeByDefault>
+                          </activation>
+                          <dependencyManagement>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>com.squareup.okhttp3</groupId>
+                                      <artifactId>mockwebserver3</artifactId>
+                                      <version>4.8.1</version>
+                                  </dependency>
+                              </dependencies>
+                          </dependencyManagement>
+                      </profile>
+                  </profiles>
+                  <dependencies>
+                      <!--~~(No version provided for direct dependency com.squareup.okhttp3:mockwebserver3:compile)~~>--><dependency>
+                          <groupId>com.squareup.okhttp3</groupId>
+                          <artifactId>mockwebserver3</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
           )
         );
     }
