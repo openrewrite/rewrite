@@ -28,7 +28,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.tree.*;
 
-import javax.xml.bind.annotation.XmlRootElement;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -48,7 +47,6 @@ import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
-@XmlRootElement(name = "project")
 @SuppressWarnings("unused")
 public class RawPom {
 
