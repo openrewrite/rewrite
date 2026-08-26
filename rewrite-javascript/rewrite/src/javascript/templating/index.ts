@@ -71,14 +71,9 @@ export {
 export {
     Precedence,
     precedenceOf,
-    slotConstraints,
-    requiredPrecedence,
     maybeParenthesize,
-    parenthesize,
-    startsWithObjectLiteral,
-    startsWithDeclarationToken
+    parenthesize
 } from './precedence';
-export type {SlotConstraints} from './precedence';
 
 // Export engine utilities (for testing)
 export {

@@ -62,7 +62,7 @@ export const Precedence = {
 } as const;
 
 /** What a slot demands of what sits in it, including the shape restrictions precedence cannot express. */
-export interface SlotConstraints {
+interface SlotConstraints {
     /** The lowest precedence that can sit here unparenthesized. */
     readonly precedence: number;
     /** The slot is a `MemberExpression`, which excludes a call: `new f()()` means `(new f())()`. */
@@ -131,7 +131,7 @@ export function precedenceOf(expression: J): number {
 }
 
 /** What the slot of `parent` holding `childId` demands, or `undefined` for a slot not modelled here. */
-export function slotConstraints(parent: J, childId: string): SlotConstraints | undefined {
+function slotConstraints(parent: J, childId: string): SlotConstraints | undefined {
     switch (parent.kind) {
         case J.Kind.Parentheses:
         case J.Kind.ControlParentheses: {
@@ -247,7 +247,6 @@ export function slotConstraints(parent: J, childId: string): SlotConstraints | u
         case J.Kind.NewClass: {
             const newClass = parent as J.NewClass;
             if (newClass.class?.id === childId) {
-                // A `new` callee is a MemberExpression: neither a call nor an optional chain
                 return {precedence: Precedence.Call, noCallShape: true, noOptionalChain: true};
             }
             return isContainerElement(newClass.arguments, childId) ? {precedence: Precedence.Assignment} : undefined;
@@ -281,7 +280,6 @@ export function slotConstraints(parent: J, childId: string): SlotConstraints | u
             return (parent as JS.Spread).expression?.id === childId ? {precedence: Precedence.Assignment} : undefined;
 
         case JS.Kind.TaggedTemplateExpression:
-            // A tagged template on an optional chain is a syntax error
             return (parent as JS.TaggedTemplateExpression).tag?.element?.id === childId ?
                 {precedence: Precedence.Call, noOptionalChain: true} : undefined;
 
@@ -299,7 +297,6 @@ export function slotConstraints(parent: J, childId: string): SlotConstraints | u
         }
 
         case J.Kind.Lambda:
-            // The concise body of an arrow function, where an object literal reads as a block
             return (parent as J.Lambda).body?.id === childId ?
                 {precedence: Precedence.Assignment, noLeadingObjectLiteral: true} : undefined;
 
@@ -309,7 +306,6 @@ export function slotConstraints(parent: J, childId: string): SlotConstraints | u
                 {precedence: Precedence.Call} : undefined;
 
         case JS.Kind.ExpressionStatement:
-            // A statement may not start with `{`, `function` or `class`
             return (parent as JS.ExpressionStatement).expression?.id === childId ?
                 {precedence: 0, noLeadingDeclarationToken: true} : undefined;
 
@@ -469,7 +465,7 @@ function isObjectLiteral(expression: J): boolean {
     return expression.kind === J.Kind.NewClass && !(expression as J.NewClass).class;
 }
 
-/** Whether this is a CallExpression, not a MemberExpression; `new f().g()` binds as `(new f()).g()`. */
+/** Whether this is a CallExpression rather than a MemberExpression. */
 function isCallShaped(expression: J): boolean {
     switch (expression.kind) {
         case J.Kind.MethodInvocation:
@@ -489,7 +485,7 @@ function isOptional(expression: J): boolean {
     return expression.markers.markers.some(marker => marker.kind === JS.Markers.Optional);
 }
 
-/** Whether any link of the member chain is optional (`?.`), which is a marker, not a node. */
+/** Whether any link of the member chain is optional (`?.`). */
 function hasOptionalChain(expression: J): boolean {
     if (isOptional(expression)) {
         return true;
@@ -507,12 +503,12 @@ function isDotAdjacentNumber(expression: J): boolean {
     return !!source && /^\d[\d_]*$/.test(source);
 }
 
-/** Whether the printed form begins with `{`, which reads as a block body rather than an object. */
-export function startsWithObjectLiteral(expression: J): boolean {
+/** Whether the printed form begins with `{`. */
+function startsWithObjectLiteral(expression: J): boolean {
     return isObjectLiteral(leftmostExpression(expression));
 }
 
-/** Whether the printed form begins with `{`, `function` or `class`, none of which may open a statement. */
+/** Whether the printed form begins with `{`, `function` or `class`. */
 export function startsWithDeclarationToken(expression: J): boolean {
     const leftmost = leftmostExpression(expression);
     return isObjectLiteral(leftmost) || isFunctionOrClassExpression(leftmost);

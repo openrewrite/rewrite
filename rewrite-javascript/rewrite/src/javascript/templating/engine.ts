@@ -709,6 +709,8 @@ export class TemplateApplier {
         if (requiredPrecedence(frames[1], originalTree.id) !== undefined) {
             return [frames[1], originalTree.id];
         }
+        // A chained rule rewrites the previous rule's detached result, leaving the cursor on the node
+        // that result stands in for; a wrong guess here only ever adds parentheses, never drops them
         return frames[0].id !== originalTree.id && requiredPrecedence(frames[1], frames[0].id) !== undefined ?
             [frames[1], frames[0].id] : undefined;
     }
@@ -753,7 +755,6 @@ export class TemplateApplier {
 
             // Determine context and wrap if needed
             if (parentExpectsStatement && originalIsStatement) {
-                // A statement may not start with `{`, `function` or `class`
                 const needsGrouping = resultIsExpression && startsWithDeclarationToken(resultToUse);
                 // Statement context: wrap in ExpressionStatement if result is not a statement
                 if (needsGrouping || (!resultIsStatement && resultIsExpression)) {

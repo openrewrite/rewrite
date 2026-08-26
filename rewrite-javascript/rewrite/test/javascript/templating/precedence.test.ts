@@ -191,28 +191,21 @@ describe('template precedence', () => {
                 `const a = (p || q);`));
         });
 
-        test('keeps a trailing `!` outside the parentheses', () => {
-            const x = capture();
-            spec.recipe = onCall(rewrite(() => ({
-                before: pattern`size(${x})`,
-                after: template`${x}!.length`
-            })));
+        test('keeps a trailing `!` or `?.` outside the parentheses', () => {
+            const x = capture(), y = capture();
+            spec.recipe = onCall(
+                rewrite(() => ({before: pattern`nonNull(${x})`, after: template`${x}!.length`}))
+                    .orElse(rewrite(() => ({before: pattern`optional(${y})`, after: template`${y}?.length`}))));
             //language=typescript
             return spec.rewriteRun(javascript(
-                `const a = size(p || q);`,
-                `const a = (p || q)!.length;`));
-        });
-
-        test('keeps a trailing `?.` outside the parentheses', () => {
-            const x = capture();
-            spec.recipe = onCall(rewrite(() => ({
-                before: pattern`size(${x})`,
-                after: template`${x}?.length`
-            })));
-            //language=javascript
-            return spec.rewriteRun(javascript(
-                `const a = size(p || q);`,
-                `const a = (p || q)?.length;`));
+                `
+                    const a = nonNull(p || q);
+                    const b = optional(p || q);
+                `,
+                `
+                    const a = (p || q)!.length;
+                    const b = (p || q)?.length;
+                `));
         });
 
         test('does not double up on parentheses the capture already carries', () => {
