@@ -99,9 +99,6 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                     return mv;
                 }
 
-                // javac only recovers from the `;` that `BlockStatementTemplateGenerator` omits when the
-                // enclosing method is the last member of its class. Terminating it in the generator
-                // instead breaks templates applied in non-statement positions.
                 boolean needsSemicolon = getCursor().getParentTreeCursor().getValue() instanceof J.Block;
                 String template = returnTypeExpression + " __typePlaceholder__" + (needsSemicolon ? ";" : "");
                 JavaTemplate.Builder templateBuilder = JavaTemplate.builder(template).contextSensitive();
