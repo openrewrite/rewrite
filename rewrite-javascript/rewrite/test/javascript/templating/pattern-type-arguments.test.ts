@@ -71,6 +71,22 @@ describe('pattern matching against calls with type arguments', () => {
         expect(matched).toEqual(['plain', 'typeArguments']);
     });
 
+    test('a variadic argument capture makes no difference', async () => {
+        const matched: string[] = [];
+        spec.recipe = probe(pattern`identity(${capture({variadic: true})})`, matched);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                const plain = identity(x);
+                const typeArguments = identity<string>(x);
+                const several = identity<string>(x, y);
+            `)
+        );
+
+        expect(matched).toEqual(['plain', 'typeArguments', 'several']);
+    });
+
     test('a pattern that spells out type arguments still constrains them', async () => {
         const matched: string[] = [];
         spec.recipe = probe(pattern`${capture()}.bind<string>(${capture()})`, matched);
@@ -81,6 +97,56 @@ describe('pattern matching against calls with type arguments', () => {
                 const plain = fn.bind(x);
                 const other = fn.bind<any>(x);
                 const same = fn.bind<string>(x);
+            `)
+        );
+
+        expect(matched).toEqual(['same']);
+    });
+});
+
+// Such a call parses as JS.FunctionCall rather than J.MethodInvocation.
+describe('pattern matching against calls with a computed callee', () => {
+    const spec = new RecipeSpec();
+
+    function probe(pat: Pattern, matched: string[]) {
+        return fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visit(tree: any, p: any, parent?: any): Promise<any> {
+                const node = await super.visit(tree, p, parent);
+                if (node && (node as J).kind && await pat.match(node as J, this.cursor)) {
+                    const variable = this.cursor.firstEnclosing(
+                        (v): v is J.VariableDeclarations.NamedVariable => (v as J)?.kind === J.Kind.NamedVariable);
+                    matched.push(variable ? (variable.name as J.Identifier).simpleName : '?');
+                }
+                return node;
+            }
+        });
+    }
+
+    test('a pattern without type arguments matches a call that has them', async () => {
+        const matched: string[] = [];
+        spec.recipe = probe(pattern`getFn()(${capture()})`, matched);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                const plain = getFn()(x);
+                const typeArguments = getFn()<string>(x);
+            `)
+        );
+
+        expect(matched).toEqual(['plain', 'typeArguments']);
+    });
+
+    test('a pattern that spells out type arguments still constrains them', async () => {
+        const matched: string[] = [];
+        spec.recipe = probe(pattern`getFn()<string>(${capture()})`, matched);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                const plain = getFn()(x);
+                const other = getFn()<number>(x);
+                const same = getFn()<string>(x);
             `)
         );
 
