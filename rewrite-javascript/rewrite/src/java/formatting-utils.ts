@@ -109,33 +109,37 @@ function marginOf(precedingWhitespace: string): string | undefined {
 }
 
 /**
- * Normalizes indentation in an entire Space: whitespace and comment suffixes take the target
- * indent, and the interior lines of a multi-line comment shift with it, so they stay aligned with
- * the opening delimiter that the surrounding whitespace positions.
+ * Normalizes indentation in an entire Space: comment lines take `commentIndent` and the line the
+ * following token lands on takes `targetIndent`, with the interior lines of a multi-line comment
+ * shifting alongside the opening delimiter that the surrounding whitespace positions.
  *
  * @param space The Space to normalize
- * @param targetIndent The indentation to use after newlines
+ * @param targetIndent The indentation for the token this Space precedes
+ * @param commentIndent The indentation for comment lines, which can sit deeper than the token — a
+ *        block's `}` closes at the block's own column while the comments ahead of it belong with
+ *        the block's contents
  * @returns The normalized Space, or the original if unchanged
  */
-export function normalizeSpaceIndent(space: J.Space, targetIndent: string): J.Space {
+export function normalizeSpaceIndent(space: J.Space, targetIndent: string, commentIndent: string = targetIndent): J.Space {
     let changed = false;
+    const lastComment = space.comments.length - 1;
 
-    // Normalize whitespace
+    // Normalize whitespace, which precedes the first comment when there is one
     let newWhitespace = space.whitespace;
     if (space.whitespace.includes("\n")) {
-        newWhitespace = replaceIndentAfterLastNewline(space.whitespace, targetIndent);
+        newWhitespace = replaceIndentAfterLastNewline(space.whitespace, lastComment < 0 ? targetIndent : commentIndent);
         changed = changed || newWhitespace !== space.whitespace;
     }
 
     // Normalize comment suffixes and multi-line comment interiors
     const newComments = space.comments.map((comment, i) => {
         const margin = marginOf(i === 0 ? space.whitespace : space.comments[i - 1].suffix);
-        let result: Comment = margin !== undefined && margin !== targetIndent && isTextComment(comment) ?
-            reindentComment(comment, margin, targetIndent) : comment;
+        let result: Comment = margin !== undefined && margin !== commentIndent && isTextComment(comment) ?
+            reindentComment(comment, margin, commentIndent) : comment;
         changed = changed || result !== comment;
 
         if (result.suffix.includes("\n")) {
-            const newSuffix = replaceIndentAfterLastNewline(result.suffix, targetIndent);
+            const newSuffix = replaceIndentAfterLastNewline(result.suffix, i === lastComment ? targetIndent : commentIndent);
             if (newSuffix !== result.suffix) {
                 changed = true;
                 result = {...result, suffix: newSuffix};
