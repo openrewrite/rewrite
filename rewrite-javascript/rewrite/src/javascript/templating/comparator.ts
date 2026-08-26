@@ -344,13 +344,12 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 if (!this.match) return methodInvocation;
             }
 
-            // Compare typeParameters
-            if ((methodInvocation.typeParameters === undefined) !== (otherMethodInvocation.typeParameters === undefined)) {
-                return this.structuralMismatch('typeParameters');
-            }
+            // A pattern that spells out no type arguments says nothing about them, as with parentheses
+            if (methodInvocation.typeParameters) {
+                if (!otherMethodInvocation.typeParameters) {
+                    return this.structuralMismatch('typeParameters');
+                }
 
-            // Visit typeParameters if present
-            if (methodInvocation.typeParameters && otherMethodInvocation.typeParameters) {
                 if (methodInvocation.typeParameters.elements.length !== otherMethodInvocation.typeParameters.elements.length) {
                     return this.arrayLengthMismatch('typeParameters.elements');
                 }

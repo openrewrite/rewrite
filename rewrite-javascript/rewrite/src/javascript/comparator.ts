@@ -2470,6 +2470,21 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return method;
     }
 
+    /** A call whose callee is not a plain identifier, such as `getFn()(x)`, `arr[0](x)` or `fn?.(x)`. */
+    override async visitFunctionCall(functionCall: JS.FunctionCall, other: J): Promise<J | undefined> {
+        if (other.kind !== JS.Kind.FunctionCall) {
+            return this.kindMismatch();
+        }
+
+        const otherFunctionCall = other as JS.FunctionCall;
+        if (!functionCall.typeParameters && otherFunctionCall.typeParameters) {
+            const withoutTypeArguments: JS.FunctionCall = {...otherFunctionCall, typeParameters: undefined};
+            return super.visitFunctionCall(functionCall, withoutTypeArguments);
+        }
+
+        return super.visitFunctionCall(functionCall, other);
+    }
+
     /**
      * Override identifier comparison to include:
      * 1. Type checking for field access
