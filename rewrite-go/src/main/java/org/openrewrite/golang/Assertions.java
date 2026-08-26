@@ -16,6 +16,7 @@
 package org.openrewrite.golang;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.marker.GoProject;
@@ -24,14 +25,57 @@ import org.openrewrite.golang.tree.GoMod;
 import org.openrewrite.golang.tree.GoSum;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.test.TypeValidation;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
+
+import static java.util.stream.Collectors.joining;
 
 public final class Assertions {
     private Assertions() {
+    }
+
+    public static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
+        if (source instanceof JavaSourceFile) {
+            if (typeValidation.erroneous()) {
+                List<J.Erroneous> erroneous = new JavaIsoVisitor<List<J.Erroneous>>() {
+                    @Override
+                    public J.Erroneous visitErroneous(J.Erroneous erroneous, List<J.Erroneous> list) {
+                        list.add(erroneous);
+                        return super.visitErroneous(erroneous, list);
+                    }
+                }.reduce(source, new ArrayList<>());
+                if (!erroneous.isEmpty()) {
+                    throw new IllegalStateException("LST contains erroneous nodes\n" + erroneous.stream()
+                            .map(J.Erroneous::getText)
+                            .collect(joining("\n\n")));
+                }
+            }
+            if (typeValidation.unknown()) {
+                List<J.Unknown> unknowns = new JavaIsoVisitor<List<J.Unknown>>() {
+                    @Override
+                    public J.Unknown visitUnknown(J.Unknown unknown, List<J.Unknown> list) {
+                        list.add(unknown);
+                        return super.visitUnknown(unknown, list);
+                    }
+                }.reduce(source, new ArrayList<>());
+                if (!unknowns.isEmpty()) {
+                    throw new IllegalStateException("LST contains unknown elements\n" + unknowns.stream()
+                            .map(unknown -> unknown.getSource().getMarkers()
+                                    .findFirst(ParseExceptionResult.class)
+                                    .map(ParseExceptionResult::getMessage)
+                                    .orElse("") + unknown.getSource().getText())
+                            .collect(joining("\n\n")));
+                }
+            }
+        }
+        return source;
     }
 
     public static SourceSpecs go(@Nullable String before) {
@@ -40,7 +84,9 @@ public final class Assertions {
     }
 
     public static SourceSpecs go(@Nullable String before, Consumer<SourceSpec<Go.CompilationUnit>> spec) {
-        SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before, null);
+        SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before,
+                Assertions::validateTypes, ctx -> {
+        });
         spec.accept(go);
         return go;
     }
@@ -52,7 +98,9 @@ public final class Assertions {
 
     public static SourceSpecs go(@Nullable String before, String after,
                                        Consumer<SourceSpec<Go.CompilationUnit>> spec) {
-        SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before, s -> after);
+        SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before,
+                Assertions::validateTypes, ctx -> {
+        }).after(s -> after);
         spec.accept(go);
         return go;
     }
