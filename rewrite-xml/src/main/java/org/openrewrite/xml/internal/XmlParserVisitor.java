@@ -202,7 +202,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                             .map(this::visitAttribute)
                             .collect(toList());
                     String beforeTagDelimiterPrefix = prefix(ctx.getStop());
-                    requireWellFormedAttribute(StringUtils.isBlank(beforeTagDelimiterPrefix), c);
+                    requireWellFormedAttribute(isXmlWhitespace(beforeTagDelimiterPrefix), c);
 
                     return new Xml.XmlDecl(
                             randomId(),
@@ -255,7 +255,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             String type = convert(ctx.Name(), (n, p) -> n.getText());
             List<Xml.Attribute> attributes = ctx.attribute().stream().map(this::visitAttribute).collect(toList());
             String beforeDirectiveClose = prefix(ctx.DIRECTIVE_CLOSE());
-            requireWellFormedAttribute(StringUtils.isBlank(beforeDirectiveClose), c);
+            requireWellFormedAttribute(isXmlWhitespace(beforeDirectiveClose), c);
 
             return new Xml.JspDirective(
                     randomId(),
@@ -388,7 +388,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         }
                     }
 
-                    requireWellFormedAttribute(StringUtils.isBlank(beforeTagDelimiterPrefix), c);
+                    requireWellFormedAttribute(isXmlWhitespace(beforeTagDelimiterPrefix), c);
 
                     return new Xml.Tag(randomId(), prefix, markers, name, attributes,
                             content, closeTag, beforeTagDelimiterPrefix);
@@ -399,7 +399,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            requireWellFormedAttribute(StringUtils.isBlank(prefix) && isSourceToken(c.Name()) &&
+            requireWellFormedAttribute(isXmlWhitespace(prefix) && isSourceToken(c.Name()) &&
                                        isSourceToken(c.EQUALS()) && isSourceToken(c.STRING()), c);
 
             Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
@@ -415,10 +415,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     )
             );
 
-            requireWellFormedAttribute(StringUtils.isBlank(beforeEquals) && StringUtils.isBlank(value.getPrefix()), c);
+            requireWellFormedAttribute(isXmlWhitespace(beforeEquals) && isXmlWhitespace(value.getPrefix()), c);
 
             return new Xml.Attribute(randomId(), prefix, Markers.EMPTY, key, beforeEquals, value);
         });
+    }
+
+    /// Whether text is XML `S`, the only thing that may separate a tag's name, attributes and delimiter.
+    /// Stricter than `StringUtils.isBlank`, which accepts characters the `INSIDE`-mode lexer never skips.
+    private boolean isXmlWhitespace(String text) {
+        return StringUtils.indexOfNonWhitespace(text) == -1;
     }
 
     /// Whether a node is a token from the source, rather than one ANTLR error recovery

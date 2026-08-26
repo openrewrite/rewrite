@@ -423,6 +423,7 @@ class XmlParserTest implements RewriteTest {
       "<t k=\"\" 10.0.0.1 \"v\"/>",
       "<t k=\"\" \"orphan\"/>",
       "<?xml version=\"1.0\" \"orphan\"?><t/>",
+      "<t k=\"\"\fabc=\"v\"/>",
     })
     void malformedAttributeIsNotSilentlyAccepted(@Language("xml") String source) {
         SourceFile parsed = XmlParser.builder().build()
