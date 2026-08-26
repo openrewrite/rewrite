@@ -2410,11 +2410,6 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                 }
             }
 
-            // If neither has type, use structural comparison
-            if (!method.methodType && !otherMethod.methodType) {
-                return super.visitMethodInvocation(method, other);
-            }
-
             // If both have types with FQ declaring types, verify they're compatible
             // (This prevents matching completely different methods like util.isArray vs util.isBoolean)
             if (method.methodType && otherMethod.methodType) {
@@ -2450,12 +2445,12 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
         // else: types matched, skip select comparison (allows namespace vs named imports)
 
-        // Compare type parameters
-        if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
-            return this.structuralMismatch('typeParameters');
-        }
+        // A pattern that spells out no type arguments says nothing about them, as with parentheses
+        if (method.typeParameters) {
+            if (!otherMethod.typeParameters) {
+                return this.structuralMismatch('typeParameters');
+            }
 
-        if (method.typeParameters && otherMethod.typeParameters) {
             await this.visitContainerProperty('typeParameters', method.typeParameters, otherMethod.typeParameters);
             if (!this.match) return method;
         }
