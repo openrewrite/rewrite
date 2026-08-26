@@ -125,33 +125,61 @@ abstract class IdVisitor extends JavaScriptVisitor<any> {
 }
 
 class RandomizeIdVisitor extends IdVisitor {
+    readonly minted = new Set<string>();
+
     protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
-        return {...tree, id: randomId()};
+        const id = randomId();
+        this.minted.add(id);
+        return {...tree, id};
     }
 }
 
-class DedupeIdVisitor extends IdVisitor {
-    private readonly seen = new Set<string>();
+class CollectIdVisitor extends IdVisitor {
+    readonly ids = new Set<string>();
 
     protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
-        if (this.seen.has(tree.id)) {
-            const id = randomId();
-            this.seen.add(id);
-            return {...tree, id};
-        }
-        this.seen.add(tree.id);
+        this.ids.add(tree.id);
         return tree;
     }
 }
 
-/** Structural copy of `tree` with a fresh `id` on every `Tree` node; counterpart of Java's `RandomizeIdVisitor`. */
-export function randomizeIds<T extends J>(tree: T): Promise<T> {
-    return new RandomizeIdVisitor().visit(tree, null) as Promise<T>;
+class RetainIdVisitor extends IdVisitor {
+    private readonly seen = new Set<string>();
+
+    constructor(private readonly retainable: ReadonlySet<string>) {
+        super();
+    }
+
+    protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
+        if (this.retainable.has(tree.id) && !this.seen.has(tree.id)) {
+            this.seen.add(tree.id);
+            return tree;
+        }
+        const id = randomId();
+        this.seen.add(id);
+        return {...tree, id};
+    }
 }
 
-/** Copy of `tree` with duplicate `Tree` ids resolved within it, keeping the first occurrence on its original id. */
-export function dedupeIds<T extends J>(tree: T): Promise<T> {
-    return new DedupeIdVisitor().visit(tree, null) as Promise<T>;
+/**
+ * Structural copy of `tree` with a fresh `id` on every `Tree` node, and the ids that were minted;
+ * counterpart of Java's `RandomizeIdVisitor`.
+ */
+export async function randomizeIds<T extends J>(tree: T): Promise<{ tree: T, ids: ReadonlySet<string> }> {
+    const visitor = new RandomizeIdVisitor();
+    return {tree: (await visitor.visit(tree, null)) as T, ids: visitor.minted};
+}
+
+/** The `id` of every `Tree` node in `tree`. */
+export async function treeIds(tree: J): Promise<ReadonlySet<string>> {
+    const visitor = new CollectIdVisitor();
+    await visitor.visit(tree, null);
+    return visitor.ids;
+}
+
+/** Copy of `tree` in which an `id` survives only where it is `retainable` and unused so far. */
+export function retainIds<T extends J>(tree: T, retainable: ReadonlySet<string>): Promise<T> {
+    return new RetainIdVisitor(retainable).visit(tree, null) as Promise<T>;
 }
 
 /**

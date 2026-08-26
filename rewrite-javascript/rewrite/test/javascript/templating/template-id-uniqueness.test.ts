@@ -230,6 +230,28 @@ describe('template id uniqueness', () => {
         expect(firstIds.filter(id => secondIds.has(id))).toEqual([]);
     });
 
+    test('a node spliced into two applications shares no ids', () => {
+        // Hoisted out of the visitor, so every application splices the very same node
+        let hoisted: J | undefined;
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (method.name.simpleName !== 'wrap') {
+                    return method;
+                }
+                hoisted ??= method.arguments.elements[0].element;
+                return template`f(${hoisted!})`.apply(method, this.cursor);
+            }
+        });
+
+        return spec.rewriteRun({
+            ...typescript(
+                'wrap(1);\nwrap(2);',
+                'f(1);\nf(1);'
+            ),
+            afterRecipe: expectUniqueIds
+        });
+    });
+
     test('a substituted capture keeps the id it had in the source tree', async () => {
         // Ids are refreshed before substitution, so nodes carried over from the source tree keep their identity
         const cu = await parse('foo(1);\n');

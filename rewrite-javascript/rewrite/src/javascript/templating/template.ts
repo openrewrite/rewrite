@@ -92,7 +92,8 @@ export class TemplateBuilder {
     /**
      * Adds a parameter to the template.
      *
-     * @param value The parameter value (Capture, Tree, or primitive)
+     * @param value The parameter value (Capture, Tree, or primitive); may be added more than once
+     *              (see {@link template})
      * @returns This builder for chaining
      */
     param(value: TemplateParameter): this {
@@ -377,7 +378,10 @@ export class Template {
  * - J.Container<T>: Elements will be expanded in place
  *
  * @param strings The string parts of the template
- * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, Tree[], J.RightPadded, J.RightPadded[], or J.Container)
+ * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, Tree[], J.RightPadded, J.RightPadded[], or J.Container).
+ *                   A parameter may appear more than once — `(${arr} ? f(${arr}) : -1)`. A node
+ *                   keeps its id only at its first occurrence, and only if it belongs to the
+ *                   subtree being replaced; anything else is spliced under fresh ids.
  * @returns A Template object that can be applied to generate AST nodes
  *
  * @example
