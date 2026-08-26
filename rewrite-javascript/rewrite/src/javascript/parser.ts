@@ -91,8 +91,11 @@ export class JavaScriptParser extends Parser {
         super({ctx, relativeTo});
         this.compilerOptions = {
             target: ts.ScriptTarget.Latest,
-            module: ts.ModuleKind.CommonJS,
-            moduleResolution: ts.ModuleResolutionKind.Node10,
+            // Bundler matches `exports` conditions leniently, so packages that publish types only under
+            // an `import` condition resolve; it pairs with `preserve`, which `commonjs` cannot (TS5095).
+            // A `node16` module kind makes TS1479 reachable, and that error costs the whole LST.
+            module: ts.ModuleKind.Preserve,
+            moduleResolution: ts.ModuleResolutionKind.Bundler,
             noEmit: true,
             allowJs: true,
             checkJs: true,
