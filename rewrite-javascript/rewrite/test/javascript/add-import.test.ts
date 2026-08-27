@@ -2625,4 +2625,177 @@ describe('AddImport visitor', () => {
         });
     });
 
+
+    describe('bound name', () => {
+        /**
+         * Calls from `visitJsCompilationUnit` rather than the constructor, so that the cursor
+         * reaches the compilation unit and the name can be resolved against it.
+         */
+        function captureBoundName(options: AddImportOptions, bound: { name?: string }): JavaScriptVisitor<any> {
+            return new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    bound.name = maybeAddImport(this, options);
+                    return super.visitJsCompilationUnit(cu, p);
+                }
+            };
+        }
+
+        test('an import that already binds the member is the answer, not a conflict', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName(
+                {module: 'fs', member: 'readFile', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        readFile('x');
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('readFile');
+        });
+
+        test('a module-scope declaration of the same name pushes the binding aside', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName(
+                {module: 'fs', member: 'readFile', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const readFile = 1;
+                    `,
+                    `
+                        import {readFile as readFile_1} from 'fs';
+
+                        const readFile = 1;
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('readFile_1');
+        });
+
+        test('an import binding of the same name from another module pushes the binding aside', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName(
+                {module: 'fs', member: 'readFile', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'node:fs';
+
+                        readFile('x');
+                    `,
+                    `
+                        import {readFile} from 'node:fs';
+                        import {readFile as readFile_1} from 'fs';
+
+                        readFile('x');
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('readFile_1');
+        });
+
+        test('an explicitly pinned alias is honoured even into a collision', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName(
+                {module: 'fs', member: 'readFile', alias: 'readFile', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const readFile = 1;
+                    `,
+                    `
+                        import {readFile} from 'fs';
+
+                        const readFile = 1;
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('readFile');
+        });
+
+        test('two calls in one visit resolve against each other', async () => {
+            const spec = new RecipeSpec();
+            const first: { name?: string } = {};
+            const second: { name?: string } = {};
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    first.name = maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false});
+                    second.name = maybeAddImport(this, {module: 'fs/promises', member: 'readFile', onlyIfReferenced: false});
+                    return super.visitJsCompilationUnit(cu, p);
+                }
+            });
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import {readFile} from 'fs';
+                        import {readFile as readFile_1} from 'fs/promises';
+
+                        const x = 1;
+                    `
+                )
+            );
+
+            expect(first.name).toBe('readFile');
+            expect(second.name).toBe('readFile_1');
+        });
+
+        test('onlyIfReferenced looks for the deconflicted name, so a shadowed member is not imported', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName({module: 'fs', member: 'readFile'}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const readFile = 1;
+
+                        readFile;
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('readFile_1');
+        });
+
+        test('a side-effect import binds no name', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {name: 'unset'};
+            spec.recipe = fromVisitor(captureBoundName({module: 'core-js/stable', sideEffectOnly: true}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import 'core-js/stable';
+
+                        const x = 1;
+                    `
+                )
+            );
+
+            expect(bound.name).toBeUndefined();
+        });
+    });
+
 });

@@ -164,17 +164,14 @@ export class ChangeImport extends Recipe {
                             alias: aliasToUse,
                             onlyIfReferenced: false
                         });
-                    } else if (aliasToUse && aliasToUse !== newMember) {
-                        maybeAddImport(this, {
-                            module: newModule,
-                            member: newMember,
-                            alias: aliasToUse,
-                            onlyIfReferenced: false
-                        });
                     } else {
                         maybeAddImport(this, {
                             module: newModule,
                             member: newMember,
+                            // A moved binding keeps the local name it had. Pinning it also tells
+                            // `maybeAddImport` not to deconflict against the import being replaced,
+                            // which is still present in the tree it reads.
+                            alias: aliasToUse ?? newMember,
                             onlyIfReferenced: false
                         });
                     }
