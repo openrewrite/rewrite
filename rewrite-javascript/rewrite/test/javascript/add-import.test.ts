@@ -2836,13 +2836,32 @@ describe('AddImport visitor', () => {
             expect(bound.name).toBe('readFile');
         });
 
-        test('a require of the same member answers the request, under the name it destructured', async () => {
+        test('a require of the same member answers the request', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName(
+                {module: 'fs', member: 'readFile', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const {readFile} = require('fs');
+
+                        readFile('x');
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('readFile');
+        });
+
+        test('a binding renamed where it is declared does not answer a request that named no preference', async () => {
             const spec = new RecipeSpec();
             const bound: string[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    bound.push(maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false}));
-                    bound.push(maybeAddImport(this, {module: 'fs/promises', member: 'readFile', onlyIfReferenced: false}));
+                    bound.push(maybeAddImport(this, {module: 'react', member: 'useState', onlyIfReferenced: false}));
+                    bound.push(maybeAddImport(this, {module: 'fs/promises', member: 'writeFile', onlyIfReferenced: false}));
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -2850,16 +2869,24 @@ describe('AddImport visitor', () => {
             await spec.rewriteRun(
                 typescript(
                     `
-                        const {readFile} = require('fs');
-                        const {readFile: rf} = require('fs/promises');
+                        import {useState as useS} from 'react';
+                        const {writeFile: wf} = require('fs/promises');
 
-                        readFile('x');
-                        rf('y');
+                        useS(0);
+                        wf('x');
+                    `,
+                    `
+                        import {useState as useS, useState} from 'react';
+                        import {writeFile} from 'fs/promises';
+                        const {writeFile: wf} = require('fs/promises');
+
+                        useS(0);
+                        wf('x');
                     `
                 )
             );
 
-            expect(bound).toEqual(['readFile', 'rf']);
+            expect(bound).toEqual(['useState', 'writeFile']);
         });
 
         test('a namespace or type declaration shadows an import just as a value declaration does', async () => {

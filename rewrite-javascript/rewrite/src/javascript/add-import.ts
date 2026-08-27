@@ -68,8 +68,8 @@ export interface AddImportOptions {
  * Register an AddImport visitor to add an import statement to a JavaScript/TypeScript file
  * @param visitor The visitor to add the import addition to
  * @param options Configuration options for the import to add
- * @returns The local name the module is bound to: an existing import's, or the one the new import
- *   will use, suffixed if the file already binds that name. `onlyIfReferenced` defaults to true, so
+ * @returns The local name the module is bound to: an existing binding's where one answers this
+ *   request, otherwise the name the new import will use, suffixed if the file already binds it. `onlyIfReferenced` defaults to true, so
  *   the import may never appear, and the name is then what it would have gone by. A side-effect
  *   import binds no name and returns `undefined`.
  *
@@ -145,10 +145,14 @@ export function maybeAddImport(
     const bindings = moduleScopeBindings(cu);
 
     // An import already serving this request answers it; queuing one would, on the next cycle,
-    // derive a suffixed name from the binding this call just added.
+    // derive a suffixed name from the binding this call just added. A caller that named a preference
+    // takes whatever comes back; one that did not assumes the name it derived, so a binding under
+    // any other name would leave the references it emits unbound.
     if (!options.alias) {
         for (const binding of bindings) {
-            if (binding.module === module && binding.member === memberName(options.member) && binding.typeOnly === typeOnly) {
+            if (binding.module === module && binding.member === memberName(options.member) &&
+                binding.typeOnly === typeOnly &&
+                (options.preferredName !== undefined || binding.name === derived)) {
                 return binding.name;
             }
         }
