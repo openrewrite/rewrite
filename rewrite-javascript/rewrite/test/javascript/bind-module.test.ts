@@ -1,6 +1,6 @@
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
-    JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings
+    JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, bindModule
 } from "../../src/javascript";
 import {J} from "../../src/java";
 
@@ -121,5 +121,113 @@ describe("isAmdBlock", () => {
             sap.ui.define(["a/B"], function (B) {});
         `));
         expect(blocks).toEqual(["define"]);
+    });
+});
+
+function rebind(module: string, bound: {name?: string}) {
+    return new class extends JavaScriptVisitor<any> {
+        override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+            if (m.name.simpleName !== "target") {
+                return super.visitMethodInvocation(m, p);
+            }
+            bound.name = await bindModule(this, module);
+            return m;
+        }
+    };
+}
+
+describe("bindModule", () => {
+    test("AMD appends to both lists and reports the new name", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/m/Button"], function (Button) { target(); });`,
+            `sap.ui.define(["sap/m/Button", "sap/ui/core/Element"], function (Button, Element) { target(); });`
+        ));
+        expect(bound.name).toBe("Element");
+    });
+
+    test("AMD reuses an existing dependency's parameter and edits nothing", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/ui/core/Element"], function (Elem) { target(); });`
+        ));
+        expect(bound.name).toBe("Elem");
+    });
+
+    test("AMD avoids a name the factory body declares", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([], function () { var Element = 1; target(); });`,
+            `sap.ui.define(["sap/ui/core/Element"], function (Element_1) { var Element = 1; target(); });`
+        ));
+        expect(bound.name).toBe("Element_1");
+    });
+
+    test("AMD refuses where a parameter would pair with the wrong dependency", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/m/Button", "x/Y"], function (Button) { target(); });`
+        ));
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("ESM creates a default import and reports its name", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(typescript(
+            `target();`,
+            `import Element from 'sap/ui/core/Element';\n\ntarget();`
+        ));
+        expect(bound.name).toBe("Element");
+    });
+
+    test("ESM reuses a default import bound under another name", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(typescript(
+            `import Elem from "sap/ui/core/Element";\n\ntarget();`
+        ));
+        expect(bound.name).toBe("Elem");
+    });
+
+    test("a CommonJS file answers with the binding its require already has", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `const Elem = require("sap/ui/core/Element");\n\ntarget();`
+        ));
+        expect(bound.name).toBe("Elem");
+    });
+
+    test("a CommonJS file refuses rather than gain an import", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `const other = require("a/Other");\n\ntarget();`
+        ));
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("a nested require callback is the block a binding belongs to", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], function (B) { sap.ui.require([], function () { target(); }); });`,
+            `sap.ui.define(["a/B"], function (B) { sap.ui.require(["sap/ui/core/Element"], function (Element) { target(); }); });`
+        ));
+        expect(bound.name).toBe("Element");
     });
 });

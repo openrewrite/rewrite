@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {J} from "../java";
+import {isIdentifier, J} from "../java";
 import {JS} from "./tree";
 import {Cursor} from "../tree";
 import {JavaScriptVisitor} from "./visitor";
-import {QuoteChar} from "./add-import";
-import {AmdBlock, amdBlockOf, DEFAULT_AMD_CALLEES, dependencyNames, parameterNames, present} from "./amd";
+import {ExecutionContext} from "../execution";
+import {UUID} from "../uuid";
+import {maybeAddImport, moduleNameOf, QuoteChar} from "./add-import";
+import {
+    AmdBlock, amdBlockOf, DEFAULT_AMD_CALLEES, dependencyNames, elementsOf, parameterNames, present, withDependency
+} from "./amd";
 
 export type EsmBindingForm = "default" | "namespace";
 
@@ -199,4 +203,182 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
         }
     }
     return bindings;
+}
+
+/**
+ * A local binding for `module`, creating one where the file does not already have it, or
+ * `undefined` where no safe binding exists.
+ *
+ * The name is decided from the cursor and returned at once; the edit that creates the binding
+ * is deferred onto `visitor.afterVisit`, as `maybeAddImport`'s is.
+ */
+export async function bindModule(
+    visitor: JavaScriptVisitor<any>,
+    module: string | J.Literal,
+    options?: BindModuleOptions
+): Promise<string | undefined> {
+    const moduleName = moduleNameOf(module);
+    const amd = enclosingAmdBlock(visitor, options);
+    if (amd !== undefined) {
+        return bindAmd(visitor, amd, moduleName, options);
+    }
+    if (compilationUnitOf(visitor) === undefined) {
+        // Without a compilation unit there is no lane and no lookup, and the caller emits a
+        // reference against whatever comes back.
+        return undefined;
+    }
+    const bindings = moduleBindings(visitor, options);
+    const bound = bindings.bindingOf(moduleName);
+    if (bound !== undefined) {
+        return bound;
+    }
+    if (bindings.moduleSystem === "commonjs") {
+        // A `require` answers for a module it already binds, but creating one is unimplemented,
+        // and an `import` in a file that has none would be the wrong form.
+        return undefined;
+    }
+    return maybeAddImport(visitor, {
+        module,
+        member: options?.esmForm === "namespace" ? "*" : "default",
+        preferredName: options?.binding ?? lastSegment(moduleName),
+        quoteStyle: options?.quoteStyle,
+        onlyIfReferenced: false
+    });
+}
+
+/** The conventional local name for a module: its last path segment. */
+export function lastSegment(module: string): string {
+    return module.substring(module.lastIndexOf("/") + 1);
+}
+
+async function bindAmd(
+    visitor: JavaScriptVisitor<any>,
+    amd: {call: J.MethodInvocation, block: AmdBlock},
+    module: string,
+    options?: BindModuleOptions
+): Promise<string | undefined> {
+    const modules = dependencyNames(amd.block);
+    const bindings = parameterNames(amd.block);
+
+    const declared = modules.indexOf(module);
+    if (declared >= 0) {
+        return bindings[declared];
+    }
+
+    // A parameter can only be appended at the end, so a block declaring more dependencies than
+    // the factory takes parameters for would bind the new module against the wrong one.
+    if (bindings.length < elementsOf(amd.block).length) {
+        return undefined;
+    }
+
+    const taken = [
+        ...bindings,
+        ...await declaredNames(amd.block, visitor),
+        ...reservedNames(visitor, amd.call.id)
+    ];
+    const binding = deconflict(options?.binding ?? lastSegment(module), taken);
+    visitor.afterVisit.push(new AddAmdDependency(amd.call.id, module, binding, calleesOf(options)));
+    return binding;
+}
+
+function deconflict(preferred: string, taken: readonly (string | undefined)[]): string {
+    if (!taken.includes(preferred)) {
+        return preferred;
+    }
+    for (let suffix = 1; ; suffix++) {
+        const candidate = `${preferred}_${suffix}`;
+        if (!taken.includes(candidate)) {
+            return candidate;
+        }
+    }
+}
+
+/** The queue is the reservation record, so calls competing for one name resolve against it. */
+function reservedNames(visitor: JavaScriptVisitor<any>, blockId: UUID): string[] {
+    return (visitor.afterVisit ?? [])
+        .filter((v): v is AddAmdDependency<any> => v instanceof AddAmdDependency && v.blockId === blockId)
+        .map(v => v.binding);
+}
+
+/**
+ * The names the body declares. A new parameter has to avoid all of them, not just the other
+ * parameters: a `var Log` in the body would shadow a parameter of the same name, and the
+ * rewritten code would quietly read the local instead of the module.
+ */
+async function declaredNames(block: AmdBlock, visitor: JavaScriptVisitor<any>): Promise<string[]> {
+    const body = bodyOf(block);
+    if (body === undefined) {
+        return [];
+    }
+    const names: string[] = [];
+    const collector = new class extends JavaScriptVisitor<ExecutionContext> {
+        override async visitVariableDeclarations(v: J.VariableDeclarations, c: ExecutionContext) {
+            for (const variable of v.variables) {
+                if (isIdentifier(variable.element.name)) {
+                    names.push((variable.element.name as J.Identifier).simpleName);
+                }
+            }
+            return super.visitVariableDeclarations(v, c);
+        }
+
+        override async visitMethodDeclaration(m: J.MethodDeclaration, c: ExecutionContext) {
+            names.push(m.name.simpleName);
+            return super.visitMethodDeclaration(m, c);
+        }
+
+        override async visitClassDeclaration(k: J.ClassDeclaration, c: ExecutionContext) {
+            names.push(k.name.simpleName);
+            return super.visitClassDeclaration(k, c);
+        }
+    };
+    await collector.visit(body, new ExecutionContext());
+    return names;
+}
+
+function bodyOf(block: AmdBlock): J.Block | undefined {
+    const body = block.factory.kind === J.Kind.MethodDeclaration ?
+        (block.factory as J.MethodDeclaration).body :
+        (block.factory as J.Lambda).body;
+    return body !== undefined && body.kind === J.Kind.Block ? body as J.Block : undefined;
+}
+
+/**
+ * Applies the dependency a `bindModule` call settled on. The block is found by id: its caller
+ * has already emitted a reference to the binding, so a block that cannot be found is an error
+ * rather than a skipped edit.
+ */
+export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
+    constructor(
+        readonly blockId: UUID,
+        readonly module: string,
+        readonly binding: string,
+        readonly callees: readonly string[]
+    ) {
+        super();
+    }
+
+    private applied = false;
+
+    override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
+        const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
+        if (!this.applied) {
+            throw new Error(
+                `No AMD block ${this.blockId} to declare '${this.module}' on, but '${this.binding}' was reported bound`);
+        }
+        return visited;
+    }
+
+    override async visitMethodInvocation(m: J.MethodInvocation, p: P): Promise<J | undefined> {
+        const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
+        if (visited.id !== this.blockId) {
+            return visited;
+        }
+        const block = amdBlockOf(visited, this.callees);
+        if (block === undefined) {
+            return visited;
+        }
+        this.applied = true;
+        // withDependency only refuses on the parameter gap bindAmd already ruled out before queuing.
+        return withDependency(visited, block, this.module, this.binding) ?? visited;
+    }
 }

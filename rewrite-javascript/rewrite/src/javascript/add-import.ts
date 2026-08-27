@@ -402,7 +402,7 @@ function deconflict(derived: string, taken: Set<string>): string {
  * sets `value` to the quoted source (`parser.ts` `mapLiteral`), so neither field alone is the
  * module name. Reuniting them and stripping the quotes yields it for either shape of literal.
  */
-function moduleNameOf(module: string | J.Literal): string {
+export function moduleNameOf(module: string | J.Literal): string {
     if (typeof module === 'string') {
         return module;
     }
