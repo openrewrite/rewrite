@@ -25,7 +25,10 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static java.util.Comparator.comparing;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1736,5 +1739,96 @@ class JavaTemplateTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void repeatedParameterOccurrencesGetFreshIds() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<ExecutionContext>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (!"indexOf".equals(method.getSimpleName()) || getCursor().firstEnclosing(J.Ternary.class) != null) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return JavaTemplate.builder("#{any(java.util.List)} == null ? -1 : #{any(java.util.List)}.indexOf(#{any()})")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(),
+                      method.getSelect(), method.getSelect(), method.getArguments().getFirst());
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  int m(List<String> l, String s) {
+                      return l.indexOf(s);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  int m(List<String> l, String s) {
+                      return l == null ? -1 : l.indexOf(s);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(JavaTemplateTest::assertUniqueIds)
+          )
+        );
+    }
+
+    @Test
+    void repeatedNamedPatternOccurrencesGetFreshIds() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<ExecutionContext>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (!"indexOf".equals(method.getSimpleName()) || getCursor().firstEnclosing(J.Ternary.class) != null) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return JavaTemplate.builder("#{l:any(java.util.List)} == null ? -1 : #{l}.indexOf(#{any()})")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(),
+                      method.getSelect(), method.getArguments().getFirst());
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  int m(List<String> l, String s) {
+                      return l.indexOf(s);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  int m(List<String> l, String s) {
+                      return l == null ? -1 : l.indexOf(s);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(JavaTemplateTest::assertUniqueIds)
+          )
+        );
+    }
+
+    private static void assertUniqueIds(J.CompilationUnit cu) {
+        Set<UUID> ids = new HashSet<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J postVisit(J tree, Integer p) {
+                assertThat(ids.add(tree.getId()))
+                  .as("Duplicate id %s on %s", tree.getId(), tree.getClass().getSimpleName())
+                  .isTrue();
+                return tree;
+            }
+        }.visit(cu, 0);
     }
 }

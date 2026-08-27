@@ -18,6 +18,7 @@
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     AddImport,
+    AddImportOptions,
     ImportStyle,
     IntelliJ,
     javascript,
@@ -26,6 +27,7 @@ import {
     maybeAddImport,
     npm,
     packageJson,
+    prettierStyle,
     RemoveImport,
     SpacesStyle,
     Template,
@@ -33,6 +35,7 @@ import {
     typescript
 } from "../../src/javascript";
 import {emptySpace, J} from "../../src/java";
+import {emptyMarkers} from "../../src/markers";
 import {MarkersKind, NamedStyles, randomId} from "../../src";
 import {create as produce} from "mutative";
 import {withDir} from "tmp-promise";
@@ -2121,4 +2124,505 @@ describe('AddImport visitor', () => {
             }).toThrow("Cannot combine sideEffectOnly with typeOnly");
         });
     });
+
+    describe('quote style', () => {
+        test('matches the quote style of an existing import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'fs',
+                member: 'readFile',
+                onlyIfReferenced: false
+            }));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import path from "path";
+                    `,
+                    `
+                        import path from "path";
+                        import {readFile} from "fs";
+                    `
+                )
+            );
+        });
+
+        test('matches the quote style of an existing require call', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'fs',
+                member: 'readFile',
+                style: ImportStyle.ES6Named,
+                onlyIfReferenced: false
+            }));
+
+            await spec.rewriteRun(
+                javascript(
+                    `
+                        const path = require("path");
+                    `,
+                    `
+                        import {readFile} from "fs";
+
+                        const path = require("path");
+                    `
+                )
+            );
+        });
+
+        test('an explicit quoteStyle overrides what the file would suggest', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'fs',
+                member: 'readFile',
+                quoteStyle: '"',
+                onlyIfReferenced: false
+            }));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import path from 'path';
+                    `,
+                    `
+                        import path from 'path';
+                        import {readFile} from "fs";
+                    `
+                )
+            );
+        });
+
+        test('an existing import outranks a require call', async () => {
+            const addReadFile = () => fromVisitor(new AddImport({
+                module: 'fs',
+                member: 'readFile',
+                style: ImportStyle.ES6Named,
+                onlyIfReferenced: false
+            }));
+
+            const topLevel = new RecipeSpec();
+            topLevel.recipe = addReadFile();
+            await topLevel.rewriteRun(
+                typescript(
+                    `
+                        declare function require(s: string): any;
+                        const a = require("x");
+                        import b from 'y';
+                    `,
+                    `
+                        declare function require(s: string): any;
+                        const a = require("x");
+                        import b from 'y';
+                        import {readFile} from 'fs';
+                    `
+                )
+            );
+
+            // An import the top-level scan cannot see still outranks the require it can.
+            const nested = new RecipeSpec();
+            nested.recipe = addReadFile();
+            await nested.rewriteRun(
+                typescript(
+                    `
+                        declare function require(s: string): any;
+                        const a = require("x");
+                        declare module "m" {
+                            import b from 'y';
+                        }
+                    `,
+                    `
+                        import {readFile} from 'fs';
+
+                        declare function require(s: string): any;
+                        const a = require("x");
+                        declare module "m" {
+                            import b from 'y';
+                        }
+                    `
+                )
+            );
+        });
+
+        test('falls back to the dominant string literal quote when there are no imports', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'fs',
+                member: 'readFile',
+                onlyIfReferenced: false
+            }));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const a = "one";
+                        const b = "two";
+                        const c = 'three';
+                    `,
+                    `
+                        import {readFile} from "fs";
+
+                        const a = "one";
+                        const b = "two";
+                        const c = 'three';
+                    `
+                )
+            );
+        });
+
+        test('defaults to single quotes when the file offers no signal', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'fs',
+                member: 'readFile',
+                onlyIfReferenced: false
+            }));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import {readFile} from 'fs';
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+
+        test('an existing import outranks the dominant string literal quote', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'fs',
+                member: 'readFile',
+                onlyIfReferenced: false
+            }));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import path from 'path';
+
+                        const a = "one";
+                        const b = "two";
+                    `,
+                    `
+                        import path from 'path';
+                        import {readFile} from 'fs';
+
+                        const a = "one";
+                        const b = "two";
+                    `
+                )
+            );
+        });
+
+        /** Stands in for a project whose .prettierrc was picked up at parse time. */
+        function createAddImportWithPrettierStyleVisitor(singleQuote: boolean): JavaScriptVisitor<any> {
+            return new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    const namedStyles: NamedStyles = {
+                        kind: MarkersKind.NamedStyles,
+                        id: randomId(),
+                        name: "test-prettier",
+                        displayName: "Test Prettier",
+                        tags: [],
+                        styles: [prettierStyle(randomId(), {singleQuote})]
+                    };
+
+                    let result: JS.CompilationUnit = {
+                        ...cu,
+                        markers: {
+                            ...cu.markers,
+                            markers: [...cu.markers.markers, namedStyles]
+                        }
+                    };
+
+                    const addImport = new AddImport({
+                        module: 'fs',
+                        member: 'readFile',
+                        onlyIfReferenced: false
+                    });
+                    return await addImport.visit(result, p) as JS.CompilationUnit;
+                }
+            };
+        }
+
+        test('honors a PrettierStyle marker with singleQuote disabled', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createAddImportWithPrettierStyleVisitor(false));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import {readFile} from "fs";
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+
+        test('a PrettierStyle marker outranks the dominant string literal quote', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createAddImportWithPrettierStyleVisitor(true));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const a = "one";
+                        const b = "two";
+                    `,
+                    `
+                        import {readFile} from 'fs';
+
+                        const a = "one";
+                        const b = "two";
+                    `
+                )
+            );
+        });
+
+        test('reuses the value source of a module specifier passed as a literal', async () => {
+            const moduleSpecifier: J.Literal = {
+                id: randomId(),
+                kind: J.Kind.Literal,
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                value: 'sap/m/Über',
+                valueSource: '"sap/m/\\u00dcber"',
+                unicodeEscapes: [],
+                type: undefined
+            };
+
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: moduleSpecifier,
+                member: 'default',
+                alias: 'Ueber',
+                onlyIfReferenced: false
+            }));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import Ueber from "sap/m/\\u00dcber";
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+
+        /**
+         * Load order is observable for side-effect imports, so imports registered in one pass
+         * have to come out in registration order.
+         */
+        function createAddImportsVisitor(imports: AddImportOptions[]): JavaScriptVisitor<any> {
+            return new class extends JavaScriptVisitor<any> {
+                constructor() {
+                    super();
+                    for (const options of imports) {
+                        maybeAddImport(this, options);
+                    }
+                }
+            };
+        }
+
+        test('adds several imports to an import-less file in call order', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createAddImportsVisitor([
+                {module: 'sap/m/Button', member: 'default', alias: 'Button', onlyIfReferenced: false},
+                {module: 'my/lib/patches', sideEffectOnly: true},
+                {module: 'sap/m/Text', member: 'default', alias: 'Text', onlyIfReferenced: false},
+                {module: 'sap/ui/core/Control', member: 'default', alias: 'Control', onlyIfReferenced: false}
+            ]));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import Button from 'sap/m/Button';
+                        import 'my/lib/patches';
+                        import Text from 'sap/m/Text';
+                        import Control from 'sap/ui/core/Control';
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+
+        test('preserves surrogate escapes in a module specifier passed as a literal', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    const existing = cu.statements[0].element as JS.Import;
+                    return await new AddImport({
+                        module: existing.moduleSpecifier!.element as J.Literal,
+                        member: 'default',
+                        alias: 'B',
+                        onlyIfReferenced: false
+                    }).visit(cu, p);
+                }
+            }());
+
+            await spec.rewriteRun(
+                typescript(
+                    "import a from './e\\uD83D\\uDE00m';",
+                    "import a from './e\\uD83D\\uDE00m';\nimport B from './e\\uD83D\\uDE00m';"
+                )
+            );
+        });
+
+        test('recognizes an existing import whose specifier carries surrogate escapes', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    const existing = cu.statements[0].element as JS.Import;
+                    return await new AddImport({
+                        module: existing.moduleSpecifier!.element as J.Literal,
+                        member: 'default',
+                        alias: 'a',
+                        onlyIfReferenced: false
+                    }).visit(cu, p);
+                }
+            }());
+
+            await spec.rewriteRun(
+                typescript("import a from './e\\uD83D\\uDE00m';")
+            );
+        });
+
+        test('gives the added literal a value that agrees with its own valueSource', async () => {
+            let added: J.Literal | undefined;
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    const existing = cu.statements[0].element as JS.Import;
+                    const result = await new AddImport({
+                        module: existing.moduleSpecifier!.element as J.Literal,
+                        member: 'default',
+                        alias: 'B',
+                        onlyIfReferenced: false
+                    }).visit(cu, p) as JS.CompilationUnit;
+                    added = (result.statements[1].element as JS.Import).moduleSpecifier!.element as J.Literal;
+                    return result;
+                }
+            }());
+
+            await spec.rewriteRun(
+                typescript(
+                    "import a from './e\\uD83D\\uDE00m';",
+                    "import a from './e\\uD83D\\uDE00m';\nimport B from './e\\uD83D\\uDE00m';"
+                )
+            );
+
+            expect(added!.value).toBe('./e\u{1F600}m');
+            expect(added!.valueSource).toBe("'./em'");
+        });
+
+        test('ignores a PrettierStyle marker for a file .prettierignore excludes', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    const namedStyles: NamedStyles = {
+                        kind: MarkersKind.NamedStyles,
+                        id: randomId(),
+                        name: "test-prettier",
+                        displayName: "Test Prettier",
+                        tags: [],
+                        styles: [prettierStyle(randomId(), {singleQuote: true}, undefined, true)]
+                    };
+                    const marked: JS.CompilationUnit = {
+                        ...cu,
+                        markers: {...cu.markers, markers: [...cu.markers.markers, namedStyles]}
+                    };
+                    return await new AddImport({
+                        module: 'fs',
+                        member: 'readFile',
+                        onlyIfReferenced: false
+                    }).visit(marked, p);
+                }
+            }());
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const a = "one";
+                        const b = "two";
+                    `,
+                    `
+                        import {readFile} from "fs";
+
+                        const a = "one";
+                        const b = "two";
+                    `
+                )
+            );
+        });
+
+        test('does not treat a require method call on a receiver as a module specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'fs',
+                member: 'readFile',
+                style: ImportStyle.ES6Named,
+                onlyIfReferenced: false
+            }));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        declare const loader: any;
+                        const legacy = loader.require('old/thing');
+                        const a = "one";
+                        const b = "two";
+                    `,
+                    `
+                        import {readFile} from "fs";
+
+                        declare const loader: any;
+                        const legacy = loader.require('old/thing');
+                        const a = "one";
+                        const b = "two";
+                    `
+                )
+            );
+        });
+
+        test('does not count JSX attribute quoting toward the dominant quote style', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'fs',
+                member: 'readFile',
+                onlyIfReferenced: false
+            }));
+
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        const a = 'one';
+                        const el = <div className="x" id="y" title="z"/>;
+                    `,
+                    `
+                        import {readFile} from 'fs';
+
+                        const a = 'one';
+                        const el = <div className="x" id="y" title="z"/>;
+                    `
+                )
+            );
+        });
+    });
+
 });
