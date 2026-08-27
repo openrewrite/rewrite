@@ -34,7 +34,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     private final Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache;
-    private final Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache;
+    private final Cache<MetadataKey, MavenMetadataCacheEntry> mavenMetadataCache;
     private final Cache<MavenRepository, Optional<MavenRepository>> repositoryCache;
     private final Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache;
 
@@ -61,7 +61,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
 
     public InMemoryMavenPomCache(String cacheNickname,
                                  Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache,
-                                 Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
+                                 Cache<MetadataKey, MavenMetadataCacheEntry> mavenMetadataCache,
                                  Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
                                  Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
 
@@ -72,7 +72,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     public InMemoryMavenPomCache(Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache,
-                                 Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
+                                 Cache<MetadataKey, MavenMetadataCacheEntry> mavenMetadataCache,
                                  Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
                                  Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
         this("default", pomCache, mavenMetadataCache, repositoryCache, dependencyCache);
@@ -89,13 +89,14 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+    public @Nullable MavenMetadataCacheEntry getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+        // No freshness policy here: entries are always served as stored (never expired).
         return mavenMetadataCache.getIfPresent(new MetadataKey(repo, gav));
     }
 
     @Override
-    public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
-        mavenMetadataCache.put(new MetadataKey(repo, gav), Optional.ofNullable(metadata));
+    public void putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadataCacheEntry metadata) {
+        mavenMetadataCache.put(new MetadataKey(repo, gav), metadata);
     }
 
     @Override

@@ -132,13 +132,13 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+    public @Nullable MavenMetadataCacheEntry getMavenMetadata(URI repo, GroupArtifactVersion gav) {
         //The Maven metadata is not something that should be stored long term, as it will change over time.
         return null;
     }
 
     @Override
-    public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
+    public void putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadataCacheEntry metadata) {
         //The Maven metadata is not something that should be stored long term, as it will change over time.
     }
 

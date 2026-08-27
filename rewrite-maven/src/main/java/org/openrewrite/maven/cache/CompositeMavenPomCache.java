@@ -49,20 +49,22 @@ public class CompositeMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
-        Optional<MavenMetadata> l1m = l1.getMavenMetadata(repo, gav);
+    public @Nullable MavenMetadataCacheEntry getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+        MavenMetadataCacheEntry l1m = l1.getMavenMetadata(repo, gav);
         if(l1m != null) {
             return l1m;
         }
-        Optional<MavenMetadata> l2m = l2.getMavenMetadata(repo, gav);
-        if(l2m != null && l2m.isPresent()) {
-            l1.putMavenMetadata(repo, gav, l2m.get());
+        MavenMetadataCacheEntry l2m = l2.getMavenMetadata(repo, gav);
+        // Promote only a still-fresh hit into l1; an expired l2 entry (validators only) is left for
+        // the downloader to revalidate, so l1 isn't seeded with a stale value.
+        if(l2m != null && l2m.getMetadata() != null && !l2m.isExpired()) {
+            l1.putMavenMetadata(repo, gav, l2m);
         }
         return l2m;
     }
 
     @Override
-    public void putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadata metadata) {
+    public void putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadataCacheEntry metadata) {
         l1.putMavenMetadata(repo, gav, metadata);
         l2.putMavenMetadata(repo, gav, metadata);
     }
