@@ -51,8 +51,13 @@ export interface ModuleBindings {
     /** The local name bound to `module`, or undefined when nothing binds it. */
     bindingOf(module: string): string | undefined;
 
-    /** The lane these bindings come from, and the one `bindModule` would use. */
-    readonly moduleSystem: "esm" | "amd" | "commonjs";
+    /**
+     * The lane these bindings come from, and the one `bindModule` would use. `"none"` is a
+     * plain script — no import, export, `require` binding, or enclosing AMD block — which
+     * `bindModule` still turns into a module on request; a caller that must not do that checks
+     * for `"none"` itself.
+     */
+    readonly moduleSystem: "esm" | "amd" | "commonjs" | "none";
 }
 
 export function calleesOf(options?: BindModuleOptions): readonly string[] {
@@ -119,10 +124,27 @@ export function moduleBindings(
     const cu = compilationUnitOf(visitor);
     const bound = cu === undefined ? [] : moduleObjectBindings(cu);
     return {
-        moduleSystem: cu !== undefined && isCommonJs(cu) ? "commonjs" : "esm",
+        moduleSystem: cu === undefined ? "esm" :
+            isCommonJs(cu) ? "commonjs" :
+            hasEsmSyntax(cu) ? "esm" : "none",
         moduleOf: localName => bound.find(b => b.name === localName)?.module,
         bindingOf: module => bound.find(b => b.module === module)?.name
     };
+}
+
+/** Whether a top-level statement already marks the file as a module: an import or any export form. */
+function hasEsmSyntax(cu: JS.CompilationUnit): boolean {
+    return cu.statements.some(stmt => {
+        const element = stmt.element;
+        // `export {a, b}`, `export * from` and `export default` are their own statement kinds;
+        // `export class`/`function`/`const` instead carry `export` as a modifier on the
+        // declaration itself, the same way TypeScript's own AST models it.
+        const modifiers = (element as {modifiers?: J.Modifier[]} | undefined)?.modifiers;
+        return element?.kind === JS.Kind.Import ||
+            element?.kind === JS.Kind.ExportDeclaration ||
+            element?.kind === JS.Kind.ExportAssignment ||
+            (modifiers?.some(m => m.keyword === "export") ?? false);
+    });
 }
 
 interface ModuleObjectBinding {

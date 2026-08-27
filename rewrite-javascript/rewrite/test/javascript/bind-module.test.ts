@@ -40,11 +40,19 @@ describe("moduleBindings", () => {
         expect(seen).toEqual({moduleSystem: "esm", module: "sap/m/Button", binding: "Button"});
     });
 
-    test("a file with no bindings reports the lane bindModule would take", async () => {
+    test("a plain script with no import, export, require, or AMD block reports \"none\"", async () => {
         const spec = new RecipeSpec();
         const seen: {moduleSystem?: string} = {};
         spec.recipe = fromVisitor(captureBindings(seen));
         await spec.rewriteRun(typescript(`const x = 1;`));
+        expect(seen.moduleSystem).toBe("none");
+    });
+
+    test("an export alone is enough to read as \"esm\", even with no import", async () => {
+        const spec = new RecipeSpec();
+        const seen: {moduleSystem?: string} = {};
+        spec.recipe = fromVisitor(captureBindings(seen));
+        await spec.rewriteRun(typescript(`export const x = 1;`));
         expect(seen.moduleSystem).toBe("esm");
     });
 
@@ -53,7 +61,7 @@ describe("moduleBindings", () => {
         const seen: {moduleSystem?: string} = {};
         spec.recipe = fromVisitor(captureBindings(seen));
         await spec.rewriteRun(javascript(`const other = foo.require("a/Other");`));
-        expect(seen.moduleSystem).toBe("esm");
+        expect(seen.moduleSystem).toBe("none");
     });
 
     test("a .cjs file reads as CommonJS even with no require call in it yet", async () => {
