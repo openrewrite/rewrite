@@ -92,7 +92,8 @@ export class TemplateBuilder {
     /**
      * Adds a parameter to the template.
      *
-     * @param value The parameter value (Capture, Tree, or primitive)
+     * @param value The parameter value (Capture, Tree, or primitive); may be added more than once
+     *              (see {@link template})
      * @returns This builder for chaining
      */
     param(value: TemplateParameter): this {
@@ -142,11 +143,11 @@ export class TemplateBuilder {
  *
  * @example
  * // Generate a literal AST node
- * const result = template`2`.apply(cursor, coordinates);
+ * const result = await template`2`.apply(node, cursor);
  *
  * @example
  * // Generate an AST node with a parameter
- * const result = template`${capture()}`.apply(cursor, coordinates);
+ * const result = await template`${capture()}`.apply(node, cursor);
  *
  * @example
  * // Access properties of captured nodes in templates
@@ -154,10 +155,10 @@ export class TemplateBuilder {
  * const pat = pattern`foo(${method})`;
  * const tmpl = template`bar(${method.name})`; // Access the 'name' property
  *
- * const match = await pat.match(someNode);
+ * const match = await pat.match(someNode, cursor);
  * if (match) {
  *     // The template will insert just the 'name' subtree from the captured method
- *     const result = await tmpl.apply(cursor, someNode, match);
+ *     const result = await tmpl.apply(someNode, cursor, { values: match });
  * }
  *
  * @example
@@ -257,7 +258,8 @@ export class Template {
         const cacheKey = generateCacheKey(
             this.templateParts,
             parametersKey,
-            contextStatements,
+            // As in Pattern.getAstPattern: a parameter's type reaches the parse as a declaration
+            [...contextStatements, ...TemplateEngine.parameterPreamble(this.parameters)],
             this.options.dependencies || {}
         );
 
@@ -358,7 +360,8 @@ export class Template {
                 mode: JavaCoordinates.Mode.Replace
             },
             normalizedValues,
-            wrappersMap
+            wrappersMap,
+            options?.format ?? true
         );
     }
 }
@@ -377,13 +380,16 @@ export class Template {
  * - J.Container<T>: Elements will be expanded in place
  *
  * @param strings The string parts of the template
- * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, Tree[], J.RightPadded, J.RightPadded[], or J.Container)
+ * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, Tree[], J.RightPadded, J.RightPadded[], or J.Container).
+ *                   A parameter may appear more than once — `(${arr} ? f(${arr}) : -1)`. A node
+ *                   keeps its id only at its first occurrence, and only if it belongs to the
+ *                   subtree being replaced; anything else is spliced under fresh ids.
  * @returns A Template object that can be applied to generate AST nodes
  *
  * @example
  * // Simple template with literal
  * const tmpl = template`console.log("hello")`;
- * const result = await tmpl.apply(cursor, node);
+ * const result = await tmpl.apply(node, cursor);
  *
  * @example
  * // Template with capture - matches captured value from pattern
@@ -391,9 +397,9 @@ export class Template {
  * const pat = pattern`foo(${expr})`;
  * const tmpl = template`bar(${expr})`;
  *
- * const match = await pat.match(node);
+ * const match = await pat.match(node, cursor);
  * if (match) {
- *     const result = await tmpl.apply(cursor, node, match);
+ *     const result = await tmpl.apply(node, cursor, { values: match });
  * }
  *
  * @example

@@ -9,7 +9,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PipfileLockParser;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.internal.PythonResolutionLinker;
@@ -17,13 +16,19 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.python.marker.PythonResolutionResult.SourceIndex;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -66,18 +71,7 @@ public class PipfileParser implements Parser {
         if (!resolvedDeps.isEmpty()) {
             return PythonResolutionLinker.applyPipfile(marker, resolvedDeps);
         }
-
-        // No Pipfile.lock found — try regenerating it from the Pipfile contents.
-        LockFileRegeneration.Result result = LockFileRegeneration.PIPENV.regenerate(doc.printAll());
-        if (!result.isSuccess() || result.getLockFileContent() == null) {
-            return marker;
-        }
-
-        resolvedDeps = PipfileLockParser.parse(result.getLockFileContent());
-        if (resolvedDeps.isEmpty()) {
-            return marker;
-        }
-        return PythonResolutionLinker.applyPipfile(marker, resolvedDeps);
+        return marker;
     }
 
     public static @Nullable PythonResolutionResult createMarker(Toml.Document doc) {
@@ -111,21 +105,62 @@ public class PipfileParser implements Parser {
                 doc.getSourcePath().toString(),
                 requiresPython,
                 null,
-                Collections.emptyList(),
+                emptyList(),
                 dependencies,
                 optionalDependencies,
-                Collections.emptyMap(),
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyList(),
+                emptyMap(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
                 PackageManager.Pipenv,
-                null
+                parseSourceIndexes(doc)
         );
+    }
+
+    private static @Nullable List<SourceIndex> parseSourceIndexes(Toml.Document doc) {
+        List<SourceIndex> indexes = new ArrayList<>();
+        for (Toml value : doc.getValues()) {
+            if (!(value instanceof Toml.Table)) {
+                continue;
+            }
+            Toml.Table table = (Toml.Table) value;
+            if (table.getName() == null || !"source".equals(table.getName().getName())) {
+                continue;
+            }
+            String url = getStringValue(table, "url");
+            if (url == null) {
+                continue;
+            }
+            String name = getStringValue(table, "name");
+            if (name == null) {
+                name = hostOf(url);
+            }
+            indexes.add(new SourceIndex(name, url, indexes.isEmpty() || "pypi".equals(name)));
+        }
+        return indexes.isEmpty() ? null : indexes;
+    }
+
+    private static String hostOf(String url) {
+        int scheme = url.indexOf("://");
+        String rest = scheme < 0 ? url : url.substring(scheme + 3);
+        int slash = rest.indexOf('/');
+        if (slash >= 0) {
+            rest = rest.substring(0, slash);
+        }
+        int at = rest.lastIndexOf('@');
+        if (at >= 0) {
+            rest = rest.substring(at + 1);
+        }
+        int colon = rest.indexOf(':');
+        if (colon >= 0) {
+            rest = rest.substring(0, colon);
+        }
+        return rest.isEmpty() ? "source" : rest;
     }
 
     private static List<Dependency> parseDependencyTable(Toml.@Nullable Table table) {
         if (table == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         List<Dependency> deps = new ArrayList<>();
         for (Toml value : table.getValues()) {

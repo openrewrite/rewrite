@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.trait.DockerFrom;
+import org.openrewrite.docker.trait.DockerImageReference;
 import org.openrewrite.marker.SearchResult;
 
 /**
@@ -49,12 +50,10 @@ public class FindUnpinnedBaseImages extends Recipe {
                 .excludeScratch()
                 .onlyUnpinned()
                 .asVisitor(image -> {
-                    // Get the reason for being unpinned
-                    DockerFrom.UnpinnedReason reason = image.getUnpinnedReason();
-
-                    String message = reason == DockerFrom.UnpinnedReason.IMPLICIT_LATEST ?
-                            "Uses implicit 'latest' tag" :
-                            "Uses 'latest' tag";
+                    String message = image.getUnpinnedReason()
+                            .filter(reason -> reason == DockerImageReference.UnpinnedReason.IMPLICIT_LATEST)
+                            .map(reason -> "Uses implicit 'latest' tag")
+                            .orElse("Uses 'latest' tag");
                     return SearchResult.found(image.getTree(), message);
                 });
     }

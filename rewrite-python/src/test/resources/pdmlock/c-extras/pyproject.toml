@@ -1,0 +1,12 @@
+[project]
+name = "c-extras"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["requests[socks]==2.32.3"]
+
+[tool.pdm]
+distribution = false
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

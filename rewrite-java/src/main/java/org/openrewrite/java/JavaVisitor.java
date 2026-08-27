@@ -199,7 +199,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public void maybeRemoveImport(String fullyQualifiedName) {
-        RemoveImport<P> op = new RemoveImport<>(fullyQualifiedName);
+        JavaVisitor<P> op = service(ImportService.class).removeImportVisitor(fullyQualifiedName);
         if (!getAfterVisit().contains(op)) {
             doAfterVisit(op);
         }

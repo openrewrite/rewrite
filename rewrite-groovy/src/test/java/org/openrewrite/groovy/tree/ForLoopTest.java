@@ -16,8 +16,11 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"GroovyEmptyStatementBody", "GroovyUnusedAssignment", "GrUnnecessarySemicolon", "GroovyUnnecessaryContinue"})
@@ -219,6 +222,81 @@ class ForLoopTest implements RewriteTest {
           groovy(
             """
               f: for(int i in [1, 2, 3]) { continue f }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyBodyClassicForLoop() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  void test() {
+                      int port = 0
+                      for (; port < 1024; port = port + 1);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new GroovyIsoVisitor<Integer>() {
+                @Override
+                public J.ForLoop visitForLoop(J.ForLoop forLoop, Integer p) {
+                    assertThat(forLoop.getBody()).isInstanceOf(J.Empty.class);
+                    return super.visitForLoop(forLoop, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void emptyBodyForLoopWithInit() {
+        rewriteRun(
+          groovy(
+            """
+              for (int i = 0; i < 10; i++);
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyBodyInfiniteForLoop() {
+        rewriteRun(
+          groovy(
+            """
+              for (;;) ;
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyBodyForEachLoop() {
+        rewriteRun(
+          groovy(
+            """
+              def list = [1, 2, 3]
+              for (x in list);
+              """,
+            spec -> spec.afterRecipe(cu -> new GroovyIsoVisitor<Integer>() {
+                @Override
+                public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, Integer p) {
+                    assertThat(forLoop.getBody()).isInstanceOf(J.Empty.class);
+                    return super.visitForEachLoop(forLoop, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void emptyBodyForEachLoopWithColon() {
+        rewriteRun(
+          groovy(
+            """
+              for (def x : [1, 2, 3]);
               """
           )
         );

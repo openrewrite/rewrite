@@ -40,7 +40,8 @@ import {
     autoFormat,
     AutoformatVisitor,
     JavaScriptVisitor,
-    typescript
+    typescript,
+    withDetectedStyle
 } from "../../../src/javascript";
 
 
@@ -700,6 +701,14 @@ const x = 1;`
             )
             // @formatter:on
         )
+    });
+
+    test('a spec opting into its own style keeps the tabs it is written with', () => {
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript("function f() {\n\tconst x = 1;\n\treturn x;\n}\n"),
+            beforeRecipe: withDetectedStyle
+        })
     });
 
 });

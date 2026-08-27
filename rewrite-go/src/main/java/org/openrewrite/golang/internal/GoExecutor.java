@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 /**
  * Locates and runs the {@code go} toolchain. Mirrors the Python/JavaScript
@@ -103,15 +105,28 @@ public final class GoExecutor {
      * installed or not on {@code PATH}.
      */
     public @Nullable String find() {
-        if (cachedPath != null) {
-            return cachedPath;
+        if (cachedPath == null) {
+            cachedPath = find(System.getenv("GOROOT"), System.getenv("PATH"), Files::isExecutable);
         }
+        return cachedPath;
+    }
 
+    /**
+     * {@code PATH} is searched ahead of the well-known install directories so the resolved binary matches the
+     * bare {@code go} that child processes invoke; otherwise the toolchain rejects the {@code GOROOT} mismatch.
+     */
+    @Nullable String find(@Nullable String goRoot, @Nullable String pathEnv, Predicate<Path> isExecutable) {
         String exe = IS_WINDOWS ? name + ".exe" : name;
         List<String> locations = new ArrayList<>();
-        String goRoot = System.getenv("GOROOT");
         if (goRoot != null && !goRoot.trim().isEmpty()) {
-            locations.add(goRoot + (IS_WINDOWS ? "\\bin\\" : "/bin/") + exe);
+            locations.add(goRoot.trim() + (IS_WINDOWS ? "\\bin\\" : "/bin/") + exe);
+        }
+        if (pathEnv != null) {
+            for (String entry : pathEnv.split(File.pathSeparator)) {
+                if (!entry.trim().isEmpty()) {
+                    locations.add(entry.trim() + File.separator + exe);
+                }
+            }
         }
         if (IS_WINDOWS) {
             locations.add("C:\\Program Files\\Go\\bin\\" + exe);
@@ -125,31 +140,9 @@ public final class GoExecutor {
 
         for (String location : locations) {
             Path path = Paths.get(location);
-            if (Files.isExecutable(path)) {
-                cachedPath = path.toAbsolutePath().toString();
-                return cachedPath;
+            if (isExecutable.test(path)) {
+                return path.toAbsolutePath().toString();
             }
-        }
-
-        try {
-            ProcessBuilder pb = new ProcessBuilder(IS_WINDOWS ? "where" : "which", exe);
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-            String first = null;
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (first == null && !line.trim().isEmpty()) {
-                        first = line.trim();
-                    }
-                }
-            }
-            if (process.waitFor() == 0 && first != null) {
-                cachedPath = first;
-                return cachedPath;
-            }
-        } catch (IOException | InterruptedException e) {
-            // Ignore
         }
 
         return null;

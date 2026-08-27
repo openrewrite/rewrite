@@ -220,6 +220,36 @@ def test_handle_install_recipes_local_path_installs_with_deps(tmp_path, monkeypa
     assert str(local) in captured["cmd"]
 
 
+def test_handle_install_recipes_local_path_attributes_to_the_supplied_path(monkeypatch, tmp_path):
+    # A local install is attributed to the supplied path (the identity the host keys the bundle by),
+    # not the resolved distribution name — matching the facade's local install.
+    import rewrite.rpc.server as server
+    from rewrite import CategoryDescriptor, Recipe
+    from rewrite.discovery import RecipeAttribution
+    from rewrite.marketplace import RecipeMarketplace
+
+    class _Sample(Recipe):
+        @property
+        def name(self): return "org.local.Sample"
+        @property
+        def display_name(self): return "Sample"
+        @property
+        def description(self): return "s"
+
+    attribution = RecipeAttribution()
+    monkeypatch.setattr(server, "_marketplace", RecipeMarketplace())
+    monkeypatch.setattr(server, "_attribution", attribution)
+    monkeypatch.setattr(server, "_recipe_install_dir", None)          # no pip; just activate
+    monkeypatch.setattr(server, "_find_package_name", lambda p: "sample-dist")
+    monkeypatch.setattr(server, "_import_and_activate_package",
+                        lambda name, mkt, local_path=None: mkt.install(_Sample, [CategoryDescriptor(display_name="Local")]))
+
+    supplied = str(tmp_path / "my-recipe-src")
+    server.handle_install_recipes({"recipes": supplied})
+
+    assert attribution.package_for("org.local.Sample") == supplied   # the path, not "sample-dist"
+
+
 def test_recipe_descriptor_to_dict_emits_all_collection_keys():
     from rewrite.recipe import RecipeDescriptor
     from rewrite.rpc.server import _recipe_descriptor_to_dict
@@ -443,3 +473,85 @@ def test_prepare_recipe_returns_whole_child_tree(monkeypatch):
 
     assert "recipeList" in response
     assert [c["descriptor"]["name"] for c in response["recipeList"]] == ["org.example.Leaf"]
+
+
+def test_prepare_recipe_same_type_children_preserve_distinct_options(monkeypatch):
+    """A composite whose recipe_list() yields multiple instances of the same recipe class with
+    different option values must keep each prepared child's own id and options, rather than
+    collapsing them."""
+    import rewrite.rpc.server as server
+    from rewrite.marketplace import RecipeMarketplace
+    from rewrite import Recipe, CategoryDescriptor
+    from rewrite.recipe import option
+    from dataclasses import dataclass, field
+
+    @dataclass
+    class _SetsText(Recipe):
+        text: str = field(default=None, metadata=option(
+            display_name="Text", description="Text value."))
+
+        @property
+        def name(self): return "org.example.SetsText"
+        @property
+        def display_name(self): return "Sets text"
+        @property
+        def description(self): return "A recipe with a text option."
+
+    class _CompositeSameType(Recipe):
+        @property
+        def name(self): return "org.example.CompositeSameType"
+        @property
+        def display_name(self): return "Composite with same-type children"
+        @property
+        def description(self): return "A composite with distinct-option children of one type."
+
+        def recipe_list(self):
+            return [_SetsText(text="a"), _SetsText(text="b"), _SetsText(text="c")]
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_CompositeSameType, [CategoryDescriptor(display_name="Test")])
+    monkeypatch.setattr(server, "_marketplace", marketplace)
+
+    response = server.handle_prepare_recipe({"id": "org.example.CompositeSameType"})
+
+    children = response["recipeList"]
+    assert [c["descriptor"]["name"] for c in children] == ["org.example.SetsText"] * 3
+
+    ids = [c["id"] for c in children]
+    assert len(set(ids)) == 3
+
+    def text_of(child):
+        return next(o["value"] for o in child["descriptor"]["options"] if o["name"] == "text")
+    assert [text_of(c) for c in children] == ["a", "b", "c"]
+
+
+def test_hub_release_rewinds_send_refs_in_lockstep_with_the_child():
+    """A child drops its receive refs for a file when the broadcast Evict reaches it, so the facade
+    must return its send-ref numbering to exactly the pre-file value. If the facade kept advancing,
+    it would emit a GET_REF for a ref the child no longer holds; if it rewound while the child did
+    not, it would reuse a number still bound to the old object and serve a wrong tree silently."""
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    bundle, first, second = "pkg", "file-1", "file-2"
+    refs = server._hub_send_refs[bundle] = ReferenceMap()
+
+    # Serving the first file advances this child's numbering and records where it started.
+    server._hub_send_checkpoint.setdefault((bundle, first), refs.snapshot())
+    refs.create(object())
+    refs.create(object())
+    server._hub_served[(bundle, first)] = object()
+    server._hub_tree[first] = object()
+
+    server._hub_release(first)
+
+    # Everything that file introduced is gone, and the counter is back where it began.
+    assert refs.snapshot() == 0
+    assert len(refs) == 0
+    assert (bundle, first) not in server._hub_served
+    assert (bundle, first) not in server._hub_send_checkpoint
+    assert first not in server._hub_tree
+
+    # So the next file reuses the same ref numbers rather than continuing past them.
+    server._hub_send_checkpoint.setdefault((bundle, second), refs.snapshot())
+    assert server._hub_send_checkpoint[(bundle, second)] == 0

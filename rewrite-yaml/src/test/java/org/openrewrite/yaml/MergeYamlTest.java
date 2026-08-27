@@ -21,16 +21,19 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.After;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.Before;
@@ -3139,6 +3142,154 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @MethodSource("insertNextToLastSiblingFollowedByBlankLinesOptions")
+    void insertNewKeyDirectlyNextToLastSiblingWhenFollowedByBlankLines(MergeYaml.@Nullable InsertMode insertMode,
+                                                                       @Nullable String insertProperty,
+                                                                       String after) {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$.service_config",
+              // language=yaml
+              """
+                enabled: true
+                """,
+              false,
+              null,
+              null,
+              insertMode,
+              insertProperty,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              service_config:
+                name: 'hello'
+
+
+
+              """,
+            after
+          )
+        );
+    }
+
+    static Stream<Arguments> insertNextToLastSiblingFollowedByBlankLinesOptions() {
+        return Stream.of(
+          arguments(null, null,
+            """
+              service_config:
+                name: 'hello'
+                enabled: true
+
+
+
+              """),
+          arguments(Last, null,
+            """
+              service_config:
+                name: 'hello'
+                enabled: true
+
+
+
+              """),
+          arguments(After, "name",
+            """
+              service_config:
+                name: 'hello'
+                enabled: true
+
+
+
+              """),
+          arguments(Before, "name",
+            """
+              service_config:
+                enabled: true
+                name: 'hello'
+
+
+
+              """)
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("insertNextToLastSiblingPrecededByBlankLinesOptions")
+    void insertNewKeyDirectlyNextToLastSiblingWhenPrecededByBlankLines(MergeYaml.@Nullable InsertMode insertMode,
+                                                                       @Nullable String insertProperty,
+                                                                       String after) {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$.service_config",
+              // language=yaml
+              """
+                enabled: true
+                """,
+              false,
+              null,
+              null,
+              insertMode,
+              insertProperty,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              service_config:
+
+
+
+                name: 'hello'
+              """,
+            after
+          )
+        );
+    }
+
+    static Stream<Arguments> insertNextToLastSiblingPrecededByBlankLinesOptions() {
+        return Stream.of(
+          arguments(null, null,
+            """
+              service_config:
+
+
+
+                name: 'hello'
+                enabled: true
+              """),
+          arguments(Last, null,
+            """
+              service_config:
+
+
+
+                name: 'hello'
+                enabled: true
+              """),
+          arguments(After, "name",
+            """
+              service_config:
+
+
+
+                name: 'hello'
+                enabled: true
+              """),
+          arguments(Before, "name",
+            """
+              service_config:
+
+
+
+                enabled: true
+                name: 'hello'
+              """)
+        );
+    }
+
     @Test
     void invalidYaml() {
         var recipe = new MergeYaml(
@@ -3990,4 +4141,281 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void overwritePlainOverBlockFoldedAdoptsPlainFormat() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: replaced", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwritePlainOverBlockLiteralAdoptsPlainFormat() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: replaced", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: |+
+                line one
+                line two
+
+              after: tail
+              """,
+            """
+              key: replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockOverPlainAdoptsIncomingBlockFormat() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: |\n  line one\n  line two\n", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: value
+              after: tail
+              """,
+            """
+              key: |
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockStripOverPlainNoTrailingNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: |-\n  line one\n  line two", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: value
+              after: tail
+              """,
+            """
+              key: |-
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockClipOverPlainNoTrailingNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: |\n  line one\n  line two", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: value
+              after: tail
+              """,
+            """
+              key: |
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockOverPlainAsLastEntryNoTrailingNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "last: |-\n  line one\n  line two", false, null, null, null, null, null)),
+          yaml(
+            """
+              before: head
+              last: value
+              """,
+            """
+              before: head
+              last: |-
+                line one
+                line two
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteBlockOverBlockSameStyleKeepsExistingEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: >-\n  replaced\n", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >-
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void doesNotCopyInlineCommentOfLastLineToInsertedEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.config",
+            //language=yaml
+            """
+              newblock:
+                child:
+                  enabled: false
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+              """,
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+                newblock:
+                  child:
+                    enabled: false
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void keepsCommentOnItsOwnLineAtTheEndOfTheDocument() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.config",
+            //language=yaml
+            """
+              newblock: value
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              config:
+                existing: true # inline comment here
+              # standalone comment
+              """,
+            """
+              config:
+                existing: true # inline comment here
+                newblock: value
+              # standalone comment
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void doesNotCopyInlineCommentOfLastLineWhenCreatingANewKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.newkey",
+            //language=yaml
+            """
+              sub: value
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              config:
+                existing: true # inline comment here
+              """,
+            """
+              config:
+                existing: true # inline comment here
+              newkey:
+                sub: value
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8416")
+    @Test
+    void mergeYamlVisitorAppliedToWholeDocument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new YamlVisitor<>() {
+              @Override
+              public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                  Yaml.Mapping root = (Yaml.Mapping) documents.getDocuments().get(0).getBlock();
+                  Yaml.Block config = root.getEntries().get(0).getValue();
+                  //language=yaml
+                  Yaml incoming = MergeYaml.parse("""
+                    newblock:
+                      child:
+                        enabled: false
+                    """);
+                  return new MergeYamlVisitor<ExecutionContext>(config, incoming, false, null, null, null)
+                    .visitNonNull(documents, ctx);
+              }
+          })),
+          yaml(
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+              """,
+            """
+              config:
+                existing:
+                  nested:
+                    value: true # inline comment here
+                newblock:
+                  child:
+                    enabled: false
+              """
+          )
+        );
+    }
 }

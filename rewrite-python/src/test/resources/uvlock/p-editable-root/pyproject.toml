@@ -1,0 +1,11 @@
+[project]
+name = "fixture-p"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "six>=1.16",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

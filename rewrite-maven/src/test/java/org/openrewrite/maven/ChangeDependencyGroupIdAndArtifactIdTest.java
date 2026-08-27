@@ -278,7 +278,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
-    void shouldAddNewIfDependencyAlreadyExistsInOlderVersion() {
+    void shouldUpgradeExistingInPlaceIfDependencyAlreadyExistsInOlderVersion() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -321,10 +321,166 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <artifactId>jakarta.activation-api</artifactId>
                           <version>1.2.2</version>
                       </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/pull/1153")
+    @Test
+    void shouldNotLeaveDuplicateWhenExistingNewDependencyIsAtLowerVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "jakarta.jws",
+            "jakarta.jws-api",
+            "jakarta.xml.ws",
+            "jakarta.xml.ws-api",
+            "4.0.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.jws</groupId>
+                          <artifactId>jakarta.jws-api</artifactId>
+                          <version>3.0.0</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>3.0.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotDeduplicateWhenClassifierDiffers() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.2",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                          <version>1.2.0</version>
+                      </dependency>
                       <dependency>
                           <groupId>jakarta.activation</groupId>
                           <artifactId>jakarta.activation-api</artifactId>
                           <version>1.2.1</version>
+                          <classifier>sources</classifier>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.2</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.1</version>
+                          <classifier>sources</classifier>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldDeduplicateWhenOnlyArtifactIdChanges() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.junit.jupiter",
+            "junit-jupiter-api",
+            null,
+            "junit-jupiter-engine",
+            "5.9.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>5.8.2</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-engine</artifactId>
+                          <version>5.8.2</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-engine</artifactId>
+                          <version>5.9.0</version>
                       </dependency>
                   </dependencies>
               </project>

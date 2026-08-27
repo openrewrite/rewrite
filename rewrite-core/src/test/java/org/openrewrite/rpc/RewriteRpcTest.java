@@ -50,6 +50,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
@@ -198,6 +200,47 @@ class RewriteRpcTest implements RewriteTest {
         assertThat(result.getText()).isEqualTo("Fixed");
     }
 
+    /**
+     * {@link RewriteRpc#evict} drops the tree from both peers and rolls the client's ref maps
+     * back to the pre-file checkpoint.
+     */
+    @SneakyThrows
+    @Test
+    void evictDropsTreeFromBothPeers() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        // High-water before the client fetches anything, so evict rolls back exactly this exchange.
+        int[] checkpoint = client.refCheckpoint();
+
+        // Server holds the tree; client fetches it → both peers cache it.
+        server.localObjects.put(id, original);
+        client.getObject(id, sourceFileType);
+        assertThat(client.localObjects).containsKey(id);
+        assertThat(client.remoteObjects).containsKey(id);
+        assertThat(server.localObjects).containsKey(id);
+        assertThat(server.remoteObjects).containsKey(id);
+
+        client.evict(id, checkpoint[0], checkpoint[1]);
+
+        // Client cleared synchronously, including refs rolled back to the checkpoint.
+        assertThat(client.localObjects).doesNotContainKey(id);
+        assertThat(client.remoteObjects).doesNotContainKey(id);
+        assertThat(client.remoteRefs.keySet()).allMatch(ref -> ref <= checkpoint[1]);
+
+        // The Evict notification is fire-and-forget; wait for the server to apply it.
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (server.localObjects.containsKey(id) && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertThat(server.localObjects).doesNotContainKey(id);
+        assertThat(server.remoteObjects).doesNotContainKey(id);
+    }
+
     @DocumentExample
     @Test
     void sendReceiveIdempotence() {
@@ -207,6 +250,25 @@ class RewriteRpcTest implements RewriteTest {
               @SneakyThrows
               public Tree preVisit(Tree tree, ExecutionContext ctx) {
                   Tree t = client.visit((SourceFile) tree, ChangeText.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return requireNonNull(t);
+              }
+          })),
+          text(
+            "Hello Jon!",
+            "Hello World!"
+          )
+        );
+    }
+
+    @Test
+    void nestedVisitBackToRequestOriginator() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = client.visit((SourceFile) tree, DispatchBackToOriginator.class.getName(), 0);
                   stopAfterPreVisit();
                   return requireNonNull(t);
               }
@@ -247,8 +309,8 @@ class RewriteRpcTest implements RewriteTest {
     @Test
     void dataTableStoreConfigurationCrossesRpc(@TempDir Path tmp) {
         client.dataTableStore(new CsvDataTableStore(tmp,
-          java.util.Collections.singletonMap("repositoryOrigin", "github.com/acme/example"),
-          java.util.Collections.emptyMap()));
+          singletonMap("repositoryOrigin", "github.com/acme/example"),
+          emptyMap()));
 
         // A trivial remote visit triggers the lazy SetDataTableStore handshake.
         rewriteRun(
@@ -319,6 +381,75 @@ class RewriteRpcTest implements RewriteTest {
           text(
             "hi",
             "hello"
+          )
+        );
+    }
+
+    /**
+     * A composite whose recipe list yields multiple instances of the same recipe class with
+     * different option values must keep each prepared child a distinct instance with its own
+     * options, rather than collapsing them.
+     */
+    @Test
+    void compositeWithSameTypeChildrenPreservesDistinctOptions() {
+        Recipe composite = client.prepareRecipe(
+          "org.openrewrite.rpc.RewriteRpcTest$RecipeWithSameTypeChildren", Map.of());
+
+        List<Recipe> children = composite.getRecipeList();
+        assertThat(children).hasSize(3);
+
+        assertThat(children.stream().map(System::identityHashCode).distinct().count())
+          .describedAs("Each prepared child must be its own instance, not a shared/collapsed one")
+          .isEqualTo(3);
+
+        List<String> toTexts = children.stream()
+          .map(child -> child.getDescriptor().getOptions().stream()
+            .filter(o -> "toText".equals(o.getName()))
+            .map(OptionDescriptor::getValue)
+            .map(String::valueOf)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Child is missing its toText option")))
+          .toList();
+        assertThat(toTexts)
+          .describedAs("Each same-type child must retain its own distinct option value")
+          .containsExactly("a", "b", "c");
+    }
+
+    /**
+     * Each same-type child must actually run with its own option, so all of "a", "b", "c"
+     * appear among the recipes that made changes (a collapse would leave the later
+     * applications as no-ops and attribute only one).
+     */
+    @Test
+    void compositeWithSameTypeChildrenAppliesEachDistinctOption() {
+        rewriteRun(
+          spec -> spec
+            .recipe(client.prepareRecipe(
+              "org.openrewrite.rpc.RewriteRpcTest$RecipeWithSameTypeChildren", Map.of()))
+            .validateRecipeSerialization(false)
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          text(
+            "hello",
+            "c",
+            spec -> spec.afterRecipe(result -> {
+                RecipesThatMadeChanges marker = result.getMarkers()
+                  .findFirst(RecipesThatMadeChanges.class)
+                  .orElseThrow(() -> new AssertionError("Expected RecipesThatMadeChanges marker"));
+
+                List<String> executedToTexts = marker.getRecipes().stream()
+                  .map(stack -> stack.get(stack.size() - 1))
+                  .filter(leaf -> "org.openrewrite.text.ChangeText".equals(leaf.getName()))
+                  .map(leaf -> leaf.getDescriptor().getOptions().stream()
+                    .filter(o -> "toText".equals(o.getName()))
+                    .map(OptionDescriptor::getValue)
+                    .map(String::valueOf)
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Executed ChangeText is missing its toText option")))
+                  .toList();
+                assertThat(executedToTexts)
+                  .describedAs("All three same-type children must execute, each with its own distinct option")
+                  .containsExactlyInAnyOrder("a", "b", "c");
+            })
           )
         );
     }
@@ -527,6 +658,14 @@ class RewriteRpcTest implements RewriteTest {
         }
     }
 
+    static class DispatchBackToOriginator extends PlainTextVisitor<Integer> {
+        @Override
+        public PlainText visitText(PlainText text, Integer p) {
+            RewriteRpc serving = requireNonNull(RewriteRpc.current(), "expected the serving RewriteRpc to be discoverable");
+            return (PlainText) requireNonNull(serving.visit(text, ChangeText.class.getName(), p));
+        }
+    }
+
     @SuppressWarnings("unused")
     public static class ThrowingRpcRecipe extends Recipe {
         @Override
@@ -565,6 +704,26 @@ class RewriteRpcTest implements RewriteTest {
         @Override
         public void buildRecipeList(RecipeList recipes) {
             recipes.recipe(new org.openrewrite.text.ChangeText("hello"));
+        }
+    }
+
+    @SuppressWarnings("unused")
+    static class RecipeWithSameTypeChildren extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "A recipe with same-type children carrying distinct options";
+        }
+
+        @Override
+        public String getDescription() {
+            return "To verify each RPC-prepared child of the same recipe type keeps its own options.";
+        }
+
+        @Override
+        public void buildRecipeList(RecipeList recipes) {
+            recipes.recipe(new org.openrewrite.text.ChangeText("a"));
+            recipes.recipe(new org.openrewrite.text.ChangeText("b"));
+            recipes.recipe(new org.openrewrite.text.ChangeText("c"));
         }
     }
 

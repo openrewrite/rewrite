@@ -20,12 +20,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -34,16 +32,12 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.trait.Trait;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
 
@@ -97,11 +91,6 @@ public class ChangeManagedDependency extends Recipe {
     @Nullable
     String versionPattern;
 
-    // Individual dependencies tend to appear in several places within a given dependency graph.
-    // Minimize the number of allocations by caching the updated dependencies.
-    transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new ConcurrentHashMap<>();
-    transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new ConcurrentHashMap<>();
-
     String displayName = "Change Gradle managed dependency";
 
     @Override
@@ -149,7 +138,7 @@ public class ChangeManagedDependency extends Recipe {
                     Optional<GradleProject> maybeGp = tree.getMarkers().findFirst(GradleProject.class);
                     if (maybeGp.isPresent()) {
                         GradleProject gp = maybeGp.get();
-                        t = t.withMarkers(t.getMarkers().setByType(updateGradleModel(gp)));
+                        t = t.withMarkers(t.getMarkers().setByType(updateGradleModel(gp, ctx)));
                     }
                     JavaSourceSet.markDirty(ctx, (SourceFile) t);
                 }
@@ -167,57 +156,22 @@ public class ChangeManagedDependency extends Recipe {
                         .orElse(m);
             }
 
-            private GradleProject updateGradleModel(GradleProject gp) {
-                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-                Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
-                boolean anyChanged = false;
-                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                    GradleDependencyConfiguration newGdc = gdc;
-                    newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        assert requested != null;
-                        if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
-                            requested = updatedRequested.computeIfAbsent(requested, r -> {
-                                GroupArtifactVersion gav = r.getGav();
-                                if (newGroupId != null) {
-                                    gav = gav.withGroupId(newGroupId);
-                                }
-                                if (newArtifactId != null) {
-                                    gav = gav.withArtifactId(newArtifactId);
-                                }
-                                if (gav != r.getGav()) {
-                                    r = r.withGav(gav);
-                                }
-                                return r;
-                            });
-                        }
-                        return requested;
-                    }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
-                        assert resolved != null;
-                        if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
-                            resolved = updatedResolved.computeIfAbsent(resolved, r -> {
-                                ResolvedGroupArtifactVersion gav = r.getGav();
-                                if (newGroupId != null) {
-                                    gav = gav.withGroupId(newGroupId);
-                                }
-                                if (newArtifactId != null) {
-                                    gav = gav.withArtifactId(newArtifactId);
-                                }
-                                if (gav != r.getGav()) {
-                                    r = r.withGav(gav);
-                                }
-                                return r;
-                            });
-                        }
-                        return resolved;
-                    }));
-                    anyChanged |= newGdc != gdc;
-                    newNameToConfiguration.put(newGdc.getName(), newGdc);
-                }
-                if (anyChanged) {
-                    gp = gp.withNameToConfiguration(newNameToConfiguration);
-                }
-                return gp;
+            private GradleProject updateGradleModel(GradleProject gp, ExecutionContext ctx) {
+                return gp.mapConfigurations(
+                        conf -> conf.mapDependencies(requested -> {
+                            if (!depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
+                                return requested;
+                            }
+                            GroupArtifactVersion gav = requested.getGav();
+                            if (newGroupId != null) {
+                                gav = gav.withGroupId(newGroupId);
+                            }
+                            if (newArtifactId != null) {
+                                gav = gav.withArtifactId(newArtifactId);
+                            }
+                            return gav == requested.getGav() ? requested : requested.withGav(gav);
+                        }, gp.getMavenRepositories(), ctx),
+                        ctx);
             }
         });
     }

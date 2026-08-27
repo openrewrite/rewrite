@@ -21,6 +21,7 @@ import {SourceFile} from "../../tree";
 import {Parsers} from "../../parser";
 import {withMetrics} from "./metrics";
 import {replaceMarkerByKind} from "../../markers";
+import {setLastParsedProject} from "./last-parsed-project";
 
 /**
  * Response item with object ID and source file type for proper deserialization.
@@ -71,15 +72,15 @@ export class ParseProject {
                     context.target = request.projectPath;
 
                     // Dynamic import to break circular dependency
-                    const {DEFAULT_EXCLUSIONS, ProjectParser} = await import("../../javascript/index.js");
+                    const {ProjectParser} = await import("../../javascript/index.js");
 
                     const projectPath = path.resolve(request.projectPath);
-                    const exclusions = request.exclusions ?? DEFAULT_EXCLUSIONS;
+                    setLastParsedProject(projectPath);
                     // Use relativeTo if specified, otherwise default to projectPath
                     const relativeTo = request.relativeTo ? path.resolve(request.relativeTo) : projectPath;
 
-                    // Use ProjectParser for file discovery and Prettier detection
-                    const projectParser = new ProjectParser(projectPath, {exclusions});
+                    // Undefined when unset, so the parser can match exclusions to its discovery mode.
+                    const projectParser = new ProjectParser(projectPath, {exclusions: request.exclusions});
                     const discovered = await projectParser.discoverFiles();
                     const prettierLoader = await projectParser.createPrettierLoader();
 
@@ -230,6 +231,17 @@ export class ParseProject {
                                 });
                             }
                         }
+                    }
+
+                    // Unparseable JS/TS files (currently: too large) are recorded as
+                    // Quarks. The Java side builds the Quark locally from sourcePath,
+                    // so no GetObject round-trip and no content crosses the wire.
+                    for (const filePath of discovered.unparseableFiles) {
+                        resultItems.push({
+                            id: randomId(),
+                            sourceFileType: "org.openrewrite.quark.Quark", // break cycle
+                            sourcePath: path.relative(relativeTo, filePath)
+                        });
                     }
 
                     // Parse other YAML files

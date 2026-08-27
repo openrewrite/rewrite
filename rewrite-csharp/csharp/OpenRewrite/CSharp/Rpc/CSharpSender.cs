@@ -1088,5 +1088,29 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             }
             return base.Visit(tree, q);
         }
+
+        public override void VisitSpace(Space space, RpcSendQueue q)
+        {
+            q.GetAndSendList(space, s => s.Comments,
+                c => c is CsDocComment.DocComment dc ? dc.Id : (object)(c.Text + c.Suffix),
+                c =>
+                {
+                    if (c is CsDocComment.DocComment dc)
+                    {
+                        // A structured doc comment is a proper tree, keyed by its id and
+                        // decomposed over RPC (mirroring the Java CSharpSender).
+                        new CsDocCommentSender(_outer).Visit(dc, q);
+                    }
+                    else
+                    {
+                        q.GetAndSend(c, cm => cm.Multiline);
+                        q.GetAndSend(c, cm => cm.Text);
+                        q.GetAndSend(c, cm => cm.Suffix);
+                        // C# Comment has no Markers; send empty Markers for protocol compatibility.
+                        q.GetAndSend(c, _ => Markers.Empty);
+                    }
+                });
+            q.GetAndSend(space, s => s.Whitespace);
+        }
     }
 }

@@ -36,9 +36,9 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -96,6 +96,15 @@ class RewriteTestTest implements RewriteTest {
             spec -> spec.recipe(new GeneratesExistingFile()),
             text("existing content", spec -> spec.path("existing.txt"))));
         assertThat(e).hasStackTraceContaining("Recipe generated a source file that already exists in the source set");
+    }
+
+    @Test
+    void generatesFileWithInvalidPath() {
+        AssertionError e = assertThrows(AssertionError.class,
+          () -> rewriteRun(
+            spec -> spec.recipe(new GeneratesFileWithInvalidPath()),
+            text("hello")));
+        assertThat(e).hasStackTraceContaining("Recipe generated a source file with an invalid path");
     }
 
     @Test
@@ -431,6 +440,34 @@ class GeneratesExistingFile extends ScanningRecipe<AtomicBoolean> {
 
 @EqualsAndHashCode(callSuper = false)
 @Value
+class GeneratesFileWithInvalidPath extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Generates a file with an invalid path";
+
+    String description = "A recipe that generates a source file whose path points outside the source root, to show " +
+      "that the test framework helps protect against this mistake.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean acc, ExecutionContext ctx) {
+        return List.of(PlainText.builder()
+          .text("outside")
+          .sourcePath(Path.of("../outside.txt"))
+          .build());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
 class RecipeWithNoOptions extends Recipe {
     String displayName = "Recipe with no options";
     String description = "Has no configurable options at all.";
@@ -462,9 +499,9 @@ class GeneratesCompilationUnitMissingTypes extends ScanningRecipe<AtomicBoolean>
           .map(cu -> (J.CompilationUnit) cu)
           .map(cu -> cu.withClasses(cu.getClasses().stream()
             .map(c -> c.withType(null))
-            .collect(Collectors.toList())))
+            .collect(toList())))
           .map(cu -> (SourceFile) cu.withSourcePath(Path.of("A.java")))
-          .collect(Collectors.toList());
+          .collect(toList());
     }
 }
 

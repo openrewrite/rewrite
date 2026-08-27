@@ -1,0 +1,530 @@
+from rewrite.rpc.facade import Facade
+
+
+class _FakeChildren:
+    def __init__(self):
+        self.calls = []
+        self.data_table_store = None
+        self._owner = {"pkg.R": "pkg"}
+
+    def set_data_table_store(self, params):
+        self.data_table_store = params
+
+    def install(self, bundle, spec, force=False, attribution_name=None):
+        self.calls.append(("install", bundle, spec, force, attribution_name))
+        return [{"descriptor": {"name": "pkg.R"}}]
+
+    def resolved_version(self, bundle):
+        return "1.0.5"          # what pip resolved — deliberately != the requested "1.0"
+
+    def marketplace(self):
+        return [{"descriptor": {"name": "pkg.R"}}]
+
+    def owner(self, name):
+        return self._owner.get(name)
+
+    def request(self, bundle, method, params):
+        self.calls.append(("request", bundle, method))
+        if method == "PrepareRecipe":
+            return {
+                "id": "prep-1",
+                "editVisitor": "edit:prep-1",
+                "scanVisitor": "scan:prep-1",
+                "recipeList": [{"id": "prep-2", "editVisitor": "edit:prep-2", "recipeList": []}],
+            }
+        if method == "BatchVisit":
+            # record which visitors this child received, and echo one result per visitor
+            vs = [v["visitor"] for v in params.get("visitors", [])]
+            self.calls.append(("batch", bundle, vs))
+            return {"results": [{"visitor": v} for v in vs]}
+        return {"ok": method}
+
+
+def test_facade_install_marketplace_prepare_visit_generate_routing():
+    children = _FakeChildren()
+    f = Facade(children)
+
+    # install a package spec -> bundle keyed by package name; version reported is the RESOLVED one
+    resp = f.install_recipes({"recipes": {"packageName": "pkg", "version": "1.0"}})
+    assert resp == {"recipesInstalled": 1, "version": "1.0.5"}
+    # registry spec: no force, no attribution override (recipes carry the distribution's own name)
+    assert children.calls[0] == ("install", "pkg", "pkg==1.0", False, None)
+
+    # marketplace served from the merged cache
+    assert f.get_marketplace({}) == [{"descriptor": {"name": "pkg.R"}}]
+
+    # prepare routes to the owning child and registers visitor/recipe ownership (root + nested)
+    prep = f.prepare_recipe({"id": "pkg.R"})
+    assert prep["id"] == "prep-1"
+
+    # visit routes by visitor name to the child that prepared it (nested included)
+    assert f.visit({"visitor": "edit:prep-1"}) == {"ok": "Visit"}
+    assert f.visit({"visitor": "edit:prep-2"}) == {"ok": "Visit"}
+
+    # generate routes by prepared-recipe id
+    assert f.generate({"id": "prep-2"}) == {"ok": "Generate"}
+
+    # SetDataTableStore is broadcast to the children (recipes emit rows there), not kept on the facade
+    assert f.set_data_table_store({"kind": "CSV", "outputDir": "/out"}) is True
+    assert children.data_table_store == {"kind": "CSV", "outputDir": "/out"}
+
+
+def test_facade_installs_a_local_path_by_resolved_distribution_name(tmp_path):
+    src = tmp_path / "my-recipes"
+    src.mkdir()
+    (src / "pyproject.toml").write_text('[project]\nname = "my-local-recipes"\nversion = "0.1.0"\n')
+
+    children = _FakeChildren()
+    f = Facade(children)
+    resp = f.install_recipes({"recipes": str(src)})
+
+    # filtered by the resolved dist name, but force-reinstalled and attributed to the supplied path
+    assert children.calls[0] == ("install", "my-local-recipes", str(src), True, str(src))
+    assert resp == {"recipesInstalled": 1, "version": "1.0.5"}
+
+
+def test_facade_rejects_a_local_path_without_a_resolvable_name(tmp_path):
+    empty = tmp_path / "no-metadata"
+    empty.mkdir()
+    f = Facade(_FakeChildren())
+    try:
+        f.install_recipes({"recipes": str(empty)})
+        assert False, "expected a ValueError for an unresolvable local path"
+    except ValueError as e:
+        assert "distribution name" in str(e)
+
+
+def test_facade_batch_visit_splits_consecutive_runs_across_bundles():
+    children = _FakeChildren()
+    f = Facade(children)
+    # visitors owned by two different bundles; the scheduler batches them across recipes
+    f._bundle_by_visitor.update({"edit:a1": "A", "edit:a2": "A", "edit:b1": "B"})
+
+    resp = f.batch_visit({"treeId": "T", "visitors": [
+        {"visitor": "edit:a1"}, {"visitor": "edit:a2"}, {"visitor": "edit:b1"}]})
+
+    # per-visitor results returned in the original order
+    assert resp == {"results": [{"visitor": "edit:a1"}, {"visitor": "edit:a2"}, {"visitor": "edit:b1"}]}
+    # dispatched as maximal consecutive same-owner runs: A gets [a1,a2], then B gets [b1]
+    batches = [c for c in children.calls if c[0] == "batch"]
+    assert batches == [("batch", "A", ["edit:a1", "edit:a2"]), ("batch", "B", ["edit:b1"])]
+
+
+def test_facade_batch_visit_re_splits_when_owners_alternate():
+    children = _FakeChildren()
+    f = Facade(children)
+    f._bundle_by_visitor.update({"edit:a": "A", "edit:b": "B"})
+    f.batch_visit({"treeId": "T", "visitors": [
+        {"visitor": "edit:a"}, {"visitor": "edit:b"}, {"visitor": "edit:a"}]})
+    batches = [c for c in children.calls if c[0] == "batch"]
+    assert batches == [("batch", "A", ["edit:a"]), ("batch", "B", ["edit:b"]), ("batch", "A", ["edit:a"])]
+
+
+class _EditingChildren(_FakeChildren):
+    """Every BatchVisit reports that its visitors modified the tree."""
+    def __init__(self, modified=True):
+        super().__init__()
+        self._modified = modified
+
+    def request(self, bundle, method, params):
+        if method == "BatchVisit":
+            vs = [v["visitor"] for v in params.get("visitors", [])]
+            self.calls.append(("batch", bundle, vs))
+            return {"results": [{"visitor": v, "modified": self._modified} for v in vs]}
+        if method == "Visit":
+            self.calls.append(("visit", bundle, params.get("visitor")))
+            return {"modified": self._modified}
+        return super().request(bundle, method, params)
+
+
+def test_cross_bundle_batch_pulls_each_bundles_edit_into_the_hub_in_order():
+    children = _EditingChildren()
+    pulls = []
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f._bundle_by_visitor.update({"edit:a": "A", "edit:b": "B"})
+
+    f.batch_visit({"treeId": "T", "sourceFileType": "py",
+                   "visitors": [{"visitor": "edit:a"}, {"visitor": "edit:b"}]})
+
+    # dispatched as consecutive same-owner runs
+    assert [c for c in children.calls if c[0] == "batch"] == [
+        ("batch", "A", ["edit:a"]), ("batch", "B", ["edit:b"])]
+    # each run's edit is pulled into the facade's tree in order, so B starts from A's result
+    assert pulls == [("A", "T", "py"), ("B", "T", "py")]
+
+
+def test_single_visit_pulls_its_edit_into_the_hub():
+    children = _EditingChildren()
+    pulls = []
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f._bundle_by_visitor["edit:a"] = "A"
+
+    f.visit({"visitor": "edit:a", "treeId": "T", "sourceFileType": "py"})
+
+    assert pulls == [("A", "T", "py")]
+
+
+def test_single_visit_does_not_pull_when_nothing_changed():
+    children = _EditingChildren(modified=False)
+    pulls = []
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f._bundle_by_visitor["edit:a"] = "A"
+
+    f.visit({"visitor": "edit:a", "treeId": "T", "sourceFileType": "py"})
+
+    assert pulls == []
+
+
+def test_single_bundle_batch_still_pulls_its_edit_into_the_hub():
+    children = _EditingChildren()
+    pulls = []
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f._bundle_by_visitor.update({"edit:a1": "A", "edit:a2": "A"})
+
+    f.batch_visit({"treeId": "T", "sourceFileType": "py",
+                   "visitors": [{"visitor": "edit:a1"}, {"visitor": "edit:a2"}]})
+
+    # one run, but the facade still owns the tree so it pulls the result back
+    assert [c for c in children.calls if c[0] == "batch"] == [("batch", "A", ["edit:a1", "edit:a2"])]
+    assert pulls == [("A", "T", "py")]
+
+
+def test_unmodified_run_is_not_pulled():
+    children = _EditingChildren(modified=False)
+    pulls = []
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f._bundle_by_visitor.update({"edit:a": "A"})
+
+    f.batch_visit({"treeId": "T", "visitors": [{"visitor": "edit:a"}]})
+
+    assert pulls == []  # nothing changed -> nothing to fetch back
+
+
+def test_handle_request_answers_print_from_the_facades_own_tree(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+
+    class _FakeFacade:
+        def get_marketplace(self, params): ...
+        def install_recipes(self, params): ...
+        def prepare_recipe(self, params): ...
+        def set_data_table_store(self, params): ...
+        def visit(self, params): ...
+        def batch_visit(self, params): ...
+        def generate(self, params): ...
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _FakeFacade())
+    monkeypatch.setattr(server, "handle_print", lambda p: "local-print")
+
+    # a tree the facade already holds is served from its own copy, no acquire needed
+    acquired = []
+    monkeypatch.setattr(server, "_hub_acquire", lambda oid, sft: acquired.append(oid))
+    monkeypatch.setitem(server._hub_tree, "T1", object())
+    assert server.handle_request("Print", {"treeId": "T1", "sourceFileType": "py"}) == "local-print"
+    assert acquired == []
+
+    # one it doesn't hold yet is acquired here, at the top level, then served locally
+    assert server.handle_request("Print", {"treeId": "other", "sourceFileType": "py"}) == "local-print"
+    assert acquired == ["other"]
+
+
+def test_handle_request_does_not_acquire_non_tree_objects(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+
+    class _FakeFacade:
+        def get_marketplace(self, params): ...
+        def install_recipes(self, params): ...
+        def prepare_recipe(self, params): ...
+        def set_data_table_store(self, params): ...
+        def visit(self, params): ...
+        def batch_visit(self, params): ...
+        def generate(self, params): ...
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _FakeFacade())
+    monkeypatch.setattr(server, "handle_get_object", lambda p: "local-get")
+
+    acquired = []
+    monkeypatch.setattr(server, "_hub_acquire", lambda oid, sft: acquired.append(oid))
+
+    # The execution context: fetched by id, no sourceFileType.
+    assert server.handle_request("GetObject", {"id": "ctx-1"}) == "local-get"
+    assert acquired == []
+
+    # A tree carries its type and is still acquired.
+    assert server.handle_request("GetObject", {"id": "tree-1", "sourceFileType": "py"}) == "local-get"
+    assert acquired == ["tree-1"]
+
+
+def test_handle_request_routes_to_facade_in_facade_mode(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+
+    routed = {}
+
+    class _FakeFacade:
+        def get_marketplace(self, params):
+            routed["marketplace"] = True
+            return ["facade-rows"]
+
+        def install_recipes(self, params):
+            routed["install"] = params
+            return {"recipesInstalled": 0, "version": None}
+
+        def prepare_recipe(self, params): ...
+        def batch_visit(self, params): ...
+        def set_data_table_store(self, params):
+            routed["store"] = params
+            return True
+        def visit(self, params): ...
+        def generate(self, params): ...
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _FakeFacade())
+
+    assert server.handle_request("GetMarketplace", {}) == ["facade-rows"]
+    # SetDataTableStore routes to the facade (which broadcasts to children) in facade mode
+    assert server.handle_request("SetDataTableStore", {"kind": "CSV"}) is True
+    assert routed["store"] == {"kind": "CSV"}
+    assert routed.get("marketplace") is True
+
+    r = {"recipes": {"packageName": "pkg"}}
+    assert server.handle_request("InstallRecipes", r) == {"recipesInstalled": 0, "version": None}
+    assert routed["install"] == r
+
+
+def test_hub_release_rolls_each_childs_ref_table_back_in_lockstep():
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    server._hub_tree["T"] = object()
+    server._hub_served[("A", "T")] = object()
+    # child A had 2 refs before this file, then the file introduced refs 3 and 4
+    refs = server._hub_send_refs["A"] = ReferenceMap()
+    survivors = [object(), object()]
+    for obj in survivors + [object(), object()]:
+        refs.create(obj)
+    server._hub_send_checkpoint[("A", "T")] = 2
+
+    server._hub_release("T")
+
+    # only the refs this file introduced are dropped; the pre-file ones survive
+    assert [refs.get(obj) for obj in survivors] == [1, 2]
+    assert len(refs) == 2
+    assert refs.snapshot() == 2                     # counter rewound so the next file re-ADDs
+    assert "T" not in server._hub_tree
+    assert ("A", "T") not in server._hub_served
+    assert ("A", "T") not in server._hub_send_checkpoint
+
+
+class _PreconditionChildren(_FakeChildren):
+    def request(self, bundle, method, params):
+        if method == "PrepareRecipe":
+            return {
+                "id": "prep-1",
+                "editVisitor": "edit:prep-1",
+                "editPreconditions": [{"visitorName": "edit:precond-1", "visitorOptions": None}],
+                "scanPreconditions": [{"visitorName": "scan:precond-2", "visitorOptions": None}],
+                "recipeList": [],
+            }
+        return super().request(bundle, method, params)
+
+
+def test_precondition_visitors_route_to_the_child_that_prepared_them():
+    children = _PreconditionChildren()
+    f = Facade(children)
+    f.prepare_recipe({"id": "pkg.R"})
+
+    assert f.visit({"visitor": "edit:precond-1"}) == {"ok": "Visit"}
+    assert f.visit({"visitor": "scan:precond-2"}) == {"ok": "Visit"}
+
+
+# --- built-in (service) visitors -------------------------------------------------------------
+#
+# Built-in visitors like AutoFormatVisitor/AddImport belong to no recipe bundle, so instead of
+# failing with "No child owns visitor" the facade runs them itself against the working tree.
+
+_AUTO_FORMAT = "org.openrewrite.python.format.AutoFormatVisitor"
+_ADD_IMPORT = "org.openrewrite.python.AddImport"
+
+
+def _local_facade(children, ran):
+    return Facade(
+        children,
+        local_visit=lambda items, params: [
+            ran.append((i["visitor"], i.get("visitorOptions"), params.get("treeId")))
+            or {"modified": True, "deleted": False, "hasNewMessages": False, "searchResultIds": []}
+            for i in items
+        ],
+        is_local_visitor=lambda name: name in (_AUTO_FORMAT, _ADD_IMPORT),
+    )
+
+
+def test_single_visit_of_a_built_in_visitor_runs_on_the_facade():
+    children = _EditingChildren()
+    ran = []
+    f = _local_facade(children, ran)
+
+    resp = f.visit({"visitor": _ADD_IMPORT, "treeId": "T", "sourceFileType": "py",
+                    "visitorOptions": {"module": "collections.abc", "name": "Iterable"}})
+
+    assert resp == {"modified": True}
+    # the options reach the visitor, and no child was asked to do anything
+    assert ran == [(_ADD_IMPORT, {"module": "collections.abc", "name": "Iterable"}, "T")]
+    assert children.calls == []
+
+
+def test_batch_visit_interleaves_built_ins_with_bundle_owned_visitors_in_order():
+    children = _EditingChildren()
+    ran = []
+    f = _local_facade(children, ran)
+    f._bundle_by_visitor.update({"edit:a": "A", "edit:b": "B"})
+
+    resp = f.batch_visit({"treeId": "T", "sourceFileType": "py", "visitors": [
+        {"visitor": "edit:a"}, {"visitor": _AUTO_FORMAT}, {"visitor": "edit:b"}]})
+
+    # one result per visitor, in the order the host asked for them
+    assert len(resp["results"]) == 3
+    assert [r.get("visitor") for r in resp["results"]] == ["edit:a", None, "edit:b"]
+    # the built-in ran on the facade, between the two children
+    assert ran == [(_AUTO_FORMAT, None, "T")]
+    assert [c for c in children.calls if c[0] == "batch"] == [
+        ("batch", "A", ["edit:a"]), ("batch", "B", ["edit:b"])]
+
+
+def _parse_python(source: str):
+    import ast
+    from rewrite.python._parser_visitor import ParserVisitor
+    return ParserVisitor(source, None, None).visit_Module(ast.parse(source))
+
+
+def _print_python(cu) -> str:
+    from rewrite.python.printer import PythonPrinter, PrintOutputCapture
+    return PythonPrinter().print(cu, PrintOutputCapture(None))
+
+
+def _isolated_hub(monkeypatch, server):
+    """Fresh hub state so this test neither sees nor leaves module-global tables."""
+    for name in ("_hub_tree", "_hub_served", "_hub_send_refs",
+                 "_hub_send_checkpoint", "local_objects"):
+        monkeypatch.setattr(server, name, {})
+
+
+def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_child(monkeypatch):
+    """A built-in visitor runs against the facade's own tree, so the only way its edit reaches a
+    child is the next _hub_serve_child diff. That works because _hub_local_visit advances _hub_tree
+    but deliberately leaves _hub_served alone: _hub_served is the "before" each child's diff is
+    generated against, so keeping it at the pre-edit tree is what makes the delta include the edit.
+    If it were updated here the facade would think the child already had this tree and serve a
+    no-op, and the child would visit a stale file."""
+    import rewrite.rpc.server as server
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft, bundle = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit", "pkg"
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: cu if obj_id == tree_id else None)
+
+    # The facade fetches the tree from Java once and owns it from then on.
+    assert server._hub_acquire(tree_id, sft) is cu
+
+    # The child is served the pre-edit tree in full.
+    full = server._hub_serve_child(bundle, tree_id, sft)
+    assert server._hub_served[(bundle, tree_id)] is cu
+
+    results = server._hub_local_visit(
+        [{"visitor": _ADD_IMPORT,
+          "visitorOptions": {"module": "collections.abc", "name": "Iterable",
+                             "only_if_referenced": False}}],
+        {"treeId": tree_id, "sourceFileType": sft})
+
+    assert results == [{"modified": True, "deleted": False,
+                        "hasNewMessages": False, "searchResultIds": []}]
+
+    # The facade's tree advanced...
+    edited = server._hub_tree[tree_id]
+    assert edited is not cu
+    assert _print_python(edited) == "from collections.abc import Iterable\nx = 1\n"
+    assert server.local_objects[tree_id] is edited
+    # ...while what the child was last served did not, so the next diff still has an edit to carry.
+    assert server._hub_served[(bundle, tree_id)] is cu
+
+    delta = server._hub_serve_child(bundle, tree_id, sft)
+    # A diff against what the child already holds (CHANGE at the root, not a second full ADD)
+    # carrying the added import and nothing else.
+    assert full[0]["state"] == "ADD" and delta[0]["state"] == "CHANGE"
+    added = [d.get("valueType") for d in delta if d["state"] == "ADD"]
+    assert "org.openrewrite.python.tree.Py$MultiImport" in added
+    values = [d.get("value") for d in delta]
+    assert "collections" in values and "abc" in values and "Iterable" in values
+    assert server._hub_served[(bundle, tree_id)] is edited
+
+    # And with nothing further edited, the same child is served a pure no-op — which is what the
+    # assertions above would degrade into if _hub_served were advanced by the local visit.
+    noop = server._hub_serve_child(bundle, tree_id, sft)
+    assert {d["state"] for d in noop} == {"NO_CHANGE", "END_OF_OBJECT"}
+
+
+def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monkeypatch):
+    """A built-in visitor may delete the file outright. The facade has to let go of it the same way
+    a broadcast Evict would: drop the tree, forget what each child was served, and rewind that
+    child's send-ref numbering — otherwise the next file reuses ref numbers the child no longer
+    holds. Nothing after the delete may run, and the child must be told DELETE, not served a
+    resurrected tree."""
+    import rewrite.rpc.server as server
+    from rewrite.python.visitor import PythonVisitor
+
+    ran_after = []
+
+    class _Delete(PythonVisitor):
+        def visit_compilation_unit(self, cu, p):
+            return None
+
+    class _Later(PythonVisitor):
+        def visit_compilation_unit(self, cu, p):
+            ran_after.append(cu)
+            return cu
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft, bundle = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit", "pkg"
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: cu if obj_id == tree_id else None)
+    monkeypatch.setattr(server, "_VISITOR_REGISTRY",
+                        {"Delete": lambda options: _Delete(), "Later": lambda options: _Later()})
+
+    server._hub_acquire(tree_id, sft)
+    server._hub_serve_child(bundle, tree_id, sft)      # child now holds this file and its refs
+    assert server._hub_send_refs[bundle].snapshot() > 0
+
+    results = server._hub_local_visit([{"visitor": "Delete"}, {"visitor": "Later"}],
+                                      {"treeId": tree_id, "sourceFileType": sft})
+
+    # The delete is reported, and it short-circuits the rest of the batch.
+    assert results == [{"modified": True, "deleted": True,
+                        "hasNewMessages": False, "searchResultIds": []}]
+    assert ran_after == []
+
+    # The facade no longer owns the file, and every per-child table it seeded is rolled back.
+    assert tree_id not in server._hub_tree
+    assert (bundle, tree_id) not in server._hub_served
+    assert (bundle, tree_id) not in server._hub_send_checkpoint
+    assert len(server._hub_send_refs[bundle]) == 0
+    assert server._hub_send_refs[bundle].snapshot() == 0
+
+    # So a child asking for it again is told the file is gone rather than served a stale tree.
+    assert server._hub_serve_child(bundle, tree_id, sft) == [
+        {"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+
+
+def test_an_unknown_visitor_is_still_an_error():
+    f = _local_facade(_EditingChildren(), [])
+    try:
+        f.visit({"visitor": "edit:nobody", "treeId": "T"})
+        assert False, "expected a ValueError for a visitor no child owns"
+    except ValueError as e:
+        assert "No child owns visitor" in str(e)

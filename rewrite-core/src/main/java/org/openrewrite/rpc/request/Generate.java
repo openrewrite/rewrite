@@ -70,7 +70,7 @@ public class Generate implements RpcRequest {
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
                 Object acc = scanningRecipe.getAccumulator(preparedRecipes.getRecipeCursors().computeIfAbsent(recipe,
                         r -> new Cursor(null, Cursor.ROOT_VALUE)), ctx);
-                Collection<? extends SourceFile> generated = scanningRecipe.generate(acc, ctx);
+                Collection<? extends SourceFile> generated = scanningRecipe.generate(acc, emptyList(), ctx);
 
                 GenerateResponse response = new GenerateResponse(
                         new ArrayList<>(generated.size()),

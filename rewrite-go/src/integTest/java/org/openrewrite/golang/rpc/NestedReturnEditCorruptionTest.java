@@ -28,6 +28,7 @@ import org.openrewrite.test.TypeValidation;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.openrewrite.golang.Assertions.go;
@@ -180,6 +181,62 @@ class NestedReturnEditCorruptionTest implements RewriteTest {
                         \t\treturn b
                         \t}
                         \treturn 0
+                        }
+                        """
+                )
+        );
+    }
+
+    private static org.openrewrite.Recipe lowercaseErrorfFormat() {
+        return toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if ("Errorf".equals(m.getSimpleName()) && m.getArguments().size() == 3 &&
+                    m.getArguments().get(0) instanceof J.Literal lit && lit.getValue() instanceof String s &&
+                    s.startsWith("Expected error")) {
+                    String replaced = "expected error" + s.substring("Expected error".length());
+                    J.Literal newLit = lit.withValue(replaced).withValueSource("\"" + replaced + "\"");
+                    return m.withArguments(List.of(newLit, m.getArguments().get(1), m.getArguments().get(2)));
+                }
+                return m;
+            }
+        });
+    }
+
+    @Test
+    void editCaseBodyStatementKeepsSiblingFields() {
+        rewriteRun(
+                spec -> spec.recipe(lowercaseErrorfFormat()),
+                go(
+                        """
+                        package main
+
+                        func TestRun(t *T) {
+                        \tfor _, tc := range testcases {
+                        \t\terr := c.Execute()
+                        \t\tswitch {
+                        \t\tcase err == nil && len(tc.expectErr) > 0:
+                        \t\t\tt.Errorf("Expected error %q but got nil", tc.expectErr)
+                        \t\tcase err != nil && err.Error() != tc.expectErr:
+                        \t\t\tt.Errorf("Expected error %q but got %q", tc.expectErr, err)
+                        \t\t}
+                        \t}
+                        }
+                        """,
+                        """
+                        package main
+
+                        func TestRun(t *T) {
+                        \tfor _, tc := range testcases {
+                        \t\terr := c.Execute()
+                        \t\tswitch {
+                        \t\tcase err == nil && len(tc.expectErr) > 0:
+                        \t\t\tt.Errorf("Expected error %q but got nil", tc.expectErr)
+                        \t\tcase err != nil && err.Error() != tc.expectErr:
+                        \t\t\tt.Errorf("expected error %q but got %q", tc.expectErr, err)
+                        \t\t}
+                        \t}
                         }
                         """
                 )

@@ -92,20 +92,19 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.ParseErrorVisitor",
             "org.openrewrite.PrintOutputCapture",
             "org.openrewrite.ipc.http.HttpSender",
+            "org.openrewrite.golang.GoModVisitor",
+            "org.openrewrite.golang.GoSumVisitor",
             "org.openrewrite.gradle.attributes.Category",
             "org.openrewrite.gradle.attributes.ProjectAttribute",
             "org.openrewrite.java.JavadocVisitor",
             "org.openrewrite.java.JavaParser",
             "org.openrewrite.java.Java17Parser",
+            "org.openrewrite.java.AnnotationMatcher",
             "org.openrewrite.java.MethodMatcher",
             "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
-            "org.openrewrite.java.TypeNameMatcher",
-            // JavaSourceSet#getTypeFactory crosses the recipe/parent classloader
-            // boundary when JavaTemplate reads it from the enclosing source file's
-            // marker; the interface must be shared so the cast in JavaTemplateParser
-            // succeeds.
             "org.openrewrite.java.internal.JavaTypeFactory",
+            "org.openrewrite.java.service",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
             "org.openrewrite.maven.MavenExecutionContextView",

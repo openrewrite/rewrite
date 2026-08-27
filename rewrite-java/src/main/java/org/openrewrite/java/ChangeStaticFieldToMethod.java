@@ -128,7 +128,6 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 }
                 return JavaTemplate
                         .builder(methodInvocationTemplate)
-                        .contextSensitive()
                         .javaParser(JavaParser.fromJavaVersion().dependsOn(methodStub))
                         .imports(newClass)
                         .build();

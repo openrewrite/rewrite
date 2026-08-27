@@ -19,6 +19,7 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.JsonRpcSuccess;
+import io.moderne.jsonrpc.RawJson;
 import io.moderne.jsonrpc.internal.SnowflakeId;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.NonNull;
@@ -40,8 +41,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -61,6 +64,8 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
  */
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
+    private static final ThreadLocal<@Nullable RewriteRpc> CURRENT = new ThreadLocal<>();
+
     private final JsonRpc jsonRpc;
     private final AtomicInteger batchSize = new AtomicInteger(1000);
     private Duration timeout = Duration.ofSeconds(30);
@@ -74,7 +79,8 @@ public class RewriteRpc {
     /**
      * Keeps track of the local and remote state of objects that are used in
      * visits and other operations for which incremental state sharing is useful
-     * between two processes.
+     * between two processes. Note these do not need to be ConcurrentHashMap as
+     * each RewriteRpc instance is held in its own ThreadLocal in RewriteRpcProcessManager
      */
     @VisibleForTesting
     final Map<String, Object> remoteObjects = new HashMap<>();
@@ -164,9 +170,9 @@ public class RewriteRpc {
             }
             return o;
         };
-        jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
+        jsonRpc.rpc("Visit", new Visit.Handler(this, localObjects, preparedRecipes,
                 getRecipeObject, this::getCursor));
-        jsonRpc.rpc("BatchVisit", new BatchVisit.Handler(localObjects, preparedRecipes,
+        jsonRpc.rpc("BatchVisit", new BatchVisit.Handler(this, localObjects, preparedRecipes,
                 getRecipeObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 getRecipeObject));
@@ -248,8 +254,44 @@ public class RewriteRpc {
                 return true;
             }
         });
+        jsonRpc.rpc("Evict", new JsonRpcMethod<Evict>() {
+            @Override
+            protected Boolean handle(Evict request) {
+                // Inbound side has no per-file checkpoint, so refs are left for Reset.
+                remoteObjects.remove(request.getId());
+                localObjects.remove(request.getId());
+                return true;
+            }
+        });
 
         jsonRpc.bind();
+    }
+
+    /**
+     * The instance the request currently being handled on this thread arrived on, or
+     * {@code null} outside request handling. Lets a visitor dispatch follow-up visits back
+     * to the requesting peer when this process is the spawned server and has no other
+     * handle to it.
+     */
+    public static @Nullable RewriteRpc current() {
+        return CURRENT.get();
+    }
+
+    /**
+     * Runs {@code work} with this instance discoverable via {@link #current()}.
+     */
+    public <T> T withCurrent(Callable<T> work) throws Exception {
+        RewriteRpc previous = CURRENT.get();
+        CURRENT.set(this);
+        try {
+            return work.call();
+        } finally {
+            if (previous == null) {
+                CURRENT.remove();
+            } else {
+                CURRENT.set(previous);
+            }
+        }
     }
 
     public RewriteRpc livenessCheck(Supplier<? extends @Nullable RuntimeException> livenessCheck) {
@@ -323,11 +365,54 @@ public class RewriteRpc {
         remoteLanguages = null;
     }
 
+    /**
+     * Ref high-water marks (send-side count, receive-side max key) captured before a file is
+     * visited so {@link #evict} rolls back exactly that file's refs. Receive-side uses the max
+     * key, not the size, because remote ids may be zero-based.
+     */
+    public int[] refCheckpoint() {
+        int remoteRefsMax = -1;
+        for (Integer ref : remoteRefs.keySet()) {
+            if (ref > remoteRefsMax) {
+                remoteRefsMax = ref;
+            }
+        }
+        return new int[]{localRefs.size(), remoteRefsMax};
+    }
+
+    /**
+     * Drop a file's tree from both peers and roll their refs back to the pre-file checkpoint.
+     * Symmetric by design: dropping the send-side ref forces the next file to re-{@code ADD} the
+     * interned object instead of a {@code REF_USE} the rolled-back receiver would reject. Notified
+     * fire-and-forget — under source-outer iteration the file's transfer is already complete.
+     *
+     * @param localRefsCheckpoint  {@code refCheckpoint()[0]} captured before the file was visited
+     * @param remoteRefsCheckpoint {@code refCheckpoint()[1]} captured before the file was visited
+     */
+    public void evict(String id, int localRefsCheckpoint, int remoteRefsCheckpoint) {
+        jsonRpc.notify(new JsonRpcRequest(null, "Evict", RawJson.of(new Evict(id))));
+
+        remoteObjects.remove(id);
+        localObjects.remove(id);
+
+        localRefs.values().removeIf(ref -> ref > localRefsCheckpoint);
+        remoteRefs.keySet().removeIf(ref -> ref > remoteRefsCheckpoint);
+    }
+
     public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p) {
         return visit(sourceFile, visitorName, p, null);
     }
 
     public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
+        return visit(tree, visitorName, null, p, cursor);
+    }
+
+    /**
+     * Run a remote visitor that takes constructor arguments (e.g. the peer's own {@code AddImport}),
+     * or {@code null} {@code visitorOptions} when it takes none.
+     */
+    public <P> @Nullable Tree visit(Tree tree, String visitorName, @Nullable Map<String, Object> visitorOptions,
+                                    P p, @Nullable Cursor cursor) {
         ensureDataTableStoreSent();
         // Set the local state of this tree, so that when the remote asks for it, we know what to send.
         localObjects.put(tree.getId().toString(), tree);
@@ -337,7 +422,7 @@ public class RewriteRpc {
 
         String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(
                 (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class)).getClass());
-        Supplier<VisitResponse> doSend = () -> send("Visit", new Visit(visitorName, sourceFileType, null,
+        Supplier<VisitResponse> doSend = () -> send("Visit", new Visit(visitorName, sourceFileType, visitorOptions,
                 tree.getId().toString(), pId, cursorIds), VisitResponse.class);
         VisitResponse response = p instanceof ExecutionContext
                 ? RewriteRpcExecutionContextView.view((ExecutionContext) p).withInFlightSlot(doSend)
@@ -683,13 +768,12 @@ public class RewriteRpc {
 
             // future.get(timeout) from a FJP worker triggers ManagedBlocker compensation,
             // which spawns helper threads that can leak per-thread RewriteRpc state.
-            // Poll non-blockingly + Thread.sleep so FJP doesn't compensate.
-            long totalTimeoutMs = timeout.toMillis();
             long pollIntervalMs = 1;
-            long livenessIntervalMs = 500;
-            long elapsedMs = 0;
-            long lastLivenessMs = 0;
-            while (elapsedMs < totalTimeoutMs) {
+            long livenessIntervalNanos = TimeUnit.MILLISECONDS.toNanos(500);
+            long startNanos = System.nanoTime();
+            long deadlineNanos = startNanos + TimeUnit.MILLISECONDS.toNanos(timeout.toMillis());
+            long lastLivenessNanos = startNanos;
+            while (System.nanoTime() < deadlineNanos) {
                 JsonRpcSuccess result = future.getNow(null);
                 if (result != null) {
                     return result.getResult(responseType);
@@ -698,10 +782,10 @@ public class RewriteRpc {
                     return future.get().getResult(responseType);
                 }
                 Thread.sleep(pollIntervalMs);
-                elapsedMs += pollIntervalMs;
-                if (elapsedMs - lastLivenessMs >= livenessIntervalMs) {
+                long nowNanos = System.nanoTime();
+                if (nowNanos - lastLivenessNanos >= livenessIntervalNanos) {
                     checkLiveness();
-                    lastLivenessMs = elapsedMs;
+                    lastLivenessNanos = nowNanos;
                 }
             }
 

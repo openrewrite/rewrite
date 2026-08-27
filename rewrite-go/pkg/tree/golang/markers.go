@@ -24,6 +24,7 @@ import "github.com/google/uuid"
 type GoProject struct {
 	Ident       uuid.UUID
 	ProjectName string
+	ModulePath  string
 }
 
 func (m GoProject) ID() uuid.UUID { return m.Ident }
@@ -46,6 +47,48 @@ func NewSemicolon() Semicolon {
 	return Semicolon{Ident: uuid.New()}
 }
 
-func NewGoProject(projectName string) GoProject {
-	return GoProject{Ident: uuid.New(), ProjectName: projectName}
+func NewGoProject(projectName, modulePath string) GoProject {
+	return GoProject{Ident: uuid.New(), ProjectName: projectName, ModulePath: modulePath}
+}
+
+// Builtin marks a J.MethodInvocation of one of Go's predeclared functions
+// (`len`, `copy`, `append`, ...). They have no signature to attribute, so the
+// marker is what separates them from a call to a user-defined function of the
+// same name. Mirrors org.openrewrite.golang.marker.Builtin.
+type Builtin struct {
+	Ident uuid.UUID
+}
+
+func (m Builtin) ID() uuid.UUID { return m.Ident }
+
+func NewBuiltin() Builtin {
+	return Builtin{Ident: uuid.New()}
+}
+
+// ImplicitForClauses marks a J.ForLoop.Control whose init/update are synthetic
+// J.Empty placeholders (Go's `for cond {}` / `for {}`), so the printer omits
+// them and their `;`. Mirrors org.openrewrite.golang.marker.ImplicitForClauses.
+type ImplicitForClauses struct {
+	Ident uuid.UUID
+}
+
+func (m ImplicitForClauses) ID() uuid.UUID { return m.Ident }
+
+func NewImplicitForClauses() ImplicitForClauses {
+	return ImplicitForClauses{Ident: uuid.New()}
+}
+
+// PartialTypeAttribution marks a CompilationUnit whose package did not
+// type-check completely, so an absent type means "not resolved here" rather
+// than "no such type". Reason names what was lost. Mirrors
+// org.openrewrite.golang.marker.PartialTypeAttribution.
+type PartialTypeAttribution struct {
+	Ident  uuid.UUID
+	Reason string
+}
+
+func (m PartialTypeAttribution) ID() uuid.UUID { return m.Ident }
+
+func NewPartialTypeAttribution(reason string) PartialTypeAttribution {
+	return PartialTypeAttribution{Ident: uuid.New(), Reason: reason}
 }

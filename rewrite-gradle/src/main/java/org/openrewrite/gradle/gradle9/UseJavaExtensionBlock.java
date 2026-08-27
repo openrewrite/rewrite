@@ -50,19 +50,13 @@ public class UseJavaExtensionBlock extends Recipe {
     private static final String SOURCE = "sourceCompatibility";
     private static final String TARGET = "targetCompatibility";
 
-    @Override
-    public String getDisplayName() {
-        return "Move `sourceCompatibility` and `targetCompatibility` into the `java { }` extension block";
-    }
+    final String displayName = "Move `sourceCompatibility` and `targetCompatibility` into the `java { }` extension block";
 
-    @Override
-    public String getDescription() {
-        return "Gradle 9 removed the `JavaPluginConvention` (deprecated in 8.2). Top-level `sourceCompatibility` and " +
-                "`targetCompatibility` assignments in a Groovy build script previously delegated to that convention object " +
-                "and stop working in Gradle 9. Move them into the `java { }` extension block, normalizing values to " +
-                "`JavaVersion.VERSION_<n>` and adding the missing counterpart so both properties are set explicitly. " +
-                "See the [Gradle upgrade guide](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.";
-    }
+    final String description = "Gradle 9 removed the `JavaPluginConvention` (deprecated in 8.2). Top-level `sourceCompatibility` and " +
+            "`targetCompatibility` assignments in a Groovy build script previously delegated to that convention object " +
+            "and stop working in Gradle 9. Move them into the `java { }` extension block, normalizing values to " +
+            "`JavaVersion.VERSION_<n>` and adding the missing counterpart so both properties are set explicitly. " +
+            "See the [Gradle upgrade guide](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -77,8 +71,7 @@ public class UseJavaExtensionBlock extends Recipe {
                 // Top-level `sourceCompatibility` / `targetCompatibility` assignments delegate to the removed
                 // `JavaPluginConvention`; move them into a `java { }` block at the root of the build script.
                 G.CompilationUnit cu = (G.CompilationUnit) visited;
-                List<Statement> mapped = moveCompatibility(cu.getStatements(), ctx);
-                return mapped == cu.getStatements() ? cu : cu.withStatements(mapped);
+                return cu.withStatements(moveCompatibility(cu.getStatements(), ctx));
             }
 
             @Override
@@ -92,8 +85,9 @@ public class UseJavaExtensionBlock extends Recipe {
                 }
                 J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
                 J.Block body = (J.Block) lambda.getBody();
-                List<Statement> mapped = moveCompatibility(body.getStatements(), ctx);
-                if (mapped == body.getStatements()) {
+                List<Statement> statements = body.getStatements();
+                List<Statement> mapped = moveCompatibility(statements, ctx);
+                if (mapped == statements) {
                     return m;
                 }
                 return autoFormat(m.withArguments(singletonList(lambda.withBody(body.withStatements(mapped)))),

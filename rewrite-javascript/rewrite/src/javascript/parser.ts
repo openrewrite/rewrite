@@ -91,8 +91,14 @@ export class JavaScriptParser extends Parser {
         super({ctx, relativeTo});
         this.compilerOptions = {
             target: ts.ScriptTarget.Latest,
-            module: ts.ModuleKind.CommonJS,
-            moduleResolution: ts.ModuleResolutionKind.Node10,
+            // Bundler matches `exports` conditions leniently, so packages that publish types only under
+            // an `import` condition resolve; it pairs with `preserve`, which `commonjs` cannot (TS5095).
+            // A `node16` module kind makes TS1479 reachable, and that error costs the whole LST.
+            module: ts.ModuleKind.Preserve,
+            moduleResolution: ts.ModuleResolutionKind.Bundler,
+            // Bundler's own condition set omits `node`, which takes the browser branch of packages
+            // that publish one, typing them against an API surface the source does not use.
+            customConditions: ["node"],
             noEmit: true,
             allowJs: true,
             checkJs: true,
@@ -326,7 +332,8 @@ export class JavaScriptParser extends Parser {
             return resolvedModules;
         };
 
-        // Create a new Program, passing the oldProgram for incremental parsing
+        // TypeScript carries the previous program's bound files forward when the root paths match,
+        // so a parser held across parses of one path costs a fraction of a freshly built one.
         const program = ts.createProgram([...inputFiles.keys()], this.compilerOptions, host, this.oldProgram);
 
         // Update the oldProgram reference
@@ -923,8 +930,40 @@ export class JavaScriptParserVisitor {
             value: unicodeEscapes.length > 0 ? cleanedSource : value,
             valueSource: cleanedSource,
             unicodeEscapes: unicodeEscapes.length > 0 ? unicodeEscapes : undefined,
-            type: this.mapPrimitiveType(node)
+            type: this.literalType(node)
         };
+    }
+
+    /**
+     * Resolve a literal's primitive type from its own lexical category rather than
+     * from the type checker.
+     *
+     * A literal's primitive is fixed by how it is written, not by its type according to the type checker.
+     */
+    private literalType(node: ts.Node): Type.Primitive {
+        switch (node.kind) {
+            case ts.SyntaxKind.StringLiteral:
+            case ts.SyntaxKind.RegularExpressionLiteral:
+            case ts.SyntaxKind.NoSubstitutionTemplateLiteral:
+            case ts.SyntaxKind.TemplateHead:
+            case ts.SyntaxKind.TemplateMiddle:
+            case ts.SyntaxKind.TemplateTail:
+            case ts.SyntaxKind.JsxText:
+                return Type.Primitive.String;
+            case ts.SyntaxKind.NumericLiteral:
+                return Type.Primitive.Double;
+            case ts.SyntaxKind.BigIntLiteral:
+                return Type.Primitive.BigInt;
+            case ts.SyntaxKind.TrueKeyword:
+            case ts.SyntaxKind.FalseKeyword:
+                return Type.Primitive.Boolean;
+            case ts.SyntaxKind.NullKeyword:
+                return Type.Primitive.Null;
+            default:
+                // Identifiers reaching mapLiteral (e.g. undefined) and any future
+                // node kinds fall back to the checker.
+                return this.mapPrimitiveType(node);
+        }
     }
 
     visitBigIntLiteral(node: ts.BigIntLiteral): J.Literal {

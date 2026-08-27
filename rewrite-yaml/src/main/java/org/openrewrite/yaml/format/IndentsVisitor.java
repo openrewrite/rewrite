@@ -61,9 +61,11 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
                 }
             }
         }
-        Iterator<Object> path = parent.getPath(Yaml.class::isInstance);
-        if (path.hasNext()) {
-            preVisit((Yaml) path.next(), p);
+        if (parent.getMessage("lastIndent") == null) {
+            Iterator<Object> path = parent.getPath(Yaml.class::isInstance);
+            if (path.hasNext()) {
+                preVisit((Yaml) path.next(), p);
+            }
         }
         return visit(tree, p);
     }

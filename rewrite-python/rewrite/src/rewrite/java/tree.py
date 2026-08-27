@@ -814,7 +814,7 @@ class ClassDeclaration(Statement, TypedTree):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> ClassDeclaration.Kind:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -823,7 +823,7 @@ class ClassDeclaration(Statement, TypedTree):
             return self._markers
 
         def with_markers(self, markers: Markers) -> ClassDeclaration.Kind:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _annotations: List[Annotation]
 
@@ -832,7 +832,7 @@ class ClassDeclaration(Statement, TypedTree):
             return self._annotations
 
         def with_annotations(self, annotations: List[Annotation]) -> ClassDeclaration.Kind:
-            return self if annotations is self._annotations else replace(self, _annotations=annotations)
+            return replace_if_changed(self, _annotations=annotations)
 
         _type: Type
 
@@ -841,7 +841,7 @@ class ClassDeclaration(Statement, TypedTree):
             return self._type
 
         def with_type(self, type: Type) -> ClassDeclaration.Kind:
-            return self if type is self._type else replace(self, _type=type)
+            return replace_if_changed(self, _type=type)
 
         class Type(Enum):
             Class = 0
@@ -1370,7 +1370,7 @@ class ForEachLoop(Loop):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> ForEachLoop.Control:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -1379,7 +1379,7 @@ class ForEachLoop(Loop):
             return self._markers
 
         def with_markers(self, markers: Markers) -> ForEachLoop.Control:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _variable: JRightPadded[Statement]
 
@@ -1510,7 +1510,7 @@ class ForLoop(Loop):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> ForLoop.Control:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -1519,7 +1519,7 @@ class ForLoop(Loop):
             return self._markers
 
         def with_markers(self, markers: Markers) -> ForLoop.Control:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _init: List[JRightPadded[Statement]]
 
@@ -1758,7 +1758,7 @@ class If(Statement):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> If.Else:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -1767,7 +1767,7 @@ class If(Statement):
             return self._markers
 
         def with_markers(self, markers: Markers) -> If.Else:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _body: JRightPadded[Statement]
 
@@ -2239,7 +2239,7 @@ class Lambda(Statement, Expression, TypedTree):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> Lambda.Parameters:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -2248,7 +2248,7 @@ class Lambda(Statement, Expression, TypedTree):
             return self._markers
 
         def with_markers(self, markers: Markers) -> Lambda.Parameters:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _parenthesized: bool
 
@@ -2257,7 +2257,7 @@ class Lambda(Statement, Expression, TypedTree):
             return self._parenthesized
 
         def with_parenthesized(self, parenthesized: bool) -> Lambda.Parameters:
-            return self if parenthesized is self._parenthesized else replace(self, _parenthesized=parenthesized)
+            return replace_if_changed(self, _parenthesized=parenthesized)
 
         _parameters: List[JRightPadded[J]]
 
@@ -2357,7 +2357,7 @@ class Literal(Expression, TypedTree):
             return self._value_source_index
 
         def with_value_source_index(self, value_source_index: int) -> Literal.UnicodeEscape:
-            return self if value_source_index is self._value_source_index else replace(self, _value_source_index=value_source_index)
+            return replace_if_changed(self, _value_source_index=value_source_index)
 
         _code_point: str
 
@@ -2366,7 +2366,7 @@ class Literal(Expression, TypedTree):
             return self._code_point
 
         def with_code_point(self, code_point: str) -> Literal.UnicodeEscape:
-            return self if code_point is self._code_point else replace(self, _code_point=code_point)
+            return replace_if_changed(self, _code_point=code_point)
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J:
         return v.visit_literal(self, p)
@@ -2539,7 +2539,7 @@ class MethodDeclaration(Statement, TypedTree):
         return self._dimensions_after_name
 
     def with_dimensions_after_name(self, dimensions_after_name: List[JLeftPadded[Space]]) -> MethodDeclaration:
-        return self if dimensions_after_name is self._dimensions_after_name else replace(self, _dimensions_after_name=dimensions_after_name)
+        return replace_if_changed(self, _dimensions_after_name=dimensions_after_name)
 
 
     _throws: Optional[JContainer[NameTree]]
@@ -2630,42 +2630,42 @@ class MethodDeclaration(Statement, TypedTree):
             return self._t._type_parameters
 
         def with_type_parameters(self, type_parameters: Optional[TypeParameters]) -> MethodDeclaration:
-            return self._t if self._t._type_parameters is type_parameters else replace(self._t, _type_parameters=type_parameters)
+            return replace_if_changed(self._t, _type_parameters=type_parameters)
 
         @property
         def name(self) -> Identifier:
             return self._t._name
 
         def with_name(self, name: Identifier) -> MethodDeclaration:
-            return self._t if self._t._name is name else replace(self._t, _name=name)
+            return replace_if_changed(self._t, _name=name)
 
         @property
         def name_annotations(self) -> List[Annotation]:
             return self._t._name_annotations
 
         def with_name_annotations(self, name_annotations: List[Annotation]) -> MethodDeclaration:
-            return self._t if self._t._name_annotations is name_annotations else replace(self._t, _name_annotations=name_annotations)
+            return replace_if_changed(self._t, _name_annotations=name_annotations)
 
         @property
         def parameters(self) -> JContainer[Statement]:
             return self._t._parameters
 
         def with_parameters(self, parameters: JContainer[Statement]) -> MethodDeclaration:
-            return self._t if self._t._parameters is parameters else replace(self._t, _parameters=parameters)
+            return replace_if_changed(self._t, _parameters=parameters)
 
         @property
         def throws(self) -> Optional[JContainer[NameTree]]:
             return self._t._throws
 
         def with_throws(self, throws: Optional[JContainer[NameTree]]) -> MethodDeclaration:
-            return self._t if self._t._throws is throws else replace(self._t, _throws=throws)
+            return replace_if_changed(self._t, _throws=throws)
 
         @property
         def default_value(self) -> Optional[JLeftPadded[Expression]]:
             return self._t._default_value
 
         def with_default_value(self, default_value: Optional[JLeftPadded[Expression]]) -> MethodDeclaration:
-            return self._t if self._t._default_value is default_value else replace(self._t, _default_value=default_value)
+            return replace_if_changed(self._t, _default_value=default_value)
 
     _annotations: Optional[weakref.ReferenceType[AnnotationsHelper]] = None
 
@@ -3777,7 +3777,7 @@ class Try(Statement):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> Try.Resource:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -3786,7 +3786,7 @@ class Try(Statement):
             return self._markers
 
         def with_markers(self, markers: Markers) -> Try.Resource:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _variable_declarations: TypedTree
 
@@ -3795,7 +3795,7 @@ class Try(Statement):
             return self._variable_declarations
 
         def with_variable_declarations(self, variable_declarations: TypedTree) -> Try.Resource:
-            return self if variable_declarations is self._variable_declarations else replace(self, _variable_declarations=variable_declarations)
+            return replace_if_changed(self, _variable_declarations=variable_declarations)
 
         _terminated_with_semicolon: bool
 
@@ -3804,7 +3804,7 @@ class Try(Statement):
             return self._terminated_with_semicolon
 
         def with_terminated_with_semicolon(self, terminated_with_semicolon: bool) -> Try.Resource:
-            return self if terminated_with_semicolon is self._terminated_with_semicolon else replace(self, _terminated_with_semicolon=terminated_with_semicolon)
+            return replace_if_changed(self, _terminated_with_semicolon=terminated_with_semicolon)
 
         def accept_java(self, v: JavaVisitor[P], p: P) -> J:
             return v.visit_try_resource(self, p)
@@ -3824,7 +3824,7 @@ class Try(Statement):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> Try.Catch:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -3833,7 +3833,7 @@ class Try(Statement):
             return self._markers
 
         def with_markers(self, markers: Markers) -> Try.Catch:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _parameter: ControlParentheses[VariableDeclarations]
 
@@ -3842,7 +3842,7 @@ class Try(Statement):
             return self._parameter
 
         def with_parameter(self, parameter: ControlParentheses[VariableDeclarations]) -> Try.Catch:
-            return self if parameter is self._parameter else replace(self, _parameter=parameter)
+            return replace_if_changed(self, _parameter=parameter)
 
         _body: Block
 
@@ -3851,7 +3851,7 @@ class Try(Statement):
             return self._body
 
         def with_body(self, body: Block) -> Try.Catch:
-            return self if body is self._body else replace(self, _body=body)
+            return replace_if_changed(self, _body=body)
 
         def accept_java(self, v: JavaVisitor[P], p: P) -> J:
             return v.visit_catch(self, p)
@@ -4223,7 +4223,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> VariableDeclarations.NamedVariable:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -4232,7 +4232,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._markers
 
         def with_markers(self, markers: Markers) -> VariableDeclarations.NamedVariable:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _name: Identifier
 
@@ -4241,7 +4241,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._name
 
         def with_name(self, name: Identifier) -> VariableDeclarations.NamedVariable:
-            return self if name is self._name else replace(self, _name=name)
+            return replace_if_changed(self, _name=name)
 
         _dimensions_after_name: List[JLeftPadded[Space]]
 
@@ -4250,7 +4250,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._dimensions_after_name
 
         def with_dimensions_after_name(self, dimensions_after_name: List[JLeftPadded[Space]]) -> VariableDeclarations.NamedVariable:
-            return self if dimensions_after_name is self._dimensions_after_name else replace(self, _dimensions_after_name=dimensions_after_name)
+            return replace_if_changed(self, _dimensions_after_name=dimensions_after_name)
 
         _initializer: Optional[JLeftPadded[Expression]]
 
@@ -4268,7 +4268,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._variable_type
 
         def with_variable_type(self, variable_type: Optional[JavaType.Variable]) -> VariableDeclarations.NamedVariable:
-            return self if variable_type is self._variable_type else replace(self, _variable_type=variable_type)
+            return replace_if_changed(self, _variable_type=variable_type)
 
         @dataclass
         class PaddingHelper:
@@ -4537,7 +4537,7 @@ class Unknown(Statement, Expression, TypeTree):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> Unknown.Source:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -4546,7 +4546,7 @@ class Unknown(Statement, Expression, TypeTree):
             return self._markers
 
         def with_markers(self, markers: Markers) -> Unknown.Source:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _text: str
 
@@ -4555,7 +4555,7 @@ class Unknown(Statement, Expression, TypeTree):
             return self._text
 
         def with_text(self, text: str) -> Unknown.Source:
-            return self if text is self._text else replace(self, _text=text)
+            return replace_if_changed(self, _text=text)
 
         def accept_java(self, v: JavaVisitor[P], p: P) -> J:
             return v.visit_unknown_source(self, p)

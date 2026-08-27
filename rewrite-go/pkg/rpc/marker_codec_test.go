@@ -22,6 +22,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
@@ -34,7 +38,7 @@ func roundTripMarkers(t *testing.T, before java.Markers) java.Markers {
 	var messages []RpcObjectData
 	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
 		messages = append(messages, batch...)
-	}, make(map[uintptr]int))
+	}, NewReferenceMap())
 	SendMarkersCodec(before, sendQ)
 	sendQ.Flush()
 
@@ -54,23 +58,32 @@ func roundTripMarkers(t *testing.T, before java.Markers) java.Markers {
 
 func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	id := uuid.MustParse("11111111-2222-3333-4444-555555555555")
-	gp := golang.GoProject{Ident: id, ProjectName: "example/foo"}
+	gp := golang.GoProject{Ident: id, ProjectName: "example/foo", ModulePath: "example.com/foo"}
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{gp}}
 
 	after := roundTripMarkers(t, before)
-	if len(after.Entries) != 1 {
-		t.Fatalf("entries: want 1, got %d", len(after.Entries))
-	}
+	require.Len(t, after.Entries, 1, "entries")
 	got, ok := after.Entries[0].(golang.GoProject)
-	if !ok {
-		t.Fatalf("entry is %T, want golang.GoProject", after.Entries[0])
-	}
+	require.Truef(t, ok, "entry is %T, want golang.GoProject", after.Entries[0])
 	if got.Ident != id {
 		t.Errorf("Ident: want %s, got %s", id, got.Ident)
 	}
-	if got.ProjectName != "example/foo" {
-		t.Errorf("ProjectName: want %q, got %q", "example/foo", got.ProjectName)
-	}
+	assert.Equalf(t, "example/foo", got.ProjectName, "ProjectName: want %q", "example/foo")
+	assert.Equalf(t, "example.com/foo", got.ModulePath, "ModulePath: want %q", "example.com/foo")
+}
+
+func TestPartialTypeAttributionMarkerRoundTrip(t *testing.T) {
+	id := uuid.MustParse("66666666-7777-8888-9999-aaaaaaaaaaaa")
+	reason := `could not resolve import "strings": cannot decode "strings", export data version 4 is greater than maximum supported version 2`
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{
+		golang.PartialTypeAttribution{Ident: id, Reason: reason}}}
+
+	after := roundTripMarkers(t, before)
+	require.Len(t, after.Entries, 1, "entries")
+	got, ok := after.Entries[0].(golang.PartialTypeAttribution)
+	require.Truef(t, ok, "entry is %T, want golang.PartialTypeAttribution", after.Entries[0])
+	assert.Equal(t, id, got.Ident)
+	assert.Equal(t, reason, got.Reason)
 }
 
 func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
@@ -119,16 +132,10 @@ func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
 
 	after := roundTripMarkers(t, before)
-	if len(after.Entries) != 1 {
-		t.Fatalf("entries: want 1, got %d", len(after.Entries))
-	}
+	require.Len(t, after.Entries, 1, "entries")
 	got, ok := after.Entries[0].(golang.GoResolutionResult)
-	if !ok {
-		t.Fatalf("entry is %T, want golang.GoResolutionResult", after.Entries[0])
-	}
-	if !reflect.DeepEqual(mrr, got) {
-		t.Errorf("round-trip mismatch\nbefore: %+v\nafter:  %+v", mrr, got)
-	}
+	require.Truef(t, ok, "entry is %T, want golang.GoResolutionResult", after.Entries[0])
+	assert.Truef(t, reflect.DeepEqual(mrr, got), "round-trip mismatch\nbefore: %+v\nafter", mrr)
 }
 
 func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
@@ -149,7 +156,82 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 
 	after := roundTripMarkers(t, before)
 	got := after.Entries[0].(golang.GoResolutionResult)
-	if got.ModulePath != "example.com/empty" {
-		t.Errorf("ModulePath: want %q, got %q", "example.com/empty", got.ModulePath)
+	assert.Equalf(t, "example.com/empty", got.ModulePath, "ModulePath: want %q", "example.com/empty")
+}
+
+// diffRoundTripMarkers serializes `after` as a delta against `before` and
+// applies the delta on the receiver, mirroring how a modified tree's markers
+// travel back to the peer.
+func diffRoundTripMarkers(t *testing.T, before, after java.Markers) java.Markers {
+	t.Helper()
+	var messages []RpcObjectData
+	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
+		messages = append(messages, batch...)
+	}, NewReferenceMap())
+	sendQ.Send(after, before, func(_ any) { SendMarkersCodec(after, sendQ) })
+	sendQ.Flush()
+
+	delivered := false
+	recvQ := NewReceiveQueue(make(map[int]any), func() []RpcObjectData {
+		if delivered {
+			return nil
+		}
+		delivered = true
+		return messages
+	})
+	result := recvQ.Receive(before, func(v any) any { return receiveMarkersCodec(recvQ, v.(java.Markers)) })
+	return result.(java.Markers)
+}
+
+func TestChangedCodecLessMarkerRoundTrip(t *testing.T) {
+	id := uuid.MustParse("11111111-2222-3333-4444-555555555555")
+	mk := func(version string) java.GenericMarker {
+		return java.GenericMarker{
+			Ident:    id,
+			JavaType: "org.openrewrite.marker.BuildTool",
+			Data:     map[string]any{"id": id.String(), "type": "Gradle", "version": version},
+		}
+	}
+	markersID := uuid.New()
+	before := java.Markers{ID: markersID, Entries: []java.Marker{mk("7.0")}}
+	after := java.Markers{ID: markersID, Entries: []java.Marker{mk("8.0")}}
+
+	got := diffRoundTripMarkers(t, before, after)
+	require.Len(t, got.Entries, 1, "entries")
+	gm, ok := got.Entries[0].(java.GenericMarker)
+	require.Truef(t, ok, "entry is %T, want java.GenericMarker", got.Entries[0])
+	if gm.Data["version"] != "8.0" {
+		t.Errorf("version: want %q, got %v", "8.0", gm.Data["version"])
+	}
+}
+
+func TestTrailingCommaMarkerRoundTripKeepsComments(t *testing.T) {
+	id := uuid.MustParse("cccccccc-dddd-eeee-ffff-000000000000")
+	tc := golang.TrailingComma{
+		Ident:  id,
+		Before: java.Space{Whitespace: " "},
+		After: java.Space{
+			Whitespace: " ",
+			Comments:   []java.Comment{{Text: " third", Suffix: "\n\t\t"}},
+		},
+	}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{tc}}
+
+	after := roundTripMarkers(t, before)
+	got, ok := after.Entries[0].(golang.TrailingComma)
+	if !ok {
+		t.Fatalf("entry is %T, want golang.TrailingComma", after.Entries[0])
+	}
+	if got.Before.Whitespace != tc.Before.Whitespace {
+		t.Errorf("Before.Whitespace: want %q, got %q", tc.Before.Whitespace, got.Before.Whitespace)
+	}
+	if got.After.Whitespace != tc.After.Whitespace {
+		t.Errorf("After.Whitespace: want %q, got %q", tc.After.Whitespace, got.After.Whitespace)
+	}
+	if len(got.After.Comments) != 1 {
+		t.Fatalf("After.Comments: want 1, got %d", len(got.After.Comments))
+	}
+	if got.After.Comments[0].Text != " third" || got.After.Comments[0].Suffix != "\n\t\t" {
+		t.Errorf("After.Comments[0]: want %#v, got %#v", tc.After.Comments[0], got.After.Comments[0])
 	}
 }

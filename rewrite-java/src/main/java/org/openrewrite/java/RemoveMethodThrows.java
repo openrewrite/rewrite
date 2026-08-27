@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 @EqualsAndHashCode(callSuper = false)
@@ -78,10 +79,17 @@ public class RemoveMethodThrows extends Recipe {
         return Preconditions.check(precondition, new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                        J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                        boolean matches = enclosingClass != null ?
-                                methodMatcher.matches(method, enclosingClass) :
-                                methodMatcher.matches(method.getMethodType());
+                        Iterator<Object> enclosingPath = getCursor().getPath(o ->
+                                o instanceof J.ClassDeclaration || o instanceof J.NewClass);
+                        Object enclosing = enclosingPath.hasNext() ? enclosingPath.next() : null;
+                        boolean matches;
+                        if (enclosing instanceof J.NewClass) {
+                            matches = methodMatcher.matches(method, (J.NewClass) enclosing);
+                        } else if (enclosing instanceof J.ClassDeclaration) {
+                            matches = methodMatcher.matches(method, (J.ClassDeclaration) enclosing);
+                        } else {
+                            matches = methodMatcher.matches(method.getMethodType());
+                        }
                         getCursor().putMessage(METHOD_MATCHES_KEY, matches);
 
                         J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
@@ -89,7 +97,7 @@ public class RemoveMethodThrows extends Recipe {
                         List<J.Annotation> originalAnnotations = method.getLeadingAnnotations();
                         if (removedAnnotation != null && originalAnnotations.size() == 1 &&
                                 originalAnnotations.get(0) == removedAnnotation) {
-                            m = collapseBlankLineLeftByRemovedAnnotation(m, enclosingClass == null);
+                            m = collapseBlankLineLeftByRemovedAnnotation(m, enclosing == null);
                         }
                         if (!matches || m.getThrows() == null) {
                             return m;

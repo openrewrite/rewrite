@@ -26,6 +26,7 @@ import org.openrewrite.kotlin.format.BlankLinesVisitor;
 import org.openrewrite.kotlin.format.NormalizeFormatVisitor;
 import org.openrewrite.kotlin.format.SpacesVisitor;
 import org.openrewrite.kotlin.style.BlankLinesStyle;
+import org.openrewrite.kotlin.style.IntelliJ;
 import org.openrewrite.style.Style;
 
 import static org.openrewrite.kotlin.style.IntelliJ.blankLines;
@@ -45,7 +46,7 @@ public class KotlinAutoFormatService extends AutoFormatService {
 
     @Override
     public <P> JavaVisitor<P> blankLinesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
-        return new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, sourceFile, () -> blankLines()), stopAfter);
+        return new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, sourceFile, IntelliJ::blankLines), stopAfter);
     }
 
     @Override

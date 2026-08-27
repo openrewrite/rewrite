@@ -333,6 +333,28 @@ class AutodetectTest implements RewriteTest {
     }
 
     @Test
+    void tabsDeeperThanBlockDepth() {
+        var cus = jp().parse(
+          """
+            public class Test {
+            \tpublic int method(boolean b) {
+            \t\tif (b)
+            \t\t\t    return 1;
+            \t\treturn 0;
+            \t}
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
     void mixedTabAndWhiteSpacesIndentsWithTabSize4() {
         var cus = jp().parse(
           """
@@ -639,6 +661,46 @@ class AutodetectTest implements RewriteTest {
 
         assertThat(importLayout.getClassCountToUseStarImport()).isEqualTo(2147483647);
         assertThat(importLayout.getNameCountToUseStarImport()).isEqualTo(2147483647);
+    }
+
+    @Test
+    void staticStarImportCountsFoldedMembersNotVariablesOfThatType() {
+        var cus = jp().parse(
+          """
+            package org.openrewrite.test;
+
+            public class Outer {
+                public enum Measure {
+                    One, Two, Three, Four, Five, Six;
+
+                    public int label;
+                }
+            }
+            """,
+          """
+            package org.openrewrite.test;
+
+            import java.util.List;
+
+            import static org.openrewrite.test.Outer.Measure.*;
+
+            class OuterTest {
+                List<Object> used() {
+                    return List.of(One, Two, Three, Four, Five);
+                }
+
+                int parameterized(Outer.Measure measure) {
+                    return measure.label;
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
+
+        assertThat(importLayout.getNameCountToUseStarImport()).isEqualTo(5);
     }
 
     @Test

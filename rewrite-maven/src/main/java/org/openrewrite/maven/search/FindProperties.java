@@ -81,9 +81,12 @@ public class FindProperties extends Recipe {
 
                 Optional<String> value = t.getValue();
                 if (value.isPresent() && propertyUsageMatcher.matcher(value.get()).matches()) {
-                    //noinspection unchecked
-                    t = t.withContent(ListUtils.mapFirst((List<Content>) t.getContent(), v ->
-                            SearchResult.found(v, getResolutionResult().getPom().getValue(value.get()))));
+                    String resolvedValue = getResolutionResult().getPom().getValue(value.get());
+                    if (valueMatcher == null || (resolvedValue != null && valueMatcher.matcher(resolvedValue).matches())) {
+                        //noinspection unchecked
+                        t = t.withContent(ListUtils.mapFirst((List<Content>) t.getContent(), v ->
+                                SearchResult.found(v, resolvedValue)));
+                    }
                 }
                 return t;
             }

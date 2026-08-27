@@ -17,6 +17,7 @@ import ts from "typescript";
 import * as path from "path";
 import {Type} from "../java";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
+import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
 
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
@@ -195,6 +196,22 @@ export class JavaScriptTypeMapping {
         } as Type.Class;
         this.typeCache.set(cacheKey, classType);
         return classType;
+    }
+
+    /**
+     * Map an exported symbol (type alias, namespace, function, ...) to its {@link Type} via the
+     * symbol's declared or value type. Enumerator-only entry point ({@code exportedTypes}) for
+     * exports that are not class/interface/enum declarations; those go through {@link declarationType}.
+     */
+    exportedType(symbol: ts.Symbol): Type | undefined {
+        const target = symbol.flags & ts.SymbolFlags.Alias ? this.checker.getAliasedSymbol(symbol) : symbol;
+        let type: ts.Type | undefined;
+        if (target.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias | ts.SymbolFlags.ValueModule)) {
+            type = this.checker.getDeclaredTypeOfSymbol(target);
+        } else if (target.valueDeclaration) {
+            type = this.checker.getTypeOfSymbolAtLocation(target, target.valueDeclaration);
+        }
+        return type ? this.getType(type) : undefined;
     }
 
     private getType(type: ts.Type): Type {
@@ -445,12 +462,23 @@ export class JavaScriptTypeMapping {
             return functionType;
         }
 
-        // For anonymous object types that could have circular references
+        // A structural type has no nominal name, so every object literal `{a: 1}` and type
+        // literal `{a: number}` shares the synthetic FQN `{}`, with `members` carrying the shape.
         if (type.flags & ts.TypeFlags.Object) {
             const objectFlags = (type as ts.ObjectType).objectFlags;
             if (objectFlags & ts.ObjectFlags.Anonymous) {
-                return Type.unknownType;
+                const objectType = this.createEmptyObjectType();
+                this.typeCache.set(signature, objectType);
+                this.populateClassType(objectType, type);
+                return objectType;
             }
+        }
+
+        // The `object` keyword: an object of unknown shape.
+        if (type.flags & ts.TypeFlags.NonPrimitive) {
+            const objectType = this.createEmptyObjectType();
+            this.typeCache.set(signature, objectType);
+            return objectType;
         }
 
         // Pre-cache as unknownType before resolving type aliases to prevent infinite
@@ -804,6 +832,29 @@ export class JavaScriptTypeMapping {
     }
 
     methodType(node: ts.Node): Type.Method | undefined {
+        // An object literal is a `J.NewClass`, and `J.NewClass.getType()` reads
+        // `constructorType.returnType`, as it does for a Java anonymous class.
+        if (ts.isObjectLiteralExpression(node)) {
+            const objectType = this.type(node);
+            if (!Type.isFullyQualified(objectType)) {
+                return undefined;
+            }
+            return {
+                kind: Type.Kind.Method,
+                flags: 0,
+                declaringType: objectType,
+                name: '<constructor>',
+                returnType: objectType,
+                parameterNames: [],
+                parameterTypes: [],
+                thrownExceptions: [],
+                annotations: [],
+                declaredFormalTypeNames: [],
+                toJSON: function () {
+                    return Type.signature(this);
+                }
+            } as Type.Method;
+        }
 
         let signature: ts.Signature | undefined;
         let methodName: string;
@@ -1626,6 +1677,23 @@ export class JavaScriptTypeMapping {
         (gtv as any).bounds = bounds;
 
         return gtv;
+    }
+
+    private createEmptyObjectType(): Type.Class {
+        return {
+            kind: Type.Kind.Class,
+            flags: 0,
+            classKind: Type.Class.Kind.Interface,
+            fullyQualifiedName: OBJECT_TYPE_NAME,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        } as Type.Class;
     }
 
     /**

@@ -182,7 +182,8 @@ public class Pom {
             return pomActivatedProfiles;
         }
         return profiles.stream()
-                .filter(p -> p.getActivation() != null && Boolean.TRUE.equals(p.getActivation().getActiveByDefault()))
+                .filter(p -> p.getActivation() != null && Boolean.TRUE.equals(p.getActivation().getActiveByDefault()) &&
+                             !ProfileActivation.isDeactivated(p.getId(), explicitActiveProfiles))
                 .collect(toList());
     }
 

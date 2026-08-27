@@ -1,0 +1,12 @@
+[project]
+name = "e-markers"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["tomli==2.0.1; python_version < '3.11'"]
+
+[tool.pdm]
+distribution = false
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

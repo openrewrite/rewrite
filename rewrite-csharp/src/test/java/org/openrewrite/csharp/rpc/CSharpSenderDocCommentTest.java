@@ -18,11 +18,10 @@ package org.openrewrite.csharp.rpc;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
-import org.openrewrite.csharp.CsDocCommentParser;
+import org.openrewrite.Tree;
 import org.openrewrite.csharp.CsDocCommentPrinter;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.csharp.tree.CsDocComment;
-import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
@@ -37,11 +36,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
 /**
- * A {@link CsDocComment.DocComment} can end up in {@link Space#getComments()} after a
- * {@code CSharpVisitor} pass parses a {@link CsDocCommentRawComment} into a structured tree.
- * Rather than flattening it back to raw text, {@link CSharpSender} decomposes the structured
- * tree over RPC (mirroring {@code Javadoc.DocComment} on the Java side) and {@link CSharpReceiver}
- * reconstructs it, so the tree survives a round trip with full fidelity.
+ * A structured {@link CsDocComment.DocComment} is decomposed over RPC by {@link CSharpSender}
+ * (mirroring {@code Javadoc.DocComment} on the Java side) and reconstructed by
+ * {@link CSharpReceiver}, so the whole tree survives a round trip with full fidelity — the raw
+ * flattened form no longer exists on either side.
  */
 class CSharpSenderDocCommentTest {
 
@@ -49,7 +47,7 @@ class CSharpSenderDocCommentTest {
 
     @Test
     void visitSpaceWithDocCommentDoesNotThrow() {
-        Space space = spaceWithDocComment("/ <summary>doc</summary>");
+        Space space = spaceWithDocComment();
 
         CSharpSender sender = new CSharpSender();
         RpcSendQueue queue = new RpcSendQueue(64, batch -> {}, new IdentityHashMap<>(), SOURCE_FILE_TYPE, false);
@@ -59,7 +57,7 @@ class CSharpSenderDocCommentTest {
 
     @Test
     void docCommentIsDecomposedAsStructuredTree() {
-        Space space = spaceWithDocComment("/ <summary>doc</summary>");
+        Space space = spaceWithDocComment();
 
         List<RpcObjectData> emitted = new ArrayList<>();
         CSharpSender sender = new CSharpSender();
@@ -68,33 +66,20 @@ class CSharpSenderDocCommentTest {
         sender.visitSpace(space, queue);
         queue.flush();
 
-        // The structured DocComment tree must travel over the wire, never the flattened raw form.
+        // The structured DocComment tree must travel over the wire as decomposed nodes.
         boolean addedDoc = emitted.stream()
                 .filter(d -> d.getState() == RpcObjectData.State.ADD)
                 .anyMatch(d -> d.getValueType() != null && d.getValueType().endsWith("$DocComment"));
-        boolean addedRaw = emitted.stream()
+        boolean addedElement = emitted.stream()
                 .filter(d -> d.getState() == RpcObjectData.State.ADD)
-                .anyMatch(d -> CsDocCommentRawComment.class.getName().equals(d.getValueType()));
+                .anyMatch(d -> d.getValueType() != null && d.getValueType().endsWith("$XmlElement"));
         assertThat(addedDoc).as("Structured DocComment should be decomposed over the wire").isTrue();
-        assertThat(addedRaw).as("DocComment should not be flattened to a raw comment").isFalse();
+        assertThat(addedElement).as("Nested XmlElement should be decomposed over the wire").isTrue();
     }
 
     @Test
     void docCommentRoundTripsThroughSenderAndReceiver() {
-        roundTripPreservesStructure("/ <summary>doc</summary>");
-    }
-
-    @Test
-    void multilineDocCommentWithNestedElementsRoundTrips() {
-        roundTripPreservesStructure(
-                "/ <summary>\n" +
-                "/// Adds <paramref name=\"a\"/> to <c>b</c>.\n" +
-                "/// </summary>\n" +
-                "/// <param name=\"a\">first</param>");
-    }
-
-    private void roundTripPreservesStructure(String rawText) {
-        Space space = spaceWithDocComment(rawText);
+        Space space = spaceWithDocComment();
         CsDocComment.DocComment original = (CsDocComment.DocComment) space.getComments().get(0);
 
         Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
@@ -117,10 +102,37 @@ class CSharpSenderDocCommentTest {
         assertThat(print(roundTripped)).isEqualTo(print(original));
     }
 
-    private static Space spaceWithDocComment(String rawText) {
-        CsDocCommentRawComment raw = new CsDocCommentRawComment(rawText, "\n", Markers.EMPTY);
-        CsDocComment.DocComment parsed = CsDocCommentParser.parse(raw);
-        return Space.EMPTY.withComments(List.<Comment>of(parsed));
+    /**
+     * Builds a structured doc comment covering every node type, equivalent to:
+     * <pre>
+     * /// &lt;summary&gt;
+     * /// Adds &lt;paramref name="a"/&gt;.
+     * /// &lt;/summary&gt;
+     * </pre>
+     */
+    private static Space spaceWithDocComment() {
+        CsDocComment paramrefName = new CsDocComment.XmlNameAttribute(Tree.randomId(), Markers.EMPTY,
+                null, List.of(text("\"a\"")), null);
+        CsDocComment paramref = new CsDocComment.XmlEmptyElement(Tree.randomId(), Markers.EMPTY, "paramref",
+                List.of(text(" "), paramrefName), List.of());
+
+        List<CsDocComment> summaryContent = List.of(
+                lineBreak("\n///"), text(" Adds "), paramref, text("."),
+                lineBreak("\n///"), text(" "));
+        CsDocComment summary = new CsDocComment.XmlElement(Tree.randomId(), Markers.EMPTY, "summary",
+                List.of(), List.of(), summaryContent, List.of());
+
+        CsDocComment.DocComment doc = new CsDocComment.DocComment(Tree.randomId(), Markers.EMPTY,
+                List.of(text(" "), lineBreak("\n///"), text(" "), summary), "\n");
+        return Space.EMPTY.withComments(List.<Comment>of(doc));
+    }
+
+    private static CsDocComment.XmlText text(String value) {
+        return new CsDocComment.XmlText(Tree.randomId(), Markers.EMPTY, value);
+    }
+
+    private static CsDocComment.LineBreak lineBreak(String margin) {
+        return new CsDocComment.LineBreak(Tree.randomId(), margin, Markers.EMPTY);
     }
 
     private static String print(CsDocComment.DocComment d) {

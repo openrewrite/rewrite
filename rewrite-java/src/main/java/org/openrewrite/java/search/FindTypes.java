@@ -172,11 +172,16 @@ public class FindTypes extends Recipe {
 
         @Override
         public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+            Object parent = getCursor().getParentOrThrow().getValue();
+            // The identifier can be the sole matching node, e.g. in Python `items: List[str]` only the
+            // `List` identifier is attributed `typing.List`; the parameterized type is builtin `list`
+            boolean matchingParameterizedTypeParent = parent instanceof J.ParameterizedType &&
+                    parameterizedTypeMatches((J.ParameterizedType) parent);
             if (ident.getType() != null &&
                     getCursor().firstEnclosing(J.Import.class) == null &&
                     getCursor().firstEnclosing(J.FieldAccess.class) == null &&
-                    !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType) &&
-                    !(getCursor().getParentOrThrow().getValue() instanceof J.ArrayType)) {
+                    !matchingParameterizedTypeParent &&
+                    !(parent instanceof J.ArrayType)) {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         ident.getSimpleName().equals(type.getClassName())) {
@@ -184,6 +189,22 @@ public class FindTypes extends Recipe {
                 }
             }
             return super.visitIdentifier(ident, ctx);
+        }
+
+        @Override
+        public J visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
+            // Non-Java parents (e.g. Python's `Py.TypeHint`) may not route the type through `visitTypeName`;
+            // in Java trees this is idempotent with the parent's `visitTypeName` call
+            J.ParameterizedType pt = (J.ParameterizedType) super.visitParameterizedType(type, ctx);
+            if (parameterizedTypeMatches(pt) && getCursor().firstEnclosing(J.Import.class) == null) {
+                return found(pt, ctx);
+            }
+            return pt;
+        }
+
+        private boolean parameterizedTypeMatches(J.ParameterizedType type) {
+            return typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType,
+                    TypeUtils.asFullyQualified(type.getType()));
         }
 
         @Override
@@ -201,20 +222,33 @@ public class FindTypes extends Recipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
-            if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
-                    "class".equals(fa.getName().getSimpleName())) {
-                return found(fa, ctx);
+            if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type)) {
+                if ("class".equals(fa.getName().getSimpleName())) {
+                    return found(fa, ctx);
+                }
+                // Identifiers under a field access are left to the enclosing name's `visitTypeName`, which covers
+                // qualified type names (`a.A1`) but not the type qualifying a static member access (`A1.CONST`).
+                // A null field type distinguishes an identifier naming the type from one that is a value of it.
+                if (fa.getTarget() instanceof J.Identifier &&
+                        ((J.Identifier) fa.getTarget()).getFieldType() == null &&
+                        getCursor().firstEnclosing(J.Import.class) == null) {
+                    return fa.withTarget(found((J.Identifier) fa.getTarget(), getCursor(), ctx));
+                }
             }
             return fa;
         }
 
         private <J2 extends TypedTree> J2 found(J2 j, ExecutionContext ctx) {
+            return found(j, getCursor().getParentTreeCursor(), ctx);
+        }
+
+        private <J2 extends TypedTree> J2 found(J2 j, Cursor parent, ExecutionContext ctx) {
             JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(j.getType());
             if (!j.getMarkers().findFirst(SearchResult.class).isPresent()) {
                 // Avoid double-counting results in the data table
                 typeUses.insertRow(ctx, new TypeUses.Row(
                         getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
-                        j.printTrimmed(getCursor().getParentTreeCursor()),
+                        j.printTrimmed(parent),
                         fqn == null ? j.getType().toString() : fqn.getFullyQualifiedName()
                 ));
             }

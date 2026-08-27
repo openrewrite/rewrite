@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "e-groups"
+version = "0.1.0"
+description = "main + dev group"
+authors = ["Test <test@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+six = "1.16.0"
+
+[tool.poetry.group.dev.dependencies]
+iniconfig = "2.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -897,17 +897,19 @@ RpcCodecs.registerCodec(NpmrcKind, {
  */
 RpcCodecs.registerCodec(DependencyKind, {
     async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
-        return updateIfChanged(before, {
-            name: await q.receive(before.name),
-            versionConstraint: await q.receive(before.versionConstraint),
-            resolved: await q.receive(before.resolved),
-        });
+        // Populated in place: the receive queue registered this instance for the ref before calling
+        // the codec, so a back-reference closing a cycle resolves to the finished object.
+        const dep = castDraft(before);
+        dep.name = await q.receive(before.name);
+        dep.versionConstraint = await q.receive(before.versionConstraint);
+        dep.resolved = await q.receive(before.resolved);
+        return before;
     },
 
     async rpcSend(after: Dependency, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.name);
         await q.getAndSend(after, a => a.versionConstraint);
-        await q.getAndSend(after, a => a.resolved);
+        await q.getAndSend(after, a => asRef(a.resolved));
     }
 });
 
@@ -916,16 +918,16 @@ RpcCodecs.registerCodec(DependencyKind, {
  */
 RpcCodecs.registerCodec(ResolvedDependencyKind, {
     async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
-        return updateIfChanged(before, {
-            name: await q.receive(before.name),
-            version: await q.receive(before.version),
-            dependencies: (await q.receiveList(before.dependencies)) || undefined,
-            devDependencies: (await q.receiveList(before.devDependencies)) || undefined,
-            peerDependencies: (await q.receiveList(before.peerDependencies)) || undefined,
-            optionalDependencies: (await q.receiveList(before.optionalDependencies)) || undefined,
-            engines: await q.receive(before.engines),
-            license: await q.receive(before.license),
-        });
+        const resolved = castDraft(before);
+        resolved.name = await q.receive(before.name);
+        resolved.version = await q.receive(before.version);
+        resolved.dependencies = (await q.receiveList(before.dependencies)) || undefined;
+        resolved.devDependencies = (await q.receiveList(before.devDependencies)) || undefined;
+        resolved.peerDependencies = (await q.receiveList(before.peerDependencies)) || undefined;
+        resolved.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || undefined;
+        resolved.engines = await q.receive(before.engines);
+        resolved.license = await q.receive(before.license);
+        return before;
     },
 
     async rpcSend(after: ResolvedDependency, q: RpcSendQueue): Promise<void> {

@@ -159,6 +159,42 @@ public final class Assertions {
         return toml;
     }
 
+    public static SourceSpecs poetryLock(@Language("toml") @Nullable String before) {
+        return poetryLock(before, s -> {
+        });
+    }
+
+    public static SourceSpecs poetryLock(@Language("toml") @Nullable String before,
+                                         Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, org.openrewrite.toml.TomlParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        toml.path("poetry.lock");
+        spec.accept(toml);
+        return toml;
+    }
+
+    public static SourceSpecs pdmLock(@Language("toml") @Nullable String before) {
+        return pdmLock(before, s -> {
+        });
+    }
+
+    public static SourceSpecs pdmLock(@Language("toml") @Nullable String before,
+                                      Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, org.openrewrite.toml.TomlParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        toml.path("pdm.lock");
+        spec.accept(toml);
+        return toml;
+    }
+
     public static SourceSpecs requirementsTxt(@Nullable String before) {
         return requirementsTxt(before, s -> {
         });

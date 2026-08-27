@@ -22,6 +22,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
@@ -74,56 +78,33 @@ type project struct {
 }
 
 func (p project) Expand() []SourceSpec {
-	marker := golang.NewGoProject(p.name)
 	var out []SourceSpec
 	for _, s := range p.inner {
-		for _, ss := range s.Expand() {
-			ss.Markers = append(append([]java.Marker{}, ss.Markers...), marker)
-			out = append(out, ss)
-		}
+		out = append(out, s.Expand()...)
 	}
 	mergeGoSumIntoGoMod(out)
-	propagateModuleResolution(out)
+	// GoProject rides on every source (like JavaProject on the Java side)
+	// and carries the module path so recipes can classify imports without
+	// reading the sibling go.mod. The full GoResolutionResult stays on the
+	// go.mod/go.sum only, just as MavenResolutionResult lives on pom.xml.
+	marker := golang.NewGoProject(p.name, projectModulePath(out))
+	for i := range out {
+		out[i].Markers = append(append([]java.Marker{}, out[i].Markers...), marker)
+	}
 	return out
 }
 
-// propagateModuleResolution copies the go.mod's GoResolutionResult
-// marker onto every sibling .go SourceSpec in the project. Recipes
-// that need module context per file (e.g. RenamePackage's
-// fileBelongsTo check) can then read it directly off the
-// CompilationUnit's Markers without re-walking the project. Java does
-// the equivalent at parse time by attaching the parsed-go.mod marker
-// to each CU.
-func propagateModuleResolution(specs []SourceSpec) {
-	var mrr *golang.GoResolutionResult
+// projectModulePath returns the module path from the project's go.mod
+// GoResolutionResult marker, or "" if the project has no parseable go.mod.
+func projectModulePath(specs []SourceSpec) string {
 	for i := range specs {
 		if specs[i].Path == "go.mod" {
-			if found := FindGoResolutionResult(specs[i]); found != nil && found.ModulePath != "" {
-				mrr = found
-				break
+			if found := FindGoResolutionResult(specs[i]); found != nil {
+				return found.ModulePath
 			}
 		}
 	}
-	if mrr == nil {
-		return
-	}
-	for i := range specs {
-		if !strings.HasSuffix(specs[i].Path, ".go") {
-			continue
-		}
-		// Skip if already present (e.g. caller pre-attached one).
-		alreadyHas := false
-		for _, m := range specs[i].Markers {
-			if _, ok := m.(golang.GoResolutionResult); ok {
-				alreadyHas = true
-				break
-			}
-		}
-		if alreadyHas {
-			continue
-		}
-		specs[i].Markers = append(append([]java.Marker{}, specs[i].Markers...), *mrr)
-	}
+	return ""
 }
 
 // mergeGoSumIntoGoMod finds a sibling go.sum spec inside the same expanded
@@ -296,9 +277,7 @@ func parsePackageGroups(t *testing.T, p *parser.GoParser, flat []SourceSpec) map
 			continue
 		}
 		cus, err := p.ParsePackage(files)
-		if err != nil {
-			t.Fatalf("parse error in package %s: %v", dir, err)
-		}
+		require.NoErrorf(t, err, "parse error in package %s", dir)
 		for i, cu := range cus {
 			out[included[i].idx] = cu
 		}
@@ -339,6 +318,7 @@ func buildProjectImporter(flat []SourceSpec) *parser.ProjectImporter {
 	pi := parser.NewProjectImporter(mrr.ModulePath, nil)
 	for _, req := range mrr.Requires {
 		pi.AddRequire(req.ModulePath)
+		pi.AddModule(req.ModulePath, "", req.Version)
 	}
 	for _, s := range flat {
 		if !strings.HasSuffix(s.Path, ".go") {
@@ -495,6 +475,10 @@ type JavaRecipeConfig struct {
 
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
+	// CheckUnchangedTreeIdentity asserts that a source whose printed output is
+	// unchanged comes back as the same tree pointer. Turn it off for fixtures that
+	// deliberately rebuild nodes into printed-identical replacements.
+	CheckUnchangedTreeIdentity bool
 	Recipe                     recipe.Recipe
 	JavaRecipe                 *JavaRecipeConfig     // when set, delegates to Java RPC
 	JavaRpcClient              *JavaRpcClient        // injected Java RPC client
@@ -504,6 +488,7 @@ type RecipeSpec struct {
 func NewRecipeSpec() *RecipeSpec {
 	return &RecipeSpec{
 		CheckParsePrintIdempotence: true,
+		CheckUnchangedTreeIdentity: true,
 	}
 }
 
@@ -627,9 +612,7 @@ func (spec *RecipeSpec) parseGoSource(t *testing.T, p *parser.GoParser, parsedBy
 		// parse this file in isolation so two bare specs sharing a
 		// default Path don't clobber each other.
 		parsed, err := p.Parse(src.Path, src.Before)
-		if err != nil {
-			t.Fatalf("parse error: %v", err)
-		}
+		require.NoError(t, err, "parse error")
 		cu = parsed
 	}
 
@@ -672,9 +655,7 @@ func (spec *RecipeSpec) parseGoMod(t *testing.T, src SourceSpec) *golang.GoMod {
 	t.Helper()
 
 	gm, err := parser.ParseGoModFile(src.Path, src.Before)
-	if err != nil {
-		t.Fatalf("go.mod parse error: %v", err)
-	}
+	require.NoError(t, err, "go.mod parse error")
 
 	// Attach any markers contributed by GoProject(...) wrappers (e.g. the
 	// GoResolutionResult / GoProject markers) so recipes can read them.
@@ -696,9 +677,7 @@ func (spec *RecipeSpec) parseGoSum(t *testing.T, src SourceSpec) *golang.GoSum {
 	t.Helper()
 
 	gs, err := parser.ParseGoSumFile(src.Path, src.Before)
-	if err != nil {
-		t.Fatalf("go.sum parse error: %v", err)
-	}
+	require.NoError(t, err, "go.sum parse error")
 
 	for _, m := range src.Markers {
 		gs = gs.WithMarkers(java.AddMarker(gs.Markers, m))
@@ -719,37 +698,39 @@ func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
 	src := ps.spec
 
 	if ps.tree == nil {
-		if src.After != nil && *src.After != src.Before {
-			t.Errorf("non-Go source %q: harness cannot apply recipes to it yet", src.Path)
-		}
+		assert.Falsef(t, src.After != nil && *src.After != src.Before, "non-Go source %q: harness cannot apply recipes to it yet", src.Path)
 		return
 	}
 
 	if spec.Recipe == nil {
-		if src.After != nil {
-			t.Error("after state specified but no recipe configured")
-		}
+		assert.Nil(t, src.After, "after state specified but no recipe configured")
 		return
 	}
 
 	if ps.result == nil {
-		if src.After != nil {
-			t.Error("recipe returned nil (deleted source file) but expected an after state")
-		}
+		assert.Nil(t, src.After, "recipe returned nil (deleted source file) but expected an after state")
 		return
 	}
 
 	actual := printTree(ps.result, spec.markerPrinter())
-	if src.After != nil {
+	if src.After != nil && *src.After != src.Before {
 		if actual != *src.After {
 			t.Errorf("recipe result mismatch\n\nexpected:\n%s\n\nactual:\n%s", *src.After, actual)
 			showDiff(t, *src.After, actual)
 		}
 		return
 	}
-	// No after state: expect no changes.
-	if actual != src.Before {
-		t.Errorf("recipe made unexpected changes\n\nexpected (no change):\n%s\n\nactual:\n%s", src.Before, actual)
+	// An after state restating the before means the same thing as omitting it.
+	if !assert.Equal(t, src.Before, actual, "recipe made unexpected changes\n\nexpected (no change") {
+		return
+	}
+	// The RPC layer derives its `modified` flag — and hence the SourcesFileResults
+	// row credited to the recipe — from tree pointer identity, not printed text, so
+	// an untouched source must come back as the very same pointer.
+	if spec.CheckUnchangedTreeIdentity && ps.result != ps.tree {
+		assert.Failf(t, "recipe returned a new tree without changing it",
+			"recipe %q rebuilt %q; the visitor must return the original pointer when nothing changed",
+			spec.Recipe.Name(), src.Path)
 	}
 }
 
@@ -775,14 +756,10 @@ func (spec *RecipeSpec) compareGenerated(t *testing.T, specs []SourceSpec, gener
 			}
 			break
 		}
-		if !found {
-			t.Errorf("expected recipe to generate file %q, but it was not generated", gs.Path)
-		}
+		assert.Truef(t, found, "expected recipe to generate file %q, but it was not generated", gs.Path)
 	}
 	for j, gt := range generated {
-		if !matched[j] && gt != nil {
-			t.Errorf("recipe generated an unexpected file %q; add a test.Generated(...) spec to assert it", generatedSourcePath(gt))
-		}
+		assert.Falsef(t, !matched[j] && gt != nil, "recipe generated an unexpected file %q; add a test.Generated(...) spec to assert it", generatedSourcePath(gt))
 	}
 }
 

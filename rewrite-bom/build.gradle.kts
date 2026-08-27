@@ -1,6 +1,7 @@
 plugins {
     `java-platform`
     id("org.openrewrite.build.publish")
+    id("org.openrewrite.build.publish-cgp")
     id("org.openrewrite.build.metadata")
 }
 

@@ -141,7 +141,7 @@ public final class ScalaTryBuilder {
                         Tree.randomId(), Space.EMPTY, Markers.EMPTY, nameId, Collections.emptyList(), null, null);
                 J.VariableDeclarations varDecl = new J.VariableDeclarations(Tree.randomId(), c.getPrefix(), Markers.EMPTY,
                         Collections.emptyList(), Collections.emptyList(), typeTree, beforeColon,
-                        Collections.emptyList(), Collections.singletonList(JRightPadded.build(namedVar)));
+                        Collections.singletonList(JRightPadded.build(namedVar)));
                 // For the first catch the J.Try printer emits the catch keyword then the brace, so its
                 // parameter prefix carries the space before `{`; subsequent catches don't reprint it.
                 Space controlPrefix = i == 0 ? blockPrefix : Space.EMPTY;

@@ -67,6 +67,10 @@ class LargeSourceSet(ABC):
         ...
 
     @abstractmethod
+    def generate(self, ls: List[SourceFile]) -> LargeSourceSet:
+        ...
+
+    @abstractmethod
     def get_changeset(self) -> List[Result]:
         ...
 
@@ -89,11 +93,17 @@ class InMemoryLargeSourceSet(LargeSourceSet):
             mapped_source = map(source)
             if mapped_source is not None:
                 mapped.append(mapped_source)
-                changed = mapped_source is not source
+                if mapped_source is not source:
+                    changed = True
             else:
                 deleted.append(source)
                 changed = True
         return self if not changed else InMemoryLargeSourceSet(mapped, deleted, self._initial_state or self)
+
+    def generate(self, ls: List[SourceFile]) -> LargeSourceSet:
+        if not ls:
+            return self
+        return InMemoryLargeSourceSet(self._sources + ls, list(self._deletions), self._initial_state or self)
 
     def get_changeset(self) -> List[Result]:
         source_file_by_id = {sf.id: sf for sf in (self._initial_state or self)._sources}

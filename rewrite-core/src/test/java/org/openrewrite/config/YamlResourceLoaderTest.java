@@ -279,6 +279,28 @@ class YamlResourceLoaderTest implements RewriteTest {
           Map.of(RecipeWithBadStaticInitializer.class.getName(), Map.of()));
     }
 
+    @Test
+    void loadRecipeWhoseStaticInitializerHasNotYetFailed() {
+        // Unlike RecipeWithBadStaticInitializer, this class is never pre-loaded, so the first
+        // load throws ExceptionInInitializerError rather than NoClassDefFoundError.
+        final List<Validated<Object>> invalidRecipes = new ArrayList<>();
+
+        createYamlResourceLoader().loadRecipe(
+          "org.company.CustomRecipe",
+          0,
+          RecipeFailingOnFirstLoad.class.getName(),
+          recipe -> {
+          },
+          recipe -> {
+          },
+          invalidRecipes::add);
+
+        assertEquals(1, invalidRecipes.size());
+        Validated.Invalid<Object> invalid = (Validated.Invalid<Object>) invalidRecipes.get(0);
+        assertThat(invalid.getException()).isInstanceOf(ExceptionInInitializerError.class);
+        assertThat(invalid.getMessage()).contains("ExceptionInInitializerError");
+    }
+
     private void assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(Object recipeData) {
         final List<Validated<Object>> invalidRecipes = new ArrayList<>();
         YamlResourceLoader resourceLoader = createYamlResourceLoader();
@@ -294,6 +316,13 @@ class YamlResourceLoaderTest implements RewriteTest {
           invalidRecipes::add);
 
         assertEquals(1, invalidRecipes.size());
+        Validated.Invalid<Object> invalid = (Validated.Invalid<Object>) invalidRecipes.get(0);
+        assertThat(invalid.getMessage())
+          .as("must report why the class could not be loaded, not merely that it could not be")
+          .contains("Could not initialize class");
+        assertThat(invalid.getException())
+          .as("the originating error must be retained for callers that can surface it")
+          .isInstanceOf(NoClassDefFoundError.class);
     }
 
     private YamlResourceLoader createYamlResourceLoader() {
@@ -333,6 +362,20 @@ class YamlResourceLoaderTest implements RewriteTest {
             .build().listRecipes().iterator().next()),
           text("hello", "/bin/java")
         );
+    }
+
+    private static class RecipeFailingOnFirstLoad extends Recipe {
+        static final int val = 1 / 0;
+
+        @Override
+        public String getDisplayName() {
+            return "";
+        }
+
+        @Override
+        public String getDescription() {
+            return "";
+        }
     }
 
     private static class RecipeWithBadStaticInitializer extends Recipe {

@@ -30,6 +30,7 @@ import org.openrewrite.marketplace.RecipeBundleReader;
 import org.openrewrite.marketplace.RecipeClassLoader;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.marketplace.ThrowingRecipeBundleReader;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
@@ -65,7 +66,8 @@ class MavenRecipeBundleReaderTest {
                 artifactCache,
                 null,
                 new HttpUrlConnectionSender(),
-                Throwable::printStackTrace
+                Throwable::printStackTrace,
+                ctx
         );
 
         resolver = new MavenRecipeBundleResolver(ctx, downloader, RecipeClassLoader::new);
@@ -174,5 +176,17 @@ class MavenRecipeBundleReaderTest {
                 .anyMatch(r -> r.getName().contains(org.openrewrite.text.Find.class.getName()));
 
         dirReader.close();
+    }
+
+    @Test
+    void blankVersionResolvesLatestRelease() {
+        RecipeBundle bundle = new RecipeBundle("maven", "org.openrewrite:rewrite-core", null, null, null);
+
+        RecipeBundleReader reader = resolver.resolve(bundle);
+
+        assertThat(reader).isNotInstanceOf(ThrowingRecipeBundleReader.class);
+        assertThat(reader.getBundle().getVersion())
+                .as("a blank version should resolve to a concrete release, not the literal RELEASE constraint")
+                .matches("\\d+\\.\\d+\\.\\d+");
     }
 }

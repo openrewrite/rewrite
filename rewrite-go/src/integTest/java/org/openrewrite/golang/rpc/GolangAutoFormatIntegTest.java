@@ -271,7 +271,7 @@ class GolangAutoFormatIntegTest implements RewriteTest {
     // =========================================================================
 
     @Test
-    void spacesConvertedToTabsInFunctionBody() {
+    void spacesPreservedInFunctionBody() {
         // Use return statement (no ShortVarDecl marker) to avoid marker deserialization issues
         rewriteRun(go("""
           package main
@@ -286,7 +286,7 @@ class GolangAutoFormatIntegTest implements RewriteTest {
                 String ws = stmt.getPrefix().getWhitespace();
                 if (ws.contains("\n")) {
                     String indent = ws.substring(ws.lastIndexOf('\n') + 1);
-                    assertThat(indent).as("Function body uses tabs").matches("\\t+");
+                    assertThat(indent).as("Function body preserves four-space indentation").isEqualTo("    ");
                 }
             }
         }))));
@@ -513,16 +513,18 @@ class GolangAutoFormatIntegTest implements RewriteTest {
 
     @Test
     void mixedTabsAndSpacesNormalized() {
-        // Input uses spaces where tabs should be
+        // The existing tab establishes the file's indentation style, so the
+        // space-indented statement should be normalized to a tab as well.
         rewriteRun(go("""
           package main
 
           func main() {
+          \t_ = 0
               return
           }
           """, spec -> spec.afterRecipe(withVisitor(new TabsAndIndentsVisitor<>(null), formatted -> {
             J.MethodDeclaration md = (J.MethodDeclaration) formatted.getStatements().get(0);
-            Statement stmt = md.getBody().getStatements().get(0);
+            Statement stmt = md.getBody().getStatements().get(1);
             String ws = stmt.getPrefix().getWhitespace();
             if (ws.contains("\n")) {
                 String indent = ws.substring(ws.lastIndexOf('\n') + 1);
@@ -585,13 +587,13 @@ class GolangAutoFormatIntegTest implements RewriteTest {
                   long newlines = ws.chars().filter(c -> c == '\n').count();
                   assertThat(newlines).as("Blank lines collapsed").isLessThanOrEqualTo(2);
               }
-              // Check indentation uses tabs
+              // Check indentation preserves the source's detected four-space style
               J.MethodDeclaration md = (J.MethodDeclaration) formatted.getStatements().get(0);
               for (Statement bodyStmt : md.getBody().getStatements()) {
                   String ws = bodyStmt.getPrefix().getWhitespace();
                   if (ws.contains("\n")) {
                       String indent = ws.substring(ws.lastIndexOf('\n') + 1);
-                      assertThat(indent).as("Uses tabs not spaces").doesNotContain("    ");
+                      assertThat(indent).as("Preserves four-space indentation").isEqualTo("    ");
                   }
               }
           }))));

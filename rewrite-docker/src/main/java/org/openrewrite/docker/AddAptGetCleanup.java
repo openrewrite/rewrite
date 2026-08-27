@@ -23,12 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.tree.Docker;
-import org.openrewrite.marker.Markers;
-
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static org.openrewrite.Tree.randomId;
 
 /**
  * Adds cleanup commands to apt-get RUN instructions to reduce image size.

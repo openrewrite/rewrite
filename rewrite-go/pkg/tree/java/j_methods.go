@@ -378,6 +378,18 @@ func (n *Parentheses) WithID(id uuid.UUID) J {
 func (n *Parentheses) GetPrefix() Space    { return n.Prefix }
 func (n *Parentheses) GetMarkers() Markers { return n.Markers }
 
+func (n *ParenthesizedTypeTree) GetID() uuid.UUID { return n.ID }
+func (n *ParenthesizedTypeTree) WithID(id uuid.UUID) J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *ParenthesizedTypeTree) GetPrefix() Space    { return n.Prefix }
+func (n *ParenthesizedTypeTree) GetMarkers() Markers { return n.Markers }
+
 func (n *Return) GetID() uuid.UUID { return n.ID }
 func (n *Return) WithID(id uuid.UUID) J {
 	if n.ID == id {

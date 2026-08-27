@@ -33,7 +33,12 @@ class AddPlatformDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core", "lombok"));
+          .parser(JavaParser.fromJavaVersion().classpath(
+            "junit-jupiter-api",
+            "guava",
+            "jackson-databind",
+            "jackson-core",
+            "lombok"));
     }
 
     @Language("java")

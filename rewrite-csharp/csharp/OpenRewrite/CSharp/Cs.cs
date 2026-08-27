@@ -52,6 +52,20 @@ public sealed class ExpressionStatement(
     public Space Prefix => Expression.Prefix;
     public Markers Markers => Expression.Markers;
 
+    /// <summary>
+    /// Delegates to the wrapped expression, mirroring <see cref="Markers"/>. Without it the
+    /// reflective wither lookup in <c>Markup</c>/<c>SearchResult</c> finds nothing on this type,
+    /// so marking a bare expression statement (<c>Foo();</c>) would silently drop the marker.
+    /// </summary>
+    public ExpressionStatement WithMarkers(Markers markers) =>
+        WithExpression(J.SetMarkers(Expression, markers));
+
+    /// <summary>
+    /// Delegates to the wrapped expression, mirroring <see cref="Prefix"/>.
+    /// </summary>
+    public ExpressionStatement WithPrefix(Space prefix) =>
+        WithExpression(J.SetPrefix(Expression, prefix));
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ExpressionStatement? other) => other is not null && Id == other.Id;

@@ -19,15 +19,24 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.DataTableStore;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.golang.GolangParser;
 import org.openrewrite.golang.internal.GoExecutor;
+import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.RpcObjectData;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.Parse;
 import org.openrewrite.rpc.request.ParseResponse;
 import org.openrewrite.tree.ParseError;
@@ -46,17 +55,22 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.Spliterator;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import static java.util.Collections.emptyList;
 
 /**
  * RPC client that communicates with a Go process for parsing and printing Go source code.
@@ -105,6 +119,15 @@ public class GoRewriteRpc extends RewriteRpc {
     }
 
     /**
+     * Parser options forwarded to the Go server with every parse request, carrying
+     * this context's {@link ExecutionContext#REQUIRE_PRINT_EQUALS_INPUT} setting.
+     */
+    public static Map<String, String> parseOptions(ExecutionContext ctx) {
+        return Collections.singletonMap(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                String.valueOf(ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)));
+    }
+
+    /**
      * Parse a batch of Go source inputs with project (module) context.
      * The Go server constructs a {@code ProjectImporter} from the module
      * path + go.mod content, registers every input as a sibling, and uses
@@ -144,7 +167,8 @@ public class GoRewriteRpc extends RewriteRpc {
                 mappedInputs,
                 relativeTo != null ? relativeTo.toString() : null,
                 module,
-                goModContent
+                goModContent,
+                parseOptions(ctx)
         ), ParseResponse.class);
         if (ids.size() != inputList.size()) {
             throw new IllegalStateException("Parse response size " + ids.size() + " != input size " + inputList.size());
@@ -241,6 +265,8 @@ public class GoRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+        // The server relativizes only against this, so without it source paths land on the LST absolute.
+        Path base = relativeTo == null ? projectPath : relativeTo;
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
@@ -251,7 +277,7 @@ public class GoRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, base, parseOptions(ctx)), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -261,6 +287,15 @@ public class GoRewriteRpc extends RewriteRpc {
 
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
+
+                if (Quark.class.getName().equals(item.getSourceFileType())) {
+                    // Oversize file the Go side declined to parse; build the Quark
+                    // locally from its path (plus file attributes) — no content on the wire.
+                    Path sourcePath = Paths.get(Objects.requireNonNull(item.getSourcePath()));
+                    action.accept(new Quark(Tree.randomId(), sourcePath, Markers.EMPTY, null,
+                            FileAttributes.fromPath(base.resolve(sourcePath))));
+                    return true;
+                }
 
                 SourceFile sourceFile;
                 try {
@@ -311,13 +346,32 @@ public class GoRewriteRpc extends RewriteRpc {
         }, false);
     }
 
+    /**
+     * Stream the public types the {@code dependency} defines: its defined FQNs to {@code onFqns}
+     * first, then each type to {@code onType}; referenced-but-undefined types come back shallow.
+     */
+    public void dependencyTypes(Dependency dependency,
+                                Consumer<Set<String>> onFqns, Consumer<JavaType.FullyQualified> onType) {
+        RpcReceiveQueue q = new RpcReceiveQueue(new HashMap<>(),
+                () -> send("DependencyTypes", dependency, GetObjectResponse.class),
+                JavaType.Class.class.getName(), null);
+        Set<String> ownFqns = new LinkedHashSet<>();
+        q.<String>receiveList(null, null, ownFqns::add);
+        onFqns.accept(ownFqns);
+        q.receiveList(null, v -> (JavaType.FullyQualified) new JavaTypeReceiver().visit(v, q), onType);
+        RpcObjectData end = q.take();
+        if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
+        }
+    }
+
     public static Builder builder() {
         return new Builder();
     }
 
     public static class Builder implements Supplier<GoRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
-        private List<RecipeBundleResolver> resolvers = Collections.emptyList();
+        private List<RecipeBundleResolver> resolvers = emptyList();
         private final Map<String, String> environment = new HashMap<>();
         private Supplier<@Nullable Path> goBinaryPathSupplier = () -> null;
         private Duration timeout = Duration.ofSeconds(60);

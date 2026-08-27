@@ -34,7 +34,9 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.function.Supplier;
 
 public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
@@ -61,7 +63,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style, SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingStyle, @Nullable Tree stopAfter) {
-        this.style = style;
+        // Indent math measures a tab as `tabSize` columns and divides by it, so only a positive width has meaning
+        this.style = style.getTabSize() > 0 ? style : style.withTabSize(IntelliJ.tabsAndIndents().getTabSize());
         this.wrappingStyle = wrappingStyle;
         this.stopAfter = stopAfter;
     }
@@ -417,7 +420,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
-        if (container == null || container.getElements().isEmpty() || container.getElements().stream().allMatch(elem -> elem instanceof J.Empty)) {
+        if (container == null || container.getElements().isEmpty() || container.getElements().stream().allMatch(J.Empty.class::isInstance)) {
             return super.visitContainer(container, loc, p);
         }
 
@@ -731,7 +734,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             } else {
                 len = text.length() + shift;
             }
-            if (len >= 0) {
+            if (len >= 0 && len < text.length()) {
                 text.delete(len, text.length());
             }
         }

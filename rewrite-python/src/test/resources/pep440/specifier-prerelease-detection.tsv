@@ -1,0 +1,18 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_specifiers.py (test_specifier_prereleases_detection)
+# Retrieved: 2026-07-16
+# specifier<TAB>whether the clause itself references a prerelease version.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+==1.0	false
+>=1.0	false
+<=1.0	false
+~=1.0	false
+<1.0	false
+>1.0	false
+<1.0.dev1	true
+>1.0.dev1	true
+!=1.0.dev1	false
+==1.0.*	false
+==1.0.dev1	true
+>=1.0.dev1	true
+<=1.0.dev1	true
+~=1.0.dev1	true

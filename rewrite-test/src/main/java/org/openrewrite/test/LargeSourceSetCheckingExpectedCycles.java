@@ -66,6 +66,11 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     }
 
     @Override
+    public void onGenerateInvalidPath(Path sourcePath) {
+        fail("Recipe generated a source file with an invalid path: " + sourcePath);
+    }
+
+    @Override
     public void afterCycle(boolean lastCycle) {
         boolean detectedChangeInThisCycle = false;
         Map<SourceFile, SourceFile> thisCycleEdits = new HashMap<>();

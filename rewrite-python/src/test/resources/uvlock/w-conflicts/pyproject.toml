@@ -1,0 +1,16 @@
+[project]
+name = "confproj"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+cpu = ["foo"]
+cuda = ["bar"]
+
+[tool.uv.sources]
+foo = { path = "libs/foo" }
+bar = { path = "libs/bar" }
+
+[tool.uv]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }]]

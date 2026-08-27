@@ -207,6 +207,28 @@ class XmlSendReceiveTest implements RewriteTest {
     }
 
     @Test
+    void sendReceiveProcessingInstructionWithoutData() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = server.visit((SourceFile) tree, NoOp.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return t;
+              }
+          })),
+          xml(
+            """
+              <?xml version="1.0"?>
+              <?xml-stylesheet?>
+              <root/>
+              """
+          )
+        );
+    }
+
+    @Test
     void sendReceiveCdata() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {

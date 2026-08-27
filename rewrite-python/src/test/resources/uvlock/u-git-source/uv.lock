@@ -1,0 +1,19 @@
+version = 1
+revision = 3
+requires-python = ">=3.9"
+
+[[package]]
+name = "gitprobe"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "six" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "six", git = "https://github.com/benjaminp/six?tag=1.17.0" }]
+
+[[package]]
+name = "six"
+version = "1.17.0"
+source = { git = "https://github.com/benjaminp/six?tag=1.17.0#ebd9b3af90247b8858d415a05e96e9ee61e48d07" }

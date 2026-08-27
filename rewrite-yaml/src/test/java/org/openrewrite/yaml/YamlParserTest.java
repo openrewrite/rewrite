@@ -863,4 +863,59 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void tagOnItsOwnLineBeforeSequence() {
+        rewriteRun(
+          yaml(
+            """
+              Resources:
+                Parameters:
+                  PrivateSubnets:
+                    !Join
+                      - ','
+                      - - a
+                        - b
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagOnItsOwnLineBeforeSequenceWithSameIndentation() {
+        rewriteRun(
+          yaml(
+            """
+              PrivateSubnets:
+                !Join
+                - ','
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagBeforeSequenceWithDashesAtColumnZero() {
+        rewriteRun(
+          yaml(
+            """
+              PrivateSubnets: !Join
+              - ','
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagOnRootSequence() {
+        rewriteRun(
+          yaml(
+            """
+              !!seq
+              - Alice
+              - Bob
+              """
+          )
+        );
+    }
 }

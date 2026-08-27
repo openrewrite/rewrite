@@ -1,5 +1,42 @@
-from rewrite.python import AutoFormat
-from rewrite.test import rewrite_run, python, RecipeSpec
+from rewrite import random_id
+from rewrite.java import Assert, J, P, Unary, JLeftPadded
+from rewrite.java.support_types import Space
+from rewrite.markers import Markers
+from rewrite.python import AutoFormat, PythonVisitor
+from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
+
+
+class NegateAssertCondition(PythonVisitor):
+    def visit_assert(self, assert_: Assert, p: P) -> J:
+        a = super().visit_assert(assert_, p)
+        if isinstance(a.condition, Unary) and a.condition.operator == Unary.Type.Not:
+            return a
+        negated = Unary(
+            random_id(),
+            a.condition.prefix,
+            Markers.EMPTY,
+            JLeftPadded(Space.EMPTY, Unary.Type.Not, Markers.EMPTY),
+            a.condition.replace(_prefix=Space.EMPTY),
+            None,
+        )
+        return a.replace(_condition=negated)
+
+
+def test_not_added_by_recipe_gets_space_from_autoformat():
+    # given a recipe that wraps the condition in `not` without a space (as InvertCondition does),
+    # when auto-format runs afterwards, then the required space is inserted
+    rewrite_run(
+        # language=python
+        python(
+            "assert x",
+            "assert not x"
+        ),
+        spec=RecipeSpec()
+        .with_recipes(
+            from_visitor(NegateAssertCondition()),
+            AutoFormat()
+        )
+    )
 
 
 def test_fix_missing_space_around_assignment():

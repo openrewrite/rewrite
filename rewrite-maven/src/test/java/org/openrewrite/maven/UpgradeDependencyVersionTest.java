@@ -16,10 +16,13 @@
 package org.openrewrite.maven;
 
 import com.google.common.collect.Lists;
+import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.tls.HandshakeCertificates;
+import okhttp3.tls.HeldCertificate;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -27,14 +30,18 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
+import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.net.InetAddress;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -1271,6 +1278,60 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void upgradesExistingParentOverridePropertyInSamePom() {
+        // Child pom redeclares a parent-managed version property below the managed value.
+        // overrideManagedVersion=true should bump that local property rather than leaving it orphaned
+        // (or adding a redundant explicit <version> that RemoveRedundantDependencyVersions would strip).
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
+          pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>3.3.0</version>
+                  </parent>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <flyway.version>10.10.0</flyway.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.flywaydb</groupId>
+                          <artifactId>flyway-core</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>3.3.0</version>
+                  </parent>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <flyway.version>10.15.0</flyway.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.flywaydb</groupId>
+                          <artifactId>flyway-core</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4193")
     @Test
     void upgradeVersionDefinedViaExplicitPropertyInRemoteParent() {
@@ -2382,6 +2443,58 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               )
             );
         }
+
+        @Test
+        void retainVersionWithoutArtifactIdFailsValidation() {
+            assertThat(new UpgradeDependencyVersion("*", "jackson*", "latest.patch", null, null,
+              singletonList("com.jcraft")).validate().isValid()).isFalse();
+        }
+
+        @Test
+        void blankRetainVersionIsIgnored() {
+            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("*", "spring-cloud-config*", "3.1.4", null, true, singletonList(""))),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-config-dependencies</artifactId>
+                          <version>3.1.2</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-config-dependencies</artifactId>
+                          <version>3.1.4</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """
+              )
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
@@ -3048,7 +3161,21 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
     void bomUpgradeSkipsSnapshotVersions() throws Exception {
+        // Serve over TLS: MavenPomDownloader#normalizeRepository probes https first and only falls back to
+        // http once that fails, so a plaintext mock costs two doomed handshakes per repository before anything
+        // resolves.
+        HeldCertificate certificate = new HeldCertificate.Builder()
+          .addSubjectAlternativeName(InetAddress.getByName("localhost").getCanonicalHostName())
+          .build();
+        HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+          .heldCertificate(certificate)
+          .build();
+        HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+          .addTrustedCertificate(certificate.certificate())
+          .build();
+
         try (var mockRepo = new MockWebServer()) {
+            mockRepo.useHttps(serverCertificates.sslSocketFactory(), false);
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
@@ -3168,7 +3295,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         <mirror>
                             <mirrorOf>*</mirrorOf>
                             <name>mock</name>
-                            <url>http://%s:%d</url>
+                            <url>https://%s:%d</url>
                             <id>mock</id>
                         </mirror>
                     </mirrors>
@@ -3176,10 +3303,18 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 """.formatted(mockRepo.getHostName(), mockRepo.getPort())
             ), new InMemoryExecutionContext());
 
+            OkHttpClient client = new OkHttpClient.Builder()
+              .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+              .connectTimeout(Duration.ofSeconds(1))
+              .readTimeout(Duration.ofSeconds(1))
+              .build();
+
             rewriteRun(
               spec -> spec
                 .recipe(new UpgradeDependencyVersion("com.example", "my-lib", "2.x", null, true, null))
-                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                .executionContext(MavenExecutionContextView.view(
+                    HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+                      .setHttpSender(new OkHttpSender(client)))
                   .setMavenSettings(settings, "mock")),
               pomXml(
                 """

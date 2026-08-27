@@ -130,6 +130,30 @@ export class RpcSendQueue {
         return result;
     }
 
+    /**
+     * Send a bare list (no enclosing object) and return the complete batch terminated by
+     * END_OF_OBJECT. Used by self-contained responses like DependencyTypes, where the peer
+     * drains one list of ref-deduplicated elements rather than a tree.
+     */
+    async generateList<T>(after: T[] | undefined,
+                          id: (value: T) => any,
+                          onChange: (value: T) => Promise<any>): Promise<RpcObjectData[]> {
+        await this.sendList(after, undefined, id, onChange);
+        return this.finish();
+    }
+
+    /**
+     * Terminate a hand-composed batch: append END_OF_OBJECT and return the accumulated data,
+     * resetting the queue. Lets a caller emit several {@link sendList}s into one stream that the
+     * peer drains as consecutive lists (e.g. DependencyTypes sends its FQN list then its type list).
+     */
+    finish(): RpcObjectData[] {
+        const result = this.q;
+        result.push({state: RpcObjectState.END_OF_OBJECT});
+        this.q = [];
+        return result;
+    }
+
     private put(d: RpcObjectData): void {
         if (this.trace) {
             d.trace = trace("Sender");
@@ -163,6 +187,12 @@ export class RpcSendQueue {
                 await this.add(after, onChange);
             } else if (after === undefined) {
                 this.put({state: RpcObjectState.DELETE});
+            } else if (isRef(after)) {
+                // A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+                // instance may be aliased by any number of other slots and source files. A CHANGE would
+                // be applied to that shared instance in place, corrupting every alias, so the new value
+                // is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+                await this.add(after, onChange);
             } else {
                 let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
                 this.put({state: RpcObjectState.CHANGE, value: onChange || afterCodec ? undefined : after});
@@ -191,12 +221,16 @@ export class RpcSendQueue {
                     const aBefore = before?.[beforePos];
                     if (aBefore === anAfter) {
                         this.put({state: RpcObjectState.NO_CHANGE});
-                    } else if (anAfter !== undefined && this.typesAreDifferent(anAfter, aBefore)) {
-                        // Type changed - treat as ADD
+                    } else if (anAfter !== undefined && (isRef(anAfter) || this.typesAreDifferent(anAfter, aBefore))) {
+                        // Type changed - treat as ADD. Ref-deduplicated items are also always
+                        // re-added rather than CHANGEd (see send()).
                         await this.add(anAfter, onChangeRun);
                     } else {
-                        this.put({state: RpcObjectState.CHANGE});
-                        await this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter, this.sourceFileType));
+                        const afterCodec = onChangeRun ? undefined : RpcCodecs.forInstance(anAfter, this.sourceFileType);
+                        // Without an onChange callback or codec, no property messages follow, so the
+                        // value must travel inline (as in send()) or the receiver keeps the stale element
+                        this.put({state: RpcObjectState.CHANGE, value: onChangeRun || afterCodec ? undefined : anAfter});
+                        await this.doChange(anAfter, aBefore, onChangeRun, afterCodec);
                     }
                 }
             }
@@ -225,7 +259,7 @@ export class RpcSendQueue {
         let ref: number | undefined;
         if (isRef(after)) {
             ref = this.refs.get(after);
-            if (ref) {
+            if (ref !== undefined) {
                 this.put({
                     state: RpcObjectState.ADD,
                     ref

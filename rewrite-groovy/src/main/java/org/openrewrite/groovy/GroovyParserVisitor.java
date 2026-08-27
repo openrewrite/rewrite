@@ -197,6 +197,20 @@ public class GroovyParserVisitor {
         }
 
         for (ClassNode aClass : ast.getClasses()) {
+            if (aClass.getName().equals(ast.getMainClassName())) {
+                for (FieldNode field : aClass.getFields()) {
+                    if (isFieldDeclaration(field)) {
+                        // The @Field transform leaves a null ConstantExpression in the script body, but the generated
+                        // script field retains the declaration's type and initializer. Restore the source annotation
+                        // and replace that placeholder statement with the field.
+                        ClassNode fieldAnnotationType = new ClassNode(Field.class);
+                        if (field.getAnnotations(fieldAnnotationType).isEmpty()) {
+                            field.addAnnotation(new AnnotationNode(fieldAnnotationType));
+                        }
+                        sortedByPosition.put(pos(field), field);
+                    }
+                }
+            }
             // skip over the synthetic script class
             if (!aClass.getName().equals(ast.getMainClassName()) || !aClass.getName().endsWith("doesntmatter")) {
                 // synthetic helper classes Groovy generates for traits hold the bodies of trait methods/fields;
@@ -943,7 +957,7 @@ public class GroovyParserVisitor {
                     typeMapping.variableType(field)
             );
 
-            if (field.getInitialExpression() != null) {
+            if (field.getInitialExpression() != null && !(field.getInitialExpression() instanceof EmptyExpression)) {
                 Space beforeAssign = sourceBefore("=");
                 Expression initializer = visitor.doVisit(field.getInitialExpression());
                 namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
@@ -2397,7 +2411,7 @@ public class GroovyParserVisitor {
                     return new J.ForLoop(randomId(), prefix, Markers.EMPTY,
                             new J.ForLoop.Control(randomId(), controlFmt,
                                     Markers.EMPTY, init, condition, update),
-                            JRightPadded.build(doVisit(forLoop.getLoopBlock())));
+                            JRightPadded.build(visitLoopBody(forLoop.getLoopBlock())));
                 } else {
                     Parameter param = forLoop.getVariable();
                     Space paramFmt = whitespace();
@@ -2427,7 +2441,7 @@ public class GroovyParserVisitor {
 
                     return new J.ForEachLoop(randomId(), prefix, forEachMarkers,
                             new J.ForEachLoop.Control(randomId(), controlFmt, Markers.EMPTY, variable, iterable),
-                            JRightPadded.build(doVisit(forLoop.getLoopBlock())));
+                            JRightPadded.build(visitLoopBody(forLoop.getLoopBlock())));
                 }
             }));
         }
@@ -2760,7 +2774,8 @@ public class GroovyParserVisitor {
                             }
                             ClosureExpression cl = (ClosureExpression) arg;
                             ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                            for (Parameter p : cl.getParameters()) {
+                            Parameter[] clParameters = cl.getParameters();
+                            for (Parameter p : clParameters == null ? Parameter.EMPTY_ARRAY : clParameters) {
                                 if (p.isDynamicTyped()) {
                                     p.setType(actualParamTypeRaw);
                                     p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
@@ -2849,7 +2864,8 @@ public class GroovyParserVisitor {
                         }
                         ClosureExpression cl = (ClosureExpression) arg;
                         ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                        for (Parameter p : cl.getParameters()) {
+                        Parameter[] clParameters = cl.getParameters();
+                        for (Parameter p : clParameters == null ? Parameter.EMPTY_ARRAY : clParameters) {
                             if (p.isDynamicTyped()) {
                                 p.setType(actualParamTypeRaw);
                                 p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
@@ -3372,7 +3388,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitDoWhileLoop(DoWhileStatement loop) {
             Space fmt = sourceBefore("do");
-            Statement body = doVisit(loop.getLoopBlock());
+            Statement body = visitLoopBody(loop.getLoopBlock());
             Space beforeWhile = sourceBefore("while");
             J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                     JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
@@ -3389,8 +3405,27 @@ public class GroovyParserVisitor {
                     new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                             JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
                                     .withAfter(sourceBefore(")"))),
-                    JRightPadded.build(doVisit(loop.getLoopBlock()))
+                    JRightPadded.build(visitLoopBody(loop.getLoopBlock()))
             ));
+        }
+
+        /**
+         * An {@link EmptyStatement} loop body, as in {@code for (...);}, contributes nothing to the queue. The
+         * terminating {@code ;} is carried on the {@link J.Empty} as a marker, since the Groovy printer emits
+         * statement terminators only where the source has one.
+         */
+        private Statement visitLoopBody(org.codehaus.groovy.ast.stmt.Statement loopBlock) {
+            Statement body = doVisit(loopBlock);
+            if (body != null) {
+                return body;
+            }
+            Space prefix = whitespace();
+            Markers markers = Markers.EMPTY;
+            if (cursor < source.length() && source.charAt(cursor) == ';') {
+                skip(";");
+                markers = markers.add(new Semicolon(randomId()));
+            }
+            return new J.Empty(randomId(), prefix, markers);
         }
 
         private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends ASTNode> nodes,
@@ -3485,6 +3520,11 @@ public class GroovyParserVisitor {
             MethodNode methodNode = (MethodNode) node;
             RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
             classVisitor.visitMethod(methodNode);
+            return JRightPadded.build(classVisitor.pollQueue());
+        } else if (node instanceof FieldNode) {
+            FieldNode fieldNode = (FieldNode) node;
+            RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
+            classVisitor.visitField(fieldNode);
             return JRightPadded.build(classVisitor.pollQueue());
         } else if (node instanceof ImportNode) {
             ImportNode importNode = (ImportNode) node;
@@ -3609,6 +3649,15 @@ public class GroovyParserVisitor {
 
     private static LineColumn pos(ASTNode node) {
         return new LineColumn(node.getLineNumber(), node.getColumnNumber());
+    }
+
+    private boolean isFieldDeclaration(FieldNode field) {
+        if (!appearsInSource(field)) {
+            return false;
+        }
+        int offset = sourceLineNumberOffsets[field.getLineNumber() - 1] + field.getColumnNumber() - 1;
+        return source.startsWith("@" + Field.class.getSimpleName(), offset) ||
+                source.startsWith("@" + Field.class.getCanonicalName(), offset);
     }
 
     private static boolean isSynthetic(ASTNode node) {

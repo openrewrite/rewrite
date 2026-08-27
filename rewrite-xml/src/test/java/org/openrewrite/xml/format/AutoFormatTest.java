@@ -114,4 +114,112 @@ class AutoFormatTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingCommentStaysOnSameLine() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes>
+                  <exclude>com.example.profit.ProfitFactory.processProfit.1</exclude> <!--tmp logic, tested elsewhere-->
+                  <exclude>com.example.profit.io.ProfitUtils</exclude><!--tmp logic, tested elsewhere-->
+                </excludes>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommentAfterTagContentStaysOnSameLine() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes>
+                  <exclude>a</exclude> <!--why a-->
+                </excludes> <!--why excludes-->
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void misindentedTrailingCommentIsStillIndented() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes>
+                  <exclude>a</exclude>
+              <!--why a-->
+                </excludes>
+              </project>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes>
+                  <exclude>a</exclude>
+                  <!--why a-->
+                </excludes>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentAfterRootElementIsRetained() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes/>
+              </project>
+              <!--why project-->
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentTrailingRootElementIsRetained() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes/>
+              </project> <!--why project-->
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingWhitespaceAfterRootElementIsRemoved() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes/>
+              </project>   \s
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                <excludes/>
+              </project>
+              """
+          )
+        );
+    }
 }

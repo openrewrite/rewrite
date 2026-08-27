@@ -1,0 +1,12 @@
+[project]
+name = "edtest"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "foo; sys_platform == 'darwin'",
+]
+
+[tool.uv.sources]
+foo = { path = "libs/foo", editable = true }
+
+[tool.uv]

@@ -529,4 +529,32 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void methodDeclarationWithTypeConstraints() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              class Original
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original
+
+              class A {
+                  fun <T> foo(t: T): Original where T : CharSequence = Original()
+              }
+              """,
+            """
+              import x.y.Target
+
+              class A {
+                  fun <T> foo(t: T): Target where T : CharSequence = Target()
+              }
+              """
+          )
+        );
+    }
 }

@@ -28,8 +28,9 @@ import java.util.Set;
 
 public class RemoveDuplicatePluginDeclarations extends Recipe {
 
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
-    private static final XPathMatcher PLUGIN_MANAGEMENT_PLUGINS_MATCHER = new XPathMatcher("/project/build/pluginManagement/plugins");
+    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("//build/plugins");
+    private static final XPathMatcher PLUGIN_MANAGEMENT_PLUGINS_MATCHER = new XPathMatcher("//build/pluginManagement/plugins");
+    private static final XPathMatcher REPORTING_PLUGINS_MATCHER = new XPathMatcher("//reporting/plugins");
 
     @Getter
     final String displayName = "Remove duplicate plugin declarations";
@@ -45,7 +46,13 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if (PLUGINS_MATCHER.matches(getCursor()) || PLUGIN_MANAGEMENT_PLUGINS_MATCHER.matches(getCursor())) {
+                if (isInsideConfiguration()) {
+                    return t;
+                }
+
+                if (PLUGINS_MATCHER.matches(getCursor()) ||
+                    PLUGIN_MANAGEMENT_PLUGINS_MATCHER.matches(getCursor()) ||
+                    REPORTING_PLUGINS_MATCHER.matches(getCursor())) {
                     Set<String> seenPlugins = new HashSet<>();
                     return t.withContent(ListUtils.filter(t.getContent(), content -> {
                         if (content instanceof Xml.Tag) {
@@ -63,6 +70,17 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 }
 
                 return t;
+            }
+
+            /**
+             * Plugin {@code <configuration>} is free-form XML that a plugin interprets itself, so repeated
+             * elements there are meaningful rather than duplicates.
+             */
+            private boolean isInsideConfiguration() {
+                return getCursor().getPathAsStream(o -> o instanceof Xml.Tag &&
+                                                       "configuration".equals(((Xml.Tag) o).getName()))
+                        .findAny()
+                        .isPresent();
             }
         };
     }

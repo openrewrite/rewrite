@@ -1,0 +1,19 @@
+version = 1
+revision = 3
+requires-python = ">=3.10"
+
+[[package]]
+name = "edtest"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "foo", marker = "sys_platform == 'darwin'" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "foo", marker = "sys_platform == 'darwin'", editable = "libs/foo" }]
+
+[[package]]
+name = "foo"
+version = "0.1.0"
+source = { editable = "libs/foo" }

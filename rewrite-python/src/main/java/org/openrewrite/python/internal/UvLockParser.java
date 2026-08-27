@@ -30,8 +30,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
 /**
  * Parses uv.lock files (TOML format) to extract resolved dependency information.
@@ -48,13 +52,13 @@ public class UvLockParser {
     public static List<ResolvedDependency> findAndParse(Path pyprojectDir, @Nullable Path boundary) {
         Path lockFile = findLockFile(pyprojectDir, boundary);
         if (lockFile == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         try {
             String content = new String(Files.readAllBytes(lockFile), StandardCharsets.UTF_8);
             return parse(content);
         } catch (IOException e) {
-            return Collections.emptyList();
+            return emptyList();
         }
     }
 
@@ -78,14 +82,6 @@ public class UvLockParser {
     }
 
     /**
-     * Check whether a poetry.lock or pdm.lock file exists near the given directory.
-     */
-    public static boolean hasAlternativeLockFile(Path startDir, @Nullable Path boundary) {
-        return findLockFile(startDir, boundary, "poetry.lock") != null ||
-               findLockFile(startDir, boundary, "pdm.lock") != null;
-    }
-
-    /**
      * Parse uv.lock content into a list of resolved dependencies.
      */
     public static List<ResolvedDependency> parse(String content) {
@@ -95,33 +91,21 @@ public class UvLockParser {
                 content
         );
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
+                singletonList(input),
                 null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         if (parsed.isEmpty() || !(parsed.get(0) instanceof Toml.Document)) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         Toml.Document doc = (Toml.Document) parsed.get(0);
         return extractPackages(doc);
     }
 
-    /**
-     * Two-pass extraction:
-     * 1. Create all ResolvedDependency objects (without transitive deps linked)
-     * 2. Link transitive dependencies by looking up names in the resolved map
-     * <p>
-     * Python resolution is flat (one version per package), so each dependency
-     * name maps to exactly one ResolvedDependency.
-     */
     private static List<ResolvedDependency> extractPackages(Toml.Document doc) {
-        // Pass 1: Create all resolved entries and collect raw dependency names per package
-        List<ResolvedDependency> resolved = new ArrayList<>();
-        Map<String, ResolvedDependency> byNormalizedName = new LinkedHashMap<>();
-        Map<String, List<String>> rawDepsPerPackage = new LinkedHashMap<>();
-
+        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>();
         for (TomlValue value : doc.getValues()) {
             if (!(value instanceof Toml.Table)) {
                 continue;
@@ -137,37 +121,10 @@ public class UvLockParser {
                 continue;
             }
 
-            String source = extractSource(table);
-            List<String> depNames = extractDependencyNames(table);
-
-            ResolvedDependency entry = new ResolvedDependency(name, version, source, null);
-            resolved.add(entry);
-            byNormalizedName.put(PythonResolutionResult.normalizeName(name), entry);
-            if (!depNames.isEmpty()) {
-                rawDepsPerPackage.put(PythonResolutionResult.normalizeName(name), depNames);
-            }
+            packages.add(new PythonResolutionLinker.UnlinkedPackage(
+                    name, version, extractSource(table), extractDependencyNames(table)));
         }
-
-        // Pass 2: Link transitive dependencies
-        List<ResolvedDependency> linked = new ArrayList<>(resolved.size());
-        for (ResolvedDependency entry : resolved) {
-            String normalizedName = PythonResolutionResult.normalizeName(entry.getName());
-            List<String> depNames = rawDepsPerPackage.get(normalizedName);
-            if (depNames != null) {
-                List<ResolvedDependency> deps = new ArrayList<>();
-                for (String depName : depNames) {
-                    ResolvedDependency dep = byNormalizedName.get(PythonResolutionResult.normalizeName(depName));
-                    if (dep != null) {
-                        deps.add(dep);
-                    }
-                }
-                linked.add(entry.withDependencies(deps.isEmpty() ? null : deps));
-            } else {
-                linked.add(entry);
-            }
-        }
-
-        return linked;
+        return PythonResolutionLinker.buildGraph(packages);
     }
 
     /**
@@ -239,6 +196,6 @@ public class UvLockParser {
                 return names;
             }
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 }

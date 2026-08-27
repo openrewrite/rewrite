@@ -1,0 +1,8 @@
+[project]
+name = "fixture-o"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "six==1.16.0",
+    "iniconfig>=2.0",
+]

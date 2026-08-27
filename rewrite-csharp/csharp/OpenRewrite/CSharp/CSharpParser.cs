@@ -2155,6 +2155,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            attributeLists.Add((AttributeList)Visit(attrList)!);
+        }
+
         // Parse modifiers
         var modifiers = new List<Modifier>();
         foreach (var mod in node.Modifiers)
@@ -2225,9 +2231,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             _cursor = node.SemicolonToken.Span.End;
         }
 
-        return new PropertyDeclaration(
+        var propertyDecl = new PropertyDeclaration(
             Guid.NewGuid(),
-            prefix,
+            attributeLists.Count > 0 ? Space.Empty : prefix,
             Markers.Empty,
             [],
             modifiers,
@@ -2238,6 +2244,19 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             expressionBody,
             initializer
         );
+
+        if (attributeLists.Count > 0)
+        {
+            return new AnnotatedStatement(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                attributeLists,
+                propertyDecl
+            );
+        }
+
+        return propertyDecl;
     }
 
     private new Block VisitAccessorList(AccessorListSyntax node)
@@ -4002,6 +4021,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var firstSemiPrefix = ExtractSpaceBefore(node.FirstSemicolonToken);
         _cursor = node.FirstSemicolonToken.Span.End;
 
+        if (init.Count == 0)
+        {
+            var empty = new Empty(Guid.NewGuid(), firstSemiPrefix, Markers.Empty);
+            init.Add(new JRightPadded<Statement>(empty, Space.Empty, Markers.Empty));
+        }
+
         // Parse condition
         Expression? condExpr = null;
         if (node.Condition != null)
@@ -4592,9 +4617,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Skip past the literal token
         _cursor = node.Token.Span.End;
 
-        var type = node.Kind() == SyntaxKind.NumericLiteralExpression
-            ? _typeMapping?.Type(node) as JavaType.Primitive ?? GetPrimitiveType(node.Kind())
-            : GetPrimitiveType(node.Kind());
+        JavaType.Primitive? type;
+        if (node.Kind() == SyntaxKind.NumericLiteralExpression)
+        {
+            // Derive value and type together from the constant's runtime type so
+            // they cannot disagree (e.g. 234.7m must not be typed Int).
+            (value, type) = NormalizeNumericLiteral(value);
+        }
+        else
+        {
+            type = GetPrimitiveType(node.Kind());
+        }
 
         return new Literal(
             Guid.NewGuid(),
@@ -8523,6 +8556,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 );
             }
 
+            if (result is ArrayType outermost)
+            {
+                result = outermost.WithType(_typeMapping?.Type(arrayType));
+            }
+
             return result;
         }
         else if (type is TupleTypeSyntax tupleType)
@@ -8738,7 +8776,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             [],
             rightText,
-            null,
+            _typeMapping?.Type(qualified.Right),
             null
         );
 
@@ -8748,7 +8786,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             left,
             new JLeftPadded<Identifier>(dotSpace, right),
-            null
+            _typeMapping?.Type(qualified)
         );
     }
 
@@ -9579,8 +9617,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var space = Space.FormatWithComments(whitespace);
         if (space.Comments.Count == 0)
+        {
             _spaceCache[whitespace] = space;
-        return space;
+            return space;
+        }
+
+        // Structure any /// doc comments into the CsDocComment tree via Roslyn's XML parse.
+        return CsDocCommentParser.StructureDocComments(space);
     }
 
     /// <summary>
@@ -10245,6 +10288,28 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             callingConvention, unmanagedConventionTypes,
             new JContainer<TypeTree>(angleBracketSpace, paramTypes, Markers.Empty), null);
     }
+
+    /// <summary>
+    /// Maps a numeric literal constant to a (value, type) pair whose runtime type matches
+    /// the declared primitive. decimal/uint/ulong have no Java equivalent: decimal narrows
+    /// to double, uint widens to long, and ulong reinterprets its bits as a signed long;
+    /// the original text is preserved in ValueSource so printing is unaffected.
+    /// </summary>
+    private static (object? Value, JavaType.Primitive Type) NormalizeNumericLiteral(object? value) => value switch
+    {
+        int i => (i, JavaType.Primitive.Of(JavaType.PrimitiveKind.Int)),
+        long l => (l, JavaType.Primitive.Of(JavaType.PrimitiveKind.Long)),
+        float f => (f, JavaType.Primitive.Of(JavaType.PrimitiveKind.Float)),
+        double d => (d, JavaType.Primitive.Of(JavaType.PrimitiveKind.Double)),
+        decimal m => ((double)m, JavaType.Primitive.Of(JavaType.PrimitiveKind.Double)),
+        uint u => ((long)u, JavaType.Primitive.Of(JavaType.PrimitiveKind.Long)),
+        ulong ul => (unchecked((long)ul), JavaType.Primitive.Of(JavaType.PrimitiveKind.Long)),
+        short s => (s, JavaType.Primitive.Of(JavaType.PrimitiveKind.Short)),
+        sbyte sb => (sb, JavaType.Primitive.Of(JavaType.PrimitiveKind.Byte)),
+        ushort us => ((int)us, JavaType.Primitive.Of(JavaType.PrimitiveKind.Int)),
+        byte b => ((short)b, JavaType.Primitive.Of(JavaType.PrimitiveKind.Short)), // Java byte cannot hold 128-255
+        _ => (value, JavaType.Primitive.Of(JavaType.PrimitiveKind.Int))
+    };
 
     private static JavaType.Primitive? GetPrimitiveType(SyntaxKind kind)
     {

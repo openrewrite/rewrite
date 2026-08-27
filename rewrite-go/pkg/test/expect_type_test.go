@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 )
 
@@ -36,13 +38,11 @@ func main() {
 	_ = p
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ExpectType(t, cu, "p", "main.Point")
 }
 
-func TestExpectPrimitiveType_LocalVar(t *testing.T) {
+func TestExpectType_BasicType(t *testing.T) {
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", `package main
 
@@ -53,11 +53,9 @@ func main() {
 	_ = y
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ExpectPrimitiveType(t, cu, "x", "int")
-	ExpectPrimitiveType(t, cu, "y", "String")
+	require.NoError(t, err)
+	ExpectType(t, cu, "x", "int")
+	ExpectType(t, cu, "y", "string")
 }
 
 func TestExpectMethodType_StdlibInvocation(t *testing.T) {
@@ -70,9 +68,7 @@ func main() {
 	fmt.Println("hello")
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ExpectMethodType(t, cu, "Println", "fmt")
 }
 
@@ -84,8 +80,6 @@ func add(a int, b int) int {
 	return a + b
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ExpectMethodType(t, cu, "add", "main")
 }

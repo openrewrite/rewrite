@@ -1,4 +1,5 @@
 import ast
+import contextlib
 import dataclasses
 import sys
 import token
@@ -94,6 +95,7 @@ class ParserVisitor(ast.NodeVisitor):
             tokenize(BytesIO(tokenizer_source.encode('utf-8')).readline)
         )
         self._token_idx = 1  # Skip ENCODING token
+        self._type_context_depth = 0
 
     def _byte_offset_to_char_offset(self, lineno: int, byte_offset: int) -> int:
         """Convert a byte offset to a character offset for a given line."""
@@ -832,14 +834,15 @@ class ParserVisitor(ast.NodeVisitor):
         return multi_import
 
     def visit_alias(self, node):
+        alias_type = self._type_mapping.import_alias_type(node)
         return j.Import(
             random_id(),
             self.__whitespace(),
             Markers.EMPTY,
             self.__pad_left(Space.EMPTY, False),
-            self.__convert_qualified_name(node.name),
+            self.__convert_qualified_name(node.name, alias_type),
             None if not node.asname else
-            self.__pad_left(self.__source_before('as'), self.__convert_name(node.asname))
+            self.__pad_left(self.__source_before('as'), self.__convert_name(node.asname, alias_type))
         )
 
     def visit_keyword(self, node):
@@ -863,7 +866,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self._type_mapping.type(node.value),
             )
 
-    def __convert_qualified_name(self, name: str) -> j.FieldAccess:
+    def __convert_qualified_name(self, name: str, name_type: Optional[JavaType] = None) -> j.FieldAccess:
         if '.' not in name:
             return j.FieldAccess(
                 random_id(),
@@ -872,11 +875,14 @@ class ParserVisitor(ast.NodeVisitor):
                 j.Empty(random_id(), Space.EMPTY, Markers.EMPTY),
                 self.__pad_left(
                     Space.EMPTY,
-                    self.__convert_name(name)
+                    self.__convert_name(name, name_type)
                 ),
-                None
+                name_type
             )
-        return cast(j.FieldAccess, self.__convert_name(name))
+        # For dotted names only the outermost FieldAccess names the full path,
+        # so only it carries the type.
+        qualid = cast(j.FieldAccess, self.__convert_name(name))
+        return qualid.replace(type=name_type) if name_type is not None else qualid
 
     def visit_Global(self, node):
         return self.__visit_variable_scope(node, 'global', py.VariableScope.Kind.GLOBAL)
@@ -1055,7 +1061,8 @@ class ParserVisitor(ast.NodeVisitor):
         expr_type, field_type = self._type_mapping.attribute_type_info(node, receiver_type)
 
         if isinstance(name_ident, j.Identifier):
-            name_ident = dataclasses.replace(name_ident, _type=expr_type, _field_type=field_type)
+            name_ident = dataclasses.replace(name_ident, _type=expr_type,
+                                             _field_type=self.__binding_field_type(field_type))
 
         return j.FieldAccess(
             random_id(),
@@ -1156,9 +1163,28 @@ class ParserVisitor(ast.NodeVisitor):
 
         # Use __convert_match_pattern to handle parentheses (GROUP patterns)
         pattern = self.__convert_match_pattern(node.pattern)
-        if isinstance(pattern, py.MatchCase) and node.guard:
+        if node.guard:
             guard = self.__pad_left(self.__source_before('if'), self.__convert(node.guard))
-            pattern = pattern.padding.replace(guard=guard)
+            if isinstance(pattern, py.MatchCase):
+                pattern = pattern.padding.replace(guard=guard)
+            else:
+                kind = (py.MatchCase.Pattern.Kind.CAPTURE if isinstance(node.pattern, ast.MatchAs)
+                        else py.MatchCase.Pattern.Kind.VALUE)
+                pattern = py.MatchCase(
+                    random_id(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    py.MatchCase.Pattern(
+                        random_id(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        kind,
+                        JContainer(Space.EMPTY, [self.__pad_right(pattern, Space.EMPTY)], Markers.EMPTY),
+                        None
+                    ),
+                    guard,
+                    None
+                )
 
         return j.Case(
             random_id(),
@@ -1403,7 +1429,7 @@ class ParserVisitor(ast.NodeVisitor):
                             Markers.EMPTY,
                             cast(j.Identifier, self.__convert_name(kwd)),
                             _EMPTY_LIST,
-                            self.__pad_left(self.__source_before('='), self.__convert(node.kwd_patterns[i])),
+                            self.__pad_left(self.__source_before('='), self.__convert_match_pattern(node.kwd_patterns[i])),
                             None
                         ), Space.EMPTY)
                     ]
@@ -2199,11 +2225,14 @@ class ParserVisitor(ast.NodeVisitor):
         if node.returns is None:
             return_type = None
         else:
+            arrow = self.__source_before('->')
+            with self.__type_context():
+                returns = self.__convert(node.returns)
             return_type = py.TypeHint(
                 random_id(),
-                self.__source_before('->'),
+                arrow,
                 Markers.EMPTY,
-                self.__convert(node.returns),
+                returns,
                 self._type_mapping.type(node.returns)
             )
         body = self.__convert_block(node.body)
@@ -2578,6 +2607,20 @@ class ParserVisitor(ast.NodeVisitor):
         # Parsing complete - all tokens should be consumed
         return cu
 
+    @contextlib.contextmanager
+    def __type_context(self):
+        self._type_context_depth += 1
+        try:
+            yield
+        finally:
+            self._type_context_depth -= 1
+
+    def __binding_field_type(self, field_type):
+        """``field_type`` describes the variable an identifier resolves to, and a
+        type position names a type rather than binding one. ty's descriptors cannot
+        draw this line: the annotation ``int`` and a variable holding an int share one."""
+        return None if self._type_context_depth else field_type
+
     def visit_Name(self, node):
         space, actual_name = self.__consume_identifier(node.id)
         expr_type, field_type = self._type_mapping.name_type_info(node)
@@ -2588,7 +2631,7 @@ class ParserVisitor(ast.NodeVisitor):
             _EMPTY_LIST,
             actual_name,
             expr_type,
-            field_type
+            self.__binding_field_type(field_type)
         )
 
     def visit_NamedExpr(self, node):
@@ -2826,7 +2869,8 @@ class ParserVisitor(ast.NodeVisitor):
 
     def __convert_type(self, node) -> Optional[TypeTree]:
         prefix = self.__whitespace()
-        converted_type = self.__convert_internal(node, self.__convert_type, self.__convert_type_mapper)
+        with self.__type_context():
+            converted_type = self.__convert_internal(node, self.__convert_type, self.__convert_type_mapper)
         if isinstance(converted_type, TypeTree):
             return converted_type.replace(prefix=prefix)  # TypeTree base class doesn't have replace
         else:

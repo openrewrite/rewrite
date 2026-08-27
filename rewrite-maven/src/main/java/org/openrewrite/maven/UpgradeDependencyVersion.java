@@ -107,7 +107,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
-        return validated;
+        return validated.and(RetainVersions.validate("retainVersions", retainVersions));
     }
 
     String displayName = "Upgrade Maven dependency version";
@@ -207,7 +207,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator accumulator) {
-        MavenIsoVisitor<ExecutionContext> mavenVisitor = new MavenIsoVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             private final VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
             @Override
@@ -581,8 +581,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return null;
             }
         };
-
-        return mavenVisitor;
     }
 
     /**

@@ -222,7 +222,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
             first = false;
         }
 
-        if (!first) {
+        // `catch { }` has a parameter with no variables
+        if (!first && ret.variables.length > 0) {
             ret = produce(ret, draft => {
                 this.ensureSpace(draft.variables[0].element.prefix);
             });

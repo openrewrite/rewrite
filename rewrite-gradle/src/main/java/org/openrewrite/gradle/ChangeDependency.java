@@ -26,7 +26,6 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -36,15 +35,16 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Objects.requireNonNull;
 
@@ -52,14 +52,6 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulator> {
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
-
-    // Individual dependencies tend to appear in several places within a given dependency graph.
-    // Minimize the number of allocations by caching the updated dependencies.
-    @EqualsAndHashCode.Exclude
-    transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new ConcurrentHashMap<>();
-
-    @EqualsAndHashCode.Exclude
-    transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new ConcurrentHashMap<>();
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -166,7 +158,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     private boolean isGlobPattern() {
         return oldGroupId.contains("*") || oldGroupId.contains("?") ||
-               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+                oldArtifactId.contains("*") || oldArtifactId.contains("?");
     }
 
     public static class Accumulator {
@@ -227,6 +219,19 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                             }
                         });
 
+                // Also resolve for NEW-coord deps so survivor-upgrade can rewrite a variable that
+                // only the survivor references (the OLD dep might use a literal version).
+                new GradleDependency.Matcher()
+                        .groupId(newGroupId)
+                        .artifactId(newArtifactId)
+                        .get(getCursor())
+                        .ifPresent(dep -> {
+                            String varName = dep.getVersionVariable();
+                            if (varName != null && !StringUtils.isBlank(newVersion)) {
+                                resolveAndRecordVersion(varName, m, dep, ctx);
+                            }
+                        });
+
                 return m;
             }
 
@@ -257,10 +262,12 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         TreeVisitor<?, ExecutionContext> gradleVisitor = Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new JavaIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
-            final DependencyMatcher existingMatcher = requireNonNull(DependencyMatcher.build(newGroupId + ":" + newArtifactId + (newVersion == null ? "" : ":" + newVersion)).getValue());
+            final DependencyMatcher existingMatcher = requireNonNull(DependencyMatcher.build(newGroupId + ":" + newArtifactId).getValue());
 
             @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
+
+            final Set<String> configurationsWithSurvivorUpgrade = new HashSet<>();
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -294,29 +301,21 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             private JavaSourceFile maybeRemoveDuplicateTargetDependency(JavaSourceFile sourceFile, ExecutionContext ctx) {
                 Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
-                if (!maybeGp.isPresent()){
+                if (!maybeGp.isPresent()) {
                     return sourceFile;
                 }
                 for (GradleDependencyConfiguration c : maybeGp.get().getConfigurations()) {
                     boolean oldFound = false;
                     boolean newFound = false;
                     for (Dependency d : c.getRequested()) {
-                        String version = d.getVersion();
-                        if (version == null) {
-                            ResolvedDependency rd = c.findResolvedDependency(d.getGroupId(), d.getArtifactId());
-                            if (rd == null) {
-                                continue;
-                            } else {
-                                version = rd.getVersion();
-                            }
-                        }
-                        oldFound |= depMatcher.matches(d.getGroupId(), d.getArtifactId(), version);
-                        newFound |= existingMatcher.matches(d.getGroupId(), d.getArtifactId(), version);
+                        oldFound |= depMatcher.matches(d.getGroupId(), d.getArtifactId());
+                        newFound |= existingMatcher.matches(d.getGroupId(), d.getArtifactId());
                     }
                     if (oldFound && newFound) {
                         sourceFile = (JavaSourceFile) new RemoveDependency(oldGroupId, oldArtifactId, c.getName())
                                 .getVisitor()
                                 .visitNonNull(sourceFile, ctx);
+                        configurationsWithSurvivorUpgrade.add(c.getName());
                     }
                 }
                 return sourceFile;
@@ -326,22 +325,79 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
+                Optional<GradleDependency> maybeDep = new GradleDependency.Matcher()
                         .groupId(oldGroupId)
-                        .artifactId(oldArtifactId);
-
-                Optional<GradleDependency> maybeDep = gradleDependencyMatcher.get(getCursor());
-                if (!maybeDep.isPresent()) {
-                    return m;
+                        .artifactId(oldArtifactId)
+                        .get(getCursor());
+                if (maybeDep.isPresent()) {
+                    return updateDependency(m, maybeDep.get(), ctx);
                 }
 
-                return updateDependency(m, maybeDep.get(), ctx);
+                // Survivor-upgrade: if this method invocation is the pre-existing NEW-coord dep in a
+                // configuration where dedupe removed the old coord, upgrade its version to newVersion.
+                if (!StringUtils.isBlank(newVersion) && !configurationsWithSurvivorUpgrade.isEmpty()) {
+                    Optional<GradleDependency> maybeSurvivor = new GradleDependency.Matcher()
+                            .groupId(newGroupId)
+                            .artifactId(newArtifactId)
+                            .get(getCursor());
+                    if (maybeSurvivor.isPresent() &&
+                            configurationsWithSurvivorUpgrade.contains(maybeSurvivor.get().getConfigurationName())) {
+                        return upgradeSurvivorVersion(m, maybeSurvivor.get(), ctx);
+                    }
+                }
+                return m;
+            }
+
+            private J.MethodInvocation upgradeSurvivorVersion(J.MethodInvocation m, GradleDependency dep, ExecutionContext ctx) {
+                String declaredVersion = dep.getDeclaredVersion();
+                String varName = dep.getVersionVariable();
+                if (varName != null) {
+                    // Variable-backed: if the variable is safe to update (used only by OLD or NEW/survivor coords),
+                    // let visitVariable rewrite the shared variable value. Otherwise write a literal override
+                    // to this method invocation so we don't drag unrelated deps along with the variable change.
+                    if (canSafelyUpdateVariable(varName, depMatcher, existingMatcher, acc)) {
+                        return m;
+                    }
+                    Object scanResult = acc.versionVariableUpdates.get(varName);
+                    if (scanResult instanceof MavenDownloadingException) {
+                        return ((MavenDownloadingException) scanResult).warn(m);
+                    }
+                    if (scanResult instanceof String) {
+                        return dep.withDeclaredVersion((String) scanResult).getTree();
+                    }
+                    return m;
+                }
+                if (StringUtils.isBlank(declaredVersion) && !Boolean.TRUE.equals(overrideManagedVersion)) {
+                    // BOM-managed: don't add a version tag unless the caller opted in via overrideManagedVersion
+                    return m;
+                }
+                try {
+                    String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                            .select(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()),
+                                    dep.getConfigurationName(), newVersion, versionPattern, ctx);
+                    if (resolvedVersion != null && !resolvedVersion.equals(declaredVersion) &&
+                            !isDowngrade(declaredVersion, resolvedVersion)) {
+                        return dep.withDeclaredVersion(resolvedVersion).getTree();
+                    }
+                } catch (MavenDownloadingException e) {
+                    return e.warn(m);
+                }
+                return m;
+            }
+
+            private boolean isDowngrade(@Nullable String currentVersion, String candidateVersion) {
+                return !StringUtils.isBlank(currentVersion) &&
+                        Semver.compare(candidateVersion, currentVersion, Semver.Ecosystem.MAVEN) < 0;
+            }
+
+            private @Nullable DependencyMatcher survivorAlsoAllowed() {
+                return configurationsWithSurvivorUpgrade.isEmpty() ? null : existingMatcher;
             }
 
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
                 J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
-                if (!canUpdateVariable(v.getSimpleName())) {
+                if (!canSafelyUpdateVariable(v.getSimpleName(), depMatcher, survivorAlsoAllowed(), acc)) {
                     return v;
                 }
                 Object scanResult = acc.versionVariableUpdates.get(v.getSimpleName());
@@ -356,10 +412,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                 }
                 return v;
-            }
-
-            private boolean canUpdateVariable(String varName) {
-                return ChangeDependency.this.canUpdateVariable(varName, depMatcher, acc);
             }
 
             private J.MethodInvocation updateDependency(J.MethodInvocation m, GradleDependency dep, ExecutionContext ctx) {
@@ -377,7 +429,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 }
 
                 String varName = dep.getVersionVariable();
-                if (varName != null && !canUpdateVariable(varName)) {
+                if (varName != null && !canSafelyUpdateVariable(varName, depMatcher, survivorAlsoAllowed(), acc)) {
                     Object scanResult = acc.versionVariableUpdates.get(varName);
                     if (scanResult instanceof MavenDownloadingException) {
                         return ((MavenDownloadingException) scanResult).warn(m);
@@ -408,77 +460,49 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             }
 
             private GradleProject updateGradleModel(GradleProject gp, ExecutionContext ctx) {
-                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-                Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
-                boolean anyChanged = false;
-                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                    GradleDependencyConfiguration newGdc = gdc;
-                    newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
-                            requested = updatedRequested.computeIfAbsent(requested, r -> {
-                                GroupArtifactVersion gav = r.getGav();
-                                if (newGroupId != null) {
-                                    gav = gav.withGroupId(newGroupId);
-                                }
-                                if (newArtifactId != null) {
-                                    gav = gav.withArtifactId(newArtifactId);
-                                }
-                                if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
-                                    try {
-                                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                                .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), gdc.getName(), newVersion, versionPattern, ctx);
-                                        if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
-                                            gav = gav.withVersion(resolvedVersion);
-                                        }
-                                    } catch (MavenDownloadingException e) {
-                                        // Failure already in `metadataFailures`
-                                    }
-                                }
-                                if (gav != r.getGav()) {
-                                    r = r.withGav(gav);
-                                }
-                                return r;
-                            });
+                return gp.mapConfigurations(configuration -> {
+                    boolean isSurvivorConfig = configurationsWithSurvivorUpgrade.contains(configuration.getName());
+                    return configuration.mapDependencies(requested -> {
+                        boolean matchesOld = depMatcher.matches(requested.getGroupId(), requested.getArtifactId());
+                        boolean matchesNew = isSurvivorConfig && existingMatcher.matches(requested.getGroupId(), requested.getArtifactId());
+
+                        // In a survivor config, drop OLD-matched entries from the model — source-side
+                        // dedupe already removed them from the file. Renaming here would produce a
+                        // duplicate NEW-coord entry in the marker's requested list.
+                        if (matchesOld && isSurvivorConfig) {
+                            return null;
                         }
-                        return requested;
-                    }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
-                        assert resolved != null;
-                        if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
-                            resolved = updatedResolved.computeIfAbsent(resolved, r -> {
-                                ResolvedGroupArtifactVersion gav = r.getGav();
-                                if (newGroupId != null) {
-                                    gav = gav.withGroupId(newGroupId);
-                                }
-                                if (newArtifactId != null) {
-                                    gav = gav.withArtifactId(newArtifactId);
-                                }
-                                if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
-                                    try {
-                                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                                .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), gdc.getName(), newVersion, versionPattern, ctx);
-                                        if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion())) {
-                                            gav = gav.withVersion(resolvedVersion);
-                                        }
-                                    } catch (MavenDownloadingException e) {
-                                        // Failure already in `metadataFailures`
-                                    }
-                                }
-                                if (gav != r.getGav()) {
-                                    r = r.withGav(gav);
-                                }
-                                return r;
-                            });
+                        if (!matchesOld && !matchesNew) {
+                            return requested;
                         }
-                        return resolved;
-                    }));
-                    anyChanged |= newGdc != gdc;
-                    newNameToConfiguration.put(newGdc.getName(), newGdc);
-                }
-                if (anyChanged) {
-                    gp = gp.withNameToConfiguration(newNameToConfiguration);
-                }
-                return gp;
+
+                        GroupArtifactVersion gav = requested.getGav();
+                        if (matchesOld) {
+                            if (newGroupId != null) {
+                                gav = gav.withGroupId(newGroupId);
+                            }
+                            if (newArtifactId != null) {
+                                gav = gav.withArtifactId(newArtifactId);
+                            }
+                        }
+                        if (!StringUtils.isBlank(newVersion) &&
+                                (!StringUtils.isBlank(gav.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
+                            try {
+                                String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                        .select(new GroupArtifact(gav.getGroupId(), gav.getArtifactId()), configuration.getName(),
+                                                newVersion, versionPattern, ctx);
+                                // Survivor entries carry a pre-existing version the user chose — don't downgrade.
+                                if (resolvedVersion != null && !resolvedVersion.equals(gav.getVersion()) &&
+                                        !(matchesNew && !matchesOld && isDowngrade(gav.getVersion(), resolvedVersion))) {
+                                    gav = gav.withVersion(resolvedVersion);
+                                }
+                            } catch (MavenDownloadingException ignored) {
+                                // Failure is already recorded in metadataFailures.
+                            }
+                        }
+                        return gav == requested.getGav() ? requested : requested.withGav(gav);
+                    }, gp.getMavenRepositories(), ctx);
+                }, ctx);
             }
         });
 
@@ -501,7 +525,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         return new PropertiesVisitor<ExecutionContext>() {
                             @Override
                             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                                if (!canUpdateVariable(entry.getKey(), propsMatcher, acc)) {
+                                if (!canSafelyUpdateVariable(entry.getKey(), propsMatcher, acc)) {
                                     return entry;
                                 }
                                 Object scanResult = acc.versionVariableUpdates.get(entry.getKey());
@@ -525,13 +549,19 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         };
     }
 
-    private boolean canUpdateVariable(String varName, DependencyMatcher depMatcher, Accumulator acc) {
+    private boolean canSafelyUpdateVariable(String varName, DependencyMatcher depMatcher, Accumulator acc) {
+        return canSafelyUpdateVariable(varName, depMatcher, null, acc);
+    }
+
+    private boolean canSafelyUpdateVariable(String varName, DependencyMatcher depMatcher,
+                                            @Nullable DependencyMatcher alsoAllowed, Accumulator acc) {
         Set<GroupArtifact> usages = acc.versionVariableUsages.get(varName);
         if (usages == null) {
             return true;
         }
         for (GroupArtifact ga : usages) {
-            if (!depMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
+            if (!depMatcher.matches(ga.getGroupId(), ga.getArtifactId()) &&
+                    (alsoAllowed == null || !alsoAllowed.matches(ga.getGroupId(), ga.getArtifactId()))) {
                 return false;
             }
             if (acc.failedResolutions.contains(ga)) {

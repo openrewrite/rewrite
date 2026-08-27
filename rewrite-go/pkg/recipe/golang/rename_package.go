@@ -163,7 +163,7 @@ func withImportPath(imp *java.Import, newPath string) *java.Import {
 	c := *imp
 	if lit, ok := imp.Qualid.(*java.Literal); ok {
 		ln := *lit
-		ln.Value = `"` + newPath + `"`
+		ln.Value = newPath
 		ln.Source = `"` + newPath + `"`
 		c.Qualid = &ln
 	}

@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
@@ -259,6 +260,56 @@ class RecipeClassLoaderTest {
             assertThat(classLoader.loadClass("org.openrewrite.RecipeException").getClassLoader())
               .as("RecipeException stays parent-delegated under the Recipe-prefix entry")
               .isSameAs(parent);
+        }
+    }
+
+    @Test
+    void serviceInterfacesShouldDelegateToParent(@TempDir Path tempDir) throws Exception {
+        // Reproduces the ClassCastException a child-loaded ChangeType hits when it casts
+        // Py.CompilationUnit's parent-loaded PythonImportService to its own ImportService;
+        // see PARENT_DELEGATED_PREFIXES in RecipeClassLoader.
+        Path parentLib = tempDir.resolve("parent");
+        Files.createDirectories(parentLib.resolve("org/openrewrite/java/service"));
+        Files.write(parentLib.resolve("org/openrewrite/java/service/ImportService.class"),
+          stubClass("org/openrewrite/java/service/ImportService"));
+
+        Path childLib = tempDir.resolve("child");
+        Files.createDirectories(childLib.resolve("org/openrewrite/java/service"));
+        Files.write(childLib.resolve("org/openrewrite/java/service/ImportService.class"),
+          stubClass("org/openrewrite/java/service/ImportService"));
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{parentLib.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            assertThat(classLoader.loadClass("org.openrewrite.java.service.ImportService").getClassLoader())
+              .as("service interfaces cross the recipe/parent boundary and must be shared")
+              .isSameAs(parent);
+        }
+    }
+
+    @Test
+    void matcherTypesInSharedSignaturesShouldDelegateToParent(@TempDir Path tempDir) throws Exception {
+        String[] matchers = {
+          "org/openrewrite/java/AnnotationMatcher",
+          "org/openrewrite/java/MethodMatcher"
+        };
+
+        Path parentLib = tempDir.resolve("parent");
+        Path childLib = tempDir.resolve("child");
+        for (String matcher : matchers) {
+            for (Path lib : Arrays.asList(parentLib, childLib)) {
+                Path classFile = lib.resolve(matcher + ".class");
+                Files.createDirectories(classFile.getParent());
+                Files.write(classFile, stubClass(matcher));
+            }
+        }
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{parentLib.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            for (String matcher : matchers) {
+                assertThat(classLoader.loadClass(matcher.replace('/', '.')).getClassLoader())
+                  .as("%s is named in shared API descriptors; split loaders raise a LinkageError on the call", matcher)
+                  .isSameAs(parent);
+            }
         }
     }
 

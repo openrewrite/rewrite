@@ -97,26 +97,17 @@ public class TomlPathMatcher {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
                 TomlKey key = kv.getKey();
                 if (key instanceof Toml.Identifier) {
-                    String keyName = ((Toml.Identifier) key).getName();
-                    Cursor parent = current.getParent();
-                    while (parent != null) {
-                        Object parentValue = parent.getValue();
-                        if (parentValue instanceof Toml.Table) {
-                            Toml.Table table = (Toml.Table) parentValue;
-                            if (table.getName() != null) {
-                                String tableName = table.getName().getName();
-                                // Split dotted names: [tool.poetry]
-                                String[] parts = tableName.split("\\.");
-                                for (int i = parts.length - 1; i >= 0; i--) {
-                                    path.add(0, parts[i].trim());
-                                }
-                            }
-                            break;
-                        }
-                        parent = parent.getParent();
+                    path.add(0, ((Toml.Identifier) key).getName());
+                }
+            } else if (value instanceof Toml.Table) {
+                Toml.Table table = (Toml.Table) value;
+                Toml.Identifier tableName = table.getName();
+                if (tableName != null) {
+                    String name = tableName.getName();
+                    String[] parts = name.split("\\.");
+                    for (int i = parts.length - 1; i >= 0; i--) {
+                        path.add(0, parts[i].trim());
                     }
-                    path.add(keyName);
-                    return path;
                 }
             }
 

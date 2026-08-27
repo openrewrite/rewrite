@@ -1,0 +1,12 @@
+[project]
+name = "a-minimal"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["six==1.16.0"]
+
+[tool.pdm]
+distribution = false
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

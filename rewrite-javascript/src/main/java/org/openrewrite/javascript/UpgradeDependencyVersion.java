@@ -21,22 +21,29 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.MatchedDependency;
+import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
+
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVersion.Accumulator> {
+public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.Accumulator> {
+
+    transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
 
     @Option(displayName = "Package name",
             description = "Exact package name to match. Mutually exclusive with `packagePattern`; " +
@@ -78,24 +85,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 r -> r.packageName != null || r.packagePattern != null));
     }
 
-    static class Accumulator {
-        final Map<Path, ProjectState> projects = new HashMap<>();
-        final Map<Path, Path> lockToPackage = new HashMap<>();
-    }
-
-    static class ProjectState {
-        @Nullable SourceFile capturedPackageJson;
-        @Nullable String capturedLockContent;
-        @Nullable Map<String, String> configFiles;
-        @Nullable List<MatchedDependency> matchedDeps;
-        @Nullable SourceFile modifiedPackageJson;
-        LockFileRegeneration.@Nullable Result regenResult;
-    }
-
-    @Override public Accumulator getInitialValue(ExecutionContext ctx) { return new Accumulator(); }
+    @Override public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) { return new NodeDependencyScan.Accumulator(); }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyScan.Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -107,7 +100,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (PackageJsonHelper.isLockFile(basename)) {
                     if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
                         Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(p);
-                        ProjectState ps = acc.projects.computeIfAbsent(packagePath, k -> new ProjectState());
+                        NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(packagePath, k -> new NodeDependencyScan.ProjectState());
                         ps.capturedLockContent = sf.printAll();
                         acc.lockToPackage.put(p, packagePath);
                     }
@@ -116,9 +109,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                     if (marker == null) return tree;
-                    ProjectState ps = acc.projects.computeIfAbsent(p, k -> new ProjectState());
+                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
-                    ps.configFiles = PackageJsonHelper.serializeConfigFiles(marker);
                     ps.matchedDeps = findMatches(sf);
                 }
                 return tree;
@@ -128,7 +120,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     private List<MatchedDependency> findMatches(SourceFile pkg) {
         NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return Collections.emptyList();
+        if (marker == null) return emptyList();
         Predicate<String> nameMatcher = buildNameMatcher();
         List<MatchedDependency> result = new ArrayList<>();
         collectMatches(result, "dependencies", marker.getDependencies(), nameMatcher);
@@ -162,7 +154,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyScan.Accumulator acc) {
+        NodeDependencyScan.linkWorkspaceMembers(acc);
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -170,7 +163,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
-                ProjectState ps = acc.projects.get(p);
+                NodeDependencyScan.ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     // If scanner found no matches on the original tree, check the live tree:
                     // a prior recipe (e.g. AddDependency) may have added the dep in this cycle.
@@ -186,44 +179,55 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (liveTree != null) {
                             effectiveSf = liveTree;
                         }
-                        ensureComputed(ps, effectiveSf);
+                        ensureComputed(ps, effectiveSf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
+                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
-                            out = Markup.warn(out, new RuntimeException(
+                            recordFailure(ctx, ps, p);
+                            return Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
-                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         return out;
                     }
                 }
 
                 Path packagePath = acc.lockToPackage.get(p);
                 if (packagePath == null) return tree;
-                ProjectState lockPs = acc.projects.get(packagePath);
-                if (lockPs == null) return tree;
-                if (lockPs.modifiedPackageJson == null) {
-                    SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
-                    if (pkg == null) pkg = lockPs.capturedPackageJson;
-                    // If scanner found no matches on the original tree, recompute from live tree.
-                    if (lockPs.matchedDeps != null && lockPs.matchedDeps.isEmpty() && pkg != null) {
-                        lockPs.matchedDeps = findMatches(pkg);
-                    }
-                    if (pkg != null && lockPs.matchedDeps != null && !lockPs.matchedDeps.isEmpty()) {
-                        ensureComputed(lockPs, pkg);
-                        if (lockPs.modifiedPackageJson != null) {
-                            PackageJsonHelper.putLiveTree(ctx, packagePath, lockPs.modifiedPackageJson);
+                NodeDependencyScan.ProjectState rootPs = acc.projects.get(packagePath);
+                if (rootPs == null) return tree;
+
+                for (Path importer : NodeDependencyScan.lockImporters(acc, packagePath, rootPs)) {
+                    NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
+                    if (ips == null) continue;
+                    if (ips.modifiedPackageJson == null) {
+                        SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
+                        if (pkg == null) pkg = ips.capturedPackageJson;
+                        // If the scanner found no matches on the original tree, recompute from the live tree.
+                        if (ips.matchedDeps != null && ips.matchedDeps.isEmpty() && pkg != null) {
+                            ips.matchedDeps = findMatches(pkg);
+                        }
+                        if (pkg != null && ips.matchedDeps != null && !ips.matchedDeps.isEmpty()) {
+                            ensureComputed(ips, pkg, ctx);
+                            if (ips.modifiedPackageJson != null) {
+                                PackageJsonHelper.putLiveTree(ctx, importer, ips.modifiedPackageJson);
+                            }
                         }
                     }
-                }
-                if (lockPs.regenResult != null && lockPs.regenResult.isSuccess()) {
-                    return PackageJsonHelper.reparseLock(sf, lockPs.regenResult.getLockFileContent());
+                    if (ips.regenResult != null) {
+                        if (ips.regenResult.isSuccess()) {
+                            return PackageJsonHelper.reparseLock(sf, ips.regenResult.getLockFileContent());
+                        }
+                        recordFailure(ctx, ips, importer);
+                        return Markup.warn(sf, new RuntimeException(
+                                "lock regeneration failed: " + ips.regenResult.getErrorMessage()));
+                    }
                 }
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, SourceFile pkg) {
+            private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
                 if (ps.matchedDeps == null || ps.matchedDeps.isEmpty()) return;
                 List<MatchedDependency> matches = ps.matchedDeps;
@@ -231,12 +235,20 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         pkg,
                         doc -> PackageJsonHelper.upgradeVersion(doc, matches, newVersion),
                         ps.capturedLockContent,
-                        ps.configFiles);
+                        ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();
                 }
             }
         };
+    }
+
+    private void recordFailure(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path packageJsonPath) {
+        if (ps.failureRecorded || ps.regenResult == null) {
+            return;
+        }
+        ps.failureRecorded = true;
+        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult, packageName);
     }
 }

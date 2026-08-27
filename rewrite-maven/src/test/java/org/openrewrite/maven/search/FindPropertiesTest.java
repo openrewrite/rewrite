@@ -129,6 +129,60 @@ class FindPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void doesNotMatchUsageWhenResolvedValueDoesNotMatchValuePattern() {
+        rewriteRun(
+          spec -> spec.recipe(new FindProperties("sample.target", "24")),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <properties>
+                  <sample.target>21</sample.target>
+                  <sample.compiler.release>${sample.target}</sample.compiler.release>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesDefinitionAndUsageWhenValuePatternMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new FindProperties("sample.target", "21")),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <properties>
+                  <sample.target>21</sample.target>
+                  <sample.compiler.release>${sample.target}</sample.compiler.release>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <properties>
+                  <!--~~>--><sample.target>21</sample.target>
+                  <sample.compiler.release><!--~~(21)~~>-->${sample.target}</sample.compiler.release>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotMatchOtherPropertyUsages() {
         rewriteRun(
           spec -> spec.recipe(new FindProperties("guava.*", null)),

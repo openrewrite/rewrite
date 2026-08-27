@@ -23,10 +23,17 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.DockerVisitor;
+import org.openrewrite.docker.internal.ImageReferences;
 import org.openrewrite.docker.tree.Docker;
+import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.trait.Trait;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.trait.VisitFunction2;
+
+import java.util.Optional;
+
+import static java.util.Collections.singletonList;
+import static org.openrewrite.Tree.randomId;
 
 /**
  * A trait representing a Docker base image from a FROM instruction.
@@ -34,7 +41,7 @@ import org.openrewrite.trait.VisitFunction2;
  * along with matching capabilities that handle environment variables.
  */
 @RequiredArgsConstructor
-public class DockerFrom implements Trait<Docker.From> {
+public class DockerFrom implements DockerImageReference<Docker.From> {
 
     @Getter
     private final Cursor cursor;
@@ -43,30 +50,33 @@ public class DockerFrom implements Trait<Docker.From> {
      * Returns the image name (without tag or digest).
      * Environment variables are preserved in their original form.
      *
-     * @return The image name, or null if it contains unresolvable variables
+     * @return The image name
      */
-    public @Nullable String getImageName() {
-        return new Matcher().extractTextWithVariables(getTree().getImageName());
+    @Override
+    public Optional<String> getImageName() {
+        return Optional.ofNullable(new Matcher().extractTextWithVariables(getTree().getImageName()));
     }
 
     /**
-     * Returns the tag, or null if no tag is specified.
+     * Returns the tag, or empty if no tag is specified.
      * Environment variables are preserved in their original form.
      *
-     * @return The tag, or null
+     * @return The tag, or empty
      */
-    public @Nullable String getTag() {
-        return new Matcher().extractTextWithVariables(getTree().getTag());
+    @Override
+    public Optional<String> getTag() {
+        return Optional.ofNullable(new Matcher().extractTextWithVariables(getTree().getTag()));
     }
 
     /**
-     * Returns the digest, or null if no digest is specified.
+     * Returns the digest, or empty if no digest is specified.
      * Environment variables are preserved in their original form.
      *
-     * @return The digest, or null
+     * @return The digest, or empty
      */
-    public @Nullable String getDigest() {
-        return new Matcher().extractTextWithVariables(getTree().getDigest());
+    @Override
+    public Optional<String> getDigest() {
+        return Optional.ofNullable(new Matcher().extractTextWithVariables(getTree().getDigest()));
     }
 
     /**
@@ -114,48 +124,40 @@ public class DockerFrom implements Trait<Docker.From> {
      *
      * @return true if the image is unpinned
      */
+    @Override
     public boolean isUnpinned() {
-        return getUnpinnedReason() != null;
+        return getUnpinnedReason().isPresent();
     }
 
     /**
-     * Reasons why an image may be considered unpinned.
-     */
-    public enum UnpinnedReason {
-        /**
-         * No tag specified, which defaults to "latest".
-         */
-        IMPLICIT_LATEST,
-        /**
-         * Explicit "latest" tag specified.
-         */
-        EXPLICIT_LATEST
-    }
-
-    /**
-     * Returns the reason this image is unpinned, or null if it's pinned.
+     * Returns the reason this image is unpinned, or empty if it's pinned.
      * Images with a digest are considered pinned. Images with environment variables
      * in the tag are conservatively considered pinned (we can't determine the value).
      *
-     * @return The reason for being unpinned, or null if pinned
+     * @return The reason for being unpinned, or empty if pinned
      */
-    public @Nullable UnpinnedReason getUnpinnedReason() {
+    @Override
+    public Optional<UnpinnedReason> getUnpinnedReason() {
         Docker.From from = getTree();
         // Images with digest are pinned
         if (from.getDigest() != null) {
-            return null;
+            return Optional.empty();
         }
-        // No tag means implicit "latest"
+        // No tag means implicit "latest", unless the name is an unresolved environment
+        // variable, in which case we can't classify it and conservatively treat it as pinned
         if (from.getTag() == null) {
-            return UnpinnedReason.IMPLICIT_LATEST;
+            if (new Matcher().hasEnvironmentVariables(from.getImageName())) {
+                return Optional.empty();
+            }
+            return Optional.of(UnpinnedReason.IMPLICIT_LATEST);
         }
         // Explicit "latest" tag is unpinned (if it's a literal, not env var)
         String tag = new Matcher().extractText(from.getTag());
         if ("latest".equals(tag)) {
-            return UnpinnedReason.EXPLICIT_LATEST;
+            return Optional.of(UnpinnedReason.EXPLICIT_LATEST);
         }
         // Has a specific tag (or env var tag) - considered pinned
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -165,6 +167,7 @@ public class DockerFrom implements Trait<Docker.From> {
      *
      * @return true if a digest is present
      */
+    @Override
     public boolean isDigestPinned() {
         return getTree().getDigest() != null;
     }
@@ -184,6 +187,7 @@ public class DockerFrom implements Trait<Docker.From> {
      * @param pattern The glob pattern to match against
      * @return true if the image name matches
      */
+    @Override
     public boolean imageNameMatches(String pattern) {
         Matcher m = new Matcher();
         String text = m.extractTextForMatching(getTree().getImageName());
@@ -196,6 +200,7 @@ public class DockerFrom implements Trait<Docker.From> {
      * @param pattern The glob pattern to match against
      * @return true if the tag matches, false if no tag or doesn't match
      */
+    @Override
     public boolean tagMatches(String pattern) {
         Docker.Argument tag = getTree().getTag();
         if (tag == null) {
@@ -212,6 +217,7 @@ public class DockerFrom implements Trait<Docker.From> {
      * @param pattern The glob pattern to match against
      * @return true if the digest matches, false if no digest or doesn't match
      */
+    @Override
     public boolean digestMatches(String pattern) {
         Docker.Argument digest = getTree().getDigest();
         if (digest == null) {
@@ -220,6 +226,32 @@ public class DockerFrom implements Trait<Docker.From> {
         Matcher m = new Matcher();
         String text = m.extractTextForMatching(digest);
         return m.matchesBidirectional(text, pattern, m.hasEnvironmentVariables(digest));
+    }
+
+    /**
+     * Returns the FROM instruction with its image reference replaced by {@code reference}
+     * (e.g. {@code "nginx:1.25"}), decomposing it into the structured image name, tag, and
+     * digest while preserving the original prefix.
+     */
+    @Override
+    public Docker.From withImageReference(String reference) {
+        Docker.From from = getTree();
+        // Pass an unquoted literal so split() decomposes name/tag/digest; a quote style would
+        // short-circuit that and keep the whole reference as a single image name.
+        Docker.@Nullable Argument[] parts = ImageReferences.split(
+                singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, reference, null)),
+                from.getImageName().getPrefix());
+        return from.withImageName(parts[0]).withTag(parts[1]).withDigest(parts[2]);
+    }
+
+    /**
+     * Returns the FROM instruction with the tag of its image reference replaced by {@code tag},
+     * preserving the image name and any digest.
+     */
+    @Override
+    public Docker.From withTag(String tag) {
+        return getTree().withTag(new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY,
+                singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, tag, getQuoteStyle()))));
     }
 
     /**

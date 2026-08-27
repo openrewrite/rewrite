@@ -57,6 +57,17 @@ public class PathUtils {
         return separatorsToSystem(a).equals(separatorsToSystem(b));
     }
 
+    /**
+     * Whether {@code path} is usable as a {@link SourceFile} source path: relative and already normalized.
+     */
+    public static boolean isValidSourcePath(Path path) {
+        if (path.isAbsolute() || path.toString().isEmpty()) {
+            return false;
+        }
+        Path normalized = path.normalize();
+        return !normalized.startsWith("..") && normalized.equals(path);
+    }
+
     public static String separatorsToUnix(String path) {
         return path.replace(WINDOWS_SEPARATOR, UNIX_SEPARATOR);
     }

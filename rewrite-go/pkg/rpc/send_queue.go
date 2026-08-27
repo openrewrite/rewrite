@@ -26,20 +26,36 @@ var defaultSender = NewGoSender()
 
 // It tracks refs for deduplication and maintains a "before" state for delta encoding.
 type SendQueue struct {
-	batchSize int
-	batch     []RpcObjectData
-	drain     func([]RpcObjectData)
-	refs      map[uintptr]int // pointer identity -> ref number
-	before    any
+	batchSize     int
+	batch         []RpcObjectData
+	drain         func([]RpcObjectData)
+	refs          *ReferenceMap
+	allocatedRefs []referenceAllocation
+	before        any
 }
 
-func NewSendQueue(batchSize int, drain func([]RpcObjectData), refs map[uintptr]int) *SendQueue {
+type referenceAllocation struct {
+	obj any
+	ref int
+}
+
+func NewSendQueue(batchSize int, drain func([]RpcObjectData), refs *ReferenceMap) *SendQueue {
 	return &SendQueue{
 		batchSize: batchSize,
 		batch:     make([]RpcObjectData, 0, batchSize),
 		drain:     drain,
 		refs:      refs,
 	}
+}
+
+// DiscardNewReferences removes references first allocated by this queue. IDs
+// remain monotonic because the receiver may already have seen definitions from
+// an earlier page of a failed transfer.
+func (q *SendQueue) DiscardNewReferences() {
+	for _, allocation := range q.allocatedRefs {
+		q.refs.deleteIfMatches(allocation.obj, allocation.ref)
+	}
+	q.allocatedRefs = nil
 }
 
 func (q *SendQueue) Put(data RpcObjectData) {
@@ -98,15 +114,38 @@ func (q *SendQueue) Send(after, before any, onChange func(any)) {
 		q.add(after, onChange)
 	} else if isNilValue(afterVal) {
 		q.Put(RpcObjectData{State: Delete})
+	} else if IsRef(after) {
+		// A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+		// instance may be aliased by any number of other slots and source files. A CHANGE would
+		// be applied to that shared instance in place, corrupting every alias, so the new value
+		// is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+		q.add(after, onChange)
 	} else {
 		vt := getValueType(afterVal)
-		var val any
-		if onChange == nil && vt == nil {
-			val = afterVal
-		}
+		val, skipDoChange := inlineValue(afterVal, onChange, vt)
 		q.Put(RpcObjectData{State: Change, ValueType: vt, Value: val})
-		q.doChange(afterVal, beforeVal, onChange)
+		if !skipDoChange {
+			q.doChange(afterVal, beforeVal, onChange)
+		}
 	}
+}
+
+// inlineValue computes the Value payload for an ADD/CHANGE message and whether
+// sub-field dispatch must be skipped. A codec-less GenericMarker ships its data
+// map inline — sub-field dispatch would emit nothing for it (sendMarkerCodecFields
+// default case). Other values travel inline when neither an onChange callback nor
+// a value type supplies sub-field messages to reconstruct them from.
+func inlineValue(afterVal any, onChange func(any), vt *string) (val any, skipDoChange bool) {
+	if gm, ok := afterVal.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
+		if gm.Data == nil {
+			return map[string]any{}, true
+		}
+		return gm.Data, true
+	}
+	if onChange == nil && vt == nil {
+		return afterVal, false
+	}
+	return nil, false
 }
 
 func (q *SendQueue) sendList(after, before []any, id func(any) any, onChange func(any), asRef bool) {
@@ -157,7 +196,9 @@ func (q *SendQueue) sendList(after, before []any, id func(any) any, onChange fun
 				}
 				if sameIdentity(aBefore, a) {
 					q.Put(RpcObjectData{State: NoChange})
-				} else if isNilValue(aBefore) || !sameType(a, aBefore) {
+				} else if asRef || isNilValue(aBefore) || !sameType(a, aBefore) {
+					// Type changed, or a ref-deduplicated item, which is always re-added
+					// rather than CHANGEd (see Send)
 					if asRef {
 						q.add(AsRef(a), onChangeRun)
 					} else {
@@ -165,8 +206,11 @@ func (q *SendQueue) sendList(after, before []any, id func(any) any, onChange fun
 					}
 				} else {
 					vt := getValueType(a)
-					q.Put(RpcObjectData{State: Change, ValueType: vt})
-					q.doChange(a, aBefore, onChangeRun)
+					val, skipDoChange := inlineValue(a, onChangeRun, vt)
+					q.Put(RpcObjectData{State: Change, ValueType: vt, Value: val})
+					if !skipDoChange {
+						q.doChange(a, aBefore, onChangeRun)
+					}
 				}
 			}
 		}
@@ -180,38 +224,19 @@ func (q *SendQueue) add(after any, onChange func(any)) {
 	}
 
 	var ref *int
-	if IsRef(after) {
-		ptr := ptrKey(afterVal)
-		if ptr != 0 { // Only track refs for pointer types (value types all return 0)
-			if existingRef, ok := q.refs[ptr]; ok {
-				// Already sent - emit pure ref
-				q.Put(RpcObjectData{State: Add, Ref: &existingRef})
-				return
-			}
-			r := len(q.refs) + 1
-			q.refs[ptr] = r
-			ref = &r
+	if IsRef(after) && isReferenceIdentity(afterVal) {
+		r, existed := q.refs.GetOrCreate(afterVal)
+		if existed {
+			// Already sent - emit pure ref
+			q.Put(RpcObjectData{State: Add, Ref: &r})
+			return
 		}
+		q.allocatedRefs = append(q.allocatedRefs, referenceAllocation{obj: afterVal, ref: r})
+		ref = &r
 	}
 
 	vt := getValueType(afterVal)
-	var val any
-	skipDoChange := false
-	if gm, ok := afterVal.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
-		// No RpcCodec on either side for this marker — inline the marker's
-		// data as the ADD message's Value so the receiver can reconstruct
-		// the typed instance. Skip sub-field dispatch, which would otherwise
-		// emit nothing (sendMarkerCodecFields default case) and leave the
-		// receiver waiting for fields that never arrive.
-		if gm.Data == nil {
-			val = map[string]any{}
-		} else {
-			val = gm.Data
-		}
-		skipDoChange = true
-	} else if onChange == nil && vt == nil {
-		val = afterVal
-	}
+	val, skipDoChange := inlineValue(afterVal, onChange, vt)
 	q.Put(RpcObjectData{State: Add, ValueType: vt, Value: val, Ref: ref})
 	if !skipDoChange {
 		q.doChange(afterVal, nil, onChange)
@@ -230,18 +255,6 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 			defaultSender.Visit(t, q)
 		}
 	}
-}
-
-func ptrKey(v any) uintptr {
-	if v == nil {
-		return 0
-	}
-	rv := reflect.ValueOf(v)
-	if rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Interface {
-		return rv.Pointer()
-	}
-	// For non-pointer types, we can't track by identity
-	return 0
 }
 
 func sameIdentity(a, b any) bool {

@@ -88,12 +88,21 @@ class ChangeDependencyConcurrencyTest {
       </metadata>
       """;
 
+    private static final String COMMONS_LANG3_POM = """
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-lang3</artifactId>
+          <version>3.14.0</version>
+      </project>
+      """;
+
     @Timeout(60)
     @Test
     void concurrentVisitsSharingOneRecipeInstanceMustNotThrowConcurrentModificationException() throws Exception {
         // One recipe instance for the whole run, exactly as RecipeRunCycle uses it
         ChangeDependency recipe = new ChangeDependency(
-          "commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.x", null, null, false);
+          "commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.x", null, true, false);
 
         GroovyParser.Builder groovyParser = GroovyParser.builder();
         // The two files resolve different versions of the old dependency so that their map keys differ:
@@ -199,9 +208,13 @@ class ChangeDependencyConcurrencyTest {
     }
 
     private static HttpSender.Response metadataResponse(HttpSender.Request request) {
-        if (!request.getUrl().toString().endsWith("maven-metadata.xml")) {
-            throw new IllegalStateException("Unexpected request: " + request.getUrl());
+        String url = request.getUrl().toString();
+        if (url.endsWith("maven-metadata.xml")) {
+            return new MockHttpSender(() -> new ByteArrayInputStream(COMMONS_LANG3_METADATA.getBytes(UTF_8))).send(request);
         }
-        return new MockHttpSender(() -> new ByteArrayInputStream(COMMONS_LANG3_METADATA.getBytes(UTF_8))).send(request);
+        if (url.endsWith("commons-lang3-3.14.0.pom")) {
+            return new MockHttpSender(() -> new ByteArrayInputStream(COMMONS_LANG3_POM.getBytes(UTF_8))).send(request);
+        }
+        throw new IllegalStateException("Unexpected request: " + request.getUrl());
     }
 }

@@ -17,7 +17,7 @@ import {JS} from "../tree";
 import {JavaScriptVisitor} from "../visitor";
 import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../../java";
 import {create as produce, Draft} from "mutative";
-import {Cursor, isScope, Tree} from "../../tree";
+import {Cursor, isScope, isSourceFile, Tree} from "../../tree";
 import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "../style";
 import {NamedStyles} from "../../style";
 import {produceAsync} from "../../visitor";
@@ -74,13 +74,16 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
             return applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
         }
 
+        // Style markers live on the source file, which is `tree` itself only when a whole file is being formatted
+        const styleSource = (isSourceFile(tree) ? tree : cursor?.firstEnclosing(isSourceFile)) ?? tree;
+
         const visitors = [
             new NormalizeWhitespaceVisitor(this.stopAfter),
             new MinimumViableSpacingVisitor(this.stopAfter),
-            new BlankLinesVisitor(getStyle(StyleKind.BlankLinesStyle, tree, this.styles) as BlankLinesStyle, this.stopAfter),
-            new WrappingAndBracesVisitor(getStyle(StyleKind.WrappingAndBracesStyle, tree, this.styles) as WrappingAndBracesStyle, this.stopAfter),
-            new SpacesVisitor(getStyle(StyleKind.SpacesStyle, tree, this.styles) as SpacesStyle, this.stopAfter),
-            new TabsAndIndentsVisitor(getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle, this.stopAfter),
+            new BlankLinesVisitor(getStyle(StyleKind.BlankLinesStyle, styleSource, this.styles) as BlankLinesStyle, this.stopAfter),
+            new WrappingAndBracesVisitor(getStyle(StyleKind.WrappingAndBracesStyle, styleSource, this.styles) as WrappingAndBracesStyle, this.stopAfter),
+            new SpacesVisitor(getStyle(StyleKind.SpacesStyle, styleSource, this.styles) as SpacesStyle, this.stopAfter),
+            new TabsAndIndentsVisitor(getStyle(StyleKind.TabsAndIndentsStyle, styleSource, this.styles) as TabsAndIndentsStyle, this.stopAfter),
         ]
 
         let t: R | undefined = tree as R;
@@ -227,11 +230,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 // Apply beforeComma rule to all elements except the last
                 // (last element's after is before closing bracket, not a comma)
                 for (let i = 0; i < draft.elements.length - 1; i++) {
-                    const afterWs = draft.elements[i].after.whitespace;
-                    // Preserve newlines - only adjust when on same line
-                    if (!afterWs.includes("\n")) {
-                        draft.elements[i].after.whitespace = this.style.other.beforeComma ? " " : "";
-                    }
+                    this.spaceAfterRightPaddedDraft(draft.elements[i], this.style.other.beforeComma);
                 }
             }
             if (draft.elements.length > 1) {

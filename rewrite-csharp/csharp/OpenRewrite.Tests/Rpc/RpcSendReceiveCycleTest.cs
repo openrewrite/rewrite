@@ -21,18 +21,18 @@ using Rewrite.Core.Rpc;
 namespace OpenRewrite.Tests.Rpc;
 
 /// <summary>
-/// Proves that the CHANGE path in RpcSendQueue lacks cycle detection for
-/// Reference-wrapped types. On the Java side, the thread-local flyweight
-/// in Reference.asRef masks this bug. The C# side creates new Reference
-/// instances, exposing the infinite recursion.
+/// Diffing a Reference-wrapped cyclic type graph must terminate. A changed ref
+/// slot is re-added (see RpcSendQueue.Send), and the walk of the new value's
+/// graph terminates because each node is registered in the refs table before
+/// its fields are walked, so a cycle resolves to a ref-only ADD.
 /// </summary>
 public class RpcSendReceiveCycleTest
 {
     /// <summary>
     /// Creates two separate instances of the same cyclic type (simulating
-    /// deserialized types with different reference identity), then sends
-    /// them through the sender in CHANGE mode. Without cycle detection in
-    /// the CHANGE path, this stack-overflows.
+    /// deserialized types with different reference identity), then diffs one
+    /// against the other. Without the ref-table registration this would
+    /// stack-overflow.
     /// </summary>
     [Fact]
     public void CyclicTypeInChangePath()
@@ -58,7 +58,7 @@ public class RpcSendReceiveCycleTest
 
         Assert.NotSame(node1, node2);
 
-        // Send node2 with node1 as before — triggers the CHANGE path
+        // Diff node2 against node1 as the before state
         var allData = new List<RpcObjectData>();
         var sendRefs = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
         var sendQueue = new RpcSendQueue(1024, batch => allData.AddRange(batch),

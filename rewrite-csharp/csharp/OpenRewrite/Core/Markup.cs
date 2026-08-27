@@ -31,12 +31,16 @@ public abstract class Markup(Guid id, string message, string? detail) : Marker, 
     public override bool Equals(object? obj) => Equals(obj as Markup);
     public override int GetHashCode() => Id.GetHashCode();
 
+    /// <summary>
+    /// Attaches <paramref name="marker"/> to <paramref name="tree"/>, resolving the wither on the
+    /// concrete type. Throws when the node exposes none: a search recipe's whole output is the marker
+    /// it attaches, so quietly returning the node unchanged reports "no findings" for code that does
+    /// have them — a failure mode with no symptom at all. Every J type in this assembly exposes
+    /// <c>WithMarkers(Markers)</c> (enforced by <c>JWitherContractTests</c>), so this cannot fire for
+    /// in-tree nodes.
+    /// </summary>
     private static T AddMarker<T>(T tree, Markup marker) where T : J
-    {
-        var newMarkers = tree.Markers.Add(marker);
-        var withMarkers = tree.GetType().GetMethod("WithMarkers", [typeof(Markers)]);
-        return withMarkers != null ? (T)withMarkers.Invoke(tree, [newMarkers])! : tree;
-    }
+        => J.SetMarkers(tree, tree.Markers.Add(marker));
 
     /// <summary>
     /// Adds an Error markup marker to the given tree node.

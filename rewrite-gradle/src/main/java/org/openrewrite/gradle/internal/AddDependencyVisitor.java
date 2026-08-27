@@ -167,18 +167,18 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                                 J.MethodInvocation beforeDependency = (J.MethodInvocation) (dependencyComparator.getBeforeDependency() instanceof J.Return ?
                                         requireNonNull(((J.Return) dependencyComparator.getBeforeDependency()).getExpression()) :
                                         dependencyComparator.getBeforeDependency());
+                                Space currentPrefix = currentStatement.getPrefix();
                                 if (i == 0) {
                                     if (!addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
-                                        statements.set(i, currentStatement.withPrefix(Space.format("\n\n" + currentStatement.getPrefix().getIndent())));
+                                        statements.set(i, currentStatement.withPrefix(currentPrefix.withWhitespace("\n\n" + currentPrefix.getIndent())));
                                     }
                                 } else {
                                     Space originalPrefix = addDependencyInvocation.getPrefix();
-                                    addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
+                                    addDependencyInvocation = addDependencyInvocation.withPrefix(Space.format(currentPrefix.getWhitespace()));
 
-                                    if (addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
-                                        if (!currentStatement.getPrefix().equals(originalPrefix)) {
-                                            statements.set(i, currentStatement.withPrefix(originalPrefix));
-                                        }
+                                    if (addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName()) &&
+                                            !currentPrefix.getWhitespace().equals(originalPrefix.getWhitespace())) {
+                                        statements.set(i, currentStatement.withPrefix(currentPrefix.withWhitespace(originalPrefix.getWhitespace())));
                                     }
                                 }
                             }

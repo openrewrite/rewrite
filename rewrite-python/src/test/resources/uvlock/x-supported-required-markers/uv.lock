@@ -1,0 +1,30 @@
+version = 1
+revision = 3
+requires-python = ">=3.9"
+resolution-markers = [
+    "sys_platform == 'darwin'",
+    "sys_platform == 'linux'",
+]
+supported-markers = [
+    "sys_platform == 'darwin'",
+    "sys_platform == 'linux'",
+]
+required-markers = [
+    "sys_platform == 'darwin'",
+]
+
+[[package]]
+name = "envproj"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "foo", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "foo", directory = "libs/foo" }]
+
+[[package]]
+name = "foo"
+version = "0.1.0"
+source = { directory = "libs/foo" }

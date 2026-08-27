@@ -60,10 +60,9 @@ class FindInheritedFieldsTest implements RewriteTest {
           ),
           java(
             "public class B extends A {}",
-            spec -> spec.afterRecipe(cu -> {
+            spec -> spec.afterRecipe(cu ->
                 assertThat(FindInheritedFields.find(cu.getClasses().getFirst(), "java.lang.String").stream()
-                  .map(JavaType.Variable::getName)).containsExactly("s");
-            })
+                  .map(JavaType.Variable::getName)).containsExactly("s"))
           )
         );
     }

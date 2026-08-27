@@ -7,7 +7,7 @@ and type-specific visit methods handling only additional fields.
 from typing import Any, TYPE_CHECKING
 
 from rewrite import Markers
-from rewrite.utils import id_to_str
+from rewrite.utils import id_to_int, id_to_str
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
 from rewrite.parser import ParseError
 from rewrite.python import CompilationUnit
@@ -26,6 +26,12 @@ if TYPE_CHECKING:
 
 class PythonRpcSender:
     """Sender that mirrors Java's PythonSender for RPC serialization."""
+
+    def __init__(self):
+        # Type-variable names currently being rendered by _type_signature; a
+        # re-entrant occurrence prints just the name, so signatures of recursive
+        # bounds (e.g. T extends Comparable<T>) stay finite.
+        self._type_var_name_stack: set = set()
 
     def send(self, after: Any, before: Any, q: 'RpcSendQueue') -> None:
         """Entry point for sending an object."""
@@ -290,6 +296,7 @@ class PythonRpcSender:
 
     def _visit_type_alias(self, ta: TypeAlias, q: 'RpcSendQueue') -> None:
         q.get_and_send(ta, lambda x: x.name, lambda el: self._visit(el, q))
+        q.get_and_send(ta, lambda x: x.padding.type_parameters, lambda c: self._visit_container(c, q) if c else None)
         q.get_and_send(ta, lambda x: x.padding.value, lambda el: self._visit_left_padded(el, q))
         q.get_and_send_as_ref(ta, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
 
@@ -821,10 +828,11 @@ class PythonRpcSender:
         if markers is None:
             return
         q.get_and_send(markers, lambda x: id_to_str(x._id))
-        # Send markers list as ref - for now send as regular list
-        # Java uses getAndSendListAsRef but we'll use regular list for simplicity
+        # A marker whose type Python lacks a codec for is held opaquely as {'kind': ..., 'id': ...},
+        # where 'id' is a canonical UUID string (not the 128-bit int a typed node's _id is); normalise
+        # it so id_to_str gets an int. (Markers is the only list that can carry opaque elements.)
         q.get_and_send_list(markers, lambda x: x.markers,
-                           lambda m: id_to_str(m._id),
+                           lambda m: id_to_str(id_to_int(m['id']) if isinstance(m, dict) else m._id),
                            None)  # No on_change - each marker is sent as-is
 
     def _visit_type(self, java_type, q: 'RpcSendQueue') -> None:
@@ -993,8 +1001,16 @@ class PythonRpcSender:
             elem_sig = self._type_signature(java_type._elem_type) if java_type._elem_type else ''
             return f"{elem_sig}[]"
         if isinstance(java_type, JT.GenericTypeVariable):
-            bounds_sig = ' & '.join(self._type_signature(b) for b in java_type.bounds) if java_type.bounds else ''
-            return f"Generic{{{java_type._name}{' extends ' + bounds_sig if bounds_sig else ''}}}"
+            name = java_type._name
+            if name != '?' and name in self._type_var_name_stack:
+                return f"Generic{{{name}}}"
+            if name != '?':
+                self._type_var_name_stack.add(name)
+            try:
+                bounds_sig = ' & '.join(self._type_signature(b) for b in java_type.bounds) if java_type.bounds else ''
+            finally:
+                self._type_var_name_stack.discard(name)
+            return f"Generic{{{name}{' extends ' + bounds_sig if bounds_sig else ''}}}"
         if isinstance(java_type, JT.Union):
             return '|'.join(self._type_signature(b) for b in java_type.bounds)
         if isinstance(java_type, JT.Intersection):

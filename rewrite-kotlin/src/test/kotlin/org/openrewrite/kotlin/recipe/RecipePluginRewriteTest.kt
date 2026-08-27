@@ -671,6 +671,98 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `multi-param selector rewrite attaches method type — sumBy to sumOf`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseSumOf = recipe(
+                    displayName = "Use sumOf",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: Iterable<Int>, selector: (Int) -> Int -> xs.sumBy(selector) } to { xs, selector -> xs.sumOf(selector) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseSumOf",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                fun total(xs: List<Int>): Int = xs.sumBy { it * 2 }
+                """,
+                """
+                fun total(xs: List<Int>): Int = xs.sumOf { it * 2 }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `nested generic type argument in selector attaches method type`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseFlatMap = recipe(
+                    displayName = "Use flatMap",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: Iterable<Int>, f: (Int) -> List<Int> -> xs.map(f).flatten() } to { xs, f -> xs.flatMap(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseFlatMap",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                fun expand(xs: List<Int>): List<Int> = xs.map { listOf(it) }.flatten()
+                """,
+                """
+                fun expand(xs: List<Int>): List<Int> = xs.flatMap { listOf(it) }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `use-site variance argument degrades gracefully to raw`() {
+        // Use-site variance can't be rendered concretely, so the type falls back
+        // to raw: the rewrite still applies but the method type is absent.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseToMutableList = recipe(
+                    displayName = "Use toMutableList",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: Iterable<out Number> -> xs.toList() } to { xs -> xs.toMutableList() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseToMutableList",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build())
+            },
+            kotlin(
+                """
+                fun copy(xs: List<Int>): List<Int> = xs.toList()
+                """,
+                """
+                fun copy(xs: List<Int>): List<Int> = xs.toMutableList()
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `bare single-call rewrite preserves dot-on-its-own-line layout`() {
         // Same fix, different rewrite path: `methodInvocationRewrite` (the
         // non-chain bare path) also runs the template through
@@ -1041,6 +1133,66 @@ class RecipePluginRewriteTest : RewriteTest {
         assertThat(r.description).isEqualTo("Test description")
         assertThat(r.getTags()).containsExactlyInAnyOrder("test", "smoke")
         assertThat(r.estimatedEffortPerOccurrence?.toMinutes()).isEqualTo(3L)
+    }
+
+    @Test
+    fun `concatenated displayName and description fold to constants`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val MyRecipe = recipe(
+                    displayName = "Replace " + "lowercase",
+                    description = "Uses " + "uppercase" + " instead",
+                ) {
+                    edit {
+                        rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "MyRecipe",
+        )
+        assertThat(r.displayName).isEqualTo("Replace lowercase")
+        assertThat(r.description).isEqualTo("Uses uppercase instead")
+    }
+
+    @Test
+    fun `text-block description with trimIndent folds to a constant`() {
+        val tq = "\"\"\""
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val MyRecipe = recipe(
+                    displayName = "d",
+                    description = $tq
+                        Alpha
+                        Beta
+                    $tq.trimIndent(),
+                ) {
+                    edit {
+                        rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "MyRecipe",
+        )
+        assertThat(r.displayName).isEqualTo("d")
+        assertThat(r.description).isEqualTo("Alpha\nBeta")
+    }
+
+    @Test
+    fun `composite recipes metadata folds concatenation`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                import org.openrewrite.recipes
+                val A = recipe("A", "first") { edit { kotlin { visitClassDeclaration { it } } } }
+                val Combo = recipes("Co" + "mbo", "A" + " only", A)
+            """.trimIndent(),
+            propertyName = "Combo",
+        )
+        assertThat(r.displayName).isEqualTo("Combo")
+        assertThat(r.description).isEqualTo("A only")
+        assertThat(r.recipeList).hasSize(1)
     }
 
     @Test

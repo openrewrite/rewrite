@@ -239,11 +239,16 @@ class JavaRecipeVisitor(TreeVisitor[Tree, Any]):
         if tree is None:
             return None
 
-        from .server import local_objects, get_object_from_java
+        from rewrite.execution import ExecutionContext
+        from .server import local_object, local_objects, get_object_from_java
 
         # Ensure tree is in local_objects so Java can fetch it
         tree_id = str(tree.id)
         local_objects[tree_id] = tree
+
+        # Java's Visit handler fetches the execution context (`p`) over
+        # GetObject, so it must be resolvable by id as well.
+        context_id = local_object(p) if isinstance(p, ExecutionContext) else None
 
         # Determine source file type
         source_file_type = f"{tree.__class__.__module__}.{tree.__class__.__name__}"
@@ -256,6 +261,7 @@ class JavaRecipeVisitor(TreeVisitor[Tree, Any]):
             self._prepared_recipe,
             tree_id,
             source_file_type,
+            context_id=context_id,
             phase=self._phase
         )
 

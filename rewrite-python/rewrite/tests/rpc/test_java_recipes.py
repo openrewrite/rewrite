@@ -33,8 +33,15 @@ from rewrite.test import RecipeSpec, python
 class TestChangeType:
     """Tests for the ChangeType Java recipe wrapper."""
 
-    def test_change_simple_type(self, java_rpc):
-        """Test changing a simple type reference."""
+    def test_change_type_with_unqualified_target(self, java_rpc):
+        """Test changing a type reference to an unqualified target name
+        (contrast ``builtins.list`` in the type-attribution test below).
+
+        The unused ``from typing import List`` is removed: Java's ChangeType
+        retires Python imports through ``PythonImportService``, which reaches
+        the Python-side import visitors over the serving RPC connection when
+        the JVM is the spawned server, as in this Python-hosted topology.
+        """
         from rewrite.python import ChangeType
 
         spec = RecipeSpec(
@@ -55,6 +62,210 @@ class TestChangeType:
                 def foo(items: list[str]) -> list[int]:
                     pass
                 """
+            )
+        )
+
+
+    def test_change_type_preserves_import_alias(self, java_rpc):
+        """The alias carries over to the new import, so usages of ``L`` need no
+        rewriting."""
+        from rewrite.python import ChangeType
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="typing.List",
+                new_fully_qualified_type_name="builtins.list"
+            )
+        )
+        spec.rewrite_run(
+            python(
+                """
+                from typing import List as L
+
+                def foo(items: L[str]) -> L[int]:
+                    pass
+                """,
+                """
+                from builtins import list as L
+
+                def foo(items: L[str]) -> L[int]:
+                    pass
+                """
+            )
+        )
+
+
+    def test_change_type_preserves_alias_of_reexported_import(self, java_rpc):
+        """``collections.abc.Iterable`` is attributed as ``typing.Iterable``, so the
+        recipe names a type this source never spells. Miss the alias here and the
+        old import is retired with nothing left to bind ``I``.
+        """
+        from rewrite.python import ChangeType
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="typing.Iterable",
+                new_fully_qualified_type_name="typing.Sequence"
+            )
+        )
+        spec.rewrite_run(
+            python(
+                """
+                from collections.abc import Iterable as I
+
+                def f(it: I) -> None:
+                    pass
+                """,
+                """
+                from typing import Sequence as I
+
+                def f(it: I) -> None:
+                    pass
+                """
+            )
+        )
+
+
+    def test_change_type_preserves_alias_of_plain_module_import(self, java_rpc):
+        """A standalone ``import <module> as <alias>`` parses as a plain
+        ``J.Import`` rather than a ``Py.MultiImport`` — a second shape the alias
+        lookup has to cover.
+        """
+        from rewrite.python import ChangeType
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="os",
+                new_fully_qualified_type_name="pathlib"
+            )
+        )
+        spec.rewrite_run(
+            python(
+                """
+                import os as o
+
+                x = o.sep
+                """,
+                """
+                import pathlib as o
+
+                x = o.sep
+                """
+            )
+        )
+
+
+    def test_change_type_ignores_function_local_aliased_import(self, java_rpc):
+        """A function-local import binds a name the top-level import machinery
+        does not manage, so the file's text stays unchanged.
+        """
+        from rewrite.python import ChangeType
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="typing.List",
+                new_fully_qualified_type_name="builtins.list"
+            ),
+            # ChangeType updates the type attribution of the local usages — an
+            # LST change with no printed-output change.
+            allow_empty_diff=True,
+        )
+        spec.rewrite_run(
+            python(
+                """
+                def foo():
+                    from typing import List as L
+                    items: L[int] = []
+                    return items
+                """
+            )
+        )
+
+
+    def test_change_type_ignores_type_checking_aliased_import(self, java_rpc):
+        """Same for an import under ``if TYPE_CHECKING:``, the common way to keep
+        typing-only imports out of the runtime path.
+        """
+        from rewrite.python import ChangeType
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="typing.List",
+                new_fully_qualified_type_name="builtins.list"
+            ),
+            allow_empty_diff=True,
+        )
+        spec.rewrite_run(
+            python(
+                """
+                from __future__ import annotations
+
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import List as L
+
+                def foo(items: L[int]) -> None:
+                    pass
+                """
+            )
+        )
+
+
+    def test_change_simple_type_updates_type_attribution(self, java_rpc):
+        """The renamed identifiers must also carry the *new* JavaType, so that
+        downstream type-driven logic (``uses_type``, MethodMatcher, a second
+        recipe in a composite) matches on ``builtins.list``. As a consequence,
+        a second run over the output must be a no-op: every former
+        ``typing.List`` reference is already typed ``builtins.list``.
+        """
+        from rewrite import InMemoryExecutionContext
+        from rewrite.java.support_types import JavaType
+        from rewrite.python import ChangeType
+        from rewrite.python.visitor import PythonVisitor
+
+        def assert_types(source_file):
+            list_idents = []
+
+            class CollectTypes(PythonVisitor):
+                def visit_identifier(self, identifier, p):
+                    if identifier.simple_name == "list":
+                        list_idents.append(identifier)
+                    return identifier
+
+            CollectTypes().visit(source_file, None)
+            assert len(list_idents) == 2, \
+                f"expected 2 'list' identifiers, found {len(list_idents)}"
+            for ident in list_idents:
+                t = ident.type
+                assert isinstance(t, JavaType.FullyQualified), \
+                    f"identifier 'list' has type {t!r}"
+                assert t.fully_qualified_name == "builtins.list", \
+                    f"identifier 'list' still typed as {t.fully_qualified_name}"
+
+            editor = spec.recipe.recipe_list()[0].editor()
+            run2 = editor.visit(source_file, InMemoryExecutionContext())
+            assert run2 is source_file, "second run should be a no-op"
+
+        spec = RecipeSpec(
+            recipe=ChangeType(
+                old_fully_qualified_type_name="typing.List",
+                new_fully_qualified_type_name="builtins.list"
+            )
+        )
+        spec.rewrite_run(
+            python(
+                """
+                from typing import List
+
+                def foo(items: List[str]) -> List[int]:
+                    pass
+                """,
+                """
+                def foo(items: list[str]) -> list[int]:
+                    pass
+                """,
+                after_recipe=assert_types,
             )
         )
 
@@ -94,14 +305,20 @@ class TestAddLiteralMethodArgument:
     """Tests for the AddLiteralMethodArgument Java recipe wrapper."""
 
     def test_add_argument(self, java_rpc):
-        """Test adding a literal argument to a method call."""
+        """Test adding a literal argument to a method call.
+
+        The method pattern matches against the *declared* signature, where
+        ``datetime.now`` carries its optional ``tz`` parameter — hence
+        ``(..)`` rather than ``()``. A str option is inserted as a string
+        literal, i.e. quoted.
+        """
         from rewrite.python import AddLiteralMethodArgument
 
         spec = RecipeSpec(
             recipe=AddLiteralMethodArgument(
-                method_pattern="datetime.datetime now()",
+                method_pattern="datetime.datetime now(..)",
                 argument_index=0,
-                literal="datetime.UTC"
+                literal="UTC"
             )
         )
         spec.rewrite_run(
@@ -114,7 +331,7 @@ class TestAddLiteralMethodArgument:
                 """
                 from datetime import datetime
 
-                now = datetime.now(datetime.UTC)
+                now = datetime.now("UTC")
                 """
             )
         )

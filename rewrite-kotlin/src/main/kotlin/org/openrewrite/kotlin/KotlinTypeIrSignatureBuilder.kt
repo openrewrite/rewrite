@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 @file:Suppress("DEPRECATION", "DEPRECATION_ERROR")
+@file:OptIn(org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI::class)
 package org.openrewrite.kotlin
 
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyClass

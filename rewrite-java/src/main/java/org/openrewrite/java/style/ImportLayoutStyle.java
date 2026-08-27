@@ -356,7 +356,7 @@ public class ImportLayoutStyle implements JavaStyle {
         List<Block> effectiveLayout = getLayout();
         // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages
         Map<Boolean, List<Block>> blockGroups = effectiveLayout.stream()
-                .collect(partitioningBy(block -> block instanceof Block.AllOthers));
+                .collect(partitioningBy(Block.AllOthers.class::isInstance));
         List<Block> noCatchalls = blockGroups.get(false);
         List<Block> onlyCatchalls = blockGroups.get(true);
 

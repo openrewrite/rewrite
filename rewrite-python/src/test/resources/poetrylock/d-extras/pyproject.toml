@@ -1,0 +1,13 @@
+[tool.poetry]
+name = "d-extras"
+version = "0.1.0"
+description = "requests with socks extra"
+authors = ["Test <test@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+requests = {version = "2.32.3", extras = ["socks"]}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

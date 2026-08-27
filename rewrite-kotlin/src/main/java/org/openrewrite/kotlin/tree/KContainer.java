@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.tree;
 public class KContainer {
     @SuppressWarnings("LombokGetterMayBeUsed")
     public enum Location {
+        CONTEXT_PARAMETERS(KSpace.Location.CONTEXT_PARAMETERS, KRightPadded.Location.CONTEXT_PARAMETER_SUFFIX),
         DESTRUCT_ASSIGNMENTS(KSpace.Location.DESTRUCT_ELEMENTS, KRightPadded.Location.DESTRUCT_SUFFIX),
         FUNCTION_TYPE_PARAMETERS(KSpace.Location.FUNCTION_TYPE_PARAMETERS, KRightPadded.Location.FUNCTION_TYPE_PARAMETER_SUFFIX),
         LIST_LITERAL_ELEMENTS(KSpace.Location.LIST_LITERAL_ELEMENTS, KRightPadded.Location.LIST_LITERAL_ELEMENT_SUFFIX),

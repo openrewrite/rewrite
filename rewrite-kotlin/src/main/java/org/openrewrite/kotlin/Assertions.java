@@ -57,6 +57,9 @@ public final class Assertions {
     public static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
         if (source instanceof JavaSourceFile) {
             assertValidTypes(typeValidation, (JavaSourceFile) source);
+            if (typeValidation.unknown()) {
+                assertNoUnknownElements(source);
+            }
         }
         return source;
     }
@@ -214,6 +217,24 @@ public final class Assertions {
                 kotlinSourceSpec.afterRecipe(spaceConscious(kotlinSourceSpec));
             }
         };
+    }
+
+    private static void assertNoUnknownElements(SourceFile source) {
+        List<J.Unknown> unknowns = new KotlinIsoVisitor<List<J.Unknown>>() {
+            @Override
+            public J visitUnknown(J.Unknown unknown, List<J.Unknown> unknowns) {
+                unknowns.add(unknown);
+                return super.visitUnknown(unknown, unknowns);
+            }
+        }.reduce(source, new ArrayList<>());
+        if (!unknowns.isEmpty()) {
+            throw new IllegalStateException("LST contains unknown elements\n" + unknowns.stream()
+                    .map(unknown -> unknown.getSource().getMarkers()
+                            .findFirst(ParseExceptionResult.class)
+                            .map(ParseExceptionResult::getMessage)
+                            .orElse("") + unknown.getSource().getText())
+                    .collect(joining("\n\n")));
+        }
     }
 
     private static void assertValidTypes(TypeValidation typeValidation, J sf) {
@@ -474,7 +495,7 @@ public final class Assertions {
             return inPackageDeclaration() || inImport() || isClassName() ||
                     isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
                     isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
-                    isInJavaDoc(ident) || isWhenLabel() || isUseSite() || isNamedArgument();
+                    isInJavaDoc(ident) || isWhenLabel() || isUseSite() || isNamedArgument() || isThisLabel();
         }
 
         private boolean isNamedArgument() {
@@ -563,6 +584,11 @@ public final class Assertions {
 
         private boolean isLabel() {
             return getCursor().firstEnclosing(J.Label.class) != null;
+        }
+
+        private boolean isThisLabel() {
+            // The label of `this@Foo` names an enclosing class or lambda, not a typed expression
+            return getCursor().getParentTreeCursor().getValue() instanceof K.This;
         }
 
         private boolean isAnnotationField(J.Identifier ident) {

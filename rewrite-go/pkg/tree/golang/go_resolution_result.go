@@ -28,7 +28,7 @@ type GoResolutionResult struct {
 	ModulePath           string
 	GoVersion            string // empty if no `go` directive
 	Toolchain            string // empty if no `toolchain` directive
-	Path                 string // path to the go.mod file
+	Path                 string // project-root-relative path to the go.mod file
 	Requires             []GoRequire
 	Replaces             []GoReplace
 	Excludes             []GoExclude

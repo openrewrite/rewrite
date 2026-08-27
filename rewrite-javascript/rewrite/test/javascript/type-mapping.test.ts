@@ -2153,6 +2153,78 @@ describe('JavaScript type mapping', () => {
             )
         }, {unsafeCleanup: true});
     });
+
+    describe('object types', () => {
+        test('an object literal is attributed as an object type whose members carry each field name and type', async () => {
+            const literals: J.NewClass[] = [];
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind !== J.Kind.NewClass) {
+                    return null;
+                }
+                literals.push(node as J.NewClass);
+                return formatObjectType(type);
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'const c = {a: 1, b: "x", nested: {deep: true}};',
+                    'const c = /*~~({} a, b, nested)~~>*/{a: 1, b: "x", nested: /*~~({} deep)~~>*/{deep: true}};'
+                )
+            );
+
+            const outer = objectTypeOf(literals, 'a');
+            expect(outer.classKind).toBe(Type.Class.Kind.Interface);
+            expect(outer.members.map(m => [m.name, Type.signature(m.type)])).toEqual([
+                ['a', 'double'],
+                ['b', 'String'],
+                ['nested', '{}']
+            ]);
+            expect(outer.members.every(m => m.owner === outer)).toBe(true);
+
+            const nested = outer.members[2].type as Type.Class;
+            expect(nested.members.map(m => [m.name, Type.signature(m.type)])).toEqual([['deep', 'boolean']]);
+        });
+
+        test('a reference to a variable bound to an object literal keeps the object type and its owning variable', async () => {
+            const references: J.Identifier[] = [];
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind !== J.Kind.Identifier || !Type.isObjectType(type)) {
+                    return null;
+                }
+                references.push(node as J.Identifier);
+                return formatObjectType(type);
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'const c = {a: 1};\nconsole.log(c);',
+                    'const /*~~({} a)~~>*/c = {a: 1};\nconsole.log(/*~~({} a)~~>*/c);'
+                )
+            );
+
+            const use = references[references.length - 1];
+            expect(use.fieldType!.name).toBe('c');
+            expect(use.fieldType!.type).toBe(use.type);
+            expect((use.type as Type.Class).members.map(m => [m.name, Type.signature(m.type)])).toEqual([['a', 'double']]);
+        });
+
+        test('the object keyword is attributed as an object type with no members', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => node?.kind === J.Kind.Identifier ? formatObjectType(type) : null);
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    'declare function f(o: object): void;',
+                    'declare function f(/*~~({})~~>*/o: /*~~({})~~>*/object): void;'
+                )
+            );
+        });
+    });
 });
 
 /**
@@ -2211,6 +2283,15 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                     return visited;
                 }
 
+                async visitNewClass(newClass: J.NewClass, p: ExecutionContext): Promise<J.NewClass> {
+                    const visited = await super.visitNewClass(newClass, p) as J.NewClass;
+                    const description = predicate(visited, visited.constructorType?.returnType);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
                 async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J.MethodInvocation> {
                     const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
                     const description = predicate(visited, visited.methodType);
@@ -2240,4 +2321,20 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
  */
 function formatPrimitiveType(type: Type | undefined): string | null {
     return Type.isPrimitive(type) ? type.keyword || 'None' : null;
+}
+
+function formatObjectType(type: Type | undefined): string | null {
+    if (!Type.isObjectType(type)) {
+        return null;
+    }
+    return type.members.length === 0 ? '{}' : `{} ${type.members.map(m => m.name).join(', ')}`;
+}
+
+function objectTypeOf(literals: J.NewClass[], memberName: string): Type.Class {
+    const match = literals.find(l => {
+        const type = l.constructorType?.returnType;
+        return Type.isObjectType(type) && type.members.some(m => m.name === memberName);
+    });
+    expect(match, `no object literal with a '${memberName}' member`).toBeDefined();
+    return match!.constructorType!.returnType as Type.Class;
 }

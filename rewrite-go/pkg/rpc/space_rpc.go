@@ -127,6 +127,34 @@ func SendMarkersCodec(m java.Markers, q *SendQueue) {
 		func(v any) { sendMarkerCodecFields(v, q) })
 }
 
+// fileAttributesFields is the field order org.openrewrite.FileAttributes#rpcSend uses, and the
+// number of sub-field messages it emits. Both the marker path and the source-file field path
+// (see receiveFileAttributes) depend on it.
+var fileAttributesFields = []string{"creationTime", "lastModifiedTime", "lastAccessTime",
+	"isReadable", "isWritable", "isExecutable", "size"}
+
+// receiveFileAttributes consumes the sub-fields of a source file's fileAttributes and discards
+// them. No Go tree models file attributes, and because the send side reports NO_CHANGE for the
+// field, the peer keeps its own value rather than having it overwritten with an empty one.
+func receiveFileAttributes(q *ReceiveQueue) {
+	q.Receive(nil, func(any) any {
+		for range fileAttributesFields {
+			q.Receive(nil, nil)
+		}
+		return nil
+	})
+}
+
+// receiveChecksum consumes the two sub-fields org.openrewrite.Checksum#rpcSend emits, on the
+// same terms as receiveFileAttributes.
+func receiveChecksum(q *ReceiveQueue) {
+	q.Receive(nil, func(any) any {
+		q.Receive(nil, nil) // algorithm
+		q.Receive(nil, nil) // value
+		return nil
+	})
+}
+
 // hasGenericMarkerCodec reports whether sendMarkerCodecFields will dispatch
 // sub-field messages for a java.GenericMarker with the given Java FQN.
 // Markers not listed here have no RpcCodec on either side and must travel
@@ -165,17 +193,22 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		// SearchResult.rpcSend sends: id (UUID string), description (nullable string)
 		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Description }, nil)
+	case java.RecipesThatMadeChanges:
+		sendRecipesThatMadeChanges(m, q)
 	case golang.GroupedImport:
-		// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
+		// GroupedImport.rpcSend sends: id (UUID string), before Space
 		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Before.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Before },
+			func(v any) { sendSpace(v.(java.Space), q) })
 	case golang.ImportBlock:
-		// ImportBlock.rpcSend sends: id, closePrevious, before, grouped, groupedBefore
+		// ImportBlock.rpcSend sends: id, closePrevious, before Space, grouped, groupedBefore Space
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).ClosePrevious }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Before.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Before },
+			func(v any) { sendSpace(v.(java.Space), q) })
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Grouped }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).GroupedBefore.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).GroupedBefore },
+			func(v any) { sendSpace(v.(java.Space), q) })
 	case golang.ShortVarDecl:
 		q.GetAndSend(m, func(x any) any { return x.(golang.ShortVarDecl).Ident.String() }, nil)
 	case golang.VarKeyword:
@@ -186,26 +219,39 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedSpec).Ident.String() }, nil)
 	case golang.InterfaceMethod:
 		q.GetAndSend(m, func(x any) any { return x.(golang.InterfaceMethod).Ident.String() }, nil)
-	case golang.SelectStmt:
-		q.GetAndSend(m, func(x any) any { return x.(golang.SelectStmt).Ident.String() }, nil)
 	case golang.TypeSwitchGuard:
 		q.GetAndSend(m, func(x any) any { return x.(golang.TypeSwitchGuard).Ident.String() }, nil)
+	case golang.ImplicitForClauses:
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImplicitForClauses).Ident.String() }, nil)
+	case golang.Builtin:
+		q.GetAndSend(m, func(x any) any { return x.(golang.Builtin).Ident.String() }, nil)
 	case golang.StructTag:
 		// StructTag.rpcSend sends: id (UUID string), tag valueSource (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTag).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTag).Tag.Source }, nil)
 	case golang.TrailingComma:
-		// TrailingComma.rpcSend sends: id (UUID string), before whitespace, after whitespace
+		// TrailingComma.rpcSend sends: id (UUID string), before Space, after Space
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Before.Whitespace }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Before },
+			func(v any) { sendSpace(v.(java.Space), q) })
+		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After },
+			func(v any) { sendSpace(v.(java.Space), q) })
+	case golang.PartialTypeAttribution:
+		// PartialTypeAttribution.rpcSend sends: id (UUID string), reason (string)
+		q.GetAndSend(m, func(x any) any { return x.(golang.PartialTypeAttribution).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.PartialTypeAttribution).Reason }, nil)
+	case golang.StructTagQuote:
+		// StructTagQuote.rpcSend sends: id (UUID string), quote (string)
+		q.GetAndSend(m, func(x any) any { return x.(golang.StructTagQuote).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.StructTagQuote).Quote }, nil)
 	case golang.Semicolon:
 		// Semicolon.rpcSend sends: id (UUID string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.Semicolon).Ident.String() }, nil)
 	case golang.GoProject:
-		// GoProject.rpcSend sends: id (UUID string), projectName (string)
+		// GoProject.rpcSend sends: id (UUID string), projectName (string), modulePath (string, nullable)
 		q.GetAndSend(m, func(x any) any { return x.(golang.GoProject).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.GoProject).ProjectName }, nil)
+		q.GetAndSend(m, func(x any) any { return emptyAsNil(x.(golang.GoProject).ModulePath) }, nil)
 	case golang.GoResolutionResult:
 		// Field order mirrors Java's GoResolutionResult#rpcSend exactly;
 		// see go_resolution_result_codec.go for the per-field commentary.
@@ -228,7 +274,7 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 				return nil
 			}, nil)
 		case "org.openrewrite.FileAttributes":
-			for _, key := range []string{"creationTime", "lastModifiedTime", "lastAccessTime", "isReadable", "isWritable", "isExecutable", "size"} {
+			for _, key := range fileAttributesFields {
 				k := key
 				q.GetAndSend(m, func(_ any) any {
 					if d != nil {
@@ -338,16 +384,17 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				m.Description = desc.(string)
 			}
 			return m
+		case java.RecipesThatMadeChanges:
+			return receiveRecipesThatMadeChanges(m, q)
 		case golang.GroupedImport:
-			// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
+			// GroupedImport.rpcSend sends: id (UUID string), before Space
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
 					m.Ident = parsed
 				}
 			}
-			ws := receiveScalar[string](q, m.Before.Whitespace)
-			m.Before = java.Space{Whitespace: ws}
+			m.Before = receiveValue(q, m.Before, func(s java.Space) any { return receiveSpace(s, q) })
 			return m
 		case golang.ImportBlock:
 			// ImportBlock.rpcReceive: id, closePrevious, before, grouped, groupedBefore
@@ -358,11 +405,9 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			}
 			m.ClosePrevious = receiveScalar[bool](q, m.ClosePrevious)
-			ws := receiveScalar[string](q, m.Before.Whitespace)
-			m.Before = java.Space{Whitespace: ws}
+			m.Before = receiveValue(q, m.Before, func(s java.Space) any { return receiveSpace(s, q) })
 			m.Grouped = receiveScalar[bool](q, m.Grouped)
-			gbWs := receiveScalar[string](q, m.GroupedBefore.Whitespace)
-			m.GroupedBefore = java.Space{Whitespace: gbWs}
+			m.GroupedBefore = receiveValue(q, m.GroupedBefore, func(s java.Space) any { return receiveSpace(s, q) })
 			return m
 		case golang.ShortVarDecl:
 			idStr := receiveScalar[string](q, m.Ident.String())
@@ -404,7 +449,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			}
 			return m
-		case golang.SelectStmt:
+		case golang.TypeSwitchGuard:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -412,7 +457,15 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			}
 			return m
-		case golang.TypeSwitchGuard:
+		case golang.ImplicitForClauses:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			return m
+		case golang.Builtin:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -445,6 +498,24 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			}
 			return m
+		case golang.PartialTypeAttribution:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.Reason = receiveScalar[string](q, m.Reason)
+			return m
+		case golang.StructTagQuote:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.Quote = receiveScalar[string](q, m.Quote)
+			return m
 		case golang.TrailingComma:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
@@ -452,10 +523,8 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 					m.Ident = parsed
 				}
 			}
-			beforeWs := receiveScalar[string](q, m.Before.Whitespace)
-			m.Before = java.Space{Whitespace: beforeWs}
-			afterWs := receiveScalar[string](q, m.After.Whitespace)
-			m.After = java.Space{Whitespace: afterWs}
+			m.Before = receiveValue(q, m.Before, func(s java.Space) any { return receiveSpace(s, q) })
+			m.After = receiveValue(q, m.After, func(s java.Space) any { return receiveSpace(s, q) })
 			return m
 		case golang.Semicolon:
 			idStr := receiveScalar[string](q, m.Ident.String())
@@ -473,6 +542,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			}
 			m.ProjectName = receiveScalar[string](q, m.ProjectName)
+			m.ModulePath = receiveNullableString(q, m.ModulePath)
 			return m
 		case golang.GoResolutionResult:
 			return receiveGoResolutionResult(m, q)
@@ -487,7 +557,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			case "org.openrewrite.FileAttributes":
 				m.Data = map[string]any{}
-				for _, key := range []string{"creationTime", "lastModifiedTime", "lastAccessTime", "isReadable", "isWritable", "isExecutable", "size"} {
+				for _, key := range fileAttributesFields {
 					m.Data[key] = q.Receive(nil, nil)
 				}
 			case "org.openrewrite.marker.Markup$Error",

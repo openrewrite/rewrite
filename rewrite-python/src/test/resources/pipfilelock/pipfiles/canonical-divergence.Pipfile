@@ -1,0 +1,12 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[packages]
+Flask = "*"
+Flask_SQLAlchemy = ">=3.0"
+"ruamel.YAML" = ">=0.17"
+
+[dev-packages]
+Pytest = ">=7.0"

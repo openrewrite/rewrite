@@ -19,9 +19,12 @@ import dev.failsafe.Failsafe;
 import dev.failsafe.FailsafeException;
 import dev.failsafe.RetryPolicy;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.tree.MavenRepository;
@@ -39,6 +42,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -61,21 +65,50 @@ public class MavenArtifactDownloader {
     private final Map<String, MavenSettings.Server> serverIdToServer;
     private final Consumer<Throwable> onError;
     private final HttpSender httpSender;
+    private final ExecutionContext ctx;
 
 
+    /**
+     * @deprecated Use {@link #MavenArtifactDownloader(MavenArtifactCache, MavenSettings, Consumer, ExecutionContext)}
+     * and pass the session {@link ExecutionContext} so the anonymous-first authentication cache is shared with
+     * POM/metadata resolution instead of living on a throwaway context.
+     */
+    @Deprecated
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
                                    Consumer<Throwable> onError) {
-        this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError);
+        this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError, new InMemoryExecutionContext());
+    }
+
+    public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
+                                   @Nullable MavenSettings settings,
+                                   Consumer<Throwable> onError,
+                                   ExecutionContext ctx) {
+        this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError, ctx);
+    }
+
+    /**
+     * @deprecated Use {@link #MavenArtifactDownloader(MavenArtifactCache, MavenSettings, HttpSender, Consumer, ExecutionContext)}
+     * and pass the session {@link ExecutionContext} so the anonymous-first authentication cache is shared with
+     * POM/metadata resolution instead of living on a throwaway context.
+     */
+    @Deprecated
+    public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
+                                   @Nullable MavenSettings settings,
+                                   HttpSender httpSender,
+                                   Consumer<Throwable> onError) {
+        this(mavenArtifactCache, settings, httpSender, onError, new InMemoryExecutionContext());
     }
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
                                    HttpSender httpSender,
-                                   Consumer<Throwable> onError) {
+                                   Consumer<Throwable> onError,
+                                   ExecutionContext ctx) {
         this.httpSender = httpSender;
         this.mavenArtifactCache = mavenArtifactCache;
         this.onError = onError;
+        this.ctx = ctx;
         this.serverIdToServer = settings == null || settings.getServers() == null ?
                 new HashMap<>() :
                 settings.getServers().getServers().stream()
@@ -111,25 +144,39 @@ public class MavenArtifactDownloader {
             } else if ("file".equals(URI.create(uri).getScheme())) {
                 bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
             } else {
-                HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
                 try {
+                    MavenRepository repository = dependency.getRepository();
+                    // Mirror Apache Maven's DeferredCredentialsProvider: anonymous first, unless this host has
+                    // already required credentials in this session, in which case authenticate preemptively.
+                    Set<String> authenticationRequiredEndpoints = MavenExecutionContextView.view(ctx).getAuthenticationRequiredEndpoints();
+                    String endpoint = endpointOrNull(uri);
+                    boolean preemptive = hasAuthentication(repository) && endpoint != null &&
+                                         authenticationRequiredEndpoints.contains(endpoint);
                     byte[] responseBytes = null;
                     int responseCode;
-                    try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
+                    HttpSender.Request firstRequest = preemptive ?
+                            applyAuthentication(repository, httpSender.get(uri)).build() :
+                            httpSender.get(uri).build();
+                    try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(firstRequest));
                          InputStream body = response.getBody()) {
                         responseCode = response.getCode();
                         if (response.isSuccessful() && body != null) {
                             responseBytes = readAllBytes(body);
                         }
                     }
-                    // Fall back to anonymous if authenticated request fails with a client error
-                    if (responseBytes == null && isClientSideError(responseCode) && hasAuthentication(dependency.getRepository())) {
-                        try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(httpSender.get(uri).build()));
+                    // Retry with credentials if the anonymous request failed with a client error
+                    if (responseBytes == null && !preemptive && isClientSideError(responseCode) && hasAuthentication(repository)) {
+                        HttpSender.Request.Builder request = applyAuthentication(repository, httpSender.get(uri));
+                        try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                              InputStream body = response.getBody()) {
                             responseCode = response.getCode();
                             if (response.isSuccessful() && body != null) {
                                 responseBytes = readAllBytes(body);
                             }
+                        }
+                        if (responseBytes != null && endpoint != null) {
+                            // Remember so later artifacts from this host authenticate preemptively
+                            authenticationRequiredEndpoints.add(endpoint);
                         }
                     }
                     if (responseBytes == null) {
@@ -164,6 +211,12 @@ public class MavenArtifactDownloader {
 
     private boolean hasAuthentication(MavenRepository repository) {
         return !resolveHttpHeaders(repository).isEmpty() || resolveCredentials(repository) != null;
+    }
+
+    private static @Nullable String endpointOrNull(String uri) {
+        URI parsed = URI.create(uri);
+        String host = parsed.getHost();
+        return host == null ? null : host + ':' + parsed.getPort();
     }
 
     /**

@@ -33,6 +33,7 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -172,54 +173,20 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
     }
 
     public static class Accumulator {
-        @Nullable MavenResolutionResult updatedRootMarker;
-        @Nullable MavenDownloadingException scannerException;
-        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> gavToOriginalMarker = new HashMap<>();
-        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> gavToNewMarker = new HashMap<>();
+        /**
+         * The re-resolved marker for each pom whose {@code <parent>} is being changed, keyed by that pom's
+         * resolved GAV. Only the poms actually being changed are retained here (not every pom in the run, as
+         * a prior implementation did); descendants are re-parented onto these in the edit phase without being
+         * stored, and one re-resolved marker is shared by all of a changed pom's descendants.
+         */
+        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> updatedByPom = new ConcurrentHashMap<>();
 
         /**
-         * Build the complete marker hierarchy. This should be called once at the start of the visitor phase.
-         * It propagates marker updates from the root down through all descendants.
-         * Note: The root pom's marker is NOT stored in updatedMarkers because it gets updated
-         * by UpdateMavenModel after XML changes are made. Only descendant pom markers are stored.
+         * The same markers as {@link #updatedByPom}, but also declaring the dependency management that the
+         * edit phase restores in the changed pom. Descendants resolve against this view; filled on demand in
+         * the edit phase, as it depends on the new parent's own model.
          */
-        void buildMarkerHierarchy() {
-            if (updatedRootMarker == null) {
-                return;
-            }
-            // Propagate marker updates to all descendants
-            Queue<MavenResolutionResult> queue = new LinkedList<>();
-            queue.add(updatedRootMarker);
-
-            while (!queue.isEmpty()) {
-                MavenResolutionResult parentMarker = queue.poll();
-                ResolvedGroupArtifactVersion parentGav = parentMarker.getPom().getGav();
-
-                // Find all poms whose parent GAV matches this parent's GAV
-                for (Map.Entry<ResolvedGroupArtifactVersion, MavenResolutionResult> entry : gavToOriginalMarker.entrySet()) {
-                    ResolvedGroupArtifactVersion childGav = entry.getKey();
-                    MavenResolutionResult childMarker = entry.getValue();
-
-                    // Skip if already processed
-                    if (gavToNewMarker.containsKey(childGav)) {
-                        continue;
-                    }
-
-                    // Check if this child's parent matches the current parent's GAV
-                    if (childMarker.getParent() != null) {
-                        ResolvedGroupArtifactVersion childParentGav = childMarker.getParent().getPom().getGav();
-                        if (parentGav.getGroupId().equals(childParentGav.getGroupId()) &&
-                            parentGav.getArtifactId().equals(childParentGav.getArtifactId()) &&
-                            parentGav.getVersion().equals(childParentGav.getVersion())) {
-                            // Create updated marker for this child with updated parent reference
-                            MavenResolutionResult updatedChildMarker = childMarker.withParent(parentMarker);
-                            gavToNewMarker.put(childGav, updatedChildMarker);
-                            queue.add(updatedChildMarker);
-                        }
-                    }
-                }
-            }
-        }
+        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> restoredByPom = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -262,7 +229,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 MavenResolutionResult mrr = getResolutionResult();
-                acc.gavToOriginalMarker.put(mrr.getPom().getGav(), mrr);
 
                 Parent parent = mrr.getPom().getRequested().getParent();
                 if (parent != null &&
@@ -296,31 +262,30 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                                 return document;
                             }
 
-                            // Pre-compute the updated MavenResolutionResult with the new parent info
+                            // Re-resolve this changed pom against its new parent and record the marker keyed
+                            // by GAV. Only the poms actually being changed are retained (not every pom in the
+                            // run); descendants are re-parented onto these in the edit phase. Keying by GAV
+                            // lets multiple changed poms - e.g. one root per repository in a multi-repo run -
+                            // each propagate independently, and one marker is shared by all its descendants.
                             Parent updatedParentRef = new Parent(
                                     new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()),
-                                    targetRelativePath
-                            );
+                                    targetRelativePath);
                             Pom updatedPom = mrr.getPom().getRequested().withParent(updatedParentRef);
                             ResolvedPom updatedResolvedPom = mrr.getPom()
                                     .withRequested(updatedPom)
                                     .resolve(ctx, new MavenPomDownloader(
-                                            mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles()));
-                            acc.updatedRootMarker = mrr.withPom(updatedResolvedPom);
+                                            mrr.getProjectPoms(), ctx, MavenExecutionContextView.view(ctx).effectiveSettings(mrr),
+                                            mrr.getActiveProfiles()));
+                            acc.updatedByPom.put(mrr.getPom().getGav(), mrr.withPom(updatedResolvedPom));
                         }
                     } catch (MavenDownloadingException e) {
-                        acc.scannerException = e;
+                        // The edit-phase visitor re-attempts the download for the changed pom and surfaces
+                        // any failure there; nothing needs to be recorded for descendants in that case.
                     }
                 }
                 return document;
             }
         };
-    }
-
-    @Override
-    public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
-        acc.buildMarkerHierarchy();
-        return emptyList();
     }
 
     @Override
@@ -348,16 +313,18 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-
                 Xml.Document d = super.visitDocument(document, ctx);
 
-                // Check if this pom has a pre-computed updated marker
+                // Descendants of a changed pom (the changed poms themselves are edited in visitTag): re-parent
+                // this pom onto the changed ancestor's re-resolved marker and let UpdateMavenModel re-resolve
+                // this pom's own model against it.
                 MavenResolutionResult mrr = d.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
-                if (mrr != null) {
-                    MavenResolutionResult updatedMarker = acc.gavToNewMarker.get(mrr.getPom().getGav());
-                    if (updatedMarker != null) {
+                if (mrr != null && !acc.updatedByPom.containsKey(mrr.getPom().getGav())) {
+                    MavenResolutionResult reparented = reparentOntoChangedAncestor(mrr, acc, ctx);
+                    if (reparented != null) {
+                        d = pinVersionsDroppedByChangedAncestor(d, mrr, reparented, ctx);
                         d = d.withMarkers(d.getMarkers().computeByType(mrr,
-                                (original, ignored) -> updatedMarker));
+                                (original, ignored) -> reparented));
                         maybeUpdateModel();
                         doAfterVisit(new RemoveRedundantDependencyVersions(null, null, GTE, except).getVisitor());
                     }
@@ -410,7 +377,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                             }
 
                             // Retain managed versions from the old parent that are not managed in the new parent
-                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                            MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
                             ResolvedPom oldParent = mpd.download(new GroupArtifactVersion(currentGroupId, currentArtifactId, oldVersion), null, resolvedPom, resolvedPom.getRepositories())
                                     .resolve(emptyList(), mpd, ctx);
                             ResolvedPom newParent = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, resolvedPom, resolvedPom.getRepositories())
@@ -418,15 +385,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                             // Inspect this pom plus any descendant modules that inherit from it, so dependency
                             // management dropped by the new parent can be restored in this (local) parent on
                             // behalf of child modules that declare those dependencies without an explicit version.
-                            List<MavenResolutionResult> modulesToInspect = new ArrayList<>();
-                            modulesToInspect.add(mrr);
-                            ResolvedGroupArtifactVersion thisGav = mrr.getPom().getGav();
-                            for (MavenResolutionResult candidate : acc.gavToOriginalMarker.values()) {
-                                if (isDescendantOf(candidate, thisGav)) {
-                                    modulesToInspect.add(candidate);
-                                }
-                            }
-                            List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(modulesToInspect, newParent);
+                            List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, newParent);
                             for (ResolvedManagedDependency dep : dependenciesWithoutExplicitVersions) {
                                 changeParentTagVisitors.add(new AddManagedDependencyVisitor(
                                         dep.getGroupId(), dep.getArtifactId(), dep.getVersion() == null ? "" : dep.getVersion(),
@@ -477,9 +436,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                                         repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
                             }
                             return e.warn(tag);
-                        }
-                        if (acc.scannerException != null) {
-                            t = acc.scannerException.warn(t);
                         }
                     }
                 }
@@ -542,31 +498,175 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                 .collect(toMap(p -> p, cascadedProps::get));
     }
 
-    private static boolean isDescendantOf(MavenResolutionResult module, ResolvedGroupArtifactVersion ancestorGav) {
-        for (MavenResolutionResult parent = module.getParent(); parent != null; parent = parent.getParent()) {
-            if (parent.getPom().getGav().equals(ancestorGav)) {
-                return true;
-            }
+    /**
+     * If {@code mrr} descends from a pom whose {@code <parent>} is being changed (an entry in
+     * {@code updatedByPom}), return {@code mrr} re-parented onto that changed ancestor's re-resolved marker,
+     * so this pom's view of its parent - including the parent's re-resolved dependency management - reflects
+     * the new parent. {@link UpdateMavenModel} then re-resolves this pom's own model against it.
+     * {@code UpdateMavenModel} re-resolves a pom and its modules but never its parent, so the ancestor must be
+     * supplied already re-resolved here. Returns {@code null} when no ancestor is being changed.
+     */
+    private static @Nullable MavenResolutionResult reparentOntoChangedAncestor(
+            MavenResolutionResult mrr, Accumulator acc, ExecutionContext ctx) {
+        MavenResolutionResult parent = mrr.getParent();
+        if (parent == null) {
+            return null;
         }
-        return false;
+        MavenResolutionResult updatedParent = acc.updatedByPom.get(parent.getPom().getGav());
+        if (updatedParent == null) {
+            updatedParent = reparentOntoChangedAncestor(parent, acc, ctx);
+            if (updatedParent == null) {
+                return null;
+            }
+        } else {
+            updatedParent = withRestoredManagement(parent, updatedParent, acc, ctx);
+        }
+        return mrr.withParent(updatedParent);
     }
 
-    private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(List<MavenResolutionResult> modules, ResolvedPom newParent) {
+    /**
+     * The changed pom as its descendants need to see it: resolved against the new parent, and declaring the
+     * dependency management that the edit phase restores in it. A descendant resolved against the unrestored
+     * view would find no version at all for a dependency it declares without one.
+     */
+    private static MavenResolutionResult withRestoredManagement(MavenResolutionResult original, MavenResolutionResult withNewParent,
+                                                                Accumulator acc, ExecutionContext ctx) {
+        ResolvedGroupArtifactVersion gav = withNewParent.getPom().getGav();
+        MavenResolutionResult restored = acc.restoredByPom.get(gav);
+        if (restored == null) {
+            restored = restoreManagement(original, withNewParent, ctx);
+            acc.restoredByPom.put(gav, restored);
+        }
+        return restored;
+    }
+
+    private static MavenResolutionResult restoreManagement(MavenResolutionResult original, MavenResolutionResult withNewParent, ExecutionContext ctx) {
+        Parent parentRef = withNewParent.getPom().getRequested().getParent();
+        if (parentRef == null) {
+            return withNewParent;
+        }
+
+        ResolvedPom pom = withNewParent.getPom();
+        MavenPomDownloader downloader = new MavenPomDownloader(withNewParent.getProjectPoms(), ctx, withNewParent.getMavenSettings(), withNewParent.getActiveProfiles());
+        try {
+            ResolvedPom newParent = downloader.download(parentRef.getGav(), null, pom, pom.getRepositories())
+                    .resolve(emptyList(), downloader, ctx);
+            // Read off the original resolution; the one against the new parent no longer holds the dropped entries
+            List<ResolvedManagedDependency> dropped = getDependenciesUnmanagedByNewParent(original, newParent);
+            if (dropped.isEmpty()) {
+                return withNewParent;
+            }
+
+            List<ManagedDependency> managed = new ArrayList<>(pom.getRequested().getDependencyManagement());
+            for (ResolvedManagedDependency dep : dropped) {
+                managed.add(new ManagedDependency.Defined(dep.getGav(),
+                        dep.getScope() == null ? null : dep.getScope().toString().toLowerCase(),
+                        dep.getType(), dep.getClassifier(), null));
+            }
+            return withNewParent.withPom(pom
+                    .withRequested(pom.getRequested().withDependencyManagement(managed))
+                    .resolve(ctx, downloader));
+        } catch (MavenDownloadingException e) {
+            // The changed pom's own edit reports the failure; descendants keep the unrestored view
+            return withNewParent;
+        }
+    }
+
+    /**
+     * Write back an explicit version for any dependency this pom declares without one that the changed ancestor
+     * no longer manages. The ancestor restores management only for the modules it can see, and its snapshot of
+     * them predates any edit made earlier in the same run, so a module whose version was stripped as redundant
+     * by an earlier recipe has to restore it here or resolve to no version at all.
+     */
+    private static Xml.Document pinVersionsDroppedByChangedAncestor(Xml.Document document, MavenResolutionResult before,
+                                                                    MavenResolutionResult reparented, ExecutionContext ctx) {
+        ResolvedPom beforePom = before.getPom();
+        List<Dependency> withoutExplicitVersion = new ArrayList<>();
+        for (Dependency dep : beforePom.getRequested().getDependencies()) {
+            if (dep.getVersion() == null) {
+                withoutExplicitVersion.add(dep);
+            }
+        }
+        if (withoutExplicitVersion.isEmpty()) {
+            return document;
+        }
+
+        Map<String, String> pinned = new LinkedHashMap<>();
+        try {
+            MavenPomDownloader mpd = new MavenPomDownloader(reparented.getProjectPoms(), ctx, reparented.getMavenSettings(), reparented.getActiveProfiles());
+            ResolvedPom afterPom = reparented.getPom().resolve(ctx, mpd);
+            for (Dependency dep : withoutExplicitVersion) {
+                String groupId = beforePom.getValue(dep.getGroupId());
+                String artifactId = beforePom.getValue(dep.getArtifactId());
+                if (artifactId == null || afterPom.getManagedVersion(groupId, artifactId, dep.getType(), dep.getClassifier()) != null) {
+                    continue;
+                }
+                String version = beforePom.getManagedVersion(groupId, artifactId, dep.getType(), dep.getClassifier());
+                if (version != null) {
+                    pinned.put(dependencyKey(dep.getGroupId(), dep.getArtifactId(), dep.getType(), dep.getClassifier()), version);
+                }
+            }
+        } catch (MavenDownloadingException e) {
+            return document;
+        }
+        if (pinned.isEmpty()) {
+            return document;
+        }
+
+        return (Xml.Document) new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+                if (isDependencyTag() && !t.getChild("version").isPresent()) {
+                    String version = pinned.get(dependencyKey(t.getChildValue("groupId").orElse(null),
+                            t.getChildValue("artifactId").orElse(null),
+                            t.getChildValue("type").orElse(null),
+                            t.getChildValue("classifier").orElse(null)));
+                    if (version != null) {
+                        t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build("<version>" + version + "</version>"),
+                                new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                    }
+                }
+                return t;
+            }
+        }.visitNonNull(document, ctx);
+    }
+
+    private static String dependencyKey(@Nullable String groupId, @Nullable String artifactId,
+                                        @Nullable String type, @Nullable String classifier) {
+        return groupId + ":" + artifactId + ":" + (type == null ? "jar" : type) + ":" + classifier;
+    }
+
+    private static void collectDescendantModules(MavenResolutionResult mrr, List<MavenResolutionResult> out) {
+        for (MavenResolutionResult module : mrr.getModules()) {
+            out.add(module);
+            collectDescendantModules(module, out);
+        }
+    }
+
+    private static List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ResolvedPom newParent) {
         // Remove from the list any that would still be managed under the new parent
         Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
                 .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
                 .collect(toSet());
 
+        List<MavenResolutionResult> modules = new ArrayList<>();
+        modules.add(mrr);
+        collectDescendantModules(mrr, modules);
+
         Map<GroupArtifact, ResolvedManagedDependency> unmanaged = new LinkedHashMap<>();
         for (MavenResolutionResult module : modules) {
-            for (ResolvedManagedDependency dep : getDependenciesUnmanagedByNewParentForModule(module, newParentManagedGa)) {
-                unmanaged.putIfAbsent(new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()), dep);
+            for (ResolvedManagedDependency dep : getManagementInheritedFromParent(module)) {
+                GroupArtifact ga = new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId());
+                if (!newParentManagedGa.contains(ga)) {
+                    unmanaged.putIfAbsent(ga, dep);
+                }
             }
         }
         return new ArrayList<>(unmanaged.values());
     }
 
-    private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParentForModule(MavenResolutionResult mrr, Set<GroupArtifact> newParentManagedGa) {
+    private static List<ResolvedManagedDependency> getManagementInheritedFromParent(MavenResolutionResult mrr) {
         ResolvedPom resolvedPom = mrr.getPom();
 
         // Dependencies managed by the current pom's own dependency management are irrelevant to parent upgrade
@@ -588,7 +688,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
             return emptyList();
         }
 
-        List<ResolvedManagedDependency> depsWithoutExplicitVersion = resolvedPom.getDependencyManagement().stream()
+        return resolvedPom.getDependencyManagement().stream()
                 .filter(dep -> requestedWithoutExplicitVersion.contains(dep.getGav().withVersion(null)))
                 // Exclude dependencies managed by a bom imported by the current pom
                 .filter(dep -> dep.getBomGav() == null || locallyManaged.stream()
@@ -597,14 +697,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                             String artifactId = resolvedPom.getValue(it.getArtifactId());
                             return dep.getBomGav().getGroupId().equals(groupId) && dep.getBomGav().getArtifactId().equals(artifactId);
                         }))
-                .collect(toList());
-
-        if (depsWithoutExplicitVersion.isEmpty()) {
-            return emptyList();
-        }
-
-        return depsWithoutExplicitVersion.stream()
-                .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))
                 .collect(toList());
     }
 }

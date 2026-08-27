@@ -21,28 +21,26 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 )
 
 func prepareRecipe(t *testing.T, s *server, id string) string {
 	t.Helper()
 	params, err := json.Marshal(prepareRecipeRequest{ID: id})
-	if err != nil {
-		t.Fatalf("marshal prepare request: %v", err)
-	}
+	require.NoError(t, err, "marshal prepare request")
 	resp, rpcErr := s.handlePrepareRecipe(params)
-	if rpcErr != nil {
-		t.Fatalf("handlePrepareRecipe returned error: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr, "handlePrepareRecipe returned error")
 	return resp.(prepareRecipeResponse).ID
 }
 
 func visit(t *testing.T, s *server, visitor string) (any, *rpcError) {
 	t.Helper()
 	params, err := json.Marshal(visitRequest{Visitor: visitor, TreeID: "tree-1", SourceFileType: "Go"})
-	if err != nil {
-		t.Fatalf("marshal visit request: %v", err)
-	}
+	require.NoError(t, err, "marshal visit request")
 	return s.handleVisit(params)
 }
 
@@ -67,14 +65,8 @@ func TestVisitMetadataOnlyRecipeFailsLoudly(t *testing.T) {
 		resp, rpcErr := visit(t, s, phase+":"+recipeID)
 
 		// then
-		if rpcErr == nil {
-			t.Fatalf("%s: expected an rpcError, got success response %+v", phase, resp)
-		}
-		if !strings.Contains(rpcErr.Message, recipeName) {
-			t.Errorf("%s: error message %q does not name the recipe %q", phase, rpcErr.Message, recipeName)
-		}
-		if !strings.Contains(rpcErr.Message, "stale or missing") {
-			t.Errorf("%s: error message %q does not explain the stale/missing binary cause", phase, rpcErr.Message)
-		}
+		require.NotNilf(t, rpcErr, "%s: expected an rpcError, got success response %+v", phase, resp)
+		assert.Truef(t, strings.Contains(rpcErr.Message, recipeName), "%s: error message %q does not name the recipe", phase, rpcErr.Message)
+		assert.Truef(t, strings.Contains(rpcErr.Message, "stale or missing"), "%s: error message %q does not explain the stale/missing binary cause", phase, rpcErr.Message)
 	}
 }

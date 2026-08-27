@@ -27,15 +27,15 @@ import java.util.List;
  * <p>
  * Bundles the optional, independent parsing inputs into one value so the API doesn't grow a long
  * tail of positional parameters (and adjacent same-typed arguments that are easy to transpose). Build
- * with {@link #builder()}; every field is optional and defaults to {@code null}.
+ * with {@code builder()}; every field is optional and defaults to {@code null}.
  */
 @Value
 @Builder
 public class ParseProjectOptions {
 
     /**
-     * Glob patterns to exclude from parsing. When {@code null}, the parser's default exclusions
-     * ({@code __pycache__}, {@code .venv}, etc.) are used.
+     * Glob patterns matched against directory names, not paths. These extend the parser's built-in
+     * exclusions ({@code __pycache__}, {@code .venv}, etc.) rather than replacing them.
      */
     @Nullable
     List<String> exclusions;

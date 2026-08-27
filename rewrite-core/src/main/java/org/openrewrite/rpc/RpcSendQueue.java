@@ -114,16 +114,33 @@ public class RpcSendQueue {
 
         if (beforeVal == afterVal) {
             put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
+        } else if (afterVal instanceof List && beforeVal instanceof List) {
+            // The concrete List implementation class (e.g. List.of vs ArrayList) is irrelevant
+            // to the diff: two non-null lists always diff as CHANGE, because sendList emits
+            // positions into the before list while the receiver's ADD path starts from an empty one.
+            sendChange(afterVal, beforeVal, onChange);
         } else if (beforeVal == null || (afterVal != null && afterVal.getClass() != beforeVal.getClass())) {
             // Treat as ADD when before is null OR types differ (it's a new object, not a change)
             add(after, onChange);
         } else if (afterVal == null) {
             put(new RpcObjectData(DELETE, null, null, null, trace));
+        } else if (after instanceof Reference) {
+            // A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+            // instance may be aliased by any number of other slots and source files. A CHANGE would
+            // be applied to that shared instance in place, corrupting every alias, so the new value
+            // is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+            add(after, onChange);
         } else {
-            RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
-            put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
-            doChange(afterVal, beforeVal, onChange, afterCodec);
+            sendChange(afterVal, beforeVal, onChange);
         }
+    }
+
+    private void sendChange(Object afterVal, Object beforeVal, @Nullable Runnable onChange) {
+        RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
+        // Without an onChange callback or codec, no property messages follow, so the
+        // value must travel inline or the receiver keeps the stale object
+        put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
+        doChange(afterVal, beforeVal, onChange, afterCodec);
     }
 
     <T> void sendList(@Nullable List<T> after,
@@ -145,12 +162,12 @@ public class RpcSendQueue {
                     T aBefore = before == null ? null : before.get(beforePos);
                     if (aBefore == anAfter) {
                         put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
-                    } else if (aBefore == null || anAfter.getClass() != aBefore.getClass()) {
-                        // Type changed - treat as ADD
+                    } else if (asRef || aBefore == null || anAfter.getClass() != aBefore.getClass()) {
+                        // Type changed - treat as ADD. Ref-deduplicated items are also always
+                        // re-added rather than CHANGEd (see send()).
                         add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
                     } else {
-                        put(new RpcObjectData(CHANGE, getValueType(anAfter), null, null, trace));
-                        doChange(anAfter, aBefore, onChangeRun, RpcCodec.forInstance(anAfter, sourceFileType));
+                        sendChange(anAfter, aBefore, onChangeRun);
                     }
                 }
             }
@@ -228,7 +245,11 @@ public class RpcSendQueue {
         @Override
         protected @Nullable String computeValue(Class<?> afterType) {
             Package pkg = afterType.getPackage();
-            if (afterType.isPrimitive() || afterType.isArray() || (pkg != null && pkg.getName().startsWith("java.lang")) ||
+            String pkgName = pkg == null ? "" : pkg.getName();
+            if (afterType.isPrimitive() || afterType.isArray() || pkgName.startsWith("java.lang") ||
+                // JDK value types have no codec on either side, so a valueType only buys the
+                // receiver a bogus Objenesis instance it discards. Send them as scalars.
+                pkgName.startsWith("java.time") || pkgName.startsWith("java.math") ||
                 afterType.equals(UUID.class) || Iterable.class.isAssignableFrom(afterType) ||
                 Map.class.isAssignableFrom(afterType)) {
                 // A plain Map (like a Collection) is serialized structurally and needs no
@@ -244,7 +265,7 @@ public class RpcSendQueue {
             // If the class is a subtype of JavaType but in a different package,
             // return the superclass name instead
             Class<?> jt = getJavaTypeClass(afterType);
-            if (jt != null && pkg != null && !pkg.getName().equals(JAVA_TYPE_PACKAGE) && jt.isAssignableFrom(afterType)) {
+            if (jt != null && pkg != null && !JAVA_TYPE_PACKAGE.equals(pkg.getName()) && jt.isAssignableFrom(afterType)) {
                 Class<?> superclass = afterType.getSuperclass();
                 if (superclass != null && !Object.class.equals(superclass)) {
                     return superclass.getName();

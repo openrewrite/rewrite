@@ -80,8 +80,8 @@ func (r *GoReceiver) receiveParseError(pe *java.ParseError, q *ReceiveQueue) *ja
 	pe.SourcePath = receiveScalar[string](q, pe.SourcePath)
 	pe.CharsetName = receiveScalar[string](q, pe.CharsetName)
 	pe.CharsetBomMarked = receiveScalar[bool](q, pe.CharsetBomMarked)
-	q.Receive(nil, nil) // checksum
-	q.Receive(nil, nil) // fileAttributes
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	pe.Text = receiveScalar[string](q, pe.Text)
 	return pe
 }
@@ -92,24 +92,9 @@ func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) jav
 	cu = &c
 	cu.SourcePath = receiveScalar[string](q, cu.SourcePath)
 	q.Receive(nil, nil) // charset
-	q.Receive(nil, nil) // charsetBomMarked
-	// checksum — Checksum.rpcSend sends: algorithm (string), value (byte[])
-	q.Receive(nil, func(v any) any {
-		receiveScalar[string](q, "") // algorithm
-		q.Receive(nil, nil)          // value
-		return nil
-	})
-	// fileAttributes — FileAttributes.rpcSend sends 7 sub-fields
-	q.Receive(nil, func(v any) any {
-		q.Receive(nil, nil) // creationTime
-		q.Receive(nil, nil) // lastModifiedTime
-		q.Receive(nil, nil) // lastAccessTime
-		q.Receive(nil, nil) // isReadable
-		q.Receive(nil, nil) // isWritable
-		q.Receive(nil, nil) // isExecutable
-		q.Receive(nil, nil) // size
-		return nil
-	})
+	cu.CharsetBomMarked = receiveScalar[bool](q, cu.CharsetBomMarked)
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	// packageDecl
 	var beforePkgDecl any
 	if cu.PackageDecl != nil {
@@ -124,16 +109,10 @@ func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) jav
 	// imports (container)
 	cu.Imports = receivePointerContainer[*java.Import](r, q, cu.Imports)
 	// statements
-	beforeStmts := make([]any, len(cu.Statements))
-	for i, s := range cu.Statements {
-		beforeStmts[i] = s
-	}
-	afterStmts := q.ReceiveList(beforeStmts, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterStmts != nil {
-		cu.Statements = make([]java.RightPadded[java.Statement], len(afterStmts))
-		for i, s := range afterStmts {
-			cu.Statements[i] = coerceToStatementRP(s)
-		}
+	if after := receiveTypedList(q, cu.Statements,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToStatementRP); after != nil {
+		cu.Statements = after
 	}
 	cu.EOF = receiveValue(q, cu.EOF, func(e java.Space) any { return receiveSpace(e, q) })
 	return cu
@@ -180,6 +159,7 @@ func (r *GoReceiver) VisitGoUnary(u *golang.Unary, p any) java.J {
 	u = &c
 	u.Operator = receiveLeftPaddedEnum(r, q, u.Operator, golang.ParseUnaryOperator)
 	u.Expression = receiveValue(q, u.Expression, func(e java.Expression) any { return r.Visit(e, q) })
+	u.Type = r.receiveType(u.Type, q)
 	return u
 }
 
@@ -226,6 +206,7 @@ func (r *GoReceiver) VisitComposite(comp *golang.Composite, p any) java.J {
 	comp = &c
 	comp.TypeExpr = receiveValue(q, comp.TypeExpr, func(e java.Expression) any { return r.Visit(e, q) })
 	comp.Elements = receiveContainer[java.Expression](r, q, comp.Elements)
+	comp.Type = r.receiveType(comp.Type, q)
 	return comp
 }
 
@@ -278,6 +259,26 @@ func (r *GoReceiver) VisitMapType(mt *golang.MapType, p any) java.J {
 	}
 	mt.Value = receiveValue(q, mt.Value, func(e java.Expression) any { return r.Visit(e, q) })
 	return mt
+}
+
+func (r *GoReceiver) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ta
+	ta = &c
+	if result := q.Receive(ta.Left, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		ta.Left = result.(java.RightPadded[java.Expression])
+	}
+	ta.AssertedType = receiveValue(q, ta.AssertedType, func(e *java.ControlParentheses) any { return r.Visit(e, q) })
+	ta.Type = r.receiveType(ta.Type, q)
+	return ta
+}
+
+func (r *GoReceiver) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *es
+	es = &c
+	es.Expression = receiveValue(q, es.Expression, func(e java.Expression) any { return r.Visit(e, q) })
+	return es
 }
 
 func (r *GoReceiver) VisitStatementExpression(se *golang.StatementExpression, p any) java.J {
@@ -350,16 +351,10 @@ func (r *GoReceiver) VisitUnion(u *golang.Union, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *u // shallow copy to avoid mutating remoteObjects baseline
 	u = &c
-	beforeTypes := make([]any, len(u.Types))
-	for i, t := range u.Types {
-		beforeTypes[i] = t
-	}
-	afterTypes := q.ReceiveList(beforeTypes, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterTypes != nil {
-		u.Types = make([]java.RightPadded[java.Expression], len(afterTypes))
-		for i, t := range afterTypes {
-			u.Types[i] = coerceToExpressionRP(t)
-		}
+	if after := receiveTypedList(q, u.Types,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToExpressionRP); after != nil {
+		u.Types = after
 	}
 	return u
 }
@@ -377,18 +372,10 @@ func (r *GoReceiver) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	c := *td // shallow copy to avoid mutating remoteObjects baseline
 	td = &c
 	// leadingAnnotations
-	beforeAnns := make([]any, len(td.LeadingAnnotations))
-	for i, a := range td.LeadingAnnotations {
-		beforeAnns[i] = a
-	}
-	afterAnns := q.ReceiveList(beforeAnns, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if afterAnns != nil {
-		td.LeadingAnnotations = make([]*java.Annotation, 0, len(afterAnns))
-		for _, a := range afterAnns {
-			if a != nil {
-				td.LeadingAnnotations = append(td.LeadingAnnotations, a.(*java.Annotation))
-			}
-		}
+	if after := receiveTypedListNonNil(q, td.LeadingAnnotations,
+		func(v any) any { return r.Visit(v.(java.Tree), q) },
+		coerceAnnotation, annotationIsNil); after != nil {
+		td.LeadingAnnotations = after
 	}
 	td.Name = receiveValue(q, td.Name, func(e *java.Identifier) any { return r.Visit(e, q) })
 	// typeParameters
@@ -413,18 +400,10 @@ func (r *GoReceiver) VisitDeclarationBlock(db *golang.DeclarationBlock, p any) j
 	c := *db // shallow copy to avoid mutating remoteObjects baseline
 	db = &c
 	// leadingAnnotations
-	beforeAnns := make([]any, len(db.LeadingAnnotations))
-	for i, a := range db.LeadingAnnotations {
-		beforeAnns[i] = a
-	}
-	afterAnns := q.ReceiveList(beforeAnns, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if afterAnns != nil {
-		db.LeadingAnnotations = make([]*java.Annotation, 0, len(afterAnns))
-		for _, a := range afterAnns {
-			if a != nil {
-				db.LeadingAnnotations = append(db.LeadingAnnotations, a.(*java.Annotation))
-			}
-		}
+	if after := receiveTypedListNonNil(q, db.LeadingAnnotations,
+		func(v any) any { return r.Visit(v.(java.Tree), q) },
+		coerceAnnotation, annotationIsNil); after != nil {
+		db.LeadingAnnotations = after
 	}
 	// kind
 	kindStr := receiveScalar[string](q, "")
@@ -442,30 +421,18 @@ func (r *GoReceiver) VisitMultiAssignment(ma *golang.MultiAssignment, p any) jav
 	q := p.(*ReceiveQueue)
 	c := *ma // shallow copy to avoid mutating remoteObjects baseline
 	ma = &c
-	beforeVars := make([]any, len(ma.Variables))
-	for i, v := range ma.Variables {
-		beforeVars[i] = v
-	}
-	afterVars := q.ReceiveList(beforeVars, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterVars != nil {
-		ma.Variables = make([]java.RightPadded[java.Expression], len(afterVars))
-		for i, v := range afterVars {
-			ma.Variables[i] = coerceToExpressionRP(v)
-		}
+	if after := receiveTypedList(q, ma.Variables,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToExpressionRP); after != nil {
+		ma.Variables = after
 	}
 	if result := q.Receive(ma.Operator, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
 		ma.Operator = result.(java.LeftPadded[java.Space])
 	}
-	beforeVals := make([]any, len(ma.Values))
-	for i, v := range ma.Values {
-		beforeVals[i] = v
-	}
-	afterVals := q.ReceiveList(beforeVals, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterVals != nil {
-		ma.Values = make([]java.RightPadded[java.Expression], len(afterVals))
-		for i, v := range afterVals {
-			ma.Values[i] = coerceToExpressionRP(v)
-		}
+	if after := receiveTypedList(q, ma.Values,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToExpressionRP); after != nil {
+		ma.Values = after
 	}
 	return ma
 }
@@ -474,16 +441,10 @@ func (r *GoReceiver) VisitGoReturn(ret *golang.Return, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *ret // shallow copy to avoid mutating remoteObjects baseline
 	ret = &c
-	beforeExprs := make([]any, len(ret.Expressions))
-	for i, e := range ret.Expressions {
-		beforeExprs[i] = e
-	}
-	afterExprs := q.ReceiveList(beforeExprs, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterExprs != nil {
-		ret.Expressions = make([]java.RightPadded[java.Expression], len(afterExprs))
-		for i, v := range afterExprs {
-			ret.Expressions[i] = coerceToExpressionRP(v)
-		}
+	if after := receiveTypedList(q, ret.Expressions,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToExpressionRP); after != nil {
+		ret.Expressions = after
 	}
 	return ret
 }
@@ -514,18 +475,20 @@ func (r *GoReceiver) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	cc = &c
 	cc.Comm = receiveValue(q, cc.Comm, func(e java.Statement) any { return r.Visit(e, q) })
 	cc.Colon = receiveValue(q, cc.Colon, func(e java.Space) any { return receiveSpace(e, q) })
-	beforeBody := make([]any, len(cc.Body))
-	for i, s := range cc.Body {
-		beforeBody[i] = s
-	}
-	afterBody := q.ReceiveList(beforeBody, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterBody != nil {
-		cc.Body = make([]java.RightPadded[java.Statement], len(afterBody))
-		for i, s := range afterBody {
-			cc.Body[i] = coerceToStatementRP(s)
-		}
+	if after := receiveTypedList(q, cc.Body,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToStatementRP); after != nil {
+		cc.Body = after
 	}
 	return cc
+}
+
+func (r *GoReceiver) VisitSelect(sel *golang.Select, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *sel // shallow copy to avoid mutating remoteObjects baseline
+	sel = &c
+	sel.Body = receiveValue(q, sel.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	return sel
 }
 
 func (r *GoReceiver) VisitIndexList(il *golang.IndexList, p any) java.J {

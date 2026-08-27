@@ -46,6 +46,34 @@ describe.each([
     }));
 });
 
+describe('property key literal types', () => {
+    // A property name literal's type must match the literal's own lexical category,
+    // not the property value's type. Regression for a string key over a numeric
+    // value ({'a"b': 1}) being typed `double`: the JVM deserializer is type-directed
+    // and ran Double.valueOf("a\"b"), throwing NumberFormatException mid-stream.
+    function keyLiteral(cu: JS.CompilationUnit): Literal {
+        const decl = cu.statements[0].element as J.VariableDeclarations;
+        const newClass = decl.variables[0].element.initializer!.element as J.NewClass;
+        const prop = newClass.body!.statements[0].element as JS.PropertyAssignment;
+        return prop.name.element as Literal;
+    }
+
+    test.each([
+        [`{'a"b': 1}`, 'a"b', Type.Primitive.String],
+        [`{'ab': 1}`, 'ab', Type.Primitive.String],
+        [`{"foo": 2}`, 'foo', Type.Primitive.String],
+        [`{1: 2}`, 1, Type.Primitive.Double],
+    ])('%s key is typed by its own literal', (obj, expectedValue, expectedType) =>
+        spec.rewriteRun({
+            ...typescript(`const o = ${obj};`),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const key = keyLiteral(cu);
+                expect(key.value).toBe(expectedValue);
+                expect(key.type).toBe(expectedType);
+            }
+        }));
+});
+
 describe('Old-style octal literals (error 1121)', () => {
     test('should parse in .js files', () => spec.rewriteRun({
         ...javascript('0777'),

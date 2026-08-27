@@ -1025,4 +1025,77 @@ class UpgradePluginVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/1173")
+    @Test
+    void shouldNotAddVersionWhenManagedInSamePomEvenWhenManagedVersionUpgraded() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins",
+            "maven-compiler-plugin",
+            "3.11.0",
+            null,
+            null,
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.8.1</version>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.11.0</version>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
 }

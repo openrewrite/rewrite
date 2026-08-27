@@ -23,6 +23,8 @@ import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import org.openrewrite.rpc.Reference;
+
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 
 public class GolangSender extends GolangVisitor<RpcSendQueue> {
@@ -92,6 +94,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitComposite(Go.Composite composite, RpcSendQueue q) {
         q.getAndSend(composite, Go.Composite::getTypeExpr, el -> visit(el, q));
         q.getAndSend(composite, c -> c.getPadding().getElements(), el -> visitContainer(el, q));
+        q.getAndSend(composite, c -> Reference.asRef(c.getType()), type -> visitType(getValueNonNull(type), q));
         return composite;
     }
 
@@ -129,6 +132,20 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitTypeAssertion(Go.TypeAssertion ta, RpcSendQueue q) {
+        q.getAndSend(ta, t -> t.getPadding().getLeft(), el -> visitRightPadded(el, q));
+        q.getAndSend(ta, Go.TypeAssertion::getAssertedType, el -> visit(el, q));
+        q.getAndSend(ta, t -> Reference.asRef(t.getType()), type -> visitType(getValueNonNull(type), q));
+        return ta;
+    }
+
+    @Override
+    public J visitExpressionStatement(Go.ExpressionStatement es, RpcSendQueue q) {
+        q.getAndSend(es, Go.ExpressionStatement::getExpression, el -> visit(el, q));
+        return es;
+    }
+
+    @Override
     public J visitStatementExpression(Go.StatementExpression se, RpcSendQueue q) {
         q.getAndSend(se, Go.StatementExpression::getStatement, el -> visit(el, q));
         return se;
@@ -158,6 +175,12 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitStructType(Go.StructType structType, RpcSendQueue q) {
         q.getAndSend(structType, Go.StructType::getBody, el -> visit(el, q));
         return structType;
+    }
+
+    @Override
+    public J visitSelect(Go.Select select, RpcSendQueue q) {
+        q.getAndSend(select, Go.Select::getBody, el -> visit(el, q));
+        return select;
     }
 
     @Override
@@ -250,6 +273,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitGoUnary(Go.Unary unary, RpcSendQueue q) {
         q.getAndSend(unary, u -> u.getPadding().getOperator(), op -> visitLeftPadded(op, q));
         q.getAndSend(unary, Go.Unary::getExpression, el -> visit(el, q));
+        q.getAndSend(unary, u -> Reference.asRef(u.getType()), type -> visitType(getValueNonNull(type), q));
         return unary;
     }
 

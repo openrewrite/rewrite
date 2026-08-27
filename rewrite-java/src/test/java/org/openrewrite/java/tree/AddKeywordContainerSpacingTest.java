@@ -20,11 +20,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Collections;
-
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -50,9 +49,9 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
                   maybeAddImport("java.io.IOException");
                   J.Identifier ioException = new J.Identifier(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                          Collections.emptyList(), "IOException",
+                          emptyList(), "IOException",
                           JavaType.ShallowClass.build("java.io.IOException"), null);
-                  return method.withThrows(Collections.singletonList(ioException));
+                  return method.withThrows(singletonList(ioException));
               }
           })),
           //language=java
@@ -87,9 +86,9 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
                   maybeAddImport("java.io.Serializable");
                   J.Identifier serializable = new J.Identifier(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                          Collections.emptyList(), "Serializable",
+                          emptyList(), "Serializable",
                           JavaType.ShallowClass.build("java.io.Serializable"), null);
-                  return cd.withImplements(Collections.singletonList(serializable));
+                  return cd.withImplements(singletonList(serializable));
               }
           })),
           //language=java
@@ -119,9 +118,9 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
                   }
                   J.Identifier circle = new J.Identifier(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                          Collections.emptyList(), "Circle",
+                          emptyList(), "Circle",
                           JavaType.ShallowClass.build("Circle"), null);
-                  return cd.withPermits(Collections.singletonList(circle));
+                  return cd.withPermits(singletonList(circle));
               }
           })),
           //language=java
@@ -156,27 +155,27 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
                   // Build a single resource: AutoCloseable r = null
                   J.Identifier acType = new J.Identifier(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                          Collections.emptyList(), "AutoCloseable",
+                          emptyList(), "AutoCloseable",
                           JavaType.ShallowClass.build("java.lang.AutoCloseable"), null);
                   J.Identifier varName = new J.Identifier(
                           Tree.randomId(), Space.format(" "), Markers.EMPTY,
-                          Collections.emptyList(), "r", null, null);
+                          emptyList(), "r", null, null);
                   J.Literal nullLit = new J.Literal(
                           Tree.randomId(), Space.format(" "), Markers.EMPTY,
                           null, "null", null, JavaType.Primitive.Null);
                   J.VariableDeclarations.NamedVariable namedVar = new J.VariableDeclarations.NamedVariable(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                          varName, Collections.emptyList(),
+                          varName, emptyList(),
                           new JLeftPadded<>(Space.format(" "), nullLit, Markers.EMPTY),
                           null);
                   J.VariableDeclarations decl = new J.VariableDeclarations(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                          Collections.emptyList(), Collections.emptyList(),
-                          acType, null, Collections.emptyList(),
-                          Collections.singletonList(new JRightPadded<>(namedVar, Space.EMPTY, Markers.EMPTY)));
+                          emptyList(), emptyList(),
+                          acType, null, emptyList(),
+                          singletonList(new JRightPadded<>(namedVar, Space.EMPTY, Markers.EMPTY)));
                   J.Try.Resource resource = new J.Try.Resource(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY, decl, false);
-                  return tryStmt.withResources(Collections.singletonList(resource));
+                  return tryStmt.withResources(singletonList(resource));
               }
           })),
           //language=java
@@ -215,9 +214,9 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
                   maybeAddImport("java.lang.Comparable");
                   J.Identifier comparable = new J.Identifier(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                          Collections.emptyList(), "Comparable",
+                          emptyList(), "Comparable",
                           JavaType.ShallowClass.build("java.lang.Comparable"), null);
-                  return typeParam.withBounds(Collections.singletonList(comparable));
+                  return typeParam.withBounds(singletonList(comparable));
               }
           })),
           //language=java

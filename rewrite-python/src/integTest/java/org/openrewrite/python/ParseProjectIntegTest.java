@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
@@ -33,8 +35,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -90,7 +92,7 @@ class ParseProjectIntegTest {
         // Parse the project
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(2);
         assertThat(sources)
@@ -111,7 +113,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(2);
         // Source paths must be relative to the project directory
@@ -132,7 +134,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(1);
         assertThat(sources.get(0).getSourcePath().toString()).doesNotContain("__pycache__");
@@ -146,7 +148,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).isEmpty();
     }
@@ -163,7 +165,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(absolutePath, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(1);
     }
@@ -184,7 +186,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -212,7 +214,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -247,7 +249,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -286,7 +288,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         // pyproject.toml should be included but not requirements.txt
         assertThat(sources)
@@ -312,7 +314,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -338,6 +340,38 @@ class ParseProjectIntegTest {
         // Each file should have its own distinct marker pointing to its own path
         assertThat(baseMarker.getPath()).isEqualTo("requirements.txt");
         assertThat(devMarker.getPath()).isEqualTo("requirements-dev.txt");
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void complexLiteralValueSurvivesRpcBridge() throws Exception {
+        Path projectDir = tempDir.resolve("complex_literal");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("main.py"), "x = 0j\n");
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(toList());
+
+        SourceFile main = sources.stream()
+                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("main.py"))
+                .findFirst()
+                .orElseThrow();
+
+        List<J.Literal> literals = new java.util.ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Literal visitLiteral(J.Literal literal, Integer p) {
+                literals.add(literal);
+                return literal;
+            }
+        }.visit(main, 0);
+
+        assertThat(literals).hasSize(1);
+        assertThat(literals.get(0).getValueSource()).isEqualTo("0j");
+        assertThat(literals.get(0).getValue())
+                .as("complex literal value must survive the RPC bridge, not be dropped to null")
+                .isEqualTo("0j");
     }
 
     private PythonRewriteRpc client() {

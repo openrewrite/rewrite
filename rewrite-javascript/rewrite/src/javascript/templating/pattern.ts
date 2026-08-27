@@ -233,27 +233,28 @@ export class Pattern {
         const cacheKey = generateCacheKey(
             this.templateParts,
             capturesKey,
-            contextStatements,
+            // A capture's type reaches the parse as a declaration, so it shapes the tree the same
+            // way an explicit context statement does and belongs in the key alongside one.
+            [...contextStatements, ...TemplateEngine.capturePreamble(this.captures)],
             this._options.dependencies || {}
         );
 
         // Level 2: Global cache (fast path - shared with Template)
-        const cached = globalAstCache.get(cacheKey);
-        if (cached) {
-            this._cachedAstPattern = cached;
-            return cached;
+        let tree = globalAstCache.get(cacheKey);
+        if (!tree) {
+            // Level 3: Compute via TemplateEngine (slow path)
+            tree = await TemplateEngine.getPatternTree(
+                this.templateParts,
+                this.captures,
+                contextStatements,
+                this._options.dependencies || {}
+            );
+            globalAstCache.set(cacheKey, tree);
         }
 
-        // Level 3: Compute via TemplateEngine (slow path)
-        const result = await TemplateEngine.getPatternTree(
-            this.templateParts,
-            this.captures,
-            contextStatements,
-            this._options.dependencies || {}
-        );
-
-        // Cache in both levels
-        globalAstCache.set(cacheKey, result);
+        // The key names captures but says nothing about their constraints, so two patterns of the
+        // same shape share an entry; markers are attached per instance to keep them apart.
+        const result = await TemplateEngine.attachCaptureMarkers(tree, this.captures);
         this._cachedAstPattern = result;
 
         return result;
@@ -579,7 +580,7 @@ export class Pattern {
  * @example
  * const x = capture('x');
  * const pat = pattern`foo(${x})`;
- * const match = await pat.match(someNode);
+ * const match = await pat.match(someNode, cursor);
  * if (match) {
  *     const captured = match.get('x');  // Get by name
  *     // or
@@ -590,7 +591,7 @@ export class Pattern {
  * // Variadic captures return arrays
  * const args = capture({ variadic: true });
  * const pat = pattern`foo(${args})`;
- * const match = await pat.match(methodInvocation);
+ * const match = await pat.match(methodInvocation, cursor);
  * if (match) {
  *     const capturedArgs = match.get(args);  // Returns J[] for variadic captures
  * }

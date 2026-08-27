@@ -1,0 +1,7 @@
+[project]
+name = "fixture-h3"
+version = "0.1.0"
+requires-python = "<3.15,>=3.10"
+dependencies = [
+    "iniconfig>=2.0",
+]

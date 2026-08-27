@@ -57,10 +57,15 @@ public class ChangePackage extends Recipe {
 
     @With
     @Option(displayName = "Recursive",
-            description = "Recursively change subpackage names",
+            description = "Recursively change subpackage names. Defaults to `false`, renaming only types " +
+                          "directly in `oldPackageName`; set to `true` to also rename types in its subpackages.",
             required = false)
     @Nullable
     Boolean recursive;
+
+    private boolean isRecursive() {
+        return Boolean.TRUE.equals(recursive);
+    }
 
     @Override
     public String getInstanceNameSuffix() {
@@ -84,16 +89,16 @@ public class ChangePackage extends Recipe {
             @Override
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
+                boolean recursive = isRecursive();
+                String recursivePackageNamePrefix = oldPackageName + ".";
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
                     if (cu.getPackageDeclaration() != null) {
                         String original = PackageNameUtils.getPackageName(cu.getPackageDeclaration());
-                        if (original.startsWith(oldPackageName)) {
+                        if (original.equals(oldPackageName) || recursive && original.startsWith(recursivePackageNamePrefix)) {
                             return SearchResult.found(cu);
                         }
                     }
-                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
-                    String recursivePackageNamePrefix = oldPackageName + ".";
                     for (J.Import anImport : cu.getImports()) {
                         String importedPackage = anImport.getPackageName();
                         if (importedPackage.equals(oldPackageName) || recursive && importedPackage.startsWith(recursivePackageNamePrefix)) {
@@ -115,10 +120,9 @@ public class ChangePackage extends Recipe {
                     }
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
-                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
-                    String recursivePackageNamePrefix = oldPackageName + ".";
+                    PackageMatcher matcher = new PackageMatcher(oldPackageName, recursive);
                     for (Reference ref : cu.getReferences().getReferences()) {
-                        if (ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
+                        if (matcher.matchesReference(ref)) {
                             return SearchResult.found(cu);
                         }
                     }
@@ -141,8 +145,7 @@ public class ChangePackage extends Recipe {
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
-                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
-                    PackageMatcher matcher = new PackageMatcher(oldPackageName, recursive);
+                    PackageMatcher matcher = new PackageMatcher(oldPackageName, isRecursive());
                     Map<Tree, List<Reference>> matches = new HashMap<>();
                     for (Reference ref : references.findMatches(matcher)) {
                         matches.computeIfAbsent(ref.getTree(), k -> new java.util.ArrayList<>()).add(ref);
@@ -165,18 +168,41 @@ public class ChangePackage extends Recipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J f = super.visitFieldAccess(fieldAccess, ctx);
 
-            if (((J.FieldAccess) f).isFullyQualifiedClassReference(oldPackageName)) {
-                Cursor parent = getCursor().getParent();
-                if (parent != null &&
-                    // Ensure the parent isn't a J.FieldAccess OR the parent doesn't match the target package name.
-                    (!(parent.getValue() instanceof J.FieldAccess) ||
-                     (!(((J.FieldAccess) parent.getValue()).isFullyQualifiedClassReference(newPackageName))))) {
-
-                    f = TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
-                            .withPrefix(f.getPrefix());
+            if (!((J.FieldAccess) f).isFullyQualifiedClassReference(oldPackageName)) {
+                return f;
+            }
+            Cursor parent = getCursor().getParent();
+            if (parent == null) {
+                return f;
+            }
+            if (parent.getValue() instanceof J.FieldAccess) {
+                J.FieldAccess enclosing = (J.FieldAccess) parent.getValue();
+                if (enclosing.isFullyQualifiedClassReference(newPackageName)) {
+                    // Already rewritten to the new package.
+                    return f;
+                }
+                if (!isRecursive() && !namesTypeDirectlyInOldPackage(enclosing)) {
+                    // Leading segments of a subpackage-qualified name such as oldPackageName.sub.Type.
+                    return f;
                 }
             }
-            return f;
+            return TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
+                    .withPrefix(f.getPrefix());
+        }
+
+        /**
+         * Whether the name enclosing this occurrence of {@code oldPackageName} is a type declared
+         * directly in it, rather than a subpackage. Uses the same leading-capital convention as
+         * {@link PackageMatcher} where type attribution is unavailable.
+         */
+        private boolean namesTypeDirectlyInOldPackage(J.FieldAccess enclosing) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(enclosing.getType());
+            if (fq != null) {
+                return oldPackageName.equals(fq.getPackageName());
+            }
+            String nextSegment = enclosing.getSimpleName();
+            return "*".equals(nextSegment) ||
+                   !nextSegment.isEmpty() && Character.isUpperCase(nextSegment.charAt(0));
         }
 
         @Override
@@ -282,7 +308,7 @@ public class ChangePackage extends Recipe {
                     String oldSubPkg = oldPackageName + changingTo.substring(newPackageName.length());
                     sf = maybeExpandStarImport(sf, changingTo, oldSubPkg, ctx);
                 }
-                if (Boolean.TRUE.equals(recursive)) {
+                if (isRecursive()) {
                     for (J.Import anImport : sf.getImports()) {
                         if (!anImport.isStatic() && "*".equals(anImport.getQualid().getSimpleName())) {
                             String pkg = anImport.getPackageName();
@@ -518,7 +544,7 @@ public class ChangePackage extends Recipe {
         }
 
         private String getNewPackageName(String packageName) {
-            return (recursive == null || recursive) && !newPackageName.endsWith(packageName.substring(oldPackageName.length())) ?
+            return isRecursive() && !newPackageName.endsWith(packageName.substring(oldPackageName.length())) ?
                     newPackageName + packageName.substring(oldPackageName.length()) : newPackageName;
         }
 
@@ -529,7 +555,7 @@ public class ChangePackage extends Recipe {
         }
 
         private boolean isTargetRecursivePackageName(String packageName) {
-            return (recursive == null || recursive) &&
+            return isRecursive() &&
                    packageName.startsWith(oldPackageName + ".") &&
                    !packageName.startsWith(newPackageName);
         }

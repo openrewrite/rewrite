@@ -23,6 +23,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -186,13 +187,13 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitImport(J.Import import_, ExecutionContext ctx) {
-            // Collect alias import information here
-            // If there is an existing import with an alias, we need to add a target import with an alias accordingly.
-            // If there is an existing import without an alias, we need to add a target import with an alias accordingly.
-            if (hasSameFQN(import_, originalType)) {
-                if (import_.getAlias() != null) {
-                    importAlias = import_.getAlias();
-                }
+            // An alias on the original type has to be reused for the target import, or references to
+            // it stop resolving. Imports nested in a block (a function body, an `if TYPE_CHECKING:`)
+            // bind a narrower scope than the file-level import that would be added in their place,
+            // so only file-level ones are considered.
+            if (import_.getAlias() != null && getCursor().firstEnclosing(J.Block.class) == null &&
+                    hasSameFQN(import_, originalType)) {
+                importAlias = import_.getAlias();
             }
 
             // visitCompilationUnit() handles changing the imports.
@@ -280,6 +281,11 @@ public class ChangeType extends Recipe {
                     }
                 }
 
+                if (targetType instanceof JavaType.FullyQualified && service(ImportService.class).usesStatementBasedImports()) {
+                    // Queued after the addition so the import service sees the name already bound by
+                    // the new import, which is what makes the old one safe to retire.
+                    maybeRemoveImport(originalType.getFullyQualifiedName());
+                }
                 j = sf.withImports(ListUtils.map(sf.getImports(), i -> {
                     Cursor cursor = getCursor();
                     setCursor(new Cursor(cursor, i));
@@ -748,8 +754,13 @@ public class ChangeType extends Recipe {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 for (J.ClassDeclaration declaration : cu.getClasses()) {
-                    // Check the class name instead of source path, as it might differ
-                    String fqn = declaration.getType().getFullyQualifiedName();
+                    // Check the class name instead of source path, as it might differ.
+                    // Non-Java (e.g. Python) class declarations may lack type attribution.
+                    JavaType.FullyQualified declarationType = declaration.getType();
+                    if (declarationType == null) {
+                        continue;
+                    }
+                    String fqn = declarationType.getFullyQualifiedName();
                     if (fqn.equals(originalType.getFullyQualifiedName())) {
                         getCursor().putMessage("UPDATE_PACKAGE", true);
                         break;

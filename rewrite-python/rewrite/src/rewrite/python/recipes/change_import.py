@@ -24,12 +24,13 @@ from rewrite.marketplace import Python
 from rewrite.recipe import option
 from rewrite.java import J
 from rewrite.java.support_types import JavaType
-from rewrite.java.tree import FieldAccess, Identifier, Import, MethodDeclaration, MethodInvocation
+from rewrite.java.tree import FieldAccess, Identifier, Import, MethodInvocation
 from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name
+from rewrite.python.scope_utils import LocalBindings
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
-from rewrite.python.remove_import import RemoveImportOptions, maybe_remove_import
+from rewrite.python.remove_import import RemoveImportOptions, maybe_remove_import, prefix_to_inherit
 
 
 _Imports = [*Python, CategoryDescriptor(display_name="Imports")]
@@ -142,6 +143,7 @@ class ChangeImport(Recipe):
             module_alias: Optional[str] = None
             rewrote_qualified_refs: bool = False
             new_module_type: Optional[JavaType.Class] = None
+            local_bindings: LocalBindings  # a fresh instance per compilation unit
 
             def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
                 self.has_old_import = False
@@ -150,6 +152,7 @@ class ChangeImport(Recipe):
                 self.module_alias = None
                 self.rewrote_qualified_refs = False
                 self.new_module_type = None
+                self.local_bindings = LocalBindings()
 
                 # Single pass: detect old imports and direct module imports
                 for stmt in cu.statements:
@@ -185,6 +188,8 @@ class ChangeImport(Recipe):
                 result = super().visit_compilation_unit(cu, p)
                 if not isinstance(result, CompilationUnit):
                     return result
+
+                result = self._transfer_removed_prefixes(cu, result)
 
                 # Schedule adding the new import (only for direct import changes)
                 if self.has_old_import:
@@ -257,14 +262,13 @@ class ChangeImport(Recipe):
                 # Skip identifiers inside import statements
                 if self.cursor.first_enclosing(Import):
                     return ident
-                # Skip local variables that shadow the imported name.
-                # Only check field_type inside function scopes — at module level,
-                # bare references to the imported name always need renaming.
-                # When ty is unavailable, field_type is None for all identifiers
-                # and shadowed locals may be incorrectly renamed.
-                if self.cursor.first_enclosing(MethodDeclaration) is not None:
-                    if ident.field_type is not None:
-                        return ident
+                # An attribute name resolves against its target object;
+                # visit_field_access handles the qualified references.
+                parent = self.cursor.parent_tree_cursor().value
+                if isinstance(parent, FieldAccess) and parent.name.id == ident.id:
+                    return ident
+                if self.local_bindings.is_bound(self.cursor, old_ref_name):
+                    return ident
                 return ident.replace(_simple_name=new_ref_name)
 
             def visit_method_invocation(self, method: MethodInvocation, p: ExecutionContext) -> J:
@@ -342,6 +346,39 @@ class ChangeImport(Recipe):
                     new_name_ident = result.name.replace(_simple_name=new_name)
                     result = result.padding.replace(_name=result.padding.name.replace(_element=new_name_ident))
                 return result
+
+            def _transfer_removed_prefixes(self, before: CompilationUnit, after: CompilationUnit) -> CompilationUnit:
+                """Dropping a statement discards its prefix; when it is worth rescuing
+                (see prefix_to_inherit) hand it to the next surviving statement,
+                mirroring RemoveImport._remove_import."""
+                removed_ids = ({p.element.id for p in before.padding.statements}
+                               - {p.element.id for p in after.padding.statements})
+                if not removed_ids:
+                    return after
+                inherited = None
+                prefix_by_id = {}
+                for index, padded in enumerate(before.padding.statements):
+                    stmt = padded.element
+                    if stmt.id in removed_ids:
+                        prefix = prefix_to_inherit(stmt, index)
+                        if prefix is not None:
+                            inherited = prefix
+                    elif inherited is not None:
+                        # A whitespace-only prefix is handed only to a following
+                        # import: a following plain statement keeps its own
+                        # separation, which AddImport's front insertion relies on
+                        # when it places the replacement import before it.
+                        if inherited.comments or isinstance(stmt, (Import, MultiImport)):
+                            prefix_by_id[stmt.id] = inherited
+                        inherited = None
+                if not prefix_by_id:
+                    return after
+                new_padded = [
+                    p.replace(_element=p.element.replace(prefix=prefix_by_id[p.element.id]))
+                    if p.element.id in prefix_by_id else p
+                    for p in after.padding.statements
+                ]
+                return after.padding.replace(_statements=new_padded)
 
             def _get_new_module_type(self) -> JavaType.Class:
                 if self.new_module_type is None:

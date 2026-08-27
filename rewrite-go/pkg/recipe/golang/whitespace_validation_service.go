@@ -18,11 +18,11 @@ package golang
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // WhitespaceValidationService walks a tree and reports any Space whose
@@ -44,10 +44,14 @@ type WhitespaceValidationService struct{}
 // Validate walks the tree rooted at root and returns one descriptive
 // error per offending Space / Comment. Returns nil when the tree is
 // well-formed.
+//
+// The walk is by reflection rather than through GoVisitor, which reaches
+// only the Spaces it was written to reach — a Container's Markers, and
+// so the TrailingComma marker's own spacing, it never visits.
 func (s *WhitespaceValidationService) Validate(root java.Tree) []string {
-	v := visitor.Init(&whitespaceValidator{})
-	v.Visit(root, nil)
-	return v.errs
+	w := &spaceWalker{seen: map[uintptr]bool{}}
+	w.walk(reflect.ValueOf(root), "")
+	return w.errs
 }
 
 // IsValid is the boolean shorthand. Recipes that just want to assert
@@ -56,24 +60,81 @@ func (s *WhitespaceValidationService) IsValid(root java.Tree) bool {
 	return len(s.Validate(root)) == 0
 }
 
-type whitespaceValidator struct {
-	visitor.GoVisitor
+var (
+	spaceType     = reflect.TypeOf(java.Space{})
+	javaTypeIface = reflect.TypeOf((*java.JavaType)(nil)).Elem()
+)
+
+type spaceWalker struct {
 	errs []string
+	seen map[uintptr]bool
 }
 
-func (v *whitespaceValidator) VisitSpace(space java.Space, p any) java.Space {
-	if space.Whitespace != "" && !isWhitespaceOnly(space.Whitespace) {
-		v.errs = append(v.errs, fmt.Sprintf("Space.Whitespace contains non-whitespace: %q", truncateForError(space.Whitespace, 80)))
+func (w *spaceWalker) walk(v reflect.Value, path string) {
+	if !v.IsValid() {
+		return
 	}
-	for i, c := range space.Comments {
+	switch v.Kind() {
+	case reflect.Ptr, reflect.Interface:
+		if v.IsNil() {
+			return
+		}
+		if v.Kind() == reflect.Ptr {
+			// Type graphs are cyclic by construction and hold no Space;
+			// stopping at them keeps the walk finite and cheap.
+			if v.Type().Implements(javaTypeIface) {
+				return
+			}
+			if w.seen[v.Pointer()] {
+				return
+			}
+			w.seen[v.Pointer()] = true
+			path = strings.TrimPrefix(v.Type().String(), "*")
+		}
+		w.walk(v.Elem(), path)
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			w.walk(v.Index(i), path)
+		}
+	case reflect.Map:
+		for _, k := range v.MapKeys() {
+			w.walk(v.MapIndex(k), path)
+		}
+	case reflect.Struct:
+		if v.Type() == spaceType {
+			w.checkSpace(v.Interface().(java.Space), path)
+			return
+		}
+		if v.Type().Implements(javaTypeIface) {
+			return
+		}
+		// Padding and container wrappers keep the enclosing node's name,
+		// which is what identifies the site to a reader.
+		if n := v.Type().Name(); n != "" && !strings.HasPrefix(n, "Container") &&
+			!strings.HasPrefix(n, "RightPadded") && !strings.HasPrefix(n, "LeftPadded") {
+			path = v.Type().String()
+		}
+		for i := 0; i < v.NumField(); i++ {
+			if v.Type().Field(i).PkgPath != "" {
+				continue // unexported: neither reachable nor printed
+			}
+			w.walk(v.Field(i), path+"."+v.Type().Field(i).Name)
+		}
+	}
+}
+
+func (w *spaceWalker) checkSpace(s java.Space, path string) {
+	if s.Whitespace != "" && !isWhitespaceOnly(s.Whitespace) {
+		w.errs = append(w.errs, fmt.Sprintf("%s: Space.Whitespace contains non-whitespace: %q", path, truncateForError(s.Whitespace, 80)))
+	}
+	for i, c := range s.Comments {
 		if c.Suffix != "" && !isWhitespaceOnly(c.Suffix) {
-			v.errs = append(v.errs, fmt.Sprintf("Comment[%d].Suffix contains non-whitespace: %q", i, truncateForError(c.Suffix, 80)))
+			w.errs = append(w.errs, fmt.Sprintf("%s: Comment[%d].Suffix contains non-whitespace: %q", path, i, truncateForError(c.Suffix, 80)))
 		}
 		if c.Text != "" && !strings.HasPrefix(c.Text, "//") && !strings.HasPrefix(c.Text, "/*") {
-			v.errs = append(v.errs, fmt.Sprintf("Comment[%d].Text is not a comment: %q", i, truncateForError(c.Text, 80)))
+			w.errs = append(w.errs, fmt.Sprintf("%s: Comment[%d].Text is not a comment: %q", path, i, truncateForError(c.Text, 80)))
 		}
 	}
-	return space
 }
 
 func isWhitespaceOnly(s string) bool {

@@ -1008,35 +1008,58 @@ public class MavenPomDownloader {
         // URLs are case-sensitive after the domain name, so it can be incorrect to lowerCase() a whole URL
         // This regex accepts any capitalization of the letters in "http"
         String originalUrl = repository.getUri();
-        String httpsUri = originalUrl.toLowerCase().startsWith("http:") ?
-                repository.getUri().replaceFirst("[hH][tT][tT][pP]://", "https://") :
-                repository.getUri();
-        if (!httpsUri.endsWith("/")) {
-            httpsUri += "/";
-        }
+        String httpsUri = normalizedRepositoryUri(originalUrl);
 
-        HttpSender.Request.Builder request = httpSender.options(httpsUri);
-
-        ReachabilityResult reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request));
+        ReachabilityResult reachability = reachable(repository, HttpSender.Method.OPTIONS, httpsUri);
         if (reachability.isSuccess()) {
             return repository.withUri(httpsUri);
         }
-        reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(httpsUri)));
+        reachability = reachable(repository, HttpSender.Method.HEAD, httpsUri);
         if (reachability.isReachable()) {
             return repository.withUri(httpsUri);
         }
         if (!originalUrl.equals(httpsUri)) {
-            reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
+            reachability = reachable(repository, HttpSender.Method.OPTIONS, originalUrl);
             if (reachability.isSuccess()) {
                 return repository.withUri(originalUrl);
             }
-            reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
+            reachability = reachable(repository, HttpSender.Method.HEAD, originalUrl);
             if (reachability.isReachable()) {
                 return repository.withUri(originalUrl);
             }
         }
         // Won't be null if server is unreachable
         throw Objects.requireNonNull(reachability.throwable);
+    }
+
+    /**
+     * The URI form {@link #normalizeRepository(MavenRepository)} prefers: https over http, with a trailing
+     * slash so artifact paths can be appended directly. Since that is the form a reachable repository is
+     * normalized to, it is also the URI recorded on the POMs it serves. Exposed so callers keyed on that URI
+     * — a {@link org.openrewrite.maven.cache.MavenPomCache} matching a downloaded POM back to the repository
+     * declaration it came from, for one — can derive it without reimplementing the rule and drifting from it.
+     */
+    public static String normalizedRepositoryUri(String uri) {
+        String httpsUri = uri.toLowerCase().startsWith("http:") ?
+                uri.replaceFirst("[hH][tT][tT][pP]://", "https://") :
+                uri;
+        return httpsUri.endsWith("/") ? httpsUri : httpsUri + "/";
+    }
+
+    /**
+     * Probes {@code url} to establish whether the repository host answers at all. Anonymous first, as every
+     * other request is, but a host that refuses unauthenticated requests without answering them — a connection
+     * reset or a dropped TLS handshake rather than a 401 — must not be written off as unreachable until tried
+     * with credentials. A repository declared to be behind authentication is often exactly such a host, so when
+     * credentials are configured the probe is retried with them before concluding the repository is unreachable.
+     */
+    private ReachabilityResult reachable(MavenRepository repository, HttpSender.Method method, String url) {
+        ReachabilityResult anonymous = reachable(applyTimeoutToRequest(repository, httpSender.newRequest(url).withMethod(method)));
+        if (anonymous.isReachable() || !hasAuthentication(repository)) {
+            return anonymous;
+        }
+        ReachabilityResult authenticated = reachable(applyAuthenticationAndTimeoutToRequest(repository, httpSender.newRequest(url).withMethod(method)));
+        return authenticated.isReachable() ? authenticated : anonymous;
     }
 
     @Value
@@ -1082,22 +1105,34 @@ public class MavenPomDownloader {
 
     private boolean jarExistsForPomUri(MavenRepository repo, String pomUrl) {
         String jarUrl = pomUrl.replaceAll("\\.pom$", ".jar");
+        // If this host has already required authentication in this session, authenticate preemptively rather
+        // than paying another anonymous round-trip. Otherwise probe anonymously first.
+        String endpoint = endpointOrNull(URI.create(jarUrl));
+        boolean preemptive = hasAuthentication(repo) && endpoint != null &&
+                             ctx.getAuthenticationRequiredEndpoints().contains(endpoint);
         try {
             try {
                 return Failsafe.with(retryPolicy).get(() -> {
-                    HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
-                    try (HttpSender.Response response = httpSender.send(authenticated)) {
+                    HttpSender.Request request = preemptive ?
+                            applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build() :
+                            applyTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
+                    try (HttpSender.Response response = httpSender.send(request)) {
                         return response.isSuccessful();
                     }
                 });
             } catch (FailsafeException failsafeException) {
                 Throwable cause = failsafeException.getCause();
-                if (cause instanceof HttpSenderResponseException && hasCredentials(repo) &&
+                if (cause instanceof HttpSenderResponseException && !preemptive && hasAuthentication(repo) &&
                     ((HttpSenderResponseException) cause).isClientSideException()) {
                     return Failsafe.with(retryPolicy).get(() -> {
-                        HttpSender.Request unauthenticated = httpSender.head(jarUrl).build();
-                        try (HttpSender.Response response = httpSender.send(unauthenticated)) {
-                            return response.isSuccessful();
+                        HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
+                        try (HttpSender.Response response = httpSender.send(authenticated)) {
+                            boolean successful = response.isSuccessful();
+                            if (successful && endpoint != null) {
+                                // Remember so later requests to this host authenticate preemptively
+                                ctx.getAuthenticationRequiredEndpoints().add(endpoint);
+                            }
+                            return successful;
                         }
                     });
                 }
@@ -1110,27 +1145,39 @@ public class MavenPomDownloader {
 
 
     /**
-     * Replicates Apache Maven's behavior to attempt anonymous download if repository credentials prove invalid
+     * Replicates Apache Maven's DeferredCredentialsProvider behavior: request anonymously first and only send
+     * credentials once the server challenges the anonymous request with a 4xx.
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
+        // If this host has already required authentication in this session, authenticate preemptively rather
+        // than paying another anonymous round-trip. Otherwise request anonymously first.
+        String endpoint = endpointOrNull(URI.create(uriString));
+        if (hasAuthentication(repo) && endpoint != null && ctx.getAuthenticationRequiredEndpoints().contains(endpoint)) {
+            return sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
+        }
         try {
-            HttpSender.Request.Builder request = httpSender.get(uriString);
-            return sendRequest(applyAuthenticationAndTimeoutToRequest(repo, request).build());
+            return sendRequest(applyTimeoutToRequest(repo, httpSender.get(uriString)).build());
         } catch (HttpSenderResponseException e) {
-            if (hasCredentials(repo) && e.isClientSideException()) {
-                return retryRequestAnonymously(uriString, e);
+            if (hasAuthentication(repo) && e.isClientSideException()) {
+                return retryRequestWithCredentials(repo, uriString, e);
             } else {
                 throw e;
             }
         }
     }
 
-    private byte[] retryRequestAnonymously(String uriString, HttpSenderResponseException originalException) throws HttpSenderResponseException, IOException {
+    private byte[] retryRequestWithCredentials(MavenRepository repo, String uriString, HttpSenderResponseException anonymousException) throws HttpSenderResponseException, IOException {
         try {
-            return sendRequest(httpSender.get(uriString).build());
+            byte[] responseBody = sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
+            // Remember so later requests to this host authenticate preemptively
+            String endpoint = endpointOrNull(URI.create(uriString));
+            if (endpoint != null) {
+                ctx.getAuthenticationRequiredEndpoints().add(endpoint);
+            }
+            return responseBody;
         } catch (HttpSenderResponseException retryException) {
             if (retryException.isAccessDenied()) {
-                throw originalException;
+                throw anonymousException;
             } else {
                 throw retryException;
             }
@@ -1145,33 +1192,62 @@ public class MavenPomDownloader {
     }
 
     /**
-     * Returns a request builder with Authorization header set if the provided repository specifies credentials
+     * Applies connect/read timeouts from the repository and any matching server configuration, without sending
+     * any credentials or configured HTTP headers. Used for anonymous-first requests.
      */
-    private HttpSender.Request.Builder applyAuthenticationAndTimeoutToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
+    private HttpSender.Request.Builder applyTimeoutToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
         if (mavenSettings != null && mavenSettings.getServers() != null) {
             request.withConnectTimeout(repository.getTimeout() == null ? Duration.ofSeconds(10) : repository.getTimeout());
             request.withReadTimeout(repository.getTimeout() == null ? Duration.ofSeconds(30) : repository.getTimeout());
             for (MavenSettings.Server server : mavenSettings.getServers().getServers()) {
                 if (server.getId().equals(repository.getId()) && server.getConfiguration() != null) {
                     MavenSettings.ServerConfiguration configuration = server.getConfiguration();
-                    if (server.getConfiguration().getHttpHeaders() != null) {
-                        for (MavenSettings.HttpHeader header : configuration.getHttpHeaders()) {
-                            request.withHeader(header.getName(), header.getValue());
-                        }
-                    }
                     if (configuration.getTimeout() != null) {
                         request.withConnectTimeout(Duration.ofMillis(configuration.getTimeout()));
-                    }
-                    if (configuration.getTimeout() != null) {
                         request.withReadTimeout(Duration.ofMillis(configuration.getTimeout()));
                     }
                 }
             }
         }
+        return request;
+    }
+
+    /**
+     * Returns a request builder with timeouts, any configured HTTP headers, and an Authorization header when the
+     * repository specifies credentials. Only used to retry once an anonymous request has been challenged with a 4xx.
+     */
+    private HttpSender.Request.Builder applyAuthenticationAndTimeoutToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
+        applyTimeoutToRequest(repository, request);
+        for (MavenSettings.HttpHeader header : resolveHttpHeaders(repository)) {
+            request.withHeader(header.getName(), header.getValue());
+        }
         if (hasCredentials(repository)) {
             return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
         }
         return request;
+    }
+
+    /**
+     * Whether an authenticated request to this repository would differ from an anonymous one at all, and so
+     * whether retrying with authentication after a 4xx is worth a round-trip. A {@code <server>} may carry
+     * only {@code <httpHeaders>} (a bearer token or PAT) with no username or password, which authenticates
+     * just as much as basic credentials do. Mirrors {@code MavenArtifactDownloader#hasAuthentication}.
+     */
+    private boolean hasAuthentication(MavenRepository repository) {
+        return hasCredentials(repository) || !resolveHttpHeaders(repository).isEmpty();
+    }
+
+    private List<MavenSettings.HttpHeader> resolveHttpHeaders(MavenRepository repository) {
+        if (mavenSettings != null && mavenSettings.getServers() != null) {
+            for (MavenSettings.Server server : mavenSettings.getServers().getServers()) {
+                MavenSettings.ServerConfiguration configuration = server.getConfiguration();
+                if (server.getId().equals(repository.getId()) && configuration != null &&
+                    configuration.getHttpHeaders() != null) {
+                    return configuration.getHttpHeaders();
+                }
+            }
+        }
+        return emptyList();
     }
 
     private static boolean hasCredentials(MavenRepository repository) {

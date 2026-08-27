@@ -71,18 +71,9 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                     JarEntry entry = jarFile.getJarEntry("META-INF/rewrite/recipes.csv");
                     if (entry != null) {
                         try (InputStream recipesCsv = jarFile.getInputStream(entry)) {
-                            RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(recipesCsv);
-                            // The recipes.csv inside a JAR may be generated without a version,
-                            // since the version of a published Maven artifact is determined at
-                            // publish time if the artifact is a snapshot. Having resolved the
-                            // JAR containing the recipes.csv, we now know the version.
-                            //
-                            // We must walk the full tree structure rather than using getAllRecipes()
-                            // because getAllRecipes() returns a deduplicated set (by recipe name).
-                            // When a recipe appears in multiple categories, each category has its
-                            // own RecipeListing with its own RecipeBundle that needs updating.
-                            setVersionRecursive(marketplace.getRoot());
-                            return marketplace;
+                            // The CSV's own bundle columns are not trusted; RecipeMarketplace.install
+                            // binds every listing to the resolved bundle.
+                            return new RecipeMarketplaceReader().fromCsv(recipesCsv);
                         }
                     }
                 } catch (IOException e) {
@@ -111,14 +102,13 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                     classLoader
             ).build();
 
-            GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
+            GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getEffectiveVersion());
 
             for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
                 marketplace.install(
                         RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
                                 "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
-                                bundle.getRequestedVersion() == null ? gav.getVersion() : bundle.getRequestedVersion(),
-                                gav.getVersion(), null)),
+                                bundle.getRequestedVersion(), bundle.getVersion(), null)),
                         descriptor.inferCategoriesFromName(env)
                 );
             }
@@ -198,19 +188,5 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private boolean isResolvedBundle(ResolvedDependency resolvedDependency) {
         return resolvedDependency.isDirect() && bundle.getPackageName()
                 .equals(resolvedDependency.getGroupId() + ":" + resolvedDependency.getArtifactId());
-    }
-
-    private void setVersionRecursive(RecipeMarketplace.Category category) {
-        for (RecipeListing recipe : category.getRecipes()) {
-            RecipeBundle recipeBundle = recipe.getBundle();
-            // Only update bundles from the same package as the bundle we're reading
-            if (bundle.getPackageName().equals(recipeBundle.getPackageName())) {
-                recipeBundle.setVersion(bundle.getVersion());
-                recipeBundle.setRequestedVersion(bundle.getRequestedVersion());
-            }
-        }
-        for (RecipeMarketplace.Category child : category.getCategories()) {
-            setVersionRecursive(child);
-        }
     }
 }

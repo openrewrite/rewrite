@@ -16,7 +16,15 @@
 
 package rpc
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"math/big"
+	"strconv"
+	"strings"
+)
 
 type State int
 
@@ -66,25 +74,114 @@ func (d RpcObjectData) MarshalJSON() ([]byte, error) {
 	return json.Marshal(Alias{
 		State:     d.State.String(),
 		ValueType: d.ValueType,
-		Value:     d.Value,
+		Value:     wireNumber(d.Value),
 		Ref:       d.Ref,
 	})
 }
 
-func ParseObjectData(m map[string]any) RpcObjectData {
-	d := RpcObjectData{}
-	if s, ok := m["state"].(string); ok {
-		d.State = parseState(s)
+// A value that carries no valueType is bound on the JVM side by its JSON shape,
+// and Go writes a float64 without a fraction or an exponent for every magnitude
+// between 1e-6 and 1e21 -- a shape the receiver reads as an integer. Only a value
+// sent on its own is bound that way; one nested in an inlined map arrives under a
+// valueType, which binds it against the type of the field it fills.
+func wireNumber(v any) any {
+	f, ok := v.(float64)
+	if !ok {
+		return v
 	}
-	if vt, ok := m["valueType"].(string); ok {
-		d.ValueType = &vt
+	s := strconv.FormatFloat(f, 'g', -1, 64)
+	if !strings.ContainsAny(s, ".eE") {
+		s += ".0"
 	}
-	d.Value = m["value"]
-	if ref, ok := m["ref"]; ok && ref != nil {
-		r := int(ref.(float64))
-		d.Ref = &r
+	return json.Number(s)
+}
+
+type wireObjectData struct {
+	State     string  `json:"state"`
+	ValueType *string `json:"valueType"`
+	Value     any     `json:"value"`
+	Ref       *int    `json:"ref"`
+}
+
+func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	open, err := dec.Token()
+	if err != nil {
+		if err == io.EOF {
+			return nil, nil
+		}
+		return nil, err
 	}
-	return d
+	if open == nil {
+		return nil, nil
+	}
+	if d, ok := open.(json.Delim); !ok || d != '[' {
+		return nil, fmt.Errorf("expected JSON array, got %v", open)
+	}
+	batch := make([]RpcObjectData, 0, len(data)/40+1)
+	var w wireObjectData
+	for dec.More() {
+		w = wireObjectData{}
+		if err := dec.Decode(&w); err != nil {
+			return nil, err
+		}
+		d := RpcObjectData{State: parseState(w.State), ValueType: w.ValueType, Ref: w.Ref}
+		if w.Value != nil {
+			d.Value = decodeValue(w.Value, intern)
+		}
+		batch = append(batch, d)
+	}
+	return batch, nil
+}
+
+func decodeValue(v any, tbl map[string]string) any {
+	switch x := v.(type) {
+	case string:
+		return internString(x, tbl)
+	case json.Number:
+		return decodeNumber(x)
+	case []any:
+		for i := range x {
+			x[i] = decodeValue(x[i], tbl)
+		}
+		return x
+	case map[string]any:
+		for k, val := range x {
+			x[k] = decodeValue(val, tbl)
+		}
+		return x
+	default:
+		return v
+	}
+}
+
+// The remote's numbers arrive as text (see UseNumber above) and take the Go type
+// their JSON shape implies, so a value keeps both its kind and its full precision
+// across a round trip.
+func decodeNumber(n json.Number) any {
+	s := n.String()
+	if !strings.ContainsAny(s, ".eE") {
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return i
+		}
+		if i, ok := new(big.Int).SetString(s, 10); ok {
+			return i
+		}
+	}
+	f, _ := n.Float64()
+	return f
+}
+
+func internString(s string, tbl map[string]string) string {
+	if s == "" || tbl == nil {
+		return s
+	}
+	if c, ok := tbl[s]; ok {
+		return c
+	}
+	tbl[s] = s
+	return s
 }
 
 func parseState(s string) State {

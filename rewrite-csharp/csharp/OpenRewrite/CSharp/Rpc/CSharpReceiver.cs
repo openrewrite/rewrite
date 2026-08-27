@@ -1110,21 +1110,17 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         {
             var comments = q.ReceiveList(space.Comments, c =>
             {
-                // The Java side decomposes a structured CsDocComment.DocComment tree; the C#
-                // side has no such model, so drain it and re-flatten to a raw XmlDocComment.
-                if (c is StructuredDocComment)
+                // A structured /// XML documentation comment is decomposed as a proper tree;
+                // reconstruct it node-by-node rather than flattening it to text.
+                if (c is CsDocComment.DocComment docComment)
                 {
-                    return CsDocCommentReceiver.ReceiveDocComment(q);
+                    return (Comment)new CsDocCommentReceiver(_outer).Visit(docComment, q)!;
                 }
                 var multiline = q.Receive(c.Multiline);
                 var text = q.Receive(c.Text);
                 var suffix = q.Receive(c.Suffix);
                 // C# Comment doesn't have Markers; consume and discard
                 q.Receive<Markers>(Markers.Empty);
-                if (c is XmlDocComment)
-                {
-                    return new XmlDocComment(text!, suffix!, multiline);
-                }
                 return new TextComment(text!, suffix!, multiline);
             });
             var whitespace = q.Receive(space.Whitespace);
