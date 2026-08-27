@@ -1144,6 +1144,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(accessor, p);
 
+        foreach (var attrList in accessor.AttributeLists)
+        {
+            Visit(attrList, p);
+        }
+
         // Print modifiers
         foreach (var mod in accessor.Modifiers)
         {
