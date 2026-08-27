@@ -5,7 +5,6 @@ import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
 import {getStyle, PrettierStyle, SpacesStyle, StyleKind} from "./style";
 import {Cursor} from "../tree";
-import {RemoveImport} from "./remove-import";
 
 export type QuoteChar = "'" | '"';
 
@@ -38,6 +37,11 @@ export interface AddImportOptions {
      * emitted code using it.
      * Cannot be combined with `sideEffectOnly`. */
     alias?: string;
+
+    /** Preferred local name, deconflicted if the file already binds it. Stands in for `alias` where
+     * `member` is 'default' or '*' and the caller wants a name it does not insist on.
+     * Cannot be combined with `sideEffectOnly`. */
+    preferredName?: string;
 
     /** If true, only add the import if the member is actually used in the file. Default: true
      * Cannot be combined with `sideEffectOnly`. */
@@ -106,10 +110,12 @@ export function maybeAddImport(
     options: AddImportOptions
 ): string | undefined {
     const module = moduleNameOf(options.module);
+    // Neither the quote nor a preferred name says which binding is wanted, so a request differing
+    // only in those is the same request, and answering with the name already settled on keeps a
+    // caller from emitting a reference to an import that never appears.
     for (const v of visitor.afterVisit || []) {
         if (v instanceof AddImport &&
             v.module === module &&
-            v.quoteStyle === options.quoteStyle &&
             v.member === options.member &&
             v.alias === options.alias &&
             v.sideEffectOnly === (options.sideEffectOnly ?? false) &&
@@ -123,7 +129,7 @@ export function maybeAddImport(
         return undefined;
     }
 
-    const derived = options.alias ?? options.member ?? module;
+    const derived = options.alias ?? options.preferredName ?? memberName(options.member) ?? module;
     const cu = compilationUnitOf(visitor);
     if (!cu) {
         visitor.afterVisit.push(new AddImport(options, derived));
@@ -137,7 +143,7 @@ export function maybeAddImport(
     // derive a suffixed name from the binding this call just added.
     if (!options.alias) {
         for (const binding of bindings) {
-            if (binding.module === module && binding.member === options.member && binding.typeOnly === typeOnly) {
+            if (binding.module === module && binding.member === memberName(options.member) && binding.typeOnly === typeOnly) {
                 return binding.name;
             }
         }
@@ -146,6 +152,11 @@ export function maybeAddImport(
     const name = options.alias ?? deconflict(derived, takenNames(bindings, visitor));
     visitor.afterVisit.push(new AddImport(options, name));
     return name;
+}
+
+/** `'default'` and an absent member both name a default import, which binds no member name of its own. */
+function memberName(member: string | undefined): string | undefined {
+    return member === 'default' ? undefined : member;
 }
 
 /** A name introduced into the file's module scope, and where it came from when that is an import. */
@@ -265,27 +276,22 @@ function importBindings(jsImport: JS.Import): ModuleScopeBinding[] {
     return bindings;
 }
 
-/** On the `afterVisit` queue, a pending `AddImport` has claimed a name and a pending `RemoveImport` frees one. */
+/**
+ * Names the file binds, plus those pending `AddImport`s on the `afterVisit` queue have claimed. A
+ * queued `RemoveImport` does not free one: it removes only what the file leaves unused, and binding
+ * a name it keeps is an error, where an unnecessary suffix merely reads oddly.
+ */
 function takenNames(bindings: ModuleScopeBinding[], visitor: JavaScriptVisitor<any>): Set<string> {
     const taken = new Set<string>();
-    const removals: RemoveImport<any>[] = [];
 
     for (const v of visitor.afterVisit || []) {
-        if (v instanceof AddImport) {
-            if (v.bindingName) {
-                taken.add(v.bindingName);
-            }
-        } else if (v instanceof RemoveImport) {
-            removals.push(v);
+        if (v instanceof AddImport && v.bindingName) {
+            taken.add(v.bindingName);
         }
     }
 
     for (const binding of bindings) {
-        const removed = binding.module !== undefined && removals.some(r =>
-            r.module === binding.module && (r.member === undefined || r.member === binding.member));
-        if (!removed) {
-            taken.add(binding.name);
-        }
+        taken.add(binding.name);
     }
 
     return taken;
@@ -425,6 +431,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     readonly moduleUnicodeEscapes?: J.LiteralUnicodeEscape[];
     readonly member?: string;
     readonly alias?: string;
+    readonly preferredName?: string;
     readonly onlyIfReferenced: boolean;
     readonly sideEffectOnly: boolean;
     readonly typeOnly: boolean;
@@ -436,13 +443,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     constructor(options: AddImportOptions, bindingName?: string) {
         super();
 
-        // Validate that alias is provided when member is 'default'
-        if (options.member === 'default' && !options.alias) {
+        // Validate that a name is provided when member is 'default'
+        if (options.member === 'default' && !options.alias && !options.preferredName) {
             throw new Error("When member is 'default', the alias parameter is required");
         }
 
-        // Validate that alias is provided when member is '*' (namespace import)
-        if (options.member === '*' && !options.alias) {
+        // Validate that a name is provided when member is '*' (namespace import)
+        if (options.member === '*' && !options.alias && !options.preferredName) {
             throw new Error("When member is '*', the alias parameter is required");
         }
 
@@ -453,6 +460,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
             if (options.alias !== undefined) {
                 throw new Error("Cannot combine sideEffectOnly with alias");
+            }
+            if (options.preferredName !== undefined) {
+                throw new Error("Cannot combine sideEffectOnly with preferredName");
             }
             if (options.onlyIfReferenced !== undefined) {
                 throw new Error("Cannot combine sideEffectOnly with onlyIfReferenced");
@@ -467,12 +477,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         this.moduleUnicodeEscapes = typeof options.module === 'string' ? undefined : options.module.unicodeEscapes;
         this.member = options.member;
         this.alias = options.alias;
+        this.preferredName = options.preferredName;
         this.onlyIfReferenced = options.onlyIfReferenced ?? true;
         this.sideEffectOnly = options.sideEffectOnly ?? false;
         this.typeOnly = options.typeOnly ?? false;
         this.style = options.style;
         this.quoteStyle = options.quoteStyle;
-        this.bindingName = this.sideEffectOnly ? undefined : bindingName ?? this.alias ?? this.member ?? this.module;
+        this.bindingName = this.sideEffectOnly ? undefined : bindingName ?? this.alias ?? this.preferredName ?? memberName(this.member) ?? this.module;
     }
 
     /**
@@ -1048,7 +1059,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         const importName = this.getImportName(specifier);
                         const aliasName = this.getImportAlias(specifier);
 
-                        if (importName === this.member && aliasName === this.alias) {
+                        // A specifier binds its alias, or its own name where it has none; that is
+                        // what this request has to match, however it came by the name it binds.
+                        if (importName === this.member && (aliasName ?? importName) === this.bindingName) {
                             return true;
                         }
                     }
@@ -1104,7 +1117,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 if (elem.element?.kind === JS.Kind.BindingElement) {
                     const bindingElem = elem.element as JS.BindingElement;
                     const name = (bindingElem.name as J.Identifier)?.simpleName;
-                    if (name === (this.alias || this.member)) {
+                    if (name === this.bindingName) {
                         return true;
                     }
                 }

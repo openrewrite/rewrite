@@ -2776,6 +2776,125 @@ describe('AddImport visitor', () => {
             expect(bound.name).toBe('readFile_1');
         });
 
+        test('a preferred name is deconflicted, unlike a pinned alias', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName(
+                {module: 'sap/ui/core/Theming', member: 'default', preferredName: 'Theming', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const Theming = 1;
+                    `,
+                    `
+                        import Theming_1 from 'sap/ui/core/Theming';
+
+                        const Theming = 1;
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('Theming_1');
+        });
+
+        test("a default import is reused whether the request spells the member 'default' or omits it", async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName(
+                {module: 'sap/ui/core/Theming', member: 'default', preferredName: 'Theming', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import Th from 'sap/ui/core/Theming';
+
+                        Th.setTheme('dark');
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('Th');
+        });
+
+        test('a pinned alias that names the member matches the plain specifier already there', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName(
+                {module: 'fs', member: 'readFile', alias: 'readFile', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        readFile('x');
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('readFile');
+        });
+
+        test('a require binding the plain name does not answer a request that had to be renamed', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName(
+                {module: 'fs', member: 'readFile', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const {readFile} = require('fs');
+
+                        readFile('x');
+                    `,
+                    `
+                        import {readFile as readFile_1} from 'fs';
+
+                        const {readFile} = require('fs');
+
+                        readFile('x');
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('readFile_1');
+        });
+
+        test('a second request for the same binding gets the name the first settled on', async () => {
+            const spec = new RecipeSpec();
+            const quoted: string[] = [];
+            const preferred: string[] = [];
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false}));
+
+                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Theming', onlyIfReferenced: false}));
+                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Th', onlyIfReferenced: false}));
+                    return super.visitJsCompilationUnit(cu, p);
+                }
+            });
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import {readFile} from 'fs';
+                        import Theming from 'theme';
+
+                        const x = 1;
+                    `
+                )
+            );
+
+            expect(quoted).toEqual(['readFile', 'readFile']);
+            expect(preferred).toEqual(['Theming', 'Theming']);
+        });
+
         test('a side-effect import binds no name', async () => {
             const spec = new RecipeSpec();
             const bound: { name?: string } = {name: 'unset'};
