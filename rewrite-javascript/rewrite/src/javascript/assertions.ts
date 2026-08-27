@@ -256,6 +256,21 @@ export function packageLockJson(before: string, after?: AfterRecipeText): Source
     };
 }
 
+/**
+ * Gives a source file the style its own text is written in. A spec that formats its output is
+ * measured against the built-in defaults unless it opts in with
+ * `{...typescript(src), beforeRecipe: withDetectedStyle}`; a file parsed through {@link npm} is
+ * sampled alongside its siblings and needs no opt-in.
+ */
+export async function withDetectedStyle(sourceFile: JS.CompilationUnit): Promise<JS.CompilationUnit> {
+    const detector = Autodetect.detector();
+    await detector.sample(sourceFile);
+    const detected = detector.build();
+    return produce(sourceFile, draft => {
+        draft.markers = replaceMarkerByKind(draft.markers, detected);
+    });
+}
+
 export function javascript(before: string | null, after?: AfterRecipeText): SourceSpec<JS.CompilationUnit> {
     return {
         kind: JS.Kind.CompilationUnit,
