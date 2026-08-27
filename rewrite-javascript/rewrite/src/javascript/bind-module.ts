@@ -343,6 +343,28 @@ function bodyOf(block: AmdBlock): J.Block | undefined {
 }
 
 /**
+ * Whether the factory body references `name`. The AMD binding is a plain parameter, so a name
+ * match is the whole test — unlike the ESM lane's `onlyIfReferenced`, no attribution is involved.
+ */
+async function references(block: AmdBlock, name: string): Promise<boolean> {
+    const body = bodyOf(block);
+    if (body === undefined) {
+        return false;
+    }
+    let found = false;
+    const finder = new class extends JavaScriptVisitor<ExecutionContext> {
+        override async visitIdentifier(id: J.Identifier, c: ExecutionContext) {
+            if (id.simpleName === name) {
+                found = true;
+            }
+            return super.visitIdentifier(id, c);
+        }
+    };
+    await finder.visit(body, new ExecutionContext());
+    return found;
+}
+
+/**
  * Applies the dependency a `bindModule` call settled on. The block is found by id: its caller
  * has already emitted a reference to the binding, so a block that cannot be found is an error
  * rather than a skipped edit.
@@ -378,7 +400,9 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
             return visited;
         }
         this.applied = true;
-        // withDependency only refuses on the parameter gap bindAmd already ruled out before queuing.
-        return withDependency(visited, block, this.module, this.binding) ?? visited;
+        // Nothing referenced the binding, so the caller asked and then did not use the answer.
+        return (await references(block, this.binding)) ?
+            withDependency(visited, block, this.module, this.binding) :
+            visited;
     }
 }

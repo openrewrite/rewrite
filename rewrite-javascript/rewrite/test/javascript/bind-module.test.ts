@@ -2,7 +2,9 @@ import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, bindModule
 } from "../../src/javascript";
-import {J} from "../../src/java";
+import {emptySpace, J, rightPadded} from "../../src/java";
+import {emptyMarkers} from "../../src/markers";
+import {randomId} from "../../src/uuid";
 
 function captureBindings(seen: {moduleSystem?: string, module?: string, binding?: string},
                           localName: string = "Button", moduleName: string = "sap/m/Button") {
@@ -124,7 +126,39 @@ describe("isAmdBlock", () => {
     });
 });
 
+function identifierRef(name: string): J.Identifier {
+    return {
+        kind: J.Kind.Identifier,
+        id: randomId(),
+        prefix: emptySpace,
+        markers: emptyMarkers,
+        annotations: [],
+        simpleName: name,
+        type: undefined,
+        fieldType: undefined
+    };
+}
+
+/** A caller that uses the answer: rewrites `target()` to `<binding>.target()`, the way a real
+ *  recipe would use the name `bindModule` returned. */
 function rebind(module: string, bound: {name?: string}) {
+    return new class extends JavaScriptVisitor<any> {
+        override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+            if (m.name.simpleName !== "target") {
+                return super.visitMethodInvocation(m, p);
+            }
+            bound.name = await bindModule(this, module);
+            if (bound.name === undefined) {
+                return m;
+            }
+            const rebound: J.MethodInvocation = {...m, select: rightPadded(identifierRef(bound.name), emptySpace)};
+            return rebound;
+        }
+    };
+}
+
+/** A caller that asks, then abandons: takes the name but never uses it. */
+function askAndAbandon(module: string, bound: {name?: string}) {
     return new class extends JavaScriptVisitor<any> {
         override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
             if (m.name.simpleName !== "target") {
@@ -143,17 +177,18 @@ describe("bindModule", () => {
         spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
         await spec.rewriteRun(javascript(
             `sap.ui.define(["sap/m/Button"], function (Button) { target(); });`,
-            `sap.ui.define(["sap/m/Button", "sap/ui/core/Element"], function (Button, Element) { target(); });`
+            `sap.ui.define(["sap/m/Button", "sap/ui/core/Element"], function (Button, Element) { Element.target(); });`
         ));
         expect(bound.name).toBe("Element");
     });
 
-    test("AMD reuses an existing dependency's parameter and edits nothing", async () => {
+    test("AMD reuses an existing dependency's parameter and edits nothing on that lane", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
         await spec.rewriteRun(javascript(
-            `sap.ui.define(["sap/ui/core/Element"], function (Elem) { target(); });`
+            `sap.ui.define(["sap/ui/core/Element"], function (Elem) { target(); });`,
+            `sap.ui.define(["sap/ui/core/Element"], function (Elem) { Elem.target(); });`
         ));
         expect(bound.name).toBe("Elem");
     });
@@ -164,7 +199,7 @@ describe("bindModule", () => {
         spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
         await spec.rewriteRun(javascript(
             `sap.ui.define([], function () { var Element = 1; target(); });`,
-            `sap.ui.define(["sap/ui/core/Element"], function (Element_1) { var Element = 1; target(); });`
+            `sap.ui.define(["sap/ui/core/Element"], function (Element_1) { var Element = 1; Element_1.target(); });`
         ));
         expect(bound.name).toBe("Element_1");
     });
@@ -179,13 +214,23 @@ describe("bindModule", () => {
         expect(bound.name).toBeUndefined();
     });
 
+    test("a binding nothing goes on to reference is not written", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(askAndAbandon("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/m/Button"], function (Button) { target(); });`
+        ));
+        expect(bound.name).toBe("Element");
+    });
+
     test("ESM creates a default import and reports its name", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
         await spec.rewriteRun(typescript(
             `target();`,
-            `import Element from 'sap/ui/core/Element';\n\ntarget();`
+            `import Element from 'sap/ui/core/Element';\n\nElement.target();`
         ));
         expect(bound.name).toBe("Element");
     });
@@ -195,7 +240,8 @@ describe("bindModule", () => {
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
         await spec.rewriteRun(typescript(
-            `import Elem from "sap/ui/core/Element";\n\ntarget();`
+            `import Elem from "sap/ui/core/Element";\n\ntarget();`,
+            `import Elem from "sap/ui/core/Element";\n\nElem.target();`
         ));
         expect(bound.name).toBe("Elem");
     });
@@ -205,7 +251,8 @@ describe("bindModule", () => {
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
         await spec.rewriteRun(javascript(
-            `const Elem = require("sap/ui/core/Element");\n\ntarget();`
+            `const Elem = require("sap/ui/core/Element");\n\ntarget();`,
+            `const Elem = require("sap/ui/core/Element");\n\nElem.target();`
         ));
         expect(bound.name).toBe("Elem");
     });
@@ -226,7 +273,7 @@ describe("bindModule", () => {
         spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B"], function (B) { sap.ui.require([], function () { target(); }); });`,
-            `sap.ui.define(["a/B"], function (B) { sap.ui.require(["sap/ui/core/Element"], function (Element) { target(); }); });`
+            `sap.ui.define(["a/B"], function (B) { sap.ui.require(["sap/ui/core/Element"], function (Element) { Element.target(); }); });`
         ));
         expect(bound.name).toBe("Element");
     });
