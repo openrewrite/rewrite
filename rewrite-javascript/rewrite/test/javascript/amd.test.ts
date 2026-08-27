@@ -40,4 +40,23 @@ describe("amdBlockOf", () => {
         const call = await firstCall(`define(["a/B", "c/D"], function (B) {});`);
         expect(parameterNames(amdBlockOf(call)!)).toEqual(["B"]);
     });
+
+    test("a callee written without a dot matches whatever the receiver", async () => {
+        const call = await firstCall(`foo.define(["a/B"], function (B) {});`);
+        expect(amdBlockOf(call)).toBeDefined();
+    });
+
+    test("a dotted callee requires the whole namespaced path", async () => {
+        const namespaced = await firstCall(`sap.ui.define(["a/B"], function (B) {});`);
+        expect(amdBlockOf(namespaced, ["sap.ui.define"])).toBeDefined();
+        expect(amdBlockOf(namespaced, ["sap.ui.other"])).toBeUndefined();
+
+        const bare = await firstCall(`define(["a/B"], function (B) {});`);
+        expect(amdBlockOf(bare, ["sap.ui.define"])).toBeUndefined();
+    });
+
+    test("an empty dependency array parses as no dependencies, not one J.Empty", async () => {
+        const call = await firstCall(`define([], function () {});`);
+        expect(dependencyNames(amdBlockOf(call)!)).toEqual([]);
+    });
 });

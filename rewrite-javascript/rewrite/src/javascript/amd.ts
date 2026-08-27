@@ -65,6 +65,10 @@ function noDependencies(): J.NewArray {
     };
 }
 
+/**
+ * A callee written without a dot (`"define"`) matches by simple name on any receiver, so it
+ * also matches `foo.define(...)`; a dotted callee (`"sap.ui.define"`) requires the whole path.
+ */
 function isAmdCallee(call: J.MethodInvocation, callees: readonly string[]): boolean {
     // The name check first: this runs for every call in a file, and almost none are these.
     const simpleName = call.name.simpleName;
