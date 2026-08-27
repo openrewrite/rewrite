@@ -57,12 +57,10 @@ class RewriteRuleImpl implements RewriteRule {
                 // Apply transformation
                 let result: J | undefined;
 
-                const applyOptions = { values: match, format: this.format, bindings: options?.bindings };
-                if (typeof this.after === 'function') {
-                    result = await this.after(match).apply(node, cursor, applyOptions);
-                } else {
-                    result = await this.after.apply(node, cursor, applyOptions);
-                }
+                const template = typeof this.after === 'function' ? this.after(match) : this.after;
+                const bindings = options?.bindings ?? (options?.visitor && template.resolveBindings(options.visitor));
+                result = await template.apply(node, cursor,
+                    { values: match, format: this.format, bindings: bindings || undefined });
 
                 if (result) {
                     return result;

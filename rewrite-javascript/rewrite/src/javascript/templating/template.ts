@@ -292,6 +292,20 @@ export class Template {
     }
 
     /**
+     * Binds every module this template declares in the file `visitor` is traversing, and returns
+     * the local names to hand back through {@link ApplyOptions.bindings}. Safe to call for a node
+     * the template turns out not to apply to: the import lands in `afterVisit`, by which point the
+     * file references the name only where the template did land.
+     */
+    resolveBindings(visitor: JavaScriptVisitor<any>): Record<string, string> {
+        const resolved: Record<string, string> = {};
+        for (const [name, binding] of Object.entries(this.options.bindings ?? {})) {
+            resolved[name] = maybeAddImport(visitor, {...binding, preferredName: name});
+        }
+        return resolved;
+    }
+
+    /**
      * Applies this template and returns the resulting tree.
      *
      * @param tree Input tree to transform
@@ -314,20 +328,6 @@ export class Template {
      * });
      * ```
      */
-    /**
-     * Binds every module this template declares in the file `visitor` is traversing, and returns
-     * the local names to hand back through {@link ApplyOptions.bindings}. Safe to call for a node
-     * the template turns out not to apply to: the import lands in `afterVisit`, by which point the
-     * file references the name only where the template did land.
-     */
-    resolveBindings(visitor: JavaScriptVisitor<any>): Record<string, string> {
-        const resolved: Record<string, string> = {};
-        for (const [name, binding] of Object.entries(this.options.bindings ?? {})) {
-            resolved[name] = maybeAddImport(visitor, {...binding, preferredName: name});
-        }
-        return resolved;
-    }
-
     async apply(tree: J, cursor: Cursor, options?: ApplyOptions): Promise<J | undefined> {
         // Extract values from options
         const values = options?.values;

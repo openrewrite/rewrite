@@ -110,21 +110,27 @@ export function maybeAddImport(
     options: AddImportOptions
 ): string | undefined {
     const module = moduleNameOf(options.module);
-    // Neither the quote nor a preferred name says which binding is wanted, so a request differing
-    // only in those is the same request, and answering with the name already settled on keeps a
-    // caller from emitting a reference to an import that never appears.
+    const sideEffectOnly = options.sideEffectOnly ?? false;
+    const typeOnly = options.typeOnly ?? false;
+
+    // A queued import binds the module as much as one already in the file, so it answers a later
+    // request the same way; a name a merged request never emits would be referenced but not bound.
     for (const v of visitor.afterVisit || []) {
-        if (v instanceof AddImport &&
-            v.module === module &&
-            v.member === options.member &&
-            v.alias === options.alias &&
-            v.sideEffectOnly === (options.sideEffectOnly ?? false) &&
-            v.typeOnly === (options.typeOnly ?? false)) {
+        if (!(v instanceof AddImport) || v.module !== module ||
+            v.sideEffectOnly !== sideEffectOnly || v.typeOnly !== typeOnly) {
+            continue;
+        }
+        // How a specifier prints, or what name would be nice, does not say which binding is wanted.
+        // A pinned alias does: it asks for a binding of its own, which only the same request answers.
+        const answers = options.alias
+            ? v.alias === options.alias && v.member === options.member
+            : memberName(v.member) === memberName(options.member);
+        if (answers) {
             return v.bindingName;
         }
     }
 
-    if (options.sideEffectOnly) {
+    if (sideEffectOnly) {
         visitor.afterVisit.push(new AddImport(options));
         return undefined;
     }
@@ -137,7 +143,6 @@ export function maybeAddImport(
     }
 
     const bindings = moduleScopeBindings(cu);
-    const typeOnly = options.typeOnly ?? false;
 
     // An import already serving this request answers it; queuing one would, on the next cycle,
     // derive a suffixed name from the binding this call just added.
@@ -193,7 +198,12 @@ function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
 
     const declaredByVariables = (varDecl: J.VariableDeclarations): void => {
         for (const variable of varDecl.variables) {
-            declaredBy(variable.element?.name);
+            const required = requiredModule(variable.element?.initializer?.element);
+            if (required !== undefined) {
+                bindings.push(...requireBindings(variable.element?.name, required));
+            } else {
+                declaredBy(variable.element?.name);
+            }
         }
     };
 
@@ -219,9 +229,55 @@ function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
             case J.Kind.ClassDeclaration:
                 declaredBy((statement as J.ClassDeclaration).name);
                 break;
+            case JS.Kind.NamespaceDeclaration:
+                declaredBy((statement as JS.NamespaceDeclaration).name.element);
+                break;
+            case JS.Kind.TypeDeclaration:
+                declaredBy((statement as JS.TypeDeclaration).name.element);
+                break;
         }
     }
 
+    return bindings;
+}
+
+/** The module a `require('...')` initializer names, `undefined` for an initializer that is anything else. */
+function requiredModule(initializer: J | undefined): string | undefined {
+    if (initializer?.kind !== J.Kind.MethodInvocation) {
+        return undefined;
+    }
+    const methodInv = initializer as J.MethodInvocation;
+    if (methodInv.select || methodInv.name?.kind !== J.Kind.Identifier ||
+        (methodInv.name as J.Identifier).simpleName !== 'require') {
+        return undefined;
+    }
+    const argument = methodInv.arguments?.elements[0]?.element;
+    return argument?.kind === J.Kind.Literal ? moduleNameOf(argument as J.Literal) : undefined;
+}
+
+/** A `require` binds a module the way an import does, so the pool records it the same way. */
+function requireBindings(pattern: J | undefined, module: string): ModuleScopeBinding[] {
+    if (pattern?.kind === J.Kind.Identifier) {
+        return [{name: (pattern as J.Identifier).simpleName, module, member: undefined, typeOnly: false}];
+    }
+    if (pattern?.kind !== JS.Kind.ObjectBindingPattern) {
+        return [];
+    }
+    const bindings: ModuleScopeBinding[] = [];
+    for (const elem of (pattern as JS.ObjectBindingPattern).bindings.elements) {
+        if (elem.element?.kind !== JS.Kind.BindingElement) {
+            continue;
+        }
+        const bindingElem = elem.element as JS.BindingElement;
+        if (bindingElem.name?.kind === J.Kind.Identifier) {
+            const name = (bindingElem.name as J.Identifier).simpleName;
+            const propertyName = bindingElem.propertyName?.element;
+            const member = propertyName?.kind === J.Kind.Identifier
+                ? (propertyName as J.Identifier).simpleName
+                : name;
+            bindings.push({name, module, member, typeOnly: false});
+        }
+    }
     return bindings;
 }
 

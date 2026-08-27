@@ -19,6 +19,7 @@ import type {Pattern} from "./pattern";
 import type {Template} from "./template";
 import type {CaptureValue, RawCode} from "./capture";
 import type {AddImportOptions} from "../add-import";
+import type {JavaScriptVisitor} from "../visitor";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -547,7 +548,14 @@ export interface ApplyOptions {
 
 /** Options a caller supplies per node, as against the ones {@link RewriteConfig} fixes for the rule. */
 export interface TryOnOptions {
-    /** As {@link ApplyOptions.bindings}, for the template the rule applies. */
+    /**
+     * The visitor to bind the applied template's declared modules in. The rule holds that template,
+     * so it resolves them itself, and only once a pattern has matched — a rule that does not fire
+     * leaves the file's imports alone. {@link TryOnOptions.bindings} overrides this.
+     */
+    visitor?: JavaScriptVisitor<any>;
+
+    /** As {@link ApplyOptions.bindings}, for a caller that resolves the modules some other way. */
     bindings?: Record<string, string>;
 }
 

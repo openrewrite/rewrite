@@ -26,7 +26,7 @@ describe('templates that declare module bindings', () => {
         return fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                 method = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
-                return await rule.tryOn(this.cursor, method, {bindings: tmpl.resolveBindings(this)}) || method;
+                return await rule.tryOn(this.cursor, method, {visitor: this}) || method;
             }
         });
     }
@@ -94,7 +94,7 @@ describe('templates that declare module bindings', () => {
         );
     });
 
-    test('a file the rule never rewrites gets no import', async () => {
+    test('a rule that does not fire leaves the file\'s imports alone', async () => {
         const arg = capture('arg');
         spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({
             bindings: {Theming: {module: 'sap/ui/core/Theming', member: 'default'}}
@@ -102,7 +102,7 @@ describe('templates that declare module bindings', () => {
 
         await spec.rewriteRun(
             //language=typescript
-            typescript(`somethingElse('dark');`)
+            typescript(`const x = Theming;\nsomethingElse('dark');`)
         );
     });
 

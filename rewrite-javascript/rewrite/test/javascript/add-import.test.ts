@@ -2836,30 +2836,60 @@ describe('AddImport visitor', () => {
             expect(bound.name).toBe('readFile');
         });
 
-        test('a require binding the plain name does not answer a request that had to be renamed', async () => {
+        test('a require of the same member answers the request, under the name it destructured', async () => {
             const spec = new RecipeSpec();
-            const bound: { name?: string } = {};
-            spec.recipe = fromVisitor(captureBoundName(
-                {module: 'fs', member: 'readFile', onlyIfReferenced: false}, bound));
+            const bound: string[] = [];
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    bound.push(maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+                    bound.push(maybeAddImport(this, {module: 'fs/promises', member: 'readFile', onlyIfReferenced: false}));
+                    return super.visitJsCompilationUnit(cu, p);
+                }
+            });
 
             await spec.rewriteRun(
                 typescript(
                     `
                         const {readFile} = require('fs');
+                        const {readFile: rf} = require('fs/promises');
 
                         readFile('x');
-                    `,
-                    `
-                        import {readFile as readFile_1} from 'fs';
-
-                        const {readFile} = require('fs');
-
-                        readFile('x');
+                        rf('y');
                     `
                 )
             );
 
-            expect(bound.name).toBe('readFile_1');
+            expect(bound).toEqual(['readFile', 'rf']);
+        });
+
+        test('a namespace or type declaration shadows an import just as a value declaration does', async () => {
+            const spec = new RecipeSpec();
+            const bound: string[] = [];
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    bound.push(maybeAddImport(this, {module: 'm', member: 'join', onlyIfReferenced: false}));
+                    bound.push(maybeAddImport(this, {module: 'n', member: 'shape', onlyIfReferenced: false}));
+                    return super.visitJsCompilationUnit(cu, p);
+                }
+            });
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        namespace join { export const a = 1; }
+                        type shape = string;
+                    `,
+                    `
+                        import {join as join_1} from 'm';
+                        import {shape as shape_1} from 'n';
+
+                        namespace join { export const a = 1; }
+                        type shape = string;
+                    `
+                )
+            );
+
+            expect(bound).toEqual(['join_1', 'shape_1']);
         });
 
         test('a second request for the same binding gets the name the first settled on', async () => {
