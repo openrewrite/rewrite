@@ -31,6 +31,7 @@ export * from "./autodetect";
 export * from "./tree-debug";
 export * from "./project-parser";
 
+export * from "./scope";
 export * from "./add-import";
 export * from "./remove-import";
 export * from "./cleanup/index";
