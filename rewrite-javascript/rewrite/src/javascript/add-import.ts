@@ -366,6 +366,14 @@ function patternNames(pattern: J | undefined): { name: string; member?: string }
     if (pattern?.kind === J.Kind.Identifier) {
         return [{name: (pattern as J.Identifier).simpleName}];
     }
+    // An array pattern binds by position, so its elements name no member of what they destructure.
+    if (pattern?.kind === JS.Kind.ArrayBindingPattern) {
+        return (pattern as JS.ArrayBindingPattern).elements.elements
+            .flatMap(elem => elem.element?.kind === JS.Kind.BindingElement
+                ? patternNames((elem.element as JS.BindingElement).name)
+                : patternNames(elem.element))
+            .map(bound => ({name: bound.name}));
+    }
     if (pattern?.kind !== JS.Kind.ObjectBindingPattern) {
         return [];
     }

@@ -2952,13 +2952,14 @@ describe('AddImport visitor', () => {
             expect(preferred).toEqual(['Theming', 'Theming']);
         });
 
-        test('a name bound through a nested pattern is occupied without answering for the module', async () => {
+        test('a name bound through any binding pattern is occupied without answering for the module', async () => {
             const spec = new RecipeSpec();
             const bound: string[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
                     bound.push(maybeAddImport(this, {module: 'm', member: 'b', onlyIfReferenced: false}));
                     bound.push(maybeAddImport(this, {module: 'other', preferredName: 'z', onlyIfReferenced: false}));
+                    bound.push(maybeAddImport(this, {module: 'p', member: 'default', preferredName: 'e', onlyIfReferenced: false}));
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -2967,21 +2968,24 @@ describe('AddImport visitor', () => {
                 typescript(
                     `
                         const {a: {b}} = require('other');
+                        const [e] = window;
 
                         b();
                     `,
                     `
                         import {b as b_1} from 'm';
                         import z from 'other';
+                        import e_1 from 'p';
 
                         const {a: {b}} = require('other');
+                        const [e] = window;
 
                         b();
                     `
                 )
             );
 
-            expect(bound).toEqual(['b_1', 'z']);
+            expect(bound).toEqual(['b_1', 'z', 'e_1']);
         });
 
         test('a merged specifier sorts by the name it binds, as its neighbours do', async () => {
