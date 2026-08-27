@@ -500,7 +500,8 @@ export interface TemplateOptions {
 
 /**
  * A module a template's code depends on. The local name comes from the key it is declared under,
- * and {@link Template.resolveBindings} settles the rest.
+ * and {@link Template.resolveBindings} settles the rest. `member` and `typeOnly` shape the import
+ * it creates, so a caller passing {@link ApplyOptions.bindings} of its own reads neither.
  */
 export type ModuleBinding = Omit<AddImportOptions,
     'module' | 'alias' | 'preferredName' | 'onlyIfReferenced' | 'sideEffectOnly'> & { module: string };

@@ -16,7 +16,7 @@
 import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {ApplyOptions, Parameter, TemplateOptions, TemplateParameter} from './types';
-import {bindingContextStatement} from './bindings';
+import {bindingContextStatement, isResolvable} from './bindings';
 import {maybeAddImport} from '../add-import';
 import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
@@ -251,7 +251,8 @@ export class Template {
         // since they're spliced at construction time, not application time
         const contextStatements = [
             ...(this.options.context || this.options.imports || []),
-            ...Object.entries(this.options.bindings ?? {}).map(([name, b]) => bindingContextStatement(name, b))
+            ...Object.entries(this.options.bindings ?? {})
+                .map(([name, b]) => bindingContextStatement(name, b, this.options.dependencies ?? {}))
         ];
         const parametersKey = this.parameters.map((p, i) => {
             const value = p.value;
@@ -293,14 +294,18 @@ export class Template {
 
     /**
      * Binds every module this template declares in the file `visitor` is traversing, and returns
-     * the local names to hand back through {@link ApplyOptions.bindings}. Safe to call for a node
-     * the template turns out not to apply to: the import lands in `afterVisit`, by which point the
-     * file references the name only where the template did land.
+     * the local names to hand back through {@link ApplyOptions.bindings}. A module the dependencies
+     * cannot resolve is bound whether or not the template goes on to reference it, so call this
+     * where the template is known to apply — {@link RewriteRule.tryOn} does, once a pattern matched.
      */
     resolveBindings(visitor: JavaScriptVisitor<any>): Record<string, string> {
         const resolved: Record<string, string> = {};
+        const dependencies = this.options.dependencies ?? {};
         for (const [name, binding] of Object.entries(this.options.bindings ?? {})) {
-            resolved[name] = maybeAddImport(visitor, {...binding, preferredName: name});
+            // Recognising the reference the template splices in takes attribution, which only the
+            // import form of a context statement carries. Without one there is nothing to look for.
+            const onlyIfReferenced = isResolvable(binding.module, dependencies);
+            resolved[name] = maybeAddImport(visitor, {...binding, preferredName: name, onlyIfReferenced});
         }
         return resolved;
     }

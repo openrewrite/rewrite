@@ -16,6 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
+import {bindingContextStatement} from "../../../src/javascript/templating/bindings";
 
 describe('templates that declare module bindings', () => {
     const spec = new RecipeSpec();
@@ -104,6 +105,18 @@ describe('templates that declare module bindings', () => {
             //language=typescript
             typescript(`const x = Theming;\nsomethingElse('dark');`)
         );
+    });
+
+    test('a binding is parsed against an import only where the dependencies could resolve it', () => {
+        expect(bindingContextStatement('Theming', {module: 'sap/ui/core/Theming', member: 'default'}, {}))
+            .toBe('declare const Theming: any;');
+        expect(bindingContextStatement('Theming', {module: 'sap/ui/core/Theming', member: 'default'}, {sap: '^1.0.0'}))
+            .toBe("import Theming from 'sap/ui/core/Theming';");
+
+        expect(bindingContextStatement('Props', {module: '@scope/pkg/props', member: 'Props', typeOnly: true}, {}))
+            .toBe('type Props = any;');
+        expect(bindingContextStatement('Props', {module: '@scope/pkg/props', member: 'Props', typeOnly: true}, {'@scope/pkg': '^1.0.0'}))
+            .toBe("import type {Props} from '@scope/pkg/props';");
     });
 
     test('a declared binding left unresolved at apply is an error, not a silent wrong name', async () => {
