@@ -36,6 +36,7 @@ export * from "./add-import";
 export * from "./amd";
 export * from "./bind-module";
 export * from "./remove-import";
+export * from "./remove-amd-dependency";
 export * from "./cleanup/index";
 export * from "./recipes/index";
 export * from "./search/index";

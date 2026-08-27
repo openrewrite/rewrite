@@ -1,6 +1,7 @@
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
-    JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, bindModule
+    JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, bindModule,
+    maybeRemoveImport
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
@@ -380,5 +381,41 @@ describe("bindModule", () => {
             `sap.ui.define(["a/B"], function (B) { sap.ui.require(["sap/ui/core/Element"], function (Element) { Element.target(); }); });`
         ));
         expect(bound.name).toBe("Element");
+    });
+});
+
+function dropModule(module: string) {
+    return new class extends JavaScriptVisitor<any> {
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+            maybeRemoveImport(this, module);
+            return super.visitJsCompilationUnit(cu, p);
+        }
+    };
+}
+
+describe("maybeRemoveImport on an AMD block", () => {
+    test("an unreferenced dependency goes with its parameter", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(dropModule("sap/m/Button"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/m/Button", "a/C"], function (Button, C) { C.f(); });`,
+            `sap.ui.define(["a/C"], function (C) { C.f(); });`
+        ));
+    });
+
+    test("a dependency the body still names stays", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(dropModule("sap/m/Button"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/m/Button"], function (Button) { Button.f(); });`
+        ));
+    });
+
+    test("a dependency bound to no parameter is left alone", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(dropModule("a/Side"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/Side"], function () {});`
+        ));
     });
 });
