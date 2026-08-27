@@ -910,7 +910,7 @@ public class MavenPomDownloader {
         // Return lazy iterable
         return () -> new Iterator<MavenRepository>() {
             private final Iterator<MavenRepository> repoIterator = repositoriesById.values().iterator();
-            private final Map<@Nullable String, MavenRepository> seen = new LinkedHashMap<>();
+            private final Set<String> seen = new HashSet<>();
             private @Nullable MavenRepository next;
 
             private @Nullable MavenRepository findNext() {
@@ -920,7 +920,7 @@ public class MavenPomDownloader {
 
                     if (normalized != null &&
                         (acceptsVersion == null || repositoryAcceptsVersion(normalized, acceptsVersion, containingPom)) &&
-                        seen.put(normalized.getId(), normalized) == null) {
+                        seen.add(uriKey(normalized))) {
                         if (throttled(normalized)) {
                             ctx.getResolutionListener().repositoryAccessFailedPreviously(normalized.getUri());
                             continue;
@@ -1292,6 +1292,24 @@ public class MavenPomDownloader {
     private static @Nullable String endpointOrNull(URI uri) {
         String host = uri.getHost();
         return host == null ? null : host + ':' + uri.getPort();
+    }
+
+    /**
+     * Repositories are deduplicated by the URI that would be asked rather than by id: the id is Maven's
+     * override key, but two declarations of one URL under different ids would cost a request each.
+     */
+    private static String uriKey(MavenRepository repository) {
+        String uri = repository.getUri();
+        if (uri.endsWith("/")) {
+            uri = uri.substring(0, uri.length() - 1);
+        }
+        // Scheme and host are case-insensitive; the path is not
+        int authorityStart = uri.indexOf("://");
+        if (authorityStart < 0) {
+            return uri;
+        }
+        int pathStart = uri.indexOf('/', authorityStart + 3);
+        return pathStart < 0 ? uri.toLowerCase() : uri.substring(0, pathStart).toLowerCase() + uri.substring(pathStart);
     }
 
     private MavenRepository applyMirrors(MavenRepository repository) {

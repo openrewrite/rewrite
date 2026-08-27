@@ -153,6 +153,21 @@ class MavenPomDownloaderTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+    @Test
+    void repositoriesDeclaredUnderDifferentIdsForTheSameUriAreAskedOnce() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var repositories = List.of(
+          MavenRepository.builder().id("first").uri("https://repo.example.com/maven").knownToExist(true).build(),
+          MavenRepository.builder().id("second").uri("https://REPO.example.com/maven/").knownToExist(true).build(),
+          MavenRepository.builder().id("third").uri("https://repo.example.com/other/").knownToExist(true).build()
+        );
+
+        assertThat(new MavenPomDownloader(ctx).distinctNormalizedRepositories(repositories, null, null))
+          .extracting(MavenRepository::getId)
+          .containsExactly("first", "third");
+    }
+
     @Nested
     class WithNativeHttpURLConnectionAndTLS {
         private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
