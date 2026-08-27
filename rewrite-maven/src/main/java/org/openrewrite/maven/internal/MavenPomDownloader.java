@@ -288,14 +288,11 @@ public class MavenPomDownloader {
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "metadata");
 
         MavenMetadata mavenMetadata = null;
-        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
         List<String> attemptedUris = new ArrayList<>();
         for (MavenRepository repo : normalizedRepos) {
             ctx.getResolutionListener().repository(repo, containingPom);
-            if (gav.getVersion() != null && !repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
-                continue;
-            }
             attemptedUris.add(repo.getUri());
             Optional<MavenMetadata> result = mavenCache.getMavenMetadata(URI.create(repo.getUri()), gav);
             if (result == null) {

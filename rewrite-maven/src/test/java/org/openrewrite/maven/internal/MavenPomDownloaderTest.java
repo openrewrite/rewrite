@@ -1388,6 +1388,58 @@ class MavenPomDownloaderTest implements RewriteTest {
             });
         }
 
+        @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+        @Test
+        void mirrorKeepsThePolicyOfEachRepositoryItMirrors() throws Exception {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            try (MockWebServer mirror = getMockServer()) {
+                List<String> metadataRequests = synchronizedList(new ArrayList<>());
+                mirror.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if (recordedRequest.getPath() != null && recordedRequest.getPath().endsWith("maven-metadata.xml")) {
+                            metadataRequests.add(recordedRequest.getPath());
+                            return new MockResponse().setResponseCode(200).setBody(
+                              //language=xml
+                              """
+                                <metadata>
+                                  <groupId>org.example</groupId>
+                                  <artifactId>lib</artifactId>
+                                  <versioning>
+                                    <versions>
+                                      <version>1.0-SNAPSHOT</version>
+                                    </versions>
+                                  </versioning>
+                                </metadata>
+                                """);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("");
+                    }
+                });
+                mirror.start();
+                ctx.setMirrors(List.of(new MavenRepositoryMirror("mirror",
+                  "https://%s:%d/maven/".formatted(mirror.getHostName(), mirror.getPort()), "*", null, null, null)));
+                var downloader = new MavenPomDownloader(ctx);
+                var gav = new GroupArtifactVersion("org.example", "lib", "1.0-SNAPSHOT");
+
+                // Central does not serve snapshots, and mirroring it does not change that
+                assertThatThrownBy(() -> downloader.downloadMetadata(gav, null, List.of(MAVEN_CENTRAL)))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(metadataRequests).isEmpty();
+
+                // A mirrored repository that does accept snapshots brings the mirror into the lookup
+                var snapshots = MavenRepository.builder()
+                  .id("snapshots")
+                  .uri("https://snapshots.example.com/maven")
+                  .releases(false)
+                  .snapshots(true)
+                  .build();
+                MavenMetadata metadata = downloader.downloadMetadata(gav, null, List.of(MAVEN_CENTRAL, snapshots));
+                assertThat(metadata.getVersioning().getVersions()).containsExactly("1.0-SNAPSHOT");
+                assertThat(metadataRequests).hasSize(1);
+            }
+        }
+
         @Test
         void invalidArtifact() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
