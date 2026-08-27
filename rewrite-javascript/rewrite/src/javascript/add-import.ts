@@ -5,6 +5,7 @@ import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
 import {getStyle, PrettierStyle, SpacesStyle, StyleKind} from "./style";
 import {Cursor} from "../tree";
+import {bindingNames, namesDeclaredIn} from "./scope";
 
 export type QuoteChar = "'" | '"';
 
@@ -143,19 +144,18 @@ export function maybeAddImport(
     }
 
     const derived = derivedName(options);
-    const cu = compilationUnitOf(visitor);
+    const cursor = cursorOf(visitor);
+    const cu = cursor && compilationUnitOf(cursor);
     if (!cu) {
         visitor.afterVisit.push(new AddImport(options, derived));
         return derived;
     }
 
-    const bindings = bindingsInScope(cu, cursorOf(visitor));
-
     // An import already serving this request answers it; queuing one would, on the next cycle,
     // derive a suffixed name from the binding this call just added. A caller that named a preference
     // takes whatever comes back; one that did not assumes the name it derived, so a binding under
     // any other name would leave the references it emits unbound.
-    for (const binding of bindings) {
+    for (const binding of moduleScopeBindings(cu)) {
         if (binding.module === module && binding.member === memberName(options.member) &&
             binding.typeOnly === typeOnly &&
             (options.preferredName !== undefined || anyNameAnswers(options) ||
@@ -164,7 +164,10 @@ export function maybeAddImport(
         }
     }
 
-    const name = deconflict(derived, takenNames(bindings, visitor));
+    // Only the module scope answers for a name, but any scope in the file occupies one. The queue
+    // gives every later request for this module the name chosen here, so it has to clear the scopes
+    // those references will sit in, which are not known yet.
+    const name = deconflict(derived, takenNames(namesDeclaredIn(cu), visitor));
     visitor.afterVisit.push(new AddImport(options, name));
     return name;
 }
@@ -230,73 +233,29 @@ interface ModuleScopeBinding {
 }
 
 function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
+    // `cursor` is protected on `TreeVisitor`, and the `maybeAddImport`/`maybeRemoveImport`
+    // API is free functions, so reaching it takes a cast.
     return (visitor as unknown as { cursor?: Cursor }).cursor;
 }
 
-function compilationUnitOf(visitor: JavaScriptVisitor<any>): JS.CompilationUnit | undefined {
-    // `cursor` is protected on `TreeVisitor`, and the `maybeAddImport`/`maybeRemoveImport`
-    // API is free functions, so reaching it takes a cast.
-    return cursorOf(visitor)?.firstEnclosing((v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
+function compilationUnitOf(cursor: Cursor): JS.CompilationUnit | undefined {
+    return cursor.firstEnclosing((v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
 }
 
-/** Every name in scope at `cursor`: what the file binds, and what each block enclosing it declares. */
-function bindingsInScope(cu: JS.CompilationUnit, cursor: Cursor | undefined): ModuleScopeBinding[] {
-    const bindings = statementBindings(cu.statements);
-    // A local shadows an import for the code the template lands in, so a name a block declares is
-    // taken there even though the module never answers for it.
-    for (let c = cursor; c && c.value !== cu; c = c.parent) {
-        for (const name of scopeNames(c.value)) {
-            bindings.push({name});
-        }
-    }
-    return bindings;
-}
-
-/** The names a scope introduces directly: a block's declarations, or a function's parameters. */
-function scopeNames(scope: unknown): string[] {
-    const node = scope as J | undefined;
-    if (node?.kind === J.Kind.Block) {
-        return statementBindings((node as J.Block).statements).map(binding => binding.name);
-    }
-    if (node?.kind === J.Kind.MethodDeclaration) {
-        return (node as J.MethodDeclaration).parameters.elements
-            .flatMap(param => param.element?.kind === J.Kind.VariableDeclarations
-                ? (param.element as J.VariableDeclarations).variables.flatMap(v => patternNames(v.element?.name))
-                : patternNames(param.element))
-            .map(bound => bound.name);
-    }
-    if (node?.kind === J.Kind.Lambda) {
-        return (node as J.Lambda).parameters.parameters
-            .flatMap(param => param.element?.kind === J.Kind.VariableDeclarations
-                ? (param.element as J.VariableDeclarations).variables.flatMap(v => patternNames(v.element?.name))
-                : patternNames(param.element))
-            .map(bound => bound.name);
-    }
-    return [];
-}
-
-/** Imports are top-level statements and so is anything that can shadow one, so a flat scan sees every name. */
-function statementBindings(statements: J.RightPadded<Statement>[]): ModuleScopeBinding[] {
+/** What the file's imports and `require`s bind at module scope, and the module each name comes from. */
+function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
     const bindings: ModuleScopeBinding[] = [];
-
-    const declaredBy = (name: J | undefined): void => {
-        for (const bound of patternNames(name)) {
-            bindings.push({name: bound.name});
-        }
-    };
 
     const declaredByVariables = (varDecl: J.VariableDeclarations): void => {
         for (const variable of varDecl.variables) {
             const required = requiredModule(variable.element?.initializer?.element);
             if (required !== undefined) {
                 bindings.push(...requireBindings(variable.element?.name, required));
-            } else {
-                declaredBy(variable.element?.name);
             }
         }
     };
 
-    for (const stmt of statements) {
+    for (const stmt of cu.statements) {
         const statement = stmt.element;
         switch (statement?.kind) {
             case JS.Kind.Import:
@@ -311,18 +270,6 @@ function statementBindings(statements: J.RightPadded<Statement>[]): ModuleScopeB
                         declaredByVariables(variable.element as J.VariableDeclarations);
                     }
                 }
-                break;
-            case J.Kind.MethodDeclaration:
-                declaredBy((statement as J.MethodDeclaration).name);
-                break;
-            case J.Kind.ClassDeclaration:
-                declaredBy((statement as J.ClassDeclaration).name);
-                break;
-            case JS.Kind.NamespaceDeclaration:
-                declaredBy((statement as JS.NamespaceDeclaration).name.element);
-                break;
-            case JS.Kind.TypeDeclaration:
-                declaredBy((statement as JS.TypeDeclaration).name.element);
                 break;
         }
     }
@@ -357,55 +304,13 @@ function requiredModuleOf(methodInv: J.MethodInvocation): string | undefined {
         : undefined;
 }
 
-/**
- * Every name a binding pattern introduces. `member` is the property a name takes its value from,
- * and only a name bound directly by the pattern has one — anything deeper reads a property of a
- * property, so it occupies its name without binding a member of the module.
- */
-function patternNames(pattern: J | undefined): { name: string; member?: string }[] {
-    if (pattern?.kind === J.Kind.Identifier) {
-        return [{name: (pattern as J.Identifier).simpleName}];
-    }
-    // An array pattern binds by position, so its elements name no member of what they destructure.
-    if (pattern?.kind === JS.Kind.ArrayBindingPattern) {
-        return (pattern as JS.ArrayBindingPattern).elements.elements
-            .flatMap(elem => elem.element?.kind === JS.Kind.BindingElement
-                ? patternNames((elem.element as JS.BindingElement).name)
-                : patternNames(elem.element))
-            .map(bound => ({name: bound.name}));
-    }
-    if (pattern?.kind !== JS.Kind.ObjectBindingPattern) {
-        return [];
-    }
-    const names: { name: string; member?: string }[] = [];
-    for (const elem of (pattern as JS.ObjectBindingPattern).bindings.elements) {
-        if (elem.element?.kind !== JS.Kind.BindingElement) {
-            continue;
-        }
-        const bindingElem = elem.element as JS.BindingElement;
-        if (bindingElem.name?.kind === J.Kind.Identifier) {
-            const name = (bindingElem.name as J.Identifier).simpleName;
-            const propertyName = bindingElem.propertyName?.element;
-            names.push({
-                name,
-                member: propertyName?.kind === J.Kind.Identifier
-                    ? (propertyName as J.Identifier).simpleName
-                    : name
-            });
-        } else {
-            names.push(...patternNames(bindingElem.name).map(bound => ({name: bound.name})));
-        }
-    }
-    return names;
-}
-
 /** A `require` binds a module the way an import does, so the pool records it the same way. */
 function requireBindings(pattern: J | undefined, module: string): ModuleScopeBinding[] {
     // A whole-module require binds no member, exactly as a default import does.
     if (pattern?.kind === J.Kind.Identifier) {
         return [{name: (pattern as J.Identifier).simpleName, module, member: undefined, typeOnly: false}];
     }
-    return patternNames(pattern).map(bound => bound.member === undefined
+    return bindingNames(pattern).map(bound => bound.member === undefined
         ? {name: bound.name}
         : {name: bound.name, module, member: bound.member, typeOnly: false});
 }
@@ -465,21 +370,17 @@ function importBindings(jsImport: JS.Import): ModuleScopeBinding[] {
 }
 
 /**
- * Names the file binds, plus those pending `AddImport`s on the `afterVisit` queue have claimed. A
- * queued `RemoveImport` does not free one: it removes only what the file leaves unused, and binding
- * a name it keeps is an error, where an unnecessary suffix merely reads oddly.
+ * Names in scope, plus those pending `AddImport`s on the `afterVisit` queue have claimed. A queued
+ * `RemoveImport` does not free one: it removes only what the file leaves unused, and binding a name
+ * it keeps is an error, where an unnecessary suffix merely reads oddly.
  */
-function takenNames(bindings: ModuleScopeBinding[], visitor: JavaScriptVisitor<any>): Set<string> {
-    const taken = new Set<string>();
+function takenNames(inScope: ReadonlySet<string>, visitor: JavaScriptVisitor<any>): Set<string> {
+    const taken = new Set<string>(inScope);
 
     for (const v of visitor.afterVisit || []) {
         if (v instanceof AddImport && v.bindingName) {
             taken.add(v.bindingName);
         }
-    }
-
-    for (const binding of bindings) {
-        taken.add(binding.name);
     }
 
     return taken;
