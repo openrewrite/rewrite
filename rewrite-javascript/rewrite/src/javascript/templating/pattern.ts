@@ -238,22 +238,21 @@ export class Pattern {
         );
 
         // Level 2: Global cache (fast path - shared with Template)
-        const cached = globalAstCache.get(cacheKey);
-        if (cached) {
-            this._cachedAstPattern = cached;
-            return cached;
+        let tree = globalAstCache.get(cacheKey);
+        if (!tree) {
+            // Level 3: Compute via TemplateEngine (slow path)
+            tree = await TemplateEngine.getPatternTree(
+                this.templateParts,
+                this.captures,
+                contextStatements,
+                this._options.dependencies || {}
+            );
+            globalAstCache.set(cacheKey, tree);
         }
 
-        // Level 3: Compute via TemplateEngine (slow path)
-        const result = await TemplateEngine.getPatternTree(
-            this.templateParts,
-            this.captures,
-            contextStatements,
-            this._options.dependencies || {}
-        );
-
-        // Cache in both levels
-        globalAstCache.set(cacheKey, result);
+        // The key names captures but says nothing about their constraints, so two patterns of the
+        // same shape share an entry; markers are attached per instance to keep them apart.
+        const result = await TemplateEngine.attachCaptureMarkers(tree, this.captures);
         this._cachedAstPattern = result;
 
         return result;

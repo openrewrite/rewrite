@@ -442,15 +442,14 @@ export class TemplateEngine {
     }
 
     /**
-     * Gets the parsed and extracted pattern tree with capture markers attached.
-     * This is the entry point for pattern processing, providing pattern-specific
-     * functionality on top of the shared template tree generation.
+     * Gets the parsed and extracted pattern tree, with placeholder identifiers left bare;
+     * `attachCaptureMarkers` binds it to a particular set of captures.
      *
      * @param templateParts The string parts of the template
      * @param captures The captures between the string parts (can include RawCode)
      * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
-     * @returns A Promise resolving to the extracted pattern AST with capture markers
+     * @returns A Promise resolving to the extracted pattern AST
      */
     static async getPatternTree(
         templateParts: TemplateStringsArray,
@@ -531,18 +530,25 @@ export class TemplateEngine {
         const lastStatement = cu.statements[cu.statements.length - 1].element;
 
         // Extract from wrapper using shared utility
-        const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, 'Pattern');
+        return PlaceholderUtils.extractFromWrapper(lastStatement, 'Pattern');
+    }
 
-        // Attach CaptureMarkers to capture identifiers (only for actual captures, not raw code)
-        const visitor = new MarkerAttachmentVisitor(actualCaptures);
-        return (await visitor.visit(extracted, undefined))!;
+    /**
+     * Binds a pattern tree to a set of captures by attaching a CaptureMarker, carrying that
+     * capture's constraint and variadic options, to each placeholder identifier.
+     */
+    static async attachCaptureMarkers(tree: J, captures: (Capture | Any | RawCode)[]): Promise<J> {
+        const actualCaptures = captures.filter(c =>
+            !(c instanceof RawCode || (c && typeof c === 'object' && (c as any)[RAW_CODE_SYMBOL]))
+        ) as (Capture | Any)[];
+        return (await new MarkerAttachmentVisitor(actualCaptures).visit(tree, undefined))!;
     }
 }
 
 /**
  * Visitor that attaches CaptureMarkers to capture identifiers in pattern ASTs.
  * This allows efficient capture detection without string parsing during matching.
- * Used by TemplateEngine.getPatternTree() for pattern-specific processing.
+ * Reached through TemplateEngine.attachCaptureMarkers().
  */
 class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
     constructor(private readonly captures: (Capture | Any)[]) {

@@ -37,6 +37,11 @@ describe('Capture Constraints', () => {
         return result;
     }
 
+    async function pat(p: {match: (t: J, c: Cursor) => Promise<any>}, code: string) {
+        const expr = await parseExpression(code);
+        return p.match(expr, new Cursor(expr, undefined));
+    }
+
     describe('Simple constraints', () => {
         test('number constraint with both success and failure cases', async () => {
             const value = capture<J.Literal>({
@@ -534,6 +539,28 @@ describe('Capture Constraints', () => {
             expect(rightConstraintCalled).toBe(true);
             expect(leftWasAvailable).toBe(true); // Should see left capture
             expect(rightSawItself).toBe(false); // Should not see itself during constraint evaluation
+        });
+
+        test('a pattern of the same shape does not borrow a neighbouring pattern\'s constraint', async () => {
+            // The pattern AST cache is keyed by capture names, which say nothing about constraints
+            const equalOperands = (other: ReturnType<typeof capture<J.Literal>>) =>
+                capture<J.Literal>({
+                    name: 'cacheKeyRight',
+                    constraint: (node, context) =>
+                        (context.captures.get(other) as J.Literal | undefined)?.value === node.value
+                });
+
+            const looseLeft = capture<J.Literal>('cacheKeyLeft');
+            const loose = pattern`${looseLeft} - ${capture<J.Literal>('cacheKeyRight')}`;
+            expect(await pat(loose, '10 - 20')).toBeDefined();
+
+            const strictLeft = capture<J.Literal>('cacheKeyLeft');
+            const strict = pattern`${strictLeft} - ${equalOperands(strictLeft)}`;
+            expect(await pat(strict, '10 - 10')).toBeDefined();
+            expect(await pat(strict, '10 - 20')).toBeUndefined();
+
+            // ...and the constraint does not leak back the other way
+            expect(await pat(pattern`${capture<J.Literal>('cacheKeyLeft')} - ${capture<J.Literal>('cacheKeyRight')}`, '10 - 20')).toBeDefined();
         });
     });
 });
