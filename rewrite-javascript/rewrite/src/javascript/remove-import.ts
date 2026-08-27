@@ -41,8 +41,9 @@ export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, module: strin
         }
     }
     visitor.afterVisit.push(new RemoveImport(module, member));
-    // Whichever lane the file turns out to use, the other visitor finds nothing to do, so the
-    // caller need not know which one it is in.
+    // Both queue unconditionally so the caller need not know which lane the file uses: each
+    // visitor removes whatever matching construct it finds, ESM import or AMD dependency, and a
+    // file with both gets both removed.
     visitor.afterVisit.push(new RemoveAmdDependency(module));
 }
 

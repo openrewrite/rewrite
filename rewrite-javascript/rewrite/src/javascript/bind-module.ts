@@ -60,7 +60,7 @@ export function calleesOf(options?: BindModuleOptions): readonly string[] {
     return callee === undefined ? DEFAULT_AMD_CALLEES : typeof callee === "string" ? [callee] : callee;
 }
 
-export function isAmdBlock(node: J, options?: BindModuleOptions): boolean {
+export function isAmdBlock(node: J, options?: Pick<BindModuleOptions, "amdCallee">): boolean {
     return node.kind === J.Kind.MethodInvocation &&
         amdBlockOf(node as J.MethodInvocation, calleesOf(options)) !== undefined;
 }
@@ -97,7 +97,7 @@ export function compilationUnitOf(visitor: JavaScriptVisitor<any>): JS.Compilati
 
 export function moduleBindings(
     visitor: JavaScriptVisitor<any>,
-    options?: BindModuleOptions
+    options?: Pick<BindModuleOptions, "amdCallee">
 ): ModuleBindings {
     const amd = enclosingAmdBlock(visitor, options);
     if (amd !== undefined) {
@@ -132,6 +132,9 @@ interface ModuleObjectBinding {
 
 /** Whether the file binds its modules with `require`, which decides whether a create is possible. */
 function isCommonJs(cu: JS.CompilationUnit): boolean {
+    if (cu.sourcePath.endsWith(".cjs")) {
+        return true;
+    }
     let requires = false;
     for (const stmt of cu.statements) {
         if (stmt.element?.kind === JS.Kind.Import) {
@@ -155,7 +158,9 @@ function requiredModule(statement: J | undefined): string | undefined {
         return undefined;
     }
     const call = initializer as J.MethodInvocation;
-    if (call.name.simpleName !== "require") {
+    // `obj.require('x')` selects a method rather than loading a module, matching add-import.ts's
+    // own `requiredModuleOf`.
+    if (call.select || call.name.simpleName !== "require") {
         return undefined;
     }
     const argument = present(call.arguments.elements)[0]?.element;
@@ -317,9 +322,7 @@ async function declaredNames(block: AmdBlock, visitor: JavaScriptVisitor<any>): 
     const collector = new class extends JavaScriptVisitor<ExecutionContext> {
         override async visitVariableDeclarations(v: J.VariableDeclarations, c: ExecutionContext) {
             for (const variable of v.variables) {
-                if (isIdentifier(variable.element.name)) {
-                    names.push((variable.element.name as J.Identifier).simpleName);
-                }
+                names.push(...bindingNames(variable.element.name));
             }
             return super.visitVariableDeclarations(v, c);
         }
@@ -335,6 +338,31 @@ async function declaredNames(block: AmdBlock, visitor: JavaScriptVisitor<any>): 
         }
     };
     await collector.visit(body, new ExecutionContext());
+    return names;
+}
+
+/**
+ * Every identifier a binding pattern introduces, recursing through nested destructuring so
+ * `const {a: {b}} = m` yields `b`. A plain identifier introduces itself.
+ */
+function bindingNames(pattern: J | undefined): string[] {
+    if (isIdentifier(pattern)) {
+        return [pattern.simpleName];
+    }
+    const elements = pattern?.kind === JS.Kind.ObjectBindingPattern
+        ? (pattern as JS.ObjectBindingPattern).bindings.elements
+        : pattern?.kind === JS.Kind.ArrayBindingPattern
+            ? (pattern as JS.ArrayBindingPattern).elements.elements
+            : undefined;
+    if (elements === undefined) {
+        return [];
+    }
+    const names: string[] = [];
+    for (const elem of elements) {
+        if (elem.element?.kind === JS.Kind.BindingElement) {
+            names.push(...bindingNames((elem.element as JS.BindingElement).name));
+        }
+    }
     return names;
 }
 
@@ -433,9 +461,16 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
         }
         // withDependency re-checks the parameter/dependency count against the tree as it stands
         // now: another edit in the same visit that drops or adds a factory parameter can reopen
-        // a mismatch bindAmd's own check already cleared, and returning its `undefined` here
-        // would delete this node.
-        return withDependency(visited, block, this.module, this.binding) ?? visited;
+        // a mismatch bindAmd's own check already cleared. The caller has already emitted a
+        // reference to `this.binding`, so — as for the missing-block case above — a mismatch
+        // here is an error, not a silently dropped dependency.
+        const dependency = withDependency(visited, block, this.module, this.binding);
+        if (dependency === undefined) {
+            throw new Error(
+                `AMD block ${this.blockId} no longer has matching dependency and parameter counts, ` +
+                `so '${this.module}' could not be declared for '${this.binding}', which was reported bound`);
+        }
+        return dependency;
     }
 }
 
@@ -446,7 +481,7 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
  * module's edits — it needs the tree as it stood before the rewrite. Blocks are matched by the
  * call's id, so one a rewrite rebuilds rather than edits is silently left alone.
  */
-export async function removeNewlyUnusedBindings(
+export async function removeNewlyUnusedAmdBindings(
     before: JS.CompilationUnit,
     after: JS.CompilationUnit,
     ctx: ExecutionContext,

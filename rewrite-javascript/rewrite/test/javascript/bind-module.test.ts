@@ -1,7 +1,7 @@
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, bindModule,
-    maybeRemoveImport, removeNewlyUnusedBindings
+    maybeRemoveImport, removeNewlyUnusedAmdBindings
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
@@ -46,6 +46,22 @@ describe("moduleBindings", () => {
         spec.recipe = fromVisitor(captureBindings(seen));
         await spec.rewriteRun(typescript(`const x = 1;`));
         expect(seen.moduleSystem).toBe("esm");
+    });
+
+    test("a selected require, unlike a bare one, does not read as a CommonJS binding", async () => {
+        const spec = new RecipeSpec();
+        const seen: {moduleSystem?: string} = {};
+        spec.recipe = fromVisitor(captureBindings(seen));
+        await spec.rewriteRun(javascript(`const other = foo.require("a/Other");`));
+        expect(seen.moduleSystem).toBe("esm");
+    });
+
+    test("a .cjs file reads as CommonJS even with no require call in it yet", async () => {
+        const spec = new RecipeSpec();
+        const seen: {moduleSystem?: string} = {};
+        spec.recipe = fromVisitor(captureBindings(seen));
+        await spec.rewriteRun({...javascript(`target();`), path: "module.cjs"});
+        expect(seen.moduleSystem).toBe("commonjs");
     });
 
     test("an AMD block's parameters bind positionally to its dependencies", async () => {
@@ -217,6 +233,17 @@ describe("bindModule", () => {
         expect(bound.name).toBe("Element_1");
     });
 
+    test("AMD avoids a name a destructuring pattern binds", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([], function () { const {Element} = window; target(); });`,
+            `sap.ui.define(["sap/ui/core/Element"], function (Element_1) { const {Element} = window; Element_1.target(); });`
+        ));
+        expect(bound.name).toBe("Element_1");
+    });
+
     test("AMD refuses where a parameter would pair with the wrong dependency", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
@@ -314,14 +341,13 @@ describe("bindModule", () => {
         ))).rejects.toThrow(/No AMD block/);
     });
 
-    test("a parameter dropped elsewhere in the same visit does not delete the block", async () => {
+    test("a parameter dropped elsewhere in the same visit rejects the queued dependency", async () => {
         const spec = new RecipeSpec();
-        const bound: {name?: string} = {};
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
                 if (m.name.simpleName === "target") {
-                    bound.name = await bindModule(this, "sap/ui/core/Element");
-                    return bound.name === undefined ? m : withReference(m, bound.name);
+                    const name = await bindModule(this, "sap/ui/core/Element");
+                    return name === undefined ? m : withReference(m, name);
                 }
                 const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
                 if (!isAmdBlock(visited)) {
@@ -344,11 +370,9 @@ describe("bindModule", () => {
                 return withStrippedFactory;
             }
         });
-        await spec.rewriteRun(javascript(
-            `sap.ui.define(["a/B"], function (B) { target(); });`,
-            `sap.ui.define(["a/B"], function () { Element.target(); });`
-        ));
-        expect(bound.name).toBe("Element");
+        await expect(spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], function (B) { target(); });`
+        ))).rejects.toThrow(/no longer has matching dependency and parameter counts/);
     });
 
     test("ESM creates a default import and reports its name", async () => {
@@ -458,7 +482,7 @@ function renameThenSweep(renames: Record<string, string>) {
     return new class extends JavaScriptVisitor<ExecutionContext> {
         override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
             const rewritten = await super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
-            return removeNewlyUnusedBindings(cu, rewritten, ctx);
+            return removeNewlyUnusedAmdBindings(cu, rewritten, ctx);
         }
 
         override async visitMethodInvocation(m: J.MethodInvocation, ctx: ExecutionContext): Promise<J | undefined> {
@@ -474,7 +498,7 @@ function renameThenSweep(renames: Record<string, string>) {
     };
 }
 
-describe("removeNewlyUnusedBindings", () => {
+describe("removeNewlyUnusedAmdBindings", () => {
     test("a binding a rewrite stopped using goes", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(renameThenSweep({Old: "kept"}));

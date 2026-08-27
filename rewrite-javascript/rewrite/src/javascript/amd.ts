@@ -292,6 +292,17 @@ function splitTrailingComments(after: J.Space): {comments: J.Space, whitespace: 
 }
 
 /**
+ * Splits a leading prefix, mirroring `splitTrailingComments`: a comment documents the entry it
+ * precedes and is dropped along with it, while plain whitespace only ever positioned that entry
+ * after the opening bracket or a comma, so it travels to whichever entry takes its place.
+ */
+function splitLeadingComments(prefix: J.Space): {comments: J.Space, whitespace: J.Space} {
+    return prefix.comments.length === 0 ?
+        {comments: {...prefix, whitespace: ""}, whitespace: space(prefix.whitespace)} :
+        {comments: prefix, whitespace: emptySpace};
+}
+
+/**
  * Removes the entry at `index`. The first entry carries no separating whitespace and the
  * last carries the whitespace before the closing bracket, so removing either hands its
  * padding to whichever entry takes its place.
@@ -310,7 +321,14 @@ function removeEntry<T extends J>(
         return remaining;
     }
     if (index === 0) {
-        remaining[0] = {...remaining[0], element: slot.withPrefix(remaining[0].element, slot.prefixOf(removed.element))};
+        // Spread the survivor's own prefix rather than replacing it outright, so a comment it
+        // already carries survives; only its plain whitespace is replaced.
+        const leading = splitLeadingComments(slot.prefixOf(removed.element));
+        const survivor = remaining[0];
+        remaining[0] = {
+            ...survivor,
+            element: slot.withPrefix(survivor.element, {...slot.prefixOf(survivor.element), whitespace: leading.whitespace.whitespace})
+        };
     } else if (index === remaining.length) {
         const last = {...remaining[index - 1], after: removed.after};
         remaining[index - 1] = moveTrailingComma(removed, last).to;

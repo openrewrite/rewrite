@@ -33,8 +33,11 @@ export * from "./project-parser";
 
 export * from "./scope";
 export * from "./add-import";
-export * from "./amd";
-export * from "./bind-module";
+// AMD mechanics `recipes-ui5` builds on directly, beyond the `bindModule` surface below.
+export type {AmdBlock} from "./amd";
+export {DEFAULT_AMD_CALLEES, amdBlockOf, dependencyNames, parameterNames, withDependency, withoutDependencyAt} from "./amd";
+export type {EsmBindingForm, BindModuleOptions, ModuleBindings} from "./bind-module";
+export {bindModule, moduleBindings, isAmdBlock, removeNewlyUnusedAmdBindings} from "./bind-module";
 export * from "./remove-import";
 export * from "./remove-amd-dependency";
 export * from "./cleanup/index";

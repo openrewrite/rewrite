@@ -201,4 +201,30 @@ describe("withoutDependencyAt", () => {
         const block = amdBlockOf(call)!;
         expect(dependencyNames(amdBlockOf(withoutDependencyAt(call, block, 2))!)).toEqual(["a/B", "c/D"]);
     });
+
+    function removeFirstDependency() {
+        return new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const block = amdBlockOf(m);
+                return block === undefined ? super.visitMethodInvocation(m, p) :
+                    withoutDependencyAt(m, block, 0);
+            }
+        };
+    }
+
+    test("removing the first entry moves no comment onto the survivor and drops none of its own", async () => {
+        const relabeled = new RecipeSpec();
+        relabeled.recipe = fromVisitor(removeFirstDependency());
+        await relabeled.rewriteRun(javascript(
+            `sap.ui.define([/* keep me */ "a/B", "c/D"], function (B, D) {});`,
+            `sap.ui.define(["c/D"], function (D) {});`
+        ));
+
+        const dropped = new RecipeSpec();
+        dropped.recipe = fromVisitor(removeFirstDependency());
+        await dropped.rewriteRun(javascript(
+            `sap.ui.define(["a/B", /* about D */ "c/D"], function (B, D) {});`,
+            `sap.ui.define([/* about D */ "c/D"], function (D) {});`
+        ));
+    });
 });
