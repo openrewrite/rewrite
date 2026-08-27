@@ -183,6 +183,23 @@ export function retainIds<T extends J>(tree: T, retainable: ReadonlySet<string>)
 }
 
 /**
+ * Strips the indentation a template carries from the recipe source it was written in. Its first
+ * line starts at the opening backtick, so the common indent is the one shared by the lines below.
+ */
+export function dedentTemplate(code: string): string {
+    const lines = code.split("\n");
+    let indent = Infinity;
+    for (const line of lines.slice(1)) {
+        if (line.trim().length > 0) {
+            indent = Math.min(indent, line.length - line.trimStart().length);
+        }
+    }
+    return indent === Infinity || indent === 0 ?
+        code :
+        [lines[0], ...lines.slice(1).map(line => line.slice(indent))].join("\n");
+}
+
+/**
  * Marker that stores capture metadata on pattern AST nodes.
  * This avoids the need to parse capture names from identifiers during matching.
  */

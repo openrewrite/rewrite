@@ -2410,11 +2410,6 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                 }
             }
 
-            // If neither has type, use structural comparison
-            if (!method.methodType && !otherMethod.methodType) {
-                return super.visitMethodInvocation(method, other);
-            }
-
             // If both have types with FQ declaring types, verify they're compatible
             // (This prevents matching completely different methods like util.isArray vs util.isBoolean)
             if (method.methodType && otherMethod.methodType) {
@@ -2450,12 +2445,12 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         }
         // else: types matched, skip select comparison (allows namespace vs named imports)
 
-        // Compare type parameters
-        if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
-            return this.structuralMismatch('typeParameters');
-        }
+        // A pattern that spells out no type arguments says nothing about them, as with parentheses
+        if (method.typeParameters) {
+            if (!otherMethod.typeParameters) {
+                return this.structuralMismatch('typeParameters');
+            }
 
-        if (method.typeParameters && otherMethod.typeParameters) {
             await this.visitContainerProperty('typeParameters', method.typeParameters, otherMethod.typeParameters);
             if (!this.match) return method;
         }
@@ -2473,6 +2468,32 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         if (!this.match) return method;
 
         return method;
+    }
+
+    /**
+     * A call whose callee is not a plain identifier, such as `getFn()(x)`, `arr[0](x)` or `fn?.(x)`.
+     * Type arguments constrain it under the same rule as `visitMethodInvocation`.
+     */
+    override async visitFunctionCall(functionCall: JS.FunctionCall, other: J): Promise<J | undefined> {
+        if (other.kind !== JS.Kind.FunctionCall) {
+            return this.kindMismatch();
+        }
+
+        const otherFunctionCall = other as JS.FunctionCall;
+        if (functionCall.typeParameters) {
+            if (!otherFunctionCall.typeParameters) {
+                return this.structuralMismatch('typeParameters');
+            }
+
+            await this.visitContainerProperty('typeParameters', functionCall.typeParameters, otherFunctionCall.typeParameters);
+            if (!this.match) return functionCall;
+        }
+
+        // Type arguments are settled, so they come off both sides and the rest compares property by property
+        const patternCall: JS.FunctionCall = {...functionCall, typeParameters: undefined};
+        const targetCall: JS.FunctionCall = {...otherFunctionCall, typeParameters: undefined};
+        await super.visitFunctionCall(patternCall, targetCall);
+        return functionCall;
     }
 
     /**
@@ -2520,6 +2541,10 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * code with typeExpression.
      */
     override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.VariableDeclarations) {
+            return this.kindMismatch();
+        }
+
         const otherVariableDeclarations = other as J.VariableDeclarations;
 
         // Visit leading annotations
@@ -2578,6 +2603,10 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * code with returnTypeExpression.
      */
     override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.MethodDeclaration) {
+            return this.kindMismatch();
+        }
+
         const otherMethodDeclaration = other as J.MethodDeclaration;
 
         // Visit leading annotations

@@ -28,7 +28,8 @@ class RewriteRuleImpl implements RewriteRule {
         private readonly before: Pattern[],
         private readonly after: Template | ((match: MatchResult) => Template),
         private readonly preMatch?: (node: J, context: PreMatchContext) => boolean | Promise<boolean>,
-        private readonly postMatch?: (node: J, context: PostMatchContext) => boolean | Promise<boolean>
+        private readonly postMatch?: (node: J, context: PostMatchContext) => boolean | Promise<boolean>,
+        private readonly format?: boolean
     ) {
     }
 
@@ -56,13 +57,11 @@ class RewriteRuleImpl implements RewriteRule {
                 // Apply transformation
                 let result: J | undefined;
 
+                const options = { values: match, format: this.format };
                 if (typeof this.after === 'function') {
-                    // Call the function to get a template, then apply it
-                    const template = this.after(match);
-                    result = await template.apply(node, cursor, { values: match });
+                    result = await this.after(match).apply(node, cursor, options);
                 } else {
-                    // Use template.apply() as before
-                    result = await this.after.apply(node, cursor, { values: match });
+                    result = await this.after.apply(node, cursor, options);
                 }
 
                 if (result) {
@@ -171,7 +170,8 @@ export function rewrite(
         Array.isArray(config.before) ? config.before : [config.before],
         config.after,
         config.preMatch,
-        config.postMatch
+        config.postMatch,
+        config.format
     );
 }
 

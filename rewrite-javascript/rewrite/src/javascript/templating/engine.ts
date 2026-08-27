@@ -17,7 +17,7 @@ import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
-import {CaptureMarker, PlaceholderUtils, randomizeIds, retainIds, treeIds, WRAPPER_FUNCTION_NAME} from './utils';
+import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, treeIds, WRAPPER_FUNCTION_NAME} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
@@ -244,6 +244,7 @@ export class TemplateEngine {
      * @param coordinates The coordinates specifying where and how to insert the generated AST
      * @param values Map of capture names to values to replace the parameters with
      * @param wrappersMap Map of capture names to J.RightPadded wrappers (for preserving markers)
+     * @param format Whether to fit the result to where it lands
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplateFromAst(
@@ -252,7 +253,8 @@ export class TemplateEngine {
         cursor: Cursor,
         coordinates: JavaCoordinates,
         values: Pick<Map<string, J>, 'get'> = new Map(),
-        wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map()
+        wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map(),
+        format: boolean = true
     ): Promise<J | undefined> {
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
@@ -280,7 +282,7 @@ export class TemplateEngine {
         const uniqueAst = await retainIds(unsubstitutedAst, retainable);
 
         // Apply the template to the current AST
-        return new TemplateApplier(cursor, coordinates, uniqueAst).apply();
+        return new TemplateApplier(cursor, coordinates, uniqueAst, format).apply();
     }
 
     /**
@@ -377,7 +379,7 @@ export class TemplateEngine {
 
         // Always wrap in function body - let the parser decide what it is,
         // then we'll extract intelligently based on what was parsed
-        return `function ${WRAPPER_FUNCTION_NAME}() { ${result} }`;
+        return `function ${WRAPPER_FUNCTION_NAME}() { ${dedentTemplate(result)} }`;
     }
 
     /**
@@ -656,7 +658,8 @@ export class TemplateApplier {
     constructor(
         private readonly cursor: Cursor,
         private readonly coordinates: JavaCoordinates,
-        private readonly ast: J
+        private readonly ast: J,
+        private readonly shouldFormat: boolean = true
     ) {
     }
 
@@ -737,6 +740,10 @@ export class TemplateApplier {
             id: originalTree.id,
             prefix: originalTree.prefix
         };
+
+        if (!this.shouldFormat) {
+            return {...result, id: resultToUse.id};
+        }
 
         // Apply auto-formatting to the result
         const formatted =

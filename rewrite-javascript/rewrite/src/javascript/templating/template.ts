@@ -359,7 +359,8 @@ export class Template {
                 mode: JavaCoordinates.Mode.Replace
             },
             normalizedValues,
-            wrappersMap
+            wrappersMap,
+            options?.format ?? true
         );
     }
 }
