@@ -82,8 +82,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             return super.visitContainer(container, p);
         }
 
-        // Expand variadic placeholders in the container's elements
-        const newElements = await this.expandVariadicElements(container.elements, undefined, p);
+        // A container's element layout is the author's; a block lays its statements out by indentation
+        const newElements = await this.expandVariadicElements(container.elements, undefined, p, true);
 
         return produce(container, draft => {
             draft.elements = newElements as any;
@@ -175,6 +175,12 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         };
     }
 
+    /** As `mergePrefix`, but a line break the source wrote and the template did not is the source's layout. */
+    private mergeElementPrefix(sourcePrefix: J.Space, templatePrefix: J.Space): J.Space {
+        return sourcePrefix.whitespace.includes('\n') && !templatePrefix.whitespace.includes('\n') ?
+            sourcePrefix : this.mergePrefix(sourcePrefix, templatePrefix);
+    }
+
     /**
      * Expands variadic placeholders in a list of elements.
      *
@@ -186,7 +192,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
     private async expandVariadicElements(
         elements: J.RightPadded<J>[],
         unwrapElement: (element: J) => J = (e) => e,
-        p: any
+        p: any,
+        ownLayout: boolean = false
     ): Promise<J.RightPadded<J>[]> {
         const newElements: J.RightPadded<J>[] = [];
 
@@ -263,7 +270,9 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                                             if (i === 0 && draft.element) {
                                                 // Merge the placeholder's prefix with the first item's prefix
                                                 // Modify prefix directly within the draft
-                                                draft.element.prefix = this.mergePrefix(draft.element.prefix, element.prefix);
+                                                draft.element.prefix = ownLayout ?
+                                                    this.mergeElementPrefix(draft.element.prefix, element.prefix) :
+                                                    this.mergePrefix(draft.element.prefix, element.prefix);
                                             }
                                             // Keep all other wrapper properties (including markers with Semicolon)
                                         }));
@@ -273,7 +282,9 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                                         newElements.push(produce(wrapped, draft => {
                                             draft.element = produce(elem, itemDraft => {
                                                 if (i === 0) {
-                                                    itemDraft.prefix = this.mergePrefix(elem.prefix, element.prefix);
+                                                    itemDraft.prefix = ownLayout ?
+                                                        this.mergeElementPrefix(elem.prefix, element.prefix) :
+                                                        this.mergePrefix(elem.prefix, element.prefix);
                                                 }
                                                 // For i > 0, prefix is already correct, no changes needed
                                             });
