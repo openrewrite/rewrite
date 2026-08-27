@@ -265,17 +265,21 @@ async function bindAmd(
         return bindings[declared];
     }
 
+    // Two calls naming the same module at the same block are the same request (ADR 0013),
+    // answered from whichever reservation is already queued rather than doubling the dependency.
+    const queued = queuedFor(visitor, amd.call.id);
+    const reserved = queued.find(v => v.module === module)?.binding;
+    if (reserved !== undefined) {
+        return reserved;
+    }
+
     // A parameter can only be appended at the end, so a block declaring more dependencies than
     // the factory takes parameters for would bind the new module against the wrong one.
     if (bindings.length < elementsOf(amd.block).length) {
         return undefined;
     }
 
-    const taken = [
-        ...bindings,
-        ...await declaredNames(amd.block, visitor),
-        ...reservedNames(visitor, amd.call.id)
-    ];
+    const taken = [...bindings, ...await declaredNames(amd.block, visitor), ...queued.map(v => v.binding)];
     const binding = deconflict(options?.binding ?? lastSegment(module), taken);
     visitor.afterVisit.push(new AddAmdDependency(amd.call.id, module, binding, calleesOf(options)));
     return binding;
@@ -293,11 +297,9 @@ function deconflict(preferred: string, taken: readonly (string | undefined)[]): 
     }
 }
 
-/** The queue is the reservation record, so calls competing for one name resolve against it. */
-function reservedNames(visitor: JavaScriptVisitor<any>, blockId: UUID): string[] {
-    return (visitor.afterVisit ?? [])
-        .filter((v): v is AddAmdDependency<any> => v instanceof AddAmdDependency && v.blockId === blockId)
-        .map(v => v.binding);
+/** Queued reservations already targeting this block: the shared source for both dedup and deconfliction. */
+function queuedFor(visitor: JavaScriptVisitor<any>, blockId: UUID): AddAmdDependency<any>[] {
+    return visitor.afterVisit.filter((v): v is AddAmdDependency<any> => v instanceof AddAmdDependency && v.blockId === blockId);
 }
 
 /**
@@ -345,6 +347,9 @@ function bodyOf(block: AmdBlock): J.Block | undefined {
 /**
  * Whether the factory body references `name`. The AMD binding is a plain parameter, so a name
  * match is the whole test — unlike the ESM lane's `onlyIfReferenced`, no attribution is involved.
+ * The pool is wider than `declaredNames`'s: it matches any identifier of that name, including a
+ * member name in a field access, so a name `deconflict` treats as free can still satisfy this —
+ * a stray dependency, not broken code.
  */
 async function references(block: AmdBlock, name: string): Promise<boolean> {
     const body = bodyOf(block);
@@ -400,9 +405,13 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
             return visited;
         }
         this.applied = true;
-        // Nothing referenced the binding, so the caller asked and then did not use the answer.
-        return (await references(block, this.binding)) ?
-            withDependency(visited, block, this.module, this.binding) :
-            visited;
+        if (!(await references(block, this.binding))) {
+            // Nothing referenced the binding, so the caller asked and then did not use the answer.
+            return visited;
+        }
+        // withDependency re-checks the parameter gap against the tree as it stands now: another
+        // edit in the same visit that drops a factory parameter can reopen a gap bindAmd's own
+        // check already cleared, and returning its `undefined` here would delete this node.
+        return withDependency(visited, block, this.module, this.binding) ?? visited;
     }
 }

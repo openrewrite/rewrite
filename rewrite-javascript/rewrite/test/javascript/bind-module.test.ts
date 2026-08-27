@@ -139,8 +139,12 @@ function identifierRef(name: string): J.Identifier {
     };
 }
 
-/** A caller that uses the answer: rewrites `target()` to `<binding>.target()`, the way a real
- *  recipe would use the name `bindModule` returned. */
+/** Rewrites `call` to read as `<name>.call`, the way a real recipe uses the name `bindModule` returned. */
+function withReference(call: J.MethodInvocation, name: string): J.MethodInvocation {
+    return {...call, select: rightPadded(identifierRef(name), emptySpace)};
+}
+
+/** A caller that uses the answer. */
 function rebind(module: string, bound: {name?: string}) {
     return new class extends JavaScriptVisitor<any> {
         override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
@@ -148,11 +152,7 @@ function rebind(module: string, bound: {name?: string}) {
                 return super.visitMethodInvocation(m, p);
             }
             bound.name = await bindModule(this, module);
-            if (bound.name === undefined) {
-                return m;
-            }
-            const rebound: J.MethodInvocation = {...m, select: rightPadded(identifierRef(bound.name), emptySpace)};
-            return rebound;
+            return bound.name === undefined ? m : withReference(m, bound.name);
         }
     };
 }
@@ -220,6 +220,110 @@ describe("bindModule", () => {
         spec.recipe = fromVisitor(askAndAbandon("sap/ui/core/Element", bound));
         await spec.rewriteRun(javascript(
             `sap.ui.define(["sap/m/Button"], function (Button) { target(); });`
+        ));
+        expect(bound.name).toBe("Element");
+    });
+
+    test("two calls for the same module at one block share the reservation", async () => {
+        const spec = new RecipeSpec();
+        const bound1: {name?: string} = {};
+        const bound2: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName !== "target") {
+                    return super.visitMethodInvocation(m, p);
+                }
+                const bound = bound1.name === undefined ? bound1 : bound2;
+                bound.name = await bindModule(this, "sap/ui/core/Element");
+                return bound.name === undefined ? m : withReference(m, bound.name);
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([], function () { target(); target(); });`,
+            `sap.ui.define(["sap/ui/core/Element"], function (Element) { Element.target(); Element.target(); });`
+        ));
+        expect(bound1.name).toBe("Element");
+        expect(bound2.name).toBe("Element");
+    });
+
+    test("two different modules whose preferred names collide deconflict against each other", async () => {
+        const spec = new RecipeSpec();
+        const boundA: {name?: string} = {};
+        const boundB: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName === "targetA") {
+                    boundA.name = await bindModule(this, "a/Element");
+                    return boundA.name === undefined ? m : withReference(m, boundA.name);
+                }
+                if (m.name.simpleName === "targetB") {
+                    boundB.name = await bindModule(this, "b/Element");
+                    return boundB.name === undefined ? m : withReference(m, boundB.name);
+                }
+                return super.visitMethodInvocation(m, p);
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([], function () { targetA(); targetB(); });`,
+            `sap.ui.define(["a/Element", "b/Element"], function (Element, Element_1) { Element.targetA(); Element_1.targetB(); });`
+        ));
+        expect(boundA.name).toBe("Element");
+        expect(boundB.name).toBe("Element_1");
+    });
+
+    test("a block replaced before the deferred edit runs is an error, not a silent skip", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName === "target") {
+                    bound.name = await bindModule(this, "sap/ui/core/Element");
+                    return m;
+                }
+                const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
+                // Simulate an unrelated edit that replaces the block's own node identity, so the
+                // id the deferred edit was queued against no longer exists anywhere in the tree.
+                return isAmdBlock(visited) ? {...visited, id: randomId()} : visited;
+            }
+        });
+        await expect(spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/m/Button"], function (Button) { target(); });`
+        ))).rejects.toThrow(/No AMD block/);
+    });
+
+    test("a parameter dropped elsewhere in the same visit does not delete the block", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName === "target") {
+                    bound.name = await bindModule(this, "sap/ui/core/Element");
+                    return bound.name === undefined ? m : withReference(m, bound.name);
+                }
+                const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
+                if (!isAmdBlock(visited)) {
+                    return visited;
+                }
+                // Simulate an unrelated edit in the same visit that drops the factory's only
+                // parameter without removing the dependency it was paired to, reopening the gap
+                // bindAmd's own check had already cleared.
+                const factoryArg = visited.arguments.elements[1].element as JS.StatementExpression;
+                const method = factoryArg.statement as J.MethodDeclaration;
+                const empty: J.Empty = {kind: J.Kind.Empty, id: randomId(), prefix: emptySpace, markers: emptyMarkers};
+                const stripped: J.MethodDeclaration = {
+                    ...method,
+                    parameters: {...method.parameters, elements: [rightPadded(empty, emptySpace)]}
+                };
+                const strippedFactory: JS.StatementExpression = {...factoryArg, statement: stripped};
+                const args = [...visited.arguments.elements];
+                args[1] = {...args[1], element: strippedFactory};
+                const withStrippedFactory: J.MethodInvocation = {...visited, arguments: {...visited.arguments, elements: args}};
+                return withStrippedFactory;
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], function (B) { target(); });`,
+            `sap.ui.define(["a/B"], function () { Element.target(); });`
         ));
         expect(bound.name).toBe("Element");
     });
