@@ -244,6 +244,17 @@ describe("bindModule", () => {
         expect(bound.name).toBe("Element_1");
     });
 
+    test("AMD avoids a name a nested destructuring pattern binds", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Deep", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([], function () { const [{Deep}] = window; target(); });`,
+            `sap.ui.define(["sap/ui/core/Deep"], function (Deep_1) { const [{Deep}] = window; Deep_1.target(); });`
+        ));
+        expect(bound.name).toBe("Deep_1");
+    });
+
     test("AMD refuses where a parameter would pair with the wrong dependency", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
