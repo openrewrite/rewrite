@@ -37,6 +37,15 @@ export interface SourceSpec<T extends SourceFile> {
     ext: string
 }
 
+/** The fields a test configures on a spec, as opposed to the machinery it runs with. */
+interface RecipeSpecConfiguration {
+    checkParsePrintIdempotence: boolean;
+    allowEmptyDiff: boolean;
+    recipe: Recipe;
+    recipeExecutionContext: ExecutionContext;
+    dataTableAssertions: { [key: string]: (rows: any[]) => void };
+}
+
 export class RecipeSpec {
     checkParsePrintIdempotence: boolean = true
     allowEmptyDiff: boolean = false
@@ -56,8 +65,56 @@ export class RecipeSpec {
 
     private dataTableAssertions: { [key: string]: (rows: any[]) => void } = {}
 
+    // A suite typically declares one spec and configures it per test, which makes the spec a
+    // channel between tests unless each test starts from the same configuration. A consumer opts
+    // into that reset by calling `trackSuiteConfiguration` from a vitest setup file, as
+    // `test/setup.ts` does; until it does, `live` is undefined and no spec is retained here.
+    private static live?: RecipeSpec[];
+    private suiteConfiguration?: RecipeSpecConfiguration;
+
+    constructor() {
+        RecipeSpec.live?.push(this);
+    }
+
     dataTable<Row>(name: string, allRows: (rows: Row[]) => void) {
         this.dataTableAssertions[name] = allRows;
+    }
+
+    private configuration(): RecipeSpecConfiguration {
+        return {
+            checkParsePrintIdempotence: this.checkParsePrintIdempotence,
+            allowEmptyDiff: this.allowEmptyDiff,
+            recipe: this.recipe,
+            recipeExecutionContext: this.recipeExecutionContext,
+            dataTableAssertions: {...this.dataTableAssertions}
+        };
+    }
+
+    /** Starts recording specs, so that the calls below have something to act on. */
+    static trackSuiteConfiguration(): void {
+        RecipeSpec.live = [];
+    }
+
+    /** Records the configuration each test in the current suite starts from. */
+    static captureSuiteConfiguration(): void {
+        for (const spec of RecipeSpec.live ?? []) {
+            spec.suiteConfiguration = spec.configuration();
+        }
+    }
+
+    /** Undoes whatever the previous test configured. */
+    static restoreSuiteConfiguration(): void {
+        for (const spec of RecipeSpec.live ?? []) {
+            if (spec.suiteConfiguration) {
+                Object.assign(spec, spec.suiteConfiguration);
+                spec.dataTableAssertions = {...spec.suiteConfiguration.dataTableAssertions};
+            }
+        }
+    }
+
+    /** Bounds the registry to the suite that is running, which is all it has to span. */
+    static forgetSuiteSpecs(): void {
+        RecipeSpec.live &&= [];
     }
 
     async rewriteRun(...sourceSpecs: (SourceSpec<any> | Generator<SourceSpec<any>, void, unknown> | AsyncGenerator<SourceSpec<any>, void, unknown>)[]): Promise<void> {

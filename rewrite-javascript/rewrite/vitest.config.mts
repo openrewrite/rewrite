@@ -9,6 +9,7 @@ export default defineConfig({
         globals: true,
         testTimeout: 60_000,
         include: ['**/?(*.)+(spec|test).+(ts|tsx|js)'],
+        setupFiles: ['./test/setup.ts'],
         exclude: ['**/node_modules/**', '**/dist/**'],
         // VERBOSE_TESTS (Gradle: -PverboseTests) restores the full per-test reporter
         reporters: [
