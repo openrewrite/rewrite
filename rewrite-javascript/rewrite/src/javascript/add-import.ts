@@ -1,9 +1,11 @@
 import {JavaScriptVisitor} from "./visitor";
 import {emptySpace, J, rightPadded, singleSpace, space, Statement, Type} from "../java";
-import {JS} from "./tree";
+import {JS, JSX} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
-import {getStyle, SpacesStyle, StyleKind} from "./style";
+import {getStyle, PrettierStyle, SpacesStyle, StyleKind} from "./style";
+
+export type QuoteChar = "'" | '"';
 
 export enum ImportStyle {
     ES6Named,      // import { x } from 'module'
@@ -13,8 +15,10 @@ export enum ImportStyle {
 }
 
 export interface AddImportOptions {
-    /** The module name (e.g., 'fs', 'react') to import from */
-    module: string;
+    /** The module name (e.g., 'fs', 'react') to import from.
+     * Pass a `J.Literal` to reuse its source form verbatim, which carries the quoting,
+     * escapes and unicode form of a specifier being moved from elsewhere in the source. */
+    module: string | J.Literal;
 
     /** Optionally, the specific member to import from the module.
      * If not specified, adds a default import or namespace import.
@@ -46,6 +50,10 @@ export interface AddImportOptions {
 
     /** Optional import style to use. If not specified, auto-detects from file and existing imports */
     style?: ImportStyle;
+
+    /** Quote character for the module specifier. If not specified, detected from the file.
+     * A `J.Literal` module carries its own quoting and takes precedence over this. */
+    quoteStyle?: QuoteChar;
 }
 
 /**
@@ -79,7 +87,8 @@ export function maybeAddImport(
 ) {
     for (const v of visitor.afterVisit || []) {
         if (v instanceof AddImport &&
-            v.module === options.module &&
+            v.module === moduleNameOf(options.module) &&
+            v.quoteStyle === options.quoteStyle &&
             v.member === options.member &&
             v.alias === options.alias &&
             v.sideEffectOnly === (options.sideEffectOnly ?? false) &&
@@ -90,14 +99,134 @@ export function maybeAddImport(
     visitor.afterVisit.push(new AddImport(options));
 }
 
+/**
+ * The parser lifts surrogate pairs out of `valueSource` into `unicodeEscapes` and, when it does,
+ * sets `value` to the quoted source (`parser.ts` `mapLiteral`), so neither field alone is the
+ * module name. Reuniting them and stripping the quotes yields it for either shape of literal.
+ */
+function moduleNameOf(module: string | J.Literal): string {
+    if (typeof module === 'string') {
+        return module;
+    }
+    const source = module.valueSource;
+    if (source === undefined) {
+        return String(module.value);
+    }
+    let restored = '';
+    let cut = 0;
+    for (const escape of module.unicodeEscapes ?? []) {
+        restored += source.slice(cut, escape.valueSourceIndex) + String.fromCharCode(parseInt(escape.codePoint, 16));
+        cut = escape.valueSourceIndex;
+    }
+    restored += source.slice(cut);
+    const quote = restored.charAt(0);
+    return (quote === "'" || quote === '"') && restored.endsWith(quote) && restored.length > 1
+        ? restored.slice(1, -1)
+        : restored;
+}
+
+function quoteOf(expression: J | undefined): QuoteChar | undefined {
+    if (expression?.kind !== J.Kind.Literal) {
+        return undefined;
+    }
+    const source = (expression as J.Literal).valueSource;
+    const quote = source?.charAt(0);
+    // JsxText carries raw text as its `valueSource`, so a leading quote alone does not make a
+    // literal quote-delimited; requiring a matching pair keeps prose out of the tally.
+    return (quote === "'" || quote === '"') && source!.length > 1 && source!.endsWith(quote)
+        ? quote
+        : undefined;
+}
+
+/**
+ * Pick the quote character for a module specifier being added to `cu`, so that it agrees
+ * with the file it lands in. An existing specifier is the most direct precedent; a Prettier
+ * config states intent even where the file itself has not been formatted to match.
+ */
+async function detectQuote(cu: JS.CompilationUnit): Promise<QuoteChar> {
+    // Static imports are top-level, so the highest-ranked signal needs no traversal to find.
+    for (const statement of cu.statements) {
+        const element = statement.element;
+        const topLevelQuote = element?.kind === JS.Kind.Import
+            ? quoteOf((element as JS.Import).moduleSpecifier?.element)
+            : element?.kind === JS.Kind.ExportDeclaration
+                ? quoteOf((element as JS.ExportDeclaration).moduleSpecifier?.element)
+                : undefined;
+        if (topLevelQuote) {
+            return topLevelQuote;
+        }
+    }
+
+    let importQuote: QuoteChar | undefined;
+    let requireQuote: QuoteChar | undefined;
+    let single = 0;
+    let double = 0;
+
+    await new class extends JavaScriptVisitor<void> {
+        override async visitImportDeclaration(jsImport: JS.Import, p: void): Promise<J | undefined> {
+            importQuote ??= quoteOf(jsImport.moduleSpecifier?.element);
+            return super.visitImportDeclaration(jsImport, p);
+        }
+
+        override async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, p: void): Promise<J | undefined> {
+            importQuote ??= quoteOf(exportDeclaration.moduleSpecifier?.element);
+            return super.visitExportDeclaration(exportDeclaration, p);
+        }
+
+        override async visitMethodInvocation(method: J.MethodInvocation, p: void): Promise<J | undefined> {
+            if (!method.select && method.name?.kind === J.Kind.Identifier &&
+                (method.name as J.Identifier).simpleName === 'require') {
+                requireQuote ??= quoteOf(method.arguments?.elements[0]?.element);
+            }
+            return super.visitMethodInvocation(method, p);
+        }
+
+        override async visitJsxAttribute(attribute: JSX.Attribute, p: void): Promise<J | undefined> {
+            // JSX attribute quoting answers to Prettier's `jsxSingleQuote`, so it is no evidence
+            // about the quote style of ordinary strings.
+            return attribute;
+        }
+
+        override async visitLiteral(literal: J.Literal, p: void): Promise<J | undefined> {
+            const quote = quoteOf(literal);
+            if (quote === "'") {
+                single++;
+            } else if (quote === '"') {
+                double++;
+            }
+            return super.visitLiteral(literal, p);
+        }
+    }().visit(cu, undefined);
+
+    // Imports outrank requires; that ordering is what makes the import-only scan above sound.
+    const specifierQuote = importQuote ?? requireQuote;
+    if (specifierQuote) {
+        return specifierQuote;
+    }
+
+    const prettier = getStyle(StyleKind.PrettierStyle, cu) as PrettierStyle | undefined;
+    if (prettier?.kind === StyleKind.PrettierStyle && !prettier.ignored) {
+        const singleQuote = prettier.config.singleQuote;
+        if (typeof singleQuote === 'boolean') {
+            return singleQuote ? "'" : '"';
+        }
+    }
+
+    return double > single ? '"' : "'";
+}
+
 export class AddImport<P> extends JavaScriptVisitor<P> {
     readonly module: string;
+    /** Set when the caller supplied the module specifier as a literal; printed verbatim. */
+    readonly moduleValueSource?: string;
+    readonly moduleUnicodeEscapes?: J.LiteralUnicodeEscape[];
     readonly member?: string;
     readonly alias?: string;
     readonly onlyIfReferenced: boolean;
     readonly sideEffectOnly: boolean;
     readonly typeOnly: boolean;
     readonly style?: ImportStyle;
+    readonly quoteStyle?: QuoteChar;
 
     constructor(options: AddImportOptions) {
         super();
@@ -128,13 +257,16 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        this.module = options.module;
+        this.module = moduleNameOf(options.module);
+        this.moduleValueSource = typeof options.module === 'string' ? undefined : options.module.valueSource;
+        this.moduleUnicodeEscapes = typeof options.module === 'string' ? undefined : options.module.unicodeEscapes;
         this.member = options.member;
         this.alias = options.alias;
         this.onlyIfReferenced = options.onlyIfReferenced ?? true;
         this.sideEffectOnly = options.sideEffectOnly ?? false;
         this.typeOnly = options.typeOnly ?? false;
         this.style = options.style;
+        this.quoteStyle = options.quoteStyle;
     }
 
     /**
@@ -144,7 +276,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         if (moduleSpecifier.kind !== J.Kind.Literal) {
             return undefined;
         }
-        return (moduleSpecifier as J.Literal).value?.toString();
+        return moduleNameOf(moduleSpecifier as J.Literal);
     }
 
     /**
@@ -1033,15 +1165,20 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // For side-effect imports, use emptySpace since space comes from LeftPadded.before
         // For regular imports with import clause, use emptySpace since space comes from LeftPadded.before
         // However, the printer expects the space after 'from' in the literal's prefix
-        // Note: value contains the unquoted string, valueSource contains the quoted version for printing
+        // Note: value is the unquoted module name; valueSource and unicodeEscapes are its printed form
+        let valueSource = this.moduleValueSource;
+        if (valueSource === undefined) {
+            const quote = this.quoteStyle ?? await detectQuote(compilationUnit);
+            valueSource = `${quote}${this.module}${quote}`;
+        }
         const moduleSpecifier: J.Literal = {
             id: randomId(),
             kind: J.Kind.Literal,
             prefix: this.sideEffectOnly ? emptySpace : singleSpace,
             markers: emptyMarkers,
             value: this.module,
-            valueSource: `'${this.module}'`,
-            unicodeEscapes: [],
+            valueSource,
+            unicodeEscapes: this.moduleUnicodeEscapes,
             type: undefined
         };
 
@@ -1300,7 +1437,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return undefined;
         }
 
-        return (firstArg as J.Literal).value?.toString();
+        return moduleNameOf(firstArg as J.Literal);
     }
 
     /**
