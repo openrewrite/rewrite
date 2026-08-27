@@ -33,6 +33,8 @@ export * from "./project-parser";
 
 export * from "./scope";
 export * from "./add-import";
+export * from "./amd";
+export * from "./bind-module";
 export * from "./remove-import";
 export * from "./cleanup/index";
 export * from "./recipes/index";
