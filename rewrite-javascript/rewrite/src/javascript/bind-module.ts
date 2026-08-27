@@ -349,6 +349,9 @@ function bindingNames(pattern: J | undefined): string[] {
     if (isIdentifier(pattern)) {
         return [pattern.simpleName];
     }
+    if (pattern?.kind === JS.Kind.Spread) {
+        return bindingNames((pattern as JS.Spread).expression);
+    }
     const elements = pattern?.kind === JS.Kind.ObjectBindingPattern
         ? (pattern as JS.ObjectBindingPattern).bindings.elements
         : pattern?.kind === JS.Kind.ArrayBindingPattern

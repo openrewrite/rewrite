@@ -292,14 +292,13 @@ function splitTrailingComments(after: J.Space): {comments: J.Space, whitespace: 
 }
 
 /**
- * Splits a leading prefix, mirroring `splitTrailingComments`: a comment documents the entry it
- * precedes and is dropped along with it, while plain whitespace only ever positioned that entry
- * after the opening bracket or a comma, so it travels to whichever entry takes its place.
+ * The plain-whitespace part of a leading prefix whose entry is about to be removed. A comment in
+ * that prefix documents the entry it precedes and is dropped along with it; the whitespace only
+ * ever positioned that entry after the opening bracket or a comma, so it's what travels to
+ * whichever entry takes its place.
  */
-function splitLeadingComments(prefix: J.Space): {comments: J.Space, whitespace: J.Space} {
-    return prefix.comments.length === 0 ?
-        {comments: {...prefix, whitespace: ""}, whitespace: space(prefix.whitespace)} :
-        {comments: prefix, whitespace: emptySpace};
+function leadingWhitespaceOf(prefix: J.Space): string {
+    return prefix.comments.length === 0 ? prefix.whitespace : "";
 }
 
 /**
@@ -323,11 +322,11 @@ function removeEntry<T extends J>(
     if (index === 0) {
         // Spread the survivor's own prefix rather than replacing it outright, so a comment it
         // already carries survives; only its plain whitespace is replaced.
-        const leading = splitLeadingComments(slot.prefixOf(removed.element));
+        const whitespace = leadingWhitespaceOf(slot.prefixOf(removed.element));
         const survivor = remaining[0];
         remaining[0] = {
             ...survivor,
-            element: slot.withPrefix(survivor.element, {...slot.prefixOf(survivor.element), whitespace: leading.whitespace.whitespace})
+            element: slot.withPrefix(survivor.element, {...slot.prefixOf(survivor.element), whitespace})
         };
     } else if (index === remaining.length) {
         const last = {...remaining[index - 1], after: removed.after};

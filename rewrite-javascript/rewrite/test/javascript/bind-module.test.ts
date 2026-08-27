@@ -255,6 +255,17 @@ describe("bindModule", () => {
         expect(bound.name).toBe("Deep_1");
     });
 
+    test("AMD avoids a name a rest element binds", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([], function () { const [...Element] = window; target(); });`,
+            `sap.ui.define(["sap/ui/core/Element"], function (Element_1) { const [...Element] = window; Element_1.target(); });`
+        ));
+        expect(bound.name).toBe("Element_1");
+    });
+
     test("AMD refuses where a parameter would pair with the wrong dependency", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
