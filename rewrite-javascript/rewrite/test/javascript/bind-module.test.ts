@@ -177,7 +177,7 @@ function rebind(module: string, bound: {name?: string}) {
             if (m.name.simpleName !== "target") {
                 return super.visitMethodInvocation(m, p);
             }
-            bound.name = await bindModule(this, module);
+            bound.name = bindModule(this, module);
             return bound.name === undefined ? m : withReference(m, bound.name);
         }
     };
@@ -190,7 +190,7 @@ function askAndAbandon(module: string, bound: {name?: string}) {
             if (m.name.simpleName !== "target") {
                 return super.visitMethodInvocation(m, p);
             }
-            bound.name = await bindModule(this, module);
+            bound.name = bindModule(this, module);
             return m;
         }
     };
@@ -314,7 +314,7 @@ describe("bindModule", () => {
                     return super.visitMethodInvocation(m, p);
                 }
                 const bound = bound1.name === undefined ? bound1 : bound2;
-                bound.name = await bindModule(this, "sap/ui/core/Element");
+                bound.name = bindModule(this, "sap/ui/core/Element");
                 return bound.name === undefined ? m : withReference(m, bound.name);
             }
         });
@@ -333,11 +333,11 @@ describe("bindModule", () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
                 if (m.name.simpleName === "targetA") {
-                    boundA.name = await bindModule(this, "a/Element");
+                    boundA.name = bindModule(this, "a/Element");
                     return boundA.name === undefined ? m : withReference(m, boundA.name);
                 }
                 if (m.name.simpleName === "targetB") {
-                    boundB.name = await bindModule(this, "b/Element");
+                    boundB.name = bindModule(this, "b/Element");
                     return boundB.name === undefined ? m : withReference(m, boundB.name);
                 }
                 return super.visitMethodInvocation(m, p);
@@ -357,7 +357,7 @@ describe("bindModule", () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
                 if (m.name.simpleName === "target") {
-                    bound.name = await bindModule(this, "sap/ui/core/Element");
+                    bound.name = bindModule(this, "sap/ui/core/Element");
                     return m;
                 }
                 const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
@@ -376,7 +376,7 @@ describe("bindModule", () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
                 if (m.name.simpleName === "target") {
-                    const name = await bindModule(this, "sap/ui/core/Element");
+                    const name = bindModule(this, "sap/ui/core/Element");
                     return name === undefined ? m : withReference(m, name);
                 }
                 const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;

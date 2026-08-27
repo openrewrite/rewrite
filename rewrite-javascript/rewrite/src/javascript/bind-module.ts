@@ -17,6 +17,7 @@ import {isIdentifier, J} from "../java";
 import {JS} from "./tree";
 import {Cursor} from "../tree";
 import {JavaScriptVisitor} from "./visitor";
+import {scopeOf} from "./scope";
 import {ExecutionContext} from "../execution";
 import {UUID} from "../uuid";
 import {maybeAddImport, moduleNameOf, QuoteChar} from "./add-import";
@@ -240,11 +241,11 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
  * The name is decided from the cursor and returned at once; the edit that creates the binding
  * is deferred onto `visitor.afterVisit`, as `maybeAddImport`'s is.
  */
-export async function bindModule(
+export function bindModule(
     visitor: JavaScriptVisitor<any>,
     module: string | J.Literal,
     options?: BindModuleOptions
-): Promise<string | undefined> {
+): string | undefined {
     const moduleName = moduleNameOf(module);
     const amd = enclosingAmdBlock(visitor, options);
     if (amd !== undefined) {
@@ -279,12 +280,12 @@ export function lastSegment(module: string): string {
     return module.substring(module.lastIndexOf("/") + 1);
 }
 
-async function bindAmd(
+function bindAmd(
     visitor: JavaScriptVisitor<any>,
     amd: {call: J.MethodInvocation, block: AmdBlock},
     module: string,
     options?: BindModuleOptions
-): Promise<string | undefined> {
+): string | undefined {
     const modules = dependencyNames(amd.block);
     const bindings = parameterNames(amd.block);
 
@@ -307,7 +308,10 @@ async function bindAmd(
         return undefined;
     }
 
-    const taken = [...bindings, ...await declaredNames(amd.block, visitor), ...queued.map(v => v.binding)];
+    // What the cursor can already name, which is the factory's parameters and the declarations
+    // reaching it — a name bound in a nested scope cannot shadow the parameter, so it does not count.
+    const inScope = scopeOf(cursorOf(visitor)!);
+    const taken = [...bindings, ...inScope.names(), ...queued.map(v => v.binding)];
     const binding = deconflict(options?.binding ?? lastSegment(module), taken);
     visitor.afterVisit.push(new AddAmdDependency(amd.call.id, module, binding, calleesOf(options)));
     return binding;
@@ -330,66 +334,7 @@ function queuedFor(visitor: JavaScriptVisitor<any>, blockId: UUID): AddAmdDepend
     return visitor.afterVisit.filter((v): v is AddAmdDependency<any> => v instanceof AddAmdDependency && v.blockId === blockId);
 }
 
-/**
- * The names the body declares. A new parameter has to avoid all of them, not just the other
- * parameters: a `var Log` in the body would shadow a parameter of the same name, and the
- * rewritten code would quietly read the local instead of the module.
- */
-async function declaredNames(block: AmdBlock, visitor: JavaScriptVisitor<any>): Promise<string[]> {
-    const body = bodyOf(block);
-    if (body === undefined) {
-        return [];
-    }
-    const names: string[] = [];
-    const collector = new class extends JavaScriptVisitor<ExecutionContext> {
-        override async visitVariableDeclarations(v: J.VariableDeclarations, c: ExecutionContext) {
-            for (const variable of v.variables) {
-                names.push(...bindingNames(variable.element.name));
-            }
-            return super.visitVariableDeclarations(v, c);
-        }
 
-        override async visitMethodDeclaration(m: J.MethodDeclaration, c: ExecutionContext) {
-            names.push(m.name.simpleName);
-            return super.visitMethodDeclaration(m, c);
-        }
-
-        override async visitClassDeclaration(k: J.ClassDeclaration, c: ExecutionContext) {
-            names.push(k.name.simpleName);
-            return super.visitClassDeclaration(k, c);
-        }
-    };
-    await collector.visit(body, new ExecutionContext());
-    return names;
-}
-
-/**
- * Every identifier a binding pattern introduces, recursing through nested destructuring so
- * `const {a: {b}} = m` yields `b`. A plain identifier introduces itself.
- */
-function bindingNames(pattern: J | undefined): string[] {
-    if (isIdentifier(pattern)) {
-        return [pattern.simpleName];
-    }
-    if (pattern?.kind === JS.Kind.Spread) {
-        return bindingNames((pattern as JS.Spread).expression);
-    }
-    const elements = pattern?.kind === JS.Kind.ObjectBindingPattern
-        ? (pattern as JS.ObjectBindingPattern).bindings.elements
-        : pattern?.kind === JS.Kind.ArrayBindingPattern
-            ? (pattern as JS.ArrayBindingPattern).elements.elements
-            : undefined;
-    if (elements === undefined) {
-        return [];
-    }
-    const names: string[] = [];
-    for (const elem of elements) {
-        if (elem.element?.kind === JS.Kind.BindingElement) {
-            names.push(...bindingNames((elem.element as JS.BindingElement).name));
-        }
-    }
-    return names;
-}
 
 /** The factory's body: a `J.Block` for `function(){}` and most arrows, or the bare expression for `() => expr`. */
 export function bodyOf(block: AmdBlock): J | undefined {
@@ -399,7 +344,7 @@ export function bodyOf(block: AmdBlock): J | undefined {
 }
 
 /**
- * Whether the factory body references `name`. The pool is wider than `declaredNames`'s: it
+ * Whether the factory body references `name`. This counts any identifier of that name, so it
  * matches any identifier of that name, including a member in a field access, since a stray
  * dependency is fine where a shadowed one is not. `missingBodyAnswer` covers a body-less
  * factory: `false` for an addition (nothing to conflict with), `true` for a removal (nothing
