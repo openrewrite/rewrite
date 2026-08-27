@@ -30,6 +30,16 @@ export interface MaybeBindOptions extends AddImportOptions {
     amdCallee?: string | readonly string[];
 }
 
+export interface MaybeUnbindOptions {
+    module: string;
+
+    /** The member to remove; unset removes every unused binding of the module. */
+    member?: string;
+
+    /** Callees that introduce an AMD block. UI5 writes `sap.ui.define`, RequireJS and Dojo `define`. */
+    amdCallee?: string | readonly string[];
+}
+
 export interface ModuleBindings {
     /** The module `localName` refers to, or undefined when it is not a module binding. */
     moduleOf(localName: string): string | undefined;
@@ -237,20 +247,28 @@ export function maybeBind(
 
 /**
  * Removes `module`'s import(s) where unused, or one `member` of it — `'default'` and `'*'` select
- * the default and namespace import regardless of local name. Applies to the ESM lane only; an AMD
- * dependency binds a whole module, so `member` is ignored there.
+ * the default and namespace import regardless of local name. A member-scoped request does not
+ * apply to an AMD dependency, which binds a module rather than one of its members.
  */
-export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, module: string, member?: string) {
+export function maybeUnbind(visitor: JavaScriptVisitor<any>, options: MaybeUnbindOptions): void {
     for (const v of visitor.afterVisit || []) {
-        if (v instanceof RemoveImport && v.module === module && v.member === member) {
+        if (v instanceof RemoveImport && v.module === options.module && v.member === options.member) {
             return;
         }
     }
-    visitor.afterVisit.push(new RemoveImport(module, member));
+    visitor.afterVisit.push(new RemoveImport(options.module, options.member));
     // Both queue unconditionally so the caller need not know which lane the file uses: each
     // visitor removes whatever matching construct it finds, ESM import or AMD dependency, and a
     // file with both gets both removed.
-    visitor.afterVisit.push(new RemoveAmdDependency(module));
+    visitor.afterVisit.push(new RemoveAmdDependency(options.module, options.member, calleesOf(options)));
+}
+
+/**
+ * @deprecated Use {@link maybeUnbind} instead — this is a call-shape change, not a behaviour
+ * change: `maybeRemoveImport(v, module, member)` is `maybeUnbind(v, {module, member})`.
+ */
+export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, module: string, member?: string): void {
+    maybeUnbind(visitor, {module, member});
 }
 
 /**

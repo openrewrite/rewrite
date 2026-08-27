@@ -40,8 +40,8 @@ export {
     DEFAULT_AMD_CALLEES, amdBlockOf, dependencyNames, parameterNames, withDependency, withoutDependencyAt,
     RemoveAmdDependency, removeNewlyUnusedAmdBindings
 } from "./amd";
-export type {MaybeBindOptions, ModuleBindings} from "./binding";
-export {maybeBind, moduleBindings, isAmdBlock, maybeRemoveImport, maybeAddImport} from "./binding";
+export type {MaybeBindOptions, MaybeUnbindOptions, ModuleBindings} from "./binding";
+export {maybeBind, maybeUnbind, moduleBindings, isAmdBlock, maybeRemoveImport, maybeAddImport} from "./binding";
 export * from "./remove-import";
 export * from "./cleanup/index";
 export * from "./recipes/index";

@@ -722,15 +722,23 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
 /**
  * The AMD counterpart to `RemoveImport`: drops a dependency the block's body no longer names,
  * along with the parameter bound to it. A dependency the factory takes no parameter for is
- * loaded for its side effects and stays, matching `bindAmd`'s own read of such a block.
+ * loaded for its side effects and stays, matching `bindAmd`'s own read of such a block. A
+ * `member`-scoped request is a no-op here — see `maybeUnbind`.
  */
 export class RemoveAmdDependency<P> extends JavaScriptVisitor<P> {
-    constructor(readonly module: string, readonly callees: readonly string[] = DEFAULT_AMD_CALLEES) {
+    constructor(
+        readonly module: string,
+        readonly member?: string,
+        readonly callees: readonly string[] = DEFAULT_AMD_CALLEES
+    ) {
         super();
     }
 
     override async visitMethodInvocation(m: J.MethodInvocation, p: P): Promise<J | undefined> {
         const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
+        if (this.member !== undefined) {
+            return visited;
+        }
         const block = amdBlockOf(visited, this.callees);
         if (block === undefined) {
             return visited;

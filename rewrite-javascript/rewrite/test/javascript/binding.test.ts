@@ -1,7 +1,7 @@
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
-    maybeAddImport, maybeRemoveImport, removeNewlyUnusedAmdBindings
+    maybeAddImport, maybeUnbind, maybeRemoveImport, removeNewlyUnusedAmdBindings
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
@@ -484,16 +484,16 @@ describe("maybeBind", () => {
     });
 });
 
-function dropModule(module: string) {
+function dropModule(module: string, member?: string) {
     return new class extends JavaScriptVisitor<any> {
         override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-            maybeRemoveImport(this, module);
+            maybeUnbind(this, {module, member});
             return super.visitJsCompilationUnit(cu, p);
         }
     };
 }
 
-describe("maybeRemoveImport on an AMD block", () => {
+describe("maybeUnbind on an AMD block", () => {
     test("an unreferenced dependency goes with its parameter", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(dropModule("sap/m/Button"));
@@ -518,9 +518,31 @@ describe("maybeRemoveImport on an AMD block", () => {
             `sap.ui.define(["a/Side"], function () {});`
         ));
     });
+
+    test("a member-scoped request does not apply, since a dependency binds a whole module", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(dropModule("sap/m/Button", "default"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/m/Button"], function (Button) {});`
+        ));
+    });
+
+    test("a custom amdCallee reaches the removal lane", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeUnbind(this, {module: "sap/m/Button", amdCallee: "myDefine"});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `myDefine(["sap/m/Button", "a/C"], function (Button, C) { C.f(); });`,
+            `myDefine(["a/C"], function (C) { C.f(); });`
+        ));
+    });
 });
 
-describe("maybeRemoveImport on an ESM file", () => {
+describe("maybeUnbind on an ESM file", () => {
     test("removes the import; the AMD lane it also queues finds no block to act on", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(dropModule("sap/m/Button"));
@@ -528,6 +550,25 @@ describe("maybeRemoveImport on an ESM file", () => {
             `import Button from "sap/m/Button";\n\nconsole.log(1);`,
             `console.log(1);`
         ));
+    });
+
+    test("the deprecated maybeRemoveImport still works, doing what the equivalent maybeUnbind call would", async () => {
+        const removeWith = (remove: (visitor: JavaScriptVisitor<any>) => void) => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    remove(this);
+                    return super.visitJsCompilationUnit(cu, p);
+                }
+            });
+            return spec.rewriteRun(typescript(
+                `import Button from "sap/m/Button";\n\nconsole.log(1);`,
+                `console.log(1);`
+            ));
+        };
+
+        await removeWith(v => maybeRemoveImport(v, "sap/m/Button"));
+        await removeWith(v => maybeUnbind(v, {module: "sap/m/Button"}));
     });
 });
 
