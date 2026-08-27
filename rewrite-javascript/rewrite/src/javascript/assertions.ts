@@ -34,6 +34,19 @@ import {Marker, replaceMarkerByKind} from "../markers";
  */
 export const sourceFileCache: Map<string, ts.SourceFile> = new Map();
 
+// Pooled so a spec reuses the program the previous spec left behind; see `JavaScriptParser.parse`.
+const parserPool: Map<string, JavaScriptParser> = new Map();
+
+function pooledParser(relativeTo?: string): JavaScriptParser {
+    const key = relativeTo ?? "";
+    let parser = parserPool.get(key);
+    if (!parser) {
+        parser = new JavaScriptParser({sourceFileCache, relativeTo});
+        parserPool.set(key, parser);
+    }
+    return parser;
+}
+
 // Automatically enable sourceFileCache for template parsing in tests
 setTemplateSourceFileCache(sourceFileCache);
 
@@ -211,7 +224,7 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
 
                 yield {
                     ...spec,
-                    parser: () => new JavaScriptParser({sourceFileCache, relativeTo}),
+                    parser: () => pooledParser(relativeTo),
                     // Add style marker before recipe runs if available
                     // Compose with existing beforeRecipe if present
                     beforeRecipe: styleMarker ? (sf: JS.CompilationUnit) => {
@@ -249,7 +262,7 @@ export function javascript(before: string | null, after?: AfterRecipeText): Sour
         before: before,
         after: dedentAfter(after),
         ext: 'js',
-        parser: ctx => new JavaScriptParser({sourceFileCache})
+        parser: ctx => pooledParser()
     };
 }
 
@@ -259,7 +272,7 @@ export function typescript(before: string | null, after?: AfterRecipeText): Sour
         before: before,
         after: dedentAfter(after),
         ext: 'ts',
-        parser: () => new JavaScriptParser({sourceFileCache})
+        parser: () => pooledParser()
     };
 }
 
@@ -269,7 +282,7 @@ export function tsx(before: string | null, after?: AfterRecipeText): SourceSpec<
         before: before,
         after: dedentAfter(after),
         ext: 'tsx',
-        parser: () => new JavaScriptParser({sourceFileCache})
+        parser: () => pooledParser()
     };
 }
 
@@ -279,6 +292,6 @@ export function jsx(before: string | null, after?: AfterRecipeText): SourceSpec<
         before: before,
         after: dedentAfter(after),
         ext: 'jsx',
-        parser: () => new JavaScriptParser({sourceFileCache})
+        parser: () => pooledParser()
     };
 }

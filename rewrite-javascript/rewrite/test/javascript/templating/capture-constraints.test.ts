@@ -14,16 +14,12 @@
  * limitations under the License.
  */
 import {Cursor} from "../../../src";
-import {and, capture, JavaScriptParser, not, or, pattern} from "../../../src/javascript";
+import {and, capture, JavaScriptParser, not, or, pattern, sourceFileCache} from "../../../src/javascript";
 import {isBinary, J} from "../../../src/java";
 
 describe('Capture Constraints', () => {
-    let parser: JavaScriptParser;
+    const parser = new JavaScriptParser({sourceFileCache});
     const parseCache = new Map<string, J>();
-
-    beforeEach(() => {
-        parser = new JavaScriptParser();
-    });
 
     async function parseExpression(code: string): Promise<J> {
         // Check cache first

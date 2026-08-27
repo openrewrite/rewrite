@@ -82,6 +82,21 @@ let templateSourceFileCache: Map<string, ts.SourceFile> | undefined;
  */
 export function setTemplateSourceFileCache(cache?: Map<string, ts.SourceFile>): void {
     templateSourceFileCache = cache;
+    templateParsers.clear();
+}
+
+// Every template parses under `template.tsx`, so one parser per workspace carries its program
+// from one compile to the next; see `JavaScriptParser.parse`.
+const templateParsers: Map<string, JavaScriptParser> = new Map();
+
+function templateParser(workspaceDir?: string): JavaScriptParser {
+    const key = workspaceDir ?? "";
+    let parser = templateParsers.get(key);
+    if (!parser) {
+        parser = new JavaScriptParser({relativeTo: workspaceDir, sourceFileCache: templateSourceFileCache});
+        templateParsers.set(key, parser);
+    }
+    return parser;
 }
 
 /**
@@ -147,10 +162,7 @@ class TemplateCache {
 
         // Parse and cache (workspace only needed during parsing)
         // Use templateSourceFileCache if configured for ~3.2x speedup on dependency file parsing
-        const parser = new JavaScriptParser({
-            relativeTo: workspaceDir,
-            sourceFileCache: templateSourceFileCache
-        });
+        const parser = templateParser(workspaceDir);
         const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.tsx'});
         cu = (await parseGenerator.next()).value as JS.CompilationUnit;
 

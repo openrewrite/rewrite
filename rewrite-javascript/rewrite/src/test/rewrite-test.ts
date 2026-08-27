@@ -20,7 +20,6 @@ import {Parser} from "../parser";
 import {TreePrinters} from "../print";
 import {SourceFile} from "../tree";
 import {Result, scheduleRun} from "../run";
-import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {mapAsync, trimIndent} from "../util";
 import {ParseErrorKind} from "../parse-error";
 import {MarkersKind, ParseExceptionResult} from "../markers";
@@ -230,11 +229,13 @@ export class RecipeSpec {
      * Parse the whole group together so the sources can reference once another.
      */
     private async parse(specs: SourceSpec<any>[]): Promise<[SourceSpec<any>, SourceFile][]> {
-        let snowflake = SnowflakeId();
+        // The path is a function of position, so a test parses under the same path on every run,
+        // which is what lets a parser pooled across specs reuse its program.
+        let unnamed = 0;
         const before: [SourceSpec<any>, { text: string, sourcePath: string }][] = [];
         for (const spec of specs) {
             if (spec.before) {
-                const sourcePath = spec.path || `${snowflake.generate()}.${spec.ext}`;
+                const sourcePath = spec.path || `source-${unnamed++}.${spec.ext}`;
                 before.push([spec, {text: dedent(spec.before), sourcePath: sourcePath}]);
             }
         }
