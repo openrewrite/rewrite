@@ -95,6 +95,21 @@ describe('templates that declare module bindings', () => {
         );
     });
 
+    test('a binding called on its own is a reference to it, not a name it gives something', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`merge(${arg}, {})`.configure({
+            bindings: {merge: {module: 'sap/base/util/merge', member: 'default'}}
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `const merge = 1;\napplyTheme('dark');`,
+                `import merge_1 from 'sap/base/util/merge';\n\nconst merge = 1;\nmerge_1('dark', {});`
+            )
+        );
+    });
+
     test('a rule that does not fire leaves the file\'s imports alone', async () => {
         const arg = capture('arg');
         spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({

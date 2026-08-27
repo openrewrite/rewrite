@@ -79,13 +79,21 @@ class RenameBindingsVisitor extends JavaScriptVisitor<undefined> {
     }
 }
 
-/** An identifier in its parent's `name` slot is being named — a property, a method, a declaration. */
+/** Whether the parent is naming this identifier — as a property, a method, a declaration — rather than referencing it. */
 function namesItsParent(cursor: Cursor, identifier: J.Identifier): boolean {
     let c: Cursor | undefined = cursor.parent;
     while (c && isPadding(c.value)) {
         c = c.parent;
     }
-    const name = (c?.value as { name?: unknown } | undefined)?.name;
+    const parent = c?.value as { kind?: string; name?: unknown; select?: unknown } | undefined;
+
+    // A call names a member of whatever it selects from. With nothing selected there is no member,
+    // and its `name` is a reference to the function being called.
+    if (parent?.kind === J.Kind.MethodInvocation && !parent.select) {
+        return false;
+    }
+
+    const name = parent?.name;
     return name === identifier || (name as { element?: unknown } | undefined)?.element === identifier;
 }
 
