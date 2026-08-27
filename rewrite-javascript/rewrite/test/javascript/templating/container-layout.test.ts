@@ -45,4 +45,8 @@ describe('a substituted container keeps the line breaks the source wrote', () =>
                     2
                 ];
             `)));
+
+    test('an argument carrying a trailing comment', () => spec.rewriteRun(
+        //language=javascript
+        javascript(`Array(1 /* one */, 2 /* two */,);`, `[1 /* one */, 2 /* two */,];`)));
 });
