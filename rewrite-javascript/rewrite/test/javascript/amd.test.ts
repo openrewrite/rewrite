@@ -1,7 +1,9 @@
 import {JavaScriptParser} from "../../src/javascript";
 import {J} from "../../src/java";
 import {JS} from "../../src/javascript";
-import {amdBlockOf, dependencyNames, parameterNames} from "../../src/javascript/amd";
+import {amdBlockOf, dependencyNames, parameterNames, withDependency, withoutDependencyAt} from "../../src/javascript/amd";
+import {fromVisitor, RecipeSpec} from "../../src/test";
+import {javascript, JavaScriptVisitor} from "../../src/javascript";
 
 async function firstCall(source: string): Promise<J.MethodInvocation> {
     const parser = new JavaScriptParser();
@@ -58,5 +60,76 @@ describe("amdBlockOf", () => {
     test("an empty dependency array parses as no dependencies, not one J.Empty", async () => {
         const call = await firstCall(`define([], function () {});`);
         expect(dependencyNames(amdBlockOf(call)!)).toEqual([]);
+    });
+});
+
+function addDependency(module: string, binding: string) {
+    return new class extends JavaScriptVisitor<any> {
+        override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+            const block = amdBlockOf(m);
+            return block === undefined ? super.visitMethodInvocation(m, p) :
+                withDependency(m, block, module, binding);
+        }
+    };
+}
+
+describe("withDependency", () => {
+    test("a one-per-line block keeps one per line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([\n    "a/B"\n], function (\n    B\n) {});`,
+            `sap.ui.define([\n    "a/B",\n    "c/D"\n], function (\n    B,\n    D\n) {});`
+        ));
+    });
+
+    test("an existing trailing comma moves to the entry that ends up last", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B",], function (B,) {});`,
+            `sap.ui.define(["a/B", "c/D",], function (B, D,) {});`
+        ));
+    });
+
+    test("a block with no dependency array gains one before the factory", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(function () {});`,
+            `sap.ui.define(["c/D"], function (D) {});`
+        ));
+    });
+});
+
+describe("withoutDependencyAt", () => {
+    test("removing the last entry hands the closing bracket's whitespace to its predecessor", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const block = amdBlockOf(m);
+                return block === undefined ? super.visitMethodInvocation(m, p) :
+                    withoutDependencyAt(m, block, 1);
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([\n    "a/B",\n    "c/D"\n], function (\n    B,\n    D\n) {});`,
+            `sap.ui.define([\n    "a/B"\n], function (\n    B\n) {});`
+        ));
+    });
+
+    test("removing the first entry hands its position to the one that takes its place", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const block = amdBlockOf(m);
+                return block === undefined ? super.visitMethodInvocation(m, p) :
+                    withoutDependencyAt(m, block, 0);
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B", "c/D"], function (B, D) {});`,
+            `sap.ui.define(["c/D"], function (D) {});`
+        ));
     });
 });
