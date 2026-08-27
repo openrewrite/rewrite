@@ -15,6 +15,8 @@ import {RemoveAmdDependency} from "./remove-amd-dependency";
  *               - 'default': Removes the default import from the module if unused,
  *                 regardless of its local name (e.g., `import React from 'react'`)
  *               - '*': Removes the namespace import if unused (e.g., `import * as fs from 'fs'`)
+ *               Applies to the ESM lane only; an AMD dependency binds a whole module, so `member`
+ *               is ignored there.
  *
  * @example
  * // Remove a specific named import if unused

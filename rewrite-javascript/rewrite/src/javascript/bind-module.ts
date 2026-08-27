@@ -273,9 +273,9 @@ async function bindAmd(
         return reserved;
     }
 
-    // A parameter can only be appended at the end, so a block declaring more dependencies than
-    // the factory takes parameters for would bind the new module against the wrong one.
-    if (bindings.length < elementsOf(amd.block).length) {
+    // A parameter can only be appended at the end, so a block whose dependency and parameter
+    // counts already disagree would bind the new module against the wrong parameter either way.
+    if (bindings.length !== elementsOf(amd.block).length) {
         return undefined;
     }
 
@@ -337,24 +337,24 @@ async function declaredNames(block: AmdBlock, visitor: JavaScriptVisitor<any>): 
     return names;
 }
 
-function bodyOf(block: AmdBlock): J.Block | undefined {
-    const body = block.factory.kind === J.Kind.MethodDeclaration ?
+/** The factory's body: a `J.Block` for `function(){}` and most arrows, or the bare expression for `() => expr`. */
+export function bodyOf(block: AmdBlock): J | undefined {
+    return block.factory.kind === J.Kind.MethodDeclaration ?
         (block.factory as J.MethodDeclaration).body :
         (block.factory as J.Lambda).body;
-    return body !== undefined && body.kind === J.Kind.Block ? body as J.Block : undefined;
 }
 
 /**
- * Whether the factory body references `name`. The AMD binding is a plain parameter, so a name
- * match is the whole test — unlike the ESM lane's `onlyIfReferenced`, no attribution is involved.
- * The pool is wider than `declaredNames`'s: it matches any identifier of that name, including a
- * member name in a field access, so a name `deconflict` treats as free can still satisfy this —
- * a stray dependency, not broken code.
+ * Whether the factory body references `name`. The pool is wider than `declaredNames`'s: it
+ * matches any identifier of that name, including a member in a field access, since a stray
+ * dependency is fine where a shadowed one is not. `missingBodyAnswer` covers a body-less
+ * factory: `false` for an addition (nothing to conflict with), `true` for a removal (nothing
+ * to prove the binding unused).
  */
-async function references(block: AmdBlock, name: string): Promise<boolean> {
+export async function references(block: AmdBlock, name: string, missingBodyAnswer: boolean): Promise<boolean> {
     const body = bodyOf(block);
     if (body === undefined) {
-        return false;
+        return missingBodyAnswer;
     }
     let found = false;
     const finder = new class extends JavaScriptVisitor<ExecutionContext> {
@@ -405,7 +405,7 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
             return visited;
         }
         this.applied = true;
-        if (!(await references(block, this.binding))) {
+        if (!(await references(block, this.binding, false))) {
             // Nothing referenced the binding, so the caller asked and then did not use the answer.
             return visited;
         }

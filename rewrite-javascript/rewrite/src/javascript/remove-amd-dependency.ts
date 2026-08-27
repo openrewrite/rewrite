@@ -15,7 +15,8 @@
  */
 import {J} from "../java";
 import {JavaScriptVisitor} from "./visitor";
-import {AmdBlock, amdBlockOf, DEFAULT_AMD_CALLEES, dependencyNames, parameterNames, withoutDependencyAt} from "./amd";
+import {amdBlockOf, DEFAULT_AMD_CALLEES, dependencyNames, parameterNames, withoutDependencyAt} from "./amd";
+import {references} from "./bind-module";
 
 /**
  * The AMD counterpart to `RemoveImport`: drops a dependency the block's body no longer names,
@@ -38,29 +39,9 @@ export class RemoveAmdDependency<P> extends JavaScriptVisitor<P> {
             return visited;
         }
         const binding = parameterNames(block)[index];
-        if (binding === undefined || await this.references(block, binding, p)) {
+        if (binding === undefined || await references(block, binding, true)) {
             return visited;
         }
         return withoutDependencyAt(visited, block, index);
-    }
-
-    private async references(block: AmdBlock, binding: string, p: P): Promise<boolean> {
-        const body = block.factory.kind === J.Kind.MethodDeclaration ?
-            (block.factory as J.MethodDeclaration).body :
-            (block.factory as J.Lambda).body;
-        if (body === undefined) {
-            return true;
-        }
-        let found = false;
-        const search = new class extends JavaScriptVisitor<P> {
-            override async visitIdentifier(identifier: J.Identifier, c: P): Promise<J | undefined> {
-                if (identifier.simpleName === binding) {
-                    found = true;
-                }
-                return identifier;
-            }
-        };
-        await search.visit(body, p);
-        return found;
     }
 }

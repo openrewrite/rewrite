@@ -215,6 +215,16 @@ describe("bindModule", () => {
         expect(bound.name).toBeUndefined();
     });
 
+    test("AMD refuses where a surplus parameter would pair with the new dependency", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/m/Button"], function (Button, Extra) { target(); });`
+        ));
+        expect(bound.name).toBeUndefined();
+    });
+
     test("a binding nothing goes on to reference is not written", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
@@ -416,6 +426,17 @@ describe("maybeRemoveImport on an AMD block", () => {
         spec.recipe = fromVisitor(dropModule("a/Side"));
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/Side"], function () {});`
+        ));
+    });
+});
+
+describe("maybeRemoveImport on an ESM file", () => {
+    test("removes the import; the AMD lane it also queues finds no block to act on", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(dropModule("sap/m/Button"));
+        await spec.rewriteRun(typescript(
+            `import Button from "sap/m/Button";\n\nconsole.log(1);`,
+            `console.log(1);`
         ));
     });
 });

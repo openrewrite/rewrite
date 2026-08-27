@@ -422,9 +422,10 @@ function parameterDeclaration(name: string): J.VariableDeclarations {
 
 /**
  * Adds a dependency and its binding, keeping the array and the parameter list index-aligned.
- * Refuses (returns `undefined`) when the factory already declares fewer parameters than there
- * are dependencies: padding the gap would invent a binding for a dependency an author left
- * unbound on purpose, which silently corrupts the pairing this module exists to protect.
+ * Refuses (returns `undefined`) unless the two are already the same length: fewer parameters
+ * than dependencies would invent a binding for one an author left unbound on purpose, and more
+ * would pair the new dependency with an existing surplus parameter instead of a fresh one —
+ * either way corrupting the pairing this module exists to protect.
  */
 export function withDependency(
     call: J.MethodInvocation,
@@ -432,7 +433,7 @@ export function withDependency(
     module: string,
     binding: string
 ): J.MethodInvocation | undefined {
-    if (parametersOf(block).length < elementsOf(block).length) {
+    if (parametersOf(block).length !== elementsOf(block).length) {
         return undefined;
     }
     const dependencies = withElements(

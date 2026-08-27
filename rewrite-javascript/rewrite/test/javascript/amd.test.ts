@@ -134,6 +134,12 @@ describe("withDependency", () => {
         expect(withDependency(call, block, "c/D", "D")).toBeUndefined();
     });
 
+    test("refuses when the factory already binds more parameters than there are dependencies", async () => {
+        const call = await firstCall(`define(["a/B"], function (B, Extra) {});`);
+        const block = amdBlockOf(call)!;
+        expect(withDependency(call, block, "c/D", "D")).toBeUndefined();
+    });
+
     test("a trailing comment stays on the entry it followed instead of relabeling the appended one", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
