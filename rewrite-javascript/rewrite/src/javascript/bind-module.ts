@@ -484,11 +484,9 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
             // Nothing referenced the binding, so the caller asked and then did not use the answer.
             return visited;
         }
-        // withDependency re-checks the parameter/dependency count against the tree as it stands
-        // now: another edit in the same visit that drops or adds a factory parameter can reopen
-        // a mismatch bindAmd's own check already cleared. The caller has already emitted a
-        // reference to `this.binding`, so — as for the missing-block case above — a mismatch
-        // here is an error, not a silently dropped dependency.
+        // Another edit in the same visit can drop or add a factory parameter, reopening a count
+        // mismatch bindAmd's check already cleared — an error here for the same reason a missing
+        // block is one.
         const dependency = withDependency(visited, block, this.module, this.binding);
         if (dependency === undefined) {
             throw new Error(
@@ -500,11 +498,10 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
 }
 
 /**
- * Drops AMD bindings a rewrite left unreferenced. A binding already unused before the rewrite
- * stays: it is loaded for its side effects, so removing it would change what the module loads,
- * not just what gets called. This can't defer onto `visitor.afterVisit` like the rest of this
- * module's edits — it needs the tree as it stood before the rewrite. Blocks are matched by the
- * call's id, so one a rewrite rebuilds rather than edits is silently left alone.
+ * Drops AMD bindings a rewrite left unreferenced. One already unused beforehand stays: it is
+ * loaded for its side effects, so dropping it changes what the module loads. Needing the tree as
+ * it stood before the rewrite is why this takes both and does not defer. Blocks are matched by
+ * the call's id, so one a rewrite rebuilds rather than edits is left alone.
  */
 export async function removeNewlyUnusedAmdBindings(
     before: JS.CompilationUnit,
