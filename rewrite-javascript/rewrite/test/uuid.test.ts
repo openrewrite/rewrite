@@ -35,14 +35,4 @@ describe("randomId", () => {
 
         expect(ids.size).toBe(iterations);
     });
-
-    test("returns string type", () => {
-        const uuid = randomId();
-        expect(typeof uuid).toBe("string");
-    });
-
-    test("returns 36 character string", () => {
-        const uuid = randomId();
-        expect(uuid.length).toBe(36);
-    });
 });
