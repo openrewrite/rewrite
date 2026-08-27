@@ -264,7 +264,8 @@ export class Template {
         const cacheKey = generateCacheKey(
             this.templateParts,
             parametersKey,
-            contextStatements,
+            // As in Pattern.getAstPattern: a parameter's type reaches the parse as a declaration
+            [...contextStatements, ...TemplateEngine.parameterPreamble(this.parameters)],
             this.options.dependencies || {}
         );
 

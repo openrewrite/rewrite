@@ -25,8 +25,8 @@ import {
     pattern,
     Template,
     template,
-    typescript
-} from "../../../src/javascript";
+    typescript,
+    sourceFileCache} from "../../../src/javascript";
 
 // Template ASTs are cached, so without fresh ids per application two applications share ids (customer-requests#3057)
 
@@ -94,7 +94,7 @@ function matchAndReplace(pat: Pattern, tmpl: Template) {
 }
 
 async function parse(src: string, sourcePath = 'a.ts'): Promise<JS.CompilationUnit> {
-    const parser = new JavaScriptParser({});
+    const parser = new JavaScriptParser({sourceFileCache});
     return (await parser.parse({text: src, sourcePath}).next()).value as JS.CompilationUnit;
 }
 

@@ -29,7 +29,7 @@
 
 import {fromVisitor, RecipeSpec, SourceSpec} from "../../../src/test";
 import {MinimumViableSpacingVisitor} from "../../../src/javascript/format";
-import {JavaScriptParser, JavaScriptVisitor, JS, typescript} from "../../../src/javascript";
+import {JavaScriptParser, JavaScriptVisitor, JS, typescript, sourceFileCache} from "../../../src/javascript";
 import {create as produce} from "mutative";
 import {emptyMarkers, mapAsync, ParserInput, randomId, SourceFile} from "../../../src";
 import {emptySpace, J} from "../../../src/java";
@@ -197,7 +197,7 @@ describe('MinimumViableSpacingVisitor', () => {
             }
         }
 
-        const parser = new JavaScriptParser({});
+        const parser = new JavaScriptParser({sourceFileCache});
         for await (const cu of parser.parse({text: `try { } catch { }`, sourcePath: "a.ts"})) {
             const withModifier = (await new AddModifierVisitor().visit<JS.CompilationUnit>(cu, undefined))!;
             const formatted = await new MinimumViableSpacingVisitor().visit(withModifier, undefined);
