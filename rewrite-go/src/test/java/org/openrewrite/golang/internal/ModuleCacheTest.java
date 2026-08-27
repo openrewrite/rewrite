@@ -22,9 +22,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ModuleCacheTest {
 
     @Test
-    void onlyUppercaseInAModulePathIsEscaped() {
+    void uppercaseIsEscapedInBothHalvesOfACoordinate() {
         // A miss here is silent: the cached module reads as absent and gets downloaded again.
-        assertThat(ModuleCache.escapePath("github.com/BurntSushi/toml")).isEqualTo("github.com/!burnt!sushi/toml");
-        assertThat(ModuleCache.escapePath("github.com/gin-gonic/gin")).isEqualTo("github.com/gin-gonic/gin");
+        assertThat(ModuleCache.directoryName("github.com/BurntSushi/toml", "v1.0.0-RC1"))
+          .isEqualTo("github.com/!burnt!sushi/toml@v1.0.0-!r!c1");
+
+        assertThat(ModuleCache.directoryName("github.com/gin-gonic/gin", "v1.10.0"))
+          .isEqualTo("github.com/gin-gonic/gin@v1.10.0");
     }
 }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.golang.internal;
 
+import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.golang.marker.GoResolutionResult.Require;
 
@@ -39,23 +40,21 @@ import java.util.stream.Stream;
  * The Go RPC server's {@code ProjectImporter} type-checks a third-party import against those
  * sources, so real types for a {@code require} start with getting the module into this cache.
  */
-public final class ModuleCache {
+@UtilityClass
+public class ModuleCache {
 
     /**
      * go.mod contents a download has already been attempted for, so a run whose modules are
      * unpublished or whose proxy is unreachable pays that cost once.
      */
-    private static final Set<String> attempted = ConcurrentHashMap.newKeySet();
-
-    private ModuleCache() {
-    }
+    private final Set<String> attempted = ConcurrentHashMap.newKeySet();
 
     /**
      * Mirrors {@code parser.GoModCache()} on the Go side — {@code $GOMODCACHE}, else the first
      * {@code $GOPATH} entry's {@code pkg/mod}, else {@code ~/go/pkg/mod} — so both ends of the
      * RPC agree on which directory holds a module's sources.
      */
-    public static Path location() {
+    public Path location() {
         String goModCache = System.getenv("GOMODCACHE");
         if (goModCache != null && !goModCache.trim().isEmpty()) {
             return Paths.get(goModCache.trim());
@@ -73,8 +72,8 @@ public final class ModuleCache {
     /**
      * Whether {@code modulePath@version} has its sources extracted in the cache.
      */
-    public static boolean contains(String modulePath, String version) {
-        return Files.isDirectory(location().resolve(escapePath(modulePath) + "@" + version));
+    public boolean contains(String modulePath, String version) {
+        return Files.isDirectory(location().resolve(directoryName(modulePath, version)));
     }
 
     /**
@@ -82,7 +81,7 @@ public final class ModuleCache {
      * satisfies needs neither network nor toolchain. A missing {@code go}, or a download that
      * fails, leaves the module absent and the parse that follows attributes it to an empty stub.
      */
-    public static void download(String goModContent, Collection<Require> requires) {
+    public void download(String goModContent, Collection<Require> requires) {
         List<String> missing = new ArrayList<>();
         for (Require require : requires) {
             if (!contains(require.getModulePath(), require.getVersion())) {
@@ -118,13 +117,18 @@ public final class ModuleCache {
     }
 
     /**
-     * Go stores {@code github.com/BurntSushi/toml} under {@code github.com/!burnt!sushi/toml} so
-     * that module paths differing only in case stay distinct on a case-insensitive filesystem.
+     * Go stores {@code github.com/BurntSushi/toml@v1.0.0-RC1} under
+     * {@code github.com/!burnt!sushi/toml@v1.0.0-!r!c1} so that coordinates differing only in case
+     * stay distinct on a case-insensitive filesystem. Path and version take the same escaping.
      */
-    static String escapePath(String modulePath) {
-        StringBuilder escaped = new StringBuilder(modulePath.length());
-        for (int i = 0; i < modulePath.length(); i++) {
-            char c = modulePath.charAt(i);
+    String directoryName(String modulePath, String version) {
+        return escape(modulePath) + "@" + escape(version);
+    }
+
+    private String escape(String pathOrVersion) {
+        StringBuilder escaped = new StringBuilder(pathOrVersion.length());
+        for (int i = 0; i < pathOrVersion.length(); i++) {
+            char c = pathOrVersion.charAt(i);
             if (c >= 'A' && c <= 'Z') {
                 escaped.append('!').append((char) (c - 'A' + 'a'));
             } else {
@@ -134,7 +138,7 @@ public final class ModuleCache {
         return escaped.toString();
     }
 
-    private static void deleteRecursively(@Nullable Path dir) {
+    private void deleteRecursively(@Nullable Path dir) {
         if (dir == null || !Files.exists(dir)) {
             return;
         }
