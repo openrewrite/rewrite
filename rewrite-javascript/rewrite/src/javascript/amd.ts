@@ -13,9 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {emptyMarkers} from "../markers";
+import {emptyMarkers, findMarker} from "../markers";
 import {randomId} from "../uuid";
-import {emptyContainer, emptySpace, Expression, isIdentifier, isLiteral, J} from "../java";
+import {
+    emptyContainer,
+    emptySpace,
+    Expression,
+    isIdentifier,
+    isLiteral,
+    J,
+    rightPadded,
+    space,
+    spaceContainsNewline,
+    Statement,
+    TrailingComma
+} from "../java";
 import {JS} from "./tree";
 
 /** RequireJS and Dojo write `define`; UI5 namespaces it as `sap.ui.define`. */
@@ -121,7 +133,47 @@ export function elementsOf(block: AmdBlock): J.RightPadded<Expression>[] {
 export function parametersOf(block: AmdBlock): J.RightPadded<J>[] {
     return present(block.factory.kind === J.Kind.MethodDeclaration ?
         (block.factory as J.MethodDeclaration).parameters.elements :
-        (block.factory as J.Lambda).parameters.parameters);
+        normalizeArrowParameters((block.factory as J.Lambda).parameters.parameters));
+}
+
+/**
+ * An arrow function's parameter list isn't built the way every other comma-separated list in
+ * the tree is: a trailing comma is an extra `J.Empty` entry rather than a `TrailingComma`
+ * marker, and a parameter's own trailing whitespace sits on the identifier's declaration
+ * rather than on the list entry that holds it. Folding both into the shape the rest of this
+ * module already handles lets append/remove treat every kind of factory alike.
+ */
+function normalizeArrowParameters(raw: readonly J.RightPadded<J>[]): J.RightPadded<J>[] {
+    if (raw.length === 1 && raw[0].element.kind === J.Kind.Empty) {
+        return [...raw];
+    }
+    const trailingEmpty = raw.length > 1 && raw[raw.length - 1].element.kind === J.Kind.Empty ?
+        raw[raw.length - 1] : undefined;
+    const real = (trailingEmpty === undefined ? raw : raw.slice(0, -1)).map(foldDeclarationTrailingSpace);
+    if (trailingEmpty === undefined) {
+        return real;
+    }
+    const last = real[real.length - 1];
+    const marker: TrailingComma = {kind: J.Markers.TrailingComma, id: randomId(), suffix: trailingEmpty.after};
+    return [...real.slice(0, -1), {...last, markers: {...last.markers, markers: [...last.markers.markers, marker]}}];
+}
+
+/** Moves a VariableDeclarations parameter's trailing whitespace from the identifier's own declaration up to the list entry, when the entry doesn't already carry any. */
+function foldDeclarationTrailingSpace(entry: J.RightPadded<J>): J.RightPadded<J> {
+    if (entry.element.kind !== J.Kind.VariableDeclarations ||
+        entry.after.whitespace !== "" || entry.after.comments.length > 0) {
+        return entry;
+    }
+    const declaration = entry.element as J.VariableDeclarations;
+    const variable = declaration.variables[0];
+    if (variable === undefined) {
+        return entry;
+    }
+    const folded: J.VariableDeclarations = {
+        ...declaration,
+        variables: [{...variable, after: emptySpace}, ...declaration.variables.slice(1)]
+    };
+    return {...entry, element: folded, after: variable.after};
 }
 
 export function dependencyNames(block: AmdBlock): string[] {
@@ -142,9 +194,6 @@ export function identifierOf(parameter: J): J.Identifier | undefined {
     }
     return isIdentifier(parameter) ? parameter : undefined;
 }
-
-import {findMarker, Markers} from "../markers";
-import {rightPadded, space, spaceContainsNewline, Statement, TrailingComma} from "../java";
 
 /**
  * Where an entry's leading whitespace sits. A dependency string carries it directly, while
@@ -224,8 +273,22 @@ function appendEntry<T extends J>(
         return [rightPadded<T>(element, emptySpace)];
     }
     const positioned = slot.withPrefix(element, separator(entries, slot));
-    const moved = moveTrailingComma({...last, after: emptySpace}, rightPadded<T>(positioned, last.after));
+    const trailing = splitTrailingComments(last.after);
+    const moved = moveTrailingComma({...last, after: trailing.comments}, rightPadded<T>(positioned, trailing.whitespace));
     return [...entries.slice(0, -1), moved.from, moved.to];
+}
+
+/**
+ * Splits an entry's trailing padding when it stops being last. Plain whitespace only ever
+ * positioned the closing delimiter, so it travels to whichever entry becomes the new last. A
+ * comment documents the entry it follows and keeps its own trailing newline, so it stays put
+ * whole — a line comment with nothing left after it would otherwise swallow the comma the
+ * printer inserts right after this padding.
+ */
+function splitTrailingComments(after: J.Space): {comments: J.Space, whitespace: J.Space} {
+    return after.comments.length === 0 ?
+        {comments: {...after, whitespace: ""}, whitespace: space(after.whitespace)} :
+        {comments: after, whitespace: emptySpace};
 }
 
 /**
@@ -238,6 +301,9 @@ function removeEntry<T extends J>(
     index: number,
     slot: Slot<T>
 ): J.RightPadded<T>[] {
+    if (index < 0 || index >= entries.length) {
+        return [...entries];
+    }
     const remaining = [...entries];
     const [removed] = remaining.splice(index, 1);
     if (remaining.length === 0) {
@@ -277,7 +343,26 @@ function withParameters(
         return {...method, parameters: {...method.parameters, elements: elements as J.RightPadded<Statement>[]}};
     }
     const lambda = factory as J.Lambda;
-    return {...lambda, parameters: {...lambda.parameters, parameters: elements}};
+    // Unparenthesized arrow parameters are only valid JavaScript for exactly one parameter.
+    if (lambda.parameters.parenthesized || parameters.length === 1) {
+        return {...lambda, parameters: {...lambda.parameters, parameters: elements}};
+    }
+    return parenthesize(lambda, elements);
+}
+
+/**
+ * A bare arrow parameter has no closing delimiter of its own — the space before `=>` sits on
+ * the parameter itself. Wrapping it in parens turns that into the space before the new `)`,
+ * so it has to move to `arrow` instead, where it will actually print before `=>` again.
+ */
+function parenthesize(lambda: J.Lambda, elements: J.RightPadded<J>[]): J.Lambda {
+    const last = elements[elements.length - 1];
+    const arrowSpace = last.after.whitespace === "" ? lambda.arrow : last.after;
+    return {
+        ...lambda,
+        parameters: {...lambda.parameters, parenthesized: true, parameters: [...elements.slice(0, -1), {...last, after: emptySpace}]},
+        arrow: arrowSpace
+    };
 }
 
 function identifier(name: string): J.Identifier {
@@ -335,12 +420,21 @@ function parameterDeclaration(name: string): J.VariableDeclarations {
     };
 }
 
+/**
+ * Adds a dependency and its binding, keeping the array and the parameter list index-aligned.
+ * Refuses (returns `undefined`) when the factory already declares fewer parameters than there
+ * are dependencies: padding the gap would invent a binding for a dependency an author left
+ * unbound on purpose, which silently corrupts the pairing this module exists to protect.
+ */
 export function withDependency(
     call: J.MethodInvocation,
     block: AmdBlock,
     module: string,
     binding: string
-): J.MethodInvocation {
+): J.MethodInvocation | undefined {
+    if (parametersOf(block).length < elementsOf(block).length) {
+        return undefined;
+    }
     const dependencies = withElements(
         block.dependencies,
         appendEntry(elementsOf(block), dependencyLiteral(module, quoteOf(block)), dependencySlot));

@@ -68,7 +68,7 @@ function addDependency(module: string, binding: string) {
         override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
             const block = amdBlockOf(m);
             return block === undefined ? super.visitMethodInvocation(m, p) :
-                withDependency(m, block, module, binding);
+                withDependency(m, block, module, binding) ?? m;
         }
     };
 }
@@ -98,6 +98,48 @@ describe("withDependency", () => {
         await spec.rewriteRun(javascript(
             `sap.ui.define(function () {});`,
             `sap.ui.define(["c/D"], function (D) {});`
+        ));
+    });
+
+    test("an arrow factory keeps one per line same as a function factory", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([\n    "a/B"\n], (\n    B\n) => {});`,
+            `sap.ui.define([\n    "a/B",\n    "c/D"\n], (\n    B,\n    D\n) => {});`
+        ));
+    });
+
+    test("an arrow factory's trailing comma moves to the entry that ends up last", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B",], (B,) => {});`,
+            `sap.ui.define(["a/B", "c/D",], (B, D,) => {});`
+        ));
+    });
+
+    test("an unparenthesized single-parameter arrow gains parens as it grows past one", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], B => {});`,
+            `sap.ui.define(["a/B", "c/D"], (B, D) => {});`
+        ));
+    });
+
+    test("refuses when the factory already binds fewer parameters than there are dependencies", async () => {
+        const call = await firstCall(`define(["a/B", "jquery"], function (B) {});`);
+        const block = amdBlockOf(call)!;
+        expect(withDependency(call, block, "c/D", "D")).toBeUndefined();
+    });
+
+    test("a trailing comment stays on the entry it followed instead of relabeling the appended one", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([\n    "a/B" // note\n], function (\n    B\n) {});`,
+            `sap.ui.define([\n    "a/B" // note\n,\n    "c/D"], function (\n    B,\n    D\n) {});`
         ));
     });
 });
@@ -131,5 +173,26 @@ describe("withoutDependencyAt", () => {
             `sap.ui.define(["a/B", "c/D"], function (B, D) {});`,
             `sap.ui.define(["c/D"], function (D) {});`
         ));
+    });
+
+    test("removing the only entry leaves an empty array, not a hole", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const block = amdBlockOf(m);
+                return block === undefined ? super.visitMethodInvocation(m, p) :
+                    withoutDependencyAt(m, block, 0);
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], function (B) {});`,
+            `sap.ui.define([], function () {});`
+        ));
+    });
+
+    test("an out-of-range index leaves the block unchanged instead of throwing", async () => {
+        const call = await firstCall(`define(["a/B", "c/D"], function (B, D) {});`);
+        const block = amdBlockOf(call)!;
+        expect(dependencyNames(amdBlockOf(withoutDependencyAt(call, block, 2))!)).toEqual(["a/B", "c/D"]);
     });
 });
