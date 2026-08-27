@@ -30,8 +30,8 @@ import {
     prettierFormat,
     prettierStyle,
     PrettierStyle,
-    typescript
-} from "../../../src/javascript";
+    typescript,
+    sourceFileCache} from "../../../src/javascript";
 import {PrettierConfigLoader} from "../../../src/javascript/format/prettier-config-loader";
 import {json} from "../../../src/json";
 import {text} from "../../../src/text";
@@ -244,7 +244,7 @@ describe('AutoformatVisitor with Prettier', () => {
 
 describe('Prettier eof handling', () => {
     test('Prettier adds trailing newline via eof', async () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
 
         // Parse code without trailing newline
         const sourceFile = await parser.parseOne({
@@ -267,7 +267,7 @@ describe('Prettier eof handling', () => {
     });
 
     test('no double newline when original already has trailing newline', async () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
 
         // Parse code WITH trailing newline
         const sourceFile = await parser.parseOne({
@@ -294,7 +294,7 @@ describe('Prettier eof handling', () => {
 describe('Prettier marker reconciliation', () => {
     test('Prettier adds Semicolon marker when adding semicolon', async () => {
         // Parse code WITHOUT a semicolon
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const sourceFile = await parser.parseOne({
             sourcePath: 'test.ts',
             text: 'const x = 1'  // No semicolon
@@ -321,7 +321,7 @@ describe('Prettier marker reconciliation', () => {
 
     test('Prettier preserves Semicolon marker when present', async () => {
         // Parse code WITH a semicolon
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const sourceFile = await parser.parseOne({
             sourcePath: 'test.ts',
             text: 'const x = 1;'  // Has semicolon

@@ -201,6 +201,14 @@ describe('OrderImports', () => {
 });
 ```
 
+### Sharing a `RecipeSpec` across tests
+
+A suite that declares one `RecipeSpec` and sets `spec.recipe` inside individual tests leaks that
+recipe into the tests that follow. `test/setup.ts` resets each spec to its suite configuration
+before every test. A consumer of the published package opts in by calling
+`RecipeSpec.trackSuiteConfiguration()` from its own vitest `setupFiles`; without that call no spec
+is registered and nothing is reset.
+
 ## RPC Sender/Receiver
 
 Each language module has `rpc.ts` with a Sender (visit tree → serialize to queue) and Receiver (read queue → reconstruct tree). These must stay aligned with each other AND with the Java equivalents. Any mismatch causes deadlocks or corrupted trees.

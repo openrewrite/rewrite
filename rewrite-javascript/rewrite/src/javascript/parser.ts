@@ -332,7 +332,8 @@ export class JavaScriptParser extends Parser {
             return resolvedModules;
         };
 
-        // Create a new Program, passing the oldProgram for incremental parsing
+        // TypeScript carries the previous program's bound files forward when the root paths match,
+        // so a parser held across parses of one path costs a fraction of a freshly built one.
         const program = ts.createProgram([...inputFiles.keys()], this.compilerOptions, host, this.oldProgram);
 
         // Update the oldProgram reference

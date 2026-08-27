@@ -1,10 +1,10 @@
 import {type MockInstance} from 'vitest';
-import {capture, isExpressionStatement, JavaScriptParser, JS, pattern} from '../../../src/javascript';
+import {capture, isExpressionStatement, JavaScriptParser, JS, pattern, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
 
 describe('Pattern Debug Logging', () => {
     let consoleErrorSpy: MockInstance;
-    let parser: JavaScriptParser;
+    const parser = new JavaScriptParser({sourceFileCache});
 
     async function parseExpression(code: string): Promise<J> {
         const gen = parser.parse({text: code, sourcePath: 'test.ts'});
@@ -14,7 +14,6 @@ describe('Pattern Debug Logging', () => {
     }
 
     beforeEach(() => {
-        parser = new JavaScriptParser();
         // Spy on console.error to capture debug output
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     });
