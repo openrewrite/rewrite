@@ -3016,8 +3016,7 @@ describe('AddImport visitor', () => {
             const spec = new RecipeSpec();
             const bound: string[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-                // Each anchor asks for a different module, so the queue never answers one from
-                // another and every scope is resolved on its own.
+                // Each anchor asks for a different module, so the queue never answers one from another.
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                     if ((method.name as J.Identifier)?.simpleName === 'anchor') {
                         bound.push(maybeAddImport(this,
@@ -3040,11 +3039,19 @@ describe('AddImport visitor', () => {
                         }
 
                         const byLambda = (merge) => anchor();
+
+                        function byHoistedVar() {
+                            if (x) {
+                                var merge = 1;
+                            }
+                            anchor();
+                        }
                     `,
                     `
                         import {merge as merge_1} from 'm0';
                         import {merge as merge_2} from 'm1';
                         import {merge as merge_3} from 'm2';
+                        import {merge as merge_4} from 'm3';
 
                         function byParameter(merge) {
                             anchor();
@@ -3056,11 +3063,61 @@ describe('AddImport visitor', () => {
                         }
 
                         const byLambda = (merge) => anchor();
+
+                        function byHoistedVar() {
+                            if (x) {
+                                var merge = 1;
+                            }
+                            anchor();
+                        }
                     `
                 )
             );
 
-            expect(bound).toEqual(['merge_1', 'merge_2', 'merge_3']);
+            expect(bound).toEqual(['merge_1', 'merge_2', 'merge_3', 'merge_4']);
+        });
+
+        test('one binding serves every site, so a name any of them shadows is taken', async () => {
+            const spec = new RecipeSpec();
+            const bound: string[] = [];
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    if ((method.name as J.Identifier)?.simpleName === 'anchor') {
+                        bound.push(maybeAddImport(this,
+                            {module: 'sap/base/util/merge', member: 'merge', onlyIfReferenced: false}));
+                    }
+                    return super.visitMethodInvocation(method, p);
+                }
+            });
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function free() {
+                            anchor();
+                        }
+
+                        function shadowed(merge) {
+                            anchor();
+                        }
+                    `,
+                    `
+                        import {merge as merge_1} from 'sap/base/util/merge';
+
+                        function free() {
+                            anchor();
+                        }
+
+                        function shadowed(merge) {
+                            anchor();
+                        }
+                    `
+                )
+            );
+
+            // `free` would take plain `merge`, but the one import both sites reference has to clear
+            // the parameter too, or the reference in `shadowed` binds to it.
+            expect(bound).toEqual(['merge_1', 'merge_1']);
         });
 
         test('a request that named nothing takes the name the file already gives the module', async () => {

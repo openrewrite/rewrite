@@ -1,5 +1,6 @@
 import {JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
+import {bindingNames} from "./scope";
 import {JS, JSX} from "./tree";
 import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
@@ -268,7 +269,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     shouldRemove = !usedIdentifiers.has(name) && !usedTypes.has(name);
                 } else {
                     // Regular case: check if the import name matches the removal criteria
-                    shouldRemove = this.shouldRemoveImport(name, usedIdentifiers, usedTypes);
+                    shouldRemove = this.shouldRemoveImport(name, usedIdentifiers, usedTypes, name);
                 }
 
                 if (shouldRemove) {
@@ -325,7 +326,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         }, p);
                     }
                     // Namespace is used, we can't remove individual members from it
-                } else if (this.shouldRemoveImport(name, usedIdentifiers, usedTypes)) {
+                } else if (this.shouldRemoveImport(name, usedIdentifiers, usedTypes, name)) {
                     // If there's no default import, remove the entire import
                     if (!importClause.name) {
                         return undefined;
@@ -355,7 +356,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         }, p);
                     }
                     // Namespace is used, we can't remove individual members from it
-                } else if (this.shouldRemoveImport(aliasName, usedIdentifiers, usedTypes)) {
+                } else if (this.shouldRemoveImport(aliasName, usedIdentifiers, usedTypes, aliasName)) {
                     // If there's no default import, remove the entire import
                     if (!importClause.name) {
                         return undefined;
@@ -490,7 +491,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         return true; // Keep imports that don't match the member
                     } else {
                         // We're removing based on the import name itself
-                        return !this.shouldRemoveImport(importName, usedIdentifiers, usedTypes);
+                        return !this.shouldRemoveImport(importName, usedIdentifiers, usedTypes, importName);
                     }
                 }
                 return true; // Keep non-ImportSpecifier elements
@@ -612,14 +613,10 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         const {filtered, allRemoved} = await this.filterElementsWithPrefixPreservation(
             pattern.bindings.elements,
             (elem: J) => {
-                if (elem.kind === JS.Kind.BindingElement) {
-                    const name = this.getBindingElementName(elem as JS.BindingElement);
-                    return !this.shouldRemoveImport(name, usedIdentifiers, new Set());
-                } else if (elem.kind === J.Kind.Identifier) {
-                    const name = (elem as J.Identifier).simpleName;
-                    return !this.shouldRemoveImport(name, usedIdentifiers, new Set());
-                }
-                return true; // Keep other element types
+                const bound = this.boundByPatternElement(elem);
+                // An element whose names cannot be read is left alone.
+                return bound.length === 0 ||
+                    bound.some(b => !this.shouldRemoveImport(b.name, usedIdentifiers, new Set(), b.member));
             },
             async (elem: J, prefix: J.Space) => {
                 if (elem.kind === J.Kind.Identifier) {
@@ -687,23 +684,25 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         return undefined;
     }
 
-    private getBindingElementName(bindingElement: JS.BindingElement): string {
-        const name = bindingElement.name;
-        if (name?.kind === J.Kind.Identifier) {
-            return (name as J.Identifier).simpleName;
-        }
-        return '';
+    /** The names a pattern element binds, and for each the member of the module it reads. */
+    private boundByPatternElement(elem: J): { name: string; member?: string }[] {
+        // Shorthand, so the name it binds is the member it reads.
+        return elem.kind === J.Kind.Identifier
+            ? [{name: (elem as J.Identifier).simpleName, member: (elem as J.Identifier).simpleName}]
+            : bindingNames(elem);
     }
 
     private shouldRemoveImport(
         name: string,
         usedIdentifiers: Set<string>,
-        usedTypes: Set<string>
+        usedTypes: Set<string>,
+        member: string | undefined
     ): boolean {
         // If member is specified, we're removing a specific member from the module
         if (this.member !== undefined) {
-            // Only remove if this is the specific member we're looking for
-            if (this.member !== name) {
+            // A name bound under an alias reads one member and is referenced by another, and a name
+            // a nested pattern binds reads a property of a property, so it reads no member at all.
+            if (this.member !== member) {
                 return false;
             }
         }
