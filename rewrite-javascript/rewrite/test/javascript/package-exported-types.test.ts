@@ -208,6 +208,96 @@ declare namespace FakeIntl { interface FakeFormat { format(n: number): string; }
             expect(foo!.methods.map(m => m.name)).toContain("bar");
         }, {unsafeCleanup: true});
     }, 60000);
+
+    test("resolves types published only under a require condition", async () => {
+        await withDir(async (root) => {
+            const {pkg, nodeModules} = writeFiles(root.path, "cjs-fixture", {
+                "package.json": JSON.stringify({
+                    name: "cjs-fixture", version: "1.0.0",
+                    exports: {".": {require: {types: "./dist/index.d.cts", default: "./dist/index.cjs"}}},
+                }),
+                "dist/index.d.cts": `export declare class CjsWidget { w(): void; }\n`,
+                "dist/index.cjs": ``,
+            });
+
+            expect(fqns(exportedTypes([pkg], [nodeModules]))).toContain("cjs-fixture.CjsWidget");
+        }, {unsafeCleanup: true});
+    }, 60000);
+
+    test("takes the entry from the package's own directory, symlinked or not", async () => {
+        await withDir(async (root) => {
+            // npm alias: the directory name differs from the package's own declared name.
+            const {pkg: aliased} = writeFiles(root.path, "alias-fixture", {
+                "package.json": JSON.stringify({name: "real-fixture", version: "1.0.0", types: "index.d.ts"}),
+                "index.d.ts": `export declare class FromAliasCopy { a(): void; }\n`,
+            });
+            writeFiles(root.path, "real-fixture", {
+                "package.json": JSON.stringify({name: "real-fixture", version: "2.0.0", types: "index.d.ts"}),
+                "index.d.ts": `export declare class FromRealCopy { r(): void; }\n`,
+            });
+            expect(fqns(exportedTypes([aliased], []))).toEqual(["alias-fixture.FromAliasCopy"]);
+
+            // pnpm: node_modules/<name> is a symlink into the content-addressed store.
+            const {pkg: stored} = writeFiles(root.path, path.join(".pnpm", "pnpm-fixture@1.0.0", "node_modules", "pnpm-fixture"), {
+                "package.json": JSON.stringify({
+                    name: "pnpm-fixture", version: "1.0.0",
+                    exports: {".": {types: "./dist/index.d.ts", default: "./dist/index.js"}},
+                }),
+                "dist/index.d.ts": `export declare class PnpmWidget { p(): void; }\n`,
+            });
+            const link = path.join(root.path, "node_modules", "pnpm-fixture");
+            fs.symlinkSync(stored, link, "dir");
+            expect(fqns(exportedTypes([link], []))).toContain("pnpm-fixture.PnpmWidget");
+        }, {unsafeCleanup: true});
+    }, 60000);
+
+
+    test("falls back to the declared types file when an exports map has no types condition", async () => {
+        await withDir(async (root) => {
+            const {pkg, nodeModules} = writeFiles(root.path, "mispublished-fixture", {
+                "package.json": JSON.stringify({
+                    name: "mispublished-fixture", version: "1.0.0",
+                    types: "dist/types.d.ts",
+                    exports: {".": "./dist/index.js"},
+                }),
+                "dist/index.js": ``,
+                "dist/types.d.ts": `export declare class Mis { m(): void; }\n`,
+            });
+
+            expect(fqns(exportedTypes([pkg], [nodeModules]))).toContain("mispublished-fixture.Mis");
+        }, {unsafeCleanup: true});
+    }, 60000);
+
+
+    test("types a transitive dependency through its node + import exports conditions", async () => {
+        await withDir(async (root) => {
+            writeFiles(root.path, "modern-dep", {
+                "package.json": JSON.stringify({
+                    name: "modern-dep", version: "1.0.0",
+                    exports: {".": {
+                        browser: {types: "./dist/browser.d.ts", default: "./dist/browser.js"},
+                        node: {
+                            import: {types: "./dist/node.d.ts", default: "./dist/node.mjs"},
+                            require: {types: "./dist/node.d.cts", default: "./dist/node.cjs"},
+                        },
+                    }},
+                }),
+                "dist/node.d.ts": `export declare class Widget { render(): void; }\n`,
+                "dist/node.d.cts": `export declare class RequireWidget { render(): void; }\n`,
+                "dist/browser.d.ts": `export declare class BrowserWidget { render(): void; }\n`,
+            });
+            const {pkg, nodeModules} = writeFiles(root.path, "consumer-fixture", {
+                "package.json": JSON.stringify({name: "consumer-fixture", version: "1.0.0", types: "index.d.ts"}),
+                "index.d.ts": `import {Widget} from "modern-dep";\nexport declare class Consumer { widget(): Widget; }\n`,
+            });
+
+            const consumer = exportedTypes([pkg], [nodeModules])
+                .find(t => Type.FullyQualified.getFullyQualifiedName(t) === "consumer-fixture.Consumer") as Type.Class;
+            const widget = consumer.methods.find(m => m.name === "widget")!;
+            // Only the node/import branch declares `Widget`, so its FQN pins which conditions matched.
+            expect(Type.signature(widget.returnType)).toBe("modern-dep.Widget");
+        }, {unsafeCleanup: true});
+    }, 60000);
 });
 
 /** Register a DependencyTypes handler on a mock connection and return the captured request handler. */
