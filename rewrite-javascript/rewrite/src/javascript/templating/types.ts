@@ -509,6 +509,13 @@ export interface ApplyOptions {
      * ```
      */
     values?: Map<Capture | string, J> | MatchResult | Record<string, J>;
+
+    /**
+     * Whether the result is fitted to where it lands. Defaults to `true`; pass `false` to assemble
+     * several results into one subtree and format that subtree once, rather than once per application.
+     * The anchor supplies the result's prefix either way.
+     */
+    format?: boolean;
 }
 
 /**
@@ -623,6 +630,9 @@ export interface PostMatchContext {
 export interface RewriteConfig {
     before: Pattern | Pattern[];
     after: Template | ((match: MatchResult) => Template);
+
+    /** As {@link ApplyOptions.format}, applied to every node the rule rewrites. */
+    format?: boolean;
 
     /**
      * Optional predicate evaluated BEFORE pattern matching.
