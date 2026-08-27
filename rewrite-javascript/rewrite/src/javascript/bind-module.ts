@@ -21,7 +21,8 @@ import {ExecutionContext} from "../execution";
 import {UUID} from "../uuid";
 import {maybeAddImport, moduleNameOf, QuoteChar} from "./add-import";
 import {
-    AmdBlock, amdBlockOf, DEFAULT_AMD_CALLEES, dependencyNames, elementsOf, parameterNames, present, withDependency
+    AmdBlock, amdBlockOf, DEFAULT_AMD_CALLEES, dependencyNames, elementsOf, parameterNames, present, withDependency,
+    withoutDependencyAt
 } from "./amd";
 
 export type EsmBindingForm = "default" | "namespace";
@@ -415,4 +416,77 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
         // would delete this node.
         return withDependency(visited, block, this.module, this.binding) ?? visited;
     }
+}
+
+/**
+ * Drops AMD bindings a rewrite left unreferenced. A binding already unused before the rewrite
+ * stays: it is loaded for its side effects, so removing it would change what the module loads,
+ * not just what gets called. This can't defer onto `visitor.afterVisit` like the rest of this
+ * module's edits do — it needs the tree as it stood before the rewrite, which a deferred visitor
+ * never sees.
+ */
+export async function removeNewlyUnusedBindings(
+    before: JS.CompilationUnit,
+    after: JS.CompilationUnit,
+    ctx: ExecutionContext,
+    options?: BindModuleOptions
+): Promise<JS.CompilationUnit> {
+    const callees = calleesOf(options);
+    const usedBeforeByBlock = new Map<UUID, Set<string>>();
+    const collector = new class extends JavaScriptVisitor<ExecutionContext> {
+        override async visitMethodInvocation(m: J.MethodInvocation, c: ExecutionContext) {
+            const block = amdBlockOf(m, callees);
+            if (block !== undefined) {
+                usedBeforeByBlock.set(m.id, await usedBindings(block));
+            }
+            return super.visitMethodInvocation(m, c);
+        }
+    };
+    await collector.visit(before, ctx);
+    if (usedBeforeByBlock.size === 0) {
+        return after;
+    }
+
+    const sweeper = new class extends JavaScriptVisitor<ExecutionContext> {
+        override async visitMethodInvocation(m: J.MethodInvocation, c: ExecutionContext): Promise<J | undefined> {
+            let call = await super.visitMethodInvocation(m, c) as J.MethodInvocation;
+            const usedBefore = usedBeforeByBlock.get(call.id);
+            if (usedBefore === undefined) {
+                return call;
+            }
+            // A removal shifts the indices of the dependencies after it, so the block and its
+            // parameter names are re-derived from `call` on every pass rather than cached.
+            for (; ;) {
+                const block = amdBlockOf(call, callees);
+                if (block === undefined) {
+                    return call;
+                }
+                const bindings = parameterNames(block);
+                let goneIndex = -1;
+                for (let i = 0; i < bindings.length; i++) {
+                    const binding = bindings[i];
+                    if (binding !== undefined && usedBefore.has(binding) && !(await references(block, binding, true))) {
+                        goneIndex = i;
+                        break;
+                    }
+                }
+                if (goneIndex < 0) {
+                    return call;
+                }
+                call = withoutDependencyAt(call, block, goneIndex);
+            }
+        }
+    };
+    return await sweeper.visit(after, ctx) as JS.CompilationUnit;
+}
+
+/** The block's parameter names that its body actually references. */
+async function usedBindings(block: AmdBlock): Promise<Set<string>> {
+    const used = new Set<string>();
+    for (const binding of parameterNames(block)) {
+        if (binding !== undefined && await references(block, binding, false)) {
+            used.add(binding);
+        }
+    }
+    return used;
 }

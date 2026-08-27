@@ -1,11 +1,12 @@
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, bindModule,
-    maybeRemoveImport
+    maybeRemoveImport, removeNewlyUnusedBindings
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
 import {randomId} from "../../src/uuid";
+import {ExecutionContext} from "../../src";
 
 function captureBindings(seen: {moduleSystem?: string, module?: string, binding?: string},
                           localName: string = "Button", moduleName: string = "sap/m/Button") {
@@ -448,6 +449,46 @@ describe("maybeRemoveImport on an ESM file", () => {
         await spec.rewriteRun(typescript(
             `import Button from "sap/m/Button";\n\nconsole.log(1);`,
             `console.log(1);`
+        ));
+    });
+});
+
+function rewriteThenSweep() {
+    return new class extends JavaScriptVisitor<ExecutionContext> {
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
+            const rewritten = await super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
+            return removeNewlyUnusedBindings(cu, rewritten, ctx);
+        }
+
+        override async visitMethodInvocation(m: J.MethodInvocation, ctx: ExecutionContext): Promise<J | undefined> {
+            // `Old.f()` becomes `kept.f()`, so nothing names `Old` afterwards.
+            const select = m.select?.element;
+            if (select !== undefined && select.kind === J.Kind.Identifier &&
+                (select as J.Identifier).simpleName === "Old") {
+                const kept: J.Identifier = {...(select as J.Identifier), simpleName: "kept"};
+                const renamed: J.MethodInvocation = {...m, select: {...m.select!, element: kept}};
+                return renamed;
+            }
+            return super.visitMethodInvocation(m, ctx);
+        }
+    };
+}
+
+describe("removeNewlyUnusedBindings", () => {
+    test("a binding a rewrite stopped using goes", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rewriteThenSweep());
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/Old", "a/Kept"], function (Old, kept) { Old.f(); });`,
+            `sap.ui.define(["a/Kept"], function (kept) { kept.f(); });`
+        ));
+    });
+
+    test("a binding that was already unused stays, being loaded for its side effects", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rewriteThenSweep());
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/Side", "a/Kept"], function (side, kept) { kept.f(); });`
         ));
     });
 });
