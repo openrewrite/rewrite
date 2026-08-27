@@ -631,6 +631,9 @@ export interface RewriteConfig {
     before: Pattern | Pattern[];
     after: Template | ((match: MatchResult) => Template);
 
+    /** As {@link ApplyOptions.format}, applied to every node the rule rewrites. */
+    format?: boolean;
+
     /**
      * Optional predicate evaluated BEFORE pattern matching.
      * Use for efficient early filtering based on AST context when captures aren't needed.

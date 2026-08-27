@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {Autodetect, javascript, JavaScriptVisitor, JS, Template, template} from "../../../src/javascript";
+import {Autodetect, capture, javascript, JavaScriptVisitor, JS, pattern, rewrite, Template, template} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {create as produce} from "mutative";
 import {replaceMarkerByKind} from "../../../src/markers";
@@ -102,6 +102,29 @@ describe('template formatting', () => {
 });
     }
 }
+`));
+    });
+
+    test('a rewrite rule passes format through to the template it applies', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
+                const visited = await super.visitTernary(ternary, p) as J.Ternary;
+                const t = capture();
+                return await rewrite(() => ({
+                    before: pattern`${t} ? true : false`,
+                    after: template`${t}`,
+                    format: false
+                })).tryOn(this.cursor, visited) || visited;
+            }
+        });
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const c = a <
+  b ? true : false;
+`,
+                `const c = a <
+  b;
 `));
     });
 });
