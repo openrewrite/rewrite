@@ -135,7 +135,13 @@ export function maybeAddImport(
         return undefined;
     }
 
-    const derived = options.alias ?? options.preferredName ?? memberName(options.member) ?? module;
+    // A pinned alias is the whole answer, so the file has no say and nothing below needs to read it.
+    if (options.alias) {
+        visitor.afterVisit.push(new AddImport(options, options.alias));
+        return options.alias;
+    }
+
+    const derived = derivedName(options);
     const cu = compilationUnitOf(visitor);
     if (!cu) {
         visitor.afterVisit.push(new AddImport(options, derived));
@@ -148,19 +154,22 @@ export function maybeAddImport(
     // derive a suffixed name from the binding this call just added. A caller that named a preference
     // takes whatever comes back; one that did not assumes the name it derived, so a binding under
     // any other name would leave the references it emits unbound.
-    if (!options.alias) {
-        for (const binding of bindings) {
-            if (binding.module === module && binding.member === memberName(options.member) &&
-                binding.typeOnly === typeOnly &&
-                (options.preferredName !== undefined || binding.name === derived)) {
-                return binding.name;
-            }
+    for (const binding of bindings) {
+        if (binding.module === module && binding.member === memberName(options.member) &&
+            binding.typeOnly === typeOnly &&
+            (options.preferredName !== undefined || binding.name === derived)) {
+            return binding.name;
         }
     }
 
-    const name = options.alias ?? deconflict(derived, takenNames(bindings, visitor));
+    const name = deconflict(derived, takenNames(bindings, visitor));
     visitor.afterVisit.push(new AddImport(options, name));
     return name;
+}
+
+/** The local name a request asks for, before the file has a say in it. */
+function derivedName(options: AddImportOptions): string {
+    return options.alias ?? options.preferredName ?? memberName(options.member) ?? moduleNameOf(options.module);
 }
 
 /** `'default'` and an absent member both name a default import, which binds no member name of its own. */
@@ -189,14 +198,8 @@ function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
     const bindings: ModuleScopeBinding[] = [];
 
     const declaredBy = (name: J | undefined): void => {
-        if (name?.kind === J.Kind.Identifier) {
-            bindings.push({name: (name as J.Identifier).simpleName});
-        } else if (name?.kind === JS.Kind.ObjectBindingPattern) {
-            for (const elem of (name as JS.ObjectBindingPattern).bindings.elements) {
-                if (elem.element?.kind === JS.Kind.BindingElement) {
-                    declaredBy((elem.element as JS.BindingElement).name);
-                }
-            }
+        for (const bound of patternNames(name)) {
+            bindings.push({name: bound.name});
         }
     };
 
@@ -247,27 +250,39 @@ function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
 
 /** The module a `require('...')` initializer names, `undefined` for an initializer that is anything else. */
 function requiredModule(initializer: J | undefined): string | undefined {
-    if (initializer?.kind !== J.Kind.MethodInvocation) {
-        return undefined;
-    }
-    const methodInv = initializer as J.MethodInvocation;
+    return initializer?.kind === J.Kind.MethodInvocation
+        ? requiredModuleOf(initializer as J.MethodInvocation)
+        : undefined;
+}
+
+/**
+ * The module a `require(...)` call loads. `obj.require('x')` selects a method rather than loading a
+ * module, and a specifier that is not a string literal names none that can be read here.
+ */
+function requiredModuleOf(methodInv: J.MethodInvocation): string | undefined {
     if (methodInv.select || methodInv.name?.kind !== J.Kind.Identifier ||
         (methodInv.name as J.Identifier).simpleName !== 'require') {
         return undefined;
     }
     const argument = methodInv.arguments?.elements[0]?.element;
-    return argument?.kind === J.Kind.Literal ? moduleNameOf(argument as J.Literal) : undefined;
+    return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === 'string'
+        ? moduleNameOf(argument as J.Literal)
+        : undefined;
 }
 
-/** A `require` binds a module the way an import does, so the pool records it the same way. */
-function requireBindings(pattern: J | undefined, module: string): ModuleScopeBinding[] {
+/**
+ * Every name a binding pattern introduces. `member` is the property a name takes its value from,
+ * and only a name bound directly by the pattern has one — anything deeper reads a property of a
+ * property, so it occupies its name without binding a member of the module.
+ */
+function patternNames(pattern: J | undefined): { name: string; member?: string }[] {
     if (pattern?.kind === J.Kind.Identifier) {
-        return [{name: (pattern as J.Identifier).simpleName, module, member: undefined, typeOnly: false}];
+        return [{name: (pattern as J.Identifier).simpleName}];
     }
     if (pattern?.kind !== JS.Kind.ObjectBindingPattern) {
         return [];
     }
-    const bindings: ModuleScopeBinding[] = [];
+    const names: { name: string; member?: string }[] = [];
     for (const elem of (pattern as JS.ObjectBindingPattern).bindings.elements) {
         if (elem.element?.kind !== JS.Kind.BindingElement) {
             continue;
@@ -276,13 +291,28 @@ function requireBindings(pattern: J | undefined, module: string): ModuleScopeBin
         if (bindingElem.name?.kind === J.Kind.Identifier) {
             const name = (bindingElem.name as J.Identifier).simpleName;
             const propertyName = bindingElem.propertyName?.element;
-            const member = propertyName?.kind === J.Kind.Identifier
-                ? (propertyName as J.Identifier).simpleName
-                : name;
-            bindings.push({name, module, member, typeOnly: false});
+            names.push({
+                name,
+                member: propertyName?.kind === J.Kind.Identifier
+                    ? (propertyName as J.Identifier).simpleName
+                    : name
+            });
+        } else {
+            names.push(...patternNames(bindingElem.name).map(bound => ({name: bound.name})));
         }
     }
-    return bindings;
+    return names;
+}
+
+/** A `require` binds a module the way an import does, so the pool records it the same way. */
+function requireBindings(pattern: J | undefined, module: string): ModuleScopeBinding[] {
+    // A whole-module require binds no member, exactly as a default import does.
+    if (pattern?.kind === J.Kind.Identifier) {
+        return [{name: (pattern as J.Identifier).simpleName, module, member: undefined, typeOnly: false}];
+    }
+    return patternNames(pattern).map(bound => bound.member === undefined
+        ? {name: bound.name}
+        : {name: bound.name, module, member: bound.member, typeOnly: false});
 }
 
 function importBindings(jsImport: JS.Import): ModuleScopeBinding[] {
@@ -491,7 +521,6 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     readonly moduleUnicodeEscapes?: J.LiteralUnicodeEscape[];
     readonly member?: string;
     readonly alias?: string;
-    readonly preferredName?: string;
     readonly onlyIfReferenced: boolean;
     readonly sideEffectOnly: boolean;
     readonly typeOnly: boolean;
@@ -537,13 +566,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         this.moduleUnicodeEscapes = typeof options.module === 'string' ? undefined : options.module.unicodeEscapes;
         this.member = options.member;
         this.alias = options.alias;
-        this.preferredName = options.preferredName;
         this.onlyIfReferenced = options.onlyIfReferenced ?? true;
         this.sideEffectOnly = options.sideEffectOnly ?? false;
         this.typeOnly = options.typeOnly ?? false;
         this.style = options.style;
         this.quoteStyle = options.quoteStyle;
-        this.bindingName = this.sideEffectOnly ? undefined : bindingName ?? this.alias ?? this.preferredName ?? memberName(this.member) ?? this.module;
+        this.bindingName = this.sideEffectOnly ? undefined : bindingName ?? derivedName(options);
     }
 
     /**
@@ -560,8 +588,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * Check if a method invocation is a require() call
      */
     private isRequireCall(methodInv: J.MethodInvocation): boolean {
-        return methodInv.name?.kind === J.Kind.Identifier &&
-               (methodInv.name as J.Identifier).simpleName === 'require';
+        return requiredModuleOf(methodInv) !== undefined;
     }
 
     /**
@@ -882,7 +909,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         const existingElements = namedImports.elements.elements;
 
                         // Find the correct insertion position (alphabetical, case-insensitive)
-                        const newName = (this.alias || this.member!).toLowerCase();
+                        const newName = this.bindingName!.toLowerCase();
                         let insertIndex = existingElements.findIndex(elem => {
                             if (elem.element?.kind === JS.Kind.ImportSpecifier) {
                                 const name = this.getImportAlias(elem.element) || this.getImportName(elem.element);
@@ -1707,17 +1734,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * Get the module name from a require() call
      */
     private getModuleNameFromRequire(methodInv: J.MethodInvocation): string | undefined {
-        const args = methodInv.arguments?.elements;
-        if (!args || args.length === 0) {
-            return undefined;
-        }
-
-        const firstArg = args[0].element;
-        if (!firstArg || firstArg.kind !== J.Kind.Literal || typeof (firstArg as J.Literal).value !== 'string') {
-            return undefined;
-        }
-
-        return moduleNameOf(firstArg as J.Literal);
+        return requiredModuleOf(methodInv);
     }
 
     /**

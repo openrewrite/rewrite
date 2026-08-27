@@ -2952,6 +2952,62 @@ describe('AddImport visitor', () => {
             expect(preferred).toEqual(['Theming', 'Theming']);
         });
 
+        test('a name bound through a nested pattern is occupied without answering for the module', async () => {
+            const spec = new RecipeSpec();
+            const bound: string[] = [];
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    bound.push(maybeAddImport(this, {module: 'm', member: 'b', onlyIfReferenced: false}));
+                    bound.push(maybeAddImport(this, {module: 'other', preferredName: 'z', onlyIfReferenced: false}));
+                    return super.visitJsCompilationUnit(cu, p);
+                }
+            });
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const {a: {b}} = require('other');
+
+                        b();
+                    `,
+                    `
+                        import {b as b_1} from 'm';
+                        import z from 'other';
+
+                        const {a: {b}} = require('other');
+
+                        b();
+                    `
+                )
+            );
+
+            expect(bound).toEqual(['b_1', 'z']);
+        });
+
+        test('a merged specifier sorts by the name it binds, as its neighbours do', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName(
+                {module: 'm', member: 'zzz', preferredName: 'aaa', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {mmm} from 'm';
+
+                        mmm();
+                    `,
+                    `
+                        import {zzz as aaa, mmm} from 'm';
+
+                        mmm();
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('aaa');
+        });
+
         test('a side-effect import binds no name', async () => {
             const spec = new RecipeSpec();
             const bound: { name?: string } = {name: 'unset'};

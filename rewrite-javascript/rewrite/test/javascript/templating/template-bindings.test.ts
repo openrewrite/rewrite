@@ -97,7 +97,7 @@ describe('templates that declare module bindings', () => {
 
     test('a binding called on its own is a reference to it, not a name it gives something', async () => {
         const arg = capture('arg');
-        spec.recipe = recipeApplying(template`merge(${arg}, {})`.configure({
+        spec.recipe = recipeApplying(template`merge(${arg}, {}).merge()`.configure({
             bindings: {merge: {module: 'sap/base/util/merge', member: 'default'}}
         }), arg);
 
@@ -105,7 +105,7 @@ describe('templates that declare module bindings', () => {
             //language=typescript
             typescript(
                 `const merge = 1;\napplyTheme('dark');`,
-                `import merge_1 from 'sap/base/util/merge';\n\nconst merge = 1;\nmerge_1('dark', {});`
+                `import merge_1 from 'sap/base/util/merge';\n\nconst merge = 1;\nmerge_1('dark', {}).merge();`
             )
         );
     });
