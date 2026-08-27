@@ -2470,19 +2470,30 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return method;
     }
 
-    /** A call whose callee is not a plain identifier, such as `getFn()(x)`, `arr[0](x)` or `fn?.(x)`. */
+    /**
+     * A call whose callee is not a plain identifier, such as `getFn()(x)`, `arr[0](x)` or `fn?.(x)`.
+     * Type arguments constrain it under the same rule as `visitMethodInvocation`.
+     */
     override async visitFunctionCall(functionCall: JS.FunctionCall, other: J): Promise<J | undefined> {
         if (other.kind !== JS.Kind.FunctionCall) {
             return this.kindMismatch();
         }
 
         const otherFunctionCall = other as JS.FunctionCall;
-        if (!functionCall.typeParameters && otherFunctionCall.typeParameters) {
-            const withoutTypeArguments: JS.FunctionCall = {...otherFunctionCall, typeParameters: undefined};
-            return super.visitFunctionCall(functionCall, withoutTypeArguments);
+        if (functionCall.typeParameters) {
+            if (!otherFunctionCall.typeParameters) {
+                return this.structuralMismatch('typeParameters');
+            }
+
+            await this.visitContainerProperty('typeParameters', functionCall.typeParameters, otherFunctionCall.typeParameters);
+            if (!this.match) return functionCall;
         }
 
-        return super.visitFunctionCall(functionCall, other);
+        // Type arguments are settled, so they come off both sides and the rest compares property by property
+        const patternCall: JS.FunctionCall = {...functionCall, typeParameters: undefined};
+        const targetCall: JS.FunctionCall = {...otherFunctionCall, typeParameters: undefined};
+        await super.visitFunctionCall(patternCall, targetCall);
+        return functionCall;
     }
 
     /**
