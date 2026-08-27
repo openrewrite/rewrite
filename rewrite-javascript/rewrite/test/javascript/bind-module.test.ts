@@ -453,7 +453,8 @@ describe("maybeRemoveImport on an ESM file", () => {
     });
 });
 
-function rewriteThenSweep() {
+/** Renames a call's `select` identifier per `renames`, then sweeps whatever the rename orphaned. */
+function renameThenSweep(renames: Record<string, string>) {
     return new class extends JavaScriptVisitor<ExecutionContext> {
         override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
             const rewritten = await super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
@@ -461,15 +462,14 @@ function rewriteThenSweep() {
         }
 
         override async visitMethodInvocation(m: J.MethodInvocation, ctx: ExecutionContext): Promise<J | undefined> {
-            // `Old.f()` becomes `kept.f()`, so nothing names `Old` afterwards.
             const select = m.select?.element;
-            if (select !== undefined && select.kind === J.Kind.Identifier &&
-                (select as J.Identifier).simpleName === "Old") {
-                const kept: J.Identifier = {...(select as J.Identifier), simpleName: "kept"};
-                const renamed: J.MethodInvocation = {...m, select: {...m.select!, element: kept}};
-                return renamed;
+            const to = select?.kind === J.Kind.Identifier ? renames[(select as J.Identifier).simpleName] : undefined;
+            if (to === undefined) {
+                return super.visitMethodInvocation(m, ctx);
             }
-            return super.visitMethodInvocation(m, ctx);
+            const renamedSelect: J.Identifier = {...(select as J.Identifier), simpleName: to};
+            const renamed: J.MethodInvocation = {...m, select: {...m.select!, element: renamedSelect}};
+            return renamed;
         }
     };
 }
@@ -477,7 +477,7 @@ function rewriteThenSweep() {
 describe("removeNewlyUnusedBindings", () => {
     test("a binding a rewrite stopped using goes", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(rewriteThenSweep());
+        spec.recipe = fromVisitor(renameThenSweep({Old: "kept"}));
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/Old", "a/Kept"], function (Old, kept) { Old.f(); });`,
             `sap.ui.define(["a/Kept"], function (kept) { kept.f(); });`
@@ -486,9 +486,18 @@ describe("removeNewlyUnusedBindings", () => {
 
     test("a binding that was already unused stays, being loaded for its side effects", async () => {
         const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(rewriteThenSweep());
+        spec.recipe = fromVisitor(renameThenSweep({Old: "kept"}));
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/Side", "a/Kept"], function (side, kept) { kept.f(); });`
+        ));
+    });
+
+    test("removing two non-adjacent bindings still pairs each survivor with its own dependency", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(renameThenSweep({B: "A", D: "C"}));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/A", "a/B", "a/C", "a/D"], function (A, B, C, D) { A.f(); B.f(); C.f(); D.f(); });`,
+            `sap.ui.define(["a/A", "a/C"], function (A, C) { A.f(); A.f(); C.f(); C.f(); });`
         ));
     });
 });

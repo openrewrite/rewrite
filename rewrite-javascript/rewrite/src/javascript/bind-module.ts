@@ -371,6 +371,27 @@ export async function references(block: AmdBlock, name: string, missingBodyAnswe
 }
 
 /**
+ * Every name the factory body references, one walk for the whole block rather than one per
+ * name. `missingBodyAnswer` means what it means on `references`: the answer `.has` gives, for
+ * every name, when the factory has no body to walk.
+ */
+export async function namesUsed(block: AmdBlock, missingBodyAnswer: boolean): Promise<{has(name: string): boolean}> {
+    const body = bodyOf(block);
+    if (body === undefined) {
+        return {has: () => missingBodyAnswer};
+    }
+    const names = new Set<string>();
+    const collector = new class extends JavaScriptVisitor<ExecutionContext> {
+        override async visitIdentifier(id: J.Identifier, c: ExecutionContext) {
+            names.add(id.simpleName);
+            return super.visitIdentifier(id, c);
+        }
+    };
+    await collector.visit(body, new ExecutionContext());
+    return names;
+}
+
+/**
  * Applies the dependency a `bindModule` call settled on. The block is found by id: its caller
  * has already emitted a reference to the binding, so a block that cannot be found is an error
  * rather than a skipped edit.
@@ -422,8 +443,8 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
  * Drops AMD bindings a rewrite left unreferenced. A binding already unused before the rewrite
  * stays: it is loaded for its side effects, so removing it would change what the module loads,
  * not just what gets called. This can't defer onto `visitor.afterVisit` like the rest of this
- * module's edits do — it needs the tree as it stood before the rewrite, which a deferred visitor
- * never sees.
+ * module's edits — it needs the tree as it stood before the rewrite. Blocks are matched by the
+ * call's id, so one a rewrite rebuilds rather than edits is silently left alone.
  */
 export async function removeNewlyUnusedBindings(
     before: JS.CompilationUnit,
@@ -451,40 +472,40 @@ export async function removeNewlyUnusedBindings(
         override async visitMethodInvocation(m: J.MethodInvocation, c: ExecutionContext): Promise<J | undefined> {
             let call = await super.visitMethodInvocation(m, c) as J.MethodInvocation;
             const usedBefore = usedBeforeByBlock.get(call.id);
-            if (usedBefore === undefined) {
+            let block = usedBefore === undefined ? undefined : amdBlockOf(call, callees);
+            if (usedBefore === undefined || block === undefined) {
                 return call;
             }
-            // A removal shifts the indices of the dependencies after it, so the block and its
-            // parameter names are re-derived from `call` on every pass rather than cached.
+            // withoutDependencyAt only edits the dependency array and parameter list, never the
+            // body, so which names it references can't change between removals.
+            const usedNow = await namesUsed(block, true);
             for (; ;) {
-                const block = amdBlockOf(call, callees);
-                if (block === undefined) {
-                    return call;
-                }
                 const bindings = parameterNames(block);
-                let goneIndex = -1;
-                for (let i = 0; i < bindings.length; i++) {
-                    const binding = bindings[i];
-                    if (binding !== undefined && usedBefore.has(binding) && !(await references(block, binding, true))) {
-                        goneIndex = i;
-                        break;
-                    }
-                }
+                const goneIndex = bindings.findIndex(binding =>
+                    binding !== undefined && usedBefore.has(binding) && !usedNow.has(binding));
                 if (goneIndex < 0) {
                     return call;
                 }
                 call = withoutDependencyAt(call, block, goneIndex);
+                // A removal shifts the indices of the dependencies after it, so the block is
+                // re-derived from `call` rather than reused with stale offsets.
+                const next = amdBlockOf(call, callees);
+                if (next === undefined) {
+                    return call;
+                }
+                block = next;
             }
         }
     };
     return await sweeper.visit(after, ctx) as JS.CompilationUnit;
 }
 
-/** The block's parameter names that its body actually references. */
+/** The block's parameter names that its body actually references, from a single walk of it. */
 async function usedBindings(block: AmdBlock): Promise<Set<string>> {
+    const usedNames = await namesUsed(block, false);
     const used = new Set<string>();
     for (const binding of parameterNames(block)) {
-        if (binding !== undefined && await references(block, binding, false)) {
+        if (binding !== undefined && usedNames.has(binding)) {
             used.add(binding);
         }
     }
