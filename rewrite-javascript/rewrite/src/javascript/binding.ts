@@ -1,0 +1,277 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {J} from "../java";
+import {JS} from "./tree";
+import {Cursor} from "../tree";
+import {JavaScriptVisitor} from "./visitor";
+import {scopeOf} from "./scope";
+import {AddImportOptions, bindImport, moduleNameOf} from "./add-import";
+import {RemoveImport} from "./remove-import";
+import {
+    AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, enclosingAmdBlock, lastSegment,
+    parameterNames, RemoveAmdDependency
+} from "./amd";
+
+export interface MaybeBindOptions extends AddImportOptions {
+    /** Callees that introduce an AMD block. UI5 writes `sap.ui.define`, RequireJS and Dojo `define`. */
+    amdCallee?: string | readonly string[];
+}
+
+export interface ModuleBindings {
+    /** The module `localName` refers to, or undefined when it is not a module binding. */
+    moduleOf(localName: string): string | undefined;
+
+    /** The local name bound to `module`, or undefined when nothing binds it. */
+    bindingOf(module: string): string | undefined;
+
+    /**
+     * The lane these bindings come from, and the one `maybeBind` would use. `"none"` is a
+     * plain script — no import, export, `require` binding, or enclosing AMD block — which
+     * `maybeBind` still turns into a module on request; a caller that must not do that checks
+     * for `"none"` itself.
+     */
+    readonly moduleSystem: "esm" | "amd" | "commonjs" | "none";
+}
+
+/** `cursor` is protected on `TreeVisitor` and this API is free functions, so reaching it takes a cast. */
+function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
+    return (visitor as unknown as {cursor?: Cursor}).cursor;
+}
+
+function compilationUnitOf(visitor: JavaScriptVisitor<any>): JS.CompilationUnit | undefined {
+    return cursorOf(visitor)?.firstEnclosing(
+        (v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
+}
+
+export function moduleBindings(
+    visitor: JavaScriptVisitor<any>,
+    options?: AmdCalleeOptions
+): ModuleBindings {
+    const amd = enclosingAmdBlock(visitor, options);
+    if (amd !== undefined) {
+        const modules = dependencyNames(amd.block);
+        const bindings = parameterNames(amd.block);
+        return {
+            moduleSystem: "amd",
+            moduleOf: localName => {
+                const index = bindings.indexOf(localName);
+                return index < 0 ? undefined : modules[index];
+            },
+            bindingOf: module => {
+                const index = modules.indexOf(module);
+                return index < 0 ? undefined : bindings[index];
+            }
+        };
+    }
+
+    const cu = compilationUnitOf(visitor);
+    const bound = cu === undefined ? [] : moduleObjectBindings(cu);
+    return {
+        moduleSystem: cu === undefined ? "esm" :
+            isCommonJs(cu) ? "commonjs" :
+            hasEsmSyntax(cu) ? "esm" : "none",
+        moduleOf: localName => bound.find(b => b.name === localName)?.module,
+        bindingOf: module => bound.find(b => b.module === module)?.name
+    };
+}
+
+export function isAmdBlock(node: J, options?: AmdCalleeOptions): boolean {
+    return node.kind === J.Kind.MethodInvocation &&
+        amdBlockOf(node as J.MethodInvocation, calleesOf(options)) !== undefined;
+}
+
+/** Whether a top-level statement already marks the file as a module: an import or any export form. */
+function hasEsmSyntax(cu: JS.CompilationUnit): boolean {
+    return cu.statements.some(stmt => {
+        const element = stmt.element;
+        // `export {a, b}`, `export * from` and `export default` are their own statement kinds;
+        // `export class`/`function`/`const` instead carry `export` as a modifier on the
+        // declaration itself, the same way TypeScript's own AST models it.
+        const modifiers = (element as {modifiers?: J.Modifier[]} | undefined)?.modifiers;
+        return element?.kind === JS.Kind.Import ||
+            element?.kind === JS.Kind.ExportDeclaration ||
+            element?.kind === JS.Kind.ExportAssignment ||
+            (modifiers?.some(m => m.keyword === "export") ?? false);
+    });
+}
+
+interface ModuleObjectBinding {
+    name: string;
+    module: string;
+}
+
+/** Whether the file binds its modules with `require`, which decides whether a create is possible. */
+function isCommonJs(cu: JS.CompilationUnit): boolean {
+    if (cu.sourcePath.endsWith(".cjs")) {
+        return true;
+    }
+    let requires = false;
+    for (const stmt of cu.statements) {
+        if (stmt.element?.kind === JS.Kind.Import) {
+            return false;
+        }
+        if (requiredModule(stmt.element) !== undefined) {
+            requires = true;
+        }
+    }
+    return requires;
+}
+
+/** The module a top-level `const X = require("m")` names, for the one variable it declares. */
+function requiredModule(statement: J | undefined): string | undefined {
+    if (statement?.kind !== J.Kind.VariableDeclarations) {
+        return undefined;
+    }
+    const variables = (statement as J.VariableDeclarations).variables;
+    const initializer = variables.length === 1 ? variables[0].element?.initializer?.element : undefined;
+    if (initializer?.kind !== J.Kind.MethodInvocation) {
+        return undefined;
+    }
+    const call = initializer as J.MethodInvocation;
+    // `obj.require('x')` selects a method rather than loading a module, matching add-import.ts's
+    // own `requiredModuleOf`.
+    if (call.select || call.name.simpleName !== "require") {
+        return undefined;
+    }
+    const argument = call.arguments.elements[0]?.element;
+    return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === "string"
+        ? (argument as J.Literal).value as string
+        : undefined;
+}
+
+/** Only whole-module bindings: a named member does not name the module object. */
+function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
+    const bindings: ModuleObjectBinding[] = [];
+    for (const stmt of cu.statements) {
+        const statement = stmt.element;
+        if (statement?.kind !== JS.Kind.Import) {
+            continue;
+        }
+        const jsImport = statement as JS.Import;
+        const specifier = jsImport.moduleSpecifier?.element;
+        if (specifier?.kind !== J.Kind.Literal) {
+            continue;
+        }
+        const module = (specifier as J.Literal).value;
+        if (typeof module !== "string") {
+            continue;
+        }
+        const clause = jsImport.importClause;
+        if (clause?.name?.element?.kind === J.Kind.Identifier) {
+            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module});
+        }
+        // `namedBindings` is a `JS.Alias` only for `import * as X from "m"`; a renamed
+        // named import (`{a as b}`) nests its alias inside `NamedImports` instead.
+        const named = clause?.namedBindings;
+        if (named?.kind === JS.Kind.Alias) {
+            const alias = (named as JS.Alias).alias;
+            if (alias?.kind === J.Kind.Identifier) {
+                bindings.push({name: (alias as J.Identifier).simpleName, module});
+            }
+        }
+    }
+    for (const stmt of cu.statements) {
+        const module = requiredModule(stmt.element);
+        const name = module === undefined ? undefined :
+            (stmt.element as J.VariableDeclarations).variables[0]?.element?.name;
+        if (module !== undefined && name?.kind === J.Kind.Identifier) {
+            bindings.push({name: (name as J.Identifier).simpleName, module});
+        }
+    }
+    return bindings;
+}
+
+/**
+ * A local binding for `module` or one of its members, creating one where none exists, or
+ * `undefined` where no safe binding is possible. The lane — AMD or ESM/CommonJS — is decided
+ * from the cursor; AMD binds only the whole module, so a `member` request there refuses rather
+ * than guess. `onlyIfReferenced` defaults to true, so the import may never appear.
+ */
+export function maybeBind(
+    visitor: JavaScriptVisitor<any>,
+    options: MaybeBindOptions
+): string | undefined {
+    const module = moduleNameOf(options.module);
+
+    const amd = enclosingAmdBlock(visitor, options);
+    if (amd !== undefined) {
+        if (options.member !== undefined || options.sideEffectOnly) {
+            // Nor can a factory parameter load a module without binding it to a name.
+            return undefined;
+        }
+        const namesInScope = scopeOf(cursorOf(visitor)!).names();
+        return bindAmd(visitor, amd, module, options.preferredName, namesInScope, calleesOf(options));
+    }
+
+    const bindings = moduleBindings(visitor, options);
+    const isWholeModule = !options.sideEffectOnly && (options.member === undefined || options.member === "*");
+    if (isWholeModule) {
+        const bound = bindings.bindingOf(module);
+        if (bound !== undefined) {
+            return bound;
+        }
+        if (bindings.moduleSystem === "commonjs") {
+            // A `require` answers for a module it already binds, but creating one is
+            // unimplemented, and an `import` in a file that has none would be the wrong form.
+            return undefined;
+        }
+    }
+    return bindImport(visitor, {
+        ...options,
+        preferredName: options.preferredName ?? (isWholeModule ? lastSegment(module) : undefined)
+    });
+}
+
+/**
+ * Removes `module`'s import(s) where unused, or one `member` of it — `'default'` and `'*'` select
+ * the default and namespace import regardless of local name. Applies to the ESM lane only; an AMD
+ * dependency binds a whole module, so `member` is ignored there.
+ */
+export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, module: string, member?: string) {
+    for (const v of visitor.afterVisit || []) {
+        if (v instanceof RemoveImport && v.module === module && v.member === member) {
+            return;
+        }
+    }
+    visitor.afterVisit.push(new RemoveImport(module, member));
+    // Both queue unconditionally so the caller need not know which lane the file uses: each
+    // visitor removes whatever matching construct it finds, ESM import or AMD dependency, and a
+    // file with both gets both removed.
+    visitor.afterVisit.push(new RemoveAmdDependency(module));
+}
+
+/**
+ * @deprecated Use {@link maybeBind} instead — this is a rename, not a behaviour change, beyond
+ * `maybeBind` additionally binding through an AMD factory parameter where this only ever imports.
+ */
+export function maybeAddImport(
+    visitor: JavaScriptVisitor<any>,
+    options: AddImportOptions & { sideEffectOnly: true }
+): undefined;
+export function maybeAddImport(
+    visitor: JavaScriptVisitor<any>,
+    options: AddImportOptions & { sideEffectOnly?: false }
+): string;
+export function maybeAddImport(
+    visitor: JavaScriptVisitor<any>,
+    options: AddImportOptions
+): string | undefined;
+export function maybeAddImport(
+    visitor: JavaScriptVisitor<any>,
+    options: AddImportOptions
+): string | undefined {
+    return maybeBind(visitor, options);
+}

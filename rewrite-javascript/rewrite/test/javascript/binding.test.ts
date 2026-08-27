@@ -1,7 +1,7 @@
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
-    JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, bindModule,
-    maybeRemoveImport, removeNewlyUnusedAmdBindings
+    JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
+    maybeAddImport, maybeRemoveImport, removeNewlyUnusedAmdBindings
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
@@ -165,7 +165,7 @@ function identifierRef(name: string): J.Identifier {
     };
 }
 
-/** Rewrites `call` to read as `<name>.call`, the way a real recipe uses the name `bindModule` returned. */
+/** Rewrites `call` to read as `<name>.call`, the way a real recipe uses the name `maybeBind` returned. */
 function withReference(call: J.MethodInvocation, name: string): J.MethodInvocation {
     return {...call, select: rightPadded(identifierRef(name), emptySpace)};
 }
@@ -177,7 +177,7 @@ function rebind(module: string, bound: {name?: string}) {
             if (m.name.simpleName !== "target") {
                 return super.visitMethodInvocation(m, p);
             }
-            bound.name = bindModule(this, module);
+            bound.name = maybeBind(this, {module});
             return bound.name === undefined ? m : withReference(m, bound.name);
         }
     };
@@ -190,13 +190,13 @@ function askAndAbandon(module: string, bound: {name?: string}) {
             if (m.name.simpleName !== "target") {
                 return super.visitMethodInvocation(m, p);
             }
-            bound.name = bindModule(this, module);
+            bound.name = maybeBind(this, {module});
             return m;
         }
     };
 }
 
-describe("bindModule", () => {
+describe("maybeBind", () => {
     test("AMD appends to both lists and reports the new name", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
@@ -314,7 +314,7 @@ describe("bindModule", () => {
                     return super.visitMethodInvocation(m, p);
                 }
                 const bound = bound1.name === undefined ? bound1 : bound2;
-                bound.name = bindModule(this, "sap/ui/core/Element");
+                bound.name = maybeBind(this, {module: "sap/ui/core/Element"});
                 return bound.name === undefined ? m : withReference(m, bound.name);
             }
         });
@@ -333,11 +333,11 @@ describe("bindModule", () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
                 if (m.name.simpleName === "targetA") {
-                    boundA.name = bindModule(this, "a/Element");
+                    boundA.name = maybeBind(this, {module: "a/Element"});
                     return boundA.name === undefined ? m : withReference(m, boundA.name);
                 }
                 if (m.name.simpleName === "targetB") {
-                    boundB.name = bindModule(this, "b/Element");
+                    boundB.name = maybeBind(this, {module: "b/Element"});
                     return boundB.name === undefined ? m : withReference(m, boundB.name);
                 }
                 return super.visitMethodInvocation(m, p);
@@ -357,7 +357,7 @@ describe("bindModule", () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
                 if (m.name.simpleName === "target") {
-                    bound.name = bindModule(this, "sap/ui/core/Element");
+                    bound.name = maybeBind(this, {module: "sap/ui/core/Element"});
                     return m;
                 }
                 const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
@@ -376,7 +376,7 @@ describe("bindModule", () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
                 if (m.name.simpleName === "target") {
-                    const name = bindModule(this, "sap/ui/core/Element");
+                    const name = maybeBind(this, {module: "sap/ui/core/Element"});
                     return name === undefined ? m : withReference(m, name);
                 }
                 const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
@@ -457,6 +457,30 @@ describe("bindModule", () => {
             `sap.ui.define(["a/B"], function (B) { sap.ui.require(["sap/ui/core/Element"], function (Element) { Element.target(); }); });`
         ));
         expect(bound.name).toBe("Element");
+    });
+
+    test("the deprecated maybeAddImport still works, returning what the equivalent maybeBind call would", async () => {
+        const bindWith = (bind: (visitor: JavaScriptVisitor<any>) => string | undefined) => {
+            const bound: {name?: string} = {};
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    if (m.name.simpleName === "target") {
+                        bound.name = bind(this);
+                    }
+                    return super.visitMethodInvocation(m, p);
+                }
+            });
+            return spec.rewriteRun(typescript(
+                `target();`,
+                `import {readFile} from 'fs';\n\ntarget();`
+            )).then(() => bound.name);
+        };
+
+        const viaAddImport = await bindWith(v => maybeAddImport(v, {module: "fs", member: "readFile", onlyIfReferenced: false}));
+        const viaBind = await bindWith(v => maybeBind(v, {module: "fs", member: "readFile", onlyIfReferenced: false}));
+        expect(viaAddImport).toBe("readFile");
+        expect(viaBind).toBe("readFile");
     });
 });
 

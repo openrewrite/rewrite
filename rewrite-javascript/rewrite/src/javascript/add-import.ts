@@ -66,47 +66,11 @@ export interface AddImportOptions {
 }
 
 /**
- * Register an AddImport visitor to add an import statement to a JavaScript/TypeScript file
- * @param visitor The visitor to add the import addition to
- * @param options Configuration options for the import to add
- * @returns The local name the module is bound to: an existing binding's where one answers this
- *   request, otherwise the name the new import will use, suffixed if the file already binds it. `onlyIfReferenced` defaults to true, so
- *   the import may never appear, and the name is then what it would have gone by. A side-effect
- *   import binds no name and returns `undefined`.
- *
- * @example
- * // Add a named import
- * maybeAddImport(visitor, { module: 'fs', member: 'readFile' });
- *
- * @example
- * // Add a default import using the 'default' member specifier
- * maybeAddImport(visitor, { module: 'react', member: 'default', alias: 'React' });
- *
- * @example
- * // Add a default import (legacy way, without specifying member)
- * maybeAddImport(visitor, { module: 'react', alias: 'React' });
- *
- * @example
- * // Add a namespace import
- * maybeAddImport(visitor, { module: 'crypto', member: '*', alias: 'crypto' });
- *
- * @example
- * // Add a side-effect import
- * maybeAddImport(visitor, { module: 'core-js/stable', sideEffectOnly: true });
+ * Ensures an import for `options.module` exists, queuing an `AddImport` edit where none already
+ * serves the request. `maybeBind`'s ESM/CommonJS lane is this function; its own JSDoc carries the
+ * return-value contract.
  */
-export function maybeAddImport(
-    visitor: JavaScriptVisitor<any>,
-    options: AddImportOptions & { sideEffectOnly: true }
-): undefined;
-export function maybeAddImport(
-    visitor: JavaScriptVisitor<any>,
-    options: AddImportOptions & { sideEffectOnly?: false }
-): string;
-export function maybeAddImport(
-    visitor: JavaScriptVisitor<any>,
-    options: AddImportOptions
-): string | undefined;
-export function maybeAddImport(
+export function bindImport(
     visitor: JavaScriptVisitor<any>,
     options: AddImportOptions
 ): string | undefined {
@@ -233,8 +197,8 @@ interface ModuleScopeBinding {
 }
 
 function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
-    // `cursor` is protected on `TreeVisitor`, and the `maybeAddImport`/`maybeRemoveImport`
-    // API is free functions, so reaching it takes a cast.
+    // `cursor` is protected on `TreeVisitor`, and `bindImport`/`maybeRemoveImport` are free
+    // functions, so reaching it takes a cast.
     return (visitor as unknown as { cursor?: Cursor }).cursor;
 }
 

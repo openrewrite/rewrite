@@ -17,7 +17,7 @@ import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {ApplyOptions, Parameter, TemplateOptions, TemplateParameter} from './types';
 import {bindingContextStatement, isResolvable} from './bindings';
-import {maybeAddImport} from '../add-import';
+import {maybeAddImport} from '../binding';
 import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
 import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';

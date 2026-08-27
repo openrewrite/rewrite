@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {emptyMarkers, findMarker} from "../markers";
-import {randomId} from "../uuid";
+import {randomId, UUID} from "../uuid";
 import {
     emptyContainer,
     emptySpace,
@@ -29,6 +29,9 @@ import {
     TrailingComma
 } from "../java";
 import {JS} from "./tree";
+import {Cursor} from "../tree";
+import {JavaScriptVisitor} from "./visitor";
+import {ExecutionContext} from "../execution";
 
 /** RequireJS and Dojo write `define`; UI5 namespaces it as `sap.ui.define`. */
 export const DEFAULT_AMD_CALLEES: readonly string[] = ["define", "require"];
@@ -507,4 +510,311 @@ function restoreFactory(original: Expression, factory: J.MethodDeclaration | J.L
     }
     const arrowFunction: JS.ArrowFunction = {...(original as JS.ArrowFunction), lambda: factory as J.Lambda};
     return arrowFunction;
+}
+
+/** The subset of `MaybeBindOptions` that selects which callees introduce an AMD block. */
+export interface AmdCalleeOptions {
+    /** Callees that introduce an AMD block. */
+    amdCallee?: string | readonly string[];
+}
+
+export function calleesOf(options?: AmdCalleeOptions): readonly string[] {
+    const callee = options?.amdCallee;
+    return callee === undefined ? DEFAULT_AMD_CALLEES : typeof callee === "string" ? [callee] : callee;
+}
+
+/** `cursor` is protected on `TreeVisitor` and this API is free functions, so reaching it takes a cast. */
+function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
+    return (visitor as unknown as {cursor?: Cursor}).cursor;
+}
+
+/** The nearest AMD block the cursor sits inside, which is the one a binding belongs to. */
+export function enclosingAmdBlock(
+    visitor: JavaScriptVisitor<any>,
+    options?: AmdCalleeOptions
+): {call: J.MethodInvocation, block: AmdBlock} | undefined {
+    const callees = calleesOf(options);
+    let cursor = cursorOf(visitor);
+    while (cursor !== undefined) {
+        const value = cursor.value as J | undefined;
+        if (value?.kind === J.Kind.MethodInvocation) {
+            const block = amdBlockOf(value as J.MethodInvocation, callees);
+            if (block !== undefined) {
+                return {call: value as J.MethodInvocation, block};
+            }
+        }
+        cursor = cursor.parent;
+    }
+    return undefined;
+}
+
+/** The conventional local name for a module: its last path segment. */
+export function lastSegment(module: string): string {
+    return module.substring(module.lastIndexOf("/") + 1);
+}
+
+function deconflict(preferred: string, taken: readonly (string | undefined)[]): string {
+    if (!taken.includes(preferred)) {
+        return preferred;
+    }
+    for (let suffix = 1; ; suffix++) {
+        const candidate = `${preferred}_${suffix}`;
+        if (!taken.includes(candidate)) {
+            return candidate;
+        }
+    }
+}
+
+/** Queued reservations already targeting this block: the shared source for both dedup and deconfliction. */
+function queuedFor(visitor: JavaScriptVisitor<any>, blockId: UUID): AddAmdDependency<any>[] {
+    return visitor.afterVisit.filter((v): v is AddAmdDependency<any> => v instanceof AddAmdDependency && v.blockId === blockId);
+}
+
+/**
+ * A local binding for `module` on the AMD lane, creating one where the block does not already
+ * have it, or `undefined` where no safe binding exists.
+ *
+ * The name is decided from the cursor and returned at once; the edit that creates the binding
+ * is deferred onto `visitor.afterVisit`, as `bindImport`'s is.
+ */
+export function bindAmd(
+    visitor: JavaScriptVisitor<any>,
+    amd: {call: J.MethodInvocation, block: AmdBlock},
+    module: string,
+    preferredName: string | undefined,
+    namesInScope: ReadonlySet<string>,
+    callees: readonly string[]
+): string | undefined {
+    const modules = dependencyNames(amd.block);
+    const bindings = parameterNames(amd.block);
+
+    const declared = modules.indexOf(module);
+    if (declared >= 0) {
+        return bindings[declared];
+    }
+
+    // Two calls naming the same module at the same block are the same request (ADR 0013),
+    // answered from whichever reservation is already queued rather than doubling the dependency.
+    const queued = queuedFor(visitor, amd.call.id);
+    const reserved = queued.find(v => v.module === module)?.binding;
+    if (reserved !== undefined) {
+        return reserved;
+    }
+
+    // A parameter can only be appended at the end, so a block whose dependency and parameter
+    // counts already disagree would bind the new module against the wrong parameter either way.
+    if (bindings.length !== elementsOf(amd.block).length) {
+        return undefined;
+    }
+
+    const taken = [...bindings, ...namesInScope, ...queued.map(v => v.binding)];
+    const binding = deconflict(preferredName ?? lastSegment(module), taken);
+    visitor.afterVisit.push(new AddAmdDependency(amd.call.id, module, binding, callees));
+    return binding;
+}
+
+/** The factory's body: a `J.Block` for `function(){}` and most arrows, or the bare expression for `() => expr`. */
+export function bodyOf(block: AmdBlock): J | undefined {
+    return block.factory.kind === J.Kind.MethodDeclaration ?
+        (block.factory as J.MethodDeclaration).body :
+        (block.factory as J.Lambda).body;
+}
+
+/**
+ * Whether the factory body references `name`. This counts any identifier of that name, so it
+ * matches any identifier of that name, including a member in a field access, since a stray
+ * dependency is fine where a shadowed one is not. `missingBodyAnswer` covers a body-less
+ * factory: `false` for an addition (nothing to conflict with), `true` for a removal (nothing
+ * to prove the binding unused).
+ */
+export async function references(block: AmdBlock, name: string, missingBodyAnswer: boolean): Promise<boolean> {
+    const body = bodyOf(block);
+    if (body === undefined) {
+        return missingBodyAnswer;
+    }
+    let found = false;
+    const finder = new class extends JavaScriptVisitor<ExecutionContext> {
+        override async visitIdentifier(id: J.Identifier, c: ExecutionContext) {
+            if (id.simpleName === name) {
+                found = true;
+            }
+            return super.visitIdentifier(id, c);
+        }
+    };
+    await finder.visit(body, new ExecutionContext());
+    return found;
+}
+
+/**
+ * Every name the factory body references, one walk for the whole block rather than one per
+ * name. `missingBodyAnswer` means what it means on `references`: the answer `.has` gives, for
+ * every name, when the factory has no body to walk.
+ */
+export async function namesUsed(block: AmdBlock, missingBodyAnswer: boolean): Promise<{has(name: string): boolean}> {
+    const body = bodyOf(block);
+    if (body === undefined) {
+        return {has: () => missingBodyAnswer};
+    }
+    const names = new Set<string>();
+    const collector = new class extends JavaScriptVisitor<ExecutionContext> {
+        override async visitIdentifier(id: J.Identifier, c: ExecutionContext) {
+            names.add(id.simpleName);
+            return super.visitIdentifier(id, c);
+        }
+    };
+    await collector.visit(body, new ExecutionContext());
+    return names;
+}
+
+/**
+ * Applies the dependency a `maybeBind` call settled on. The block is found by id: its caller
+ * has already emitted a reference to the binding, so a block that cannot be found is an error
+ * rather than a skipped edit.
+ */
+export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
+    constructor(
+        readonly blockId: UUID,
+        readonly module: string,
+        readonly binding: string,
+        readonly callees: readonly string[]
+    ) {
+        super();
+    }
+
+    private applied = false;
+
+    override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
+        const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
+        if (!this.applied) {
+            throw new Error(
+                `No AMD block ${this.blockId} to declare '${this.module}' on, but '${this.binding}' was reported bound`);
+        }
+        return visited;
+    }
+
+    override async visitMethodInvocation(m: J.MethodInvocation, p: P): Promise<J | undefined> {
+        const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
+        if (visited.id !== this.blockId) {
+            return visited;
+        }
+        const block = amdBlockOf(visited, this.callees);
+        if (block === undefined) {
+            return visited;
+        }
+        this.applied = true;
+        if (!(await references(block, this.binding, false))) {
+            // Nothing referenced the binding, so the caller asked and then did not use the answer.
+            return visited;
+        }
+        // Another edit in the same visit can drop or add a factory parameter, reopening a count
+        // mismatch bindAmd's own check already cleared — an error here for the same reason a missing
+        // block is one.
+        const dependency = withDependency(visited, block, this.module, this.binding);
+        if (dependency === undefined) {
+            throw new Error(
+                `AMD block ${this.blockId} no longer has matching dependency and parameter counts, ` +
+                `so '${this.module}' could not be declared for '${this.binding}', which was reported bound`);
+        }
+        return dependency;
+    }
+}
+
+/**
+ * The AMD counterpart to `RemoveImport`: drops a dependency the block's body no longer names,
+ * along with the parameter bound to it. A dependency the factory takes no parameter for is
+ * loaded for its side effects and stays, matching `bindAmd`'s own read of such a block.
+ */
+export class RemoveAmdDependency<P> extends JavaScriptVisitor<P> {
+    constructor(readonly module: string, readonly callees: readonly string[] = DEFAULT_AMD_CALLEES) {
+        super();
+    }
+
+    override async visitMethodInvocation(m: J.MethodInvocation, p: P): Promise<J | undefined> {
+        const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
+        const block = amdBlockOf(visited, this.callees);
+        if (block === undefined) {
+            return visited;
+        }
+        const index = dependencyNames(block).indexOf(this.module);
+        if (index < 0) {
+            return visited;
+        }
+        const binding = parameterNames(block)[index];
+        if (binding === undefined || await references(block, binding, true)) {
+            return visited;
+        }
+        return withoutDependencyAt(visited, block, index);
+    }
+}
+
+/**
+ * Drops AMD bindings a rewrite left unreferenced. One already unused beforehand stays: it is
+ * loaded for its side effects, so dropping it changes what the module loads. Needing the tree as
+ * it stood before the rewrite is why this takes both and does not defer. Blocks are matched by
+ * the call's id, so one a rewrite rebuilds rather than edits is left alone.
+ */
+export async function removeNewlyUnusedAmdBindings(
+    before: JS.CompilationUnit,
+    after: JS.CompilationUnit,
+    ctx: ExecutionContext,
+    options?: AmdCalleeOptions
+): Promise<JS.CompilationUnit> {
+    const callees = calleesOf(options);
+    const usedBeforeByBlock = new Map<UUID, Set<string>>();
+    const collector = new class extends JavaScriptVisitor<ExecutionContext> {
+        override async visitMethodInvocation(m: J.MethodInvocation, c: ExecutionContext) {
+            const block = amdBlockOf(m, callees);
+            if (block !== undefined) {
+                usedBeforeByBlock.set(m.id, await usedBindings(block));
+            }
+            return super.visitMethodInvocation(m, c);
+        }
+    };
+    await collector.visit(before, ctx);
+    if (usedBeforeByBlock.size === 0) {
+        return after;
+    }
+
+    const sweeper = new class extends JavaScriptVisitor<ExecutionContext> {
+        override async visitMethodInvocation(m: J.MethodInvocation, c: ExecutionContext): Promise<J | undefined> {
+            let call = await super.visitMethodInvocation(m, c) as J.MethodInvocation;
+            const usedBefore = usedBeforeByBlock.get(call.id);
+            let block = usedBefore === undefined ? undefined : amdBlockOf(call, callees);
+            if (usedBefore === undefined || block === undefined) {
+                return call;
+            }
+            // withoutDependencyAt only edits the dependency array and parameter list, never the
+            // body, so which names it references can't change between removals.
+            const usedNow = await namesUsed(block, true);
+            for (; ;) {
+                const bindings = parameterNames(block);
+                const goneIndex = bindings.findIndex(binding =>
+                    binding !== undefined && usedBefore.has(binding) && !usedNow.has(binding));
+                if (goneIndex < 0) {
+                    return call;
+                }
+                call = withoutDependencyAt(call, block, goneIndex);
+                // A removal shifts the indices of the dependencies after it, so the block is
+                // re-derived from `call` rather than reused with stale offsets.
+                const next = amdBlockOf(call, callees);
+                if (next === undefined) {
+                    return call;
+                }
+                block = next;
+            }
+        }
+    };
+    return await sweeper.visit(after, ctx) as JS.CompilationUnit;
+}
+
+/** The block's parameter names that its body actually references, from a single walk of it. */
+async function usedBindings(block: AmdBlock): Promise<Set<string>> {
+    const usedNames = await namesUsed(block, false);
+    const used = new Set<string>();
+    for (const binding of parameterNames(block)) {
+        if (binding !== undefined && usedNames.has(binding)) {
+            used.add(binding);
+        }
+    }
+    return used;
 }

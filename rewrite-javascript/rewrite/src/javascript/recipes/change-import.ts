@@ -18,7 +18,7 @@ import { Option, Recipe } from "../../recipe";
 import { TreeVisitor } from "../../visitor";
 import { ExecutionContext } from "../../execution";
 import { JavaScriptVisitor, JS } from "../index";
-import { maybeAddImport } from "../add-import";
+import { maybeBind } from "../binding";
 import { emptySpace, J, isIdentifier, rightPadded, singleSpace, Type } from "../../java";
 import { create as produce, Draft } from "mutative";
 import { randomId } from "../../uuid";
@@ -174,26 +174,26 @@ export class ChangeImport extends Recipe {
                 let result = await super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
 
                 // If we transformed an import but need to add to existing import from new module,
-                // or if we only removed a member from a multi-import, use maybeAddImport
+                // or if we only removed a member from a multi-import, use maybeBind
                 if (this.hasOldImport && !this.transformedImport) {
                     const aliasToUse = newAlias ?? this.oldAlias;
 
                     if (newMember === 'default') {
-                        maybeAddImport(this, {
+                        maybeBind(this, {
                             module: newModule,
                             member: 'default',
                             alias: aliasToUse,
                             onlyIfReferenced: false
                         });
                     } else if (newMember === '*') {
-                        maybeAddImport(this, {
+                        maybeBind(this, {
                             module: newModule,
                             member: '*',
                             alias: aliasToUse,
                             onlyIfReferenced: false
                         });
                     } else {
-                        maybeAddImport(this, {
+                        maybeBind(this, {
                             module: newModule,
                             member: newMember,
                             // A pinned alias is taken verbatim: `oldMember` is the name this
@@ -261,7 +261,7 @@ export class ChangeImport extends Recipe {
                     });
                 } else {
                     // Remove just the specific member from the import
-                    // maybeAddImport will add the new import
+                    // maybeBind will add the new import
                     return this.removeNamedImportMember(imp, oldMember, ctx);
                 }
             }
