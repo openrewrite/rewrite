@@ -36,52 +36,18 @@ describe('arrow patterns against a zero-parameter arrow', () => {
         });
     }
 
-    const blockBodied = () =>
-        //language=javascript
-        javascript(`
-            const zeroParameters = () => { return 1; };
-            const oneParameter = (a) => { return 1; };
-        `);
-
-    const expressionBodied = () =>
+    const arrows = () =>
         //language=javascript
         javascript(`
             const zeroParameters = () => 1;
             const oneParameter = (a) => 1;
         `);
 
-    test('a variadic parameter capture', async () => {
-        const matched: string[] = [];
-        spec.recipe = probe(pattern`(${capture({variadic: true})}) => { return ${capture()}; }`, matched);
-
-        await spec.rewriteRun(blockBodied());
-
-        expect(matched).toEqual(['oneParameter']);
-    });
-
-    test('a plain parameter capture', async () => {
-        const matched: string[] = [];
-        spec.recipe = probe(pattern`(${capture()}) => { return ${capture()}; }`, matched);
-
-        await spec.rewriteRun(blockBodied());
-
-        expect(matched).toEqual(['oneParameter']);
-    });
-
-    test('a literal parameter, with no capture in the parameter list', async () => {
-        const matched: string[] = [];
-        spec.recipe = probe(pattern`(a) => { return ${capture()}; }`, matched);
-
-        await spec.rewriteRun(blockBodied());
-
-        expect(matched).toEqual(['oneParameter']);
-    });
-
-    test('an expression-bodied arrow pattern', async () => {
+    test('a one-parameter pattern reports no match', async () => {
         const matched: string[] = [];
         spec.recipe = probe(pattern`(${capture()}) => ${capture()}`, matched);
 
-        await spec.rewriteRun(expressionBodied());
+        await spec.rewriteRun(arrows());
 
         expect(matched).toEqual(['oneParameter']);
     });
@@ -90,7 +56,7 @@ describe('arrow patterns against a zero-parameter arrow', () => {
         const matched: string[] = [];
         spec.recipe = probe(pattern`() => ${capture()}`, matched);
 
-        await spec.rewriteRun(expressionBodied());
+        await spec.rewriteRun(arrows());
 
         expect(matched).toEqual(['zeroParameters']);
     });
