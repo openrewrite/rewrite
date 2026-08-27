@@ -230,11 +230,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 // Apply beforeComma rule to all elements except the last
                 // (last element's after is before closing bracket, not a comma)
                 for (let i = 0; i < draft.elements.length - 1; i++) {
-                    const afterWs = draft.elements[i].after.whitespace;
-                    // Preserve newlines - only adjust when on same line
-                    if (!afterWs.includes("\n")) {
-                        draft.elements[i].after.whitespace = this.style.other.beforeComma ? " " : "";
-                    }
+                    this.spaceAfterRightPaddedDraft(draft.elements[i], this.style.other.beforeComma);
                 }
             }
             if (draft.elements.length > 1) {
