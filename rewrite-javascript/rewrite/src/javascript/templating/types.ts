@@ -18,6 +18,8 @@ import {J, Type} from '../../java';
 import type {Pattern} from "./pattern";
 import type {Template} from "./template";
 import type {CaptureValue, RawCode} from "./capture";
+import type {AddImportOptions} from "../add-import";
+import type {JavaScriptVisitor} from "../visitor";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -481,7 +483,28 @@ export interface TemplateOptions {
      * The template engine will create a package.json with these dependencies.
      */
     dependencies?: Record<string, string>;
+
+    /**
+     * Modules the template's code refers to, keyed by the identifier its source uses for each.
+     * The key is a preferred name: {@link Template.resolveBindings} deconflicts it against the
+     * file, and applying the template rewrites the template's references to whatever it settled on.
+     *
+     * @example
+     * ```typescript
+     * template`Theming.setTheme(${capture('theme')})`
+     *     .configure({bindings: {Theming: {module: 'sap/ui/core/Theming', member: 'default'}}})
+     * ```
+     */
+    bindings?: Record<string, ModuleBinding>;
 }
+
+/**
+ * A module a template's code depends on. The local name comes from the key it is declared under,
+ * and {@link Template.resolveBindings} settles the rest. `member` and `typeOnly` shape the import
+ * it creates, so a caller passing {@link ApplyOptions.bindings} of its own reads neither.
+ */
+export type ModuleBinding = Omit<AddImportOptions,
+    'module' | 'alias' | 'preferredName' | 'onlyIfReferenced' | 'sideEffectOnly'> & { module: string };
 
 /**
  * Options for template application.
@@ -516,6 +539,25 @@ export interface ApplyOptions {
      * The anchor supplies the result's prefix either way.
      */
     format?: boolean;
+
+    /**
+     * Local names for the bindings the template declares, keyed as they are declared — normally
+     * {@link Template.resolveBindings}. Every declared binding needs one.
+     */
+    bindings?: Record<string, string>;
+}
+
+/** Options a caller supplies per node, as against the ones {@link RewriteConfig} fixes for the rule. */
+export interface TryOnOptions {
+    /**
+     * The visitor to bind the applied template's declared modules in. The rule holds that template,
+     * so it resolves them itself, and only once a pattern has matched — a rule that does not fire
+     * leaves the file's imports alone. {@link TryOnOptions.bindings} overrides this.
+     */
+    visitor?: JavaScriptVisitor<any>;
+
+    /** As {@link ApplyOptions.bindings}, for a caller that resolves the modules some other way. */
+    bindings?: Record<string, string>;
 }
 
 /**
@@ -531,7 +573,7 @@ export interface RewriteRule {
      *          When using in a visitor, always use the `|| node` pattern to return the original
      *          node when there's no match: `return await rule.tryOn(this.cursor, node) || node;`
      */
-    tryOn(cursor: Cursor, node: J): Promise<J | undefined>;
+    tryOn(cursor: Cursor, node: J, options?: TryOnOptions): Promise<J | undefined>;
 
     /**
      * Chains this rule with another rule, creating a composite rule that applies both transformations sequentially.

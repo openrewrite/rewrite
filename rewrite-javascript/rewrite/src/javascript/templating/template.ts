@@ -16,6 +16,9 @@
 import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {ApplyOptions, Parameter, TemplateOptions, TemplateParameter} from './types';
+import {bindingContextStatement, isResolvable} from './bindings';
+import {maybeAddImport} from '../add-import';
+import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
 import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
@@ -246,7 +249,11 @@ export class Template {
         // Generate cache key for global lookup
         // For raw() parameters, we need to include their code values in the key
         // since they're spliced at construction time, not application time
-        const contextStatements = this.options.context || this.options.imports || [];
+        const contextStatements = [
+            ...(this.options.context || this.options.imports || []),
+            ...Object.entries(this.options.bindings ?? {})
+                .map(([name, b]) => bindingContextStatement(name, b, this.options.dependencies ?? {}))
+        ];
         const parametersKey = this.parameters.map((p, i) => {
             const value = p.value;
             // Include raw code values in the cache key using the symbol
@@ -283,6 +290,24 @@ export class Template {
         this._cachedTemplate = result;
 
         return result;
+    }
+
+    /**
+     * Binds every module this template declares in the file `visitor` is traversing, and returns
+     * the local names to hand back through {@link ApplyOptions.bindings}. A module the dependencies
+     * cannot resolve is bound whether or not the template goes on to reference it, so call this
+     * where the template is known to apply — {@link RewriteRule.tryOn} does, once a pattern matched.
+     */
+    resolveBindings(visitor: JavaScriptVisitor<any>): Record<string, string> {
+        const resolved: Record<string, string> = {};
+        const dependencies = this.options.dependencies ?? {};
+        for (const [name, binding] of Object.entries(this.options.bindings ?? {})) {
+            // Recognising the reference the template splices in takes attribution, which only the
+            // import form of a context statement carries. Without one there is nothing to look for.
+            const onlyIfReferenced = isResolvable(binding.module, dependencies);
+            resolved[name] = maybeAddImport(visitor, {...binding, preferredName: name, onlyIfReferenced});
+        }
+        return resolved;
     }
 
     /**
@@ -347,6 +372,19 @@ export class Template {
             }
         }
 
+        const declared = this.options.bindings ?? {};
+        const renames: Record<string, string> = {};
+        const modules: Record<string, string> = {};
+        for (const [name, binding] of Object.entries(declared)) {
+            const bound = options?.bindings?.[name];
+            if (bound === undefined) {
+                throw new Error(`Template declares a binding for '${name}' but was applied without a local name for it. ` +
+                    `Pass bindings: template.resolveBindings(visitor) to apply().`);
+            }
+            renames[name] = bound;
+            modules[name] = binding.module;
+        }
+
         // Use instance-level cache to get the template tree
         const ast = await this.getTemplateTree();
 
@@ -361,7 +399,9 @@ export class Template {
             },
             normalizedValues,
             wrappersMap,
-            options?.format ?? true
+            options?.format ?? true,
+            renames,
+            modules
         );
     }
 }

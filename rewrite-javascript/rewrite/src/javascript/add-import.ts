@@ -4,6 +4,7 @@ import {JS, JSX} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
 import {getStyle, PrettierStyle, SpacesStyle, StyleKind} from "./style";
+import {Cursor} from "../tree";
 
 export type QuoteChar = "'" | '"';
 
@@ -32,8 +33,15 @@ export interface AddImportOptions {
 
     /** Optional alias for the imported member.
      * Required when member is 'default' or '*'.
+     * Taken verbatim, never deconflicted: a caller that names an alias may already have
+     * emitted code using it.
      * Cannot be combined with `sideEffectOnly`. */
     alias?: string;
+
+    /** Preferred local name, deconflicted if the file already binds it. Stands in for `alias` where
+     * `member` is 'default' or '*' and the caller wants a name it does not insist on.
+     * Cannot be combined with `sideEffectOnly`. */
+    preferredName?: string;
 
     /** If true, only add the import if the member is actually used in the file. Default: true
      * Cannot be combined with `sideEffectOnly`. */
@@ -60,6 +68,10 @@ export interface AddImportOptions {
  * Register an AddImport visitor to add an import statement to a JavaScript/TypeScript file
  * @param visitor The visitor to add the import addition to
  * @param options Configuration options for the import to add
+ * @returns The local name the module is bound to: an existing binding's where one answers this
+ *   request, otherwise the name the new import will use, suffixed if the file already binds it. `onlyIfReferenced` defaults to true, so
+ *   the import may never appear, and the name is then what it would have gone by. A side-effect
+ *   import binds no name and returns `undefined`.
  *
  * @example
  * // Add a named import
@@ -83,20 +95,405 @@ export interface AddImportOptions {
  */
 export function maybeAddImport(
     visitor: JavaScriptVisitor<any>,
+    options: AddImportOptions & { sideEffectOnly: true }
+): undefined;
+export function maybeAddImport(
+    visitor: JavaScriptVisitor<any>,
+    options: AddImportOptions & { sideEffectOnly?: false }
+): string;
+export function maybeAddImport(
+    visitor: JavaScriptVisitor<any>,
     options: AddImportOptions
-) {
+): string | undefined;
+export function maybeAddImport(
+    visitor: JavaScriptVisitor<any>,
+    options: AddImportOptions
+): string | undefined {
+    validate(options);
+    const module = moduleNameOf(options.module);
+    const sideEffectOnly = options.sideEffectOnly ?? false;
+    const typeOnly = options.typeOnly ?? false;
+
+    // A queued import binds the module as much as one already in the file, so it answers a later
+    // request the same way; a name a merged request never emits would be referenced but not bound.
     for (const v of visitor.afterVisit || []) {
-        if (v instanceof AddImport &&
-            v.module === moduleNameOf(options.module) &&
-            v.quoteStyle === options.quoteStyle &&
-            v.member === options.member &&
-            v.alias === options.alias &&
-            v.sideEffectOnly === (options.sideEffectOnly ?? false) &&
-            v.typeOnly === (options.typeOnly ?? false)) {
-            return;
+        if (!(v instanceof AddImport) || v.module !== module ||
+            v.sideEffectOnly !== sideEffectOnly || v.typeOnly !== typeOnly) {
+            continue;
+        }
+        // How a specifier prints, or what name would be nice, does not say which binding is wanted.
+        // A pinned alias does: it asks for a binding of its own, which only the same request answers.
+        const answers = options.alias
+            ? v.alias === options.alias && v.member === options.member
+            : memberName(v.member) === memberName(options.member);
+        if (answers) {
+            return v.bindingName;
         }
     }
-    visitor.afterVisit.push(new AddImport(options));
+
+    if (sideEffectOnly) {
+        visitor.afterVisit.push(new AddImport(options));
+        return undefined;
+    }
+
+    // A pinned alias is the whole answer, so the file has no say and nothing below needs to read it.
+    if (options.alias) {
+        visitor.afterVisit.push(new AddImport(options, options.alias));
+        return options.alias;
+    }
+
+    const derived = derivedName(options);
+    const cu = compilationUnitOf(visitor);
+    if (!cu) {
+        visitor.afterVisit.push(new AddImport(options, derived));
+        return derived;
+    }
+
+    const bindings = bindingsInScope(cu, cursorOf(visitor));
+
+    // An import already serving this request answers it; queuing one would, on the next cycle,
+    // derive a suffixed name from the binding this call just added. A caller that named a preference
+    // takes whatever comes back; one that did not assumes the name it derived, so a binding under
+    // any other name would leave the references it emits unbound.
+    for (const binding of bindings) {
+        if (binding.module === module && binding.member === memberName(options.member) &&
+            binding.typeOnly === typeOnly &&
+            (options.preferredName !== undefined || anyNameAnswers(options) ||
+                binding.name === derived)) {
+            return binding.name;
+        }
+    }
+
+    const name = deconflict(derived, takenNames(bindings, visitor));
+    visitor.afterVisit.push(new AddImport(options, name));
+    return name;
+}
+
+/** Rejects a request on its own terms, whatever the queue already holds. */
+function validate(options: AddImportOptions): void {
+    // Validate that a name is provided when member is 'default'
+    if (options.member === 'default' && !options.alias && !options.preferredName) {
+        throw new Error("When member is 'default', the alias parameter is required");
+    }
+
+    // Validate that a name is provided when member is '*' (namespace import)
+    if (options.member === '*' && !options.alias && !options.preferredName) {
+        throw new Error("When member is '*', the alias parameter is required");
+    }
+
+    // Validate that sideEffectOnly is not combined with incompatible options
+    if (options.sideEffectOnly) {
+        if (options.member !== undefined) {
+            throw new Error("Cannot combine sideEffectOnly with member");
+        }
+        if (options.alias !== undefined) {
+            throw new Error("Cannot combine sideEffectOnly with alias");
+        }
+        if (options.preferredName !== undefined) {
+            throw new Error("Cannot combine sideEffectOnly with preferredName");
+        }
+        if (options.onlyIfReferenced !== undefined) {
+            throw new Error("Cannot combine sideEffectOnly with onlyIfReferenced");
+        }
+        if (options.typeOnly) {
+            throw new Error("Cannot combine sideEffectOnly with typeOnly");
+        }
+    }
+}
+
+/**
+ * A request that named no local name and asks for no member of the module. Having expressed no
+ * preference it has none to disappoint, so whatever the file already calls that module answers it.
+ */
+function anyNameAnswers(options: AddImportOptions): boolean {
+    return !options.sideEffectOnly && memberName(options.member) === undefined &&
+        options.alias === undefined && options.preferredName === undefined;
+}
+
+/** The local name a request asks for, before the file has a say in it. */
+function derivedName(options: AddImportOptions): string {
+    return options.alias ?? options.preferredName ?? memberName(options.member) ?? moduleNameOf(options.module);
+}
+
+/** `'default'` and an absent member both name a default import, which binds no member name of its own. */
+function memberName(member: string | undefined): string | undefined {
+    return member === 'default' ? undefined : member;
+}
+
+/** A name introduced into the file's module scope, and where it came from when that is an import. */
+interface ModuleScopeBinding {
+    name: string;
+    module?: string;
+    /** Carries the {@link AddImportOptions.member} spelling, so `undefined` means a default import. */
+    member?: string;
+    typeOnly?: boolean;
+}
+
+function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
+    return (visitor as unknown as { cursor?: Cursor }).cursor;
+}
+
+function compilationUnitOf(visitor: JavaScriptVisitor<any>): JS.CompilationUnit | undefined {
+    // `cursor` is protected on `TreeVisitor`, and the `maybeAddImport`/`maybeRemoveImport`
+    // API is free functions, so reaching it takes a cast.
+    return cursorOf(visitor)?.firstEnclosing((v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
+}
+
+/** Every name in scope at `cursor`: what the file binds, and what each block enclosing it declares. */
+function bindingsInScope(cu: JS.CompilationUnit, cursor: Cursor | undefined): ModuleScopeBinding[] {
+    const bindings = statementBindings(cu.statements);
+    // A local shadows an import for the code the template lands in, so a name a block declares is
+    // taken there even though the module never answers for it.
+    for (let c = cursor; c && c.value !== cu; c = c.parent) {
+        for (const name of scopeNames(c.value)) {
+            bindings.push({name});
+        }
+    }
+    return bindings;
+}
+
+/** The names a scope introduces directly: a block's declarations, or a function's parameters. */
+function scopeNames(scope: unknown): string[] {
+    const node = scope as J | undefined;
+    if (node?.kind === J.Kind.Block) {
+        return statementBindings((node as J.Block).statements).map(binding => binding.name);
+    }
+    if (node?.kind === J.Kind.MethodDeclaration) {
+        return (node as J.MethodDeclaration).parameters.elements
+            .flatMap(param => param.element?.kind === J.Kind.VariableDeclarations
+                ? (param.element as J.VariableDeclarations).variables.flatMap(v => patternNames(v.element?.name))
+                : patternNames(param.element))
+            .map(bound => bound.name);
+    }
+    if (node?.kind === J.Kind.Lambda) {
+        return (node as J.Lambda).parameters.parameters
+            .flatMap(param => param.element?.kind === J.Kind.VariableDeclarations
+                ? (param.element as J.VariableDeclarations).variables.flatMap(v => patternNames(v.element?.name))
+                : patternNames(param.element))
+            .map(bound => bound.name);
+    }
+    return [];
+}
+
+/** Imports are top-level statements and so is anything that can shadow one, so a flat scan sees every name. */
+function statementBindings(statements: J.RightPadded<Statement>[]): ModuleScopeBinding[] {
+    const bindings: ModuleScopeBinding[] = [];
+
+    const declaredBy = (name: J | undefined): void => {
+        for (const bound of patternNames(name)) {
+            bindings.push({name: bound.name});
+        }
+    };
+
+    const declaredByVariables = (varDecl: J.VariableDeclarations): void => {
+        for (const variable of varDecl.variables) {
+            const required = requiredModule(variable.element?.initializer?.element);
+            if (required !== undefined) {
+                bindings.push(...requireBindings(variable.element?.name, required));
+            } else {
+                declaredBy(variable.element?.name);
+            }
+        }
+    };
+
+    for (const stmt of statements) {
+        const statement = stmt.element;
+        switch (statement?.kind) {
+            case JS.Kind.Import:
+                bindings.push(...importBindings(statement as JS.Import));
+                break;
+            case J.Kind.VariableDeclarations:
+                declaredByVariables(statement as J.VariableDeclarations);
+                break;
+            case JS.Kind.ScopedVariableDeclarations:
+                for (const variable of (statement as JS.ScopedVariableDeclarations).variables) {
+                    if (variable.element?.kind === J.Kind.VariableDeclarations) {
+                        declaredByVariables(variable.element as J.VariableDeclarations);
+                    }
+                }
+                break;
+            case J.Kind.MethodDeclaration:
+                declaredBy((statement as J.MethodDeclaration).name);
+                break;
+            case J.Kind.ClassDeclaration:
+                declaredBy((statement as J.ClassDeclaration).name);
+                break;
+            case JS.Kind.NamespaceDeclaration:
+                declaredBy((statement as JS.NamespaceDeclaration).name.element);
+                break;
+            case JS.Kind.TypeDeclaration:
+                declaredBy((statement as JS.TypeDeclaration).name.element);
+                break;
+        }
+    }
+
+    return bindings;
+}
+
+/** The module a `require('...')` initializer names, `undefined` for an initializer that is anything else. */
+function requiredModule(initializer: J | undefined): string | undefined {
+    return initializer?.kind === J.Kind.MethodInvocation
+        ? requiredModuleOf(initializer as J.MethodInvocation)
+        : undefined;
+}
+
+/** A `require(...)` call, whatever it is passed. `obj.require('x')` selects a method rather than loading a module. */
+function isRequireCall(methodInv: J.MethodInvocation): boolean {
+    return !methodInv.select && methodInv.name?.kind === J.Kind.Identifier &&
+        (methodInv.name as J.Identifier).simpleName === 'require';
+}
+
+/**
+ * The module a `require(...)` call loads. `obj.require('x')` selects a method rather than loading a
+ * module, and a specifier that is not a string literal names none that can be read here.
+ */
+function requiredModuleOf(methodInv: J.MethodInvocation): string | undefined {
+    if (!isRequireCall(methodInv)) {
+        return undefined;
+    }
+    const argument = methodInv.arguments?.elements[0]?.element;
+    return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === 'string'
+        ? moduleNameOf(argument as J.Literal)
+        : undefined;
+}
+
+/**
+ * Every name a binding pattern introduces. `member` is the property a name takes its value from,
+ * and only a name bound directly by the pattern has one — anything deeper reads a property of a
+ * property, so it occupies its name without binding a member of the module.
+ */
+function patternNames(pattern: J | undefined): { name: string; member?: string }[] {
+    if (pattern?.kind === J.Kind.Identifier) {
+        return [{name: (pattern as J.Identifier).simpleName}];
+    }
+    // An array pattern binds by position, so its elements name no member of what they destructure.
+    if (pattern?.kind === JS.Kind.ArrayBindingPattern) {
+        return (pattern as JS.ArrayBindingPattern).elements.elements
+            .flatMap(elem => elem.element?.kind === JS.Kind.BindingElement
+                ? patternNames((elem.element as JS.BindingElement).name)
+                : patternNames(elem.element))
+            .map(bound => ({name: bound.name}));
+    }
+    if (pattern?.kind !== JS.Kind.ObjectBindingPattern) {
+        return [];
+    }
+    const names: { name: string; member?: string }[] = [];
+    for (const elem of (pattern as JS.ObjectBindingPattern).bindings.elements) {
+        if (elem.element?.kind !== JS.Kind.BindingElement) {
+            continue;
+        }
+        const bindingElem = elem.element as JS.BindingElement;
+        if (bindingElem.name?.kind === J.Kind.Identifier) {
+            const name = (bindingElem.name as J.Identifier).simpleName;
+            const propertyName = bindingElem.propertyName?.element;
+            names.push({
+                name,
+                member: propertyName?.kind === J.Kind.Identifier
+                    ? (propertyName as J.Identifier).simpleName
+                    : name
+            });
+        } else {
+            names.push(...patternNames(bindingElem.name).map(bound => ({name: bound.name})));
+        }
+    }
+    return names;
+}
+
+/** A `require` binds a module the way an import does, so the pool records it the same way. */
+function requireBindings(pattern: J | undefined, module: string): ModuleScopeBinding[] {
+    // A whole-module require binds no member, exactly as a default import does.
+    if (pattern?.kind === J.Kind.Identifier) {
+        return [{name: (pattern as J.Identifier).simpleName, module, member: undefined, typeOnly: false}];
+    }
+    return patternNames(pattern).map(bound => bound.member === undefined
+        ? {name: bound.name}
+        : {name: bound.name, module, member: bound.member, typeOnly: false});
+}
+
+/** The member a specifier imports and the name it binds it under, which are the same absent an alias. */
+function specifierBinding(specifier: JS.ImportSpecifier): { name: string; member: string } | undefined {
+    if (specifier.specifier?.kind === J.Kind.Identifier) {
+        const name = (specifier.specifier as J.Identifier).simpleName;
+        return {name, member: name};
+    }
+    if (specifier.specifier?.kind !== JS.Kind.Alias) {
+        return undefined;
+    }
+    const alias = specifier.specifier as JS.Alias;
+    return alias.propertyName?.element?.kind === J.Kind.Identifier && alias.alias?.kind === J.Kind.Identifier
+        ? {name: (alias.alias as J.Identifier).simpleName, member: (alias.propertyName.element as J.Identifier).simpleName}
+        : undefined;
+}
+
+function importBindings(jsImport: JS.Import): ModuleScopeBinding[] {
+    const moduleSpecifier = jsImport.moduleSpecifier?.element;
+    const module = moduleSpecifier?.kind === J.Kind.Literal
+        ? moduleNameOf(moduleSpecifier as J.Literal)
+        : undefined;
+    const importClause = jsImport.importClause;
+    if (!importClause) {
+        return [];
+    }
+
+    const typeOnly = importClause.typeOnly;
+    const bindings: ModuleScopeBinding[] = [];
+
+    if (importClause.name?.element?.kind === J.Kind.Identifier) {
+        bindings.push({name: (importClause.name.element as J.Identifier).simpleName, module, member: undefined, typeOnly});
+    }
+
+    const namedBindings = importClause.namedBindings;
+    if (namedBindings?.kind === J.Kind.Identifier) {
+        bindings.push({name: (namedBindings as J.Identifier).simpleName, module, member: '*', typeOnly});
+    } else if (namedBindings?.kind === JS.Kind.Alias) {
+        const alias = (namedBindings as JS.Alias).alias;
+        if (alias?.kind === J.Kind.Identifier) {
+            bindings.push({name: (alias as J.Identifier).simpleName, module, member: '*', typeOnly});
+        }
+    } else if (namedBindings?.kind === JS.Kind.NamedImports) {
+        for (const elem of (namedBindings as JS.NamedImports).elements.elements) {
+            const bound = elem.element?.kind === JS.Kind.ImportSpecifier
+                ? specifierBinding(elem.element as JS.ImportSpecifier)
+                : undefined;
+            if (bound) {
+                bindings.push({...bound, module, typeOnly});
+            }
+        }
+    }
+
+    return bindings;
+}
+
+/**
+ * Names the file binds, plus those pending `AddImport`s on the `afterVisit` queue have claimed. A
+ * queued `RemoveImport` does not free one: it removes only what the file leaves unused, and binding
+ * a name it keeps is an error, where an unnecessary suffix merely reads oddly.
+ */
+function takenNames(bindings: ModuleScopeBinding[], visitor: JavaScriptVisitor<any>): Set<string> {
+    const taken = new Set<string>();
+
+    for (const v of visitor.afterVisit || []) {
+        if (v instanceof AddImport && v.bindingName) {
+            taken.add(v.bindingName);
+        }
+    }
+
+    for (const binding of bindings) {
+        taken.add(binding.name);
+    }
+
+    return taken;
+}
+
+function deconflict(derived: string, taken: Set<string>): string {
+    if (!taken.has(derived)) {
+        return derived;
+    }
+    let suffix = 1;
+    while (taken.has(`${derived}_${suffix}`)) {
+        suffix++;
+    }
+    return `${derived}_${suffix}`;
 }
 
 /**
@@ -227,35 +624,18 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     readonly typeOnly: boolean;
     readonly style?: ImportStyle;
     readonly quoteStyle?: QuoteChar;
+    /** The local name this import binds; `undefined` for a side-effect import. */
+    readonly bindingName?: string;
+    /**
+     * A default import the request named no local name for, so whatever the file already calls
+     * that module answers it.
+     */
+    readonly anyNameAnswers: boolean;
 
-    constructor(options: AddImportOptions) {
+    constructor(options: AddImportOptions, bindingName?: string) {
         super();
 
-        // Validate that alias is provided when member is 'default'
-        if (options.member === 'default' && !options.alias) {
-            throw new Error("When member is 'default', the alias parameter is required");
-        }
-
-        // Validate that alias is provided when member is '*' (namespace import)
-        if (options.member === '*' && !options.alias) {
-            throw new Error("When member is '*', the alias parameter is required");
-        }
-
-        // Validate that sideEffectOnly is not combined with incompatible options
-        if (options.sideEffectOnly) {
-            if (options.member !== undefined) {
-                throw new Error("Cannot combine sideEffectOnly with member");
-            }
-            if (options.alias !== undefined) {
-                throw new Error("Cannot combine sideEffectOnly with alias");
-            }
-            if (options.onlyIfReferenced !== undefined) {
-                throw new Error("Cannot combine sideEffectOnly with onlyIfReferenced");
-            }
-            if (options.typeOnly) {
-                throw new Error("Cannot combine sideEffectOnly with typeOnly");
-            }
-        }
+        validate(options);
 
         this.module = moduleNameOf(options.module);
         this.moduleValueSource = typeof options.module === 'string' ? undefined : options.module.valueSource;
@@ -267,6 +647,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         this.typeOnly = options.typeOnly ?? false;
         this.style = options.style;
         this.quoteStyle = options.quoteStyle;
+        this.bindingName = this.sideEffectOnly ? undefined : bindingName ?? derivedName(options);
+        this.anyNameAnswers = anyNameAnswers(options);
     }
 
     /**
@@ -279,13 +661,6 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         return moduleNameOf(moduleSpecifier as J.Literal);
     }
 
-    /**
-     * Check if a method invocation is a require() call
-     */
-    private isRequireCall(methodInv: J.MethodInvocation): boolean {
-        return methodInv.name?.kind === J.Kind.Identifier &&
-               (methodInv.name as J.Identifier).simpleName === 'require';
-    }
 
     /**
      * Determine the appropriate import style based on file type and existing imports
@@ -365,7 +740,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     const namedVar = varDecl.variables[0].element;
                     const initializer = namedVar?.initializer?.element;
                     if (initializer?.kind === J.Kind.MethodInvocation &&
-                        this.isRequireCall(initializer as J.MethodInvocation)) {
+                        isRequireCall(initializer as J.MethodInvocation)) {
                         hasCommonJSRequires = true;
                     }
                 }
@@ -442,12 +817,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     const namedVar = varDecl.variables[0].element;
                     const initializer = namedVar?.initializer?.element;
 
-                    if (initializer?.kind === J.Kind.MethodInvocation &&
-                        this.isRequireCall(initializer as J.MethodInvocation)) {
-                        const moduleName = this.getModuleNameFromRequire(initializer as J.MethodInvocation);
-                        if (moduleName === this.module) {
-                            return ImportStyle.CommonJS;
-                        }
+                    if (requiredModule(initializer) === this.module) {
+                        return ImportStyle.CommonJS;
                     }
                 }
             }
@@ -605,10 +976,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         const existingElements = namedImports.elements.elements;
 
                         // Find the correct insertion position (alphabetical, case-insensitive)
-                        const newName = (this.alias || this.member!).toLowerCase();
+                        const newName = this.bindingName!.toLowerCase();
                         let insertIndex = existingElements.findIndex(elem => {
                             if (elem.element?.kind === JS.Kind.ImportSpecifier) {
-                                const name = this.getImportAlias(elem.element) || this.getImportName(elem.element);
+                                const name = specifierBinding(elem.element as JS.ImportSpecifier)?.name ?? '';
                                 return newName.localeCompare(name.toLowerCase()) < 0;
                             }
                             return false;
@@ -766,91 +1137,27 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * Check if the import matches what we're trying to add
      */
     private isMatchingImport(jsImport: JS.Import): boolean {
-        // Check module specifier
         const moduleSpecifier = jsImport.moduleSpecifier?.element;
-        if (!moduleSpecifier) {
+        if (!moduleSpecifier || this.getModuleName(moduleSpecifier) !== this.module) {
             return false;
         }
 
-        const moduleName = this.getModuleName(moduleSpecifier);
-        if (moduleName !== this.module) {
-            return false;
-        }
-
+        // A side-effect import is the clause-less one, and no import carrying bindings stands in
+        // for it — nor it for them.
         const importClause = jsImport.importClause;
-
-        // Handle side-effect imports (no import clause)
-        if (!importClause) {
-            // If we're trying to add a side-effect import and one already exists, it's a match
-            return this.sideEffectOnly;
+        if (!importClause || this.sideEffectOnly) {
+            return !importClause && this.sideEffectOnly;
         }
 
-        // If we're adding a side-effect import but there's an existing import with bindings,
-        // it's not a match (side-effect import should be separate)
-        if (this.sideEffectOnly) {
-            return false;
-        }
+        return importBindings(jsImport).some(binding => this.answeredBy(binding));
+    }
 
-        // Check if the typeOnly flag matches - type-only and value imports are separate
-        if (importClause.typeOnly !== this.typeOnly) {
-            return false;
-        }
-
-        // Check if the specific member or default import already exists
-        if (this.member === '*') {
-            // We're adding a namespace import, check if one exists
-            const namedBindings = importClause.namedBindings;
-            if (!namedBindings) {
-                return false;
-            }
-
-            // Namespace imports can be represented as J.Identifier or JS.Alias
-            if (namedBindings.kind === J.Kind.Identifier) {
-                const identifier = namedBindings as J.Identifier;
-                return identifier.simpleName === this.alias;
-            } else if (namedBindings.kind === JS.Kind.Alias) {
-                const alias = namedBindings as JS.Alias;
-                if (alias.alias?.kind === J.Kind.Identifier) {
-                    return (alias.alias as J.Identifier).simpleName === this.alias;
-                }
-            }
-            return false;
-        } else if (this.member === undefined || this.member === 'default') {
-            // We're adding a default import, check if one exists
-            // For member === 'default', also verify the alias matches if specified
-            if (importClause.name === undefined) {
-                return false;
-            }
-            // If we have an alias, check that it matches
-            if (this.alias && importClause.name.element?.kind === J.Kind.Identifier) {
-                const existingName = (importClause.name.element as J.Identifier).simpleName;
-                return existingName === this.alias;
-            }
-            return true;
-        } else {
-            // We're adding a named import, check if it exists
-            const namedBindings = importClause.namedBindings;
-            if (!namedBindings) {
-                return false;
-            }
-
-            if (namedBindings.kind === JS.Kind.NamedImports) {
-                const namedImports = namedBindings as JS.NamedImports;
-                for (const elem of namedImports.elements.elements) {
-                    if (elem.element?.kind === JS.Kind.ImportSpecifier) {
-                        const specifier = elem.element as JS.ImportSpecifier;
-                        const importName = this.getImportName(specifier);
-                        const aliasName = this.getImportAlias(specifier);
-
-                        if (importName === this.member && aliasName === this.alias) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-
-        return false;
+    /** Whether a binding the file already has serves this request. */
+    private answeredBy(binding: ModuleScopeBinding): boolean {
+        return binding.module === this.module &&
+            binding.member === memberName(this.member) &&
+            binding.typeOnly === this.typeOnly &&
+            (this.anyNameAnswers || binding.name === this.bindingName);
     }
 
     /**
@@ -860,52 +1167,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         if (varDecl.variables.length !== 1) {
             return false;
         }
-
         const namedVar = varDecl.variables[0].element;
-        if (!namedVar) {
+        const module = requiredModule(namedVar?.initializer?.element);
+        if (module !== this.module) {
             return false;
         }
-
-        const initializer = namedVar.initializer?.element;
-        if (!initializer || initializer.kind !== J.Kind.MethodInvocation) {
-            return false;
-        }
-
-        const methodInv = initializer as J.MethodInvocation;
-        if (!this.isRequireCall(methodInv)) {
-            return false;
-        }
-
-        const moduleName = this.getModuleNameFromRequire(methodInv);
-        if (moduleName !== this.module) {
-            return false;
-        }
-
-        // Check if the variable name matches what we're trying to add
-        const pattern = namedVar.name;
-        if ((this.member === undefined || this.member === 'default') && pattern?.kind === J.Kind.Identifier) {
-            // Default import style: const fs = require('fs')
-            // For member === 'default', also check the alias matches if specified
-            if (this.alias) {
-                const varName = (pattern as J.Identifier).simpleName;
-                return varName === this.alias;
-            }
-            return true;
-        } else if (this.member !== undefined && this.member !== 'default' && pattern?.kind === JS.Kind.ObjectBindingPattern) {
-            // Destructured import: const { member } = require('module')
-            const objectPattern = pattern as JS.ObjectBindingPattern;
-            for (const elem of objectPattern.bindings.elements) {
-                if (elem.element?.kind === JS.Kind.BindingElement) {
-                    const bindingElem = elem.element as JS.BindingElement;
-                    const name = (bindingElem.name as J.Identifier)?.simpleName;
-                    if (name === (this.alias || this.member)) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
+        return requireBindings(namedVar!.name, module).some(binding => this.answeredBy(binding));
     }
 
     /**
@@ -1031,7 +1298,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // Step 2: Look for references that match
-        const targetName = this.alias || this.member;
+        const targetName = this.bindingName;
         const targetModule = this.module;
         let found = false;
         const self = this;
@@ -1206,7 +1473,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 annotations: [],
-                simpleName: this.alias!,
+                simpleName: this.bindingName!,
                 type: undefined,
                 fieldType: undefined
             };
@@ -1238,7 +1505,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 annotations: [],
-                simpleName: this.alias || this.module,
+                simpleName: this.bindingName!,
                 type: undefined,
                 fieldType: undefined
             };
@@ -1313,7 +1580,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     private createImportSpecifier(): JS.ImportSpecifier {
         let specifier: J.Identifier | JS.Alias;
 
-        if (this.alias) {
+        // An alias equal to the member says nothing `{member}` alone does not.
+        if (this.bindingName !== this.member) {
             // Aliased import: import { member as alias } from 'module'
             const propertyName: J.Identifier = {
                 id: randomId(),
@@ -1332,7 +1600,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 annotations: [],
-                simpleName: this.alias,
+                simpleName: this.bindingName!,
                 type: undefined,
                 fieldType: undefined
             };
@@ -1423,51 +1691,6 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         return 0;
     }
 
-    /**
-     * Get the module name from a require() call
-     */
-    private getModuleNameFromRequire(methodInv: J.MethodInvocation): string | undefined {
-        const args = methodInv.arguments?.elements;
-        if (!args || args.length === 0) {
-            return undefined;
-        }
 
-        const firstArg = args[0].element;
-        if (!firstArg || firstArg.kind !== J.Kind.Literal || typeof (firstArg as J.Literal).value !== 'string') {
-            return undefined;
-        }
 
-        return moduleNameOf(firstArg as J.Literal);
-    }
-
-    /**
-     * Get the import name from an import specifier
-     */
-    private getImportName(specifier: JS.ImportSpecifier): string {
-        const spec = specifier.specifier;
-        if (spec?.kind === JS.Kind.Alias) {
-            const alias = spec as JS.Alias;
-            const propertyName = alias.propertyName.element;
-            if (propertyName?.kind === J.Kind.Identifier) {
-                return (propertyName as J.Identifier).simpleName;
-            }
-        } else if (spec?.kind === J.Kind.Identifier) {
-            return (spec as J.Identifier).simpleName;
-        }
-        return '';
-    }
-
-    /**
-     * Get the import alias from an import specifier
-     */
-    private getImportAlias(specifier: JS.ImportSpecifier): string | undefined {
-        const spec = specifier.specifier;
-        if (spec?.kind === JS.Kind.Alias) {
-            const alias = spec as JS.Alias;
-            if (alias.alias?.kind === J.Kind.Identifier) {
-                return (alias.alias as J.Identifier).simpleName;
-            }
-        }
-        return undefined;
-    }
 }
