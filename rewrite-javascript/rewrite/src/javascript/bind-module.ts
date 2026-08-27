@@ -409,9 +409,10 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
             // Nothing referenced the binding, so the caller asked and then did not use the answer.
             return visited;
         }
-        // withDependency re-checks the parameter gap against the tree as it stands now: another
-        // edit in the same visit that drops a factory parameter can reopen a gap bindAmd's own
-        // check already cleared, and returning its `undefined` here would delete this node.
+        // withDependency re-checks the parameter/dependency count against the tree as it stands
+        // now: another edit in the same visit that drops or adds a factory parameter can reopen
+        // a mismatch bindAmd's own check already cleared, and returning its `undefined` here
+        // would delete this node.
         return withDependency(visited, block, this.module, this.binding) ?? visited;
     }
 }

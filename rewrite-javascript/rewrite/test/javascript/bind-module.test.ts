@@ -183,6 +183,17 @@ describe("bindModule", () => {
         expect(bound.name).toBe("Element");
     });
 
+    test("AMD appends to an expression-bodied arrow factory same as a block-bodied one", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], (B) => target());`,
+            `sap.ui.define(["a/B", "sap/ui/core/Element"], (B, Element) => Element.target());`
+        ));
+        expect(bound.name).toBe("Element");
+    });
+
     test("AMD reuses an existing dependency's parameter and edits nothing on that lane", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
