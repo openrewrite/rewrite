@@ -44,6 +44,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
@@ -63,6 +64,8 @@ public class MavenPomDownloader {
             .withJitter(0.1)
             .withMaxRetries(5)
             .build();
+
+    private static final Duration THROTTLE_COOLDOWN = Duration.ofSeconds(60);
 
     private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
 
@@ -161,7 +164,14 @@ public class MavenPomDownloader {
             });
         } catch (FailsafeException failsafeException) {
             if (failsafeException.getCause() instanceof HttpSenderResponseException) {
-                throw (HttpSenderResponseException) failsafeException.getCause();
+                HttpSenderResponseException e = (HttpSenderResponseException) failsafeException.getCause();
+                if (e.isThrottled()) {
+                    String endpoint = endpointOrNull(URI.create(request.getUrl().toString()));
+                    if (endpoint != null) {
+                        ctx.getThrottledEndpoints().put(endpoint, Instant.now().plus(THROTTLE_COOLDOWN));
+                    }
+                }
+                throw e;
             }
             throw failsafeException;
         } catch (UncheckedIOException e) {
@@ -169,6 +179,26 @@ public class MavenPomDownloader {
         } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }
+    }
+
+    /**
+     * Whether the repository's endpoint answered HTTP 429 recently enough that it is still cooling down.
+     */
+    private boolean throttled(MavenRepository repo) {
+        Map<String, Instant> throttled = ctx.getThrottledEndpoints();
+        if (throttled.isEmpty()) {
+            return false;
+        }
+        String endpoint = endpointOrNull(URI.create(repo.getUri()));
+        Instant until = endpoint == null ? null : throttled.get(endpoint);
+        if (until == null) {
+            return false;
+        }
+        if (Instant.now().isBefore(until)) {
+            return true;
+        }
+        throttled.remove(endpoint, until);
+        return false;
     }
 
     private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
@@ -363,9 +393,10 @@ public class MavenPomDownloader {
      * @return Metadata or null if the metadata cannot be derived.
      */
     private @Nullable MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, IOException, MavenDownloadingException {
-        if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null) {
+        if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null || throttled(repo)) {
             // Do not derive metadata if we cannot navigate/browse the artifacts.
             // Do not derive metadata if a specific version has been defined.
+            // Do not derive metadata from an endpoint that has just answered 429 to the metadata request.
             return null;
         }
 
@@ -890,6 +921,10 @@ public class MavenPomDownloader {
                     if (normalized != null &&
                         (acceptsVersion == null || repositoryAcceptsVersion(normalized, acceptsVersion, containingPom)) &&
                         seen.put(normalized.getId(), normalized) == null) {
+                        if (throttled(normalized)) {
+                            ctx.getResolutionListener().repositoryAccessFailedPreviously(normalized.getUri());
+                            continue;
+                        }
                         return normalized;
                     }
                 }
@@ -1299,6 +1334,10 @@ public class MavenPomDownloader {
 
         public boolean isAccessDenied() {
             return responseCode != null && 400 < responseCode && responseCode <= 403;
+        }
+
+        public boolean isThrottled() {
+            return responseCode != null && responseCode == 429;
         }
 
         // Any response code below 100 implies that no connection was made. Sometimes 0 or -1 is used for connection failures.

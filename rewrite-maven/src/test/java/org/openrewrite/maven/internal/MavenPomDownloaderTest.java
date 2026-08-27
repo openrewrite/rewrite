@@ -51,6 +51,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -1333,6 +1334,42 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .build();
                 var normalizedRepo = downloader.normalizeRepository(originalRepo, MavenExecutionContextView.view(ctx), null);
                 assertThat(normalizedRepo).isEqualTo(originalRepo);
+            });
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+        @Test
+        void throttledEndpointIsNotAskedAgainUntilItsCooldownElapses() {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            List<String> skipped = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repositoryAccessFailedPreviously(String uri) {
+                    skipped.add(uri);
+                }
+            });
+            var downloader = new MavenPomDownloader(ctx);
+            mockServer(429, mockRepo -> {
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .knownToExist(true)
+                  .build());
+
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "first"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                // The maven-metadata.xml request only: a host that just answered 429 is not asked for a directory listing too
+                assertThat(mockRepo.getRequestCount()).isEqualTo(1);
+
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "second"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(mockRepo.getRequestCount()).isEqualTo(1);
+                assertThat(skipped).containsExactly(repositories.get(0).getUri());
+
+                ctx.getThrottledEndpoints().replaceAll((endpoint, until) -> Instant.EPOCH);
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "second"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(mockRepo.getRequestCount()).isEqualTo(2);
             });
         }
 

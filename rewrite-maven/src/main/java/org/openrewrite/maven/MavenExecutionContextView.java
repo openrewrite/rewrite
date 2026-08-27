@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
@@ -57,6 +58,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
     private static final String MAVEN_UNREACHABLE_ENDPOINTS = "org.openrewrite.maven.unreachableEndpoints";
     private static final String MAVEN_AUTHENTICATION_REQUIRED_ENDPOINTS = "org.openrewrite.maven.authenticationRequiredEndpoints";
+    private static final String MAVEN_THROTTLED_ENDPOINTS = "org.openrewrite.maven.throttledEndpoints";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -105,6 +107,19 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      */
     public Set<String> getAuthenticationRequiredEndpoints() {
         return computeMessageIfAbsent(MAVEN_AUTHENTICATION_REQUIRED_ENDPOINTS, k -> ConcurrentHashMap.newKeySet());
+    }
+
+    /**
+     * The rate-limiting counterpart to {@link #getUnreachableEndpoints()}: connection endpoints, each a
+     * {@code host:port}, that answered HTTP 429 during this execution, mapped to the instant until which
+     * requests to them are skipped rather than sent. A 429 is transient, so it is never negative-cached; this
+     * map is what keeps every subsequent lookup from re-asking a host that has already said it is throttling.
+     * As with unreachable endpoints, the key is {@code host:port} rather than the full URI because rate limits
+     * are imposed per host, not per path. The map is concurrent because resolution runs across multiple
+     * threads sharing one execution context.
+     */
+    public Map<String, Instant> getThrottledEndpoints() {
+        return computeMessageIfAbsent(MAVEN_THROTTLED_ENDPOINTS, k -> new ConcurrentHashMap<>());
     }
 
     public MavenExecutionContextView setResolutionListener(ResolutionEventListener listener) {
