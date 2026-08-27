@@ -109,6 +109,7 @@ export function maybeAddImport(
     visitor: JavaScriptVisitor<any>,
     options: AddImportOptions
 ): string | undefined {
+    validate(options);
     const module = moduleNameOf(options.module);
     const sideEffectOnly = options.sideEffectOnly ?? false;
     const typeOnly = options.typeOnly ?? false;
@@ -157,7 +158,8 @@ export function maybeAddImport(
     for (const binding of bindings) {
         if (binding.module === module && binding.member === memberName(options.member) &&
             binding.typeOnly === typeOnly &&
-            (options.preferredName !== undefined || binding.name === derived)) {
+            (options.preferredName !== undefined || anyNameAnswers(options) ||
+                binding.name === derived)) {
             return binding.name;
         }
     }
@@ -165,6 +167,47 @@ export function maybeAddImport(
     const name = deconflict(derived, takenNames(bindings, visitor));
     visitor.afterVisit.push(new AddImport(options, name));
     return name;
+}
+
+/** Rejects a request on its own terms, whatever the queue already holds. */
+function validate(options: AddImportOptions): void {
+    // Validate that a name is provided when member is 'default'
+    if (options.member === 'default' && !options.alias && !options.preferredName) {
+        throw new Error("When member is 'default', the alias parameter is required");
+    }
+
+    // Validate that a name is provided when member is '*' (namespace import)
+    if (options.member === '*' && !options.alias && !options.preferredName) {
+        throw new Error("When member is '*', the alias parameter is required");
+    }
+
+    // Validate that sideEffectOnly is not combined with incompatible options
+    if (options.sideEffectOnly) {
+        if (options.member !== undefined) {
+            throw new Error("Cannot combine sideEffectOnly with member");
+        }
+        if (options.alias !== undefined) {
+            throw new Error("Cannot combine sideEffectOnly with alias");
+        }
+        if (options.preferredName !== undefined) {
+            throw new Error("Cannot combine sideEffectOnly with preferredName");
+        }
+        if (options.onlyIfReferenced !== undefined) {
+            throw new Error("Cannot combine sideEffectOnly with onlyIfReferenced");
+        }
+        if (options.typeOnly) {
+            throw new Error("Cannot combine sideEffectOnly with typeOnly");
+        }
+    }
+}
+
+/**
+ * A request that named no local name and asks for no member of the module. Having expressed no
+ * preference it has none to disappoint, so whatever the file already calls that module answers it.
+ */
+function anyNameAnswers(options: AddImportOptions): boolean {
+    return !options.sideEffectOnly && memberName(options.member) === undefined &&
+        options.alias === undefined && options.preferredName === undefined;
 }
 
 /** The local name a request asks for, before the file has a say in it. */
@@ -294,13 +337,18 @@ function requiredModule(initializer: J | undefined): string | undefined {
         : undefined;
 }
 
+/** A `require(...)` call, whatever it is passed. `obj.require('x')` selects a method rather than loading a module. */
+function isRequireCall(methodInv: J.MethodInvocation): boolean {
+    return !methodInv.select && methodInv.name?.kind === J.Kind.Identifier &&
+        (methodInv.name as J.Identifier).simpleName === 'require';
+}
+
 /**
  * The module a `require(...)` call loads. `obj.require('x')` selects a method rather than loading a
  * module, and a specifier that is not a string literal names none that can be read here.
  */
 function requiredModuleOf(methodInv: J.MethodInvocation): string | undefined {
-    if (methodInv.select || methodInv.name?.kind !== J.Kind.Identifier ||
-        (methodInv.name as J.Identifier).simpleName !== 'require') {
+    if (!isRequireCall(methodInv)) {
         return undefined;
     }
     const argument = methodInv.arguments?.elements[0]?.element;
@@ -579,34 +627,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     constructor(options: AddImportOptions, bindingName?: string) {
         super();
 
-        // Validate that a name is provided when member is 'default'
-        if (options.member === 'default' && !options.alias && !options.preferredName) {
-            throw new Error("When member is 'default', the alias parameter is required");
-        }
-
-        // Validate that a name is provided when member is '*' (namespace import)
-        if (options.member === '*' && !options.alias && !options.preferredName) {
-            throw new Error("When member is '*', the alias parameter is required");
-        }
-
-        // Validate that sideEffectOnly is not combined with incompatible options
-        if (options.sideEffectOnly) {
-            if (options.member !== undefined) {
-                throw new Error("Cannot combine sideEffectOnly with member");
-            }
-            if (options.alias !== undefined) {
-                throw new Error("Cannot combine sideEffectOnly with alias");
-            }
-            if (options.preferredName !== undefined) {
-                throw new Error("Cannot combine sideEffectOnly with preferredName");
-            }
-            if (options.onlyIfReferenced !== undefined) {
-                throw new Error("Cannot combine sideEffectOnly with onlyIfReferenced");
-            }
-            if (options.typeOnly) {
-                throw new Error("Cannot combine sideEffectOnly with typeOnly");
-            }
-        }
+        validate(options);
 
         this.module = moduleNameOf(options.module);
         this.moduleValueSource = typeof options.module === 'string' ? undefined : options.module.valueSource;
@@ -619,8 +640,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         this.style = options.style;
         this.quoteStyle = options.quoteStyle;
         this.bindingName = this.sideEffectOnly ? undefined : bindingName ?? derivedName(options);
-        this.anyNameAnswers = !this.sideEffectOnly && memberName(options.member) === undefined &&
-            options.alias === undefined && options.preferredName === undefined;
+        this.anyNameAnswers = anyNameAnswers(options);
     }
 
     /**
@@ -711,7 +731,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 if (varDecl.variables.length === 1) {
                     const namedVar = varDecl.variables[0].element;
                     const initializer = namedVar?.initializer?.element;
-                    if (requiredModule(initializer) !== undefined) {
+                    if (initializer?.kind === J.Kind.MethodInvocation &&
+                        isRequireCall(initializer as J.MethodInvocation)) {
                         hasCommonJSRequires = true;
                     }
                 }

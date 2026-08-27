@@ -3059,6 +3059,24 @@ describe('AddImport visitor', () => {
             expect(bound).toEqual(['merge_1', 'merge_2', 'merge_3']);
         });
 
+        test('a request that named nothing takes the name the file already gives the module', async () => {
+            const spec = new RecipeSpec();
+            const bound: { name?: string } = {};
+            spec.recipe = fromVisitor(captureBoundName({module: 'lodash', onlyIfReferenced: false}, bound));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import Foo from 'lodash';
+
+                        Foo();
+                    `
+                )
+            );
+
+            expect(bound.name).toBe('Foo');
+        });
+
         test('a side-effect import binds no name', async () => {
             const spec = new RecipeSpec();
             const bound: { name?: string } = {name: 'unset'};
