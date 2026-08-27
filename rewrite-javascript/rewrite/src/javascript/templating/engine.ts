@@ -214,7 +214,7 @@ export class TemplateEngine {
         dependencies: Record<string, string> = {}
     ): Promise<J> {
         // Generate type preamble for captures/parameters with types
-        const preamble = TemplateEngine.generateTypePreamble(parameters);
+        const preamble = TemplateEngine.parameterPreamble(parameters);
 
         // Build the template string with parameter placeholders
         const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
@@ -303,7 +303,33 @@ export class TemplateEngine {
      * @param parameters The parameters
      * @returns Array of preamble statements
      */
-    private static generateTypePreamble(parameters: Parameter[]): string[] {
+    /** The declarations that give a capture's placeholder its type while the pattern is parsed. */
+    static capturePreamble(captures: (Capture | Any | RawCode)[]): string[] {
+        const preamble: string[] = [];
+        for (const capture of captures) {
+            // Raw code is spliced in as source, so it declares nothing
+            if (capture instanceof RawCode || (capture && typeof capture === 'object' && (capture as any)[RAW_CODE_SYMBOL])) {
+                continue;
+            }
+
+            const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
+            const captureType = (capture as any)[CAPTURE_TYPE_SYMBOL];
+            if (captureType) {
+                const typeString = typeof captureType === 'string'
+                    ? captureType
+                    : this.typeToString(captureType);
+                // `any` attributes nothing, so a declaration for it would only cost a parse
+                if (typeString !== 'any') {
+                    const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
+                    preamble.push(`let ${placeholder}: ${typeString};`);
+                }
+            }
+        }
+        return preamble;
+    }
+
+    /** The parameter counterpart of {@link capturePreamble}. */
+    static parameterPreamble(parameters: Parameter[]): string[] {
         const preamble: string[] = [];
 
         for (let i = 0; i < parameters.length; i++) {
@@ -457,29 +483,7 @@ export class TemplateEngine {
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
     ): Promise<J> {
-        // Generate type preamble for captures with types (skip RawCode)
-        const preamble: string[] = [];
-        for (const capture of captures) {
-            // Skip raw code - it's not a capture
-            if (capture instanceof RawCode || (capture && typeof capture === 'object' && (capture as any)[RAW_CODE_SYMBOL])) {
-                continue;
-            }
-
-            const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
-            const captureType = (capture as any)[CAPTURE_TYPE_SYMBOL];
-            if (captureType) {
-                // Convert Type to string if needed
-                const typeString = typeof captureType === 'string'
-                    ? captureType
-                    : this.typeToString(captureType);
-                // Only add preamble if we have a concrete type (not 'any')
-                if (typeString !== 'any') {
-                    const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
-                    preamble.push(`let ${placeholder}: ${typeString};`);
-                }
-            }
-            // Don't add preamble declarations without types - they don't provide type attribution
-        }
+        const preamble = TemplateEngine.capturePreamble(captures);
 
         // Build the template string with placeholders for captures and raw code
         let result = '';

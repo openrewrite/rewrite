@@ -233,7 +233,9 @@ export class Pattern {
         const cacheKey = generateCacheKey(
             this.templateParts,
             capturesKey,
-            contextStatements,
+            // A capture's type reaches the parse as a declaration, so it shapes the tree the same
+            // way an explicit context statement does and belongs in the key alongside one.
+            [...contextStatements, ...TemplateEngine.capturePreamble(this.captures)],
             this._options.dependencies || {}
         );
 

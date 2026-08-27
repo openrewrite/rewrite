@@ -233,4 +233,19 @@ describe('capture types', () => {
             typescript('oldMethod(items)', 'newMethod(items)'),
         );
     });
+
+    test('a declared type is not borrowed from a neighbour of the same shape', async () => {
+        // Each pair below agrees on parts, names and arity, so the AST cache either separates them
+        // on the declared type or serves the first one's tree for both
+        const strPattern = pattern`${capture({name: 'v', type: Type.Primitive.String})} + z`;
+        expect(((await strPattern.getAstPattern()) as J.Binary).left.type).toBe(Type.Primitive.String);
+        const numPattern = pattern`${capture({name: 'v', type: Type.Primitive.Double})} + z`;
+        expect(((await numPattern.getAstPattern()) as J.Binary).left.type).toBe(Type.Primitive.Double);
+
+        // Templates key on parameter position rather than name, which collides just as readily
+        const strTemplate = template`${capture({name: 'v', type: Type.Primitive.String})}`;
+        expect((await (strTemplate as any).getTemplateTree() as J.Identifier).type).toBe(Type.Primitive.String);
+        const numTemplate = template`${capture({name: 'v', type: Type.Primitive.Double})}`;
+        expect((await (numTemplate as any).getTemplateTree() as J.Identifier).type).toBe(Type.Primitive.Double);
+    });
 });
