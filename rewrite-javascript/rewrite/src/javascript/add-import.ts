@@ -148,7 +148,7 @@ export function maybeAddImport(
         return derived;
     }
 
-    const bindings = moduleScopeBindings(cu);
+    const bindings = bindingsInScope(cu, cursorOf(visitor));
 
     // An import already serving this request answers it; queuing one would, on the next cycle,
     // derive a suffixed name from the binding this call just added. A caller that named a preference
@@ -186,15 +186,54 @@ interface ModuleScopeBinding {
     typeOnly?: boolean;
 }
 
+function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
+    return (visitor as unknown as { cursor?: Cursor }).cursor;
+}
+
 function compilationUnitOf(visitor: JavaScriptVisitor<any>): JS.CompilationUnit | undefined {
     // `cursor` is protected on `TreeVisitor`, and the `maybeAddImport`/`maybeRemoveImport`
     // API is free functions, so reaching it takes a cast.
-    const cursor = (visitor as unknown as { cursor?: Cursor }).cursor;
-    return cursor?.firstEnclosing((v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
+    return cursorOf(visitor)?.firstEnclosing((v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
+}
+
+/** Every name in scope at `cursor`: what the file binds, and what each block enclosing it declares. */
+function bindingsInScope(cu: JS.CompilationUnit, cursor: Cursor | undefined): ModuleScopeBinding[] {
+    const bindings = statementBindings(cu.statements);
+    // A local shadows an import for the code the template lands in, so a name a block declares is
+    // taken there even though the module never answers for it.
+    for (let c = cursor; c && c.value !== cu; c = c.parent) {
+        for (const name of scopeNames(c.value)) {
+            bindings.push({name});
+        }
+    }
+    return bindings;
+}
+
+/** The names a scope introduces directly: a block's declarations, or a function's parameters. */
+function scopeNames(scope: unknown): string[] {
+    const node = scope as J | undefined;
+    if (node?.kind === J.Kind.Block) {
+        return statementBindings((node as J.Block).statements).map(binding => binding.name);
+    }
+    if (node?.kind === J.Kind.MethodDeclaration) {
+        return (node as J.MethodDeclaration).parameters.elements
+            .flatMap(param => param.element?.kind === J.Kind.VariableDeclarations
+                ? (param.element as J.VariableDeclarations).variables.flatMap(v => patternNames(v.element?.name))
+                : patternNames(param.element))
+            .map(bound => bound.name);
+    }
+    if (node?.kind === J.Kind.Lambda) {
+        return (node as J.Lambda).parameters.parameters
+            .flatMap(param => param.element?.kind === J.Kind.VariableDeclarations
+                ? (param.element as J.VariableDeclarations).variables.flatMap(v => patternNames(v.element?.name))
+                : patternNames(param.element))
+            .map(bound => bound.name);
+    }
+    return [];
 }
 
 /** Imports are top-level statements and so is anything that can shadow one, so a flat scan sees every name. */
-function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
+function statementBindings(statements: J.RightPadded<Statement>[]): ModuleScopeBinding[] {
     const bindings: ModuleScopeBinding[] = [];
 
     const declaredBy = (name: J | undefined): void => {
@@ -214,7 +253,7 @@ function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
         }
     };
 
-    for (const stmt of cu.statements) {
+    for (const stmt of statements) {
         const statement = stmt.element;
         switch (statement?.kind) {
             case JS.Kind.Import:

@@ -3008,6 +3008,57 @@ describe('AddImport visitor', () => {
             expect(bound.name).toBe('aaa');
         });
 
+        test('a name an enclosing scope declares is taken where the import would be used', async () => {
+            const spec = new RecipeSpec();
+            const bound: string[] = [];
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                // Each anchor asks for a different module, so the queue never answers one from
+                // another and every scope is resolved on its own.
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    if ((method.name as J.Identifier)?.simpleName === 'anchor') {
+                        bound.push(maybeAddImport(this,
+                            {module: `m${bound.length}`, member: 'merge', onlyIfReferenced: false}));
+                    }
+                    return super.visitMethodInvocation(method, p);
+                }
+            });
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        function byParameter(merge) {
+                            anchor();
+                        }
+
+                        function byDeclaration() {
+                            const merge = 1;
+                            anchor();
+                        }
+
+                        const byLambda = (merge) => anchor();
+                    `,
+                    `
+                        import {merge as merge_1} from 'm0';
+                        import {merge as merge_2} from 'm1';
+                        import {merge as merge_3} from 'm2';
+
+                        function byParameter(merge) {
+                            anchor();
+                        }
+
+                        function byDeclaration() {
+                            const merge = 1;
+                            anchor();
+                        }
+
+                        const byLambda = (merge) => anchor();
+                    `
+                )
+            );
+
+            expect(bound).toEqual(['merge_1', 'merge_2', 'merge_3']);
+        });
+
         test('a side-effect import binds no name', async () => {
             const spec = new RecipeSpec();
             const bound: { name?: string } = {name: 'unset'};
