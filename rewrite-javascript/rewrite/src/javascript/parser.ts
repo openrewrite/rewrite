@@ -1220,7 +1220,10 @@ export class JavaScriptParserVisitor {
     private mapTypeInfo(node: ts.MethodDeclaration | ts.PropertyDeclaration | ts.VariableDeclaration | ts.ParameterDeclaration
         | ts.PropertySignature | ts.MethodSignature | ts.ArrowFunction | ts.CallSignatureDeclaration | ts.GetAccessorDeclaration
         | ts.FunctionDeclaration | ts.ConstructSignatureDeclaration | ts.FunctionExpression | ts.NamedTupleMember): JS.TypeInfo | undefined {
-        return node.type && {
+        if (!node.type || ts.isReparsed(node.type)) {
+            return undefined;
+        }
+        return {
             kind: JS.Kind.TypeInfo,
             id: randomId(),
             prefix: this.prefix(childAt(node, childrenOf(node).indexOf(node.type) - 1)),

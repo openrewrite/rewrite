@@ -41,7 +41,7 @@ export {
 } from "typescript/unstable/ast";
 export type {Checker as TypeChecker} from "typescript/unstable/sync";
 
-import {skipTrivia, SyntaxKind, type Node, type NodeArray, type SourceFile} from "typescript/unstable/ast";
+import {NodeFlags, skipTrivia, SyntaxKind, type Node, type NodeArray, type SourceFile} from "typescript/unstable/ast";
 
 /** Whether a source file is a module, which its export or import marks it as being. */
 export function isExternalModule(sourceFile: SourceFile): boolean {
@@ -75,4 +75,12 @@ export function exclamationTokenOf(node: Node): Node | undefined {
     const token = (node as {postfixToken?: Node; exclamationToken?: Node}).postfixToken
         ?? (node as {exclamationToken?: Node}).exclamationToken;
     return token?.kind === SyntaxKind.ExclamationToken ? token : undefined;
+}
+
+/**
+ * Whether a node came from a JSDoc comment rather than from syntax. The compiler turns JSDoc types
+ * into nodes of the declaration they annotate, positioned inside the comment they were read from.
+ */
+export function isReparsed(node: Node | undefined): boolean {
+    return node !== undefined && (node.flags & NodeFlags.Reparsed) !== 0;
 }

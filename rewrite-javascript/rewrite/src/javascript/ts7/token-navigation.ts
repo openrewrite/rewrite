@@ -16,6 +16,7 @@
 import {
     createScanner,
     LanguageVariant,
+    NodeFlags,
     skipTrivia,
     type Node,
     type NodeArray,
@@ -114,6 +115,11 @@ function buildChildren(node: Node, sourceFile: SourceFile): Node[] {
     // children stop at what `forEachChild` yields.
     node.forEachChild(
         child => {
+            // The compiler turns JSDoc types into nodes of the declaration they annotate. They sit
+            // at the comment's offsets, where the source holds a comment rather than a type.
+            if (child.flags & NodeFlags.Reparsed) {
+                return undefined;
+            }
             scanBetween(sourceFile, pos, child.pos, node, children);
             children.push(child);
             pos = child.end;

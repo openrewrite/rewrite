@@ -351,6 +351,25 @@ export function hasFlowAnnotation(sourceFile: ts.SourceFile) {
     return false;
 }
 
+/**
+ * The character ranges of every comment in `text`. The compiler parses JSDoc and reports syntax
+ * errors from inside it, with no option to stop it, so the parser locates those to leave them be.
+ */
+function commentRanges(text: string): Array<[number, number]> {
+    const scanner = ts.createScanner(false, ts.LanguageVariant.Standard, text);
+    const ranges: Array<[number, number]> = [];
+    for (; ;) {
+        const token = scanner.scan();
+        if (token === ts.SyntaxKind.EndOfFile) {
+            break;
+        }
+        if (token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia) {
+            ranges.push([scanner.getTokenStart(), scanner.getTokenEnd()]);
+        }
+    }
+    return ranges;
+}
+
 export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile) {
     // Diagnostics arrive already localised and flattened, and carry offsets rather than a file.
     const diagnostics = [
@@ -358,8 +377,10 @@ export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile
         ...program.getSemanticDiagnostics(sourceFile.fileName),
     ];
     let syntaxErrors: [errorMsg: string, errorCode: number][] = [];
+    const comments = commentRanges(sourceFile.text);
     const errors = diagnostics.filter(d =>
-        d.category === ts.DiagnosticCategory.Error && isCriticalDiagnostic(d.code, sourceFile));
+        d.category === ts.DiagnosticCategory.Error && isCriticalDiagnostic(d.code, sourceFile)
+        && !comments.some(([from, to]) => d.pos >= from && d.pos < to));
     if (errors.length > 0) {
         syntaxErrors = errors.map(e => {
             const {line, character} = sourceFile.getLineAndCharacterOfPosition(e.pos);
