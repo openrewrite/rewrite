@@ -18,7 +18,6 @@ import {J, Type} from '../../java';
 import type {Pattern} from "./pattern";
 import type {Template} from "./template";
 import type {CaptureValue, RawCode} from "./capture";
-import type {AddImportOptions} from "../add-import";
 import type {JavaScriptVisitor} from "../visitor";
 
 /**
