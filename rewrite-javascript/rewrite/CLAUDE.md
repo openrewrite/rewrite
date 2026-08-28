@@ -220,12 +220,18 @@ only be appended at the end. Nothing in the LST enforces that pairing, and a mis
 prints plausibly while binding later modules to the wrong names — so every edit keeps the two
 lists index-aligned, and an operation that cannot is refused rather than guessed.
 
+A binding is reused only where its name still resolves to it at the cursor. Where something nearer
+shadows it, `maybeBind` binds the module again under a name that reaches — a second import, or a
+second AMD dependency — because a caller mid-rewrite needs a name it can emit. `maybeRebind` answers
+with the name its binding already carries, which is what keeps existing references resolving, so it
+reports that name whether or not the cursor reaches it.
+
 ### When `maybeBind` returns `undefined`
 
 - the block's dependency and parameter counts already disagree, in either direction
 - a `member` is requested on the AMD lane, which binds whole modules only
 - the file binds its modules with `require` and one would have to be created (`ImportStyle.CommonJS`
-  has no add path); reuse of an existing `require` is always allowed
+  has no add path), which covers an existing `require` shadowed where the caller asked
 - no legal identifier can be derived from the module's last path segment and no `preferredName`
   or `alias` was given — `lodash-es`, `node:fs`, `@scope/my-lib`, `a/class`
 - a pinned `alias` cannot be bound verbatim, since deconflicting it would leave code the caller

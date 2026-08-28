@@ -16,7 +16,7 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, walk} from "./scope";
+import {compilationUnitOf, cursorOf, declarationsOf, scopeOf, walk} from "./scope";
 import {AddImportOptions, bindImport, existingImportBinding, memberName, moduleNameOf, RebindImport, requiredModuleOf} from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {
@@ -312,12 +312,14 @@ export function maybeBind(
 
     const cu = compilationUnitOf(visitor);
     const isWholeModule = !options.sideEffectOnly && (key === undefined || key === "*");
-    if (isWholeModule) {
-        const bound = cu && moduleObjectBindings(cu).find(b =>
+    if (isWholeModule && cu) {
+        const scope = scopeOf(cursorOf(visitor)!);
+        const bound = moduleObjectBindings(cu).find(b =>
             b.module === module && answersWholeModuleRequest(b, key === "*", options.typeOnly ?? false) &&
             // A pinned alias asks for a binding of that name, so another name for the same
             // module does not answer it; `bindImport`'s own lookup applies the same rule.
-            (options.alias === undefined || b.name === options.alias));
+            (options.alias === undefined || b.name === options.alias) &&
+            scope.declaringScope(b.name) === cu);
         if (bound !== undefined) {
             return bound.name;
         }
