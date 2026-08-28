@@ -269,5 +269,33 @@ describe('markers on a spliced capture', () => {
             )
         );
     });
+
+    test('a marker the value owns stays inside parentheses the slot needs', () => {
+        const arg = capture();
+        const rule = rewrite(() => ({before: pattern`g(${arg})`, after: template`new ${arg}()`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, method) || method;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('g(f()!);', 'new (f()!)();')
+        );
+    });
+
+    test('a marker the template writes wraps those parentheses', () => {
+        const arg = capture();
+        const rule = rewrite(() => ({before: pattern`f(${arg})`, after: template`${arg}!.m()`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, method) || method;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('f(a + b);', '(a + b)!.m();')
+        );
+    });
 });
 

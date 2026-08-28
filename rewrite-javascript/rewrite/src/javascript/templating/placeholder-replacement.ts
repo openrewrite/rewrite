@@ -42,7 +42,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             const replacement = this.replacePlaceholder(tree);
             if (replacement !== tree) {
                 // `this.cursor` is still the enclosing template node: `super.visit()` has not pushed this one
-                return maybeParenthesize(enclosingTree(parent ?? this.cursor), tree.id, replacement, true) as R;
+                return maybeParenthesize(enclosingTree(parent ?? this.cursor), tree.id, replacement, tree.markers) as R;
             }
         }
 
