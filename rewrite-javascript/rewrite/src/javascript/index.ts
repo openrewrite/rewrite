@@ -32,13 +32,15 @@ export * from "./tree-debug";
 export * from "./project-parser";
 
 export type {Scope} from "./scope";
-export {scopeOf, namesInScope, namesDeclaredIn, bindingNames} from "./scope";
+export {scopeOf, namesInScope, namesDeclaredIn, namesDeclaredWithin, bindingNames, deconflict} from "./scope";
 export type {QuoteChar, AddImportOptions} from "./add-import";
 export {ImportStyle, moduleNameOf, AddImport} from "./add-import";
 // AMD mechanics `recipes-ui5` builds on directly, beyond the `maybeBind` surface below.
-export type {AmdBlock} from "./amd";
+export type {AmdBlock, AmdCalleeOptions} from "./amd";
 export {
-    DEFAULT_AMD_CALLEES, amdBlockOf, dependencyNames, parameterNames, withDependency, withoutDependencyAt,
+    DEFAULT_AMD_CALLEES, amdBlockOf, enclosingAmdBlock, present, elementsOf, parametersOf, identifierOf,
+    dependencyNames, parameterNames, bodyOf, references, namesUsed, lastSegment, derivedBindingName,
+    withDependency, withUnboundDependency, withoutDependencyAt,
     RemoveAmdDependency, removeNewlyUnusedAmdBindings
 } from "./amd";
 export type {MaybeBindOptions, MaybeUnbindOptions, MaybeRebindOptions, ModuleBindings} from "./binding";

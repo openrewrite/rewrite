@@ -1,9 +1,12 @@
-import {JavaScriptParser} from "../../src/javascript";
 import {J} from "../../src/java";
-import {JS} from "../../src/javascript";
-import {amdBlockOf, dependencyNames, parameterNames, withDependency, withoutDependencyAt} from "../../src/javascript/amd";
+import {Cursor} from "../../src/tree";
+import {
+    amdBlockOf, bodyOf, deconflict, dependencyNames, derivedBindingName, elementsOf, enclosingAmdBlock,
+    identifierOf, javascript, JavaScriptParser, JavaScriptVisitor, JS, lastSegment, namesDeclaredWithin,
+    namesUsed, parameterNames, parametersOf, present, references, withDependency, withoutDependencyAt,
+    withUnboundDependency
+} from "../../src/javascript";
 import {fromVisitor, RecipeSpec} from "../../src/test";
-import {javascript, JavaScriptVisitor} from "../../src/javascript";
 
 async function firstCall(source: string): Promise<J.MethodInvocation> {
     const parser = new JavaScriptParser();
@@ -253,5 +256,56 @@ describe("withoutDependencyAt", () => {
             `sap.ui.define(["a/B", /* about D */ "c/D"], function (B, D) {});`,
             `sap.ui.define([/* about D */ "c/D"], function (D) {});`
         ));
+    });
+});
+
+describe("withUnboundDependency", () => {
+    function addUnbound(module: string) {
+        return new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const block = amdBlockOf(m);
+                return block === undefined ? super.visitMethodInvocation(m, p) :
+                    withUnboundDependency(m, block, module) ?? m;
+            }
+        };
+    }
+
+    test("the appended dependency takes no parameter, whether or not the block already leaves one unbound", async () => {
+        const bound = new RecipeSpec();
+        bound.recipe = fromVisitor(addUnbound("c/D"));
+        await bound.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], function (B) {});`,
+            `sap.ui.define(["a/B", "c/D"], function (B) {});`
+        ));
+
+        const alreadyUnbound = new RecipeSpec();
+        alreadyUnbound.recipe = fromVisitor(addUnbound("e/F"));
+        await alreadyUnbound.rewriteRun(javascript(
+            `sap.ui.define(["a/B", "c/D"], function (B) {});`,
+            `sap.ui.define(["a/B", "c/D", "e/F"], function (B) {});`
+        ));
+    });
+
+    test("a surplus parameter refuses, since the appended dependency would bind to it", async () => {
+        const call = await firstCall(`sap.ui.define(["a/B"], function (B, D) {});`);
+        expect(withUnboundDependency(call, amdBlockOf(call)!, "c/D")).toBeUndefined();
+    });
+});
+
+describe("the surface a consumer builds on", () => {
+    test("a bare cursor finds the block, which then reads entirely through helpers the entry point exports", async () => {
+        const call = await firstCall(`sap.ui.define(["a/B", "c/D"], function (B, D) { return B; });`);
+        const block = enclosingAmdBlock(new Cursor(call))!.block;
+        expect(elementsOf(block)).toHaveLength(2);
+        expect(present(block.dependencies.initializer!.elements)).toHaveLength(2);
+        expect(parametersOf(block).map(padded => identifierOf(padded.element)?.simpleName)).toEqual(["B", "D"]);
+        expect(bodyOf(block)!.kind).toBe(J.Kind.Block);
+        expect(await references(block, "B", false)).toBe(true);
+        expect((await namesUsed(block, false)).has("D")).toBe(false);
+
+        const declared = namesDeclaredWithin(block.factory);
+        expect(lastSegment("a/B")).toBe("B");
+        expect(derivedBindingName("a/B")).toBe("B");
+        expect(deconflict(derivedBindingName("a/B")!, name => declared.has(name))).toBe("B_1");
     });
 });
