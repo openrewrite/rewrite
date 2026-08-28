@@ -29,16 +29,19 @@ final class YamlDocumentEndCommentRelocator {
     static Yaml.Document relocate(Yaml.Document before, Yaml.Document after) {
         String comment = inlineCommentOf(before.getEnd().getPrefix());
         UUID ownerId = finalEntryId(before.getBlock());
-        if (comment.isEmpty() || ownerId == null) {
+        String endPrefix = after.getEnd().getPrefix();
+        if (comment.isEmpty() || ownerId == null ||
+                !sameInlineComment(endPrefix, comment)) {
             return after;
         }
 
         CommentRelocator visitor = new CommentRelocator(ownerId, comment, linebreak(before.getEnd().getPrefix()));
-        Yaml.Document relocated = after.withBlock((Yaml.Block) visitor.visitNonNull(after.getBlock(), 0));
-        if (!visitor.relocated || !sameInlineComment(after.getEnd().getPrefix(), comment)) {
-            return relocated;
+        Yaml.Block relocatedBlock = (Yaml.Block) visitor.visitNonNull(after.getBlock(), 0);
+        if (!visitor.relocated) {
+            return after;
         }
-        return relocated.withEnd(after.getEnd().withPrefix(removeInlineComment(after.getEnd().getPrefix())));
+        return after.withBlock(relocatedBlock)
+                .withEnd(after.getEnd().withPrefix(removeInlineComment(endPrefix)));
     }
 
     private static @Nullable UUID finalEntryId(Yaml.Block block) {
