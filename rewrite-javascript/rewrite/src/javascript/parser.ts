@@ -217,7 +217,7 @@ export class JavaScriptParser extends Parser {
         // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
         // This ensures that TypeScript types with the same type.id map to the same Type instance,
         // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
-        const typeMapping = new JavaScriptTypeMapping(session.project.checker, this.relativeTo);
+        const typeMapping = new JavaScriptTypeMapping(session.project.checker, this.relativeTo ?? process.cwd());
 
         try {
         for (const [filePath, input] of inputFiles) {

@@ -18,7 +18,7 @@ import * as path from "path";
 import {Type} from "../java";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
-import {declarationsOf, fullyQualifiedNameOf, signatureKeyOf, valueDeclarationOf} from "./ts7/checker";
+import {declarationsOf, declaredNameOf, fullyQualifiedNameOf, signatureKeyOf, typeAtLocation, valueDeclarationOf} from "./ts7/checker";
 import {isScanned} from "./token-navigation";
 
 export class JavaScriptTypeMapping {
@@ -77,12 +77,7 @@ export class JavaScriptTypeMapping {
         if (isScanned(node)) {
             return undefined;
         }
-        let type: ts.Type | undefined;
-        if (ts.isTypeNode(node)) {
-            type = this.checker.getTypeFromTypeNode(node);
-        } else {
-            type = this.checker.getTypeAtLocation(node);
-        }
+        const type = typeAtLocation(this.checker, node);
         return type && this.getType(type);
     }
 
@@ -1258,7 +1253,7 @@ export class JavaScriptTypeMapping {
 
                 if (moduleSpecifier) {
                     // Build the fully qualified name from module specifier + symbol name
-                    const symbolName = symbol.name;
+                    const symbolName = declaredNameOf(symbol);
                     return `${moduleSpecifier}.${symbolName}`;
                 }
             }
@@ -1648,7 +1643,7 @@ export class JavaScriptTypeMapping {
      */
     private createGenericTypeVariable(typeParam: ts.TypeParameter, cacheKey: string | number): Type.GenericTypeVariable {
         const symbol = typeParam.getSymbol();
-        const name = symbol ? symbol.name : '?';
+        const name = symbol ? declaredNameOf(symbol) : '?';
 
         // Shell-cache: Create stub, cache it, then populate (prevents cycles)
         const gtv = {

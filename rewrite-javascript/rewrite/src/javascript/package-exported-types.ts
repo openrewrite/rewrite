@@ -191,8 +191,67 @@ function globalTypeSymbols(checker: ts.TypeChecker, sourceFile: ts.SourceFile): 
  * file; else a top-level `index.d.ts` (then `index.ts`). Reaching none of them means the package
  * ships no types, which leaves the caller to fall back to its DefinitelyTyped package.
  */
-function resolvePackageEntry(dir: string): string | undefined {
+/**
+ * The target an `exports` value selects under `conditions`. Keys are tried in the order the manifest
+ * lists them, which is what decides between `import` and `require` when a package offers both.
+ */
+function selectExportTarget(target: unknown, conditions: ReadonlySet<string>): string | undefined {
+    if (typeof target === "string") {
+        return target;
+    }
+    if (Array.isArray(target)) {
+        for (const alternative of target) {
+            const selected = selectExportTarget(alternative, conditions);
+            if (selected) {
+                return selected;
+            }
+        }
+        return undefined;
+    }
+    if (target && typeof target === "object") {
+        for (const [condition, value] of Object.entries(target)) {
+            if (conditions.has(condition)) {
+                const selected = selectExportTarget(value, conditions);
+                if (selected) {
+                    return selected;
+                }
+            }
+        }
+    }
+    return undefined;
+}
+
+/** The declaration file a package's `exports` map names for the package itself. */
+function entryFromExports(dir: string, exportsField: unknown, conditions: ReadonlySet<string>): string | undefined {
+    let root = exportsField;
+    if (root && typeof root === "object" && !Array.isArray(root)) {
+        const keys = Object.keys(root);
+        if (keys.some(key => key.startsWith("."))) {
+            root = (root as Record<string, unknown>)["."];
+        }
+    }
+    const target = selectExportTarget(root, conditions);
+    if (!target || !target.startsWith(".")) {
+        return undefined;
+    }
+    const resolved = path.resolve(dir, target);
+    return TYPESCRIPT_FILE.test(resolved) && containedIn(dir, resolved) && fs.existsSync(resolved)
+        ? resolved
+        : undefined;
+}
+
+function resolvePackageEntry(dir: string, customConditions: readonly string[] = ["node"]): string | undefined {
     const manifest = packageManifest(dir);
+    // There is no module resolver to ask, so the `exports` map is read here. A package's
+    // declarations count under whichever of `import` and `require` carries them, since no consumer's
+    // import mode is choosing between them.
+    for (const mode of ["import", "require"]) {
+        const conditions = new Set(["types", "default", mode, ...customConditions]);
+        const entry = entryFromExports(dir, manifest?.exports, conditions);
+        if (entry) {
+            return entry;
+        }
+    }
     // An `exports` map without a `types` condition takes resolution to the runtime entry and stops
     // it there, while `types` still names the declarations.
     const declared = manifest?.types ?? manifest?.typings;
@@ -222,7 +281,7 @@ function containedIn(dir: string, file: string): boolean {
     return path.resolve(file).startsWith(path.resolve(dir) + path.sep);
 }
 
-function packageManifest(dir: string): {name?: unknown, types?: unknown, typings?: unknown} | undefined {
+function packageManifest(dir: string): {name?: unknown, types?: unknown, typings?: unknown, exports?: unknown} | undefined {
     const packageJson = path.join(dir, "package.json");
     if (!fs.existsSync(packageJson)) {
         return undefined;

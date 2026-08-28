@@ -66,6 +66,23 @@ export function declarationsOf(symbol: Symbol7): Node[] {
         .filter((node): node is Node => node !== undefined);
 }
 
+/**
+ * The name a symbol declares. A class or interface exported as the default carries `default` as its
+ * symbol name, and the name it was written with is only on the declaration.
+ */
+export function declaredNameOf(symbol: Symbol7): string {
+    if (symbol.name !== "default") {
+        return symbol.name;
+    }
+    for (const declaration of declarationsOf(symbol)) {
+        const name = (declaration as {name?: {text?: string}}).name;
+        if (name?.text) {
+            return name.text;
+        }
+    }
+    return symbol.name;
+}
+
 /** A symbol's value declaration, resolved from its handle. */
 export function valueDeclarationOf(symbol: Symbol7): Node | undefined {
     return symbol.valueDeclaration?.resolve();
@@ -76,7 +93,7 @@ export function fullyQualifiedNameOf(symbol: Symbol7): string {
     const parts: string[] = [];
     let current: Symbol7 | undefined = symbol;
     while (current) {
-        parts.unshift(current.name);
+        parts.unshift(declaredNameOf(current));
         current = current.getParent();
     }
     return parts.join(".");
