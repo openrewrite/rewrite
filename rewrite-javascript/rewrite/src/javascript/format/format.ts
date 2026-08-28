@@ -18,7 +18,7 @@ import {JavaScriptVisitor} from "../visitor";
 import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../../java";
 import {create as produce, Draft} from "mutative";
 import {Cursor, isScope, isSourceFile, Tree} from "../../tree";
-import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "../style";
+import {BlankLinesStyle, getStyle, PrettierStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "../style";
 import {NamedStyles} from "../../style";
 import {produceAsync} from "../../visitor";
 import {Generator} from "../markers";
@@ -55,8 +55,9 @@ export const autoFormat = async <J2 extends J, P>(
  * 2. Styles from source file markers (NamedStyles)
  * 3. IntelliJ defaults
  *
- * When a PrettierStyle is present (either in the styles array or as a marker on the source file),
- * Prettier is used for formatting. Otherwise, built-in formatting visitors are used.
+ * A PrettierStyle, in the styles array or as a marker on the source file, formats through Prettier.
+ * The built-in visitors lay out a generated subtree Prettier cannot carry back, and any file
+ * without such a style.
  */
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     private readonly styles?: NamedStyles<string>[];
@@ -67,23 +68,27 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
-        // Check for PrettierStyle in styles array or as marker on source file
-        // If found, delegate entirely to Prettier (skip other formatting visitors)
         const prettierStyle = getPrettierStyle(tree, cursor, this.styles);
         if (prettierStyle) {
-            return applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
+            const formatted = await applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
+            if (formatted !== undefined) {
+                return formatted;
+            }
         }
 
         // Style markers live on the source file, which is `tree` itself only when a whole file is being formatted
         const styleSource = (isSourceFile(tree) ? tree : cursor?.firstEnclosing(isSourceFile)) ?? tree;
+        const tabsAndIndents = getStyle(StyleKind.TabsAndIndentsStyle, styleSource, this.styles) as TabsAndIndentsStyle;
+        const spaces = getStyle(StyleKind.SpacesStyle, styleSource, this.styles) as SpacesStyle;
 
         const visitors = [
             new NormalizeWhitespaceVisitor(this.stopAfter),
             new MinimumViableSpacingVisitor(this.stopAfter),
             new BlankLinesVisitor(getStyle(StyleKind.BlankLinesStyle, styleSource, this.styles) as BlankLinesStyle, this.stopAfter),
             new WrappingAndBracesVisitor(getStyle(StyleKind.WrappingAndBracesStyle, styleSource, this.styles) as WrappingAndBracesStyle, this.stopAfter),
-            new SpacesVisitor(getStyle(StyleKind.SpacesStyle, styleSource, this.styles) as SpacesStyle, this.stopAfter),
-            new TabsAndIndentsVisitor(getStyle(StyleKind.TabsAndIndentsStyle, styleSource, this.styles) as TabsAndIndentsStyle, this.stopAfter),
+            new SpacesVisitor(prettierStyle ? spacesFrom(prettierStyle, spaces) : spaces, this.stopAfter),
+            new TabsAndIndentsVisitor(
+                prettierStyle ? tabsAndIndentsFrom(prettierStyle, tabsAndIndents) : tabsAndIndents, this.stopAfter),
         ]
 
         let t: R | undefined = tree as R;
@@ -96,6 +101,22 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
 
         return t;
     }
+}
+
+/** The brace spacing a Prettier configuration states, over the style the rest of the spacing comes from. */
+function spacesFrom(prettierStyle: PrettierStyle, fallback: SpacesStyle): SpacesStyle {
+    // Prettier's default, in force for a configuration that does not name it
+    const bracketSpacing = prettierStyle.config.bracketSpacing !== false;
+    return {...fallback, within: {...fallback.within, objectLiteralBraces: bracketSpacing, es6ImportExportBraces: bracketSpacing}};
+}
+
+/** The widths a Prettier configuration states, over the style the rest of the layout comes from. */
+function tabsAndIndentsFrom(prettierStyle: PrettierStyle, fallback: TabsAndIndentsStyle): TabsAndIndentsStyle {
+    const config = prettierStyle.config;
+    // Prettier's defaults, in force for a configuration that names neither
+    const tabWidth = typeof config.tabWidth === 'number' ? config.tabWidth : 2;
+    const useTabCharacter = config.useTabs === true;
+    return {...fallback, useTabCharacter, tabSize: tabWidth, indentSize: tabWidth, continuationIndent: tabWidth};
 }
 
 export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
