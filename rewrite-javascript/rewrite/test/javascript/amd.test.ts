@@ -128,6 +128,15 @@ describe("withDependency", () => {
         ));
     });
 
+    test("a comment before a bare arrow stays with the parameter it followed as parens go on", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], B /*x*/ => {});`,
+            `sap.ui.define(["a/B", "c/D"], (B /*x*/ , D) => {});`
+        ));
+    });
+
     test("refuses when the factory already binds fewer parameters than there are dependencies", async () => {
         const call = await firstCall(`define(["a/B", "jquery"], function (B) {});`);
         const block = amdBlockOf(call)!;
@@ -211,6 +220,24 @@ describe("withoutDependencyAt", () => {
             }
         };
     }
+
+    test("removing the only parameter of an unparenthesized arrow keeps the space before the arrow", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(removeFirstDependency());
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], B => {});`,
+            `sap.ui.define([], () => {});`
+        ));
+    });
+
+    test("removing the only parameter of a parenthesized arrow leaves its parens and arrow alone", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(removeFirstDependency());
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], (B) => {});`,
+            `sap.ui.define([], () => {});`
+        ));
+    });
 
     test("removing the first entry moves no comment onto the survivor and drops none of its own", async () => {
         const relabeled = new RecipeSpec();
