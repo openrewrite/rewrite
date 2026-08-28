@@ -1,9 +1,10 @@
 import {fromVisitor, RecipeSpec} from "../../src/test";
+import {withDir} from "tmp-promise";
 import {
-    JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
+    JavaScriptVisitor, JS, javascript, npm, packageJson, tsx, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
     maybeAddImport, MaybeBindOptions, maybeUnbind, maybeRebind, maybeRemoveImport, removeNewlyUnusedAmdBindings
 } from "../../src/javascript";
-import {emptySpace, J, rightPadded} from "../../src/java";
+import {emptySpace, J, rightPadded, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
 import {randomId} from "../../src/uuid";
 import {ExecutionContext} from "../../src";
@@ -849,8 +850,17 @@ describe("maybeBind", () => {
         expect(bound.name).toBe("Theming_1");
     });
 
+function rebindOldToNew() {
+    return new class extends JavaScriptVisitor<any> {
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+            maybeRebind(this, {from: {module: "m", member: "Old"}, to: {module: "m2", member: "New"}});
+            return super.visitJsCompilationUnit(cu, p);
+        }
+    };
+}
+
 describe("maybeRebind", () => {
-    test("an ESM member move keeps the local name", async () => {
+    test("an ESM member rename takes the new name, carrying the references that resolve to it", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
@@ -863,11 +873,289 @@ describe("maybeRebind", () => {
             }
         });
         await spec.rewriteRun(typescript(
-            `import { extend } from "lodash";\n\nextend({}, {});`,
-            `import { assign as extend } from "lodash";\n\nextend({}, {});`
+            `import { extend } from "lodash";\n\nextend({}, {});\nobj.extend();\nfunction f() { const extend = 1; return extend; }`,
+            `import { assign } from "lodash";\n\nassign({}, {});\nobj.extend();\nfunction f() { const extend = 1; return extend; }`
         ));
-        expect(bound.name).toBe("extend");
+        expect(bound.name).toBe("assign");
     });
+
+    test("a pinned alias names the binding, and the references follow it", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeRebind(this, {
+                    from: {module: "lodash", member: "extend"},
+                    to: {module: "lodash", member: "assign", alias: "merge"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import { extend } from "lodash";\n\nextend({}, {});`,
+            `import { assign as merge } from "lodash";\n\nmerge({}, {});`
+        ));
+        expect(bound.name).toBe("merge");
+    });
+
+    test("an aliased member keeps the alias, which is a name of the file's own choosing", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeRebind(this, {
+                    from: {module: "lodash", member: "extend"},
+                    to: {module: "lodash", member: "assign"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import { extend as myExtend } from "lodash";\n\nmyExtend({}, {});`,
+            `import { assign as myExtend } from "lodash";\n\nmyExtend({}, {});`
+        ));
+        expect(bound.name).toBe("myExtend");
+    });
+
+    test("an alias the new member name makes redundant is dropped", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeRebind(this, {
+                    from: {module: "lodash", member: "extend"},
+                    to: {module: "lodash", member: "assign"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import { extend as assign } from "lodash";\n\nassign({}, {});`,
+            `import { assign } from "lodash";\n\nassign({}, {});`
+        ));
+        expect(bound.name).toBe("assign");
+    });
+
+    test("a re-export keeps the name the module publishes, and the binding under it follows", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\n\nexport { Old };\nconst y = Old;`,
+            `import { New } from "m2";\n\nexport { New as Old };\nconst y = New;`
+        ));
+    });
+
+    test("an aliased re-export renames only the reference beside the name it publishes", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\n\nconst X = 1;\nexport { Old as Public };\nexport { X as Old };`,
+            `import { New } from "m2";\n\nconst X = 1;\nexport { New as Public };\nexport { X as Old };`
+        ));
+    });
+
+    test("a shorthand property keeps its key and takes the renamed binding as its value", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\n\nconst p = {Old};\nconst o = {Old: 1};`,
+            `import { New } from "m2";\n\nconst p = {Old: New};\nconst o = {Old: 1};`
+        ));
+    });
+
+    test("a pinned alias the file cannot bind verbatim refuses, leaving the import alone", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeRebind(this, {
+                    from: {module: "m", member: "Old"},
+                    to: {module: "m2", member: "New", alias: "taken"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(`import { Old } from "m";\n\nconst taken = 1;\nOld();`));
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("an AMD alias pin refuses where it renames the parameter, and passes where it agrees", async () => {
+        const amdRebind = (alias: string, bound: {name?: string}) => new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName !== "target") {
+                    return super.visitMethodInvocation(m, p);
+                }
+                bound.name = maybeRebind(this, {from: {module: "a/Old"}, to: {module: "a/New", alias}});
+                return m;
+            }
+        };
+
+        const renames = new RecipeSpec();
+        const renamesBound: {name?: string} = {};
+        renames.recipe = fromVisitor(amdRebind("Renamed", renamesBound));
+        await renames.rewriteRun(javascript(`sap.ui.define(["a/Old"], function (Old) { target(); });`));
+        expect(renamesBound.name).toBeUndefined();
+
+        const agrees = new RecipeSpec();
+        const agreesBound: {name?: string} = {};
+        agrees.recipe = fromVisitor(amdRebind("Old", agreesBound));
+        await agrees.rewriteRun(javascript(
+            `sap.ui.define(["a/Old"], function (Old) { target(); });`,
+            `sap.ui.define(["a/New"], function (Old) { target(); });`));
+        expect(agreesBound.name).toBe("Old");
+    });
+
+    test("an alias that is not a legal identifier refuses rather than emitting unparseable source", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeRebind(this, {
+                    from: {module: "m", member: "Old"},
+                    to: {module: "m2", member: "New", alias: "my-name"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(`import { Old } from "m";\n\nconst y = Old;`));
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("a name the file only references, never declares, still counts as taken", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeRebind(this, {
+                    from: {module: "m", member: "Old"},
+                    to: {module: "m2", member: "Event"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        // `Event` is an ambient global: the file declares it nowhere, so a check reading only
+        // declarations would call the name free and let the import shadow it here.
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\n\nfunction f(e: Event) { return Old(e); }`,
+            `import { Event as Old } from "m2";\n\nfunction f(e: Event) { return Old(e); }`
+        ));
+        expect(bound.name).toBe("Old");
+    });
+
+    test("a reference in type-name position renames: a decorator, and a generic's own base", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\n\n@Old({})\nexport class C {\n    @Old() field: Old<string>;\n}`,
+            `import { New } from "m2";\n\n@New({})\nexport class C {\n    @New() field: New<string>;\n}`
+        ));
+    });
+
+    test("a name a bind queued earlier in the same visit has claimed is taken too", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeBind(this, {module: "other", member: "New", onlyIfReferenced: false});
+                bound.name = maybeRebind(this, {
+                    from: {module: "m", member: "Old"},
+                    to: {module: "m2", member: "New"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\n\nconst y = Old;`,
+            `import { New as Old } from "m2";\nimport {New} from "other";\n\nconst y = Old;`
+        ));
+        expect(bound.name).toBe("Old");
+    });
+
+    test("a name in a namespace of its own — a nearer scope, a label — is left alone", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\n\nconst z = Old;\nOld: for (;;) { break Old; }\nfunction f() { const Old = 1; return {Old}; }`,
+            `import { New } from "m2";\n\nconst z = New;\nOld: for (;;) { break Old; }\nfunction f() { const Old = 1; return {Old}; }`
+        ));
+    });
+
+    test("a re-export from another module names that module's member, not the binding", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\n\nexport { Old } from "./other";\nconst y = Old;`,
+            `import { New } from "m2";\n\nexport { Old } from "./other";\nconst y = New;`
+        ));
+    });
+
+    test("a second statement binding the same member is left intact, not given the first's name", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        // One call moves one binding, so the second statement is a later call's to make; sharing
+        // the name read from the first would bind it twice.
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\nimport { Old as Other } from "m";\n\nconst y = Old;\nconst z = Other;`,
+            `import { New } from "m2";\nimport { Old as Other } from "m";\n\nconst y = New;\nconst z = Other;`
+        ));
+    });
+
+    test("the moved binding's attribution names the module it moved to", async () => {
+        const spec = new RecipeSpec();
+        const declaring: (string | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {
+                    from: {module: "lodash", member: "extend"},
+                    to: {module: "lodash-es", member: "assign"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await withDir(async (repo) => {
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import { extend } from 'lodash';\n\nextend({}, {});\n`,
+                    `import { assign } from 'lodash-es';\n\nassign({}, {});\n`),
+                afterRecipe: async (cu: any) => {
+                    await new class extends JavaScriptVisitor<any> {
+                        override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                            const declaringType = m.methodType?.declaringType;
+                            declaring.push(declaringType && Type.isFullyQualified(declaringType)
+                                ? Type.FullyQualified.getFullyQualifiedName(declaringType as any)
+                                : undefined);
+                            return m;
+                        }
+                    }().visit(cu, undefined);
+                }
+            } as any, packageJson(`{"name":"t","dependencies":{"lodash":"^4.17.21","lodash-es":"^4.17.21"}}`)));
+        }, {unsafeCleanup: true});
+        expect(declaring).toEqual(["lodash-es"]);
+    });
+
+    test("a self-referential type on a moved reference terminates", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {
+                    from: {module: "./util", member: "helper"},
+                    to: {module: "./util2", member: "helper2"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        // A function imported from a relative module is attributed to a class holding a method
+        // whose declaring type is that same class, and a reference carries it whole.
+        await withDir(async (repo) => {
+            await spec.rewriteRun(npm(repo.path,
+                {...typescript(`export function helper() { return 1; }\n`), path: "util.ts"} as any,
+                {...typescript(`export function helper2() { return 1; }\n`), path: "util2.ts"} as any,
+                {...typescript(
+                    `import { helper } from './util';\n\nconst x = helper;\n`,
+                    `import { helper2 } from './util2';\n\nconst x = helper2;\n`), path: "main.ts"} as any,
+                packageJson(`{"name":"t"}`)));
+        }, {unsafeCleanup: true});
+    }, 30000);
 
     test("an AMD dependency swap keeps the parameter and its index", async () => {
         const spec = new RecipeSpec();
@@ -1203,6 +1491,22 @@ describe("removeNewlyUnusedAmdBindings", () => {
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/A", "a/B", "a/C", "a/D"], function (A, B, C, D) { A.f(); B.f(); C.f(); D.f(); });`,
             `sap.ui.define(["a/A", "a/C"], function (A, C) { A.f(); A.f(); C.f(); C.f(); });`
+        ));
+    });
+});
+
+describe("maybeRebind JSX", () => {
+    test("a JSX attribute key is a name, not a reference", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member: "Old"}, to: {module: "m2", member: "New"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(tsx(
+            `import { Old } from "m";\n\nconst e = <div Old="x">{Old}</div>;`,
+            `import { New } from "m2";\n\nconst e = <div Old="x">{New}</div>;`
         ));
     });
 });
