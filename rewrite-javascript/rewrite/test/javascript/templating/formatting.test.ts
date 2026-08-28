@@ -18,6 +18,8 @@ import {Autodetect, capture, javascript, JavaScriptVisitor, JS, pattern, rewrite
 import {J} from "../../../src/java";
 import {create as produce} from "mutative";
 import {replaceMarkerByKind} from "../../../src/markers";
+import {prettierStyle} from "../../../src/javascript/style";
+import {randomId} from "../../../src/uuid";
 
 /** Stands in for the style marker the project parser attaches to the compilation units it produces. */
 async function withDetectedStyles(cu: JS.CompilationUnit): Promise<JS.CompilationUnit> {
@@ -31,6 +33,41 @@ async function withDetectedStyles(cu: JS.CompilationUnit): Promise<JS.Compilatio
 
 describe('template formatting', () => {
     const spec = new RecipeSpec();
+
+    test('generated code Prettier restructures is indented to the width Prettier is configured with', async () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return m.name.simpleName === 'register' ?
+                    Template.builder()
+                        // The parentheses are here because Prettier removes them, putting its
+                        // output out of step with the tree being formatted
+                        .code('provide(() => {\nconst fn = (')
+                        .param(m.arguments.elements[0].element)
+                        .code(')();\nreturn fn;\n})')
+                        .build()
+                        .apply(m, this.cursor) : m;
+            }
+        });
+
+        await runUnderPrettier({},
+            `const config = {\n  providers: [\n    provide(() => {\n      const fn = (init)();\n      return fn;\n    }),\n  ],\n};`);
+
+        await runUnderPrettier({tabWidth: 4},
+            `const config = {\n  providers: [\n      provide(() => {\n          const fn = (init)();\n          return fn;\n      }),\n  ],\n};`);
+    });
+
+    /** Runs the suite's recipe over one `register(init)` call under a Prettier configuration. */
+    function runUnderPrettier(config: Record<string, unknown>, after: string) {
+        return spec.rewriteRun({
+            //language=javascript
+            ...javascript(`const config = {\n  providers: [\n    register(init),\n  ],\n};`, after),
+            beforeRecipe: async (cu: JS.CompilationUnit) => ({
+                ...cu,
+                markers: {...cu.markers, markers: [...cu.markers.markers, prettierStyle(randomId(), config)]}
+            })
+        });
+    }
 
     test('generated code follows the styles of the file it lands in', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {

@@ -492,7 +492,9 @@ export async function prettierFormatSubtree<T extends J>(
     const reconciler = new WhitespaceReconciler();
     const reconciled = reconciler.reconcile(target as J, formattedTarget as J, undefined, stopAfter);
 
-    return reconciled as T;
+    // The walk that carries whitespace back pairs the two trees node for node, which a change to
+    // the code itself — Prettier dropping redundant parentheses, say — makes impossible
+    return reconciler.isCompatible() ? reconciled as T : undefined;
 }
 
 /**
@@ -554,7 +556,8 @@ export function getPrettierStyle(
  * @param p The visitor parameter
  * @param cursor Optional cursor for subtree formatting
  * @param stopAfter Optional tree to stop after
- * @returns The formatted tree
+ * @returns The formatted tree, or `undefined` where Prettier's result cannot be carried back,
+ *          leaving the caller to lay the tree out itself
  */
 export async function applyPrettierFormatting<R extends J, P>(
     tree: R,
@@ -596,24 +599,10 @@ export async function applyPrettierFormatting<R extends J, P>(
             return formatted as unknown as R;
         }
 
-        if (!cursor) {
-            // No cursor provided - can't use subtree formatting, return with essential formatting
-            console.warn('Prettier formatting: No cursor provided for subtree, returning with essential formatting only');
-            return t;
-        }
-
-        // Use prettierFormatSubtree for subtree formatting
-        const formatted = await prettierFormatSubtree(t, cursor, prettierOpts, stopAfter as J | undefined);
-        if (formatted) {
-            return formatted as R;
-        }
-
-        // Subtree formatting failed, return with essential formatting applied
-        console.warn('Prettier formatting: Subtree formatting failed, returning with essential formatting only');
-        return t;
+        // Pruning and reconciling a subtree both go by where it sits in its file
+        return cursor && await prettierFormatSubtree(t, cursor, prettierOpts, stopAfter as J | undefined) as R | undefined;
     } catch (e) {
-        // If Prettier fails, return tree with essential formatting applied
-        console.warn('Prettier formatting failed, returning with essential formatting only:', e);
-        return t;
+        console.warn('Prettier formatting failed, leaving the tree to the built-in visitors:', e);
+        return undefined;
     }
 }
