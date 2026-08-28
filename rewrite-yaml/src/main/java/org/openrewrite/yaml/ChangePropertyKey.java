@@ -252,10 +252,18 @@ public class ChangePropertyKey extends Recipe {
         private final String subproperty;
         private final Yaml.Mapping.Entry entryToReplace;
 
+        private Yaml.Mapping.@Nullable Entry movedEntry;
+
         private InsertSubpropertyVisitor(Yaml.Mapping.Entry scope, String subproperty, Yaml.Mapping.Entry entryToReplace) {
             this.scope = scope;
             this.subproperty = subproperty;
             this.entryToReplace = entryToReplace;
+        }
+
+        @Override
+        public Yaml.Documents visitDocuments(Yaml.Documents documents, P p) {
+            Yaml.Documents visited = (Yaml.Documents) super.visitDocuments(documents, p);
+            return MergeYamlVisitor.relocateDocumentEndComment(documents, visited, movedEntry);
         }
 
         @Override
@@ -270,6 +278,7 @@ public class ChangePropertyKey extends Recipe {
                                 Yaml.Scalar.Style.PLAIN, null, null, subproperty),
                         scope.getBeforeMappingValueIndicator(),
                         removeExclusions(entryToReplace.getValue().copyPaste()));
+                movedEntry = newEntry;
 
                 if (hasExcludedValues(entryToReplace)) {
                     m = m.withEntries(ListUtils.concat(m.getEntries(), newEntry));
