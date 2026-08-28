@@ -61,6 +61,17 @@ describe('AutoformatVisitor with Prettier', () => {
         )
     });
 
+    test('a file Prettier cannot format keeps its own layout', () => {
+        // A parser Prettier has no plugin for is what makes it throw over the whole file
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new AutoformatVisitor(undefined,
+            [prettierStyle(randomId(), {parser: 'no-such-parser'})]));
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('const x   =   1+2\n\n\n\nconst  y=3')
+        );
+    });
+
     test('subtree formatting with Prettier applies Prettier defaults', async () => {
         // This test verifies that subtree formatting (triggered via maybeAutoFormat)
         // works correctly with the Prettier pruning optimization.

@@ -55,8 +55,9 @@ export const autoFormat = async <J2 extends J, P>(
  * 2. Styles from source file markers (NamedStyles)
  * 3. IntelliJ defaults
  *
- * A PrettierStyle, in the styles array or as a marker on the source file, formats through Prettier;
- * the built-in visitors format whatever Prettier does not, and every file without such a style.
+ * A PrettierStyle, in the styles array or as a marker on the source file, formats through Prettier.
+ * The built-in visitors lay out a generated subtree Prettier cannot carry back, and any file
+ * without such a style.
  */
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     private readonly styles?: NamedStyles<string>[];
