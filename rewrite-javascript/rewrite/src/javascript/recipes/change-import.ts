@@ -19,8 +19,36 @@ import { TreeVisitor } from "../../visitor";
 import { ExecutionContext } from "../../execution";
 import { JavaScriptVisitor, JS } from "../index";
 import { maybeAddImport } from "../add-import";
-import { J, isIdentifier, Type } from "../../java";
+import { emptySpace, J, isIdentifier, rightPadded, singleSpace, Type } from "../../java";
 import { create as produce, Draft } from "mutative";
+import { randomId } from "../../uuid";
+import { emptyMarkers } from "../../markers";
+
+/**
+ * Binds `member` under the name `local` already carries, so the file's references to it still
+ * resolve. `local` itself becomes the alias, keeping the type attribution it holds, and the alias
+ * takes its prefix: that whitespace separates the specifier from a `type` keyword before it.
+ */
+function aliasing(local: Draft<J.Identifier>, member: string): JS.Alias {
+    const propertyName: J.Identifier = {
+        id: randomId(),
+        kind: J.Kind.Identifier,
+        prefix: emptySpace,
+        markers: emptyMarkers,
+        annotations: [],
+        simpleName: member,
+        type: undefined,
+        fieldType: undefined
+    };
+    return {
+        id: randomId(),
+        kind: JS.Kind.Alias,
+        prefix: local.prefix,
+        markers: emptyMarkers,
+        propertyName: rightPadded(propertyName, singleSpace),
+        alias: {...local, prefix: singleSpace} as J.Identifier
+    };
+}
 
 /**
  * Changes an import from one module to another, updating all type attributions.
@@ -41,7 +69,7 @@ import { create as produce, Draft } from "mutative";
  * // After:  import { act } from 'react';
  *
  * @example
- * // Change a named import to a different name
+ * // Change which member of the module a name is bound to
  * const recipe = new ChangeImport({
  *     oldModule: "lodash",
  *     oldMember: "extend",
@@ -49,7 +77,7 @@ import { create as produce, Draft } from "mutative";
  *     newMember: "assign"
  * });
  * // Before: import { extend } from 'lodash';
- * // After:  import { assign } from 'lodash';
+ * // After:  import { assign as extend } from 'lodash';
  */
 export class ChangeImport extends Recipe {
     readonly name = "org.openrewrite.javascript.change-import";
@@ -168,10 +196,9 @@ export class ChangeImport extends Recipe {
                         maybeAddImport(this, {
                             module: newModule,
                             member: newMember,
-                            // A moved binding keeps the local name it had. Pinning it also tells
-                            // `maybeAddImport` not to deconflict against the import being replaced,
-                            // which is still present in the tree it reads.
-                            alias: aliasToUse ?? newMember,
+                            // A pinned alias is taken verbatim: `oldMember` is the name this
+                            // import bound, which the file's references to it already read.
+                            alias: aliasToUse ?? oldMember,
                             onlyIfReferenced: false
                         });
                     }
@@ -219,7 +246,7 @@ export class ChangeImport extends Recipe {
                                     const specifier = elem.element;
                                     if (specifier.specifier.kind === J.Kind.Identifier &&
                                         specifier.specifier.simpleName === oldMember) {
-                                        specifier.specifier.simpleName = newMember;
+                                        specifier.specifier = aliasing(specifier.specifier as Draft<J.Identifier>, newMember);
                                     } else if (specifier.specifier.kind === JS.Kind.Alias) {
                                         const aliasNode = specifier.specifier as Draft<JS.Alias>;
                                         const propertyName = aliasNode.propertyName.element;

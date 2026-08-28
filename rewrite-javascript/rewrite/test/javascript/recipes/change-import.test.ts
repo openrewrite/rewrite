@@ -339,40 +339,6 @@ describe("change-import", () => {
     });
 
     describe("member renaming", () => {
-        test("renames member when changing import", async () => {
-            const spec = new RecipeSpec();
-            spec.recipe = new ChangeImport({
-                oldModule: "lodash",
-                oldMember: "extend",
-                newModule: "lodash",
-                newMember: "assign"
-            });
-
-            // Note: This test only verifies the import statement change.
-            // The identifier usage in the code would need a separate recipe to rename.
-            await withDir(async (repo) => {
-                await spec.rewriteRun(
-                    npm(
-                        repo.path,
-                        typescript(
-                            `
-                            import { extend } from 'lodash';
-                            `,
-                            `
-                            import { assign } from 'lodash';
-                            `
-                        ),
-                        packageJson(`{
-                            "name": "test",
-                            "dependencies": {
-                                "lodash": "^4.17.21"
-                            }
-                        }`)
-                    )
-                );
-            }, { unsafeCleanup: true });
-        });
-
         test("renames aliased member when changing import", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({
@@ -392,6 +358,123 @@ describe("change-import", () => {
                             `,
                             `
                             import { assign as myExtend } from 'lodash';
+                            `
+                        ),
+                        packageJson(`{
+                            "name": "test",
+                            "dependencies": {
+                                "lodash": "^4.17.21"
+                            }
+                        }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test("renames the member but keeps the local name", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "lodash",
+                oldMember: "extend",
+                newModule: "lodash",
+                newMember: "assign"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                            import { extend } from 'lodash';
+
+                            function assign() {}
+
+                            extend({}, {});
+                            assign();
+                            `,
+                            `
+                            import { assign as extend } from 'lodash';
+
+                            function assign() {}
+
+                            extend({}, {});
+                            assign();
+                            `
+                        ),
+                        packageJson(`{
+                            "name": "test",
+                            "dependencies": {
+                                "lodash": "^4.17.21"
+                            }
+                        }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test("keeps a type-only specifier's type keyword separate", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "lodash",
+                oldMember: "extend",
+                newModule: "lodash",
+                newMember: "assign"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                            import { type extend } from 'lodash';
+
+                            let v: extend;
+                            `,
+                            `
+                            import { type assign as extend } from 'lodash';
+
+                            let v: extend;
+                            `
+                        ),
+                        packageJson(`{
+                            "name": "test",
+                            "dependencies": {
+                                "lodash": "^4.17.21"
+                            }
+                        }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test("keeps the local name when moving a member to another module", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "lodash",
+                oldMember: "extend",
+                newModule: "lodash-es",
+                newMember: "assign"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                            import { extend, flatten } from 'lodash';
+
+                            extend({}, {});
+                            flatten([]);
+                            `,
+                            `
+                            import { flatten } from 'lodash';
+                            import { assign as extend } from 'lodash-es';
+
+                            extend({}, {});
+                            flatten([]);
                             `
                         ),
                         packageJson(`{
