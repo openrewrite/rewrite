@@ -145,6 +145,33 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void preservesCrLfAndStandaloneCommentAfterInlineComment() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("foo.bar", "bar", null, null, null)),
+          yaml(
+            """
+              foo:
+                bar:
+                  prop: val
+                other: other-val # keep me
+              # standalone
+              ---
+              next: document
+              """.replace("\n", "\r\n"),
+            """
+              foo:
+                other: other-val # keep me
+              bar:
+                prop: val
+              # standalone
+              ---
+              next: document
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2608")
     @Test
     void multiDocument() {
