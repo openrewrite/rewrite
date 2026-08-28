@@ -25,7 +25,6 @@ export type {
     MatchOptions,
     TemplateParameter,
     TemplateOptions,
-    ModuleBinding,
     RewriteRule,
     TryOnOptions,
     RewriteConfig,

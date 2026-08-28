@@ -54,6 +54,12 @@ import SpreadAttribute = JSX.SpreadAttribute;
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
     sourceFileCache?: Map<string, ts.SourceFile>,
+    /**
+     * Type packages to load whose declarations nothing imports. Unset leaves TypeScript's default,
+     * which reads `@types/*` and nothing else; a package declaring its modules ambiently needs
+     * naming here for those declarations to be in scope.
+     */
+    types?: string[],
 }
 
 function getScriptKindFromFileName(fileName: string): ts.ScriptKind {
@@ -86,6 +92,7 @@ export class JavaScriptParser extends Parser {
             relativeTo,
             styles,
             sourceFileCache,
+            types,
         }: JavaScriptParserOptions = {},
     ) {
         super({ctx, relativeTo});
@@ -113,7 +120,7 @@ export class JavaScriptParser extends Parser {
             strict: false,
             // `types` defaults to `[]`, which attributes ambient `@types/*` packages only when named;
             // `*` enumerates everything under `node_modules/@types`.
-            types: ["*"],
+            types: types ?? ["*"],
             baseUrl: relativeTo || process.cwd()
         };
         this.styles = styles;

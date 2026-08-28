@@ -29,7 +29,7 @@ import {
     typescript
 } from "../../../src/javascript";
 import {DependencyWorkspace} from "../../../src/javascript/dependency-workspace";
-import {J} from "../../../src/java";
+import {J, Type} from "../../../src/java";
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import * as path from "path";
 import * as os from "os";
@@ -75,6 +75,81 @@ describe('template dependencies integration', () => {
 
         expect(foundMatch).toBe(true);
     }, 60000);
+
+    test('`types` decides whether a pattern matches, where matching is strict', async () => {
+        // A pattern matches on attribution, so the declarations it was parsed against decide it.
+        // Lenient matching — the default — succeeds either way, which is what makes it lenient.
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/node': '^20.0.0'}});
+        const parser = new JavaScriptParser({relativeTo: workspaceDir, types: ['node']});
+        const parseGen = parser.parse({text: `process.cwd();`, sourcePath: 'test.ts'});
+        const cu = (await parseGen.next()).value;
+
+        const matchesWith = async (types: string[]) => {
+            const pat = pattern`process.cwd()`.configure({
+                dependencies: {'@types/node': '^20.0.0'},
+                types,
+                lenientTypeMatching: false
+            });
+            let matched = false;
+            await (new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                    if (method.name.simpleName === 'cwd' && await pat.match(method, this.cursor)) {
+                        matched = true;
+                    }
+                    return method;
+                }
+            }).visit(cu, undefined);
+            return matched;
+        };
+
+        expect(await matchesWith(['node'])).toBe(true);
+
+        expect(await matchesWith([])).toBe(false);
+    }, 120000);
+
+    test('`types` decides which declarations the template parse loads', async () => {
+        // `process` is a global `@types/node` declares, reachable only through automatic type
+        // inclusion — unlike a module specifier, which resolves by path whatever this option says.
+        // An explicit list replaces the default rather than extending it, so `[]` loads nothing.
+        const processDeclaringTypeWith = async (types: string[]) => {
+            const tmpl = template`process.cwd()`.configure({
+                dependencies: {'@types/node': '^20.0.0'},
+                types
+            });
+
+            const parser = new JavaScriptParser();
+            const parseGen = parser.parse({text: `const x = 1;`, sourcePath: 'test.ts'});
+            const cu = (await parseGen.next()).value;
+
+            let applied: J | undefined;
+            await (new class extends JavaScriptVisitor<any> {
+                override async visitVariable(variable: any, _p: any): Promise<any> {
+                    applied ??= await tmpl.apply(variable, this.cursor, {values: new Map()});
+                    return variable;
+                }
+            }).visit(cu, undefined);
+
+            let methodType: Type.Method | undefined;
+            await (new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                    if (method.name.simpleName === 'cwd') {
+                        methodType ??= method.methodType;
+                    }
+                    return method;
+                }
+            }).visit(applied!, undefined);
+            // `name` is the callee's own spelling whether or not anything resolved, so the
+            // declaring type is what says the declarations were loaded.
+            const declaring = methodType?.declaringType;
+            return declaring && Type.isClass(declaring)
+                ? (declaring as Type.Class).fullyQualifiedName
+                : undefined;
+        };
+
+        expect(await processDeclaringTypeWith(['node'])).toBe('global.NodeJS.Process');
+
+        expect(await processDeclaringTypeWith([])).toBeUndefined();
+    }, 120000);
 
     test('template with dependencies generates AST with type attribution', async () => {
         // Create a template with dependencies

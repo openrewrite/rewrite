@@ -18,37 +18,9 @@ import { Option, Recipe } from "../../recipe";
 import { TreeVisitor } from "../../visitor";
 import { ExecutionContext } from "../../execution";
 import { JavaScriptVisitor, JS } from "../index";
-import { maybeAddImport } from "../add-import";
-import { emptySpace, J, isIdentifier, rightPadded, singleSpace, Type } from "../../java";
-import { create as produce, Draft } from "mutative";
-import { randomId } from "../../uuid";
-import { emptyMarkers } from "../../markers";
-
-/**
- * Binds `member` under the name `local` already carries, so the file's references to it still
- * resolve. `local` itself becomes the alias, keeping the type attribution it holds, and the alias
- * takes its prefix: that whitespace separates the specifier from a `type` keyword before it.
- */
-function aliasing(local: Draft<J.Identifier>, member: string): JS.Alias {
-    const propertyName: J.Identifier = {
-        id: randomId(),
-        kind: J.Kind.Identifier,
-        prefix: emptySpace,
-        markers: emptyMarkers,
-        annotations: [],
-        simpleName: member,
-        type: undefined,
-        fieldType: undefined
-    };
-    return {
-        id: randomId(),
-        kind: JS.Kind.Alias,
-        prefix: local.prefix,
-        markers: emptyMarkers,
-        propertyName: rightPadded(propertyName, singleSpace),
-        alias: {...local, prefix: singleSpace} as J.Identifier
-    };
-}
+import { maybeRebind } from "../binding";
+import { J, Type } from "../../java";
+import { create as produce } from "mutative";
 
 /**
  * Changes an import from one module to another, updating all type attributions.
@@ -113,19 +85,11 @@ export class ChangeImport extends Recipe {
     })
     newMember?: string;
 
-    @Option({
-        displayName: "New alias",
-        description: "Optional alias for the new import. Required when newMember is 'default' or '*'.",
-        required: false
-    })
-    newAlias?: string;
-
     constructor(options?: {
         oldModule?: string;
         oldMember?: string;
         newModule?: string;
         newMember?: string;
-        newAlias?: string;
     }) {
         super(options);
     }
@@ -135,7 +99,6 @@ export class ChangeImport extends Recipe {
         const oldMember = this.oldMember;
         const newModule = this.newModule;
         const newMember = this.newMember ?? oldMember;
-        const newAlias = this.newAlias;
 
         // Build the old and new FQNs for type attribution updates
         const oldFqn = oldMember === 'default' || oldMember === '*'
@@ -147,181 +110,14 @@ export class ChangeImport extends Recipe {
 
         return new class extends JavaScriptVisitor<ExecutionContext> {
             private hasOldImport = false;
-            private oldAlias?: string;
-            private transformedImport = false;
 
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
-                // Reset tracking for each file
-                this.hasOldImport = false;
-                this.oldAlias = undefined;
-                this.transformedImport = false;
+                this.hasOldImport = maybeRebind(this, {
+                    from: {module: oldModule, member: oldMember},
+                    to: {module: newModule, member: newMember}
+                }) !== undefined;
 
-                // First pass: check if the old import exists and capture any alias
-                for (const statement of cu.statements) {
-                    const stmt = statement.element ?? statement;
-                    if (stmt.kind === JS.Kind.Import) {
-                        const jsImport = stmt as JS.Import;
-                        const aliasInfo = this.checkForOldImport(jsImport);
-                        if (aliasInfo.found) {
-                            this.hasOldImport = true;
-                            this.oldAlias = aliasInfo.alias;
-                            break;
-                        }
-                    }
-                }
-
-                // Visit the compilation unit (this will transform imports via visitJsImport)
-                let result = await super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
-
-                // If we transformed an import but need to add to existing import from new module,
-                // or if we only removed a member from a multi-import, use maybeAddImport
-                if (this.hasOldImport && !this.transformedImport) {
-                    const aliasToUse = newAlias ?? this.oldAlias;
-
-                    if (newMember === 'default') {
-                        maybeAddImport(this, {
-                            module: newModule,
-                            member: 'default',
-                            alias: aliasToUse,
-                            onlyIfReferenced: false
-                        });
-                    } else if (newMember === '*') {
-                        maybeAddImport(this, {
-                            module: newModule,
-                            member: '*',
-                            alias: aliasToUse,
-                            onlyIfReferenced: false
-                        });
-                    } else {
-                        maybeAddImport(this, {
-                            module: newModule,
-                            member: newMember,
-                            // A pinned alias is taken verbatim: `oldMember` is the name this
-                            // import bound, which the file's references to it already read.
-                            alias: aliasToUse ?? oldMember,
-                            onlyIfReferenced: false
-                        });
-                    }
-                }
-
-                return result;
-            }
-
-            override async visitImportDeclaration(jsImport: JS.Import, ctx: ExecutionContext): Promise<J | undefined> {
-                let imp = await super.visitImportDeclaration(jsImport, ctx) as JS.Import;
-
-                if (!this.hasOldImport) {
-                    return imp;
-                }
-
-                const aliasInfo = this.checkForOldImport(imp);
-                if (!aliasInfo.found) {
-                    return imp;
-                }
-
-                // Check if this is the only import from the old module
-                const namedImports = this.getNamedImports(imp);
-                const isOnlyImport = namedImports.length === 1 ||
-                    (oldMember === 'default' && !imp.importClause?.namedBindings) ||
-                    (oldMember === '*');
-
-                if (isOnlyImport) {
-                    // Transform the module specifier in place
-                    this.transformedImport = true;
-                    return produce(imp, draft => {
-                        if (draft.moduleSpecifier) {
-                            const literal = draft.moduleSpecifier.element as Draft<J.Literal>;
-                            literal.value = newModule;
-                            // Update valueSource to preserve quote style
-                            const originalSource = literal.valueSource || `"${oldModule}"`;
-                            const quoteChar = originalSource.startsWith("'") ? "'" : '"';
-                            literal.valueSource = `${quoteChar}${newModule}${quoteChar}`;
-                        }
-                        // If we're also renaming the member, update the import specifier
-                        if (newMember !== oldMember && oldMember !== 'default' && oldMember !== '*') {
-                            const importClause = draft.importClause;
-                            if (importClause?.namedBindings?.kind === JS.Kind.NamedImports) {
-                                const namedImports = importClause.namedBindings as Draft<JS.NamedImports>;
-                                for (const elem of namedImports.elements.elements) {
-                                    const specifier = elem.element;
-                                    if (specifier.specifier.kind === J.Kind.Identifier &&
-                                        specifier.specifier.simpleName === oldMember) {
-                                        specifier.specifier = aliasing(specifier.specifier as Draft<J.Identifier>, newMember);
-                                    } else if (specifier.specifier.kind === JS.Kind.Alias) {
-                                        const aliasNode = specifier.specifier as Draft<JS.Alias>;
-                                        const propertyName = aliasNode.propertyName.element;
-                                        if (propertyName.kind === J.Kind.Identifier &&
-                                            propertyName.simpleName === oldMember) {
-                                            propertyName.simpleName = newMember;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    });
-                } else {
-                    // Remove just the specific member from the import
-                    // maybeAddImport will add the new import
-                    return this.removeNamedImportMember(imp, oldMember, ctx);
-                }
-            }
-
-            private async removeNamedImportMember(imp: JS.Import, memberToRemove: string, _ctx: ExecutionContext): Promise<JS.Import> {
-                return produce(imp, draft => {
-                    const importClause = draft.importClause;
-                    if (!importClause?.namedBindings) return;
-                    if (importClause.namedBindings.kind !== JS.Kind.NamedImports) return;
-
-                    const namedImports = importClause.namedBindings as Draft<JS.NamedImports>;
-                    const elements = namedImports.elements.elements;
-                    const filteredElements = elements.filter(elem => {
-                        const specifier = elem.element;
-                        const specifierNode = specifier.specifier;
-
-                        if (specifierNode.kind === J.Kind.Identifier) {
-                            return specifierNode.simpleName !== memberToRemove;
-                        }
-
-                        if (specifierNode.kind === JS.Kind.Alias) {
-                            const alias = specifierNode as JS.Alias;
-                            const propertyName = alias.propertyName.element;
-                            if (propertyName.kind === J.Kind.Identifier) {
-                                return propertyName.simpleName !== memberToRemove;
-                            }
-                        }
-
-                        return true;
-                    });
-
-                    namedImports.elements.elements = filteredElements;
-                });
-            }
-
-            private getNamedImports(imp: JS.Import): string[] {
-                const imports: string[] = [];
-                const importClause = imp.importClause;
-                if (!importClause) return imports;
-
-                const namedBindings = importClause.namedBindings;
-                if (!namedBindings || namedBindings.kind !== JS.Kind.NamedImports) return imports;
-
-                const namedImports = namedBindings as JS.NamedImports;
-                for (const elem of namedImports.elements.elements) {
-                    const specifier = elem.element;
-                    const specifierNode = specifier.specifier;
-
-                    if (isIdentifier(specifierNode)) {
-                        imports.push(specifierNode.simpleName);
-                    } else if (specifierNode.kind === JS.Kind.Alias) {
-                        const alias = specifierNode as JS.Alias;
-                        const propertyName = alias.propertyName.element;
-                        if (isIdentifier(propertyName)) {
-                            imports.push(propertyName.simpleName);
-                        }
-                    }
-                }
-
-                return imports;
+                return super.visitJsCompilationUnit(cu, ctx);
             }
 
             override async visitIdentifier(identifier: J.Identifier, ctx: ExecutionContext): Promise<J | undefined> {
@@ -652,79 +448,6 @@ export class ChangeImport extends Recipe {
                     } as Type.Array;
                 }
                 return arrayType;
-            }
-
-            private checkForOldImport(jsImport: JS.Import): { found: boolean; alias?: string } {
-                // Check if this import is from the old module
-                const moduleSpecifier = jsImport.moduleSpecifier;
-                if (!moduleSpecifier) return { found: false };
-
-                const literal = moduleSpecifier.element;
-                if (literal.kind !== J.Kind.Literal) return { found: false };
-
-                const value = (literal as J.Literal).value;
-                if (value !== oldModule) return { found: false };
-
-                const importClause = jsImport.importClause;
-                if (!importClause) {
-                    // Side-effect import - not what we're looking for
-                    return { found: false };
-                }
-
-                // Check for default import
-                if (oldMember === 'default') {
-                    if (importClause.name) {
-                        const nameElem = importClause.name.element;
-                        if (isIdentifier(nameElem)) {
-                            return { found: true, alias: nameElem.simpleName };
-                        }
-                    }
-                    return { found: false };
-                }
-
-                // Check for namespace import
-                if (oldMember === '*') {
-                    const namedBindings = importClause.namedBindings;
-                    if (namedBindings?.kind === JS.Kind.Alias) {
-                        const alias = namedBindings as JS.Alias;
-                        if (isIdentifier(alias.alias)) {
-                            return { found: true, alias: alias.alias.simpleName };
-                        }
-                    }
-                    return { found: false };
-                }
-
-                // Check for named imports
-                const namedBindings = importClause.namedBindings;
-                if (!namedBindings) return { found: false };
-
-                if (namedBindings.kind !== JS.Kind.NamedImports) return { found: false };
-
-                const namedImports = namedBindings as JS.NamedImports;
-                const elements = namedImports.elements.elements;
-
-                for (const elem of elements) {
-                    const specifier = elem.element;
-                    const specifierNode = specifier.specifier;
-
-                    // Handle direct import: import { act }
-                    if (isIdentifier(specifierNode) && specifierNode.simpleName === oldMember) {
-                        return { found: true };
-                    }
-
-                    // Handle aliased import: import { act as something }
-                    if (specifierNode.kind === JS.Kind.Alias) {
-                        const alias = specifierNode as JS.Alias;
-                        const propertyName = alias.propertyName.element;
-                        if (isIdentifier(propertyName) && propertyName.simpleName === oldMember) {
-                            if (isIdentifier(alias.alias)) {
-                                return { found: true, alias: alias.alias.simpleName };
-                            }
-                        }
-                    }
-                }
-
-                return { found: false };
             }
         }();
     }

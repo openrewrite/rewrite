@@ -16,6 +16,8 @@
 import {Cursor, isTree} from "../tree";
 import {J} from "../java";
 import {JS} from "./tree";
+// scope.ts sits below the visitor, so this stays type-only.
+import type {JavaScriptVisitor} from "./visitor";
 
 /** The names code at some position can reach unqualified. */
 export interface Scope {
@@ -43,7 +45,12 @@ export function scopeOf(cursor: Cursor): Scope {
  * shadow it at one of them.
  */
 export function namesDeclaredIn(cu: JS.CompilationUnit): ReadonlySet<string> {
-    const cached = declared.get(cu);
+    return namesDeclaredWithin(cu.statements, cu);
+}
+
+/** As {@link namesDeclaredIn}, over one subtree, for a binding shared across only that much of a file. */
+export function namesDeclaredWithin(node: unknown, cacheKey: object = node as object): ReadonlySet<string> {
+    const cached = declared.get(cacheKey);
     if (cached) {
         return cached;
     }
@@ -61,9 +68,9 @@ export function namesDeclaredIn(cu: JS.CompilationUnit): ReadonlySet<string> {
         }
         return false;
     };
-    walk(cu.statements, collect);
+    walk(node, collect);
 
-    declared.set(cu, names);
+    declared.set(cacheKey, names);
     return names;
 }
 
@@ -220,7 +227,7 @@ const blockScoped = new Set(['let', 'const', 'using']);
 // replaced one is walked afresh: every call site in a function asks what that body hoists, and every
 // import added to a file asks what that file declares.
 const hoisted = new WeakMap<object, string[]>();
-const declared = new WeakMap<JS.CompilationUnit, ReadonlySet<string>>();
+const declared = new WeakMap<object, ReadonlySet<string>>();
 
 /**
  * The names blocks under `scope` hoist out to it. A `var` or function declaration reaches the whole
@@ -268,7 +275,7 @@ function hoistedNames(scope: any): string[] {
 }
 
 /** Visits every LST node under `node`, leaving a subtree unvisited where `visit` returns false. */
-function walk(node: unknown, visit: (node: any) => boolean): void {
+export function walk(node: unknown, visit: (node: any) => boolean): void {
     if (Array.isArray(node)) {
         node.forEach(child => walk(child, visit));
         return;
@@ -287,4 +294,45 @@ function walk(node: unknown, visit: (node: any) => boolean): void {
 /** The element a padding wrapper holds, or the node itself. */
 function unwrap(node: any): any {
     return node?.kind === J.Kind.RightPadded || node?.kind === J.Kind.LeftPadded ? unwrap(node.element) : node;
+}
+
+/** `cursor` is protected on `TreeVisitor` and these APIs are free functions, so reaching it takes a cast. */
+export function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
+    return (visitor as unknown as {cursor?: Cursor}).cursor;
+}
+
+/** The compilation unit a cursor sits in, or the one a visitor is currently positioned in. */
+export function compilationUnitOf(from: Cursor | JavaScriptVisitor<any>): JS.CompilationUnit | undefined {
+    const cursor = from instanceof Cursor ? from : cursorOf(from);
+    return cursor?.firstEnclosing((v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
+}
+
+/** `preferred`, or the first `preferred_N` that `isTaken` rejects, so a new name never shadows one in scope. */
+export function deconflict(preferred: string, isTaken: (name: string) => boolean): string {
+    if (!isTaken(preferred)) {
+        return preferred;
+    }
+    for (let suffix = 1; ; suffix++) {
+        const candidate = `${preferred}_${suffix}`;
+        if (!isTaken(candidate)) {
+            return candidate;
+        }
+    }
+}
+
+/**
+ * The `J.VariableDeclarations` a statement declares — itself for a bare `const x = …`, one per
+ * declarator for `const a = …, b = …`, which the parser wraps in a `JS.ScopedVariableDeclarations`
+ * instead.
+ */
+export function declarationsOf(statement: J | undefined): J.VariableDeclarations[] {
+    if (statement?.kind === J.Kind.VariableDeclarations) {
+        return [statement as J.VariableDeclarations];
+    }
+    if (statement?.kind === JS.Kind.ScopedVariableDeclarations) {
+        return (statement as JS.ScopedVariableDeclarations).variables
+            .map(v => v.element)
+            .filter((v): v is J.VariableDeclarations => v?.kind === J.Kind.VariableDeclarations);
+    }
+    return [];
 }
