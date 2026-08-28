@@ -1720,8 +1720,10 @@ function removeNamedSpecifier(jsImport: JS.Import, member: string): JS.Import {
  * Moves the binding `from` names to `to`, keeping the local name it already had. In place when
  * the statement that carries it binds nothing else — module and member specifier rewritten there
  * directly; otherwise the old specifier drops and {@link bindImport} queues the replacement,
- * aliased to the preserved name. Neither branch refuses: `maybeRebind` queues this only once it
- * has confirmed the move is safe.
+ * aliased to the preserved name.
+ *
+ * Not built on `RemoveImport`/`maybeUnbind`: those only drop a binding once nothing references
+ * it, but a rebind moves one that is still in use — removal here has to be unconditional.
  */
 export class RebindImport<P> extends JavaScriptVisitor<P> {
     constructor(

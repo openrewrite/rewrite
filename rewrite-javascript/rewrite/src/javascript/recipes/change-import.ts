@@ -85,24 +85,11 @@ export class ChangeImport extends Recipe {
     })
     newMember?: string;
 
-    /**
-     * Currently has no effect: the move keeps whatever local name the binding already had, and
-     * overriding that to a different name would leave the file's existing references to it
-     * unbound without a scope-correct rename this module does not yet have.
-     */
-    @Option({
-        displayName: "New alias",
-        description: "Optional alias for the new import. Required when newMember is 'default' or '*'.",
-        required: false
-    })
-    newAlias?: string;
-
     constructor(options?: {
         oldModule?: string;
         oldMember?: string;
         newModule?: string;
         newMember?: string;
-        newAlias?: string;
     }) {
         super(options);
     }
