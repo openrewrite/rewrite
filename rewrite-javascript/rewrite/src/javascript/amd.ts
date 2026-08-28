@@ -30,6 +30,7 @@ import {
 } from "../java";
 import {JS} from "./tree";
 import {cursorOf, deconflict, namesDeclaredWithin, scopeOf} from "./scope";
+import {Cursor} from "../tree";
 import {JavaScriptVisitor} from "./visitor";
 import {ExecutionContext} from "../execution";
 
@@ -470,6 +471,26 @@ export function withDependency(
     return withParts(call, block, dependencies, factory);
 }
 
+/**
+ * Adds a dependency the factory takes no parameter for, as AMD allows for a module loaded only
+ * for its side effects. Refuses where parameters outnumber dependencies, since the appended one
+ * would land on a surplus parameter and bind after all — as it would in `define(factory)`, whose
+ * parameters come from the loader.
+ */
+export function withUnboundDependency(
+    call: J.MethodInvocation,
+    block: AmdBlock,
+    module: string
+): J.MethodInvocation | undefined {
+    if (parametersOf(block).length > elementsOf(block).length) {
+        return undefined;
+    }
+    const dependencies = withElements(
+        block.dependencies,
+        appendEntry(elementsOf(block), dependencyLiteral(module, quoteOf(block)), dependencySlot));
+    return withParts(call, block, dependencies, block.factory);
+}
+
 export function withoutDependencyAt(
     call: J.MethodInvocation,
     block: AmdBlock,
@@ -551,11 +572,11 @@ export function calleesOf(options?: AmdCalleeOptions): readonly string[] {
 
 /** The nearest AMD block the cursor sits inside, which is the one a binding belongs to. */
 export function enclosingAmdBlock(
-    visitor: JavaScriptVisitor<any>,
+    from: Cursor | JavaScriptVisitor<any>,
     options?: AmdCalleeOptions
 ): {call: J.MethodInvocation, block: AmdBlock} | undefined {
     const callees = calleesOf(options);
-    let cursor = cursorOf(visitor);
+    let cursor = from instanceof Cursor ? from : cursorOf(from);
     while (cursor !== undefined) {
         const value = cursor.value as J | undefined;
         if (value?.kind === J.Kind.MethodInvocation) {
