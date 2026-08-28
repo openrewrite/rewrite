@@ -133,7 +133,7 @@ describe('templates that declare module bindings', () => {
         );
     });
 
-    test('a declared binding left unresolved at apply is an error, not a silent wrong name', async () => {
+    test('a rule given no way to resolve its bindings is an error, not a silent wrong name', async () => {
         const arg = capture('arg');
         const tmpl = template`Theming.setTheme(${arg})`.configure({
             context: [`import Theming from 'sap/ui/core/Theming';`]
@@ -150,6 +150,6 @@ describe('templates that declare module bindings', () => {
         await expect(spec.rewriteRun(
             //language=typescript
             typescript(`applyTheme('dark');`)
-        )).rejects.toThrow(/Theming/);
+        )).rejects.toThrow(/needs their local names/);
     });
 });

@@ -240,10 +240,10 @@ export class Template {
      * @returns The cached or newly computed template tree
      * @internal
      */
-    private async getTemplateTree(): Promise<JS.CompilationUnit> {
+    private async getTemplateTree(): Promise<J> {
         // Level 1: Instance cache (fastest path)
         if (this._cachedTemplate) {
-            return this._cachedTemplate as JS.CompilationUnit;
+            return this._cachedTemplate;
         }
 
         // Generate cache key for global lookup
@@ -270,8 +270,8 @@ export class Template {
         // Level 2: Global cache (fast path - shared with Pattern)
         const cached = globalAstCache.get(cacheKey);
         if (cached) {
-            this._cachedTemplate = cached as JS.CompilationUnit;
-            return cached as JS.CompilationUnit;
+            this._cachedTemplate = cached;
+            return cached;
         }
 
         // Level 3: Compute via TemplateEngine (slow path)
@@ -281,7 +281,7 @@ export class Template {
             contextStatements,
             this.options.dependencies || {},
             this.options.types
-        ) as JS.CompilationUnit;
+        );
 
         // Cache in both levels
         globalAstCache.set(cacheKey, result);
@@ -316,6 +316,11 @@ export class Template {
             }
         }
         return resolved;
+    }
+
+    /** Whether the context binds a module, which applying this template therefore has to resolve. */
+    async bindsModules(): Promise<boolean> {
+        return (await this.contextBindings()).length > 0;
     }
 
     /** What this template's context statements bind, which is what it needs bound in the target file. */

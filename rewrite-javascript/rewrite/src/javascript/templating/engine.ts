@@ -303,7 +303,7 @@ export class TemplateEngine {
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplateFromAst(
-        ast: JS.CompilationUnit,
+        ast: J,
         parameters: Parameter[],
         cursor: Cursor,
         coordinates: JavaCoordinates,
@@ -530,7 +530,8 @@ export class TemplateEngine {
         templateParts: TemplateStringsArray,
         captures: (Capture | Any | RawCode)[],
         contextStatements: string[] = [],
-        dependencies: Record<string, string> = {}
+        dependencies: Record<string, string> = {},
+        types?: string[]
     ): Promise<J> {
         const preamble = TemplateEngine.capturePreamble(captures);
 
@@ -571,7 +572,8 @@ export class TemplateEngine {
             templateString,
             actualCaptures,
             contextWithPreamble,
-            dependencies
+            dependencies,
+            types
         );
 
         // Check if there are any statements

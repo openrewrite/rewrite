@@ -350,6 +350,12 @@ export interface PatternOptions {
     dependencies?: Record<string, string>;
 
     /**
+     * Type packages to load whose declarations nothing imports, as {@link TemplateOptions.types}.
+     * A pattern matches on attribution, so a module typed only ambiently needs this to match.
+     */
+    types?: string[];
+
+    /**
      * When true, allows patterns without type annotations to match code with type annotations.
      * This enables more flexible pattern matching during development or when full type attribution
      * is not needed. When false, enforces strict type matching where both pattern and target must

@@ -60,6 +60,13 @@ class RewriteRuleImpl implements RewriteRule {
                 const template = typeof this.after === 'function' ? this.after(match) : this.after;
                 const bindings = options?.bindings ??
                     (options?.visitor ? await template.resolveBindings(options.visitor) : undefined);
+                // Applying without them would splice the context's own names in unbound, which
+                // reads as a working edit and is not one.
+                if (bindings === undefined && await template.bindsModules()) {
+                    throw new Error(
+                        "Template binds modules in its context, so applying it needs their local names. " +
+                        "Pass {visitor: this} to tryOn, or bindings you resolved yourself.");
+                }
                 result = await template.apply(node, cursor,
                     { values: match, format: this.format, bindings: bindings || undefined });
 

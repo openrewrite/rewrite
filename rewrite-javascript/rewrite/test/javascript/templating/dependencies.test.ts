@@ -76,6 +76,37 @@ describe('template dependencies integration', () => {
         expect(foundMatch).toBe(true);
     }, 60000);
 
+    test('`types` decides whether a pattern matches, where matching is strict', async () => {
+        // A pattern matches on attribution, so the declarations it was parsed against decide it.
+        // Lenient matching — the default — succeeds either way, which is what makes it lenient.
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/node': '^20.0.0'}});
+        const parser = new JavaScriptParser({relativeTo: workspaceDir, types: ['node']});
+        const parseGen = parser.parse({text: `process.cwd();`, sourcePath: 'test.ts'});
+        const cu = (await parseGen.next()).value;
+
+        const matchesWith = async (types: string[]) => {
+            const pat = pattern`process.cwd()`.configure({
+                dependencies: {'@types/node': '^20.0.0'},
+                types,
+                lenientTypeMatching: false
+            });
+            let matched = false;
+            await (new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                    if (method.name.simpleName === 'cwd' && await pat.match(method, this.cursor)) {
+                        matched = true;
+                    }
+                    return method;
+                }
+            }).visit(cu, undefined);
+            return matched;
+        };
+
+        expect(await matchesWith(['node'])).toBe(true);
+
+        expect(await matchesWith([])).toBe(false);
+    }, 120000);
+
     test('`types` decides which declarations the template parse loads', async () => {
         // `process` is a global `@types/node` declares, reachable only through automatic type
         // inclusion — unlike a module specifier, which resolves by path whatever this option says.
