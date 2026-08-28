@@ -385,6 +385,7 @@ const additionalCriticalCodes = new Set([
 const excludedCodes = new Set([
     1039, // Initializers are not allowed in ambient contexts.
     1064, // The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<{0}>'?
+    1101, // 'with' statements are not allowed in strict mode.
     1107, // Jump target cannot cross function boundary.
     1111, // Private field '{0}' must be declared in an enclosing class.
     1117, // An object literal cannot have multiple properties with the same name.
