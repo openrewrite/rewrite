@@ -41,7 +41,7 @@ export {
 } from "typescript/unstable/ast";
 export type {Checker as TypeChecker} from "typescript/unstable/sync";
 
-import {skipTrivia, type Node, type NodeArray, type SourceFile} from "typescript/unstable/ast";
+import {skipTrivia, SyntaxKind, type Node, type NodeArray, type SourceFile} from "typescript/unstable/ast";
 
 /** Whether a source file is a module, which its export or import marks it as being. */
 export function isExternalModule(sourceFile: SourceFile): boolean {
@@ -58,4 +58,21 @@ export function hasTrailingComma(nodes: NodeArray<Node>, sourceFile: SourceFile)
     }
     const afterLast = skipTrivia(sourceFile.text, nodes[nodes.length - 1].end);
     return sourceFile.text[afterLast] === ",";
+}
+
+/**
+ * The `?` a member carries, if any. A named member holds whichever of `?` and `!` follows its name
+ * in one `postfixToken`, while the other declarations that can take a `?` keep their own field.
+ */
+export function questionTokenOf(node: Node): Node | undefined {
+    const token = (node as {postfixToken?: Node; questionToken?: Node}).postfixToken
+        ?? (node as {questionToken?: Node}).questionToken;
+    return token?.kind === SyntaxKind.QuestionToken ? token : undefined;
+}
+
+/** The `!` a member carries, if any; it shares `postfixToken` with `?`. */
+export function exclamationTokenOf(node: Node): Node | undefined {
+    const token = (node as {postfixToken?: Node; exclamationToken?: Node}).postfixToken
+        ?? (node as {exclamationToken?: Node}).exclamationToken;
+    return token?.kind === SyntaxKind.ExclamationToken ? token : undefined;
 }

@@ -18,4 +18,4 @@
 // place whitespace. The compiler leaves them out of the tree it sends, so they are scanned back out
 // of the source text; ts7/token-navigation.ts does that and this is the surface the parser reads.
 
-export {childAt, childCountOf, childrenOf, firstTokenOf, lastTokenOf} from "./ts7/token-navigation";
+export {childAt, childCountOf, childrenOf, firstTokenOf, isScanned, lastTokenOf} from "./ts7/token-navigation";

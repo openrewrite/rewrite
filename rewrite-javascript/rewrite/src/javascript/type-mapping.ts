@@ -19,6 +19,7 @@ import {Type} from "../java";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
 import {declarationsOf, fullyQualifiedNameOf, signatureKeyOf, valueDeclarationOf} from "./ts7/checker";
+import {isScanned} from "./token-navigation";
 
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
@@ -71,6 +72,11 @@ export class JavaScriptTypeMapping {
         // TypeNode needs getTypeFromTypeNode (resolves the annotation itself).
         // Everything else — expressions, declarations, specifiers, bindings, etc. —
         // uses getTypeAtLocation which works for virtually all node kinds.
+        // A scanned token stands for punctuation the compiler left out of its tree, so the checker
+        // has nothing to look it up by.
+        if (isScanned(node)) {
+            return undefined;
+        }
         let type: ts.Type | undefined;
         if (ts.isTypeNode(node)) {
             type = this.checker.getTypeFromTypeNode(node);

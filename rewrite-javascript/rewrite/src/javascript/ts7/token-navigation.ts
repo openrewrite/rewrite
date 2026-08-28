@@ -31,6 +31,14 @@ import {
 // nothing in the compiler's tree can collide with.
 const SYNTAX_LIST = Symbol("syntaxList");
 
+// A scanned token has no counterpart in the compiler process, so it cannot be handed back to the
+// checker; callers ask this before doing so.
+const SCANNED = Symbol("scanned");
+
+export function isScanned(node: Node): boolean {
+    return (node as unknown as Record<symbol, unknown>)[SCANNED] === true;
+}
+
 interface SyntaxListNode extends Node {
     readonly [SYNTAX_LIST]: NodeArray<Node>;
 }
@@ -46,6 +54,7 @@ function scannedNode(kind: SyntaxKind, pos: number, end: number, sourceFile: Sou
     const start = () => Math.min(skipTrivia(sourceFile.text, pos), end);
     const leadingTriviaWidth = () => start() - pos;
     const node = {
+        [SCANNED]: true,
         kind, pos, end, parent,
         flags: 0,
         forEachChild: () => undefined,

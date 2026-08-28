@@ -1083,7 +1083,7 @@ export class JavaScriptParserVisitor {
                         draft.markers = this.maybeAddOptionalMarker(draft, node);
 
                         // This will be mutually exclusive with the optional token
-                        if ((node as {exclamationToken?: ts.Node}).exclamationToken) {
+                        if (ts.exclamationTokenOf(node)) {
                             draft.markers.markers.push({
                                 kind: JS.Markers.NonNullAssertion,
                                 id: randomId(),
@@ -3157,7 +3157,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: produce(emptyMarkers, draft => {
-                if ((node as {exclamationToken?: ts.Node}).exclamationToken) {
+                if (ts.exclamationTokenOf(node)) {
                     draft.markers.push({
                         kind: JS.Markers.NonNullAssertion,
                         id: randomId(),
@@ -3221,7 +3221,7 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: isMulti ? emptySpace : this.prefix(declaration),
                     markers: produce(emptyMarkers, draft => {
-                        if (declaration.exclamationToken) {
+                        if (ts.exclamationTokenOf(declaration)) {
                             draft.markers.push({
                                 kind: JS.Markers.NonNullAssertion,
                                 id: randomId(),
@@ -4555,7 +4555,7 @@ export class JavaScriptParserVisitor {
         markers: Markers
     }, node: ts.MethodSignature | ts.MethodDeclaration | ts.ParameterDeclaration | ts.PropertySignature | ts.PropertyDeclaration | ts.NamedTupleMember): Markers {
         return produce(t.markers, draft => {
-            if ((node as {questionToken?: ts.Node}).questionToken) {
+            if (ts.questionTokenOf(node)) {
                 draft.markers.push({
                     kind: JS.Markers.Optional,
                     id: randomId(),
