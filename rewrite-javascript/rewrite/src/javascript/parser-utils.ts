@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as ts from "typescript";
+import ts from "./compiler";
 import {Expression, J, Statement} from "../java";
 import {JS} from "./tree";
 import {childAt, childCountOf, childrenOf, lastTokenOf} from "./token-navigation";

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as ts from "typescript";
+import ts from "./compiler";
 
 // Punctuation and keyword tokens are absent from node fields, and the LST needs their offsets to
 // place whitespace. The parser reaches them only through these five calls, keeping its dependency
