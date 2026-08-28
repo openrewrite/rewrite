@@ -1,0 +1,30 @@
+{
+  "name": "multi-alias-same",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "multi-alias-same",
+      "version": "1.0.0",
+      "dependencies": {
+        "er-x": "npm:emoji-regex@^8.0.0",
+        "er-y": "npm:emoji-regex@^8.0.0"
+      }
+    },
+    "node_modules/er-x": {
+      "name": "emoji-regex",
+      "version": "8.0.0",
+      "resolved": "https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz",
+      "integrity": "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==",
+      "license": "MIT"
+    },
+    "node_modules/er-y": {
+      "name": "emoji-regex",
+      "version": "8.0.0",
+      "resolved": "https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz",
+      "integrity": "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==",
+      "license": "MIT"
+    }
+  }
+}
