@@ -1735,8 +1735,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         if (vartype == null) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
-            if ((node.sym.flags() & Flags.PARAMETER) > 0) {
-                // this is a lambda parameter with an inferred type expression
+            if (!hasLombokGeneratedSymbol(node)) {
+                // Inferred lambda parameter types and unresolved types have no source representation.
                 typeExpr = null;
             } else {
                 Space space = whitespace();
