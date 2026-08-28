@@ -11,5 +11,10 @@
   },
   "include": [
     "src/**/*"
+  ],
+  // The ts7 modules run against `typescript7`, a devDependency, and only the conformance test
+  // loads them; shipping them would put an unresolvable require in the published package.
+  "exclude": [
+    "src/javascript/ts7/**"
   ]
 }
