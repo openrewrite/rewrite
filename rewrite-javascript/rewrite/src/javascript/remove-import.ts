@@ -5,41 +5,6 @@ import {JS, JSX} from "./tree";
 import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
 
-/**
- * @param visitor The visitor to add the import removal to
- * @param module The module name (e.g., 'fs', 'react') to remove imports from
- * @param member Optionally, the specific member to remove from the import.
- *               If not specified, removes all unused imports from the module.
- *               Special values:
- *               - 'default': Removes the default import from the module if unused,
- *                 regardless of its local name (e.g., `import React from 'react'`)
- *               - '*': Removes the namespace import if unused (e.g., `import * as fs from 'fs'`)
- *
- * @example
- * // Remove a specific named import if unused
- * maybeRemoveImport(visitor, 'fs', 'readFile');
- *
- * @example
- * // Remove the default import from 'react' if unused (regardless of local name)
- * maybeRemoveImport(visitor, 'react', 'default');
- *
- * @example
- * // Remove all unused imports from 'react' module
- * maybeRemoveImport(visitor, 'react');
- *
- * @example
- * // Remove namespace import if unused
- * maybeRemoveImport(visitor, 'fs', '*');
- */
-export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, module: string, member?: string) {
-    for (const v of visitor.afterVisit || []) {
-        if (v instanceof RemoveImport && v.module === module && v.member === member) {
-            return;
-        }
-    }
-    visitor.afterVisit.push(new RemoveImport(module, member));
-}
-
 // Type alias for RightPadded elements to simplify type signatures
 type RightPaddedElement<T extends J> = {
     element?: T;

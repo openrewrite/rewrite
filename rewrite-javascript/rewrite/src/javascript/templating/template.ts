@@ -16,8 +16,8 @@
 import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {ApplyOptions, Parameter, TemplateOptions, TemplateParameter} from './types';
-import {bindingContextStatement, isResolvable} from './bindings';
-import {maybeAddImport} from '../add-import';
+import {maybeBind} from '../binding';
+import {ContextBinding} from './engine';
 import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
 import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
@@ -177,6 +177,7 @@ export class TemplateBuilder {
 export class Template {
     private options: TemplateOptions = {};
     private _cachedTemplate?: J;
+    private _contextBindings?: Promise<ContextBinding[]>;
 
     /**
      * Creates a new template.
@@ -224,6 +225,7 @@ export class Template {
         this.options = {...this.options, ...options};
         // Invalidate cache when configuration changes
         this._cachedTemplate = undefined;
+        this._contextBindings = undefined;
         return this;
     }
 
@@ -240,20 +242,16 @@ export class Template {
      * @returns The cached or newly computed template tree
      * @internal
      */
-    private async getTemplateTree(): Promise<JS.CompilationUnit> {
+    private async getTemplateTree(): Promise<J> {
         // Level 1: Instance cache (fastest path)
         if (this._cachedTemplate) {
-            return this._cachedTemplate as JS.CompilationUnit;
+            return this._cachedTemplate;
         }
 
         // Generate cache key for global lookup
         // For raw() parameters, we need to include their code values in the key
         // since they're spliced at construction time, not application time
-        const contextStatements = [
-            ...(this.options.context || this.options.imports || []),
-            ...Object.entries(this.options.bindings ?? {})
-                .map(([name, b]) => bindingContextStatement(name, b, this.options.dependencies ?? {}))
-        ];
+        const contextStatements = this.options.context || this.options.imports || [];
         const parametersKey = this.parameters.map((p, i) => {
             const value = p.value;
             // Include raw code values in the cache key using the symbol
@@ -267,14 +265,15 @@ export class Template {
             parametersKey,
             // As in Pattern.getAstPattern: a parameter's type reaches the parse as a declaration
             [...contextStatements, ...TemplateEngine.parameterPreamble(this.parameters)],
-            this.options.dependencies || {}
+            this.options.dependencies || {},
+            this.options.types
         );
 
         // Level 2: Global cache (fast path - shared with Pattern)
         const cached = globalAstCache.get(cacheKey);
         if (cached) {
-            this._cachedTemplate = cached as JS.CompilationUnit;
-            return cached as JS.CompilationUnit;
+            this._cachedTemplate = cached;
+            return cached;
         }
 
         // Level 3: Compute via TemplateEngine (slow path)
@@ -282,8 +281,9 @@ export class Template {
             this.templateParts,
             this.parameters,
             contextStatements,
-            this.options.dependencies || {}
-        ) as JS.CompilationUnit;
+            this.options.dependencies || {},
+            this.options.types
+        );
 
         // Cache in both levels
         globalAstCache.set(cacheKey, result);
@@ -298,16 +298,45 @@ export class Template {
      * cannot resolve is bound whether or not the template goes on to reference it, so call this
      * where the template is known to apply — {@link RewriteRule.tryOn} does, once a pattern matched.
      */
-    resolveBindings(visitor: JavaScriptVisitor<any>): Record<string, string> {
+    async resolveBindings(visitor: JavaScriptVisitor<any>): Promise<Record<string, string>> {
         const resolved: Record<string, string> = {};
-        const dependencies = this.options.dependencies ?? {};
-        for (const [name, binding] of Object.entries(this.options.bindings ?? {})) {
-            // Recognising the reference the template splices in takes attribution, which only the
-            // import form of a context statement carries. Without one there is nothing to look for.
-            const onlyIfReferenced = isResolvable(binding.module, dependencies);
-            resolved[name] = maybeAddImport(visitor, {...binding, preferredName: name, onlyIfReferenced});
+        for (const binding of await this.contextBindings()) {
+            // Recognising the reference the template splices in takes attribution, so a module the
+            // workspace could not resolve is bound whether or not the template turns out to use it.
+            const onlyIfReferenced = binding.attributed;
+            const bound = maybeBind(visitor, {
+                module: binding.module!,
+                member: binding.member,
+                typeOnly: binding.typeOnly,
+                preferredName: binding.name,
+                onlyIfReferenced
+            });
+            // An unresolved binding is left out rather than recorded as `undefined`, so `apply()`'s
+            // own "applied without a local name" check catches it, same as a caller-omitted one.
+            if (bound !== undefined) {
+                resolved[binding.name] = bound;
+            }
         }
         return resolved;
+    }
+
+    /** Whether the context binds a module, which applying this template therefore has to resolve. */
+    async bindsModules(): Promise<boolean> {
+        return (await this.contextBindings()).length > 0;
+    }
+
+    /** What this template's context statements bind, which is what it needs bound in the target file. */
+    private contextBindings(): Promise<ContextBinding[]> {
+        return this._contextBindings ??= this.deriveContextBindings();
+    }
+
+    private deriveContextBindings(): Promise<ContextBinding[]> {
+        return TemplateEngine.getContextBindings(
+            this.templateParts, this.parameters,
+            this.options.context || this.options.imports || [],
+            this.options.dependencies || {},
+            this.options.types
+        );
     }
 
     /**
@@ -372,17 +401,21 @@ export class Template {
             }
         }
 
-        const declared = this.options.bindings ?? {};
         const renames: Record<string, string> = {};
         const modules: Record<string, string> = {};
-        for (const [name, binding] of Object.entries(declared)) {
-            const bound = options?.bindings?.[name];
-            if (bound === undefined) {
-                throw new Error(`Template declares a binding for '${name}' but was applied without a local name for it. ` +
-                    `Pass bindings: template.resolveBindings(visitor) to apply().`);
+        // Supplying names is what asks for the context's modules to be bound in the file being
+        // edited; without them a context import only types the template.
+        if (options?.bindings !== undefined) {
+            for (const binding of await this.contextBindings()) {
+                const bound = options.bindings[binding.name];
+                if (bound === undefined) {
+                    throw new Error(`Template binds '${binding.module}' in its context, but no local name was ` +
+                        `given for '${binding.name}'. Either pass bindings from resolveBindings(visitor), or — if it ` +
+                        `already did — binding was refused, which an AMD block or a file requiring its modules can do.`);
+                }
+                renames[binding.name] = bound;
+                modules[binding.name] = binding.module!;
             }
-            renames[name] = bound;
-            modules[name] = binding.module;
         }
 
         // Use instance-level cache to get the template tree

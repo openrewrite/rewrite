@@ -16,7 +16,6 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {bindingContextStatement} from "../../../src/javascript/templating/bindings";
 
 describe('templates that declare module bindings', () => {
     const spec = new RecipeSpec();
@@ -35,7 +34,7 @@ describe('templates that declare module bindings', () => {
     test('the bound name is deconflicted and the template follows it', async () => {
         const arg = capture('arg');
         spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({
-            bindings: {Theming: {module: 'sap/ui/core/Theming', member: 'default'}}
+            context: [`import Theming from 'sap/ui/core/Theming';`]
         }), arg);
 
         await spec.rewriteRun(
@@ -50,7 +49,7 @@ describe('templates that declare module bindings', () => {
     test('an import already binding the module is reused, under the name it already has', async () => {
         const arg = capture('arg');
         spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({
-            bindings: {Theming: {module: 'sap/ui/core/Theming', member: 'default'}}
+            context: [`import Theming from 'sap/ui/core/Theming';`]
         }), arg);
 
         await spec.rewriteRun(
@@ -65,10 +64,10 @@ describe('templates that declare module bindings', () => {
     test('a template resolves every binding it declares', async () => {
         const arg = capture('arg');
         spec.recipe = recipeApplying(template`new Locale(Localization.getLanguageTag(${arg}))`.configure({
-            bindings: {
-                Locale: {module: 'sap/ui/core/Locale', member: 'default'},
-                Localization: {module: 'sap/base/i18n/Localization', member: 'default'}
-            }
+            context: [
+                `import Locale from 'sap/ui/core/Locale';`,
+                `import Localization from 'sap/base/i18n/Localization';`
+            ]
         }), arg);
 
         await spec.rewriteRun(
@@ -83,7 +82,7 @@ describe('templates that declare module bindings', () => {
     test('a name in a naming position is not a reference to the binding', async () => {
         const arg = capture('arg');
         spec.recipe = recipeApplying(template`Theming.setTheme(${arg}.Theming)`.configure({
-            bindings: {Theming: {module: 'sap/ui/core/Theming', member: 'default'}}
+            context: [`import Theming from 'sap/ui/core/Theming';`]
         }), arg);
 
         await spec.rewriteRun(
@@ -98,7 +97,7 @@ describe('templates that declare module bindings', () => {
     test('a binding called on its own is a reference to it, not a name it gives something', async () => {
         const arg = capture('arg');
         spec.recipe = recipeApplying(template`merge(${arg}, {}).merge()`.configure({
-            bindings: {merge: {module: 'sap/base/util/merge', member: 'default'}}
+            context: [`import merge from 'sap/base/util/merge';`]
         }), arg);
 
         await spec.rewriteRun(
@@ -113,7 +112,7 @@ describe('templates that declare module bindings', () => {
     test('a rule that does not fire leaves the file\'s imports alone', async () => {
         const arg = capture('arg');
         spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({
-            bindings: {Theming: {module: 'sap/ui/core/Theming', member: 'default'}}
+            context: [`import Theming from 'sap/ui/core/Theming';`]
         }), arg);
 
         await spec.rewriteRun(
@@ -122,22 +121,22 @@ describe('templates that declare module bindings', () => {
         );
     });
 
-    test('a binding is parsed against an import only where the dependencies could resolve it', () => {
-        expect(bindingContextStatement('Theming', {module: 'sap/ui/core/Theming', member: 'default'}, {}))
-            .toBe('declare const Theming: any;');
-        expect(bindingContextStatement('Theming', {module: 'sap/ui/core/Theming', member: 'default'}, {sap: '^1.0.0'}))
-            .toBe("import Theming from 'sap/ui/core/Theming';");
+    test('a context statement that is not an import binds nothing', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`helper(${arg})`.configure({
+            context: [`declare function helper(x: string): void;`]
+        }), arg);
 
-        expect(bindingContextStatement('Props', {module: '@scope/pkg/props', member: 'Props', typeOnly: true}, {}))
-            .toBe('type Props = any;');
-        expect(bindingContextStatement('Props', {module: '@scope/pkg/props', member: 'Props', typeOnly: true}, {'@scope/pkg': '^1.0.0'}))
-            .toBe("import type {Props} from '@scope/pkg/props';");
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`applyTheme('dark');`, `helper('dark');`)
+        );
     });
 
-    test('a declared binding left unresolved at apply is an error, not a silent wrong name', async () => {
+    test('a rule given no way to resolve its bindings is an error, not a silent wrong name', async () => {
         const arg = capture('arg');
         const tmpl = template`Theming.setTheme(${arg})`.configure({
-            bindings: {Theming: {module: 'sap/ui/core/Theming', member: 'default'}}
+            context: [`import Theming from 'sap/ui/core/Theming';`]
         });
         const rule = rewrite(() => ({before: pattern`applyTheme(${arg})`, after: tmpl}));
 
@@ -151,6 +150,6 @@ describe('templates that declare module bindings', () => {
         await expect(spec.rewriteRun(
             //language=typescript
             typescript(`applyTheme('dark');`)
-        )).rejects.toThrow(/Theming/);
+        )).rejects.toThrow(/needs their local names/);
     });
 });

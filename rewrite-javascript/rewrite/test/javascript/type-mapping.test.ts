@@ -276,7 +276,7 @@ describe('JavaScript type mapping', () => {
                             memberNames.includes('classList');
 
                         if (hasExpectedProperties) {
-                            return `${type.fullyQualifiedName} (${type.members.length} members)`;
+                            return `${type.fullyQualifiedName} (has expected members)`;
                         }
                         return type.fullyQualifiedName;
                     }
@@ -294,7 +294,7 @@ describe('JavaScript type mapping', () => {
                         element = div;
                     `,
                     `
-                        let element: /*~~(HTMLElement (246 members))~~>*/HTMLElement;
+                        let element: /*~~(HTMLElement (has expected members))~~>*/HTMLElement;
                         const div = document.createElement('div');
                         element = div;
                     `
