@@ -19,12 +19,18 @@ import {JS} from "./tree";
 // scope.ts sits below the visitor, so this stays type-only.
 import type {JavaScriptVisitor} from "./visitor";
 
-/** The names code at some position can reach unqualified. */
+/** Which names code at some position can reach unqualified, and where each of them comes from. */
 export interface Scope {
     /** Whether this scope or one enclosing it binds `name`. */
     declares(name: string): boolean;
 
-    names(): ReadonlySet<string>;
+    /**
+     * The node owning the innermost scope that binds `name` — the compilation unit for a
+     * module-scope binding, otherwise the function, block or loop holding it — or undefined where
+     * nothing in scope does. A caller holding a declaration asks whether this is the node it came
+     * from: anything nearer shadows it.
+     */
+    declaringScope(name: string): J | undefined;
 }
 
 /**
@@ -34,9 +40,10 @@ export interface Scope {
  * reach the cursor.
  */
 export function scopeOf(cursor: Cursor): Scope {
-    let resolved: Set<string> | undefined;
-    const names = () => resolved ??= namesInScope(cursor);
-    return {declares: name => names().has(name), names};
+    return {
+        declares: name => declaringScopeOf(cursor, name) !== undefined,
+        declaringScope: name => declaringScopeOf(cursor, name)
+    };
 }
 
 /**
@@ -114,7 +121,17 @@ function unnamedMembers(bound: { name: string }[]): { name: string }[] {
     return bound.map(({name}) => ({name}));
 }
 
-function namesInScope(cursor: Cursor): Set<string> {
+function declaringScopeOf(cursor: Cursor, name: string): J | undefined {
+    for (let c: Cursor | undefined = cursor; c; c = c.parent) {
+        if (frameBindings(c.value, c.parent?.value).includes(name)) {
+            return c.value;
+        }
+    }
+    return undefined;
+}
+
+/** Every name {@link scopeOf} answers `declares` for, when a caller has none in mind to ask about. */
+export function namesInScope(cursor: Cursor): ReadonlySet<string> {
     const names = new Set<string>();
     for (let c: Cursor | undefined = cursor; c; c = c.parent) {
         for (const name of frameBindings(c.value, c.parent?.value)) {
@@ -124,26 +141,46 @@ function namesInScope(cursor: Cursor): Set<string> {
     return names;
 }
 
-/** What one node on the cursor path binds, `parent` being the node it hangs from. */
+/**
+ * What one node on the cursor path binds, `parent` being the node it hangs from. Only these two
+ * answers turn on the parent; a node alone settles the rest, which is what makes them cacheable.
+ */
 function frameBindings(node: any, parent: any): string[] {
-    switch (node?.kind) {
+    // A class body holds members, which are reached through an instance rather than by name.
+    if (node?.kind === J.Kind.Block && parent?.kind === J.Kind.ClassDeclaration) {
+        return [];
+    }
+    // A function expression is the only function whose own name its body reaches: a declaration's
+    // name belongs to the enclosing block, a method's to an instance.
+    if (node?.kind === J.Kind.MethodDeclaration && parent?.kind === JS.Kind.StatementExpression) {
+        const self = bindingNames((node as J.MethodDeclaration).name).map(bound => bound.name);
+        return [...self, ...ownBindings(node)];
+    }
+    return ownBindings(node);
+}
+
+function ownBindings(node: any): string[] {
+    if (typeof node !== 'object' || node === null) {
+        return [];
+    }
+    let names = frames.get(node);
+    if (!names) {
+        frames.set(node, names = readBindings(node));
+    }
+    return names;
+}
+
+function readBindings(node: any): string[] {
+    switch (node.kind) {
         case JS.Kind.CompilationUnit: {
             const statements = (node as JS.CompilationUnit).statements;
             return [...declaredNames(statements), ...hoistedNames(statements)];
         }
         case J.Kind.Block:
-            // A class body holds members, which are reached through an instance rather than by name.
-            return parent?.kind === J.Kind.ClassDeclaration ? [] : declaredNames((node as J.Block).statements);
+            return blockScopedNames((node as J.Block).statements);
         case J.Kind.MethodDeclaration: {
             const method = node as J.MethodDeclaration;
-            // A function expression is the only function whose own name its body reaches: a
-            // declaration's name belongs to the enclosing block, a method's to an instance.
-            const self = parent?.kind === JS.Kind.StatementExpression ? bindingNames(method.name) : [];
-            return [
-                ...self.map(bound => bound.name),
-                ...declaredNames(method.parameters.elements),
-                ...hoistedNames(method.body)
-            ];
+            return [...declaredNames(method.parameters.elements), ...hoistedNames(method.body)];
         }
         case J.Kind.Lambda: {
             const lambda = node as J.Lambda;
@@ -162,6 +199,31 @@ function frameBindings(node: any, parent: any): string[] {
         default:
             return [];
     }
+}
+
+/**
+ * The names statements bind in the block holding them — the complement of what
+ * {@link hoistedNames} claims, so `function (x) { var x = 1; }` reads as one binding, not two.
+ */
+function blockScopedNames(statements: any[]): string[] {
+    return statements.flatMap(statement => {
+        const element = unwrap(statement);
+        switch (element?.kind) {
+            case J.Kind.MethodDeclaration:
+                return [];
+            case J.Kind.VariableDeclarations:
+            case JS.Kind.ScopedVariableDeclarations:
+                return isBlockScoped(element) ? declarationNames(element) : [];
+            case J.Kind.Case:
+                return blockScopedNames((element as J.Case).statements.elements);
+            default:
+                return declarationNames(element);
+        }
+    });
+}
+
+function isBlockScoped(declaration: any): boolean {
+    return ((declaration.modifiers ?? []) as J.Modifier[]).some(m => blockScoped.has(m.keyword!));
 }
 
 /** The names statements declare directly in the scope holding them. */
@@ -224,10 +286,12 @@ function aliasedName(specifier: J | undefined): string[] {
 const blockScoped = new Set(['let', 'const', 'using']);
 
 // A walk of an immutable subtree has one answer, so it runs once. Keyed on the subtree itself, a
-// replaced one is walked afresh: every call site in a function asks what that body hoists, and every
-// import added to a file asks what that file declares.
+// replaced one is walked afresh: every call site in a function asks what that body hoists, every
+// import added to a file asks what that file declares, and every scope is asked what it binds by
+// each of the call sites it encloses.
 const hoisted = new WeakMap<object, string[]>();
 const declared = new WeakMap<object, ReadonlySet<string>>();
+const frames = new WeakMap<object, string[]>();
 
 /**
  * The names blocks under `scope` hoist out to it. A `var` or function declaration reaches the whole
@@ -251,7 +315,7 @@ function hoistedNames(scope: any): string[] {
                 return false;
             case J.Kind.VariableDeclarations:
             case JS.Kind.ScopedVariableDeclarations:
-                if (!((node.modifiers ?? []) as J.Modifier[]).some(m => blockScoped.has(m.keyword!))) {
+                if (!isBlockScoped(node)) {
                     names.push(...declarationNames(node));
                 }
                 return false;

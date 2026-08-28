@@ -4,7 +4,7 @@ import {JS, JSX} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
 import {getStyle, PrettierStyle, SpacesStyle, StyleKind} from "./style";
-import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, namesDeclaredIn} from "./scope";
+import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, namesDeclaredIn, scopeOf} from "./scope";
 import {create as produce, Draft} from "mutative";
 
 export type QuoteChar = "'" | '"';
@@ -130,9 +130,10 @@ export function bindImport(
     // derive a suffixed name from the binding this call just added. A caller that named a preference
     // takes whatever comes back; one that did not assumes the name it derived, so a binding under
     // any other name would leave the references it emits unbound.
+    const scope = scopeOf(cursor);
     for (const binding of moduleScopeBindings(cu)) {
         if (binding.module === module && binding.member === memberName(options.member) &&
-            binding.typeOnly === typeOnly &&
+            binding.typeOnly === typeOnly && scope.declaringScope(binding.name) === cu &&
             (options.preferredName !== undefined || anyNameAnswers(options) ||
                 binding.name === derived)) {
             return binding.name;

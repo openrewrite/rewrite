@@ -29,7 +29,7 @@ import {
     TrailingComma
 } from "../java";
 import {JS} from "./tree";
-import {cursorOf, deconflict, namesDeclaredWithin} from "./scope";
+import {cursorOf, deconflict, namesDeclaredWithin, scopeOf} from "./scope";
 import {JavaScriptVisitor} from "./visitor";
 import {ExecutionContext} from "../execution";
 
@@ -374,17 +374,19 @@ function withParameters(
 }
 
 /**
- * A bare arrow parameter has no closing delimiter of its own — the space before `=>` sits on
- * the parameter itself. Wrapping it in parens turns that into the space before the new `)`,
- * so it has to move to `arrow` instead, where it will actually print before `=>` again.
+ * A bare arrow parameter has no closing delimiter of its own — the space before `=>` is the
+ * parameter's trailing padding, so parenthesizing moves its whitespace to `arrow` and leaves any
+ * comment with the parameter. The padding comes from the original list, since `elements` stands
+ * in for an emptied list with a placeholder that carries none.
  */
 function parenthesize(lambda: J.Lambda, elements: J.RightPadded<J>[]): J.Lambda {
+    const original = normalizeArrowParameters(lambda.parameters.parameters);
+    const trailing = original[original.length - 1]?.after ?? lambda.arrow;
     const last = elements[elements.length - 1];
-    const arrowSpace = last.after.whitespace === "" ? lambda.arrow : last.after;
     return {
         ...lambda,
         parameters: {...lambda.parameters, parenthesized: true, parameters: [...elements.slice(0, -1), {...last, after: emptySpace}]},
-        arrow: arrowSpace
+        arrow: space(trailing.whitespace)
     };
 }
 
@@ -619,7 +621,18 @@ export function bindAmd(
 
     const declared = module === "" ? -1 : modules.indexOf(module);
     if (declared >= 0) {
-        return bindings[declared];
+        const bound = bindings[declared];
+        if (bound === undefined) {
+            // A parameter that is not a plain name gives the module no binding to hand back.
+            return undefined;
+        }
+        // Only code the factory encloses can shadow its parameter, so a cursor elsewhere in the
+        // block — on the `define` call, or on its dependency array — has nothing to measure.
+        const cursor = cursorOf(visitor);
+        const withinFactory = cursor?.firstEnclosing((v): v is J => v === amd.block.factory);
+        if (withinFactory === undefined || scopeOf(cursor!).declaringScope(bound) === amd.block.factory) {
+            return bound;
+        }
     }
 
     // Two calls naming the same module at the same block are the same request (ADR 0013),
