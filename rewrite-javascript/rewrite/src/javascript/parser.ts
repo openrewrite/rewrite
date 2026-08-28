@@ -51,7 +51,7 @@ import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
 import {childAt, childCountOf, childrenOf, firstTokenOf, lastTokenOf} from "./token-navigation";
-import {openSession} from "./ts7/program";
+import {Compiler} from "./ts7/program";
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
@@ -79,7 +79,7 @@ export class JavaScriptParser extends Parser {
 
     private readonly compilerOptions: Record<string, unknown>;
     private readonly styles?: NamedStyles[];
-    private oldProgram?: ts.Program;
+    private compiler?: Compiler;
     private readonly sourceFileCache?: Map<string, ts.SourceFile>;
 
     constructor(
@@ -143,9 +143,8 @@ export class JavaScriptParser extends Parser {
 
         // There is no parser outside the compiler process, so even a parse that wants no types
         // goes through a session; it is opened for this file alone and released straight after.
-        const root = this.relativeTo ?? process.cwd();
-        const absolutePath = path.resolve(root, sourcePath);
-        const session = openSession(root, new Map([[absolutePath, sourceText]]), this.compilerOptions);
+        const absolutePath = path.resolve(this.relativeTo ?? process.cwd(), sourcePath);
+        const session = this.sharedCompiler().open(new Map([[absolutePath, sourceText]]), this.compilerOptions);
         let tsSourceFile;
         try {
             tsSourceFile = session.project.program.getSourceFile(absolutePath);
@@ -185,8 +184,14 @@ export class JavaScriptParser extends Parser {
     // noinspection JSUnusedGlobalSymbols
     reset(): this {
         this.sourceFileCache && this.sourceFileCache.clear();
-        this.oldProgram = undefined;
+        this.compiler?.close();
+        this.compiler = undefined;
         return this;
+    }
+
+    /** The compiler process this parser reuses; starting one costs far more than a parse does. */
+    private sharedCompiler(): Compiler {
+        return this.compiler ??= new Compiler(this.relativeTo ?? process.cwd());
     }
 
     override async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
@@ -211,7 +216,7 @@ export class JavaScriptParser extends Parser {
         for (const [sourcePath, input] of inputFiles) {
             sources.set(sourcePath, parserInputRead(input));
         }
-        const session = openSession(this.relativeTo ?? process.cwd(), sources, this.compilerOptions);
+        const session = this.sharedCompiler().open(sources, this.compilerOptions);
         const program = session.project.program;
 
         // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
