@@ -40,8 +40,8 @@ import static org.openrewrite.semver.Semver.Ecosystem.NODE;
  * (npm only; see {@link #autoInstallPeers}) and the slice is cleanest — an all-prod closure, the peer
  * a single pure-leaf version required by a single package — the peer is added as a top-level node; every other
  * missing-peer shape fails loud. An {@code npm:<name>@<range>} alias resolves its real package but is keyed and
- * placed by the alias name, reproduced only when self-contained (no un-aliased copy of the same package, no peer
- * entanglement). Version and constraint decisions are delegated entirely to node-semver.
+ * placed by the alias name, reproduced unless it entangles the peer machinery (its real name required as a peer,
+ * or the alias declaring peers). Version and constraint decisions are delegated entirely to node-semver.
  */
 public final class NpmGraphBuilder {
 
@@ -284,28 +284,17 @@ public final class NpmGraphBuilder {
     }
 
     /**
-     * Only a self-contained alias is reproduced byte-exact: the real package must not also resolve un-aliased (nor
-     * be aliased more than once), and it must not entangle the peer machinery (which keys by real name). An alias
-     * that forks with a non-aliased copy, whose real name is required as a peer, or that itself declares peers,
-     * defers with the classic message.
+     * Guard the alias shapes the serializer cannot yet place byte-exact. Every alias lands at its own top-level
+     * slot, so any number of aliases of a package, with or without an un-aliased copy, are reproduced. An alias
+     * whose real name is required as a peer, or that declares peers of its own, still defers because the peer
+     * machinery keys by real name.
      */
     private static void requireResolvableAliases(Map<String, String> aliases, Map<String, Set<String>> chosen,
                                                  Map<String, VersionManifest> manifests) {
         if (aliases.isEmpty()) {
             return;
         }
-        Map<String, Integer> targetCount = new LinkedHashMap<>();
-        for (String realName : aliases.values()) {
-            targetCount.merge(realName, 1, Integer::sum);
-        }
         Set<String> aliasedReal = new HashSet<>(aliases.values());
-        for (Map.Entry<String, String> alias : aliases.entrySet()) {
-            String realName = alias.getValue();
-            if (chosen.containsKey(realName) || targetCount.get(realName) > 1) {
-                throw new EngineFailure(RESOLUTION_REQUIRED, realName, alias.getKey() + " aliases " + realName +
-                        " which also resolves un-aliased (alias fork not yet resolved)");
-            }
-        }
         for (VersionManifest m : manifests.values()) {
             Map<String, String> peers = m.getPeerDependencies();
             if (peers == null) {
