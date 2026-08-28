@@ -806,6 +806,30 @@ describe("maybeRebind", () => {
             `import type { b} from "m";\nimport type {a} from "m2";\n\nlet x: a;\nlet y: b;`
         ));
     });
+
+    test("a rebind that would change default/named/namespace shape refuses, since the only edit available is in place", async () => {
+        const namedToDefault = new RecipeSpec();
+        const namedToDefaultBound: {name?: string} = {};
+        namedToDefault.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                namedToDefaultBound.name = maybeRebind(this, {from: {module: "old", member: "act"}, to: {module: "new", member: "default"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await namedToDefault.rewriteRun(typescript(`import {act} from "old";\n\nact();`));
+        expect(namedToDefaultBound.name).toBeUndefined();
+
+        const defaultToNamed = new RecipeSpec();
+        const defaultToNamedBound: {name?: string} = {};
+        defaultToNamed.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                defaultToNamedBound.name = maybeRebind(this, {from: {module: "old"}, to: {module: "new", member: "act"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await defaultToNamed.rewriteRun(typescript(`import D from "old";\n\nD();`));
+        expect(defaultToNamedBound.name).toBeUndefined();
+    });
 });
 
 function dropModule(module: string, member?: string) {

@@ -305,7 +305,12 @@ export class Template {
             // Recognising the reference the template splices in takes attribution, which only the
             // import form of a context statement carries. Without one there is nothing to look for.
             const onlyIfReferenced = isResolvable(binding.module, dependencies);
-            resolved[name] = maybeAddImport(visitor, {...binding, preferredName: name, onlyIfReferenced});
+            const bound = maybeAddImport(visitor, {...binding, preferredName: name, onlyIfReferenced});
+            // An unresolved binding is left out rather than recorded as `undefined`, so `apply()`'s
+            // own "applied without a local name" check catches it, same as a caller-omitted one.
+            if (bound !== undefined) {
+                resolved[name] = bound;
+            }
         }
         return resolved;
     }

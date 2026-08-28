@@ -2860,8 +2860,8 @@ describe('AddImport visitor', () => {
             const bound: string[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    bound.push(maybeAddImport(this, {module: 'react', member: 'useState', onlyIfReferenced: false}));
-                    bound.push(maybeAddImport(this, {module: 'fs/promises', member: 'writeFile', onlyIfReferenced: false}));
+                    bound.push(maybeAddImport(this, {module: 'react', member: 'useState', onlyIfReferenced: false})!);
+                    bound.push(maybeAddImport(this, {module: 'fs/promises', member: 'writeFile', onlyIfReferenced: false})!);
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -2894,8 +2894,8 @@ describe('AddImport visitor', () => {
             const bound: string[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    bound.push(maybeAddImport(this, {module: 'm', member: 'join', onlyIfReferenced: false}));
-                    bound.push(maybeAddImport(this, {module: 'n', member: 'shape', onlyIfReferenced: false}));
+                    bound.push(maybeAddImport(this, {module: 'm', member: 'join', onlyIfReferenced: false})!);
+                    bound.push(maybeAddImport(this, {module: 'n', member: 'shape', onlyIfReferenced: false})!);
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -2925,11 +2925,11 @@ describe('AddImport visitor', () => {
             const preferred: string[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false}));
-                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false}));
+                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false})!);
+                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false})!);
 
-                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Theming', onlyIfReferenced: false}));
-                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Th', onlyIfReferenced: false}));
+                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Theming', onlyIfReferenced: false})!);
+                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Th', onlyIfReferenced: false})!);
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -3020,7 +3020,7 @@ describe('AddImport visitor', () => {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                     if ((method.name as J.Identifier)?.simpleName === 'anchor') {
                         bound.push(maybeAddImport(this,
-                            {module: `m${bound.length}`, member: 'merge', onlyIfReferenced: false}));
+                            {module: `m${bound.length}`, member: 'merge', onlyIfReferenced: false})!);
                     }
                     return super.visitMethodInvocation(method, p);
                 }
@@ -3084,7 +3084,7 @@ describe('AddImport visitor', () => {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                     if ((method.name as J.Identifier)?.simpleName === 'anchor') {
                         bound.push(maybeAddImport(this,
-                            {module: 'sap/base/util/merge', member: 'merge', onlyIfReferenced: false}));
+                            {module: 'sap/base/util/merge', member: 'merge', onlyIfReferenced: false})!);
                     }
                     return super.visitMethodInvocation(method, p);
                 }

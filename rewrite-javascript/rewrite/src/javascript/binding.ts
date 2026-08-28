@@ -392,12 +392,21 @@ function sameCallees(a: readonly string[], b: readonly string[]): boolean {
     return a.length === b.length && a.every((callee, i) => callee === b[i]);
 }
 
+/** Which of an import clause's three slots `member` binds — `import`, `import *`, or `import {}`. */
+function bindingShape(member: string | undefined): "default" | "namespace" | "named" {
+    const key = memberName(member);
+    return key === undefined ? "default" : key === "*" ? "namespace" : "named";
+}
+
 /**
  * Moves the binding for `from` to `to`, keeping the local name it already had — the primitive
  * behind a member rename or a module move, so a caller never has to thread that name through a
  * separate unbind and bind itself. Refuses, changing nothing, where nothing binds `from`, where
  * `from` or `to` names a member on the AMD lane (a factory parameter binds only a whole module),
- * or where completing the move on the ESM lane would have to gain an import into a CommonJS file.
+ * where completing the move on the ESM lane would have to gain an import into a CommonJS file, or
+ * where `from` and `to` differ in default/namespace/named shape and `from`'s statement binds
+ * nothing else — the only edit then available is in place, and an in-place edit cannot restructure
+ * the clause it's editing.
  */
 export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebindOptions): string | undefined {
     const amd = enclosingAmdBlock(visitor, options);
@@ -417,6 +426,9 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     const cu = compilationUnitOf(visitor);
     const existing = cu && existingImportBinding(cu, options.from.module, options.from.member);
     if (existing === undefined) {
+        return undefined;
+    }
+    if (existing.onlyMemberOfStatement && bindingShape(options.from.member) !== bindingShape(options.to.member)) {
         return undefined;
     }
     if (!existing.onlyMemberOfStatement && moduleBindings(visitor, options).moduleSystem === "commonjs") {
@@ -445,7 +457,7 @@ export function maybeAddImport(
 export function maybeAddImport(
     visitor: JavaScriptVisitor<any>,
     options: AddImportOptions & { sideEffectOnly?: false }
-): string;
+): string | undefined;
 export function maybeAddImport(
     visitor: JavaScriptVisitor<any>,
     options: AddImportOptions
