@@ -205,6 +205,11 @@ export function clearTemplateCache(): void {
     templateCache.clear();
 }
 
+/** Whether a name reads as a TypeScript type reference: a dotted chain of identifiers. */
+function isTypeReference(name: string): boolean {
+    return /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(name);
+}
+
 /**
  * Internal template engine - handles the core templating logic.
  * Not exported from index, so only visible within the templating module.
@@ -479,7 +484,10 @@ export class TemplateEngine {
         // Handle Type.Class and Type.ShallowClass - return their fully qualified names
         if (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) {
             const classType = type as Type.Class;
-            return classType.fullyQualifiedName;
+            // A module qualifies its types by where they come from — `src/a.Foo` — and a path that
+            // is no type reference cannot be declared for. Naming a module's type takes a `context`
+            // statement of the caller's own, which `type` then names.
+            return isTypeReference(classType.fullyQualifiedName) ? classType.fullyQualifiedName : 'any';
         }
 
         // Handle Type.Primitive - map to TypeScript primitive types

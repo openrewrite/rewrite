@@ -222,6 +222,12 @@ export class Template {
      *     })
      */
     configure(options: TemplateOptions): Template {
+        // The `never` applies only where a caller typechecks against it, so JavaScript and pre-#8685
+        // typings reach here, where a silently dropped option leaves the template's names unbound.
+        if ((options as { bindings?: unknown }).bindings !== undefined) {
+            throw new Error("Template option 'bindings' is now 'context': name each module as the " +
+                "import it stands for, e.g. context: [`import {vi} from 'vitest';`].");
+        }
         this.options = {...this.options, ...options};
         // Invalidate cache when configuration changes
         this._cachedTemplate = undefined;
