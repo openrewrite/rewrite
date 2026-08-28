@@ -44,7 +44,11 @@ export interface ModuleBindings {
     /** The module `localName` refers to, or undefined when it is not a module binding. */
     moduleOf(localName: string): string | undefined;
 
-    /** The local name bound to `module`, or undefined when nothing binds it. */
+    /**
+     * The local name bound to `module`, or undefined when nothing binds it — of any shape: a
+     * namespace import counts, even though `maybeBind` will not treat it as answering a plain
+     * `{module}` request. What a name can stand in for is `maybeBind`'s question, not this one's.
+     */
     bindingOf(module: string): string | undefined;
 
     /**
@@ -121,6 +125,13 @@ function hasEsmSyntax(cu: JS.CompilationUnit): boolean {
 interface ModuleObjectBinding {
     name: string;
     module: string;
+
+    /**
+     * `"default"` and `"namespace"` bind different values — a namespace object's default sits at
+     * `.default` — so only one answers a whole-module request of the matching form. CommonJS has
+     * no such split: `"require"` answers either.
+     */
+    shape: "default" | "namespace" | "require";
 }
 
 /** Whether the file binds its modules with `require`, which decides whether a create is possible. */
@@ -187,7 +198,7 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
         }
         const clause = jsImport.importClause;
         if (clause?.name?.element?.kind === J.Kind.Identifier) {
-            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module});
+            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module, shape: "default"});
         }
         // `namedBindings` is a `JS.Alias` only for `import * as X from "m"`; a renamed
         // named import (`{a as b}`) nests its alias inside `NamedImports` instead.
@@ -195,7 +206,7 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
         if (named?.kind === JS.Kind.Alias) {
             const alias = (named as JS.Alias).alias;
             if (alias?.kind === J.Kind.Identifier) {
-                bindings.push({name: (alias as J.Identifier).simpleName, module});
+                bindings.push({name: (alias as J.Identifier).simpleName, module, shape: "namespace"});
             }
         }
     }
@@ -204,10 +215,15 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
         const name = module === undefined ? undefined :
             (stmt.element as J.VariableDeclarations).variables[0]?.element?.name;
         if (module !== undefined && name?.kind === J.Kind.Identifier) {
-            bindings.push({name: (name as J.Identifier).simpleName, module});
+            bindings.push({name: (name as J.Identifier).simpleName, module, shape: "require"});
         }
     }
     return bindings;
+}
+
+/** Whether `binding`'s shape satisfies a whole-module request for the namespace form when `wantsNamespace`. */
+function answersWholeModuleRequest(binding: ModuleObjectBinding, wantsNamespace: boolean): boolean {
+    return binding.shape === "require" || binding.shape === (wantsNamespace ? "namespace" : "default");
 }
 
 /**
@@ -232,9 +248,18 @@ export function maybeBind(
         return bindAmd(visitor, amd, module, options.preferredName, namesInScope, calleesOf(options));
     }
 
-    // `bindImport` finds and reuses an existing binding on its own — including one made via
-    // `require` — so refusal here only has to gate the point where it would create a new one.
     const isWholeModule = !options.sideEffectOnly && (options.member === undefined || options.member === "*");
+    if (isWholeModule) {
+        const cu = compilationUnitOf(visitor);
+        const bound = cu && moduleObjectBindings(cu).find(b =>
+            b.module === module && answersWholeModuleRequest(b, options.member === "*"));
+        if (bound !== undefined) {
+            return bound.name;
+        }
+    }
+
+    // `bindImport`'s own lookup finds and reuses a member-specific binding on its own, so
+    // refusal here only has to gate the point where it would create a new one.
     const refuseCreate = moduleBindings(visitor, options).moduleSystem === "commonjs";
     return bindImport(visitor, {
         ...options,

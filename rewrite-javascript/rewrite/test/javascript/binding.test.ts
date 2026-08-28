@@ -427,6 +427,46 @@ describe("maybeBind", () => {
         expect(bound.name).toBe("Elem");
     });
 
+    test("a namespace import answers a namespace request but not a plain module request", async () => {
+        const namespaceRequest = new RecipeSpec();
+        const namespaceName: {value?: string} = {};
+        namespaceRequest.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                namespaceName.value = maybeBind(this, {module: "sap/m/Button", member: "*"});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await namespaceRequest.rewriteRun(typescript(
+            `import * as Button from "sap/m/Button";\n\ntarget();`
+        ));
+
+        const bareRequest = new RecipeSpec();
+        const bound: {name?: string} = {};
+        bareRequest.recipe = fromVisitor(rebind("sap/m/Button", bound));
+        await bareRequest.rewriteRun(typescript(
+            `import * as Button from "sap/m/Button";\n\ntarget();`,
+            `import * as Button from "sap/m/Button";\nimport Button_1 from "sap/m/Button";\n\nButton_1.target();`
+        ));
+
+        expect(namespaceName.value).toBe("Button");
+        expect(bound.name).toBe("Button_1");
+    });
+
+    test("a require binding answers a namespace request too, since CommonJS has no default/namespace split", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeBind(this, {module: "sap/ui/core/Element", member: "*"});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `const Elem = require("sap/ui/core/Element");\n\ntarget();`
+        ));
+        expect(bound.name).toBe("Elem");
+    });
+
     test("a CommonJS file answers with the binding its require already has", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
