@@ -1621,6 +1621,25 @@ function importBinds(jsImport: JS.Import, module: string, member: string | undef
     return undefined;
 }
 
+/** Whether the named specifier binding `key` carries its own inline `type`, as in `{type a, b}`. */
+function namedSpecifierIsTypeOnly(imp: JS.Import, key: string): boolean {
+    const namedBindings = imp.importClause?.namedBindings;
+    if (namedBindings?.kind !== JS.Kind.NamedImports) {
+        return false;
+    }
+    for (const elem of (namedBindings as JS.NamedImports).elements.elements) {
+        const specifierNode = elem.element.specifier;
+        const matches = (isIdentifier(specifierNode) && specifierNode.simpleName === key) ||
+            (specifierNode.kind === JS.Kind.Alias &&
+                isIdentifier((specifierNode as JS.Alias).propertyName.element) &&
+                ((specifierNode as JS.Alias).propertyName.element as J.Identifier).simpleName === key);
+        if (matches) {
+            return elem.element.importType.element;
+        }
+    }
+    return false;
+}
+
 /** How many named specifiers `jsImport` carries, `0` for a default, namespace or side-effect import. */
 function namedImportCount(jsImport: JS.Import): number {
     const namedBindings = jsImport.importClause?.namedBindings;
@@ -1799,7 +1818,10 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         if (importBinds(imp, this.from.module, this.from.member) === undefined) {
             return imp;
         }
-        this.typeOnly = imp.importClause?.typeOnly ?? false;
+        // A moved named specifier's own inline `type` marks it type-only even where the clause
+        // it's leaving is not — the replacement needs the same answer to stay type-safe.
+        this.typeOnly = (imp.importClause?.typeOnly ?? false) ||
+            (key !== undefined && key !== '*' && namedSpecifierIsTypeOnly(imp, key));
 
         if (!isOnlyMember(imp)) {
             return removeBinding(imp, this.from.member);

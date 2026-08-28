@@ -577,14 +577,26 @@ export function lastSegment(module: string): string {
     return module.substring(module.lastIndexOf("/") + 1);
 }
 
+// Always-reserved words, plus the strict-mode-only ones (module code is always strict) and
+// `await`/`yield`, contextual elsewhere but a trap to bind regardless of where they're legal.
+const RESERVED_WORDS = new Set([
+    "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do",
+    "else", "enum", "export", "extends", "false", "finally", "for", "function", "if", "import",
+    "in", "instanceof", "new", "null", "return", "super", "switch", "this", "throw", "true", "try",
+    "typeof", "var", "void", "while", "with",
+    "await", "implements", "interface", "let", "package", "private", "protected", "public",
+    "static", "yield"
+]);
+
 /**
  * `lastSegment(module)`, or `undefined` where that string cannot bind a name — a scoped
- * package's `@scope/my-lib`, a subpath's `lodash.merge`, or a bare `-`/`.`-bearing package name
- * are all real module strings that are not legal identifiers.
+ * package's `@scope/my-lib`, a subpath's `lodash.merge`, a `-`/`.`-bearing name, or a reserved
+ * word are all real module strings that are not legal identifiers. ASCII identifiers only —
+ * stricter than JavaScript itself, which allows Unicode, but refusing there is safe.
  */
 export function derivedBindingName(module: string): string | undefined {
     const segment = lastSegment(module);
-    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment) ? segment : undefined;
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment) && !RESERVED_WORDS.has(segment) ? segment : undefined;
 }
 
 function deconflict(preferred: string, taken: readonly (string | undefined)[]): string {

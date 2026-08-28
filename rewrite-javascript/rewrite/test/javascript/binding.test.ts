@@ -504,6 +504,30 @@ describe("maybeBind", () => {
         expect(bound.name).toBeUndefined();
     });
 
+    test("refuses rather than derive a reserved word from the module's last segment", async () => {
+        const hardKeyword = new RecipeSpec();
+        const hardKeywordBound: {name?: string} = {};
+        hardKeyword.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                hardKeywordBound.name = maybeBind(this, "a/class");
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await hardKeyword.rewriteRun(typescript(`const x = 1;`));
+        expect(hardKeywordBound.name).toBeUndefined();
+
+        const contextualKeyword = new RecipeSpec();
+        const contextualKeywordBound: {name?: string} = {};
+        contextualKeyword.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                contextualKeywordBound.name = maybeBind(this, "a/await");
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await contextualKeyword.rewriteRun(typescript(`const x = 1;`));
+        expect(contextualKeywordBound.name).toBeUndefined();
+    });
+
     test("ESM reuses a default import bound under another name", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
@@ -829,6 +853,20 @@ describe("maybeRebind", () => {
         });
         await defaultToNamed.rewriteRun(typescript(`import D from "old";\n\nD();`));
         expect(defaultToNamedBound.name).toBeUndefined();
+    });
+
+    test("a moved specifier's own inline type marker survives even where the clause it left is not type-only", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member: "a"}, to: {module: "m2", member: "a"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import {type a, b} from "m";\n\nlet x: a;\nlet y: b;`,
+            `import {b} from "m";\nimport type {a} from "m2";\n\nlet x: a;\nlet y: b;`
+        ));
     });
 });
 
