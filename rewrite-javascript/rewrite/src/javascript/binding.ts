@@ -41,7 +41,11 @@ export interface MaybeUnbindOptions {
 }
 
 export interface ModuleBindings {
-    /** The module `localName` refers to, or undefined when it is not a module binding. */
+    /**
+     * The module `localName` refers to, or undefined when it is not a module binding — of any
+     * shape, so a namespace import's name answers here even though `maybeBind` will not reuse it
+     * for a plain `{module}` request. See `bindingOf`.
+     */
     moduleOf(localName: string): string | undefined;
 
     /**
