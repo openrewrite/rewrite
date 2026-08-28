@@ -29,7 +29,7 @@ import {
     TrailingComma
 } from "../java";
 import {JS} from "./tree";
-import {cursorOf, deconflict} from "./scope";
+import {cursorOf, deconflict, namesDeclaredWithin} from "./scope";
 import {JavaScriptVisitor} from "./visitor";
 import {ExecutionContext} from "../execution";
 
@@ -611,13 +611,13 @@ export function bindAmd(
     amd: {call: J.MethodInvocation, block: AmdBlock},
     module: string,
     preferredName: string | undefined,
-    namesInScope: ReadonlySet<string>,
-    callees: readonly string[]
+    callees: readonly string[],
+    pinned: boolean = false
 ): string | undefined {
     const modules = dependencyNames(amd.block);
     const bindings = parameterNames(amd.block);
 
-    const declared = modules.indexOf(module);
+    const declared = module === "" ? -1 : modules.indexOf(module);
     if (declared >= 0) {
         return bindings[declared];
     }
@@ -639,8 +639,16 @@ export function bindAmd(
     if (preferredName === undefined && derivedBindingName(module) === undefined) {
         return undefined;
     }
-    const taken = [...bindings, ...namesInScope, ...queued.map(v => v.binding)];
-    const binding = deconflict(preferredName ?? derivedBindingName(module)!, candidate => taken.includes(candidate));
+    // A parameter is in scope across the whole factory, and the queue hands this name to later
+    // requests at cursors inside it, so every name the factory declares is one it has to clear.
+    const taken = [...bindings, ...namesDeclaredWithin(amd.block.factory), ...queued.map(v => v.binding)];
+    const requested = preferredName ?? derivedBindingName(module)!;
+    const binding = deconflict(requested, candidate => taken.includes(candidate));
+    if (pinned && binding !== requested) {
+        // An alias is bound verbatim or not at all, since the caller may already have emitted
+        // code naming it, and a deconflicted spelling would leave that unbound.
+        return undefined;
+    }
     visitor.afterVisit.push(new AddAmdDependency(amd.call.id, module, binding, callees));
     return binding;
 }
@@ -784,7 +792,7 @@ export class RebindAmdDependency<P> extends JavaScriptVisitor<P> {
             return visited;
         }
         this.applied = true;
-        const index = dependencyNames(block).indexOf(this.fromModule);
+        const index = this.fromModule === "" ? -1 : dependencyNames(block).indexOf(this.fromModule);
         if (index < 0) {
             throw new Error(
                 `AMD block ${this.blockId} no longer has dependency '${this.fromModule}' to rebind to '${this.toModule}'`);
@@ -863,6 +871,11 @@ export async function removeNewlyUnusedAmdBindings(
             const usedBefore = usedBeforeByBlock.get(call.id);
             let block = usedBefore === undefined ? undefined : amdBlockOf(call, callees);
             if (usedBefore === undefined || block === undefined) {
+                return call;
+            }
+            // A block written `define(factory)` takes `require`, `exports` and `module` from the
+            // loader, so a parameter there is positional against arguments no dependency list names.
+            if (block.dependenciesIndex < 0 || parameterNames(block).length !== elementsOf(block).length) {
                 return call;
             }
             // withoutDependencyAt only edits the dependency array and parameter list, never the

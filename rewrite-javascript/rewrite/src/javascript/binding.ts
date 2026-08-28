@@ -16,7 +16,7 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, scopeOf, walk} from "./scope";
+import {compilationUnitOf, cursorOf, declarationsOf, walk} from "./scope";
 import {AddImportOptions, bindImport, existingImportBinding, memberName, moduleNameOf, RebindImport, requiredModuleOf} from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {
@@ -24,7 +24,12 @@ import {
     parameterNames, RebindAmdDependency, RemoveAmdDependency
 } from "./amd";
 
-/** A bare string is shorthand for `{module}`, the overwhelmingly common call with nothing else to configure. */
+/**
+ * A bare string is shorthand for `{module}`, the overwhelmingly common call with nothing else to
+ * configure. A factory parameter binds a whole module under a name and nothing else, so on the AMD
+ * lane `member`, `typeOnly`, `sideEffectOnly`, `onlyIfReferenced`, `quoteStyle` and `style` do not
+ * apply: the first three refuse, and the rest have nothing to shape.
+ */
 export interface MaybeBindOptions extends AddImportOptions {
     /** Callees that introduce an AMD block. UI5 writes `sap.ui.define`, RequireJS and Dojo `define`. */
     amdCallee?: string | readonly string[];
@@ -85,10 +90,12 @@ export function moduleBindings(
             moduleSystem: "amd",
             moduleOf: localName => {
                 const index = bindings.indexOf(localName);
-                return index < 0 ? undefined : modules[index];
+                // `dependencyNames` pads a non-literal element with "" to hold its position; that
+                // filler names no module, so it answers neither lookup.
+                return index < 0 || modules[index] === "" ? undefined : modules[index];
             },
             bindingOf: module => {
-                const index = modules.indexOf(module);
+                const index = module === "" ? -1 : modules.indexOf(module);
                 return index < 0 ? undefined : bindings[index];
             }
         };
@@ -155,6 +162,9 @@ interface ModuleObjectBinding {
      * `member: "*"`, which is what a module exporting no default is bound by.
      */
     shape: "default" | "namespace" | "require";
+
+    /** A type-only import erases, so the name it binds stands for no value at runtime. */
+    typeOnly: boolean;
 }
 
 /** Whether the file binds its modules with `require`, which decides whether a create is possible. */
@@ -168,16 +178,11 @@ function isCommonJs(cu: JS.CompilationUnit): boolean {
     if (cu.sourcePath.endsWith(".mjs") || cu.sourcePath.endsWith(".mts")) {
         return false;
     }
-    let requires = false;
-    for (const stmt of cu.statements) {
-        if (stmt.element?.kind === JS.Kind.Import) {
-            return false;
-        }
-        if (declarationsOf(stmt.element).some(d => requiredModule(d) !== undefined)) {
-            requires = true;
-        }
+    if (hasEsmSyntax(cu)) {
+        return false;
     }
-    return requires;
+    return cu.statements.some(stmt =>
+        declarationsOf(stmt.element).some(d => requiredModule(d) !== undefined));
 }
 
 /** The module a `const X = require("m")` declaration names, for the one variable it declares. */
@@ -226,7 +231,7 @@ function wholeModuleBindingsVia(
             const module = moduleOf(declaration);
             const name = declaration.variables[0]?.element?.name;
             if (module !== undefined && name?.kind === J.Kind.Identifier) {
-                bindings.push({name: (name as J.Identifier).simpleName, module, shape});
+                bindings.push({name: (name as J.Identifier).simpleName, module, shape, typeOnly: false});
             }
         }
     }
@@ -251,8 +256,9 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
             continue;
         }
         const clause = jsImport.importClause;
+        const typeOnly = clause?.typeOnly ?? false;
         if (clause?.name?.element?.kind === J.Kind.Identifier) {
-            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module, shape: "default"});
+            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module, shape: "default", typeOnly});
         }
         // `namedBindings` is a `JS.Alias` only for `import * as X from "m"`; a renamed
         // named import (`{a as b}`) nests its alias inside `NamedImports` instead.
@@ -260,7 +266,7 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
         if (named?.kind === JS.Kind.Alias) {
             const alias = (named as JS.Alias).alias;
             if (alias?.kind === J.Kind.Identifier) {
-                bindings.push({name: (alias as J.Identifier).simpleName, module, shape: "namespace"});
+                bindings.push({name: (alias as J.Identifier).simpleName, module, shape: "namespace", typeOnly});
             }
         }
     }
@@ -269,9 +275,13 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
     return bindings;
 }
 
-/** Whether `binding`'s shape satisfies a whole-module request for the namespace form when `wantsNamespace`. */
-function answersWholeModuleRequest(binding: ModuleObjectBinding, wantsNamespace: boolean): boolean {
-    return binding.shape === "require" || binding.shape === (wantsNamespace ? "namespace" : "default");
+/**
+ * Whether `binding` answers a whole-module request: the namespace form when `wantsNamespace`, and
+ * never a type-only import for a value, which erases and would leave the reference unbound.
+ */
+function answersWholeModuleRequest(binding: ModuleObjectBinding, wantsNamespace: boolean, typeOnly: boolean): boolean {
+    return binding.typeOnly === typeOnly &&
+        (binding.shape === "require" || binding.shape === (wantsNamespace ? "namespace" : "default"));
 }
 
 /**
@@ -296,15 +306,18 @@ export function maybeBind(
             // Nor can a factory parameter load a module without binding it to a name.
             return undefined;
         }
-        const namesInScope = scopeOf(cursorOf(visitor)!).names();
-        return bindAmd(visitor, amd, module, options.preferredName, namesInScope, calleesOf(options));
+        return bindAmd(visitor, amd, module, options.alias ?? options.preferredName,
+            calleesOf(options), options.alias !== undefined);
     }
 
     const cu = compilationUnitOf(visitor);
     const isWholeModule = !options.sideEffectOnly && (key === undefined || key === "*");
     if (isWholeModule) {
         const bound = cu && moduleObjectBindings(cu).find(b =>
-            b.module === module && answersWholeModuleRequest(b, key === "*"));
+            b.module === module && answersWholeModuleRequest(b, key === "*", options.typeOnly ?? false) &&
+            // A pinned alias asks for a binding of that name, so another name for the same
+            // module does not answer it; `bindImport`'s own lookup applies the same rule.
+            (options.alias === undefined || b.name === options.alias));
         if (bound !== undefined) {
             return bound.name;
         }
@@ -362,13 +375,8 @@ function bindingShape(member: string | undefined): "default" | "namespace" | "na
 
 /**
  * Moves the binding for `from` to `to`, keeping the local name it already had — the primitive
- * behind a member rename or a module move, so a caller never has to thread that name through a
- * separate unbind and bind itself. Refuses, changing nothing, where nothing binds `from`, where
- * `from` or `to` names a member on the AMD lane (a factory parameter binds only a whole module),
- * where completing the move on the ESM lane would have to gain an import into a CommonJS file, or
- * where `from` and `to` differ in default/namespace/named shape and `from`'s statement binds
- * nothing else — the only edit then available is in place, and an in-place edit cannot restructure
- * the clause it's editing.
+ * behind a member rename or a module move. Returns `undefined`, changing nothing, where the move
+ * is not safely expressible; the refusals are listed in CLAUDE.md: JavaScript module bindings.
  */
 export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebindOptions): string | undefined {
     const amd = enclosingAmdBlock(visitor, options);
@@ -381,7 +389,12 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         if (binding === undefined) {
             return undefined;
         }
-        visitor.afterVisit.push(new RebindAmdDependency(amd.call.id, options.from.module, options.to.module, calleesOf(options)));
+        const callees = calleesOf(options);
+        const from = options.from.module;
+        if (!(visitor.afterVisit || []).some(v => v instanceof RebindAmdDependency &&
+            v.blockId === amd.call.id && v.fromModule === from && sameCallees(v.callees, callees))) {
+            visitor.afterVisit.push(new RebindAmdDependency(amd.call.id, from, options.to.module, callees));
+        }
         return binding;
     }
 
@@ -412,8 +425,9 @@ export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, module: strin
 }
 
 /**
- * @deprecated Use {@link maybeBind} instead — this is a rename, not a behaviour change, beyond
- * `maybeBind` additionally binding through an AMD factory parameter where this only ever imports.
+ * @deprecated Use {@link maybeBind} instead. Beyond binding through an AMD factory parameter,
+ * `maybeBind` returns `undefined` rather than creating an import where the file binds its modules
+ * with `require`, or where no legal identifier can be derived from the module and none was named.
  */
 export function maybeAddImport(
     visitor: JavaScriptVisitor<any>,

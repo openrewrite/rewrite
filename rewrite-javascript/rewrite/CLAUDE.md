@@ -209,6 +209,37 @@ before every test. A consumer of the published package opts in by calling
 `RecipeSpec.trackSuiteConfiguration()` from its own vitest `setupFiles`; without that call no spec
 is registered and nothing is reset.
 
+## JavaScript module bindings
+
+`maybeBind`, `maybeUnbind` and `maybeRebind` (`src/javascript/binding.ts`) give a recipe a local
+name for a module whether the file uses ES imports, `require`, or an AMD `define` block. The lane
+is decided from the cursor, so one call serves all three.
+
+AMD pairs the dependency array with the factory parameter list *by position*, and a parameter can
+only be appended at the end. Nothing in the LST enforces that pairing, and a mistake parses and
+prints plausibly while binding later modules to the wrong names — so every edit keeps the two
+lists index-aligned, and an operation that cannot is refused rather than guessed.
+
+### When `maybeBind` returns `undefined`
+
+- the block's dependency and parameter counts already disagree, in either direction
+- a `member` is requested on the AMD lane, which binds whole modules only
+- the file binds its modules with `require` and one would have to be created (`ImportStyle.CommonJS`
+  has no add path); reuse of an existing `require` is always allowed
+- no legal identifier can be derived from the module's last path segment and no `preferredName`
+  or `alias` was given — `lodash-es`, `node:fs`, `@scope/my-lib`, `a/class`
+- a pinned `alias` cannot be bound verbatim, since deconflicting it would leave code the caller
+  already emitted unbound
+- there is no reachable compilation unit
+
+### When `maybeRebind` returns `undefined`
+
+The four above that still apply, plus: nothing binds `from`; `from` or `to` names a member on the
+AMD lane; or the two differ in default/namespace/named shape while `from`'s statement binds nothing
+else. That last one is a layering boundary rather than an oversight — the only edit available in
+place is a rewrite of the existing clause, and changing shape needs whole-statement replacement
+with the header-preserving prefix transfer that `RemoveImport` does over the statement list.
+
 ## RPC Sender/Receiver
 
 Each language module has `rpc.ts` with a Sender (visit tree → serialize to queue) and Receiver (read queue → reconstruct tree). These must stay aligned with each other AND with the Java equivalents. Any mismatch causes deadlocks or corrupted trees.

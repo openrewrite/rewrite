@@ -45,7 +45,12 @@ export function scopeOf(cursor: Cursor): Scope {
  * shadow it at one of them.
  */
 export function namesDeclaredIn(cu: JS.CompilationUnit): ReadonlySet<string> {
-    const cached = declared.get(cu);
+    return namesDeclaredWithin(cu.statements, cu);
+}
+
+/** As {@link namesDeclaredIn}, over one subtree, for a binding shared across only that much of a file. */
+export function namesDeclaredWithin(node: unknown, cacheKey: object = node as object): ReadonlySet<string> {
+    const cached = declared.get(cacheKey);
     if (cached) {
         return cached;
     }
@@ -63,9 +68,9 @@ export function namesDeclaredIn(cu: JS.CompilationUnit): ReadonlySet<string> {
         }
         return false;
     };
-    walk(cu.statements, collect);
+    walk(node, collect);
 
-    declared.set(cu, names);
+    declared.set(cacheKey, names);
     return names;
 }
 
@@ -222,7 +227,7 @@ const blockScoped = new Set(['let', 'const', 'using']);
 // replaced one is walked afresh: every call site in a function asks what that body hoists, and every
 // import added to a file asks what that file declares.
 const hoisted = new WeakMap<object, string[]>();
-const declared = new WeakMap<JS.CompilationUnit, ReadonlySet<string>>();
+const declared = new WeakMap<object, ReadonlySet<string>>();
 
 /**
  * The names blocks under `scope` hoist out to it. A `var` or function declaration reaches the whole

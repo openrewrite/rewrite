@@ -1745,6 +1745,11 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
             kept.push({...entry, element: formatter.processKept(entry.element)});
         }
     }
+    if (kept.length === 0) {
+        // An emptied brace list still prints, as `import D, {} from "m"`, so it goes with its
+        // last member; the caller drops the whole statement when no default remains either.
+        return {...jsImport, importClause: {...importClause, namedBindings: undefined}};
+    }
     const updatedNamedImports: JS.NamedImports = {...namedImports, elements: {...namedImports.elements, elements: kept}};
     return {...jsImport, importClause: {...importClause, namedBindings: updatedNamedImports}};
 }

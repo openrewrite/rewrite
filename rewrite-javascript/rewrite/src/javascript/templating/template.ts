@@ -177,6 +177,7 @@ export class TemplateBuilder {
 export class Template {
     private options: TemplateOptions = {};
     private _cachedTemplate?: J;
+    private _contextBindings?: Promise<ContextBinding[]>;
 
     /**
      * Creates a new template.
@@ -224,6 +225,7 @@ export class Template {
         this.options = {...this.options, ...options};
         // Invalidate cache when configuration changes
         this._cachedTemplate = undefined;
+        this._contextBindings = undefined;
         return this;
     }
 
@@ -325,6 +327,10 @@ export class Template {
 
     /** What this template's context statements bind, which is what it needs bound in the target file. */
     private contextBindings(): Promise<ContextBinding[]> {
+        return this._contextBindings ??= this.deriveContextBindings();
+    }
+
+    private deriveContextBindings(): Promise<ContextBinding[]> {
         return TemplateEngine.getContextBindings(
             this.templateParts, this.parameters,
             this.options.context || this.options.imports || [],
@@ -403,8 +409,9 @@ export class Template {
             for (const binding of await this.contextBindings()) {
                 const bound = options.bindings[binding.name];
                 if (bound === undefined) {
-                    throw new Error(`Template binds '${binding.name}' in its context but was applied without a local name for it. ` +
-                        `Pass bindings: await template.resolveBindings(visitor) to apply().`);
+                    throw new Error(`Template binds '${binding.module}' in its context, but no local name was ` +
+                        `given for '${binding.name}'. Either pass bindings from resolveBindings(visitor), or — if it ` +
+                        `already did — binding was refused, which an AMD block or a file requiring its modules can do.`);
                 }
                 renames[binding.name] = bound;
                 modules[binding.name] = binding.module!;

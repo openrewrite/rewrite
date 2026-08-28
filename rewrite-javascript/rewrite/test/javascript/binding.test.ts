@@ -715,6 +715,61 @@ describe("maybeBind", () => {
     });
 });
 
+    test("a type-only import does not answer a request for a value", async () => {
+        // The name a type-only import binds erases, so reusing it would emit an unbound reference.
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("m", bound));
+        await spec.rewriteRun(typescript(
+            `import type X from "m";\ntarget();`,
+            `import type X from "m";\nimport m from "m";\nm.target();`));
+        expect(bound.name).toBe("m");
+    });
+
+    test("a file that exports is a module, whatever else it requires", async () => {
+        // `export` settles the module system, so a `require` alongside it does not make the file
+        // CommonJS and does not block creating an import.
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("m", bound));
+        await spec.rewriteRun(typescript(
+            `export function f() {}\nconst p = require("path");\ntarget();`,
+            `import m from "m";\n\nexport function f() {}\nconst p = require("path");\nm.target();`));
+        expect(bound.name).toBe("m");
+    });
+
+    test("an alias is bound verbatim or not at all", async () => {
+        // A caller naming an alias may already have emitted code using it, so another name for
+        // the same module does not answer the request and a deconflicted spelling is refused.
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName !== "target") {
+                    return super.visitMethodInvocation(m, p);
+                }
+                bound.name = maybeBind(this, {module: "m", alias: "Pinned"});
+                return bound.name === undefined ? m : withReference(m, bound.name);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import Y from "m";\ntarget();`,
+            `import Y from "m";\nimport Pinned from "m";\nPinned.target();`));
+        expect(bound.name).toBe("Pinned");
+    });
+
+    test("a factory parameter clears every name the factory declares, not only those in scope", async () => {
+        // The parameter is visible across the whole body, and the queue hands its name to later
+        // requests at cursors inside it, so a name declared in a nested scope still shadows it.
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("a/Theming", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([], function () { target(); function f() { var Theming = 1; return Theming; } });`,
+            `sap.ui.define(["a/Theming"], function (Theming_1) { Theming_1.target(); function f() { var Theming = 1; return Theming; } });`));
+        expect(bound.name).toBe("Theming_1");
+    });
+
 describe("maybeRebind", () => {
     test("an ESM member move keeps the local name", async () => {
         const spec = new RecipeSpec();
@@ -980,6 +1035,47 @@ describe("maybeUnbind on an ESM file", () => {
 
         await removeWith(v => maybeRemoveImport(v, "sap/m/Button"));
         await removeWith(v => maybeUnbind(v, {module: "sap/m/Button"}));
+    });
+
+    test("a block with no dependency array keeps its loader parameters", async () => {
+        // `define(factory)` takes `require`, `exports` and `module` from the loader by position,
+        // so dropping one there shifts what the rest receive.
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(renameThenSweep({exports: "elsewhere"}));
+        await spec.rewriteRun(javascript(
+            `define(function (require, exports, module) { exports.x(); });`,
+            `define(function (require, exports, module) { elsewhere.x(); });`));
+    });
+
+    test("two calls for one move are one rebind", async () => {
+        // Each matched reference asks, but the block is rewritten once: a second queued visitor
+        // would find the dependency already moved and fail the recipe.
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName !== "target") {
+                    return super.visitMethodInvocation(m, p);
+                }
+                maybeRebind(this, {from: {module: "a/Old"}, to: {module: "a/New"}});
+                return m;
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/Old"], function (Old) { target(); target(); });`,
+            `sap.ui.define(["a/New"], function (Old) { target(); target(); });`));
+    });
+
+    test("moving the only named member out leaves no empty braces", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member: "a"}, to: {module: "m2", member: "a"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import D, {a} from "m";\na();`,
+            `import D from "m";\nimport {a} from "m2";\na();`));
     });
 });
 
