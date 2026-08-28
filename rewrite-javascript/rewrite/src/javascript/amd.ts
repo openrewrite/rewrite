@@ -577,6 +577,16 @@ export function lastSegment(module: string): string {
     return module.substring(module.lastIndexOf("/") + 1);
 }
 
+/**
+ * `lastSegment(module)`, or `undefined` where that string cannot bind a name — a scoped
+ * package's `@scope/my-lib`, a subpath's `lodash.merge`, or a bare `-`/`.`-bearing package name
+ * are all real module strings that are not legal identifiers.
+ */
+export function derivedBindingName(module: string): string | undefined {
+    const segment = lastSegment(module);
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment) ? segment : undefined;
+}
+
 function deconflict(preferred: string, taken: readonly (string | undefined)[]): string {
     if (!taken.includes(preferred)) {
         return preferred;
@@ -631,8 +641,11 @@ export function bindAmd(
         return undefined;
     }
 
+    if (preferredName === undefined && derivedBindingName(module) === undefined) {
+        return undefined;
+    }
     const taken = [...bindings, ...namesInScope, ...queued.map(v => v.binding)];
-    const binding = deconflict(preferredName ?? lastSegment(module), taken);
+    const binding = deconflict(preferredName ?? derivedBindingName(module)!, taken);
     visitor.afterVisit.push(new AddAmdDependency(amd.call.id, module, binding, callees));
     return binding;
 }

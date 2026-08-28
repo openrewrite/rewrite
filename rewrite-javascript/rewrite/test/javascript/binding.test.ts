@@ -93,6 +93,22 @@ describe("moduleBindings", () => {
         expect(seen.moduleSystem).toBe("commonjs");
     });
 
+    test("a .cts file reads as CommonJS even with no require call in it yet", async () => {
+        const spec = new RecipeSpec();
+        const seen: {moduleSystem?: string} = {};
+        spec.recipe = fromVisitor(captureBindings(seen));
+        await spec.rewriteRun({...typescript(`target();`), path: "module.cts"});
+        expect(seen.moduleSystem).toBe("commonjs");
+    });
+
+    test("a require among several declarators in one statement still reads as CommonJS", async () => {
+        const spec = new RecipeSpec();
+        const seen: {moduleSystem?: string} = {};
+        spec.recipe = fromVisitor(captureBindings(seen));
+        await spec.rewriteRun(javascript(`const a = require("x"), b = require("y");`));
+        expect(seen.moduleSystem).toBe("commonjs");
+    });
+
     test("an AMD block's parameters bind positionally to its dependencies", async () => {
         const spec = new RecipeSpec();
         const seen: {moduleSystem?: string, module?: string, binding?: string} = {};
@@ -222,6 +238,25 @@ describe("maybeBind", () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/m/Button"], function (Button) { target(); });`,
+            `sap.ui.define(["sap/m/Button", "sap/ui/core/Element"], function (Button, Element) { Element.target(); });`
+        ));
+        expect(bound.name).toBe("Element");
+    });
+
+    test("AMD accepts member: \"default\", which names the same whole module as no member at all", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName !== "target") {
+                    return super.visitMethodInvocation(m, p);
+                }
+                bound.name = maybeBind(this, {module: "sap/ui/core/Element", member: "default"});
+                return bound.name === undefined ? m : withReference(m, bound.name);
+            }
+        });
         await spec.rewriteRun(javascript(
             `sap.ui.define(["sap/m/Button"], function (Button) { target(); });`,
             `sap.ui.define(["sap/m/Button", "sap/ui/core/Element"], function (Button, Element) { Element.target(); });`
@@ -454,6 +489,19 @@ describe("maybeBind", () => {
             `import Element from 'sap/ui/core/Element';\n\nElement.target();`
         ));
         expect(bound.name).toBe("Element");
+    });
+
+    test("refuses rather than derive an illegal identifier from the module's last segment", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeBind(this, "lodash-es");
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(`const x = 1;`));
+        expect(bound.name).toBeUndefined();
     });
 
     test("ESM reuses a default import bound under another name", async () => {
@@ -716,6 +764,48 @@ describe("maybeRebind", () => {
         ));
         expect(bound.name).toBeUndefined();
     });
+
+    test("moving the default out of a mixed default+named import keeps the named siblings", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "react"}, to: {module: "preact"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import React, {useState, useMemo} from "react";\n\nReact.foo();\nuseState();\nuseMemo();`,
+            `import {useState, useMemo} from "react";\nimport React from "preact";\n\nReact.foo();\nuseState();\nuseMemo();`
+        ));
+    });
+
+    test("moving the namespace out of a mixed default+namespace import keeps the default", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member: "*"}, to: {module: "m2", member: "*"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import D, * as N from "m";\n\nD();\nN.foo();`,
+            `import D from "m";\nimport * as N from "m2";\n\nD();\nN.foo();`
+        ));
+    });
+
+    test("the created replacement stays type-only, and the surviving specifier keeps its own formatting", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member: "a"}, to: {module: "m2", member: "a"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import type { a, b} from "m";\n\nlet x: a;\nlet y: b;`,
+            `import type { b} from "m";\nimport type {a} from "m2";\n\nlet x: a;\nlet y: b;`
+        ));
+    });
 });
 
 function dropModule(module: string, member?: string) {
@@ -772,6 +862,21 @@ describe("maybeUnbind on an AMD block", () => {
         await spec.rewriteRun(javascript(
             `myDefine(["sap/m/Button", "a/C"], function (Button, C) { C.f(); });`,
             `myDefine(["a/C"], function (C) { C.f(); });`
+        ));
+    });
+
+    test("two calls differing only in amdCallee each queue their own removal", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeUnbind(this, {module: "a/B", amdCallee: "define"});
+                maybeUnbind(this, {module: "a/B", amdCallee: "myDefine"});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `define(["a/B", "a/C"], function (B, C) { C.f(); });\nmyDefine(["a/B", "a/D"], function (B, D) { D.f(); });`,
+            `define(["a/C"], function (C) { C.f(); });\nmyDefine(["a/D"], function (D) { D.f(); });`
         ));
     });
 });

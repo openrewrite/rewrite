@@ -18,10 +18,10 @@ import {JS} from "./tree";
 import {Cursor} from "../tree";
 import {JavaScriptVisitor} from "./visitor";
 import {scopeOf, walk} from "./scope";
-import {AddImportOptions, bindImport, existingImportBinding, moduleNameOf, RebindImport} from "./add-import";
+import {AddImportOptions, bindImport, existingImportBinding, memberName, moduleNameOf, RebindImport} from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {
-    AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, enclosingAmdBlock, lastSegment,
+    AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, derivedBindingName, enclosingAmdBlock,
     parameterNames, RebindAmdDependency, RemoveAmdDependency
 } from "./amd";
 
@@ -170,7 +170,7 @@ interface ModuleObjectBinding {
 
 /** Whether the file binds its modules with `require`, which decides whether a create is possible. */
 function isCommonJs(cu: JS.CompilationUnit): boolean {
-    if (cu.sourcePath.endsWith(".cjs")) {
+    if (cu.sourcePath.endsWith(".cjs") || cu.sourcePath.endsWith(".cts")) {
         return true;
     }
     // Node treats these as ES modules regardless of what they contain, the same way
@@ -184,19 +184,33 @@ function isCommonJs(cu: JS.CompilationUnit): boolean {
         if (stmt.element?.kind === JS.Kind.Import) {
             return false;
         }
-        if (requiredModule(stmt.element) !== undefined) {
+        if (declarationsOf(stmt.element).some(d => requiredModule(d) !== undefined)) {
             requires = true;
         }
     }
     return requires;
 }
 
-/** The module a top-level `const X = require("m")` names, for the one variable it declares. */
-function requiredModule(statement: J | undefined): string | undefined {
-    if (statement?.kind !== J.Kind.VariableDeclarations) {
-        return undefined;
+/**
+ * The `J.VariableDeclarations` a statement declares — itself for a bare `const x = …`, one per
+ * declarator for `const a = …, b = …`, which the parser wraps in a `JS.ScopedVariableDeclarations`
+ * instead.
+ */
+function declarationsOf(statement: J | undefined): J.VariableDeclarations[] {
+    if (statement?.kind === J.Kind.VariableDeclarations) {
+        return [statement as J.VariableDeclarations];
     }
-    const variables = (statement as J.VariableDeclarations).variables;
+    if (statement?.kind === JS.Kind.ScopedVariableDeclarations) {
+        return (statement as JS.ScopedVariableDeclarations).variables
+            .map(v => v.element)
+            .filter((v): v is J.VariableDeclarations => v?.kind === J.Kind.VariableDeclarations);
+    }
+    return [];
+}
+
+/** The module a `const X = require("m")` declaration names, for the one variable it declares. */
+function requiredModule(declaration: J.VariableDeclarations): string | undefined {
+    const variables = declaration.variables;
     const initializer = variables.length === 1 ? variables[0].element?.initializer?.element : undefined;
     if (initializer?.kind !== J.Kind.MethodInvocation) {
         return undefined;
@@ -214,15 +228,12 @@ function requiredModule(statement: J | undefined): string | undefined {
 }
 
 /**
- * The module a top-level `const X = await import("m")` names, for the one variable it declares.
+ * The module a `const X = await import("m")` declaration names, for the one variable it declares.
  * A dynamic import resolves to the module namespace object, the same value `import * as X`
  * binds, so it shares that shape rather than getting one of its own.
  */
-function dynamicallyImportedModule(statement: J | undefined): string | undefined {
-    if (statement?.kind !== J.Kind.VariableDeclarations) {
-        return undefined;
-    }
-    const variables = (statement as J.VariableDeclarations).variables;
+function dynamicallyImportedModule(declaration: J.VariableDeclarations): string | undefined {
+    const variables = declaration.variables;
     const initializer = variables.length === 1 ? variables[0].element?.initializer?.element : undefined;
     const awaited = initializer?.kind === JS.Kind.Await ? (initializer as JS.Await).expression : undefined;
     // `import(...)` is a keyword, not an identifier, so the parser maps it to `JS.FunctionCall`
@@ -241,19 +252,20 @@ function dynamicallyImportedModule(statement: J | undefined): string | undefined
         : undefined;
 }
 
-/** Bindings from top-level `const X = <moduleOf-recognised call>` statements, all of one shape. */
+/** Bindings from top-level `const X = <moduleOf-recognised call>` declarations, all of one shape. */
 function wholeModuleBindingsVia(
     cu: JS.CompilationUnit,
-    moduleOf: (statement: J | undefined) => string | undefined,
+    moduleOf: (declaration: J.VariableDeclarations) => string | undefined,
     shape: ModuleObjectBinding["shape"]
 ): ModuleObjectBinding[] {
     const bindings: ModuleObjectBinding[] = [];
     for (const stmt of cu.statements) {
-        const module = moduleOf(stmt.element);
-        const name = module === undefined ? undefined :
-            (stmt.element as J.VariableDeclarations).variables[0]?.element?.name;
-        if (module !== undefined && name?.kind === J.Kind.Identifier) {
-            bindings.push({name: (name as J.Identifier).simpleName, module, shape});
+        for (const declaration of declarationsOf(stmt.element)) {
+            const module = moduleOf(declaration);
+            const name = declaration.variables[0]?.element?.name;
+            if (module !== undefined && name?.kind === J.Kind.Identifier) {
+                bindings.push({name: (name as J.Identifier).simpleName, module, shape});
+            }
         }
     }
     return bindings;
@@ -314,10 +326,11 @@ export function maybeBind(
         options = {module: options};
     }
     const module = moduleNameOf(options.module);
+    const key = memberName(options.member);
 
     const amd = enclosingAmdBlock(visitor, options);
     if (amd !== undefined) {
-        if (options.member !== undefined || options.sideEffectOnly) {
+        if (key !== undefined || options.sideEffectOnly) {
             // Nor can a factory parameter load a module without binding it to a name.
             return undefined;
         }
@@ -325,14 +338,20 @@ export function maybeBind(
         return bindAmd(visitor, amd, module, options.preferredName, namesInScope, calleesOf(options));
     }
 
-    const isWholeModule = !options.sideEffectOnly && (options.member === undefined || options.member === "*");
+    const isWholeModule = !options.sideEffectOnly && (key === undefined || key === "*");
     if (isWholeModule) {
         const cu = compilationUnitOf(visitor);
         const bound = cu && moduleObjectBindings(cu).find(b =>
-            b.module === module && answersWholeModuleRequest(b, options.member === "*"));
+            b.module === module && answersWholeModuleRequest(b, key === "*"));
         if (bound !== undefined) {
             return bound.name;
         }
+    }
+
+    if (isWholeModule && options.preferredName === undefined && derivedBindingName(module) === undefined) {
+        // The module's last path segment is not a legal identifier, and the caller named no
+        // preference of its own — there is no name left to bind it to.
+        return undefined;
     }
 
     // `bindImport`'s own lookup finds and reuses a member-specific binding on its own, so
@@ -340,7 +359,7 @@ export function maybeBind(
     const refuseCreate = moduleBindings(visitor, options).moduleSystem === "commonjs";
     return bindImport(visitor, {
         ...options,
-        preferredName: options.preferredName ?? (isWholeModule ? lastSegment(module) : undefined)
+        preferredName: options.preferredName ?? (isWholeModule ? derivedBindingName(module) : undefined)
     }, refuseCreate);
 }
 
@@ -353,16 +372,24 @@ export function maybeUnbind(visitor: JavaScriptVisitor<any>, options: MaybeUnbin
     if (typeof options === "string") {
         options = {module: options};
     }
-    for (const v of visitor.afterVisit || []) {
-        if (v instanceof RemoveImport && v.module === options.module && v.member === options.member) {
-            return;
-        }
+    const callees = calleesOf(options);
+    const queued = visitor.afterVisit || [];
+    if (!queued.some(v => v instanceof RemoveImport && v.module === options.module && v.member === options.member)) {
+        visitor.afterVisit.push(new RemoveImport(options.module, options.member));
     }
-    visitor.afterVisit.push(new RemoveImport(options.module, options.member));
     // Both queue unconditionally so the caller need not know which lane the file uses: each
     // visitor removes whatever matching construct it finds, ESM import or AMD dependency, and a
-    // file with both gets both removed.
-    visitor.afterVisit.push(new RemoveAmdDependency(options.module, options.member, calleesOf(options)));
+    // file with both gets both removed. `amdCallee` says which block a call means, not how
+    // anything prints, so — unlike `preferredName`/`quoteStyle` on the bind side — it is part of
+    // the dedup key.
+    if (!queued.some(v => v instanceof RemoveAmdDependency && v.module === options.module &&
+        v.member === options.member && sameCallees(v.callees, callees))) {
+        visitor.afterVisit.push(new RemoveAmdDependency(options.module, options.member, callees));
+    }
+}
+
+function sameCallees(a: readonly string[], b: readonly string[]): boolean {
+    return a.length === b.length && a.every((callee, i) => callee === b[i]);
 }
 
 /**
@@ -375,7 +402,7 @@ export function maybeUnbind(visitor: JavaScriptVisitor<any>, options: MaybeUnbin
 export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebindOptions): string | undefined {
     const amd = enclosingAmdBlock(visitor, options);
     if (amd !== undefined) {
-        if (options.from.member !== undefined || options.to.member !== undefined) {
+        if (memberName(options.from.member) !== undefined || memberName(options.to.member) !== undefined) {
             return undefined;
         }
         const index = dependencyNames(amd.block).indexOf(options.from.module);

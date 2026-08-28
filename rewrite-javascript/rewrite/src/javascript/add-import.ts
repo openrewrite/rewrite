@@ -1,5 +1,5 @@
 import {JavaScriptVisitor} from "./visitor";
-import {emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, Type} from "../java";
+import {ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, Type} from "../java";
 import {JS, JSX} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
@@ -199,7 +199,7 @@ function derivedName(options: AddImportOptions): string {
 }
 
 /** `'default'` and an absent member both name a default import, which binds no member name of its own. */
-function memberName(member: string | undefined): string | undefined {
+export function memberName(member: string | undefined): string | undefined {
     return member === 'default' ? undefined : member;
 }
 
@@ -1628,15 +1628,18 @@ function namedImportCount(jsImport: JS.Import): number {
 }
 
 /**
- * Whether `member` is the only thing `jsImport` binds — a namespace import always is, a default
- * import is unless it also carries named bindings, and a named import is only when it is alone
- * in its `{}`.
+ * Whether `jsImport`'s clause binds exactly one thing — a default, a namespace, or one named
+ * specifier. That is the only shape a module-only move can rewrite in place: whichever binding
+ * `importBinds` already matched is this one, so nothing else the clause carries goes along with it.
  */
-function isOnlyMember(jsImport: JS.Import, member: string | undefined): boolean {
-    const key = memberName(member);
-    return key === '*' ||
-        (key === undefined && !jsImport.importClause?.namedBindings) ||
-        namedImportCount(jsImport) === 1;
+function isOnlyMember(jsImport: JS.Import): boolean {
+    const importClause = jsImport.importClause;
+    if (!importClause) {
+        return false;
+    }
+    const hasDefault = importClause.name !== undefined;
+    const hasNamespace = importClause.namedBindings?.kind === JS.Kind.Alias;
+    return (hasDefault ? 1 : 0) + (hasNamespace ? 1 : 0) + namedImportCount(jsImport) === 1;
 }
 
 export interface ExistingImportBinding {
@@ -1660,7 +1663,7 @@ export function existingImportBinding(
         }
         const localName = importBinds(element as JS.Import, module, member);
         if (localName !== undefined) {
-            return {localName, onlyMemberOfStatement: isOnlyMember(element as JS.Import, member)};
+            return {localName, onlyMemberOfStatement: isOnlyMember(element as JS.Import)};
         }
     }
     return undefined;
@@ -1692,28 +1695,66 @@ function aliasing(local: J.Identifier, member: string): JS.Alias {
     };
 }
 
-/** Drops the specifier binding `member` from `jsImport`'s named list. */
-function removeNamedSpecifier(jsImport: JS.Import, member: string): JS.Import {
-    return produce(jsImport, draft => {
-        const importClause = draft.importClause;
-        if (importClause?.namedBindings?.kind !== JS.Kind.NamedImports) {
-            return;
+/**
+ * Drops the binding for `member` from `jsImport`'s clause — the default, the namespace alias, or
+ * one entry of the named list, whichever `member` names — keeping everything else the clause
+ * binds. `ElementRemovalFormatter` carries the dropped binding's prefix onto whatever prints
+ * next, the same way `RemoveImport` keeps formatting sane when trimming a list.
+ */
+function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Import {
+    const importClause = jsImport.importClause;
+    if (!importClause) {
+        return jsImport;
+    }
+    const key = memberName(member);
+
+    if (key === undefined) {
+        if (!importClause.name) {
+            return jsImport;
         }
-        const namedImports = importClause.namedBindings as Draft<JS.NamedImports>;
-        namedImports.elements.elements = namedImports.elements.elements.filter(elem => {
-            const specifierNode = elem.element.specifier;
-            if (specifierNode.kind === J.Kind.Identifier) {
-                return specifierNode.simpleName !== member;
-            }
-            if (specifierNode.kind === JS.Kind.Alias) {
-                const propertyName = (specifierNode as Draft<JS.Alias>).propertyName.element;
-                if (propertyName.kind === J.Kind.Identifier) {
-                    return propertyName.simpleName !== member;
-                }
-            }
-            return true;
-        });
-    });
+        const namedBindings = importClause.namedBindings;
+        if (namedBindings?.kind === JS.Kind.NamedImports) {
+            // `NamedImports` keeps the space before its own `{` on the container's `before`,
+            // not on its own prefix, so the removed default's prefix has to land there instead.
+            const namedImports = namedBindings as JS.NamedImports;
+            const updated: JS.NamedImports = {
+                ...namedImports,
+                elements: {...namedImports.elements, before: importClause.name.element.prefix}
+            };
+            return {...jsImport, importClause: {...importClause, name: undefined, namedBindings: updated}};
+        }
+        if (namedBindings) {
+            const formatter = new ElementRemovalFormatter<J>();
+            formatter.markRemoved(importClause.name.element);
+            return {...jsImport, importClause: {...importClause, name: undefined, namedBindings: formatter.processKept(namedBindings)}};
+        }
+        return {...jsImport, importClause: {...importClause, name: undefined}};
+    }
+
+    if (key === '*') {
+        return {...jsImport, importClause: {...importClause, namedBindings: undefined}};
+    }
+
+    if (importClause.namedBindings?.kind !== JS.Kind.NamedImports) {
+        return jsImport;
+    }
+    const namedImports = importClause.namedBindings as JS.NamedImports;
+    const formatter = new ElementRemovalFormatter<JS.ImportSpecifier>();
+    const kept: J.RightPadded<JS.ImportSpecifier>[] = [];
+    for (const entry of namedImports.elements.elements) {
+        const specifierNode = entry.element.specifier;
+        const matches = (specifierNode.kind === J.Kind.Identifier && specifierNode.simpleName === key) ||
+            (specifierNode.kind === JS.Kind.Alias &&
+                (specifierNode as JS.Alias).propertyName.element.kind === J.Kind.Identifier &&
+                ((specifierNode as JS.Alias).propertyName.element as J.Identifier).simpleName === key);
+        if (matches) {
+            formatter.markRemoved(entry.element);
+        } else {
+            kept.push({...entry, element: formatter.processKept(entry.element)});
+        }
+    }
+    const updatedNamedImports: JS.NamedImports = {...namedImports, elements: {...namedImports.elements, elements: kept}};
+    return {...jsImport, importClause: {...importClause, namedBindings: updatedNamedImports}};
 }
 
 /**
@@ -1735,6 +1776,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 
     private transformedInPlace = false;
+    private typeOnly = false;
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
         const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
@@ -1743,6 +1785,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
                 module: this.to.module,
                 member: this.to.member,
                 alias: this.localName,
+                typeOnly: this.typeOnly,
                 onlyIfReferenced: false
             });
         }
@@ -1756,9 +1799,10 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         if (importBinds(imp, this.from.module, this.from.member) === undefined) {
             return imp;
         }
+        this.typeOnly = imp.importClause?.typeOnly ?? false;
 
-        if (!isOnlyMember(imp, this.from.member)) {
-            return removeNamedSpecifier(imp, key!);
+        if (!isOnlyMember(imp)) {
+            return removeBinding(imp, this.from.member);
         }
 
         this.transformedInPlace = true;
