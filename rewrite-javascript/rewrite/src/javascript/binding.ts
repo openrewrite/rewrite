@@ -25,11 +25,13 @@ import {
     parameterNames, RebindAmdDependency, RemoveAmdDependency
 } from "./amd";
 
+/** A bare string is shorthand for `{module}`, the overwhelmingly common call with nothing else to configure. */
 export interface MaybeBindOptions extends AddImportOptions {
     /** Callees that introduce an AMD block. UI5 writes `sap.ui.define`, RequireJS and Dojo `define`. */
     amdCallee?: string | readonly string[];
 }
 
+/** A bare string is shorthand for `{module}`, the overwhelmingly common call with nothing else to configure. */
 export interface MaybeUnbindOptions {
     module: string;
 
@@ -306,8 +308,11 @@ function answersWholeModuleRequest(binding: ModuleObjectBinding, wantsNamespace:
  */
 export function maybeBind(
     visitor: JavaScriptVisitor<any>,
-    options: MaybeBindOptions
+    options: MaybeBindOptions | string
 ): string | undefined {
+    if (typeof options === "string") {
+        options = {module: options};
+    }
     const module = moduleNameOf(options.module);
 
     const amd = enclosingAmdBlock(visitor, options);
@@ -344,7 +349,10 @@ export function maybeBind(
  * the default and namespace import regardless of local name. A member-scoped request does not
  * apply to an AMD dependency, which binds a module rather than one of its members.
  */
-export function maybeUnbind(visitor: JavaScriptVisitor<any>, options: MaybeUnbindOptions): void {
+export function maybeUnbind(visitor: JavaScriptVisitor<any>, options: MaybeUnbindOptions | string): void {
+    if (typeof options === "string") {
+        options = {module: options};
+    }
     for (const v of visitor.afterVisit || []) {
         if (v instanceof RemoveImport && v.module === options.module && v.member === options.member) {
             return;

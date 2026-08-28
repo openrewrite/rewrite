@@ -437,6 +437,25 @@ describe("maybeBind", () => {
         expect(bound.name).toBe("Element");
     });
 
+    test("a bare string is shorthand for {module}", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName !== "target") {
+                    return super.visitMethodInvocation(m, p);
+                }
+                bound.name = maybeBind(this, "sap/ui/core/Element");
+                return bound.name === undefined ? m : withReference(m, bound.name);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `target();`,
+            `import Element from 'sap/ui/core/Element';\n\nElement.target();`
+        ));
+        expect(bound.name).toBe("Element");
+    });
+
     test("ESM reuses a default import bound under another name", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
@@ -761,6 +780,20 @@ describe("maybeUnbind on an ESM file", () => {
     test("removes the import; the AMD lane it also queues finds no block to act on", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(dropModule("sap/m/Button"));
+        await spec.rewriteRun(typescript(
+            `import Button from "sap/m/Button";\n\nconsole.log(1);`,
+            `console.log(1);`
+        ));
+    });
+
+    test("a bare string is shorthand for {module}", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeUnbind(this, "sap/m/Button");
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
         await spec.rewriteRun(typescript(
             `import Button from "sap/m/Button";\n\nconsole.log(1);`,
             `console.log(1);`
