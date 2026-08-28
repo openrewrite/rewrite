@@ -484,8 +484,9 @@ export class TemplateEngine {
         // Handle Type.Class and Type.ShallowClass - return their fully qualified names
         if (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) {
             const classType = type as Type.Class;
-            // A module qualifies its types by its path — `src/a.Foo`, `@angular/router.Router` —
-            // which is no type reference; naming one takes a `context` statement that declares it
+            // A module qualifies its types by where they come from — `src/a.Foo` — and a path that
+            // is no type reference cannot be declared for. Naming a module's type takes a `context`
+            // statement of the caller's own, which `type` then names.
             return isTypeReference(classType.fullyQualifiedName) ? classType.fullyQualifiedName : 'any';
         }
 

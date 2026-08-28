@@ -54,14 +54,37 @@ describe('template formatting', () => {
             `const config = {\n  providers: [\n    provide(() => {\n      const fn = (init)();\n      return fn;\n    }),\n  ],\n};`);
 
         await runUnderPrettier({tabWidth: 4},
-            `const config = {\n  providers: [\n      provide(() => {\n          const fn = (init)();\n          return fn;\n      }),\n  ],\n};`);
+            `const config = {\n    providers: [\n        provide(() => {\n            const fn = (init)();\n            return fn;\n        }),\n    ],\n};`,
+            `const config = {\n    providers: [\n        register(init),\n    ],\n};`);
+    });
+
+    test('generated code Prettier restructures spaces its braces as Prettier is configured to', async () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return m.name.simpleName === 'register' ?
+                    Template.builder()
+                        .code('provide(() => {\nconst fn = (')
+                        .param(m.arguments.elements[0].element)
+                        .code(')();\nreturn {value: fn};\n})')
+                        .build()
+                        .apply(m, this.cursor) : m;
+            }
+        });
+
+        await runUnderPrettier({},
+            `const config = {\n  providers: [\n    provide(() => {\n      const fn = (init)();\n      return { value: fn };\n    }),\n  ],\n};`);
+
+        await runUnderPrettier({bracketSpacing: false},
+            `const config = {\n  providers: [\n    provide(() => {\n      const fn = (init)();\n      return {value: fn};\n    }),\n  ],\n};`);
     });
 
     /** Runs the suite's recipe over one `register(init)` call under a Prettier configuration. */
-    function runUnderPrettier(config: Record<string, unknown>, after: string) {
+    function runUnderPrettier(config: Record<string, unknown>, after: string,
+                              before = `const config = {\n  providers: [\n    register(init),\n  ],\n};`) {
         return spec.rewriteRun({
             //language=javascript
-            ...javascript(`const config = {\n  providers: [\n    register(init),\n  ],\n};`, after),
+            ...javascript(before, after),
             beforeRecipe: async (cu: JS.CompilationUnit) => ({
                 ...cu,
                 markers: {...cu.markers, markers: [...cu.markers.markers, prettierStyle(randomId(), config)]}

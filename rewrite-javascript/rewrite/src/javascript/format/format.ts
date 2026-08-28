@@ -79,13 +79,14 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
         // Style markers live on the source file, which is `tree` itself only when a whole file is being formatted
         const styleSource = (isSourceFile(tree) ? tree : cursor?.firstEnclosing(isSourceFile)) ?? tree;
         const tabsAndIndents = getStyle(StyleKind.TabsAndIndentsStyle, styleSource, this.styles) as TabsAndIndentsStyle;
+        const spaces = getStyle(StyleKind.SpacesStyle, styleSource, this.styles) as SpacesStyle;
 
         const visitors = [
             new NormalizeWhitespaceVisitor(this.stopAfter),
             new MinimumViableSpacingVisitor(this.stopAfter),
             new BlankLinesVisitor(getStyle(StyleKind.BlankLinesStyle, styleSource, this.styles) as BlankLinesStyle, this.stopAfter),
             new WrappingAndBracesVisitor(getStyle(StyleKind.WrappingAndBracesStyle, styleSource, this.styles) as WrappingAndBracesStyle, this.stopAfter),
-            new SpacesVisitor(getStyle(StyleKind.SpacesStyle, styleSource, this.styles) as SpacesStyle, this.stopAfter),
+            new SpacesVisitor(prettierStyle ? spacesFrom(prettierStyle, spaces) : spaces, this.stopAfter),
             new TabsAndIndentsVisitor(
                 prettierStyle ? tabsAndIndentsFrom(prettierStyle, tabsAndIndents) : tabsAndIndents, this.stopAfter),
         ]
@@ -100,6 +101,13 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
 
         return t;
     }
+}
+
+/** The brace spacing a Prettier configuration states, over the style the rest of the spacing comes from. */
+function spacesFrom(prettierStyle: PrettierStyle, fallback: SpacesStyle): SpacesStyle {
+    // Prettier's default, in force for a configuration that does not name it
+    const bracketSpacing = prettierStyle.config.bracketSpacing !== false;
+    return {...fallback, within: {...fallback.within, objectLiteralBraces: bracketSpacing, es6ImportExportBraces: bracketSpacing}};
 }
 
 /** The widths a Prettier configuration states, over the style the rest of the layout comes from. */
