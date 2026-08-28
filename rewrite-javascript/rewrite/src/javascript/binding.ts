@@ -152,7 +152,8 @@ interface ModuleObjectBinding {
     /**
      * `"default"` and `"namespace"` bind different values — a namespace object's default sits at
      * `.default` — so only one answers a whole-module request of the matching form. CommonJS has
-     * no such split: `"require"` answers either.
+     * no such split: `"require"` answers either. A caller wanting the namespace asks for
+     * `member: "*"`, which is what a module exporting no default is bound by.
      */
     shape: "default" | "namespace" | "require";
 }
