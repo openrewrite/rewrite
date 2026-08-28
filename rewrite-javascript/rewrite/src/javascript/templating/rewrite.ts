@@ -58,7 +58,8 @@ class RewriteRuleImpl implements RewriteRule {
                 let result: J | undefined;
 
                 const template = typeof this.after === 'function' ? this.after(match) : this.after;
-                const bindings = options?.bindings ?? (options?.visitor && template.resolveBindings(options.visitor));
+                const bindings = options?.bindings ??
+                    (options?.visitor ? await template.resolveBindings(options.visitor) : undefined);
                 result = await template.apply(node, cursor,
                     { values: match, format: this.format, bindings: bindings || undefined });
 

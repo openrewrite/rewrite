@@ -16,36 +16,6 @@
 import {J, Type} from '../../java';
 import {JavaScriptVisitor} from '../visitor';
 import {Cursor} from '../../tree';
-import {ModuleBinding} from './types';
-
-/**
- * Whether the template's dependencies bring a workspace that could resolve `module`.
- */
-export function isResolvable(module: string, dependencies: Record<string, string>): boolean {
-    const segments = module.split('/');
-    const pkg = module.startsWith('@') ? segments.slice(0, 2).join('/') : segments[0];
-    return Object.prototype.hasOwnProperty.call(dependencies, pkg);
-}
-
-/**
- * What a declared binding's name is parsed against, ahead of the template and so out of its output.
- * An import is what carries attribution, and costs a module resolution to get it; a declaration
- * names the binding for a module no workspace could have resolved anyway.
- */
-export function bindingContextStatement(name: string, binding: ModuleBinding, dependencies: Record<string, string>): string {
-    if (!isResolvable(binding.module, dependencies)) {
-        return binding.typeOnly ? `type ${name} = any;` : `declare const ${name}: any;`;
-    }
-    const type = binding.typeOnly ? 'type ' : '';
-    if (binding.member === '*') {
-        return `import ${type}* as ${name} from '${binding.module}';`;
-    }
-    if (binding.member === undefined || binding.member === 'default') {
-        return `import ${type}${name} from '${binding.module}';`;
-    }
-    const specifier = binding.member === name ? name : `${binding.member} as ${name}`;
-    return `import ${type}{${specifier}} from '${binding.module}';`;
-}
 
 /**
  * Renames the identifiers a template uses for its declared bindings to the names the file

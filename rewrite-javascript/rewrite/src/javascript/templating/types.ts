@@ -485,26 +485,14 @@ export interface TemplateOptions {
     dependencies?: Record<string, string>;
 
     /**
-     * Modules the template's code refers to, keyed by the identifier its source uses for each.
-     * The key is a preferred name: {@link Template.resolveBindings} deconflicts it against the
-     * file, and applying the template rewrites the template's references to whatever it settled on.
+     * Type packages to load whose declarations nothing imports. TypeScript reads `@types/*` on its
+     * own and everything else only when named here, so a package declaring its modules ambiently —
+     * rather than at a path matching the specifier — resolves only with this set.
      *
-     * @example
-     * ```typescript
-     * template`Theming.setTheme(${capture('theme')})`
-     *     .configure({bindings: {Theming: {module: 'sap/ui/core/Theming', member: 'default'}}})
-     * ```
+     * @example `{dependencies: {'@sapui5/types': '^1.120.0'}, types: ['@sapui5/types']}`
      */
-    bindings?: Record<string, ModuleBinding>;
+    types?: string[];
 }
-
-/**
- * A module a template's code depends on. The local name comes from the key it is declared under,
- * and {@link Template.resolveBindings} settles the rest. `member` and `typeOnly` shape the import
- * it creates, so a caller passing {@link ApplyOptions.bindings} of its own reads neither.
- */
-export type ModuleBinding = Omit<AddImportOptions,
-    'module' | 'alias' | 'preferredName' | 'onlyIfReferenced' | 'sideEffectOnly'> & { module: string };
 
 /**
  * Options for template application.

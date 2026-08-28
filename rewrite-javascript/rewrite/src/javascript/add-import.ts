@@ -204,7 +204,7 @@ export function memberName(member: string | undefined): string | undefined {
 }
 
 /** A name introduced into the file's module scope, and where it came from when that is an import. */
-interface ModuleScopeBinding {
+export interface ModuleScopeBinding {
     name: string;
     module?: string;
     /** Carries the {@link AddImportOptions.member} spelling, so `undefined` means a default import. */
@@ -213,7 +213,7 @@ interface ModuleScopeBinding {
 }
 
 /** What the file's imports and `require`s bind at module scope, and the module each name comes from. */
-function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
+export function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
     const bindings: ModuleScopeBinding[] = [];
 
     const declaredByVariables = (varDecl: J.VariableDeclarations): void => {
