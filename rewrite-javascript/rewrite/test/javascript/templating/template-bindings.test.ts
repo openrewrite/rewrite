@@ -152,4 +152,18 @@ describe('templates that declare module bindings', () => {
             typescript(`applyTheme('dark');`)
         )).rejects.toThrow(/needs their local names/);
     });
+
+    test('the removed `bindings` option is rejected by the type and names its replacement', () => {
+        // Neither simplification of this fixture still pins the tombstone: excess property checking
+        // rejects a fresh literal, and the weak-type check rejects a lone `bindings`.
+        const optionsFrom = (member: string) => ({
+            dependencies: {vitest: '^2.0.0'},
+            bindings: {[member]: {module: 'vitest', member}}
+        });
+
+        expect(() => template`vi.fn()`.configure(
+            // @ts-expect-error
+            optionsFrom('vi')
+        )).toThrow(/context/);
+    });
 });
