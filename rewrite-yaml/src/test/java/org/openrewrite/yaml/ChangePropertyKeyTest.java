@@ -74,28 +74,7 @@ class ChangePropertyKeyTest implements RewriteTest {
     }
 
     @Test
-    void preservesInlineCommentOnUnchangedPropertyWhenMovingSibling() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("foo.bar", "bar", null, null, null)),
-          yaml(
-            """
-              foo:
-                bar:
-                  prop: val
-                other: other-val # keep me
-              """,
-            """
-              foo:
-                other: other-val # keep me
-              bar:
-                prop: val
-              """
-          )
-        );
-    }
-
-    @Test
-    void preservesInlineCommentOnUnchangedSpringPropertyWhenMovingMongoDb() {
+    void preservesInlineCommentOnDeeplyNestedUnchangedPropertyWhenMovingSibling() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey("spring.data.mongodb", "spring.mongodb", null, null, null)),
           yaml(

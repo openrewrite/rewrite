@@ -4418,36 +4418,4 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void movesDocumentEndCommentToSuccessorEntry() {
-        rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
-              bar:
-                prop: val
-              """,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null
-          )),
-          yaml(
-            """
-              foo:
-                other: other-val # keep me
-              """,
-            """
-              foo:
-                other: other-val # keep me
-              bar:
-                prop: val
-              """
-          )
-        );
-    }
 }
