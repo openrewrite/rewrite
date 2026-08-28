@@ -31,7 +31,8 @@ export * from "./autodetect";
 export * from "./tree-debug";
 export * from "./project-parser";
 
-export * from "./scope";
+export type {Scope} from "./scope";
+export {scopeOf, namesDeclaredIn, bindingNames} from "./scope";
 export type {QuoteChar, AddImportOptions} from "./add-import";
 export {ImportStyle, moduleNameOf, AddImport} from "./add-import";
 // AMD mechanics `recipes-ui5` builds on directly, beyond the `maybeBind` surface below.

@@ -56,6 +56,14 @@ describe("moduleBindings", () => {
         expect(seen.moduleSystem).toBe("esm");
     });
 
+    test("a top-level await import is the file's only module syntax and reports \"esm\"", async () => {
+        const spec = new RecipeSpec();
+        const seen: {moduleSystem?: string} = {};
+        spec.recipe = fromVisitor(captureBindings(seen));
+        await spec.rewriteRun(typescript(`const Button = await import("sap/m/Button");`));
+        expect(seen.moduleSystem).toBe("esm");
+    });
+
     test("a selected require, unlike a bare one, does not read as a CommonJS binding", async () => {
         const spec = new RecipeSpec();
         const seen: {moduleSystem?: string} = {};
@@ -465,6 +473,48 @@ describe("maybeBind", () => {
             `const Elem = require("sap/ui/core/Element");\n\ntarget();`
         ));
         expect(bound.name).toBe("Elem");
+    });
+
+    test("a whole-module await import answers a namespace request but not a plain module request", async () => {
+        const namespaceRequest = new RecipeSpec();
+        const namespaceName: {value?: string} = {};
+        namespaceRequest.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                namespaceName.value = maybeBind(this, {module: "sap/m/Button", member: "*"});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await namespaceRequest.rewriteRun(typescript(
+            `const Button = await import("sap/m/Button");\n\ntarget();`
+        ));
+
+        const bareRequest = new RecipeSpec();
+        const bound: {name?: string} = {};
+        bareRequest.recipe = fromVisitor(rebind("sap/m/Button", bound));
+        await bareRequest.rewriteRun(typescript(
+            `const Button = await import("sap/m/Button");\n\ntarget();`,
+            `import Button_1 from "sap/m/Button";\n\nconst Button = await import("sap/m/Button");\n\nButton_1.target();`
+        ));
+
+        expect(namespaceName.value).toBe("Button");
+        expect(bound.name).toBe("Button_1");
+    });
+
+    test("a destructured await import answers neither request but still occupies its name", async () => {
+        const spec = new RecipeSpec();
+        const bound: (string | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.push(maybeBind(this, {module: "sap/m/Button", onlyIfReferenced: false}));
+                bound.push(maybeBind(this, {module: "sap/m/Button", member: "*", onlyIfReferenced: false}));
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `const {Button} = await import("sap/m/Button");\n\ntarget();`,
+            `import Button_1 from "sap/m/Button";\nimport * as Button_2 from "sap/m/Button";\n\nconst {Button} = await import("sap/m/Button");\n\ntarget();`
+        ));
+        expect(bound).toEqual(["Button_1", "Button_2"]);
     });
 
     test("a CommonJS file answers with the binding its require already has", async () => {

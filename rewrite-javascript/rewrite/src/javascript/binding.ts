@@ -17,7 +17,7 @@ import {J} from "../java";
 import {JS} from "./tree";
 import {Cursor} from "../tree";
 import {JavaScriptVisitor} from "./visitor";
-import {scopeOf} from "./scope";
+import {scopeOf, walk} from "./scope";
 import {AddImportOptions, bindImport, moduleNameOf} from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {
@@ -119,7 +119,26 @@ function hasEsmSyntax(cu: JS.CompilationUnit): boolean {
             element?.kind === JS.Kind.ExportDeclaration ||
             element?.kind === JS.Kind.ExportAssignment ||
             (modifiers?.some(m => m.keyword === "export") ?? false);
+    }) || hasTopLevelAwait(cu);
+}
+
+/**
+ * Whether a statement holds an `await` outside any function of its own — legal only at module
+ * top level, unlike an `await` inside an `async function`, which says nothing about the file.
+ */
+function hasTopLevelAwait(cu: JS.CompilationUnit): boolean {
+    let found = false;
+    walk(cu.statements, node => {
+        if (found) {
+            return false;
+        }
+        if (node.kind === JS.Kind.Await) {
+            found = true;
+            return false;
+        }
+        return node.kind !== J.Kind.MethodDeclaration && node.kind !== J.Kind.Lambda;
     });
+    return found;
 }
 
 interface ModuleObjectBinding {
@@ -179,6 +198,52 @@ function requiredModule(statement: J | undefined): string | undefined {
         : undefined;
 }
 
+/**
+ * The module a top-level `const X = await import("m")` names, for the one variable it declares.
+ * A dynamic import resolves to the module namespace object, the same value `import * as X`
+ * binds, so it shares that shape rather than getting one of its own.
+ */
+function dynamicallyImportedModule(statement: J | undefined): string | undefined {
+    if (statement?.kind !== J.Kind.VariableDeclarations) {
+        return undefined;
+    }
+    const variables = (statement as J.VariableDeclarations).variables;
+    const initializer = variables.length === 1 ? variables[0].element?.initializer?.element : undefined;
+    const awaited = initializer?.kind === JS.Kind.Await ? (initializer as JS.Await).expression : undefined;
+    // `import(...)` is a keyword, not an identifier, so the parser maps it to `JS.FunctionCall`
+    // rather than the `J.MethodInvocation` an ordinary call gets.
+    if (awaited?.kind !== JS.Kind.FunctionCall) {
+        return undefined;
+    }
+    const call = awaited as JS.FunctionCall;
+    const callee = call.function?.element;
+    if (callee?.kind !== J.Kind.Identifier || (callee as J.Identifier).simpleName !== "import") {
+        return undefined;
+    }
+    const argument = call.arguments.elements[0]?.element;
+    return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === "string"
+        ? (argument as J.Literal).value as string
+        : undefined;
+}
+
+/** Bindings from top-level `const X = <moduleOf-recognised call>` statements, all of one shape. */
+function wholeModuleBindingsVia(
+    cu: JS.CompilationUnit,
+    moduleOf: (statement: J | undefined) => string | undefined,
+    shape: ModuleObjectBinding["shape"]
+): ModuleObjectBinding[] {
+    const bindings: ModuleObjectBinding[] = [];
+    for (const stmt of cu.statements) {
+        const module = moduleOf(stmt.element);
+        const name = module === undefined ? undefined :
+            (stmt.element as J.VariableDeclarations).variables[0]?.element?.name;
+        if (module !== undefined && name?.kind === J.Kind.Identifier) {
+            bindings.push({name: (name as J.Identifier).simpleName, module, shape});
+        }
+    }
+    return bindings;
+}
+
 /** Only whole-module bindings: a named member does not name the module object. */
 function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
     const bindings: ModuleObjectBinding[] = [];
@@ -210,14 +275,8 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
             }
         }
     }
-    for (const stmt of cu.statements) {
-        const module = requiredModule(stmt.element);
-        const name = module === undefined ? undefined :
-            (stmt.element as J.VariableDeclarations).variables[0]?.element?.name;
-        if (module !== undefined && name?.kind === J.Kind.Identifier) {
-            bindings.push({name: (name as J.Identifier).simpleName, module, shape: "require"});
-        }
-    }
+    bindings.push(...wholeModuleBindingsVia(cu, requiredModule, "require"));
+    bindings.push(...wholeModuleBindingsVia(cu, dynamicallyImportedModule, "namespace"));
     return bindings;
 }
 

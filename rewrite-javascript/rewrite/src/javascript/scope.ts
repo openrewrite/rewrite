@@ -268,7 +268,7 @@ function hoistedNames(scope: any): string[] {
 }
 
 /** Visits every LST node under `node`, leaving a subtree unvisited where `visit` returns false. */
-function walk(node: unknown, visit: (node: any) => boolean): void {
+export function walk(node: unknown, visit: (node: any) => boolean): void {
     if (Array.isArray(node)) {
         node.forEach(child => walk(child, visit));
         return;
