@@ -726,10 +726,11 @@ public class RewriteRpcServer
     {
         var beforeCount = _marketplace.AllRecipes().Count;
         string? version = null;          // requested version, as supplied by the caller (never mutated)
-        string? resolvedVersion = null;  // concrete version NuGet resolved it to (null off the NuGet path)
+        string? resolvedVersion = null;  // concrete version NuGet resolved it to (null for a loose assembly)
+        string? publishDir = null;       // the bundle's publish output (null for a loose assembly)
 
         // SystemTextJsonFormatter deserializes the object-typed Recipes payload to a JsonElement:
-        // a JSON string is a local assembly path; a JSON object describes a NuGet package.
+        // a JSON string is a local path; a JSON object describes a NuGet package.
         var recipesString = request.Recipes switch
         {
             string s => s,
@@ -740,63 +741,58 @@ public class RewriteRpcServer
             ? (JsonElement?)obj
             : null;
 
+        string packageName;
         if (recipesString != null)
         {
-            // Local assembly path
-            var absolutePath = Path.GetFullPath(recipesString);
-            var context = new PluginLoadContext(absolutePath);
-            var assembly = context.LoadFromAssemblyPath(absolutePath);
-            CheckVersionCompatibility(assembly);
-            ActivateAssembly(assembly, recipesString);
+            packageName = recipesString;
         }
         else if (recipesObject is { } packageObj)
         {
-            var packageName = (packageObj.TryGetProperty("packageName", out var pn) ? pn.GetString() : null)
-                              ?? throw new ArgumentException("Missing packageName in recipes object");
+            packageName = (packageObj.TryGetProperty("packageName", out var pn) ? pn.GetString() : null)
+                          ?? throw new ArgumentException("Missing packageName in recipes object");
             version = packageObj.TryGetProperty("version", out var v) ? v.GetString() : null;
-
-            if (File.Exists(packageName))
-            {
-                var absolutePath = Path.GetFullPath(packageName);
-                var context = new PluginLoadContext(absolutePath);
-                var assembly = context.LoadFromAssemblyPath(absolutePath);
-                CheckVersionCompatibility(assembly);
-                ActivateAssembly(assembly, packageName);
-            }
-            else
-            {
-                // NuGet install reads as a three-stage pipeline: restore the bundle (which also
-                // resolves the concrete version), publish it into the resolved-version dir, then
-                // load the plugin assemblies. The requested version may be a concrete pin or a
-                // floating/unspecified spec — restore resolves either uniformly.
-                var (stagingCsproj, resolved) = RestoreBundle(packageName, version);
-                resolvedVersion = resolved;
-                var publishDir = PublishBundle(stagingCsproj, resolved);
-                var assemblies = LoadPlugin(publishDir);
-                var ownAssemblyNames = OwnAssemblyNames(packageName, resolved);
-                if (ownAssemblyNames.Count == 0)
-                {
-                    Log.Warning("No own assemblies found for {Package} {Version} (lib folder missing/empty); no recipes activated", packageName, resolved);
-                }
-                foreach (var assembly in assemblies)
-                {
-                    CheckVersionCompatibility(assembly);
-                    if (ownAssemblyNames.Contains(assembly.GetName().Name))
-                    {
-                        ActivateAssembly(assembly, packageName);
-                    }
-                }
-            }
         }
         else
         {
             throw new ArgumentException($"Unexpected recipes type: {request.Recipes?.GetType().Name ?? "null"}");
         }
 
+        if (File.Exists(packageName))
+        {
+            // Local assembly path
+            var absolutePath = Path.GetFullPath(packageName);
+            var context = new PluginLoadContext(absolutePath);
+            var assembly = context.LoadFromAssemblyPath(absolutePath);
+            CheckVersionCompatibility(assembly);
+            ActivateAssembly(assembly, packageName);
+        }
+        else if (Directory.Exists(packageName))
+        {
+            // The publish output of an earlier NuGet install, handed back by the host
+            publishDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(packageName));
+            resolvedVersion = ActivateBundle(publishDir, packageName).Version;
+        }
+        else if (recipesString != null)
+        {
+            throw new FileNotFoundException("Recipe assembly or publish directory not found", packageName);
+        }
+        else
+        {
+            // NuGet install reads as a three-stage pipeline: restore the bundle (which also
+            // resolves the concrete version), publish it into the resolved-version dir, then
+            // activate the publish output. The requested version may be a concrete pin or a
+            // floating/unspecified spec — restore resolves either uniformly.
+            var (stagingCsproj, resolved) = RestoreBundle(packageName, version);
+            resolvedVersion = resolved;
+            publishDir = PublishBundle(stagingCsproj, resolved);
+            ActivateBundle(publishDir, packageName);
+        }
+
         return Task.FromResult(new InstallRecipesResponse
         {
             RecipesInstalled = _marketplace.AllRecipes().Count - beforeCount,
-            Version = resolvedVersion ?? version
+            Version = resolvedVersion ?? version,
+            PublishDir = publishDir
         });
     }
 
@@ -895,36 +891,6 @@ public class RewriteRpcServer
 
         return csprojPath;
     }
-
-    private static HashSet<string> OwnAssemblyNames(string packageName, string? version, string? packagesRoot = null)
-    {
-        // The package's own runtime assemblies are those shipped in its lib/<tfm> folder
-        // in the global packages cache (the directly-contributed boundary). All other
-        // published DLLs are transitive dependencies and must not be activated.
-        packagesRoot ??= Environment.GetEnvironmentVariable("NUGET_PACKAGES")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
-        // NuGet's v3 global-packages layout lowercases both the package id and the (normalized)
-        // version in the folder path, so match that or the lib dir won't be found on a
-        // case-sensitive filesystem (Linux).
-        var libDir = Path.Combine(packagesRoot, packageName.ToLowerInvariant(), (version ?? "").ToLowerInvariant(), "lib");
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (Directory.Exists(libDir))
-        {
-            foreach (var dll in Directory.GetFiles(libDir, "*.dll", SearchOption.AllDirectories))
-            {
-                names.Add(Path.GetFileNameWithoutExtension(dll));
-            }
-        }
-        return names;
-    }
-
-    /// <summary>
-    /// Test seam for <see cref="OwnAssemblyNames"/>: exposes the private helper
-    /// with an explicit packages root so unit tests can use a synthetic temp directory
-    /// without a real NuGet install.
-    /// </summary>
-    internal static HashSet<string> OwnAssemblyNamesForTest(string packageName, string? version, string packagesRoot)
-        => OwnAssemblyNames(packageName, version, packagesRoot);
 
     /// <summary>
     /// Produces the recipe project's <c>nuget.config</c> with the local development
@@ -1036,28 +1002,43 @@ public class RewriteRpcServer
     }
 
     /// <summary>
-    /// Load stage: load the recipe-bearing assemblies from a publish output directory into an
-    /// isolated <see cref="PluginLoadContext"/>. Because the NuGet package name may not match the
-    /// assembly name, we scan all non-host DLLs in the publish output for
-    /// <see cref="IRecipeActivator"/> implementations.
+    /// Activate stage: load a publish output directory (see <see cref="PublishBundle"/>) and
+    /// activate the recipes of the bundle package's own assemblies — never those of its
+    /// transitive dependencies. The directory carries everything this needs, so a host can hand
+    /// an <see cref="InstallRecipesResponse.PublishDir"/> back to a later server instance and
+    /// have the bundle loaded again without a registry.
+    /// </summary>
+    private PublishedBundle ActivateBundle(string publishDir, string origin)
+    {
+        var bundle = PublishedBundle.Read(publishDir);
+        if (bundle.OwnAssemblyNames.Count == 0)
+        {
+            Log.Warning("No own assemblies found for {Package} {Version} in {PublishDir}; no recipes activated",
+                bundle.PackageName, bundle.Version, publishDir);
+        }
+        foreach (var assembly in LoadPlugin(publishDir))
+        {
+            CheckVersionCompatibility(assembly);
+            if (bundle.OwnAssemblyNames.Contains(assembly.GetName().Name!))
+            {
+                ActivateAssembly(assembly, origin);
+            }
+        }
+        return bundle;
+    }
+
+    /// <summary>
+    /// Load the assemblies of a publish output directory into an isolated
+    /// <see cref="PluginLoadContext"/>, anchored on the staging project's <c>Recipes.dll</c> so
+    /// that transitive dependencies resolve through <c>Recipes.deps.json</c>.
     /// </summary>
     private List<Assembly> LoadPlugin(string publishDir)
     {
-        // Use the Recipes.deps.json (from the staging project) for the dependency resolver
-        var depsJson = Path.Combine(publishDir, "Recipes.deps.json");
-        if (!File.Exists(depsJson))
-        {
-            Log.Warning("No .deps.json found in publish output at {PublishDir}", publishDir);
-        }
-
-        // The staging project's main DLL is the anchor for AssemblyDependencyResolver
         var anchorDll = Path.Combine(publishDir, "Recipes.dll");
         if (!File.Exists(anchorDll))
         {
-            // Fallback: pick any DLL that has a matching .deps.json
-            anchorDll = Directory.GetFiles(publishDir, "*.dll").FirstOrDefault()
-                        ?? throw new InvalidOperationException(
-                            $"No DLLs found in publish output at {publishDir}");
+            throw new InvalidOperationException(
+                $"{publishDir} is not a recipe bundle publish directory: no Recipes.dll");
         }
 
         var context = new PluginLoadContext(anchorDll);
@@ -2300,6 +2281,13 @@ public class InstallRecipesResponse
 {
     public int RecipesInstalled { get; set; }
     public string? Version { get; set; }
+
+    /// <summary>
+    /// Where a NuGet bundle's publish output landed. Passing it back as the
+    /// <see cref="InstallRecipesRequest.Recipes"/> path of a later server instance loads the
+    /// bundle again without a registry. Null for a loose assembly.
+    /// </summary>
+    public string? PublishDir { get; set; }
 }
 
 public class PrepareRecipeRequest
