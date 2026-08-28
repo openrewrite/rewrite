@@ -614,7 +614,12 @@ const RESERVED_WORDS = new Set([
  */
 export function derivedBindingName(module: string): string | undefined {
     const segment = lastSegment(module);
-    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment) && !RESERVED_WORDS.has(segment) ? segment : undefined;
+    return isBindableName(segment) ? segment : undefined;
+}
+
+/** Whether `name` is one a binding can take. ASCII identifiers only, so a legal name may be refused. */
+export function isBindableName(name: string): boolean {
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) && !RESERVED_WORDS.has(name);
 }
 
 /** Queued reservations already targeting this block: the shared source for both dedup and deconfliction. */
