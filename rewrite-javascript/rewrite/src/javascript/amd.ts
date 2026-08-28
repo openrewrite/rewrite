@@ -29,7 +29,7 @@ import {
     TrailingComma
 } from "../java";
 import {JS} from "./tree";
-import {cursorOf, deconflict, namesDeclaredWithin} from "./scope";
+import {cursorOf, deconflict, namesDeclaredWithin, scopeOf} from "./scope";
 import {JavaScriptVisitor} from "./visitor";
 import {ExecutionContext} from "../execution";
 
@@ -619,7 +619,18 @@ export function bindAmd(
 
     const declared = module === "" ? -1 : modules.indexOf(module);
     if (declared >= 0) {
-        return bindings[declared];
+        const bound = bindings[declared];
+        if (bound === undefined) {
+            // A parameter that is not a plain name gives the module no binding to hand back.
+            return undefined;
+        }
+        // Only code the factory encloses can shadow its parameter, so a cursor elsewhere in the
+        // block — on the `define` call, or on its dependency array — has nothing to measure.
+        const cursor = cursorOf(visitor);
+        const withinFactory = cursor?.firstEnclosing((v): v is J => v === amd.block.factory);
+        if (withinFactory === undefined || scopeOf(cursor!).declaringScope(bound) === amd.block.factory) {
+            return bound;
+        }
     }
 
     // Two calls naming the same module at the same block are the same request (ADR 0013),

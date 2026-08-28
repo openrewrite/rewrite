@@ -19,11 +19,13 @@ import {
     JavaScriptVisitor,
     JS,
     namesDeclaredIn,
+    namesInScope,
     Scope,
     scopeOf,
     sourceFileCache
 } from "../../src/javascript";
 import {J} from "../../src/java";
+import {Cursor} from "../../src/tree";
 
 const parser = new JavaScriptParser({sourceFileCache});
 
@@ -31,13 +33,13 @@ async function parse(source: string, sourcePath = 'test.ts'): Promise<JS.Compila
     return (await parser.parse({text: source, sourcePath}).next()).value as JS.CompilationUnit;
 }
 
-/** The scope where the source calls `anchor()`. */
-async function scopeAtAnchor(source: string, sourcePath?: string): Promise<Scope> {
-    const found: Scope[] = [];
+/** The position where the source calls `anchor()`. */
+async function cursorAtAnchor(source: string, sourcePath?: string): Promise<Cursor> {
+    const found: Cursor[] = [];
     await new class extends JavaScriptVisitor<undefined> {
         override async visitMethodInvocation(method: J.MethodInvocation, p: undefined): Promise<J | undefined> {
             if ((method.name as J.Identifier)?.simpleName === 'anchor') {
-                found.push(scopeOf(this.cursor));
+                found.push(this.cursor);
             }
             return super.visitMethodInvocation(method, p);
         }
@@ -46,8 +48,12 @@ async function scopeAtAnchor(source: string, sourcePath?: string): Promise<Scope
     return found[0];
 }
 
+async function scopeAtAnchor(source: string, sourcePath?: string): Promise<Scope> {
+    return scopeOf(await cursorAtAnchor(source, sourcePath));
+}
+
 async function namesAtAnchor(source: string, sourcePath?: string): Promise<string[]> {
-    return [...(await scopeAtAnchor(source, sourcePath)).names()].sort();
+    return [...namesInScope(await cursorAtAnchor(source, sourcePath))].sort();
 }
 
 describe('scopeOf', () => {
@@ -195,6 +201,25 @@ describe('scopeOf', () => {
         expect(scope.declares('merge')).toBe(true);
         expect(scope.declares('param')).toBe(true);
         expect(scope.declares('absent')).toBe(false);
+    });
+
+    test('declaringScope names the innermost scope binding a name, not merely one that does', async () => {
+        const shadowed = await scopeAtAnchor(
+            `import B from 'a/B';\nfunction inner() { { var B = 1; } anchor(); }`);
+        // A `var` reaches the whole function, so the function binds it, not the block holding it.
+        expect(shadowed.declaringScope('B')?.kind).toBe(J.Kind.MethodDeclaration);
+        expect(shadowed.declaringScope('absent')).toBeUndefined();
+
+        const reachable = await scopeAtAnchor(`import B from 'a/B';\nfunction inner() { anchor(); }`);
+        expect(reachable.declaringScope('B')?.kind).toBe(JS.Kind.CompilationUnit);
+    });
+
+    test('a var belongs to the function it sits in, a let to the block', async () => {
+        const hoisting = await scopeAtAnchor(`function f(p) { var p = 1; anchor(); }`);
+        expect(hoisting.declaringScope('p')?.kind).toBe(J.Kind.MethodDeclaration);
+
+        const blockScoped = await scopeAtAnchor(`function f(p) { let p = 1; anchor(); }`);
+        expect(blockScoped.declaringScope('p')?.kind).toBe(J.Kind.Block);
     });
 });
 

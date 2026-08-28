@@ -1,7 +1,7 @@
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
-    maybeAddImport, maybeUnbind, maybeRebind, maybeRemoveImport, removeNewlyUnusedAmdBindings
+    maybeAddImport, MaybeBindOptions, maybeUnbind, maybeRebind, maybeRemoveImport, removeNewlyUnusedAmdBindings
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
@@ -204,13 +204,13 @@ function withReference(call: J.MethodInvocation, name: string): J.MethodInvocati
 }
 
 /** A caller that uses the answer. */
-function rebind(module: string, bound: {name?: string}) {
+function rebind(options: MaybeBindOptions | string, bound: {name?: string}) {
     return new class extends JavaScriptVisitor<any> {
         override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
             if (m.name.simpleName !== "target") {
                 return super.visitMethodInvocation(m, p);
             }
-            bound.name = maybeBind(this, {module});
+            bound.name = maybeBind(this, options);
             return bound.name === undefined ? m : withReference(m, bound.name);
         }
     };
@@ -522,6 +522,85 @@ describe("maybeBind", () => {
         });
         await contextualKeyword.rewriteRun(typescript(`const x = 1;`));
         expect(contextualKeywordBound.name).toBeUndefined();
+    });
+
+    test("AMD refuses where the declared dependency's parameter is not a name to hand back", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("a/B", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], function ({x}) { target(); });`
+        ));
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("AMD reuses a parameter its own body redeclares", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("a/B", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], function (B) { var B = B || {}; target(); });`,
+            `sap.ui.define(["a/B"], function (B) { var B = B || {}; B.target(); });`
+        ));
+        expect(bound.name).toBe("B");
+    });
+
+    test("AMD reuses a parameter for a cursor the factory does not enclose", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (isAmdBlock(m)) {
+                    bound.name = maybeBind(this, "a/B");
+                }
+                return super.visitMethodInvocation(m, p);
+            }
+        });
+        await spec.rewriteRun(javascript(`sap.ui.define(["a/B"], function (B) { B.x(); });`));
+        expect(bound.name).toBe("B");
+    });
+
+    test("AMD binds a module afresh where the parameter it would reuse is shadowed", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("a/B", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], function (B) { function inner() { var B = 1; target(); return B; } });`,
+            `sap.ui.define(["a/B", "a/B"], function (B, B_1) { function inner() { var B = 1; B_1.target(); return B; } });`
+        ));
+        expect(bound.name).toBe("B_1");
+    });
+
+    test("ESM binds a module afresh where the import it would reuse is shadowed", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/m/Button", bound));
+        await spec.rewriteRun(typescript(
+            `import Button from "sap/m/Button";\n\nfunction inner() { const Button = 1; target(); return Button; }`,
+            `import Button from "sap/m/Button";\nimport Button_1 from "sap/m/Button";\n\nfunction inner() { const Button = 1; Button_1.target(); return Button; }`
+        ));
+        expect(bound.name).toBe("Button_1");
+
+        // A `const` binds its whole block, so reaching the import ahead of one is a TDZ error
+        // rather than a reference to the module — the ordering of the two does not change that.
+        const declaredLater = new RecipeSpec();
+        declaredLater.recipe = fromVisitor(rebind("sap/m/Button", bound));
+        await declaredLater.rewriteRun(typescript(
+            `import Button from "sap/m/Button";\n\nfunction inner() { target(); const Button = 1; return Button; }`,
+            `import Button from "sap/m/Button";\nimport Button_1 from "sap/m/Button";\n\nfunction inner() { Button_1.target(); const Button = 1; return Button; }`
+        ));
+        expect(bound.name).toBe("Button_1");
+    });
+
+    test("ESM binds a member afresh where the specifier it would reuse is shadowed", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind({module: "a/lib", member: "Widget"}, bound));
+        await spec.rewriteRun(typescript(
+            `import {Widget} from "a/lib";\n\nfunction inner() { const Widget = 1; target(); return Widget; }`,
+            `import {Widget, Widget as Widget_1} from "a/lib";\n\nfunction inner() { const Widget = 1; Widget_1.target(); return Widget; }`
+        ));
+        expect(bound.name).toBe("Widget_1");
     });
 
     test("ESM reuses a default import bound under another name", async () => {
