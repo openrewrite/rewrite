@@ -448,6 +448,47 @@ describe("maybeBind", () => {
         expect(bound.name).toBeUndefined();
     });
 
+    test("a member request refuses on a CommonJS file but still creates on an ESM file", async () => {
+        const memberBind = (bound: {value?: string}) => new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.value = maybeBind(this, {module: "fs", member: "readFile", onlyIfReferenced: false});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        };
+
+        const onCommonJs = new RecipeSpec();
+        const commonJsName: {value?: string} = {};
+        onCommonJs.recipe = fromVisitor(memberBind(commonJsName));
+        await onCommonJs.rewriteRun(javascript(
+            `const other = require("a/Other");\n\ntarget();`
+        ));
+
+        const onEsm = new RecipeSpec();
+        const esmName: {value?: string} = {};
+        onEsm.recipe = fromVisitor(memberBind(esmName));
+        await onEsm.rewriteRun(typescript(
+            `target();`,
+            `import {readFile} from 'fs';\n\ntarget();`
+        ));
+
+        expect(commonJsName.value).toBeUndefined();
+        expect(esmName.value).toBe("readFile");
+    });
+
+    test("a .mjs file with a require call still creates an import", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun({
+            ...javascript(
+                `const other = require("a/Other");\n\ntarget();`,
+                `import Element from "sap/ui/core/Element";\n\nconst other = require("a/Other");\n\nElement.target();`
+            ),
+            path: "module.mjs"
+        });
+        expect(bound.name).toBe("Element");
+    });
+
     test("a nested require callback is the block a binding belongs to", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};

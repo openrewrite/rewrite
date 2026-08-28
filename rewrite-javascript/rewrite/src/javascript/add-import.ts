@@ -68,11 +68,13 @@ export interface AddImportOptions {
 /**
  * Ensures an import for `options.module` exists, queuing an `AddImport` edit where none already
  * serves the request. `maybeBind`'s ESM/CommonJS lane is this function; its own JSDoc carries the
- * return-value contract.
+ * return-value contract. `refuseCreate` answers `undefined` instead of queuing a new import,
+ * without affecting whether an existing binding answers the request first.
  */
 export function bindImport(
     visitor: JavaScriptVisitor<any>,
-    options: AddImportOptions
+    options: AddImportOptions,
+    refuseCreate?: boolean
 ): string | undefined {
     validate(options);
     const module = moduleNameOf(options.module);
@@ -97,12 +99,18 @@ export function bindImport(
     }
 
     if (sideEffectOnly) {
+        if (refuseCreate) {
+            return undefined;
+        }
         visitor.afterVisit.push(new AddImport(options));
         return undefined;
     }
 
     // A pinned alias is the whole answer, so the file has no say and nothing below needs to read it.
     if (options.alias) {
+        if (refuseCreate) {
+            return undefined;
+        }
         visitor.afterVisit.push(new AddImport(options, options.alias));
         return options.alias;
     }
@@ -111,6 +119,9 @@ export function bindImport(
     const cursor = cursorOf(visitor);
     const cu = cursor && compilationUnitOf(cursor);
     if (!cu) {
+        if (refuseCreate) {
+            return undefined;
+        }
         visitor.afterVisit.push(new AddImport(options, derived));
         return derived;
     }
@@ -126,6 +137,10 @@ export function bindImport(
                 binding.name === derived)) {
             return binding.name;
         }
+    }
+
+    if (refuseCreate) {
+        return undefined;
     }
 
     // Only the module scope answers for a name, but any scope in the file occupies one. The queue

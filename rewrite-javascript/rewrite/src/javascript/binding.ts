@@ -128,6 +128,12 @@ function isCommonJs(cu: JS.CompilationUnit): boolean {
     if (cu.sourcePath.endsWith(".cjs")) {
         return true;
     }
+    // Node treats these as ES modules regardless of what they contain, the same way
+    // `AddImport`'s own `determineImportStyle` reads them as ES6-preferring; `.js`/`.ts`/`.tsx`
+    // stay ambiguous and fall through to the statements below.
+    if (cu.sourcePath.endsWith(".mjs") || cu.sourcePath.endsWith(".mts")) {
+        return false;
+    }
     let requires = false;
     for (const stmt of cu.statements) {
         if (stmt.element?.kind === JS.Kind.Import) {
@@ -226,23 +232,14 @@ export function maybeBind(
         return bindAmd(visitor, amd, module, options.preferredName, namesInScope, calleesOf(options));
     }
 
-    const bindings = moduleBindings(visitor, options);
+    // `bindImport` finds and reuses an existing binding on its own — including one made via
+    // `require` — so refusal here only has to gate the point where it would create a new one.
     const isWholeModule = !options.sideEffectOnly && (options.member === undefined || options.member === "*");
-    if (isWholeModule) {
-        const bound = bindings.bindingOf(module);
-        if (bound !== undefined) {
-            return bound;
-        }
-        if (bindings.moduleSystem === "commonjs") {
-            // A `require` answers for a module it already binds, but creating one is
-            // unimplemented, and an `import` in a file that has none would be the wrong form.
-            return undefined;
-        }
-    }
+    const refuseCreate = moduleBindings(visitor, options).moduleSystem === "commonjs";
     return bindImport(visitor, {
         ...options,
         preferredName: options.preferredName ?? (isWholeModule ? lastSegment(module) : undefined)
-    });
+    }, refuseCreate);
 }
 
 /**
