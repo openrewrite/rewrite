@@ -15,11 +15,11 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import ts from "typescript";
-import {SyntaxKind as SyntaxKind7, type Node as Node7, type SourceFile as SourceFile7} from "typescript7/unstable/ast";
-import {SymbolFlags as SymbolFlags7} from "typescript7/unstable/sync";
+import ts from "typescript6";
+import {SyntaxKind as SyntaxKind7, type Node as Node7, type SourceFile as SourceFile7} from "typescript/unstable/ast";
+import {SymbolFlags as SymbolFlags7} from "typescript/unstable/sync";
 import {typeAtLocation} from "../../src/javascript/ts7/checker";
-import {type Child, childrenOf} from "../../src/javascript/ts7/token-navigation";
+import {childrenOf} from "../../src/javascript/ts7/token-navigation";
 import {openSession} from "../../src/javascript/ts7/program";
 
 // TypeScript 7 renumbers every SyntaxKind, so trees are compared by kind *name*. Where 7 renames a
@@ -63,7 +63,7 @@ function stream6(node: ts.Node, sourceFile: ts.SourceFile, out: string[]): strin
     return out;
 }
 
-function stream7(node: Child, sourceFile: SourceFile7, out: string[]): string[] {
+function stream7(node: Node7, sourceFile: SourceFile7, out: string[]): string[] {
     for (const child of childrenOf(node, sourceFile)) {
         const name = NAMES_7.get(child.kind)!;
         out.push(`${equivalentName(name, child.pos, child.end)}@${child.pos}:${child.end}`);
@@ -97,7 +97,7 @@ describe("TypeScript 7 AST conformance", () => {
                 expect(sourceFile7, `TypeScript 7 did not parse ${virtualPath}`).toBeDefined();
 
                 const expected = stream6(sourceFile6, sourceFile6, []);
-                const actual = stream7(sourceFile7 as unknown as Child, sourceFile7!, []);
+                const actual = stream7(sourceFile7 as unknown as Node7, sourceFile7!, []);
                 const at = expected.findIndex((token, i) => token !== actual[i]);
                 if (at !== -1 || expected.length !== actual.length) {
                     mismatches.push(`${path.basename(virtualPath)} at #${at}: `

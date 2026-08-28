@@ -15,8 +15,8 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import {API, type Project} from "typescript7/unstable/sync";
-import type {FileSystem} from "typescript7/unstable/fs";
+import {API, type Project} from "typescript/unstable/sync";
+import type {FileSystem} from "typescript/unstable/fs";
 
 // The TypeScript 7 compiler runs as a Go process that owns parsing and module resolution, so a
 // program is described to it rather than built here: sources the parser holds in memory are served
@@ -37,13 +37,16 @@ export function openSession(
     root: string,
     sources: ReadonlyMap<string, string>,
     compilerOptions: Record<string, unknown>,
+    rootFiles?: readonly string[],
 ): ParseSession {
     const configPath = path.join(root, "tsconfig.json");
     const files = new Map(sources);
-    files.set(configPath, JSON.stringify({
-        compilerOptions,
-        include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
-    }));
+    // The program is rooted at the files it was given. A glob would take in everything under
+    // `root`, which for a parse rooted at a project directory is the whole project.
+    const roots = rootFiles ?? [...sources.keys()];
+    files.set(configPath, JSON.stringify(roots.length > 0
+        ? {compilerOptions, files: roots}
+        : {compilerOptions, include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]}));
 
     const fileSystem: FileSystem = {
         readFile: file => files.get(file),

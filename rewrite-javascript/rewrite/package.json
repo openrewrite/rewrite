@@ -82,7 +82,7 @@
     "picomatch": "^4.0.4",
     "semver": "^7.7.4",
     "tmp-promise": "^3.0.3",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vscode-jsonrpc": "^8.2.1",
     "yaml": "^2.9.0"
   },
@@ -95,7 +95,7 @@
     "benchmark": "^2.1.4",
     "bun": "^1.3.5",
     "prettier": "^3.7.4",
-    "typescript7": "npm:typescript@^7.0.2",
+    "typescript6": "npm:@typescript/typescript6@^6.0.2",
     "vitest": "^4.1.8"
   },
   "optionalDependencies": {

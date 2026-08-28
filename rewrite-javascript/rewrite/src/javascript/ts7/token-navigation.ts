@@ -13,36 +13,54 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {createScanner, LanguageVariant, type Node, type NodeArray, type SourceFile, SyntaxKind} from "typescript7/unstable/ast";
+import {
+    createScanner,
+    LanguageVariant,
+    type Node,
+    type NodeArray,
+    type SourceFile,
+    SyntaxKind,
+} from "typescript/unstable/ast";
 
-// The TypeScript 7 AST arrives deserialised from the Go compiler, which carries only the semantic
-// children; `forEachChild` therefore skips punctuation. Scanning each gap between children recovers
-// the tokens whose offsets the LST hangs whitespace on. ../token-navigation.ts is the same surface
-// over the TypeScript 6 AST, where the compiler supplies these children directly.
+// The compiler sends only the semantic children, so `forEachChild` skips punctuation. Scanning each
+// gap between children recovers the tokens whose offsets the LST hangs whitespace on. They come back
+// as nodes, since the parser reads a child's text and position the same way whichever kind it is.
 
-/** A scanned token. It has no place in the Go compiler's tree, so it carries only what callers read. */
-interface SyntheticToken {
-    readonly kind: SyntaxKind;
-    readonly pos: number;
-    readonly end: number;
-}
-
-/** Wraps a NodeArray so a list's own punctuation stays reachable, mirroring TypeScript's SyntaxList. */
-interface SyntaxListNode extends SyntheticToken {
-    readonly [SYNTAX_LIST]: NodeArray<Node>;
-}
-
-// Real nodes carry fields like `elements` and `types`, so the wrapper is tagged with a symbol that
+// Real nodes carry fields like `elements` and `types`, so a list is tagged with a symbol that
 // nothing in the compiler's tree can collide with.
 const SYNTAX_LIST = Symbol("syntaxList");
 
-export type Child = Node | SyntheticToken | SyntaxListNode;
+interface SyntaxListNode extends Node {
+    readonly [SYNTAX_LIST]: NodeArray<Node>;
+}
 
-const isSyntaxList = (n: Child): n is SyntaxListNode => (n as SyntaxListNode)[SYNTAX_LIST] !== undefined;
+const isSyntaxList = (n: Node): n is SyntaxListNode => (n as SyntaxListNode)[SYNTAX_LIST] !== undefined;
 const isToken = (k: SyntaxKind) => k >= SyntaxKind.FirstToken && k <= SyntaxKind.LastToken;
 const isJSDoc = (k: SyntaxKind) => k >= SyntaxKind.FirstJSDocNode && k <= SyntaxKind.LastJSDocNode;
 
-function scanBetween(sf: SourceFile, from: number, to: number, out: Child[]): void {
+/** Stands for a token the compiler leaves out of the tree, backed by the source text it was read from. */
+function scannedNode(kind: SyntaxKind, pos: number, end: number, sourceFile: SourceFile, parent: Node,
+                     elements?: NodeArray<Node>): Node {
+    const leadingTriviaWidth = () => sourceFile.text.slice(pos, end).search(/\S|$/);
+    const start = () => pos + leadingTriviaWidth();
+    const node = {
+        kind, pos, end, parent,
+        flags: 0,
+        forEachChild: () => undefined,
+        getSourceFile: () => sourceFile,
+        getStart: () => start(),
+        getFullStart: () => pos,
+        getEnd: () => end,
+        getWidth: () => end - start(),
+        getFullWidth: () => end - pos,
+        getLeadingTriviaWidth: () => leadingTriviaWidth(),
+        getFullText: () => sourceFile.text.slice(pos, end),
+        getText: () => sourceFile.text.slice(start(), end),
+    };
+    return (elements ? {...node, [SYNTAX_LIST]: elements} : node) as unknown as Node;
+}
+
+function scanBetween(sf: SourceFile, from: number, to: number, parent: Node, out: Node[]): void {
     if (to <= from) {
         return;
     }
@@ -54,59 +72,59 @@ function scanBetween(sf: SourceFile, from: number, to: number, out: Child[]): vo
             break;
         }
         // A token's `pos` runs from the end of the previous one, so leading trivia belongs to it.
-        out.push({kind, pos: scanner.getTokenFullStart(), end: scanner.getTokenEnd()});
+        out.push(scannedNode(kind, scanner.getTokenFullStart(), scanner.getTokenEnd(), sf, parent));
     }
 }
 
-export function childrenOf(node: Child, sourceFile: SourceFile): Child[] {
+export function childrenOf(node: Node, sourceFile: SourceFile = node.getSourceFile()): Node[] {
     if (isSyntaxList(node)) {
         return syntaxListChildren(node, sourceFile);
     }
     if (isToken(node.kind)) {
         return [];
     }
-    const children: Child[] = [];
+    const children: Node[] = [];
     let pos = node.pos;
     // JSDoc reaches the tree only through `node.jsDoc`, and the parser asks for none of it, so the
     // children stop at what `forEachChild` yields.
-    (node as Node).forEachChild(
+    node.forEachChild(
         child => {
-            scanBetween(sourceFile, pos, child.pos, children);
+            scanBetween(sourceFile, pos, child.pos, node, children);
             children.push(child);
             pos = child.end;
             return undefined;
         },
         nodes => {
-            scanBetween(sourceFile, pos, nodes.pos, children);
-            children.push({kind: SyntaxKind.SyntaxList, pos: nodes.pos, end: nodes.end, [SYNTAX_LIST]: nodes});
+            scanBetween(sourceFile, pos, nodes.pos, node, children);
+            children.push(scannedNode(SyntaxKind.SyntaxList, nodes.pos, nodes.end, sourceFile, node, nodes));
             pos = nodes.end;
             return undefined;
         });
-    scanBetween(sourceFile, pos, node.end, children);
+    scanBetween(sourceFile, pos, node.end, node, children);
     return children;
 }
 
-function syntaxListChildren(list: SyntaxListNode, sourceFile: SourceFile): Child[] {
-    const out: Child[] = [];
+function syntaxListChildren(list: SyntaxListNode, sourceFile: SourceFile): Node[] {
+    const out: Node[] = [];
     let pos = list.pos;
     for (const element of list[SYNTAX_LIST]) {
-        scanBetween(sourceFile, pos, element.pos, out);
+        scanBetween(sourceFile, pos, element.pos, list, out);
         out.push(element);
         pos = element.end;
     }
-    scanBetween(sourceFile, pos, list.end, out);
+    scanBetween(sourceFile, pos, list.end, list, out);
     return out;
 }
 
-export function childCountOf(node: Child, sourceFile: SourceFile): number {
+export function childCountOf(node: Node, sourceFile: SourceFile = node.getSourceFile()): number {
     return childrenOf(node, sourceFile).length;
 }
 
-export function childAt(node: Child, index: number, sourceFile: SourceFile): Child | undefined {
+export function childAt(node: Node, index: number, sourceFile: SourceFile = node.getSourceFile()): Node {
     return childrenOf(node, sourceFile)[index];
 }
 
-export function firstTokenOf(node: Child, sourceFile: SourceFile): Child | undefined {
+export function firstTokenOf(node: Node, sourceFile: SourceFile = node.getSourceFile()): Node | undefined {
     const child = childrenOf(node, sourceFile).find(c => !isJSDoc(c.kind));
     if (!child) {
         return undefined;
@@ -114,7 +132,7 @@ export function firstTokenOf(node: Child, sourceFile: SourceFile): Child | undef
     return child.kind < SyntaxKind.FirstNode ? child : firstTokenOf(child, sourceFile);
 }
 
-export function lastTokenOf(node: Child, sourceFile: SourceFile): Child | undefined {
+export function lastTokenOf(node: Node, sourceFile: SourceFile = node.getSourceFile()): Node | undefined {
     const children = childrenOf(node, sourceFile);
     const child = children[children.length - 1];
     if (!child) {

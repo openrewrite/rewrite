@@ -17,7 +17,7 @@ import {AfterRecipeText, dedentAfter, SourceSpec} from "../test";
 import {JavaScriptParser} from "./parser";
 import {PackageJsonParser} from "./package-json-parser";
 import {JS} from "./tree";
-import ts from "./compiler";
+import * as ts from "./compiler";
 import {json, Json} from "../json";
 import {DependencyWorkspace} from "./dependency-workspace";
 import {setTemplateSourceFileCache} from "./templating/engine";

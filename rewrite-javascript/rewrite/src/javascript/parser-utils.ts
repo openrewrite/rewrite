@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import ts from "./compiler";
+import * as ts from "./compiler";
 import {Expression, J, Statement} from "../java";
 import {JS} from "./tree";
 import {childAt, childCountOf, childrenOf, lastTokenOf} from "./token-navigation";
@@ -352,24 +352,19 @@ export function hasFlowAnnotation(sourceFile: ts.SourceFile) {
 }
 
 export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile) {
-    const diagnostics = ts.getPreEmitDiagnostics(program, sourceFile);
-    // checking Parsing and Syntax Errors
-    let syntaxErrors : [errorMsg: string, errorCode: number][] = [];
-    if (diagnostics.length > 0) {
-        const errors = diagnostics.filter(d =>  (d.category === ts.DiagnosticCategory.Error) && isCriticalDiagnostic(d.code, sourceFile));
-        if (errors.length > 0) {
-            syntaxErrors = errors.map(e => {
-                let errorMsg;
-                if (e.file) {
-                    let {line, character} = ts.getLineAndCharacterOfPosition(e.file, e.start!);
-                    let message = ts.flattenDiagnosticMessageText(e.messageText, "\n");
-                    errorMsg = `(${line + 1},${character + 1}): ${message}`;
-                } else {
-                    errorMsg = ts.flattenDiagnosticMessageText(e.messageText, "\n");
-                }
-                return [errorMsg, e.code];
-            });
-        }
+    // Diagnostics arrive already localised and flattened, and carry offsets rather than a file.
+    const diagnostics = [
+        ...program.getSyntacticDiagnostics(sourceFile.fileName),
+        ...program.getSemanticDiagnostics(sourceFile.fileName),
+    ];
+    let syntaxErrors: [errorMsg: string, errorCode: number][] = [];
+    const errors = diagnostics.filter(d =>
+        d.category === ts.DiagnosticCategory.Error && isCriticalDiagnostic(d.code, sourceFile));
+    if (errors.length > 0) {
+        syntaxErrors = errors.map(e => {
+            const {line, character} = sourceFile.getLineAndCharacterOfPosition(e.pos);
+            return [`(${line + 1},${character + 1}): ${e.text}`, e.code];
+        });
     }
     return syntaxErrors;
 }

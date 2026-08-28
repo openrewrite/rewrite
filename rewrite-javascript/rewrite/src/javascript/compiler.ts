@@ -13,10 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import ts from "typescript";
 
-// The one place the parser binds to a TypeScript release. Its kinds, node types and type guards are
-// spelled differently across releases, so the parser reads them from here and this module carries
-// whatever renaming a release needs.
+// The one place the parser binds to the compiler. TypeScript serves the syntax tree and the type
+// system from separate entry points and spells some names differently from the release before it,
+// so both are gathered here under the single `ts` namespace the parser reads.
 
-export default ts;
+export * from "typescript/unstable/ast";
+export * from "typescript/unstable/sync";
+// ModifierFlags comes from both entry points; the syntax one is what the parser reads.
+export {ModifierFlags} from "typescript/unstable/ast";
+
+export type {
+    MethodSignatureDeclaration as MethodSignature,
+    PropertySignatureDeclaration as PropertySignature,
+    SignatureDeclaration as SignatureDeclarationBase,
+} from "typescript/unstable/ast";
+
+import type {Declaration, DeclarationName} from "typescript/unstable/ast";
+
+// `Declaration` says only that a node declares something; the declarations that carry a name do so
+// on their own interfaces, and this is the shape of the ones the parser reads a name from.
+export type NamedDeclaration = Declaration & {readonly name?: DeclarationName};
+export {
+    isMethodSignatureDeclaration as isMethodSignature,
+    isParameterDeclaration as isParameter,
+    isPropertySignatureDeclaration as isPropertySignature,
+} from "typescript/unstable/ast";
+export type {Checker as TypeChecker} from "typescript/unstable/sync";
+
+import type {SourceFile} from "typescript/unstable/ast";
+
+/** Whether a source file is a module, which its export or import marks it as being. */
+export function isExternalModule(sourceFile: SourceFile): boolean {
+    return sourceFile.externalModuleIndicator !== undefined;
+}

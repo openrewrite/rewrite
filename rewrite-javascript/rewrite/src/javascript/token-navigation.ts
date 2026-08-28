@@ -13,28 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import ts from "./compiler";
 
 // Punctuation and keyword tokens are absent from node fields, and the LST needs their offsets to
-// place whitespace. The parser reaches them only through these five calls, keeping its dependency
-// on the TypeScript AST's token surface in one file.
+// place whitespace. The compiler leaves them out of the tree it sends, so they are scanned back out
+// of the source text; ts7/token-navigation.ts does that and this is the surface the parser reads.
 
-export function childrenOf(node: ts.Node, sourceFile?: ts.SourceFile): readonly ts.Node[] {
-    return node.getChildren(sourceFile);
-}
-
-export function childCountOf(node: ts.Node, sourceFile?: ts.SourceFile): number {
-    return node.getChildCount(sourceFile);
-}
-
-export function childAt(node: ts.Node, index: number, sourceFile?: ts.SourceFile): ts.Node {
-    return node.getChildAt(index, sourceFile);
-}
-
-export function firstTokenOf(node: ts.Node, sourceFile?: ts.SourceFile): ts.Node | undefined {
-    return node.getFirstToken(sourceFile);
-}
-
-export function lastTokenOf(node: ts.Node, sourceFile?: ts.SourceFile): ts.Node | undefined {
-    return node.getLastToken(sourceFile);
-}
+export {childAt, childCountOf, childrenOf, firstTokenOf, lastTokenOf} from "./ts7/token-navigation";

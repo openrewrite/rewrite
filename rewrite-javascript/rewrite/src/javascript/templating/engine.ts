@@ -26,7 +26,7 @@ import {maybeAutoFormat} from '../format';
 import {renameBindings} from './bindings';
 import {isExpression, isStatement} from '../parser-utils';
 import {randomId} from '../../uuid';
-import ts from "../compiler";
+import * as ts from "../compiler";
 import {DependencyWorkspace} from "../dependency-workspace";
 import {Parameter} from "./types";
 

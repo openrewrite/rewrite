@@ -23,8 +23,8 @@ import {
     type Node,
     type SourceFile,
     type TypeNode,
-} from "typescript7/unstable/ast";
-import type {Checker, Project, Signature, Symbol as Symbol7, Type} from "typescript7/unstable/sync";
+} from "typescript/unstable/ast";
+import type {Checker, Signature, Symbol as Symbol7, Type} from "typescript/unstable/sync";
 
 // The checker runs in the Go process and answers over IPC, which shapes three things the parser has
 // to account for: a type-position identifier resolves through its enclosing type node, a symbol's
@@ -56,16 +56,19 @@ function enclosingTypeNode(node: Node): TypeNode | undefined {
         : undefined;
 }
 
-/** A symbol's declarations, which cross the IPC boundary as handles into the project's tree. */
-export function declarationsOf(symbol: Symbol7, project: Project): Node[] {
+/**
+ * A symbol's declarations, which cross the IPC boundary as handles. Each resolves against the
+ * project that produced it, so callers need no project of their own.
+ */
+export function declarationsOf(symbol: Symbol7): Node[] {
     return symbol.declarations
-        .map(handle => handle.resolve(project))
+        .map(handle => handle.resolve())
         .filter((node): node is Node => node !== undefined);
 }
 
 /** A symbol's value declaration, resolved from its handle. */
-export function valueDeclarationOf(symbol: Symbol7, project: Project): Node | undefined {
-    return symbol.valueDeclaration?.resolve(project);
+export function valueDeclarationOf(symbol: Symbol7): Node | undefined {
+    return symbol.valueDeclaration?.resolve();
 }
 
 /** The dotted chain of symbol names from `symbol` up to the outermost symbol enclosing it. */
