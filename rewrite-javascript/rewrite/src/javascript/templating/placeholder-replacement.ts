@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, isTree} from '../..';
+import {Cursor, isTree, Markers} from '../..';
 import {J} from '../../java';
 import {JS} from '..';
 import {JavaScriptVisitor} from '../visitor';
@@ -179,6 +179,16 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
     private mergeElementPrefix(sourcePrefix: J.Space, templatePrefix: J.Space): J.Space {
         return sourcePrefix.whitespace.includes('\n') && !templatePrefix.whitespace.includes('\n') ?
             sourcePrefix : this.mergePrefix(sourcePrefix, templatePrefix);
+    }
+
+    /** As `mergePrefix`, for markers: everything the value was matched with, plus the kinds only the slot wrote. */
+    private mergeMarkers(sourceMarkers: Markers, templateMarkers: Markers): Markers {
+        const added = templateMarkers.markers.filter(
+            template => !sourceMarkers.markers.some(source => source.kind === template.kind));
+        return added.length === 0 ? sourceMarkers : {
+            ...sourceMarkers,
+            markers: [...sourceMarkers.markers, ...added]
+        };
     }
 
     /**
@@ -386,7 +396,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                 if (isTree(propertyValue)) {
                     const propValueAsJ = propertyValue as J;
                     return produce(propValueAsJ, draft => {
-                        draft.markers = placeholder.markers;
+                        draft.markers = this.mergeMarkers(propValueAsJ.markers, placeholder.markers);
                         draft.prefix = this.mergePrefix(propValueAsJ.prefix, placeholder.prefix);
                     });
                 }
@@ -421,7 +431,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             const matchedNode = this.values.get(name);
             if (matchedNode && !Array.isArray(matchedNode)) {
                 return produce(matchedNode, draft => {
-                    draft.markers = placeholder.markers;
+                    draft.markers = this.mergeMarkers(matchedNode.markers, placeholder.markers);
                     draft.prefix = this.mergePrefix(matchedNode.prefix, placeholder.prefix);
                 });
             }
@@ -438,7 +448,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             // Extract the element from the J.RightPadded wrapper
             const element = param.value.element as J;
             return produce(element, draft => {
-                draft.markers = placeholder.markers;
+                draft.markers = this.mergeMarkers(element.markers, placeholder.markers);
                 draft.prefix = this.mergePrefix(element.prefix, placeholder.prefix);
             });
         }
@@ -458,7 +468,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         if (isTree(param.value)) {
             // Return the AST node, preserving comments from the source
             return produce(param.value as J, draft => {
-                draft.markers = placeholder.markers;
+                draft.markers = this.mergeMarkers(param.value.markers, placeholder.markers);
                 draft.prefix = this.mergePrefix(param.value.prefix, placeholder.prefix);
             });
         }
