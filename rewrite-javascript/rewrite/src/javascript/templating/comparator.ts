@@ -85,6 +85,17 @@ class CaptureMapImpl implements CaptureMap {
     }
 }
 
+/** A capture found in a pattern, and the target node it binds to. */
+interface CaptureAt {
+    marker: CaptureMarker;
+    target: J;
+}
+
+/** Parentheses that `JavaScriptSemanticComparatorVisitor.unwrap()` sees through. */
+function isParenthesized(j: any): boolean {
+    return j?.kind === J.Kind.Parentheses || j?.kind === J.Kind.ControlParentheses;
+}
+
 /**
  * A comparator for pattern matching that is lenient about optional properties.
  * Allows patterns without type annotations to match actual code with type annotations.
@@ -112,33 +123,59 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         };
     }
 
+    /** The capture this pattern node stands for, paired with the target node it should bind to. */
+    protected captureAt(j: Tree, p: J): CaptureAt | undefined {
+        const marker = PlaceholderUtils.getCaptureMarker(j as J);
+        return marker ? {marker, target: p} : this.captureBehindParentheses(j, p);
+    }
+
+    /** The marker `attachCaptureMarkers` moved onto a parenthesized capture's `J.RightPadded`, which `unwrap()` skips past. */
+    private captureBehindParentheses(j: Tree, p: J): CaptureAt | undefined {
+        let pattern: any = j;
+        let target: any = p;
+        while (isParenthesized(pattern)) {
+            const padded = pattern.tree as J.RightPadded<J> | undefined;
+            if (!padded) {
+                return undefined;
+            }
+            target = isParenthesized(target) ? target.tree.element : target;
+            const marker = PlaceholderUtils.getCaptureMarker(padded);
+            if (marker) {
+                return {marker, target: target as J};
+            }
+            pattern = padded.element;
+        }
+        return undefined;
+    }
+
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
         // Check if the pattern node is a capture - this handles unwrapped captures
         // (Wrapped captures in J.RightPadded are handled by visitRightPadded override)
         // Note: targetCursor will be pushed by parent's visit() method after this check
-        const captureMarker = PlaceholderUtils.getCaptureMarker(j)!;
-        if (captureMarker) {
+        const capture = this.captureAt(j, p);
+        if (capture) {
+            const {marker: captureMarker, target} = capture;
 
             // Push targetCursor to position it at the captured node for constraint evaluation
             // Only create cursor if targetCursor was initialized (meaning user provided one)
             const savedTargetCursor = this.targetCursor;
             const cursorAtCapturedNode = this.targetCursor !== undefined
-                ? new Cursor(p, this.targetCursor)
-                : new Cursor(p);
+                ? new Cursor(target, this.targetCursor)
+                : new Cursor(target);
             this.targetCursor = cursorAtCapturedNode;
             try {
                 // Evaluate constraint with context (cursor + previous captures)
                 // Skip constraint for variadic captures - they're evaluated in matchSequence with the full array
                 if (captureMarker.constraint && !captureMarker.variadicOptions) {
                     const context = this.buildConstraintContext(cursorAtCapturedNode);
-                    if (!captureMarker.constraint(p, context)) {
+                    if (!captureMarker.constraint(target, context)) {
                         const captureName = captureMarker.captureName || 'unnamed';
-                        const targetKind = (p as any).kind || 'unknown';
+                        const targetKind = (target as any).kind || 'unknown';
                         return this.constraintFailed(captureName, targetKind) as R;
                     }
                 }
 
-                const success = this.matcher.handleCapture(captureMarker, p, undefined);
+                const success = this.matcher.handleCapture(captureMarker, target, undefined);
                 if (!success) {
                     const captureName = captureMarker.captureName || 'unnamed';
                     return this.captureConflict(captureName) as R;
@@ -896,26 +933,27 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     }
 
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
-        const captureMarker = PlaceholderUtils.getCaptureMarker(j)!;
-        if (captureMarker) {
+        const capture = this.captureAt(j, p);
+        if (capture) {
+            const {marker: captureMarker, target} = capture;
             const savedTargetCursor = this.targetCursor;
             const cursorAtCapturedNode = this.targetCursor !== undefined
-                ? new Cursor(p, this.targetCursor)
-                : new Cursor(p);
+                ? new Cursor(target, this.targetCursor)
+                : new Cursor(target);
             this.targetCursor = cursorAtCapturedNode;
             try {
                 if (captureMarker.constraint && !captureMarker.variadicOptions) {
                     this.debug.log('debug', 'constraint', `Evaluating constraint for capture: ${captureMarker.captureName}`);
-                    const constraintResult = captureMarker.constraint(p, this.buildConstraintContext(cursorAtCapturedNode));
+                    const constraintResult = captureMarker.constraint(target, this.buildConstraintContext(cursorAtCapturedNode));
                     if (!constraintResult) {
                         this.debug.log('info', 'constraint', `Constraint failed for capture: ${captureMarker.captureName}`);
-                        this.debug.setExplanation('constraint-failed', `Capture ${captureMarker.captureName} with valid constraint`, `Constraint failed for ${(p as any).kind}`, `Constraint evaluation returned false`);
+                        this.debug.setExplanation('constraint-failed', `Capture ${captureMarker.captureName} with valid constraint`, `Constraint failed for ${(target as any).kind}`, `Constraint evaluation returned false`);
                         return this.abort(j) as R;
                     }
                     this.debug.log('debug', 'constraint', `Constraint passed for capture: ${captureMarker.captureName}`);
                 }
 
-                const success = this.matcher.handleCapture(captureMarker, p, undefined);
+                const success = this.matcher.handleCapture(captureMarker, target, undefined);
                 if (!success) {
                     return this.abort(j) as R;
                 }
