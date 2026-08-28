@@ -1428,7 +1428,7 @@ export class JavaScriptTypeMapping {
             const objectType = type as ts.ObjectType;
             if (objectType.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface)) {
                 try {
-                    baseTypes = (this.checker as any).getBaseTypes?.(type as ts.InterfaceType);
+                    baseTypes = this.checker.getBaseTypes(type as ts.InterfaceType);
                 } catch (e) {
                     // getBaseTypes might fail for some types, fall back to declaration-based extraction
                 }
@@ -1443,7 +1443,7 @@ export class JavaScriptTypeMapping {
                     const declaredType = this.checker.getDeclaredTypeOfSymbol(classSymbol);
                     if (declaredType && declaredType !== type) {
                         try {
-                            baseTypes = (this.checker as any).getBaseTypes?.(declaredType as ts.InterfaceType);
+                            baseTypes = this.checker.getBaseTypes(declaredType as ts.InterfaceType);
                         } catch (e) {
                             // getBaseTypes might fail, fall back to declaration-based extraction
                         }
@@ -1454,7 +1454,7 @@ export class JavaScriptTypeMapping {
                     const instanceType = this.checker.getDeclaredTypeOfSymbol(classSymbol);
                     if (instanceType && instanceType !== type) {
                         try {
-                            baseTypes = (this.checker as any).getBaseTypes?.(instanceType as ts.InterfaceType);
+                            baseTypes = this.checker.getBaseTypes(instanceType as ts.InterfaceType);
                         } catch (e) {
                             // getBaseTypes might fail, fall back to declaration-based extraction
                         }
