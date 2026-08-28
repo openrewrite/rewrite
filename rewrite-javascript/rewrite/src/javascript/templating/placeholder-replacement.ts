@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor, isTree, Markers} from '../..';
-import {J} from '../../java';
+import {emptySpace, Expression, J, rightPadded} from '../../java';
 import {JS} from '..';
 import {JavaScriptVisitor} from '../visitor';
 import {create as produce} from 'mutative';
@@ -22,6 +22,15 @@ import {PlaceholderUtils} from './utils';
 import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
 import {enclosingTree, maybeParenthesize} from './precedence';
 import {Parameter} from './types';
+
+/**
+ * A name slot spells a name out, so an expression landing in one has no valid form to print;
+ * `computedForm` is the spelling that keys off a value instead.
+ */
+function nameSlotError(value: J, slot: string, computedForm: string): Error {
+    return new Error(`A ${value.kind} cannot be a ${slot}: write \`${computedForm}\` to key off the ` +
+        `value of an expression.`);
+}
 
 /**
  * Visitor that replaces placeholder nodes with actual parameter values.
@@ -68,6 +77,63 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         }
 
         return bindingElement;
+    }
+
+    /**
+     * A placeholder in callee position sits in `J.MethodInvocation.name`, a slot only an identifier fills.
+     * `JS.FunctionCall` is the shape that takes an arbitrary callee, so any other value becomes one.
+     */
+    override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+        const slotMarkers = method.name.markers;
+        const visited = await super.visitMethodInvocation(method, p);
+        if (visited?.kind !== J.Kind.MethodInvocation) {
+            return visited;
+        }
+
+        const invocation = visited as J.MethodInvocation;
+        const callee = invocation.name as J;
+        if (callee.kind === J.Kind.Identifier) {
+            return invocation;
+        }
+        if (invocation.select) {
+            throw nameSlotError(callee, 'member name', '${a}[${b}]()');
+        }
+
+        const callOf = (fn: J): JS.FunctionCall => ({
+            kind: JS.Kind.FunctionCall,
+            id: invocation.id,
+            prefix: invocation.prefix,
+            markers: invocation.markers,
+            function: rightPadded(fn as Expression, emptySpace),
+            typeParameters: invocation.typeParameters,
+            arguments: invocation.arguments,
+            methodType: invocation.methodType
+        });
+        const call = callOf(callee);
+        return callOf(maybeParenthesize(call, callee.id, callee, slotMarkers));
+    }
+
+    override async visitFieldAccess(fieldAccess: J.FieldAccess, p: any): Promise<J | undefined> {
+        const visited = await super.visitFieldAccess(fieldAccess, p);
+        if (visited?.kind === J.Kind.FieldAccess) {
+            const name = (visited as J.FieldAccess).name.element as J;
+            if (name.kind !== J.Kind.Identifier) {
+                throw nameSlotError(name, 'member name', '${a}[${b}]');
+            }
+        }
+        return visited;
+    }
+
+    override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, p: any): Promise<J | undefined> {
+        const visited = await super.visitPropertyAssignment(propertyAssignment, p);
+        if (visited?.kind === JS.Kind.PropertyAssignment) {
+            const name = (visited as JS.PropertyAssignment).name.element as J;
+            if (name.kind !== J.Kind.Identifier && name.kind !== J.Kind.Literal &&
+                name.kind !== JS.Kind.ComputedPropertyName) {
+                throw nameSlotError(name, 'property name', '{[${k}]: v}');
+            }
+        }
+        return visited;
     }
 
     /**

@@ -149,6 +149,26 @@ describe('template precedence', () => {
                 `));
         });
 
+        test('as the callee of a call, which only `JS.FunctionCall` can hold', () => {
+            const x = capture();
+            spec.recipe = onCall(rewrite(() => ({
+                before: pattern`register(${x})`,
+                after: template`${x}()`
+            })));
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `
+                    register(() => 1);
+                    register(handlers.init);
+                    register(initAuth);
+                `,
+                `
+                    (() => 1)();
+                    handlers.init();
+                    initAuth();
+                `));
+        });
+
         test('as the condition of a ternary', () => {
             const c = capture(), t = capture(), f = capture();
             spec.recipe = onCall(rewrite(() => ({
@@ -462,6 +482,18 @@ describe('template precedence', () => {
                         });
                     }
                 `));
+        });
+
+        test('a function expression as a callee reads as a declaration', () => {
+            const x = capture();
+            spec.recipe = onCall(rewrite(() => ({
+                before: pattern`register(${x})`,
+                after: template`${x}()`
+            })));
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `register(function () { return 1; });`,
+                `(function () {\n    return 1;\n})();`));
         });
 
         test('a class heritage clause takes a left-hand-side expression', () => {

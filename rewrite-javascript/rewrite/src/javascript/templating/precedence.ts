@@ -71,7 +71,7 @@ interface SlotConstraints {
     readonly noOptionalChain?: boolean;
     /** The slot may not start with `{`, which would be read as a block. */
     readonly noLeadingObjectLiteral?: boolean;
-    /** The slot may not start with `{`, `function` or `class`, as a statement may not. */
+    /** The slot may not start with `{`, `function` or `class`, which would open a block or a declaration. */
     readonly noLeadingDeclarationToken?: boolean;
     /** The slot is followed by `.`, so a bare integer literal would lex as a decimal point. */
     readonly followedByDot?: boolean;
@@ -239,7 +239,8 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
         case JS.Kind.FunctionCall: {
             const call = parent as JS.FunctionCall;
             if (call.function?.element?.id === childId) {
-                return {precedence: Precedence.Call};
+                // Parentheses on the callee keep the call legal in every slot the call itself can sit in
+                return {precedence: Precedence.Call, noLeadingDeclarationToken: true};
             }
             return isContainerElement(call.arguments, childId) ? {precedence: Precedence.Assignment} : undefined;
         }

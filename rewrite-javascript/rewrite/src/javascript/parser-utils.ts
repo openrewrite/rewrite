@@ -120,6 +120,7 @@ const is_expressions: string[] = [
     JS.Kind.Delete,
     JS.Kind.ExportSpecifier,
     JS.Kind.ExpressionWithTypeArguments,
+    JS.Kind.FunctionCall,
     JS.Kind.FunctionType,
     JS.Kind.ImportType,
     JS.Kind.IndexedAccessType,
