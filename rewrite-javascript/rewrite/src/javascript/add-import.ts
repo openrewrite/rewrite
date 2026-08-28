@@ -1,11 +1,12 @@
 import {JavaScriptVisitor} from "./visitor";
-import {ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, Type} from "../java";
+import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, Type} from "../java";
 import {JS, JSX} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
 import {getStyle, PrettierStyle, SpacesStyle, StyleKind} from "./style";
-import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, namesDeclaredIn, scopeOf} from "./scope";
+import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf} from "./scope";
 import {create as produce, Draft} from "mutative";
+import {TypeVisitor} from "../java/type-visitor";
 
 export type QuoteChar = "'" | '"';
 
@@ -333,12 +334,12 @@ function importBindings(jsImport: JS.Import): ModuleScopeBinding[] {
 }
 
 /**
- * Names in scope, plus those pending `AddImport`s on the `afterVisit` queue have claimed. A queued
+ * `names`, plus those pending `AddImport`s on the `afterVisit` queue have claimed. A queued
  * `RemoveImport` does not free one: it removes only what the file leaves unused, and binding a name
  * it keeps is an error, where an unnecessary suffix merely reads oddly.
  */
-function takenNames(inScope: ReadonlySet<string>, visitor: JavaScriptVisitor<any>): Set<string> {
-    const taken = new Set<string>(inScope);
+export function takenNames(names: ReadonlySet<string>, visitor: JavaScriptVisitor<any>): Set<string> {
+    const taken = new Set<string>(names);
 
     for (const v of visitor.afterVisit || []) {
         if (v instanceof AddImport && v.bindingName) {
@@ -347,6 +348,12 @@ function takenNames(inScope: ReadonlySet<string>, visitor: JavaScriptVisitor<any
     }
 
     return taken;
+}
+
+/** As {@link takenNames}, for a caller asking about one name rather than probing repeatedly. */
+export function nameTaken(name: string, names: ReadonlySet<string>, visitor: JavaScriptVisitor<any>): boolean {
+    return names.has(name) ||
+        (visitor.afterVisit || []).some(v => v instanceof AddImport && v.bindingName === name);
 }
 
 /**
@@ -1643,6 +1650,9 @@ function isOnlyMember(jsImport: JS.Import): boolean {
 export interface ExistingImportBinding {
     localName: string;
     onlyMemberOfStatement: boolean;
+
+    /** Whether the source states this local name — `import {a as b}` — or takes it from the member. */
+    aliased: boolean;
 }
 
 /**
@@ -1661,16 +1671,21 @@ export function existingImportBinding(
         }
         const localName = importBinds(element as JS.Import, module, member);
         if (localName !== undefined) {
-            return {localName, onlyMemberOfStatement: isOnlyMember(element as JS.Import)};
+            return {
+                localName,
+                onlyMemberOfStatement: isOnlyMember(element as JS.Import),
+                aliased: localName !== memberName(member)
+            };
         }
     }
     return undefined;
 }
 
 /**
- * Binds `member` under the name `local` already carries, so the file's references to it still
- * resolve. `local` itself becomes the alias, keeping the type attribution it holds, and the alias
- * takes its prefix: that whitespace separates the specifier from a `type` keyword before it.
+ * The `member as local` specifier, for an import binding `member` under `local` or an export
+ * publishing `local`'s binding under that name. `local` itself becomes the alias, keeping the type
+ * attribution it holds, and the alias takes its prefix: that whitespace separates the specifier
+ * from a `type` keyword before it.
  */
 function aliasing(local: J.Identifier, member: string): JS.Alias {
     const propertyName: J.Identifier = {
@@ -1756,10 +1771,10 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
 }
 
 /**
- * Moves the binding `from` names to `to`, keeping the local name it already had. In place when
- * the statement that carries it binds nothing else — module and member specifier rewritten there
- * directly; otherwise the old specifier drops and {@link bindImport} queues the replacement,
- * aliased to the preserved name.
+ * Moves the binding `from` names to `to`, binding it under `boundName`. In place when the
+ * statement that carries it binds nothing else — module and member specifier rewritten there
+ * directly; otherwise the old specifier drops and {@link bindImport} queues the replacement.
+ * A `boundName` of its own renames the binding, and the file's references to it follow.
  *
  * Not built on `RemoveImport`/`maybeUnbind`: those only drop a binding once nothing references
  * it, but a rebind moves one that is still in use — removal here has to be unconditional.
@@ -1768,13 +1783,21 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     constructor(
         readonly from: {module: string; member?: string},
         readonly to: {module: string; member?: string},
-        readonly localName: string
+        readonly localName: string,
+        readonly boundName: string
     ) {
         super();
     }
 
     private transformedInPlace = false;
     private typeOnly = false;
+    private readonly movedTypes = new MovedTypes(this.from, this.to);
+    /** Identifiers settled as references to the binding, so a parent need not settle it again. */
+    private readonly references = new Set<string>();
+
+    private get renaming(): boolean {
+        return this.boundName !== this.localName;
+    }
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
         const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
@@ -1782,7 +1805,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             bindImport(this, {
                 module: this.to.module,
                 member: this.to.member,
-                alias: this.localName,
+                alias: this.boundName,
                 typeOnly: this.typeOnly,
                 onlyIfReferenced: false
             });
@@ -1794,7 +1817,9 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         const imp = await super.visitImportDeclaration(jsImport, p) as JS.Import;
 
         const key = memberName(this.from.member);
-        if (importBinds(imp, this.from.module, this.from.member) === undefined) {
+        // One call moves one binding, and no two imports bind the same local name, so the name
+        // read from the matched statement is what picks it back out of the file.
+        if (importBinds(imp, this.from.module, this.from.member) !== this.localName) {
             return imp;
         }
         // A moved named specifier's own inline `type` marks it type-only even where the clause
@@ -1814,28 +1839,220 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             const quoteChar = originalSource.startsWith("'") ? "'" : '"';
             literal.valueSource = `${quoteChar}${this.to.module}${quoteChar}`;
 
-            // A named specifier's local name has to stay put in the source, since it is what the
-            // rest of the file already reads; default and namespace imports carry that name on
-            // the clause itself, which needs no edit for a module-only move.
-            const toKey = memberName(this.to.member);
-            if (key !== undefined && key !== '*' && toKey !== undefined && toKey !== key) {
-                const importClause = draft.importClause;
-                if (importClause?.namedBindings?.kind === JS.Kind.NamedImports) {
-                    const namedImports = importClause.namedBindings as Draft<JS.NamedImports>;
-                    for (const elem of namedImports.elements.elements) {
-                        const specifier = elem.element;
-                        if (specifier.specifier.kind === J.Kind.Identifier && specifier.specifier.simpleName === key) {
-                            specifier.specifier = aliasing(specifier.specifier as Draft<J.Identifier>, toKey) as Draft<JS.Alias>;
-                        } else if (specifier.specifier.kind === JS.Kind.Alias) {
-                            const aliasNode = specifier.specifier as Draft<JS.Alias>;
-                            const propertyName = aliasNode.propertyName.element;
-                            if (propertyName.kind === J.Kind.Identifier && propertyName.simpleName === key) {
-                                propertyName.simpleName = toKey;
-                            }
-                        }
-                    }
+            // A default or namespace import carries its local name on the clause itself; a named
+            // one states the member alongside it, in the specifier.
+            if (key === undefined || key === '*') {
+                if (this.boundName !== this.localName) {
+                    renameClauseBinding(draft.importClause, key, this.boundName);
                 }
+                return;
             }
+            rewriteNamedSpecifier(draft.importClause, key, memberName(this.to.member) ?? key, this.boundName);
         });
+    }
+
+    override async visitIdentifier(identifier: J.Identifier, p: P): Promise<J | undefined> {
+        if (!this.referencesBinding(identifier)) {
+            return identifier;
+        }
+        this.references.add(identifier.id);
+        // The name follows the binding, and so does what the name is attributed to; an aliased
+        // binding keeps its name and still resolves somewhere new.
+        const type = await this.movedTypes.visit(identifier.type, undefined);
+        const fieldType = await this.movedTypes.visit(identifier.fieldType, undefined) as Type.Variable | undefined;
+        return !this.renaming && type === identifier.type && fieldType === identifier.fieldType
+            ? identifier
+            : {...identifier, simpleName: this.boundName, type, fieldType} as J.Identifier;
+    }
+
+    override async visitMethodInvocation(method: J.MethodInvocation, p: P): Promise<J | undefined> {
+        const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+        // A rewrite keeps the identifier's id, so the name `visitIdentifier` settled is the one
+        // this call carries the method type of.
+        if (!this.references.has(m.name.id)) {
+            return m;
+        }
+        const methodType = await this.movedTypes.visit(m.methodType, undefined) as Type.Method | undefined;
+        return methodType === m.methodType ? m : {...m, methodType} as J.MethodInvocation;
+    }
+
+    /**
+     * A decorator and the other type-name positions reach the tree through this hook, which the
+     * base visitor holds closed; a reference in one of them is a reference like any other.
+     */
+    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: P): Promise<N> {
+        return await this.visit(nameTree, p) as N;
+    }
+
+    /**
+     * An export specifier's own name is the module's public surface, which its consumers read and
+     * the rename leaves alone. See CLAUDE.md: Which name a rebind binds.
+     */
+    override async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, p: P): Promise<J | undefined> {
+        if (!this.renaming) {
+            return super.visitExportSpecifier(exportSpecifier, p);
+        }
+        // `export {a} from "m"` names `m`'s member rather than anything this file binds.
+        const from = this.cursor.firstEnclosing(
+            (v): v is JS.ExportDeclaration => (v as J | undefined)?.kind === JS.Kind.ExportDeclaration);
+        if (from?.moduleSpecifier !== undefined) {
+            return exportSpecifier;
+        }
+        const specifier = exportSpecifier.specifier;
+        if (specifier.kind === J.Kind.Identifier && (specifier as J.Identifier).simpleName === this.localName) {
+            return {...exportSpecifier, specifier: aliasing(specifier as J.Identifier, this.boundName)} as JS.ExportSpecifier;
+        }
+        if (specifier.kind === JS.Kind.Alias) {
+            const alias = specifier as JS.Alias;
+            const propertyName = alias.propertyName.element;
+            return propertyName.kind === J.Kind.Identifier && (propertyName as J.Identifier).simpleName === this.localName
+                ? {
+                    ...exportSpecifier,
+                    specifier: {
+                        ...alias,
+                        propertyName: {...alias.propertyName, element: {...propertyName, simpleName: this.boundName}}
+                    }
+                } as JS.ExportSpecifier
+                : exportSpecifier;
+        }
+        return super.visitExportSpecifier(exportSpecifier, p);
+    }
+
+    /**
+     * Whether the identifier at the cursor stands for the moved binding: the right name, in a
+     * position that references rather than declares, reaching the module scope that binds it.
+     */
+    private referencesBinding(identifier: J.Identifier): boolean {
+        return identifier.simpleName === this.localName &&
+            // The specifier binding the name is the one edit that is not a reference to it.
+            !this.cursor.firstEnclosing((v): v is JS.Import => (v as J | undefined)?.kind === JS.Kind.Import) &&
+            isValueReference(this.cursor, identifier) &&
+            scopeOf(this.cursor).declaringScope(this.localName)?.kind === JS.Kind.CompilationUnit;
+    }
+
+    /** A shorthand property's name slot is also the reference to the binding. */
+    override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, p: P): Promise<J | undefined> {
+        const name = propertyAssignment.name.element;
+        if (this.renaming && propertyAssignment.initializer === undefined &&
+            name.kind === J.Kind.Identifier && (name as J.Identifier).simpleName === this.localName &&
+            scopeOf(this.cursor).declaringScope(this.localName)?.kind === JS.Kind.CompilationUnit) {
+            // The key names a property rather than the binding, so it carries no attribution,
+            // the same way `aliasing` builds a property name that stands for nothing.
+            return {
+                ...propertyAssignment,
+                name: {...propertyAssignment.name, element: {...name, type: undefined, fieldType: undefined}},
+                assigmentToken: JS.PropertyAssignment.Token.Colon,
+                initializer: {...(name as J.Identifier), prefix: singleSpace, simpleName: this.boundName}
+            } as JS.PropertyAssignment;
+        }
+        return super.visitPropertyAssignment(propertyAssignment, p);
+    }
+}
+
+/**
+ * Rewrites the attribution a move invalidates, onto the module and member it moved to. Applied
+ * only at a reference to the moved binding: a module's type is shared with the siblings imported
+ * beside it, which stay where they are.
+ */
+class MovedTypes extends TypeVisitor<undefined> {
+    private readonly onPath = new Set<Type>();
+    private readonly answered = new Map<Type, Type | undefined>();
+    private readonly renamed: ReadonlyMap<string, string>;
+
+    constructor(from: {module: string; member?: string}, to: {module: string; member?: string}) {
+        super();
+        // Where no member is named the two keys coincide, and both name the module.
+        this.renamed = new Map([[from.module, to.module], [qualifiedName(from), qualifiedName(to)]]);
+    }
+
+    /**
+     * A type reached while it is still being visited is a cycle — a class holds a method whose
+     * declaring type is that class — and answers with itself, which is what ends the walk. Every
+     * reference to a binding shares one type, so a completed walk is remembered for the next.
+     */
+    override async visit<T extends Type>(type: T | undefined, p: undefined): Promise<T | undefined> {
+        if (type === undefined || this.onPath.has(type)) {
+            return type;
+        }
+        if (this.answered.has(type)) {
+            return this.answered.get(type) as T | undefined;
+        }
+        this.onPath.add(type);
+        try {
+            const answer = await super.visit(type, p);
+            // Only a walk that met no cycle stands for the type on its own; one cut short by
+            // `onPath` answered for the path it was on.
+            if (this.onPath.size === 1) {
+                this.answered.set(type, answer);
+            }
+            return answer;
+        } finally {
+            this.onPath.delete(type);
+        }
+    }
+
+    protected override async visitClass(aClass: Type.Class, p: undefined): Promise<Type | undefined> {
+        const visited = await super.visitClass(aClass, p) as Type.Class;
+        const moved = this.renamed.get(visited.fullyQualifiedName);
+        return moved === undefined || moved === visited.fullyQualifiedName
+            ? visited
+            : {...visited, fullyQualifiedName: moved} as Type.Class;
+    }
+}
+
+/** A member's qualified name, or the module's own where no member is named. */
+function qualifiedName(binding: {module: string; member?: string}): string {
+    const key = memberName(binding.member);
+    return key === undefined || key === '*' ? binding.module : `${binding.module}.${key}`;
+}
+
+/** Renames the identifier a default (`key` undefined) or namespace clause binds its module under. */
+function renameClauseBinding(
+    importClause: Draft<JS.ImportClause> | undefined,
+    key: string | undefined,
+    boundName: string
+): void {
+    const bound = key === undefined
+        ? importClause?.name?.element
+        : (importClause?.namedBindings as Draft<JS.Alias> | undefined)?.alias;
+    if (bound?.kind === J.Kind.Identifier) {
+        (bound as Draft<J.Identifier>).simpleName = boundName;
+    }
+}
+
+/**
+ * Rewrites the specifier importing `key` to import `member` under `boundName` — a bare `{member}`
+ * where the two agree, since an alias saying the same thing is noise the source never had.
+ */
+function rewriteNamedSpecifier(
+    importClause: Draft<JS.ImportClause> | undefined,
+    key: string,
+    member: string,
+    boundName: string
+): void {
+    if (importClause?.namedBindings?.kind !== JS.Kind.NamedImports) {
+        return;
+    }
+    for (const elem of (importClause.namedBindings as Draft<JS.NamedImports>).elements.elements) {
+        const specifier = elem.element;
+        const node = specifier.specifier;
+        if (!namedSpecifierImports(node as JS.ImportSpecifier["specifier"], key)) {
+            continue;
+        }
+        const alias = node.kind === JS.Kind.Alias ? node as Draft<JS.Alias> : undefined;
+        const local = (alias?.alias ?? node) as Draft<J.Identifier>;
+        if (local.kind !== J.Kind.Identifier) {
+            continue;
+        }
+        if (boundName === member) {
+            // An alias node holds the specifier's leading whitespace, so the bare identifier
+            // standing in for it takes that prefix.
+            specifier.specifier = {...local, prefix: (alias ?? local).prefix, simpleName: member};
+        } else if (alias) {
+            (alias.propertyName.element as Draft<J.Identifier>).simpleName = member;
+            local.simpleName = boundName;
+        } else {
+            specifier.specifier = aliasing({...local, simpleName: boundName}, member) as Draft<JS.Alias>;
+        }
     }
 }

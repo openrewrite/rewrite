@@ -371,6 +371,40 @@ describe("change-import", () => {
             }, { unsafeCleanup: true });
         });
 
+        test("renames an unaliased member and the references that resolve to it", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "primeng/sidebar",
+                oldMember: "SidebarModule",
+                newModule: "primeng/drawer",
+                newMember: "DrawerModule"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                            import { SidebarModule } from 'primeng/sidebar';
+
+                            const m = SidebarModule;
+                            `,
+                            `
+                            import { DrawerModule } from 'primeng/drawer';
+
+                            const m = DrawerModule;
+                            `
+                        ),
+                        packageJson(`{
+                            "name": "test",
+                            "dependencies": {}
+                        }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
         test("renames the member but keeps the local name", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({
@@ -413,13 +447,14 @@ describe("change-import", () => {
             }, { unsafeCleanup: true });
         });
 
-        test("keeps a type-only specifier's type keyword separate", async () => {
+        test("a pinned alias keeps a type-only specifier's type keyword separate", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({
                 oldModule: "lodash",
                 oldMember: "extend",
                 newModule: "lodash",
-                newMember: "assign"
+                newMember: "assign",
+                newAlias: "extend"
             });
 
             await withDir(async (repo) => {
@@ -449,7 +484,7 @@ describe("change-import", () => {
             }, { unsafeCleanup: true });
         });
 
-        test("keeps the local name when moving a member to another module", async () => {
+        test("moving a member to another module renames it too, leaving its siblings behind", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({
                 oldModule: "lodash",
@@ -471,9 +506,9 @@ describe("change-import", () => {
                             `,
                             `
                             import { flatten } from 'lodash';
-                            import { assign as extend } from 'lodash-es';
+                            import { assign } from 'lodash-es';
 
-                            extend({}, {});
+                            assign({}, {});
                             flatten([]);
                             `
                         ),

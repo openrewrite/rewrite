@@ -55,6 +55,26 @@ export function namesDeclaredIn(cu: JS.CompilationUnit): ReadonlySet<string> {
     return namesDeclaredWithin(cu.statements, cu);
 }
 
+/**
+ * Every name the file spells, declared or not — what a name has to be absent from to be free. An
+ * ambient global is spelled and declared nowhere, and binding over one would capture its uses.
+ */
+export function namesUsedIn(cu: JS.CompilationUnit): ReadonlySet<string> {
+    const cached = used.get(cu);
+    if (cached) {
+        return cached;
+    }
+    const names = new Set<string>();
+    walk(cu.statements, node => {
+        if (node.kind === J.Kind.Identifier) {
+            names.add((node as J.Identifier).simpleName);
+        }
+        return true;
+    });
+    used.set(cu, names);
+    return names;
+}
+
 /** As {@link namesDeclaredIn}, over one subtree, for a binding shared across only that much of a file. */
 export function namesDeclaredWithin(node: unknown, cacheKey: object = node as object): ReadonlySet<string> {
     const cached = declared.get(cacheKey);
@@ -291,6 +311,7 @@ const blockScoped = new Set(['let', 'const', 'using']);
 // each of the call sites it encloses.
 const hoisted = new WeakMap<object, string[]>();
 const declared = new WeakMap<object, ReadonlySet<string>>();
+const used = new WeakMap<object, ReadonlySet<string>>();
 const frames = new WeakMap<object, string[]>();
 
 /**
@@ -399,4 +420,35 @@ export function declarationsOf(statement: J | undefined): J.VariableDeclarations
             .filter((v): v is J.VariableDeclarations => v?.kind === J.Kind.VariableDeclarations);
     }
     return [];
+}
+
+/**
+ * Whether the identifier stands for a value binding, which is what tells a rename which
+ * occurrences to follow. A name its parent introduces does not — a property, a method, a
+ * declaration — and neither does one drawn from a namespace of its own: a statement label, whether
+ * declaring (`x:`) or referencing (`break x`), and a JSX attribute's prop.
+ */
+export function isValueReference(cursor: Cursor, identifier: J.Identifier): boolean {
+    let c: Cursor | undefined = cursor.parent;
+    while (c && isPadding(c.value)) {
+        c = c.parent;
+    }
+    const parent = c?.value as
+        { kind?: string; name?: unknown; key?: unknown; label?: unknown; select?: unknown } | undefined;
+
+    // A call names a member of whatever it selects from. With nothing selected there is no member,
+    // and its `name` is a reference to the function being called.
+    if (parent?.kind === J.Kind.MethodInvocation && !parent.select) {
+        return true;
+    }
+
+    // A JSX attribute keeps its prop name on `key`; the three label-bearing nodes keep theirs on
+    // `label`. Every other kind that names rather than references keeps it on `name`.
+    const named = parent?.kind === JS.Kind.JsxAttribute ? parent.key : (parent?.name ?? parent?.label);
+    return named !== identifier && (named as { element?: unknown } | undefined)?.element !== identifier;
+}
+
+function isPadding(value: unknown): boolean {
+    const kind = (value as { kind?: string } | undefined)?.kind;
+    return kind === J.Kind.RightPadded || kind === J.Kind.LeftPadded || kind === J.Kind.Container;
 }
