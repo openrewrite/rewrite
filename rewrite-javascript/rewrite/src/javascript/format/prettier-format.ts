@@ -592,8 +592,9 @@ export async function applyPrettierFormatting<R extends J, P>(
         prettierVersion: prettierStyle.prettierVersion,
     };
 
+    const wholeFile = t.kind === JS.Kind.CompilationUnit;
     try {
-        if (t.kind === JS.Kind.CompilationUnit) {
+        if (wholeFile) {
             // Format and reconcile the entire compilation unit
             const formatted = await prettierFormat(t as unknown as JS.CompilationUnit, prettierOpts, stopAfter as J | undefined);
             return formatted as unknown as R;
@@ -602,7 +603,9 @@ export async function applyPrettierFormatting<R extends J, P>(
         // Pruning and reconciling a subtree both go by where it sits in its file
         return cursor && await prettierFormatSubtree(t, cursor, prettierOpts, stopAfter as J | undefined) as R | undefined;
     } catch (e) {
-        console.warn('Prettier formatting failed, leaving the tree to the built-in visitors:', e);
-        return undefined;
+        console.warn('Prettier formatting failed:', e);
+        // The built-in visitors lay out every line they are given, so a whole file — the author's
+        // layout rather than a recipe's — keeps the one it came with; a subtree is handed on.
+        return wholeFile ? t : undefined;
     }
 }
