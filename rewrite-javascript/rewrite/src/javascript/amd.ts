@@ -481,6 +481,27 @@ export function withoutDependencyAt(
     return withParts(call, block, dependencies, factory);
 }
 
+/**
+ * Swaps the module the dependency at `index` names, leaving its parameter and every other
+ * entry's position untouched — simpler than a removal and a fresh append, which would shift
+ * every dependency after it and re-litigate the parameter pairing this module exists to protect.
+ */
+export function withDependencyModuleAt(
+    call: J.MethodInvocation,
+    block: AmdBlock,
+    index: number,
+    module: string
+): J.MethodInvocation {
+    const quote = quoteOf(block);
+    const elements = [...elementsOf(block)];
+    const entry = elements[index];
+    const literal = entry.element as J.Literal;
+    const updated: J.Literal = {...literal, value: module, valueSource: `${quote}${module}${quote}`};
+    elements[index] = {...entry, element: updated};
+    const dependencies = withElements(block.dependencies, elements);
+    return withParts(call, block, dependencies, block.factory);
+}
+
 function withParts(
     call: J.MethodInvocation,
     block: AmdBlock,
@@ -718,6 +739,49 @@ export class AddAmdDependency<P> extends JavaScriptVisitor<P> {
                 `so '${this.module}' could not be declared for '${this.binding}', which was reported bound`);
         }
         return dependency;
+    }
+}
+
+/**
+ * Applies a `maybeRebind` call's decision on the AMD lane: swaps the dependency's module in
+ * place, found by the block's tree id and the module it named when the caller asked.
+ */
+export class RebindAmdDependency<P> extends JavaScriptVisitor<P> {
+    constructor(
+        readonly blockId: UUID,
+        readonly fromModule: string,
+        readonly toModule: string,
+        readonly callees: readonly string[]
+    ) {
+        super();
+    }
+
+    private applied = false;
+
+    override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
+        const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
+        if (!this.applied) {
+            throw new Error(`No AMD block ${this.blockId} to rebind '${this.fromModule}' to '${this.toModule}' on`);
+        }
+        return visited;
+    }
+
+    override async visitMethodInvocation(m: J.MethodInvocation, p: P): Promise<J | undefined> {
+        const visited = await super.visitMethodInvocation(m, p) as J.MethodInvocation;
+        if (visited.id !== this.blockId) {
+            return visited;
+        }
+        const block = amdBlockOf(visited, this.callees);
+        if (block === undefined) {
+            return visited;
+        }
+        this.applied = true;
+        const index = dependencyNames(block).indexOf(this.fromModule);
+        if (index < 0) {
+            throw new Error(
+                `AMD block ${this.blockId} no longer has dependency '${this.fromModule}' to rebind to '${this.toModule}'`);
+        }
+        return withDependencyModuleAt(visited, block, index, this.toModule);
     }
 }
 

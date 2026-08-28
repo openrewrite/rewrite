@@ -1,7 +1,7 @@
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {
     JavaScriptVisitor, JS, javascript, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
-    maybeAddImport, maybeUnbind, maybeRemoveImport, removeNewlyUnusedAmdBindings
+    maybeAddImport, maybeUnbind, maybeRebind, maybeRemoveImport, removeNewlyUnusedAmdBindings
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
@@ -625,6 +625,77 @@ describe("maybeBind", () => {
         const viaBind = await bindWith(v => maybeBind(v, {module: "fs", member: "readFile", onlyIfReferenced: false}));
         expect(viaAddImport).toBe("readFile");
         expect(viaBind).toBe("readFile");
+    });
+});
+
+describe("maybeRebind", () => {
+    test("an ESM member move keeps the local name", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeRebind(this, {
+                    from: {module: "lodash", member: "extend"},
+                    to: {module: "lodash", member: "assign"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import { extend } from "lodash";\n\nextend({}, {});`,
+            `import { assign as extend } from "lodash";\n\nextend({}, {});`
+        ));
+        expect(bound.name).toBe("extend");
+    });
+
+    test("an AMD dependency swap keeps the parameter and its index", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName !== "target") {
+                    return super.visitMethodInvocation(m, p);
+                }
+                bound.name = maybeRebind(this, {from: {module: "a/Old"}, to: {module: "a/New"}});
+                return m;
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B", "a/Old", "a/C"], function (B, Old, C) { target(); });`,
+            `sap.ui.define(["a/B", "a/New", "a/C"], function (B, Old, C) { target(); });`
+        ));
+        expect(bound.name).toBe("Old");
+    });
+
+    test("a rebind of a module nothing binds returns undefined and changes nothing", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeRebind(this, {from: {module: "nope"}, to: {module: "also-nope"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(`const x = 1;`));
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("a member rebind refuses on AMD, since a factory parameter cannot bind one", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName !== "target") {
+                    return super.visitMethodInvocation(m, p);
+                }
+                bound.name = maybeRebind(this, {from: {module: "a/Old", member: "x"}, to: {module: "a/New"}});
+                return m;
+            }
+        });
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/Old"], function (Old) { target(); });`
+        ));
+        expect(bound.name).toBeUndefined();
     });
 });
 

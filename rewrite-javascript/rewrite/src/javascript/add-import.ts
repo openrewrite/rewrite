@@ -1,11 +1,12 @@
 import {JavaScriptVisitor} from "./visitor";
-import {emptySpace, J, rightPadded, singleSpace, space, Statement, Type} from "../java";
+import {emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, Type} from "../java";
 import {JS, JSX} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
 import {getStyle, PrettierStyle, SpacesStyle, StyleKind} from "./style";
 import {Cursor} from "../tree";
 import {bindingNames, namesDeclaredIn} from "./scope";
+import {create as produce, Draft} from "mutative";
 
 export type QuoteChar = "'" | '"';
 
@@ -1573,4 +1574,221 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
 
 
+}
+
+/**
+ * The local name `jsImport` binds `member` of `module` to, or `undefined` where it binds
+ * something else. `'default'` and an absent `member` both mean the default import, matching
+ * {@link memberName}.
+ */
+function importBinds(jsImport: JS.Import, module: string, member: string | undefined): string | undefined {
+    const specifier = jsImport.moduleSpecifier?.element;
+    if (specifier?.kind !== J.Kind.Literal || (specifier as J.Literal).value !== module) {
+        return undefined;
+    }
+    const importClause = jsImport.importClause;
+    if (!importClause) {
+        return undefined;
+    }
+    const key = memberName(member);
+    if (key === undefined) {
+        const nameElem = importClause.name?.element;
+        return nameElem && isIdentifier(nameElem) ? nameElem.simpleName : undefined;
+    }
+    if (key === '*') {
+        const namedBindings = importClause.namedBindings;
+        return namedBindings?.kind === JS.Kind.Alias && isIdentifier((namedBindings as JS.Alias).alias)
+            ? ((namedBindings as JS.Alias).alias as J.Identifier).simpleName
+            : undefined;
+    }
+    const namedBindings = importClause.namedBindings;
+    if (namedBindings?.kind !== JS.Kind.NamedImports) {
+        return undefined;
+    }
+    for (const elem of (namedBindings as JS.NamedImports).elements.elements) {
+        const specifierNode = elem.element.specifier;
+        if (isIdentifier(specifierNode) && specifierNode.simpleName === key) {
+            return specifierNode.simpleName;
+        }
+        if (specifierNode.kind === JS.Kind.Alias) {
+            const alias = specifierNode as JS.Alias;
+            const propertyName = alias.propertyName.element;
+            if (isIdentifier(propertyName) && propertyName.simpleName === key && isIdentifier(alias.alias)) {
+                return alias.alias.simpleName;
+            }
+        }
+    }
+    return undefined;
+}
+
+/** How many named specifiers `jsImport` carries, `0` for a default, namespace or side-effect import. */
+function namedImportCount(jsImport: JS.Import): number {
+    const namedBindings = jsImport.importClause?.namedBindings;
+    return namedBindings?.kind === JS.Kind.NamedImports ? (namedBindings as JS.NamedImports).elements.elements.length : 0;
+}
+
+/**
+ * Whether `member` is the only thing `jsImport` binds — a namespace import always is, a default
+ * import is unless it also carries named bindings, and a named import is only when it is alone
+ * in its `{}`.
+ */
+function isOnlyMember(jsImport: JS.Import, member: string | undefined): boolean {
+    const key = memberName(member);
+    return key === '*' ||
+        (key === undefined && !jsImport.importClause?.namedBindings) ||
+        namedImportCount(jsImport) === 1;
+}
+
+export interface ExistingImportBinding {
+    localName: string;
+    onlyMemberOfStatement: boolean;
+}
+
+/**
+ * The existing binding for `member` of `module`, read from `cu`'s own import statements — what
+ * `maybeRebind` reads before committing to a `RebindImport` edit.
+ */
+export function existingImportBinding(
+    cu: JS.CompilationUnit,
+    module: string,
+    member: string | undefined
+): ExistingImportBinding | undefined {
+    for (const stmt of cu.statements) {
+        const element = stmt.element;
+        if (element?.kind !== JS.Kind.Import) {
+            continue;
+        }
+        const localName = importBinds(element as JS.Import, module, member);
+        if (localName !== undefined) {
+            return {localName, onlyMemberOfStatement: isOnlyMember(element as JS.Import, member)};
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Binds `member` under the name `local` already carries, so the file's references to it still
+ * resolve. `local` itself becomes the alias, keeping the type attribution it holds, and the alias
+ * takes its prefix: that whitespace separates the specifier from a `type` keyword before it.
+ */
+function aliasing(local: J.Identifier, member: string): JS.Alias {
+    const propertyName: J.Identifier = {
+        id: randomId(),
+        kind: J.Kind.Identifier,
+        prefix: emptySpace,
+        markers: emptyMarkers,
+        annotations: [],
+        simpleName: member,
+        type: undefined,
+        fieldType: undefined
+    };
+    return {
+        id: randomId(),
+        kind: JS.Kind.Alias,
+        prefix: local.prefix,
+        markers: emptyMarkers,
+        propertyName: rightPadded(propertyName, singleSpace),
+        alias: {...local, prefix: singleSpace}
+    };
+}
+
+/** Drops the specifier binding `member` from `jsImport`'s named list. */
+function removeNamedSpecifier(jsImport: JS.Import, member: string): JS.Import {
+    return produce(jsImport, draft => {
+        const importClause = draft.importClause;
+        if (importClause?.namedBindings?.kind !== JS.Kind.NamedImports) {
+            return;
+        }
+        const namedImports = importClause.namedBindings as Draft<JS.NamedImports>;
+        namedImports.elements.elements = namedImports.elements.elements.filter(elem => {
+            const specifierNode = elem.element.specifier;
+            if (specifierNode.kind === J.Kind.Identifier) {
+                return specifierNode.simpleName !== member;
+            }
+            if (specifierNode.kind === JS.Kind.Alias) {
+                const propertyName = (specifierNode as Draft<JS.Alias>).propertyName.element;
+                if (propertyName.kind === J.Kind.Identifier) {
+                    return propertyName.simpleName !== member;
+                }
+            }
+            return true;
+        });
+    });
+}
+
+/**
+ * Moves the binding `from` names to `to`, keeping the local name it already had. In place when
+ * the statement that carries it binds nothing else — module and member specifier rewritten there
+ * directly; otherwise the old specifier drops and {@link bindImport} queues the replacement,
+ * aliased to the preserved name. Neither branch refuses: `maybeRebind` queues this only once it
+ * has confirmed the move is safe.
+ */
+export class RebindImport<P> extends JavaScriptVisitor<P> {
+    constructor(
+        readonly from: {module: string; member?: string},
+        readonly to: {module: string; member?: string},
+        readonly localName: string
+    ) {
+        super();
+    }
+
+    private transformedInPlace = false;
+
+    override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
+        const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
+        if (!this.transformedInPlace) {
+            bindImport(this, {
+                module: this.to.module,
+                member: this.to.member,
+                alias: this.localName,
+                onlyIfReferenced: false
+            });
+        }
+        return visited;
+    }
+
+    override async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
+        const imp = await super.visitImportDeclaration(jsImport, p) as JS.Import;
+
+        const key = memberName(this.from.member);
+        if (importBinds(imp, this.from.module, this.from.member) === undefined) {
+            return imp;
+        }
+
+        if (!isOnlyMember(imp, this.from.member)) {
+            return removeNamedSpecifier(imp, key!);
+        }
+
+        this.transformedInPlace = true;
+        return produce(imp, draft => {
+            const literal = draft.moduleSpecifier!.element as Draft<J.Literal>;
+            literal.value = this.to.module;
+            const originalSource = literal.valueSource || `"${this.from.module}"`;
+            const quoteChar = originalSource.startsWith("'") ? "'" : '"';
+            literal.valueSource = `${quoteChar}${this.to.module}${quoteChar}`;
+
+            // A named specifier's local name has to stay put in the source, since it is what the
+            // rest of the file already reads; default and namespace imports carry that name on
+            // the clause itself, which needs no edit for a module-only move.
+            const toKey = memberName(this.to.member);
+            if (key !== undefined && key !== '*' && toKey !== undefined && toKey !== key) {
+                const importClause = draft.importClause;
+                if (importClause?.namedBindings?.kind === JS.Kind.NamedImports) {
+                    const namedImports = importClause.namedBindings as Draft<JS.NamedImports>;
+                    for (const elem of namedImports.elements.elements) {
+                        const specifier = elem.element;
+                        if (specifier.specifier.kind === J.Kind.Identifier && specifier.specifier.simpleName === key) {
+                            specifier.specifier = aliasing(specifier.specifier as Draft<J.Identifier>, toKey) as Draft<JS.Alias>;
+                        } else if (specifier.specifier.kind === JS.Kind.Alias) {
+                            const aliasNode = specifier.specifier as Draft<JS.Alias>;
+                            const propertyName = aliasNode.propertyName.element;
+                            if (propertyName.kind === J.Kind.Identifier && propertyName.simpleName === key) {
+                                propertyName.simpleName = toKey;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 }

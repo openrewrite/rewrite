@@ -18,11 +18,11 @@ import {JS} from "./tree";
 import {Cursor} from "../tree";
 import {JavaScriptVisitor} from "./visitor";
 import {scopeOf, walk} from "./scope";
-import {AddImportOptions, bindImport, moduleNameOf} from "./add-import";
+import {AddImportOptions, bindImport, existingImportBinding, moduleNameOf, RebindImport} from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {
     AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, enclosingAmdBlock, lastSegment,
-    parameterNames, RemoveAmdDependency
+    parameterNames, RebindAmdDependency, RemoveAmdDependency
 } from "./amd";
 
 export interface MaybeBindOptions extends AddImportOptions {
@@ -35,6 +35,14 @@ export interface MaybeUnbindOptions {
 
     /** The member to remove; unset removes every unused binding of the module. */
     member?: string;
+
+    /** Callees that introduce an AMD block. UI5 writes `sap.ui.define`, RequireJS and Dojo `define`. */
+    amdCallee?: string | readonly string[];
+}
+
+export interface MaybeRebindOptions {
+    from: {module: string; member?: string};
+    to: {module: string; member?: string};
 
     /** Callees that introduce an AMD block. UI5 writes `sap.ui.define`, RequireJS and Dojo `define`. */
     amdCallee?: string | readonly string[];
@@ -347,6 +355,40 @@ export function maybeUnbind(visitor: JavaScriptVisitor<any>, options: MaybeUnbin
     // visitor removes whatever matching construct it finds, ESM import or AMD dependency, and a
     // file with both gets both removed.
     visitor.afterVisit.push(new RemoveAmdDependency(options.module, options.member, calleesOf(options)));
+}
+
+/**
+ * Moves the binding for `from` to `to`, keeping the local name it already had — the primitive
+ * behind a member rename or a module move, so a caller never has to thread that name through a
+ * separate unbind and bind itself. Refuses, changing nothing, where nothing binds `from`, where
+ * `from` or `to` names a member on the AMD lane (a factory parameter binds only a whole module),
+ * or where completing the move on the ESM lane would have to gain an import into a CommonJS file.
+ */
+export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebindOptions): string | undefined {
+    const amd = enclosingAmdBlock(visitor, options);
+    if (amd !== undefined) {
+        if (options.from.member !== undefined || options.to.member !== undefined) {
+            return undefined;
+        }
+        const index = dependencyNames(amd.block).indexOf(options.from.module);
+        const binding = index < 0 ? undefined : parameterNames(amd.block)[index];
+        if (binding === undefined) {
+            return undefined;
+        }
+        visitor.afterVisit.push(new RebindAmdDependency(amd.call.id, options.from.module, options.to.module, calleesOf(options)));
+        return binding;
+    }
+
+    const cu = compilationUnitOf(visitor);
+    const existing = cu && existingImportBinding(cu, options.from.module, options.from.member);
+    if (existing === undefined) {
+        return undefined;
+    }
+    if (!existing.onlyMemberOfStatement && moduleBindings(visitor, options).moduleSystem === "commonjs") {
+        return undefined;
+    }
+    visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName));
+    return existing.localName;
 }
 
 /**
