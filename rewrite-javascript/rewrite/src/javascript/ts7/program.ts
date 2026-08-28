@@ -51,12 +51,31 @@ export function openSession(
     const fileSystem: FileSystem = {
         readFile: file => files.get(file),
         fileExists: file => (files.has(file) ? true : undefined),
-        directoryExists: () => undefined,
+        // A directory that only holds in-memory sources exists as far as resolution is concerned,
+        // or the compiler will not look inside it for them.
+        directoryExists: directory => {
+            const prefix = directory.endsWith(path.sep) ? directory : directory + path.sep;
+            return [...files.keys()].some(file => file.startsWith(prefix)) ? true : undefined;
+        },
         getAccessibleEntries: directory => {
-            const virtual = [...files.keys()]
-                .filter(file => path.dirname(file) === directory)
-                .map(file => path.basename(file));
-            if (virtual.length === 0) {
+            const prefix = directory.endsWith(path.sep) ? directory : directory + path.sep;
+            const virtual: string[] = [];
+            const virtualDirectories = new Set<string>();
+            for (const file of files.keys()) {
+                if (!file.startsWith(prefix)) {
+                    continue;
+                }
+                // A file nested below `directory` also makes the directory holding it visible,
+                // which is how the compiler finds its way down to that file.
+                const rest = file.slice(prefix.length);
+                const slash = rest.indexOf(path.sep);
+                if (slash === -1) {
+                    virtual.push(rest);
+                } else {
+                    virtualDirectories.add(rest.slice(0, slash));
+                }
+            }
+            if (virtual.length === 0 && virtualDirectories.size === 0) {
                 return undefined;
             }
             // A directory holding in-memory sources may also exist on disk, and the server needs
@@ -69,7 +88,10 @@ export function openSession(
             } catch {
                 // Purely virtual directory.
             }
-            return {files: [...new Set([...entries.files, ...virtual])], directories: entries.directories};
+            return {
+                files: [...new Set([...entries.files, ...virtual])],
+                directories: [...new Set([...entries.directories, ...virtualDirectories])],
+            };
         },
         realpath: () => undefined,
     };

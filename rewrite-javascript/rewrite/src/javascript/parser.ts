@@ -1914,10 +1914,15 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitBindingElement(node: ts.BindingElement): JS.BindingElement {
+    visitBindingElement(node: ts.BindingElement): JS.BindingElement | J.Empty {
+        // An elision in a binding pattern (`const [a, , b] = ...`) is a binding element with
+        // nothing bound, so there is no name to map and the hole stands on its own.
+        if (!node.name) {
+            return this.newEmpty(this.prefix(node));
+        }
         // Capture prefix before converting name, as convert may consume whitespace
         const elementPrefix = this.prefix(node);
-        let name: Expression = this.convert<Expression>(node.name!);
+        let name: Expression = this.convert<Expression>(node.name);
         if (node.dotDotDotToken) {
             // Wrap in JS.Spread; use emptySpace for prefix since the whitespace
             // belongs to BindingElement.prefix, not to the spread itself
