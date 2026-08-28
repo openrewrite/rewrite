@@ -94,7 +94,7 @@ export function moduleBindings(
     const cu = compilationUnitOf(visitor);
     const bound = cu === undefined ? [] : moduleObjectBindings(cu);
     return {
-        moduleSystem: cu === undefined ? "esm" :
+        moduleSystem: cu === undefined ? "none" :
             isCommonJs(cu) ? "commonjs" :
             hasEsmSyntax(cu) ? "esm" : "none",
         moduleOf: localName => bound.find(b => b.name === localName)?.module,

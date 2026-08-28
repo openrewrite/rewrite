@@ -221,6 +221,9 @@ const parameterSlot: Slot<J> = {
         }
         const declaration = element as J.VariableDeclarations;
         const variable = declaration.variables[0];
+        if (variable === undefined) {
+            return element;
+        }
         return {
             ...declaration,
             variables: [
@@ -621,11 +624,10 @@ export function bodyOf(block: AmdBlock): J | undefined {
 }
 
 /**
- * Whether the factory body references `name`. This counts any identifier of that name, so it
- * matches any identifier of that name, including a member in a field access, since a stray
- * dependency is fine where a shadowed one is not. `missingBodyAnswer` covers a body-less
- * factory: `false` for an addition (nothing to conflict with), `true` for a removal (nothing
- * to prove the binding unused).
+ * Whether the factory body references `name`. This counts any identifier of that name,
+ * including a member in a field access, since a stray dependency is fine where a shadowed one
+ * is not. `missingBodyAnswer` covers a body-less factory: `false` for an addition (nothing to
+ * conflict with), `true` for a removal (nothing to prove the binding unused).
  */
 export async function references(block: AmdBlock, name: string, missingBodyAnswer: boolean): Promise<boolean> {
     const body = bodyOf(block);

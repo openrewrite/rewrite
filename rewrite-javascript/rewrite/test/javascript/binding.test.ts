@@ -48,6 +48,19 @@ describe("moduleBindings", () => {
         expect(seen.moduleSystem).toBe("none");
     });
 
+    test("no compilation unit on the cursor reports \"none\", not a lane it cannot know", async () => {
+        const spec = new RecipeSpec();
+        const seen: {moduleSystem?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            constructor() {
+                super();
+                seen.moduleSystem = moduleBindings(this).moduleSystem;
+            }
+        });
+        await spec.rewriteRun(typescript(`const x = 1;`));
+        expect(seen.moduleSystem).toBe("none");
+    });
+
     test("an export alone is enough to read as \"esm\", even with no import", async () => {
         const spec = new RecipeSpec();
         const seen: {moduleSystem?: string} = {};
