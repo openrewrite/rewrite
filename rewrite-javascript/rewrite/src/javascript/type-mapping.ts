@@ -214,7 +214,7 @@ export class JavaScriptTypeMapping {
         // Check for error types first - these indicate type-checking failures
         // and should not be processed further
         if (type.flags & ts.TypeFlags.Any) {
-            const intrinsicName = type.intrinsicName;
+            const intrinsicName = type.isIntrinsicType() ? type.intrinsicName : undefined;
             if (intrinsicName === 'error') {
                 return Type.unknownType;
             }

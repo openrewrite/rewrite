@@ -16,6 +16,7 @@
 import {
     createScanner,
     LanguageVariant,
+    skipTrivia,
     type Node,
     type NodeArray,
     type SourceFile,
@@ -41,8 +42,9 @@ const isJSDoc = (k: SyntaxKind) => k >= SyntaxKind.FirstJSDocNode && k <= Syntax
 /** Stands for a token the compiler leaves out of the tree, backed by the source text it was read from. */
 function scannedNode(kind: SyntaxKind, pos: number, end: number, sourceFile: SourceFile, parent: Node,
                      elements?: NodeArray<Node>): Node {
-    const leadingTriviaWidth = () => sourceFile.text.slice(pos, end).search(/\S|$/);
-    const start = () => pos + leadingTriviaWidth();
+    // Trivia is whitespace and comments both, so the token starts wherever skipping it lands.
+    const start = () => Math.min(skipTrivia(sourceFile.text, pos), end);
+    const leadingTriviaWidth = () => start() - pos;
     const node = {
         kind, pos, end, parent,
         flags: 0,
@@ -76,7 +78,21 @@ function scanBetween(sf: SourceFile, from: number, to: number, parent: Node, out
     }
 }
 
+// Callers compare children by identity to find a node among its siblings, so a node's children are
+// built once and handed back on every later ask.
+const childCache = new WeakMap<Node, Node[]>();
+
 export function childrenOf(node: Node, sourceFile: SourceFile = node.getSourceFile()): Node[] {
+    const cached = childCache.get(node);
+    if (cached) {
+        return cached;
+    }
+    const built = buildChildren(node, sourceFile);
+    childCache.set(node, built);
+    return built;
+}
+
+function buildChildren(node: Node, sourceFile: SourceFile): Node[] {
     if (isSyntaxList(node)) {
         return syntaxListChildren(node, sourceFile);
     }

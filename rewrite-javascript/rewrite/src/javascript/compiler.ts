@@ -41,9 +41,21 @@ export {
 } from "typescript/unstable/ast";
 export type {Checker as TypeChecker} from "typescript/unstable/sync";
 
-import type {SourceFile} from "typescript/unstable/ast";
+import {skipTrivia, type Node, type NodeArray, type SourceFile} from "typescript/unstable/ast";
 
 /** Whether a source file is a module, which its export or import marks it as being. */
 export function isExternalModule(sourceFile: SourceFile): boolean {
     return sourceFile.externalModuleIndicator !== undefined;
+}
+
+/**
+ * Whether a comma follows the last element of `nodes`. The compiler declares `hasTrailingComma` on
+ * a NodeArray but sends it unset, so the answer is read back off the source.
+ */
+export function hasTrailingComma(nodes: NodeArray<Node>, sourceFile: SourceFile): boolean {
+    if (nodes.length === 0) {
+        return false;
+    }
+    const afterLast = skipTrivia(sourceFile.text, nodes[nodes.length - 1].end);
+    return sourceFile.text[afterLast] === ",";
 }

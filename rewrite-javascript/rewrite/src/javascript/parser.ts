@@ -1463,7 +1463,7 @@ export class JavaScriptParserVisitor {
                 elements: node.parameters.length == 0 ?
                     [this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))]
                     : node.parameters.map(p => this.rightPadded(this.visit(p), this.suffix(p)))
-                        .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []),
+                        .concat(ts.hasTrailingComma(node.parameters, this.sourceFile) ? this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []),
                 markers: emptyMarkers
             },
             returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type!))
@@ -2220,7 +2220,7 @@ export class JavaScriptParserVisitor {
                     parenthesized: isParenthesized,
                     parameters: node.parameters.length > 0 ?
                         node.parameters.map(p => this.rightPadded(this.convert(p), this.suffix(p)))
-                            .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []) :
+                            .concat(ts.hasTrailingComma(node.parameters, this.sourceFile) ? this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []) :
                         isParenthesized ? [this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))] : [],
                 },
                 arrow: this.prefix(node.equalsGreaterThanToken),
@@ -3402,14 +3402,14 @@ export class JavaScriptParserVisitor {
                         markers: emptyMarkers,
                         enums: node.members.map((em, i) => {
                             const isLast = i === node.members.length - 1;
-                            if (isLast && !node.members.hasTrailingComma) {
+                            if (isLast && !ts.hasTrailingComma(node.members, this.sourceFile)) {
                                 // No trailing comma - don't consume suffix, it belongs to block's end prefix
                                 return this.rightPadded(this.visit(em), emptySpace);
                             }
                             // For non-last members, or last member with trailing comma, consume the suffix
                             return this.rightPadded(this.visit(em), this.suffix(em));
                         }),
-                        terminatedWithSemicolon: node.members.hasTrailingComma
+                        terminatedWithSemicolon: ts.hasTrailingComma(node.members, this.sourceFile)
                     },
                     emptySpace)],
                 end: this.prefix(lastTokenOf(node)!)
@@ -4462,7 +4462,7 @@ export class JavaScriptParserVisitor {
                 kind: J.Kind.Container,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!),
                 elements: this.mapTypeParametersList(node.typeParameters)
-                    .concat(node.typeParameters.hasTrailingComma ? this.rightPadded<J.TypeParameter>(
+                    .concat(ts.hasTrailingComma(node.typeParameters, this.sourceFile) ? this.rightPadded<J.TypeParameter>(
                         {
                             kind: J.Kind.TypeParameter,
                             id: randomId(),
@@ -4499,7 +4499,7 @@ export class JavaScriptParserVisitor {
                     name: this.newEmpty(),
                 }, this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!))]
                 : typeParameters.map(tp => this.rightPadded(this.visit(tp), this.suffix(tp)))
-                    .concat(typeParameters.hasTrailingComma ? this.rightPadded(
+                    .concat(ts.hasTrailingComma(typeParameters, this.sourceFile) ? this.rightPadded(
                         {
                             kind: J.Kind.TypeParameter,
                             id: randomId(),
