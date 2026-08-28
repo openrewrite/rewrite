@@ -29,7 +29,7 @@ import {
     TrailingComma
 } from "../java";
 import {JS} from "./tree";
-import {Cursor} from "../tree";
+import {cursorOf, deconflict} from "./scope";
 import {JavaScriptVisitor} from "./visitor";
 import {ExecutionContext} from "../execution";
 
@@ -547,11 +547,6 @@ export function calleesOf(options?: AmdCalleeOptions): readonly string[] {
     return callee === undefined ? DEFAULT_AMD_CALLEES : typeof callee === "string" ? [callee] : callee;
 }
 
-/** `cursor` is protected on `TreeVisitor` and this API is free functions, so reaching it takes a cast. */
-function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
-    return (visitor as unknown as {cursor?: Cursor}).cursor;
-}
-
 /** The nearest AMD block the cursor sits inside, which is the one a binding belongs to. */
 export function enclosingAmdBlock(
     visitor: JavaScriptVisitor<any>,
@@ -597,18 +592,6 @@ const RESERVED_WORDS = new Set([
 export function derivedBindingName(module: string): string | undefined {
     const segment = lastSegment(module);
     return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment) && !RESERVED_WORDS.has(segment) ? segment : undefined;
-}
-
-function deconflict(preferred: string, taken: readonly (string | undefined)[]): string {
-    if (!taken.includes(preferred)) {
-        return preferred;
-    }
-    for (let suffix = 1; ; suffix++) {
-        const candidate = `${preferred}_${suffix}`;
-        if (!taken.includes(candidate)) {
-            return candidate;
-        }
-    }
 }
 
 /** Queued reservations already targeting this block: the shared source for both dedup and deconfliction. */
@@ -657,7 +640,7 @@ export function bindAmd(
         return undefined;
     }
     const taken = [...bindings, ...namesInScope, ...queued.map(v => v.binding)];
-    const binding = deconflict(preferredName ?? derivedBindingName(module)!, taken);
+    const binding = deconflict(preferredName ?? derivedBindingName(module)!, candidate => taken.includes(candidate));
     visitor.afterVisit.push(new AddAmdDependency(amd.call.id, module, binding, callees));
     return binding;
 }

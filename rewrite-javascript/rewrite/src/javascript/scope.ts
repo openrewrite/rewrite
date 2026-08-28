@@ -16,6 +16,8 @@
 import {Cursor, isTree} from "../tree";
 import {J} from "../java";
 import {JS} from "./tree";
+// scope.ts sits below the visitor, so this stays type-only.
+import type {JavaScriptVisitor} from "./visitor";
 
 /** The names code at some position can reach unqualified. */
 export interface Scope {
@@ -287,4 +289,45 @@ export function walk(node: unknown, visit: (node: any) => boolean): void {
 /** The element a padding wrapper holds, or the node itself. */
 function unwrap(node: any): any {
     return node?.kind === J.Kind.RightPadded || node?.kind === J.Kind.LeftPadded ? unwrap(node.element) : node;
+}
+
+/** `cursor` is protected on `TreeVisitor` and these APIs are free functions, so reaching it takes a cast. */
+export function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
+    return (visitor as unknown as {cursor?: Cursor}).cursor;
+}
+
+/** The compilation unit a cursor sits in, or the one a visitor is currently positioned in. */
+export function compilationUnitOf(from: Cursor | JavaScriptVisitor<any>): JS.CompilationUnit | undefined {
+    const cursor = from instanceof Cursor ? from : cursorOf(from);
+    return cursor?.firstEnclosing((v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
+}
+
+/** `preferred`, or the first `preferred_N` that `isTaken` rejects, so a new name never shadows one in scope. */
+export function deconflict(preferred: string, isTaken: (name: string) => boolean): string {
+    if (!isTaken(preferred)) {
+        return preferred;
+    }
+    for (let suffix = 1; ; suffix++) {
+        const candidate = `${preferred}_${suffix}`;
+        if (!isTaken(candidate)) {
+            return candidate;
+        }
+    }
+}
+
+/**
+ * The `J.VariableDeclarations` a statement declares — itself for a bare `const x = …`, one per
+ * declarator for `const a = …, b = …`, which the parser wraps in a `JS.ScopedVariableDeclarations`
+ * instead.
+ */
+export function declarationsOf(statement: J | undefined): J.VariableDeclarations[] {
+    if (statement?.kind === J.Kind.VariableDeclarations) {
+        return [statement as J.VariableDeclarations];
+    }
+    if (statement?.kind === JS.Kind.ScopedVariableDeclarations) {
+        return (statement as JS.ScopedVariableDeclarations).variables
+            .map(v => v.element)
+            .filter((v): v is J.VariableDeclarations => v?.kind === J.Kind.VariableDeclarations);
+    }
+    return [];
 }

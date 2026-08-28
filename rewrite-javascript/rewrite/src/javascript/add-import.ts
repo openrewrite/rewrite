@@ -4,8 +4,7 @@ import {JS, JSX} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
 import {getStyle, PrettierStyle, SpacesStyle, StyleKind} from "./style";
-import {Cursor} from "../tree";
-import {bindingNames, namesDeclaredIn} from "./scope";
+import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, namesDeclaredIn} from "./scope";
 import {create as produce, Draft} from "mutative";
 
 export type QuoteChar = "'" | '"';
@@ -147,7 +146,8 @@ export function bindImport(
     // Only the module scope answers for a name, but any scope in the file occupies one. The queue
     // gives every later request for this module the name chosen here, so it has to clear the scopes
     // those references will sit in, which are not known yet.
-    const name = deconflict(derived, takenNames(namesDeclaredIn(cu), visitor));
+    const taken = takenNames(namesDeclaredIn(cu), visitor);
+    const name = deconflict(derived, candidate => taken.has(candidate));
     visitor.afterVisit.push(new AddImport(options, name));
     return name;
 }
@@ -212,16 +212,6 @@ interface ModuleScopeBinding {
     typeOnly?: boolean;
 }
 
-function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
-    // `cursor` is protected on `TreeVisitor`, and `bindImport`/`maybeRemoveImport` are free
-    // functions, so reaching it takes a cast.
-    return (visitor as unknown as { cursor?: Cursor }).cursor;
-}
-
-function compilationUnitOf(cursor: Cursor): JS.CompilationUnit | undefined {
-    return cursor.firstEnclosing((v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
-}
-
 /** What the file's imports and `require`s bind at module scope, and the module each name comes from. */
 function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
     const bindings: ModuleScopeBinding[] = [];
@@ -237,20 +227,12 @@ function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
 
     for (const stmt of cu.statements) {
         const statement = stmt.element;
-        switch (statement?.kind) {
-            case JS.Kind.Import:
-                bindings.push(...importBindings(statement as JS.Import));
-                break;
-            case J.Kind.VariableDeclarations:
-                declaredByVariables(statement as J.VariableDeclarations);
-                break;
-            case JS.Kind.ScopedVariableDeclarations:
-                for (const variable of (statement as JS.ScopedVariableDeclarations).variables) {
-                    if (variable.element?.kind === J.Kind.VariableDeclarations) {
-                        declaredByVariables(variable.element as J.VariableDeclarations);
-                    }
-                }
-                break;
+        if (statement?.kind === JS.Kind.Import) {
+            bindings.push(...importBindings(statement as JS.Import));
+            continue;
+        }
+        for (const declaration of declarationsOf(statement)) {
+            declaredByVariables(declaration);
         }
     }
 
@@ -274,7 +256,7 @@ function isRequireCall(methodInv: J.MethodInvocation): boolean {
  * The module a `require(...)` call loads. `obj.require('x')` selects a method rather than loading a
  * module, and a specifier that is not a string literal names none that can be read here.
  */
-function requiredModuleOf(methodInv: J.MethodInvocation): string | undefined {
+export function requiredModuleOf(methodInv: J.MethodInvocation): string | undefined {
     if (!isRequireCall(methodInv)) {
         return undefined;
     }
@@ -364,17 +346,6 @@ function takenNames(inScope: ReadonlySet<string>, visitor: JavaScriptVisitor<any
     }
 
     return taken;
-}
-
-function deconflict(derived: string, taken: Set<string>): string {
-    if (!taken.has(derived)) {
-        return derived;
-    }
-    let suffix = 1;
-    while (taken.has(`${derived}_${suffix}`)) {
-        suffix++;
-    }
-    return `${derived}_${suffix}`;
 }
 
 /**
@@ -1607,18 +1578,30 @@ function importBinds(jsImport: JS.Import, module: string, member: string | undef
     }
     for (const elem of (namedBindings as JS.NamedImports).elements.elements) {
         const specifierNode = elem.element.specifier;
-        if (isIdentifier(specifierNode) && specifierNode.simpleName === key) {
+        if (!namedSpecifierImports(specifierNode, key)) {
+            continue;
+        }
+        if (isIdentifier(specifierNode)) {
             return specifierNode.simpleName;
         }
-        if (specifierNode.kind === JS.Kind.Alias) {
-            const alias = specifierNode as JS.Alias;
-            const propertyName = alias.propertyName.element;
-            if (isIdentifier(propertyName) && propertyName.simpleName === key && isIdentifier(alias.alias)) {
-                return alias.alias.simpleName;
-            }
+        const alias = (specifierNode as JS.Alias).alias;
+        if (isIdentifier(alias)) {
+            return alias.simpleName;
         }
     }
     return undefined;
+}
+
+/** Whether `specifier` imports the member `key`, under whatever local name it binds it to. */
+function namedSpecifierImports(specifier: JS.ImportSpecifier["specifier"], key: string): boolean {
+    if (isIdentifier(specifier)) {
+        return specifier.simpleName === key;
+    }
+    if (specifier.kind === JS.Kind.Alias) {
+        const propertyName = (specifier as JS.Alias).propertyName.element;
+        return isIdentifier(propertyName) && propertyName.simpleName === key;
+    }
+    return false;
 }
 
 /** Whether the named specifier binding `key` carries its own inline `type`, as in `{type a, b}`. */
@@ -1628,12 +1611,7 @@ function namedSpecifierIsTypeOnly(imp: JS.Import, key: string): boolean {
         return false;
     }
     for (const elem of (namedBindings as JS.NamedImports).elements.elements) {
-        const specifierNode = elem.element.specifier;
-        const matches = (isIdentifier(specifierNode) && specifierNode.simpleName === key) ||
-            (specifierNode.kind === JS.Kind.Alias &&
-                isIdentifier((specifierNode as JS.Alias).propertyName.element) &&
-                ((specifierNode as JS.Alias).propertyName.element as J.Identifier).simpleName === key);
-        if (matches) {
+        if (namedSpecifierImports(elem.element.specifier, key)) {
             return elem.element.importType.element;
         }
     }
@@ -1761,12 +1739,7 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
     const formatter = new ElementRemovalFormatter<JS.ImportSpecifier>();
     const kept: J.RightPadded<JS.ImportSpecifier>[] = [];
     for (const entry of namedImports.elements.elements) {
-        const specifierNode = entry.element.specifier;
-        const matches = (specifierNode.kind === J.Kind.Identifier && specifierNode.simpleName === key) ||
-            (specifierNode.kind === JS.Kind.Alias &&
-                (specifierNode as JS.Alias).propertyName.element.kind === J.Kind.Identifier &&
-                ((specifierNode as JS.Alias).propertyName.element as J.Identifier).simpleName === key);
-        if (matches) {
+        if (namedSpecifierImports(entry.element.specifier, key)) {
             formatter.markRemoved(entry.element);
         } else {
             kept.push({...entry, element: formatter.processKept(entry.element)});

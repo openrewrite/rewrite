@@ -15,10 +15,9 @@
  */
 import {J} from "../java";
 import {JS} from "./tree";
-import {Cursor} from "../tree";
 import {JavaScriptVisitor} from "./visitor";
-import {scopeOf, walk} from "./scope";
-import {AddImportOptions, bindImport, existingImportBinding, memberName, moduleNameOf, RebindImport} from "./add-import";
+import {compilationUnitOf, cursorOf, declarationsOf, scopeOf, walk} from "./scope";
+import {AddImportOptions, bindImport, existingImportBinding, memberName, moduleNameOf, RebindImport, requiredModuleOf} from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {
     AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, derivedBindingName, enclosingAmdBlock,
@@ -72,16 +71,6 @@ export interface ModuleBindings {
      * for `"none"` itself.
      */
     readonly moduleSystem: "esm" | "amd" | "commonjs" | "none";
-}
-
-/** `cursor` is protected on `TreeVisitor` and this API is free functions, so reaching it takes a cast. */
-function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
-    return (visitor as unknown as {cursor?: Cursor}).cursor;
-}
-
-function compilationUnitOf(visitor: JavaScriptVisitor<any>): JS.CompilationUnit | undefined {
-    return cursorOf(visitor)?.firstEnclosing(
-        (v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
 }
 
 export function moduleBindings(
@@ -191,39 +180,12 @@ function isCommonJs(cu: JS.CompilationUnit): boolean {
     return requires;
 }
 
-/**
- * The `J.VariableDeclarations` a statement declares — itself for a bare `const x = …`, one per
- * declarator for `const a = …, b = …`, which the parser wraps in a `JS.ScopedVariableDeclarations`
- * instead.
- */
-function declarationsOf(statement: J | undefined): J.VariableDeclarations[] {
-    if (statement?.kind === J.Kind.VariableDeclarations) {
-        return [statement as J.VariableDeclarations];
-    }
-    if (statement?.kind === JS.Kind.ScopedVariableDeclarations) {
-        return (statement as JS.ScopedVariableDeclarations).variables
-            .map(v => v.element)
-            .filter((v): v is J.VariableDeclarations => v?.kind === J.Kind.VariableDeclarations);
-    }
-    return [];
-}
-
 /** The module a `const X = require("m")` declaration names, for the one variable it declares. */
 function requiredModule(declaration: J.VariableDeclarations): string | undefined {
     const variables = declaration.variables;
     const initializer = variables.length === 1 ? variables[0].element?.initializer?.element : undefined;
-    if (initializer?.kind !== J.Kind.MethodInvocation) {
-        return undefined;
-    }
-    const call = initializer as J.MethodInvocation;
-    // `obj.require('x')` selects a method rather than loading a module, matching add-import.ts's
-    // own `requiredModuleOf`.
-    if (call.select || call.name.simpleName !== "require") {
-        return undefined;
-    }
-    const argument = call.arguments.elements[0]?.element;
-    return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === "string"
-        ? (argument as J.Literal).value as string
+    return initializer?.kind === J.Kind.MethodInvocation
+        ? requiredModuleOf(initializer as J.MethodInvocation)
         : undefined;
 }
 
@@ -338,9 +300,9 @@ export function maybeBind(
         return bindAmd(visitor, amd, module, options.preferredName, namesInScope, calleesOf(options));
     }
 
+    const cu = compilationUnitOf(visitor);
     const isWholeModule = !options.sideEffectOnly && (key === undefined || key === "*");
     if (isWholeModule) {
-        const cu = compilationUnitOf(visitor);
         const bound = cu && moduleObjectBindings(cu).find(b =>
             b.module === module && answersWholeModuleRequest(b, key === "*"));
         if (bound !== undefined) {
@@ -356,7 +318,7 @@ export function maybeBind(
 
     // `bindImport`'s own lookup finds and reuses a member-specific binding on its own, so
     // refusal here only has to gate the point where it would create a new one.
-    const refuseCreate = moduleBindings(visitor, options).moduleSystem === "commonjs";
+    const refuseCreate = cu !== undefined && isCommonJs(cu);
     return bindImport(visitor, {
         ...options,
         preferredName: options.preferredName ?? (isWholeModule ? derivedBindingName(module) : undefined)
@@ -424,14 +386,17 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     }
 
     const cu = compilationUnitOf(visitor);
-    const existing = cu && existingImportBinding(cu, options.from.module, options.from.member);
+    if (cu === undefined) {
+        return undefined;
+    }
+    const existing = existingImportBinding(cu, options.from.module, options.from.member);
     if (existing === undefined) {
         return undefined;
     }
     if (existing.onlyMemberOfStatement && bindingShape(options.from.member) !== bindingShape(options.to.member)) {
         return undefined;
     }
-    if (!existing.onlyMemberOfStatement && moduleBindings(visitor, options).moduleSystem === "commonjs") {
+    if (!existing.onlyMemberOfStatement && isCommonJs(cu)) {
         return undefined;
     }
     visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName));

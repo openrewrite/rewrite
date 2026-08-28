@@ -10,15 +10,11 @@ import {ExecutionContext} from "../../src";
 
 function captureBindings(seen: {moduleSystem?: string, module?: string, binding?: string},
                           localName: string = "Button", moduleName: string = "sap/m/Button") {
-    return new class extends JavaScriptVisitor<any> {
-        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-            const bindings = moduleBindings(this);
-            seen.moduleSystem = bindings.moduleSystem;
-            seen.module = bindings.moduleOf(localName);
-            seen.binding = bindings.bindingOf(moduleName);
-            return super.visitJsCompilationUnit(cu, p);
-        }
-    };
+    return captureModuleBindings(bindings => {
+        seen.moduleSystem = bindings.moduleSystem;
+        seen.module = bindings.moduleOf(localName);
+        seen.binding = bindings.bindingOf(moduleName);
+    });
 }
 
 /** Runs `extract` with the file's `ModuleBindings`, visited from the compilation unit itself. */
