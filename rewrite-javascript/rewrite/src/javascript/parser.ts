@@ -108,6 +108,12 @@ export class JavaScriptParser extends Parser {
             emitDecoratorMetadata: true,
             forceConsistentCasingInFileNames: false,
             jsx: ts.JsxEmit.Preserve,
+            // Strictness is a property of the parsed project rather than of the compiler we pin: under
+            // `strictNullChecks` every nullable type carries an extra `null` union constituent.
+            strict: false,
+            // `types` defaults to `[]`, which attributes ambient `@types/*` packages only when named;
+            // `*` enumerates everything under `node_modules/@types`.
+            types: ["*"],
             baseUrl: relativeTo || process.cwd()
         };
         this.styles = styles;

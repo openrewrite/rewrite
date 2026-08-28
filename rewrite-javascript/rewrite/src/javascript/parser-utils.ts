@@ -394,6 +394,7 @@ const excludedCodes = new Set([
     1183, // An implementation cannot be declared in ambient contexts.
     1203, // Export assignment cannot be used when targeting ECMAScript modules. Consider using 'export default' or another module format instead.
     1207, // Decorators cannot be applied to multiple get/set accessors of the same name.
+    1212, // Identifier expected. '{0}' is a reserved word in strict mode. The node is still parsed as an identifier.
     1215, // Invalid use of '{0}'. Modules are automatically in strict mode.
     1238, // Unable to resolve signature of class decorator when called as an expression.
     1239, // Unable to resolve signature of parameter decorator when called as an expression.
@@ -422,6 +423,7 @@ const excludedCodes = new Set([
     1375, // 'await' expressions are only allowed at the top level of a file when that file is a module, but this file has no imports or exports. Consider adding an empty 'export {}' to make this file a module.
     1378, // Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', 'nodenext', or 'preserve', and the 'target' option is set to 'es2017' or higher.
     1432, // Top-level 'for await' loops are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', 'nodenext', or 'preserve', and the 'target' option is set to 'es2017' or higher.
+    1540, // A 'namespace' declaration should not be declared using the 'module' keyword. The `module` spelling yields a ModuleDeclaration.
 ]);
 
 // Errors to exclude only for JavaScript files (.js, .jsx, .mjs, .cjs)
