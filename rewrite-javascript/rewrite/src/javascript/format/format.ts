@@ -358,12 +358,16 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                         : "";
                 }
                 if (draft.importClause.namedBindings) {
-                    const hasDefaultImport = !!draft.importClause.name;
-                    if (hasDefaultImport || draft.importClause.typeOnly) {
-                        draft.importClause.namedBindings.prefix.whitespace = " ";
-                    }
+                    // `type`, or a default name and its comma, stands between keyword and bindings
+                    const afterClause = draft.importClause.name || draft.importClause.typeOnly ? " " : "";
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
+                        // For named imports the space before `{` sits in the container, as the parser
+                        // writes it; a newline there is layout, which spacing does not decide
+                        if (!ni.prefix.whitespace.includes("\n") && !ni.elements.before.whitespace.includes("\n")) {
+                            ni.prefix.whitespace = "";
+                            ni.elements.before.whitespace = afterClause;
+                        }
                         const isMultiLine = ni.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
                         if (!isMultiLine) {
                             const braceSpace = this.style.within.es6ImportExportBraces ? " " : "";
@@ -376,6 +380,8 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                                 lastAfter.whitespace = this.style.other.beforeComma ? " " : "";
                             }
                         }
+                    } else if (afterClause) {
+                        draft.importClause.namedBindings.prefix.whitespace = afterClause;
                     }
                 }
             }

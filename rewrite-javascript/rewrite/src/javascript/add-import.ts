@@ -1,12 +1,14 @@
 import {JavaScriptVisitor} from "./visitor";
 import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, Type} from "../java";
 import {JS, JSX} from "./tree";
-import {randomId} from "../uuid";
+import {randomId, UUID} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
-import {getStyle, PrettierStyle, SpacesStyle, StyleKind} from "./style";
+import {getStyle, SpacesStyle, StyleKind} from "./style";
 import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf} from "./scope";
 import {create as produce, Draft} from "mutative";
 import {TypeVisitor} from "../java/type-visitor";
+import {autoFormat} from "./format";
+import {getPrettierStyle} from "./format/prettier-format";
 
 export type QuoteChar = "'" | '"';
 
@@ -19,8 +21,9 @@ export enum ImportStyle {
 
 export interface AddImportOptions {
     /** The module name (e.g., 'fs', 'react') to import from.
-     * Pass a `J.Literal` to reuse its source form verbatim, which carries the quoting,
-     * escapes and unicode form of a specifier being moved from elsewhere in the source. */
+     * Pass a `J.Literal` to reuse its source form, which carries the escapes and unicode form of a
+     * specifier being moved from elsewhere in the source. A Prettier configuration settles the
+     * quoting; see `quoteStyle`. */
     module: string | J.Literal;
 
     /** Optionally, the specific member to import from the module.
@@ -62,7 +65,8 @@ export interface AddImportOptions {
     style?: ImportStyle;
 
     /** Quote character for the module specifier. If not specified, detected from the file.
-     * A `J.Literal` module carries its own quoting and takes precedence over this. */
+     * A `J.Literal` module carries its own quoting and takes precedence over this. A Prettier
+     * configuration outranks both, since running Prettier would arrive at its quote anyway. */
     quoteStyle?: QuoteChar;
 }
 
@@ -461,8 +465,8 @@ async function detectQuote(cu: JS.CompilationUnit): Promise<QuoteChar> {
         return specifierQuote;
     }
 
-    const prettier = getStyle(StyleKind.PrettierStyle, cu) as PrettierStyle | undefined;
-    if (prettier?.kind === StyleKind.PrettierStyle && !prettier.ignored) {
+    const prettier = getPrettierStyle(cu);
+    if (prettier && !prettier.ignored) {
         const singleQuote = prettier.config.singleQuote;
         if (typeof singleQuote === 'boolean') {
             return singleQuote ? "'" : '"';
@@ -470,6 +474,27 @@ async function detectQuote(cu: JS.CompilationUnit): Promise<QuoteChar> {
     }
 
     return double > single ? '"' : "'";
+}
+
+/**
+ * Lays out the import statement `AddImport` wrote, so that the file's own style — a Prettier
+ * configuration's brace spacing and print width, say — reaches it.
+ */
+async function formatImport<P>(cu: JS.CompilationUnit, id: UUID, p: P): Promise<JS.CompilationUnit> {
+    return await new class extends JavaScriptVisitor<P> {
+        override async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
+            return jsImport.id === id ? await autoFormat(jsImport, p, undefined, this.cursor.parent) : jsImport;
+        }
+    }().visit(cu, p) as JS.CompilationUnit;
+}
+
+/**
+ * As {@link formatImport}, for an import that gained specifiers. Short of a Prettier configuration
+ * deciding the whole line, the statement's own text says more about its spacing than a
+ * repository-wide style does, and the merge reads it directly.
+ */
+async function formatMergedImport<P>(cu: JS.CompilationUnit, id: UUID, p: P): Promise<JS.CompilationUnit> {
+    return getPrettierStyle(cu)?.ignored === false ? formatImport(cu, id, p) : cu;
 }
 
 export class AddImport<P> extends JavaScriptVisitor<P> {
@@ -726,12 +751,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
 
         // Add ES6 import (handles ES6Named, ES6Namespace, ES6Default)
-        return this.produceJavaScript(compilationUnit, p, async draft => {
-            // Find the position to insert the import
-            const insertionIndex = this.findImportInsertionIndex(compilationUnit);
+        // Find the position to insert the import
+        const insertionIndex = this.findImportInsertionIndex(compilationUnit);
+        const newImport = await this.createImportStatement(compilationUnit, insertionIndex, p);
 
-            const newImport = await this.createImportStatement(compilationUnit, insertionIndex, p);
-
+        const withImport = await this.produceJavaScript(compilationUnit, p, async draft => {
             // Insert the import at the appropriate position
             // Create semicolon marker for the import statement
             const semicolonMarkers = markers({
@@ -788,6 +812,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 }
             }
         });
+
+        return formatImport(withImport, newImport.id, p);
     }
 
     /**
@@ -831,7 +857,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     }
 
                     // We found a matching import with named bindings - merge into it
-                    return this.produceJavaScript(compilationUnit, p, async draft => {
+                    return formatMergedImport(await this.produceJavaScript(compilationUnit, p, async draft => {
                         const namedImports = importClause.namedBindings as JS.NamedImports;
                         const existingElements = namedImports.elements.elements;
 
@@ -904,13 +930,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         draft.statements = compilationUnit.statements.map((s, idx) =>
                             idx === i ? {...s, element: updatedImport} : s
                         );
-                    });
+                    }), jsImport.id, p);
                 }
 
                 // Case 2: Default import without named bindings - add named bindings
                 // Transform: import React from 'react' -> import React, { useState } from 'react'
                 if (importClause.name && !importClause.namedBindings) {
-                    return this.produceJavaScript(compilationUnit, p, async draft => {
+                    return formatMergedImport(await this.produceJavaScript(compilationUnit, p, async draft => {
                         const newSpecifier = this.createImportSpecifier();
 
                         // Get the spaces style for brace spacing
@@ -959,7 +985,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         draft.statements = compilationUnit.statements.map((s, idx) =>
                             idx === i ? {...s, element: updatedImport} : s
                         );
-                    });
+                    }), jsImport.id, p);
                 }
             }
         }
@@ -1288,10 +1314,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // Determine the appropriate prefix (spacing before the import)
         const prefix = this.determineImportPrefix(compilationUnit, insertionIndex);
 
-        // Create the module specifier
-        // For side-effect imports, use emptySpace since space comes from LeftPadded.before
-        // For regular imports with import clause, use emptySpace since space comes from LeftPadded.before
-        // However, the printer expects the space after 'from' in the literal's prefix
+        // Whitespace throughout follows the parser's placement, so that formatting the result is a
+        // no-op where the file's style already agrees with it.
         // Note: value is the unquoted module name; valueSource and unicodeEscapes are its printed form
         let valueSource = this.moduleValueSource;
         if (valueSource === undefined) {
@@ -1301,7 +1325,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const moduleSpecifier: J.Literal = {
             id: randomId(),
             kind: J.Kind.Literal,
-            prefix: this.sideEffectOnly ? emptySpace : singleSpace,
+            prefix: singleSpace,
             markers: emptyMarkers,
             value: this.module,
             valueSource,
@@ -1341,7 +1365,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             const namespaceBinding: JS.Alias = {
                 id: randomId(),
                 kind: JS.Kind.Alias,
-                prefix: singleSpace,
+                prefix: this.typeOnly ? singleSpace : emptySpace,
                 markers: emptyMarkers,
                 propertyName: rightPadded(propertyName, singleSpace),
                 alias: aliasIdentifier
@@ -1350,7 +1374,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause = {
                 id: randomId(),
                 kind: JS.Kind.ImportClause,
-                prefix: this.typeOnly ? singleSpace : emptySpace,
+                prefix: singleSpace,
                 markers: emptyMarkers,
                 typeOnly: this.typeOnly,
                 name: undefined,
@@ -1362,7 +1386,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             const defaultName: J.Identifier = {
                 id: randomId(),
                 kind: J.Kind.Identifier,
-                prefix: singleSpace,
+                prefix: this.typeOnly ? singleSpace : emptySpace,
                 markers: emptyMarkers,
                 annotations: [],
                 simpleName: this.bindingName!,
@@ -1373,10 +1397,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause = {
                 id: randomId(),
                 kind: JS.Kind.ImportClause,
-                prefix: this.typeOnly ? singleSpace : emptySpace,
+                prefix: singleSpace,
                 markers: emptyMarkers,
                 typeOnly: this.typeOnly,
-                name: rightPadded(defaultName, emptySpace),
+                name: rightPadded(defaultName, singleSpace),
                 namedBindings: undefined
             };
         } else {
@@ -1394,11 +1418,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             const namedImports: JS.NamedImports = {
                 id: randomId(),
                 kind: JS.Kind.NamedImports,
-                prefix: singleSpace,
+                prefix: emptySpace,
                 markers: emptyMarkers,
                 elements: {
                     kind: J.Kind.Container,
-                    before: emptySpace,
+                    before: this.typeOnly ? singleSpace : emptySpace,
                     elements: [rightPadded(importSpecWithSpacing, braceSpace)],
                     markers: emptyMarkers
                 }
@@ -1407,7 +1431,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause = {
                 id: randomId(),
                 kind: JS.Kind.ImportClause,
-                prefix: this.typeOnly ? singleSpace : emptySpace,
+                prefix: singleSpace,
                 markers: emptyMarkers,
                 typeOnly: this.typeOnly,
                 name: undefined,
@@ -1424,7 +1448,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause,
             moduleSpecifier: {
                 kind: J.Kind.LeftPadded,
-                before: singleSpace,
+                // Bindings end at `}`, so the space before `from` sits here; a default import's name
+                // and a side-effect import's literal carry their own
+                before: importClause?.namedBindings ? singleSpace : emptySpace,
                 element: moduleSpecifier,
                 markers: emptyMarkers
             },

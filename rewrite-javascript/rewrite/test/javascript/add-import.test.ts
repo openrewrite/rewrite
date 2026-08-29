@@ -166,6 +166,23 @@ function createAddImportWithTemplateVisitor(
     };
 }
 
+/** Marks a file the way parsing a project whose .prettierrc was picked up marks it. */
+function withPrettierStyle(cu: JS.CompilationUnit, config: Record<string, unknown>, ignored = false): JS.CompilationUnit {
+    return {
+        ...cu,
+        markers: {...cu.markers, markers: [...cu.markers.markers, prettierStyle(randomId(), config, undefined, ignored)]}
+    };
+}
+
+function addImportUnderPrettier(config: Record<string, unknown>, module: string, member: string): JavaScriptVisitor<any> {
+    const addImport = new AddImport({module, member, onlyIfReferenced: false});
+    return new class extends JavaScriptVisitor<any> {
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+            return await addImport.visit(withPrettierStyle(cu, config), p);
+        }
+    };
+}
+
 describe('AddImport visitor', () => {
     describe('named imports', () => {
         test('should add named import when referenced', async () => {
@@ -1853,6 +1870,67 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('a Prettier configuration outranks the brace spacing the file itself writes', async () => {
+            const spec = new RecipeSpec();
+            // The configuration names no `bracketSpacing`, so Prettier's own default of `true` holds
+            spec.recipe = fromVisitor(addImportUnderPrettier({singleQuote: true}, 'lib2', 'New'));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {Old} from 'lib';
+                    `,
+                    `
+                        import {Old} from 'lib';
+                        import { New } from 'lib2';
+                    `
+                )
+            );
+        });
+
+        test('a Prettier configuration outranks an explicitly requested quote', async () => {
+            const spec = new RecipeSpec();
+            const addImport = new AddImport({module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false});
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    return await addImport.visit(withPrettierStyle(cu, {singleQuote: true}), p);
+                }
+            });
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import { readFile } from 'fs';
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+
+        test('a merged import Prettier can no longer fit on one line wraps', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(addImportUnderPrettier(
+                {printWidth: 80, singleQuote: true}, '@scope/a-long-module', 'SomethingWithAnEvenLongerName'));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import { AlphaComponent } from '@scope/a-long-module';
+                    `,
+                    `
+                        import {
+                          AlphaComponent,
+                          SomethingWithAnEvenLongerName,
+                        } from '@scope/a-long-module';
+                    `
+                )
+            );
+        });
     });
 
     describe('type-only imports', () => {
@@ -2318,40 +2396,9 @@ describe('AddImport visitor', () => {
             );
         });
 
-        /** Stands in for a project whose .prettierrc was picked up at parse time. */
-        function createAddImportWithPrettierStyleVisitor(singleQuote: boolean): JavaScriptVisitor<any> {
-            return new class extends JavaScriptVisitor<any> {
-                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    const namedStyles: NamedStyles = {
-                        kind: MarkersKind.NamedStyles,
-                        id: randomId(),
-                        name: "test-prettier",
-                        displayName: "Test Prettier",
-                        tags: [],
-                        styles: [prettierStyle(randomId(), {singleQuote})]
-                    };
-
-                    let result: JS.CompilationUnit = {
-                        ...cu,
-                        markers: {
-                            ...cu.markers,
-                            markers: [...cu.markers.markers, namedStyles]
-                        }
-                    };
-
-                    const addImport = new AddImport({
-                        module: 'fs',
-                        member: 'readFile',
-                        onlyIfReferenced: false
-                    });
-                    return await addImport.visit(result, p) as JS.CompilationUnit;
-                }
-            };
-        }
-
         test('honors a PrettierStyle marker with singleQuote disabled', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(createAddImportWithPrettierStyleVisitor(false));
+            spec.recipe = fromVisitor(addImportUnderPrettier({singleQuote: false}, 'fs', 'readFile'));
 
             await spec.rewriteRun(
                 typescript(
@@ -2359,7 +2406,7 @@ describe('AddImport visitor', () => {
                         const x = 1;
                     `,
                     `
-                        import {readFile} from "fs";
+                        import { readFile } from "fs";
 
                         const x = 1;
                     `
@@ -2369,7 +2416,7 @@ describe('AddImport visitor', () => {
 
         test('a PrettierStyle marker outranks the dominant string literal quote', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(createAddImportWithPrettierStyleVisitor(true));
+            spec.recipe = fromVisitor(addImportUnderPrettier({singleQuote: true}, 'fs', 'readFile'));
 
             await spec.rewriteRun(
                 typescript(
@@ -2378,7 +2425,7 @@ describe('AddImport visitor', () => {
                         const b = "two";
                     `,
                     `
-                        import {readFile} from 'fs';
+                        import { readFile } from 'fs';
 
                         const a = "one";
                         const b = "two";
@@ -2535,23 +2582,11 @@ describe('AddImport visitor', () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    const namedStyles: NamedStyles = {
-                        kind: MarkersKind.NamedStyles,
-                        id: randomId(),
-                        name: "test-prettier",
-                        displayName: "Test Prettier",
-                        tags: [],
-                        styles: [prettierStyle(randomId(), {singleQuote: true}, undefined, true)]
-                    };
-                    const marked: JS.CompilationUnit = {
-                        ...cu,
-                        markers: {...cu.markers, markers: [...cu.markers.markers, namedStyles]}
-                    };
                     return await new AddImport({
                         module: 'fs',
                         member: 'readFile',
                         onlyIfReferenced: false
-                    }).visit(marked, p);
+                    }).visit(withPrettierStyle(cu, {singleQuote: true}, true), p);
                 }
             }());
 

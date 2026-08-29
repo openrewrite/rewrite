@@ -79,6 +79,10 @@ describe('SpacesVisitor', () => {
                 import a from'baz.js';
                 import'module-without-export.js';
                 import type{Models} from'../models';
+                import c,{d} from 'cd.js';
+                import e, {f} from 'ef.js';
+                import g,
+                    {h} from 'gh.js';
                 `,
                 `
                 export {MyPreciousClass} from './my-precious-class';
@@ -89,6 +93,10 @@ describe('SpacesVisitor', () => {
                 import a from 'baz.js';
                 import 'module-without-export.js';
                 import type {Models} from '../models';
+                import c, {d} from 'cd.js';
+                import e, {f} from 'ef.js';
+                import g,
+                    {h} from 'gh.js';
                 `
                 // @formatter:on
             ));
