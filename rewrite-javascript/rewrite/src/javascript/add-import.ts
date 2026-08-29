@@ -1890,7 +1890,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
-        this.movesEveryBinding = declaredMember(this.from) === undefined && namesModuleOnce(cu, this.from.module);
+        this.movesEveryBinding = movesEveryBindingOf(cu, this.from);
         const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
         if (!this.transformedInPlace) {
             bindImport(this, {
@@ -1979,12 +1979,12 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         if (!this.referencesMovedBinding(nc.class)) {
             return nc;
         }
-        return {
-            ...nc,
-            type: await this.movedTypes.visit(nc.type, undefined),
-            methodType: await this.movedTypes.visit(nc.methodType, undefined) as Type.Method | undefined,
-            constructorType: await this.movedTypes.visit(nc.constructorType, undefined) as Type.Method | undefined
-        } as J.NewClass;
+        const type = await this.movedTypes.visit(nc.type, undefined);
+        const methodType = await this.movedTypes.visit(nc.methodType, undefined) as Type.Method | undefined;
+        const constructorType = await this.movedTypes.visit(nc.constructorType, undefined) as Type.Method | undefined;
+        return type === nc.type && methodType === nc.methodType && constructorType === nc.constructorType
+            ? nc
+            : {...nc, type, methodType, constructorType} as J.NewClass;
     }
 
     override async visitFunctionCall(functionCall: JS.FunctionCall, p: P): Promise<J | undefined> {
@@ -2178,8 +2178,19 @@ function qualifiedName(binding: {module: string; member?: string}): string {
 }
 
 /**
- * Whether one place in the file spells `module`, so no other binding of it survives a move. Every
- * spelling counts, since `require` and a dynamic `import` bind a module as much as a statement does.
+ * Whether the move leaves `from`'s module bound nowhere: it takes the module whole, out of a
+ * statement binding nothing else, in a file that spells that module once. Only then does every
+ * type the module declares move with it. See CLAUDE.md: What a rebind's attribution follows.
+ */
+function movesEveryBindingOf(cu: JS.CompilationUnit, from: {module: string; member?: string}): boolean {
+    return declaredMember(from) === undefined &&
+        (existingImportBinding(cu, from.module, from.member)?.onlyMemberOfStatement ?? false) &&
+        namesModuleOnce(cu, from.module);
+}
+
+/**
+ * Whether one place in the file spells `module`. Every spelling counts, since `require` and a
+ * dynamic `import` bind a module as much as a statement does.
  */
 function namesModuleOnce(cu: JS.CompilationUnit, module: string): boolean {
     let named = 0;

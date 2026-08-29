@@ -1322,6 +1322,40 @@ describe("maybeRebind", () => {
         expect(declaring).toEqual(["lodash"]);
     });
 
+    test("a whole module's move leaves alone what its own statement still binds", async () => {
+        const spec = new RecipeSpec();
+        const declaring: (string | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {
+                    from: {module: "lodash", member: "default"},
+                    to: {module: "lodash-es", member: "default"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await withDir(async (repo) => {
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import _, { flatten } from 'lodash';\n\n_.assign({}, {});\nflatten([[1]]);\n`,
+                    `import { flatten } from 'lodash';\nimport _ from 'lodash-es';\n\n_.assign({}, {});\nflatten([[1]]);\n`),
+                afterRecipe: async (cu: any) => {
+                    await new class extends JavaScriptVisitor<any> {
+                        override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                            if (m.name.simpleName === "flatten") {
+                                const d = m.methodType?.declaringType;
+                                declaring.push(d && Type.isFullyQualified(d) ? Type.FullyQualified.getFullyQualifiedName(d as any) : undefined);
+                            }
+                            return super.visitMethodInvocation(m, p);
+                        }
+                    }().visit(cu, undefined);
+                }
+            } as any, packageJson(`{"name":"t","dependencies":{"lodash":"^4.17.21","lodash-es":"^4.17.21","@types/lodash":"^4.14.202","@types/lodash-es":"^4.17.12"}}`)));
+        }, {unsafeCleanup: true});
+        // One statement binds both, and only the default moves out of it.
+        expect(declaring).toEqual(["lodash"]);
+    });
+
     test("a self-referential type on a moved reference terminates", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {

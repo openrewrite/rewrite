@@ -259,8 +259,10 @@ module and stay behind, which is why the carry is scoped to references to the mo
 
 A whole-module move instead carries every type the module declares, wherever the file names one,
 which reaches names nothing references — a variable whose type is inferred, say. It does so only
-where the file spells that module once: a `require` or a dynamic `import` of it binds it too, and
-what any second spelling binds stays.
+where the move leaves the module bound nowhere — it takes the module whole, out of a statement
+binding nothing else, in a file that spells that module once, since a `require` or a dynamic
+`import` of it binds it as much as a statement does. Anything a surviving binding names stays,
+which is why a spelling the file keeps refuses the carry rather than risking it.
 
 ### When `maybeBind` returns `undefined`
 
