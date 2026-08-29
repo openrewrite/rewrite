@@ -4,7 +4,7 @@ import {JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
 import {emptyMarkers, markers} from "../markers";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
-import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf} from "./scope";
+import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
 import {TypeVisitor} from "../java/type-visitor";
 import {autoFormat} from "./format";
@@ -131,16 +131,13 @@ export function bindImport(
         return derived;
     }
 
-    // An import already serving this request answers it; queuing one would, on the next cycle,
-    // derive a suffixed name from the binding this call just added. A caller that named a preference
-    // takes whatever comes back; one that did not assumes the name it derived, so a binding under
-    // any other name would leave the references it emits unbound.
+    // An import already serving this request answers it, under whatever name the file gave it —
+    // only a pinned alias, returned above, asks for a binding of its own. Queuing a second import
+    // would, on the next cycle, derive a suffixed name from the binding this call just added.
     const scope = scopeOf(cursor);
     for (const binding of moduleScopeBindings(cu)) {
         if (binding.module === module && binding.member === memberName(options.member) &&
-            binding.typeOnly === typeOnly && scope.declaringScope(binding.name) === cu &&
-            (options.preferredName !== undefined || anyNameAnswers(options) ||
-                binding.name === derived)) {
+            binding.typeOnly === typeOnly && scope.declaringScope(binding.name) === cu) {
             return binding.name;
         }
     }
@@ -243,6 +240,65 @@ export function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[
     }
 
     return bindings;
+}
+
+/** Whether a top-level statement already marks the file as a module: an import or any export form. */
+export function hasEsmSyntax(cu: JS.CompilationUnit): boolean {
+    return cu.statements.some(stmt => {
+        const element = stmt.element;
+        // `export {a, b}`, `export * from` and `export default` are their own statement kinds;
+        // `export class`/`function`/`const` instead carry `export` as a modifier on the
+        // declaration itself, the same way TypeScript's own AST models it.
+        const modifiers = (element as {modifiers?: J.Modifier[]} | undefined)?.modifiers;
+        return element?.kind === JS.Kind.Import ||
+            element?.kind === JS.Kind.ExportDeclaration ||
+            element?.kind === JS.Kind.ExportAssignment ||
+            (modifiers?.some(m => m.keyword === "export") ?? false);
+    }) || hasTopLevelAwait(cu);
+}
+
+/**
+ * Whether a statement holds an `await` outside any function of its own — legal only at module
+ * top level, unlike an `await` inside an `async function`, which says nothing about the file.
+ */
+function hasTopLevelAwait(cu: JS.CompilationUnit): boolean {
+    let found = false;
+    walk(cu.statements, node => {
+        if (found) {
+            return false;
+        }
+        if (node.kind === JS.Kind.Await) {
+            found = true;
+            return false;
+        }
+        return node.kind !== J.Kind.MethodDeclaration && node.kind !== J.Kind.Lambda;
+    });
+    return found;
+}
+
+/** Whether the file binds its modules with `require`, which decides whether a create is possible. */
+export function isCommonJs(cu: JS.CompilationUnit): boolean {
+    if (cu.sourcePath.endsWith(".cjs") || cu.sourcePath.endsWith(".cts")) {
+        return true;
+    }
+    // Node treats these as ES modules regardless of what they contain, the same way
+    // `determineImportStyle` reads them as ES6-preferring; `.js`/`.ts`/`.tsx` stay ambiguous and
+    // fall through to the statements below.
+    if (cu.sourcePath.endsWith(".mjs") || cu.sourcePath.endsWith(".mts")) {
+        return false;
+    }
+    if (hasEsmSyntax(cu)) {
+        return false;
+    }
+    return cu.statements.some(stmt =>
+        declarationsOf(stmt.element).some(d => requiredModuleOfDeclaration(d) !== undefined));
+}
+
+/** The module a `const X = require('m')` declaration names, for the one variable it declares. */
+export function requiredModuleOfDeclaration(declaration: J.VariableDeclarations): string | undefined {
+    return declaration.variables.length === 1
+        ? requiredModule(declaration.variables[0].element?.initializer?.element)
+        : undefined;
 }
 
 /** The module a `require('...')` initializer names, `undefined` for an initializer that is anything else. */
@@ -497,6 +553,12 @@ async function formatMergedImport<P>(cu: JS.CompilationUnit, id: UUID, p: P): Pr
     return getPrettierStyle(cu)?.ignored === false ? formatImport(cu, id, p) : cu;
 }
 
+/**
+ * Adds the import {@link AddImportOptions} describes, under the name derived there. An import
+ * already in the file answers where it binds that same name, or where the request expressed no
+ * preference at all. Reuse under some other name belongs to {@link bindImport}, whose caller
+ * learns which name came back; a recipe driving this visitor is stuck with the one it derived.
+ */
 export class AddImport<P> extends JavaScriptVisitor<P> {
     readonly module: string;
     /** Set when the caller supplied the module specifier as a literal; printed verbatim. */
@@ -743,11 +805,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        // Add the import using the appropriate style
-        if (importStyle === ImportStyle.CommonJS) {
-            // TODO: Implement CommonJS require creation
-            // For now, fall back to ES6 imports
-            // return this.addCommonJSRequire(compilationUnit, p);
+        // TODO: create a `require` here. Until then the request goes unserved, since `import` would
+        // make a file that binds its modules with `require` an ES module and change how everything
+        // in it loads — `maybeBind` refuses it for the same reason. An explicit ES6 `style`
+        // overrides, which is how a caller converting the file to ESM asks for one.
+        if (importStyle === ImportStyle.CommonJS && isCommonJs(compilationUnit)) {
+            return compilationUnit;
         }
 
         // Add ES6 import (handles ES6Named, ES6Namespace, ES6Default)

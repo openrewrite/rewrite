@@ -396,6 +396,31 @@ describe('AddImport visitor', () => {
                 new AddImport({ module: "react", member: "default" });
             }).toThrow("When member is 'default', the alias parameter is required");
         });
+
+        test('a pinned alias gets a default import of its own beside the one already there', async () => {
+            // The alias is taken verbatim, so the default import already there does not answer the
+            // request; two statements binding the same export are legal.
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'default',
+                alias: 'R',
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import React from 'react';
+                    `,
+                    `
+                        import React from 'react';
+                        import R from 'react';
+                    `
+                )
+            );
+        });
     });
 
     describe('import positioning', () => {
@@ -656,6 +681,23 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('binds the name it was given even where an alias already imports that member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile as rf} from 'fs';
+                    `,
+                    `
+                        import {readFile, readFile as rf} from 'fs';
+                    `
+                )
+            );
+        });
     });
 
     describe('CommonJS require detection', () => {
@@ -708,6 +750,45 @@ describe('AddImport visitor', () => {
                         function example() {
                             read('test.txt', (err, data) => {});
                         }
+                    `
+                )
+            );
+        });
+
+        test('a CommonJS file gains no import, unlike one that merely requires alongside its imports', async () => {
+            const addReadFile = () => fromVisitor(
+                new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            const commonJs = new RecipeSpec();
+            commonJs.recipe = addReadFile();
+            //language=javascript
+            await commonJs.rewriteRun(
+                javascript(
+                    `
+                        const other = require('other');
+
+                        readFile('test.txt');
+                    `
+                )
+            );
+
+            // The require is the file's only binding of `fs`, so the style it suggests is CommonJS;
+            // the file is an ES module all the same, and that is what decides.
+            const mixed = new RecipeSpec();
+            mixed.recipe = addReadFile();
+            //language=typescript
+            await mixed.rewriteRun(
+                typescript(
+                    `
+                        import path from 'path';
+
+                        const fs = require('fs');
+                    `,
+                    `
+                        import path from 'path';
+                        import {readFile} from 'fs';
+
+                        const fs = require('fs');
                     `
                 )
             );
@@ -1335,6 +1416,22 @@ describe('AddImport visitor', () => {
                 new AddImport({ module: "react", sideEffectOnly: true, onlyIfReferenced: true });
             }).toThrow("Cannot combine sideEffectOnly with onlyIfReferenced");
         });
+
+        test('a file that binds its modules with require gains no side-effect import', async () => {
+            // A side-effect import binds no name, but `import` still makes the file an ES module,
+            // where its own `require` calls do not resolve.
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'core-js/stable', sideEffectOnly: true}));
+
+            //language=javascript
+            await spec.rewriteRun(
+                javascript(
+                    `
+                        const other = require('other');
+                    `
+                )
+            );
+        });
     });
 
     describe('namespace imports', () => {
@@ -1468,6 +1565,26 @@ describe('AddImport visitor', () => {
                         function example() {
                             const bytes = crypto.randomBytes(16);
                         }
+                    `
+                )
+            );
+        });
+
+        test('a namespace import does not answer a request for a named member', async () => {
+            // The namespace object binds no member name of its own, and one clause holds either
+            // `* as fs` or `{readFile}`, never both, so the named binding needs its own statement.
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as fs from 'fs';
+                    `,
+                    `
+                        import * as fs from 'fs';
+                        import {readFile} from 'fs';
                     `
                 )
             );
@@ -2890,7 +3007,7 @@ describe('AddImport visitor', () => {
             expect(bound.name).toBe('readFile');
         });
 
-        test('a binding renamed where it is declared does not answer a request that named no preference', async () => {
+        test('a binding renamed where it is declared answers a request that named no preference', async () => {
             const spec = new RecipeSpec();
             const bound: string[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
@@ -2909,19 +3026,11 @@ describe('AddImport visitor', () => {
 
                         useS(0);
                         wf('x');
-                    `,
-                    `
-                        import {useState as useS, useState} from 'react';
-                        import {writeFile} from 'fs/promises';
-                        const {writeFile: wf} = require('fs/promises');
-
-                        useS(0);
-                        wf('x');
                     `
                 )
             );
 
-            expect(bound).toEqual(['useState', 'writeFile']);
+            expect(bound).toEqual(['useS', 'wf']);
         });
 
         test('a namespace or type declaration shadows an import just as a value declaration does', async () => {
