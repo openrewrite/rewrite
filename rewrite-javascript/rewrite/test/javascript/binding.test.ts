@@ -1100,9 +1100,9 @@ describe("maybeRebind", () => {
         ));
     });
 
-    test("the moved binding's attribution names the module it moved to", async () => {
+    test("the moved binding's attribution names what it moved to, and a sibling's is left alone", async () => {
         const spec = new RecipeSpec();
-        const declaring: (string | undefined)[] = [];
+        const attribution: string[] = [];
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
                 maybeRebind(this, {
@@ -1115,22 +1115,180 @@ describe("maybeRebind", () => {
         await withDir(async (repo) => {
             await spec.rewriteRun(npm(repo.path, {
                 ...typescript(
-                    `import { extend } from 'lodash';\n\nextend({}, {});\n`,
-                    `import { assign } from 'lodash-es';\n\nassign({}, {});\n`),
+                    `import { extend, flatten } from 'lodash';\n\nextend({}, {});\nflatten([[1]]);\n`,
+                    `import { flatten } from 'lodash';\nimport { assign } from 'lodash-es';\n\nassign({}, {});\nflatten([[1]]);\n`),
                 afterRecipe: async (cu: any) => {
                     await new class extends JavaScriptVisitor<any> {
                         override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
                             const declaringType = m.methodType?.declaringType;
-                            declaring.push(declaringType && Type.isFullyQualified(declaringType)
+                            attribution.push(`${declaringType && Type.isFullyQualified(declaringType)
                                 ? Type.FullyQualified.getFullyQualifiedName(declaringType as any)
-                                : undefined);
+                                : undefined}.${m.methodType?.name}`);
                             return m;
                         }
                     }().visit(cu, undefined);
                 }
-            } as any, packageJson(`{"name":"t","dependencies":{"lodash":"^4.17.21","lodash-es":"^4.17.21"}}`)));
+            } as any, packageJson(`{"name":"t","dependencies":{"lodash":"^4.17.21","lodash-es":"^4.17.21","@types/lodash":"^4.14.202","@types/lodash-es":"^4.17.12"}}`)));
         }, {unsafeCleanup: true});
-        expect(declaring).toEqual(["lodash-es"]);
+        // The member's own name moves with it; `flatten` was imported beside it and did not move.
+        expect(attribution).toEqual(["lodash-es.assign", "lodash.flatten"]);
+    });
+
+    test("a whole module's move carries a type it declares, named where nothing references it", async () => {
+        const spec = new RecipeSpec();
+        const declared: (string | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "lodash", member: "*"}, to: {module: "lodash-es", member: "*"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await withDir(async (repo) => {
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import * as _ from 'lodash';\n\nlet d: _.Dictionary<string>;\n`,
+                    `import * as _ from 'lodash-es';\n\nlet d: _.Dictionary<string>;\n`),
+                afterRecipe: async (cu: any) => {
+                    await new class extends JavaScriptVisitor<any> {
+                        override async visitIdentifier(i: J.Identifier, p: any): Promise<J | undefined> {
+                            if (i.simpleName === "d" && i.type && Type.isFullyQualified(i.type)) {
+                                declared.push(Type.FullyQualified.getFullyQualifiedName(i.type as any));
+                            }
+                            return i;
+                        }
+                    }().visit(cu, undefined);
+                }
+            } as any, packageJson(`{"name":"t","dependencies":{"lodash":"^4.17.21","lodash-es":"^4.17.21","@types/lodash":"^4.14.202","@types/lodash-es":"^4.17.12"}}`)));
+        }, {unsafeCleanup: true});
+        // `d` names the type but references no binding, so only the module's move reaches it.
+        expect(declared).toEqual(["lodash-es../index.Dictionary"]);
+    });
+
+    test("a whole module's move leaves the attribution alone where the file names it elsewhere", async () => {
+        const spec = new RecipeSpec();
+        const declaring: (string | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "lodash", member: "*"}, to: {module: "lodash-es", member: "*"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await withDir(async (repo) => {
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import * as _ from 'lodash';\nimport { flatten } from 'lodash';\n\n_.assign({}, {});\nflatten([[1]]);\n`,
+                    `import * as _ from 'lodash-es';\nimport { flatten } from 'lodash';\n\n_.assign({}, {});\nflatten([[1]]);\n`),
+                afterRecipe: async (cu: any) => {
+                    await new class extends JavaScriptVisitor<any> {
+                        override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                            if (m.name.simpleName === "flatten") {
+                                const d = m.methodType?.declaringType;
+                                declaring.push(d && Type.isFullyQualified(d) ? Type.FullyQualified.getFullyQualifiedName(d as any) : undefined);
+                            }
+                            return super.visitMethodInvocation(m, p);
+                        }
+                    }().visit(cu, undefined);
+                }
+            } as any, packageJson(`{"name":"t","dependencies":{"lodash":"^4.17.21","lodash-es":"^4.17.21","@types/lodash":"^4.14.202","@types/lodash-es":"^4.17.12","@types/node":"^20.0.0"}}`)));
+        }, {unsafeCleanup: true});
+        // `flatten` is still imported from `lodash`, so the module it names outlives the move.
+        expect(declaring).toEqual(["lodash"]);
+    });
+
+    test("a member moved onto a default binding keeps a name, since a default declares none", async () => {
+        const spec = new RecipeSpec();
+        const names: (string | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {
+                    from: {module: "lodash", member: "extend"},
+                    to: {module: "lodash-es", member: "default"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await withDir(async (repo) => {
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import { extend, flatten } from 'lodash';\n\nextend({}, {});\nflatten([[1]]);\n`,
+                    `import { flatten } from 'lodash';\nimport extend from 'lodash-es';\n\nextend({}, {});\nflatten([[1]]);\n`),
+                afterRecipe: async (cu: any) => {
+                    await new class extends JavaScriptVisitor<any> {
+                        override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                            if (m.name.simpleName === "extend") {
+                                names.push(m.methodType?.name);
+                            }
+                            return super.visitMethodInvocation(m, p);
+                        }
+                    }().visit(cu, undefined);
+                }
+            } as any, packageJson(`{"name":"t","dependencies":{"lodash":"^4.17.21","lodash-es":"^4.17.21","@types/lodash":"^4.14.202","@types/lodash-es":"^4.17.12","@types/node":"^20.0.0"}}`)));
+        }, {unsafeCleanup: true});
+        // `Type.Method.name` is declared `string`, so the move has to leave one behind.
+        expect(names).toEqual(["extend"]);
+    });
+
+    test("a constructed reference's attribution moves with the binding", async () => {
+        const spec = new RecipeSpec();
+        const declaring: (string | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {
+                    from: {module: "events", member: "EventEmitter"},
+                    to: {module: "node:events", member: "EventEmitter"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await withDir(async (repo) => {
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import { EventEmitter } from 'events';\n\nconst e = new EventEmitter();\n`,
+                    `import { EventEmitter } from 'node:events';\n\nconst e = new EventEmitter();\n`),
+                afterRecipe: async (cu: any) => {
+                    await new class extends JavaScriptVisitor<any> {
+                        override async visitNewClass(nc: J.NewClass, p: any): Promise<J | undefined> {
+                            const d = nc.constructorType?.declaringType;
+                            declaring.push(d && Type.isFullyQualified(d) ? Type.FullyQualified.getFullyQualifiedName(d as any) : undefined);
+                            return super.visitNewClass(nc, p);
+                        }
+                    }().visit(cu, undefined);
+                }
+            } as any, packageJson(`{"name":"t","dependencies":{"lodash":"^4.17.21","lodash-es":"^4.17.21","@types/lodash":"^4.14.202","@types/lodash-es":"^4.17.12","@types/node":"^20.0.0"}}`)));
+        }, {unsafeCleanup: true});
+        expect(declaring).toEqual(["node:events"]);
+    });
+
+    test("an optionally called reference's attribution moves with the binding", async () => {
+        const spec = new RecipeSpec();
+        const attribution: string[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {
+                    from: {module: "lodash", member: "extend"},
+                    to: {module: "lodash-es", member: "assign"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await withDir(async (repo) => {
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import { extend } from 'lodash';\n\nextend?.({}, {});\n`,
+                    `import { assign } from 'lodash-es';\n\nassign?.({}, {});\n`),
+                afterRecipe: async (cu: any) => {
+                    await new class extends JavaScriptVisitor<any> {
+                        override async visitFunctionCall(fc: JS.FunctionCall, p: any): Promise<J | undefined> {
+                            const d = fc.methodType?.declaringType;
+                            attribution.push(`${d && Type.isFullyQualified(d) ? Type.FullyQualified.getFullyQualifiedName(d as any) : undefined}.${fc.methodType?.name}`);
+                            return super.visitFunctionCall(fc, p);
+                        }
+                    }().visit(cu, undefined);
+                }
+            } as any, packageJson(`{"name":"t","dependencies":{"lodash":"^4.17.21","lodash-es":"^4.17.21","@types/lodash":"^4.14.202","@types/lodash-es":"^4.17.12"}}`)));
+        }, {unsafeCleanup: true});
+        // An optional call is a `JS.FunctionCall`, which carries its own method type.
+        expect(attribution).toEqual(["lodash-es.assign"]);
     });
 
     test("a self-referential type on a moved reference terminates", async () => {

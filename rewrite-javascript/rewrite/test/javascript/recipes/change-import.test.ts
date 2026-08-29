@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import { RecipeSpec } from "../../../src/test";
-import { ChangeImport, npm, packageJson, tsx, typescript } from "../../../src/javascript";
+import { ChangeImport, JavaScriptVisitor, npm, packageJson, tsx, typescript } from "../../../src/javascript";
+import { J, Type } from "../../../src/java";
 import { withDir } from "tmp-promise";
 
 describe("change-import", () => {
@@ -595,5 +596,48 @@ describe("change-import", () => {
                 );
             }, { unsafeCleanup: true });
         });
+    });
+
+    test("the moved member's attribution follows it, and a sibling's stays behind", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new ChangeImport({
+            oldModule: "lodash",
+            oldMember: "extend",
+            newModule: "lodash-es",
+            newMember: "assign"
+        });
+        const attribution: string[] = [];
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(repo.path, {
+                    ...typescript(
+                        `import { extend, flatten } from 'lodash';\n\nextend({}, {});\nflatten([[1]]);\n`,
+                        `import { flatten } from 'lodash';\nimport { assign } from 'lodash-es';\n\nassign({}, {});\nflatten([[1]]);\n`),
+                    afterRecipe: async (cu: any) => {
+                        await new class extends JavaScriptVisitor<any> {
+                            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                                const declaringType = m.methodType?.declaringType;
+                                attribution.push(`${declaringType && Type.isFullyQualified(declaringType)
+                                    ? Type.FullyQualified.getFullyQualifiedName(declaringType as any)
+                                    : undefined}.${m.methodType?.name}`);
+                                return m;
+                            }
+                        }().visit(cu, undefined);
+                    }
+                } as any, packageJson(`{
+                    "name": "test",
+                    "dependencies": {
+                        "lodash": "^4.17.21",
+                        "lodash-es": "^4.17.21",
+                        "@types/lodash": "^4.14.202",
+                        "@types/lodash-es": "^4.17.12"
+                    }
+                }`))
+            );
+        }, { unsafeCleanup: true });
+
+        // Printing does not show a method type's module, so this is what pins the sibling's.
+        expect(attribution).toEqual(["lodash-es.assign", "lodash.flatten"]);
     });
 });
