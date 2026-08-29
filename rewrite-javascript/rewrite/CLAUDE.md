@@ -252,17 +252,18 @@ pass rather than run it alongside.
 ### What a rebind's attribution follows
 
 The move carries the attribution of what it moved, so `UsesType` and any recipe matching on types
-read the new module rather than the old one. A member move carries that member alone — its
-`Type.Method`/`Type.Variable` name is the module's name for it, never the local alias, so it
-follows the member rather than the binding. Siblings imported beside it are named under that same
-module and stay behind, which is why the carry is scoped to references to the moved binding.
+read the new module rather than the old one. It reaches the references of the moved binding and
+nothing else: a member's `Type.Method`/`Type.Variable` name is the module's name for it, never the
+local alias, so it follows the member rather than the binding, while a sibling named under that
+same module stays behind.
 
-A whole-module move instead carries every type the module declares, wherever the file names one,
-which reaches names nothing references — a variable whose type is inferred, say. It does so only
-where the move leaves the module bound nowhere — it takes the module whole, out of a statement
-binding nothing else, in a file that spells that module once, since a `require` or a dynamic
-`import` of it binds it as much as a statement does. Anything a surviving binding names stays,
-which is why a spelling the file keeps refuses the carry rather than risking it.
+A name the move does not reach keeps the attribution it had — a variable whose type is inferred
+from the moved binding, say. That boundary is deliberate: reaching those means rewriting by
+qualified name across the file, and a qualified name cannot tell a sibling's type from the moved
+one, nor a type another module re-exports from one the move applies to.
+
+Moving a whole module carries nothing, since the mapper attributes what a default or namespace
+binding declares to that declaration's own shape rather than to the module's name.
 
 ### When `maybeBind` returns `undefined`
 
