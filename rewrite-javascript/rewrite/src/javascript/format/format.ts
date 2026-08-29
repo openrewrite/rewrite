@@ -362,9 +362,12 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                     const afterClause = draft.importClause.name || draft.importClause.typeOnly ? " " : "";
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
-                        // For named imports the space before `{` sits in the container, as the parser writes it
-                        ni.prefix.whitespace = "";
-                        ni.elements.before.whitespace = afterClause;
+                        // For named imports the space before `{` sits in the container, as the parser
+                        // writes it; a newline there is layout, which spacing does not decide
+                        if (!ni.prefix.whitespace.includes("\n") && !ni.elements.before.whitespace.includes("\n")) {
+                            ni.prefix.whitespace = "";
+                            ni.elements.before.whitespace = afterClause;
+                        }
                         const isMultiLine = ni.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
                         if (!isMultiLine) {
                             const braceSpace = this.style.within.es6ImportExportBraces ? " " : "";
