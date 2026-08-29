@@ -2,7 +2,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, Type} from "../java";
 import {JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
-import {emptyMarkers, findMarker, markers} from "../markers";
+import {emptyMarkers, markers} from "../markers";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
 import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf} from "./scope";
 import {create as produce, Draft} from "mutative";
@@ -21,8 +21,9 @@ export enum ImportStyle {
 
 export interface AddImportOptions {
     /** The module name (e.g., 'fs', 'react') to import from.
-     * Pass a `J.Literal` to reuse its source form verbatim, which carries the quoting,
-     * escapes and unicode form of a specifier being moved from elsewhere in the source. */
+     * Pass a `J.Literal` to reuse its source form, which carries the escapes and unicode form of a
+     * specifier being moved from elsewhere in the source. A Prettier configuration settles the
+     * quoting; see `quoteStyle`. */
     module: string | J.Literal;
 
     /** Optionally, the specific member to import from the module.
@@ -64,7 +65,8 @@ export interface AddImportOptions {
     style?: ImportStyle;
 
     /** Quote character for the module specifier. If not specified, detected from the file.
-     * A `J.Literal` module carries its own quoting and takes precedence over this. */
+     * A `J.Literal` module carries its own quoting and takes precedence over this. A Prettier
+     * configuration outranks both, since running Prettier would arrive at its quote anyway. */
     quoteStyle?: QuoteChar;
 }
 
@@ -492,7 +494,7 @@ async function formatImport<P>(cu: JS.CompilationUnit, id: UUID, p: P): Promise<
  * repository-wide style does, and the merge reads it directly.
  */
 async function formatMergedImport<P>(cu: JS.CompilationUnit, id: UUID, p: P): Promise<JS.CompilationUnit> {
-    return findMarker(cu, StyleKind.PrettierStyle) ? formatImport(cu, id, p) : cu;
+    return getPrettierStyle(cu)?.ignored === false ? formatImport(cu, id, p) : cu;
 }
 
 export class AddImport<P> extends JavaScriptVisitor<P> {
@@ -1446,7 +1448,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             importClause,
             moduleSpecifier: {
                 kind: J.Kind.LeftPadded,
-                // A clause ending in a name carries the space before `from` itself; one ending in `}` does not
+                // Bindings end at `}`, so the space before `from` sits here; a default import's name
+                // and a side-effect import's literal carry their own
                 before: importClause?.namedBindings ? singleSpace : emptySpace,
                 element: moduleSpecifier,
                 markers: emptyMarkers

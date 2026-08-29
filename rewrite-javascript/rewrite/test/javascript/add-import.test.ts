@@ -1889,6 +1889,29 @@ describe('AddImport visitor', () => {
             );
         });
 
+        test('a Prettier configuration outranks an explicitly requested quote', async () => {
+            const spec = new RecipeSpec();
+            const addImport = new AddImport({module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false});
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    return await addImport.visit(withPrettierStyle(cu, {singleQuote: true}), p);
+                }
+            });
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import { readFile } from 'fs';
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+
         test('a merged import Prettier can no longer fit on one line wraps', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(addImportUnderPrettier(
