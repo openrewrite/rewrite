@@ -104,7 +104,7 @@ describe('SpacesVisitor', () => {
             ));
     });
 
-    test('an inline type specifier keeps one space before the name it qualifies', () => {
+    test('an inline type specifier in an export keeps one space before the name it qualifies', () => {
         spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
         return spec.rewriteRun(
             // @formatter:off
@@ -129,6 +129,21 @@ describe('SpacesVisitor', () => {
                 `,
                 `
                 export {A, B as C, d} from 'm';
+                `
+                // @formatter:on
+            ));
+    });
+
+    test('an inline type specifier in an import keeps one space before the name it qualifies', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                import {type  A, type	B as C, d} from 'm';
+                `,
+                `
+                import {type A, type B as C, d} from 'm';
                 `
                 // @formatter:on
             ));
