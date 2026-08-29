@@ -249,6 +249,21 @@ A caller that renames references itself defeats this: the name it writes in is t
 wants, so the collision check sees it as taken and the binding keeps an alias instead. Drop such a
 pass rather than run it alongside.
 
+### What a rebind's attribution follows
+
+The move carries the attribution of what it moved, so `UsesType` and any recipe matching on types
+read the new module rather than the old one. A member move carries that member alone — its
+`Type.Method`/`Type.Variable` name is the module's name for it, never the local alias, so it
+follows the member rather than the binding. Siblings imported beside it are named under that same
+module and stay behind, which is why the carry is scoped to references to the moved binding.
+
+A whole-module move instead carries every type the module declares, wherever the file names one,
+which reaches names nothing references — a variable whose type is inferred, say. It does so only
+where the move leaves the module bound nowhere — it takes the module whole, out of a statement
+binding nothing else, in a file that spells that module once, since a `require` or a dynamic
+`import` of it binds it as much as a statement does. Anything a surviving binding names stays,
+which is why a spelling the file keeps refuses the carry rather than risking it.
+
 ### When `maybeBind` returns `undefined`
 
 - the block's dependency and parameter counts already disagree, in either direction
