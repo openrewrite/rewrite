@@ -262,8 +262,8 @@ from the moved binding, say. That boundary is deliberate: reaching those means r
 qualified name across the file, and a qualified name cannot tell a sibling's type from the moved
 one, nor a type another module re-exports from one the move applies to.
 
-Moving a whole module carries nothing, since the mapper attributes what a default or namespace
-binding declares to that declaration's own shape rather than to the module's name.
+Moving a whole module carries the types named after the module itself. A type attributed to a
+binding's own declared shape rather than to the module name stays where it is.
 
 ### When `maybeBind` returns `undefined`
 

@@ -2121,7 +2121,6 @@ class MovedTypes extends TypeVisitor<undefined> {
             : {...visited, fullyQualifiedName: moved} as Type.Class;
     }
 
-
     protected override async visitMethod(method: Type.Method, p: undefined): Promise<Type | undefined> {
         const visited = await super.visitMethod(method, p) as Type.Method;
         return this.declaresMovedMember(visited.name, visited.declaringType)

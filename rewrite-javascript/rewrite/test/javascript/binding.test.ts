@@ -1167,6 +1167,34 @@ describe("maybeRebind", () => {
         expect(names).toEqual(["extend"]);
     });
 
+    test("a whole-module move carries the types named after the module", async () => {
+        const spec = new RecipeSpec();
+        const named: (string | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "events"}, to: {module: "node:events"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await withDir(async (repo) => {
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import ev from 'events';\n\nconst e = new ev();\n`,
+                    `import ev from 'node:events';\n\nconst e = new ev();\n`),
+                afterRecipe: async (cu: any) => {
+                    await new class extends JavaScriptVisitor<any> {
+                        override async visitNewClass(nc: J.NewClass, p: any): Promise<J | undefined> {
+                            const d = nc.constructorType?.declaringType;
+                            named.push(d && Type.isFullyQualified(d) ? Type.FullyQualified.getFullyQualifiedName(d as any) : undefined);
+                            return super.visitNewClass(nc, p);
+                        }
+                    }().visit(cu, undefined);
+                }
+            } as any, packageJson(`{"name":"t","dependencies":{"@types/node":"^20.0.0"}}`)));
+        }, {unsafeCleanup: true});
+        expect(named).toEqual(["node:events"]);
+    }, 30000);
+
     test("a constructed reference's attribution moves with the binding", async () => {
         const spec = new RecipeSpec();
         const declaring: (string | undefined)[] = [];
