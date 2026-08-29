@@ -400,6 +400,15 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         })
     }
 
+    protected async visitImportSpecifier(importSpecifier: JS.ImportSpecifier, p: P): Promise<J | undefined> {
+        const ret = await super.visitImportSpecifier(importSpecifier, p) as JS.ImportSpecifier;
+        return produce(ret, draft => {
+            // The specifier's leading space is the brace and comma rules'; this is the
+            // gap between `type` and the name, which the name's own prefix carries
+            draft.specifier.prefix.whitespace = draft.importType.element ? " " : "";
+        });
+    }
+
     protected async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, p: P): Promise<J | undefined> {
         const ret = await super.visitIndexSignatureDeclaration(indexSignatureDeclaration, p) as JS.IndexSignatureDeclaration;
         return produce(ret, draft => {
