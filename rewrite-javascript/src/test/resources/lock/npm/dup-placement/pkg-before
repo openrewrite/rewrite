@@ -1,0 +1,9 @@
+{
+  "name": "dup-placement",
+  "version": "1.0.0",
+  "dependencies": {
+    "ansi-regex": "^6.0.0",
+    "stripa": "npm:strip-ansi@^6.0.1",
+    "stripb": "npm:strip-ansi@^6.0.1"
+  }
+}

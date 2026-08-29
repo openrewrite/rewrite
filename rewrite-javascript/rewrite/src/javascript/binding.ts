@@ -16,12 +16,15 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, scopeOf, walk} from "./scope";
-import {AddImportOptions, bindImport, existingImportBinding, memberName, moduleNameOf, RebindImport, requiredModuleOf} from "./add-import";
+import {compilationUnitOf, cursorOf, declarationsOf, namesUsedIn, scopeOf, walk} from "./scope";
+import {
+    AddImportOptions, bindImport, existingImportBinding, ExistingImportBinding, memberName, moduleNameOf,
+    nameTaken, RebindImport, requiredModuleOf
+} from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {
     AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, derivedBindingName, enclosingAmdBlock,
-    parameterNames, RebindAmdDependency, RemoveAmdDependency
+    isBindableName, parameterNames, RebindAmdDependency, RemoveAmdDependency
 } from "./amd";
 
 /**
@@ -48,7 +51,14 @@ export interface MaybeUnbindOptions {
 
 export interface MaybeRebindOptions {
     from: {module: string; member?: string};
-    to: {module: string; member?: string};
+
+    /**
+     * `alias` names the moved binding, taken verbatim. Left unset, an alias on the `from` side
+     * survives the move — `{Old as X}` becomes `{New as X}`, since `X` is a name the file chose —
+     * while an unaliased binding takes the new member's name where that name is free. Pin `alias`
+     * to the old local name to keep it. See CLAUDE.md: Which name a rebind binds.
+     */
+    to: {module: string; member?: string; alias?: string};
 
     /** Callees that introduce an AMD block. UI5 writes `sap.ui.define`, RequireJS and Dojo `define`. */
     amdCallee?: string | readonly string[];
@@ -376,9 +386,10 @@ function bindingShape(member: string | undefined): "default" | "namespace" | "na
 }
 
 /**
- * Moves the binding for `from` to `to`, keeping the local name it already had — the primitive
+ * Moves the binding for `from` to `to` and answers with the name it now carries — the primitive
  * behind a member rename or a module move. Returns `undefined`, changing nothing, where the move
- * is not safely expressible; the refusals are listed in CLAUDE.md: JavaScript module bindings.
+ * is not safely expressible; the refusals and the choice of name are listed in CLAUDE.md:
+ * JavaScript module bindings.
  */
 export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebindOptions): string | undefined {
     const amd = enclosingAmdBlock(visitor, options);
@@ -388,7 +399,10 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         }
         const index = dependencyNames(amd.block).indexOf(options.from.module);
         const binding = index < 0 ? undefined : parameterNames(amd.block)[index];
-        if (binding === undefined) {
+        if (binding === undefined ||
+            // An AMD binding's name is its factory parameter, so naming it something else means
+            // rewriting the factory's references, which this lane's dependency swap does not reach.
+            (options.to.alias !== undefined && options.to.alias !== binding)) {
             return undefined;
         }
         const callees = calleesOf(options);
@@ -414,8 +428,39 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     if (!existing.onlyMemberOfStatement && isCommonJs(cu)) {
         return undefined;
     }
-    visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName));
-    return existing.localName;
+    const boundName = rebindingName(visitor, cu, options, existing);
+    if (boundName === undefined) {
+        return undefined;
+    }
+    if (!(visitor.afterVisit || []).some(v => v instanceof RebindImport &&
+        v.from.module === options.from.module && v.from.member === options.from.member &&
+        v.localName === existing.localName)) {
+        visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName));
+    }
+    return boundName;
+}
+
+/**
+ * The name the moved binding takes, or undefined where a pinned alias cannot be bound verbatim,
+ * since deconflicting it would leave the references the caller emits unbound. The rule is
+ * CLAUDE.md: Which name a rebind binds.
+ */
+function rebindingName(
+    visitor: JavaScriptVisitor<any>,
+    cu: JS.CompilationUnit,
+    options: MaybeRebindOptions,
+    existing: ExistingImportBinding
+): string | undefined {
+    const taken = (name: string) => nameTaken(name, namesUsedIn(cu), visitor);
+    const alias = options.to.alias;
+    if (alias !== undefined) {
+        return isBindableName(alias) && (alias === existing.localName || !taken(alias)) ? alias : undefined;
+    }
+    const member = memberName(options.to.member);
+    if (existing.aliased || member === undefined || member === '*' || member === existing.localName) {
+        return existing.localName;
+    }
+    return taken(member) ? existing.localName : member;
 }
 
 /**

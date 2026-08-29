@@ -41,15 +41,16 @@ import { create as produce } from "mutative";
  * // After:  import { act } from 'react';
  *
  * @example
- * // Change which member of the module a name is bound to
+ * // Rename a member, carrying the references that resolve to it
  * const recipe = new ChangeImport({
  *     oldModule: "lodash",
  *     oldMember: "extend",
  *     newModule: "lodash",
  *     newMember: "assign"
  * });
- * // Before: import { extend } from 'lodash';
- * // After:  import { assign as extend } from 'lodash';
+ * // Before: import { extend } from 'lodash';  extend({}, {});
+ * // After:  import { assign } from 'lodash';  assign({}, {});
+ * // Adding `newAlias: "extend"` instead binds it as `import { assign as extend }`.
  */
 export class ChangeImport extends Recipe {
     readonly name = "org.openrewrite.javascript.change-import";
@@ -85,11 +86,21 @@ export class ChangeImport extends Recipe {
     })
     newMember?: string;
 
+    @Option({
+        displayName: "New alias",
+        description: "The local name to bind the new member under. Defaults to the alias the import " +
+            "already had, or to the new member name where it had none.",
+        example: "act",
+        required: false
+    })
+    newAlias?: string;
+
     constructor(options?: {
         oldModule?: string;
         oldMember?: string;
         newModule?: string;
         newMember?: string;
+        newAlias?: string;
     }) {
         super(options);
     }
@@ -99,6 +110,7 @@ export class ChangeImport extends Recipe {
         const oldMember = this.oldMember;
         const newModule = this.newModule;
         const newMember = this.newMember ?? oldMember;
+        const newAlias = this.newAlias;
 
         // Build the old and new FQNs for type attribution updates
         const oldFqn = oldMember === 'default' || oldMember === '*'
@@ -114,7 +126,7 @@ export class ChangeImport extends Recipe {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
                 this.hasOldImport = maybeRebind(this, {
                     from: {module: oldModule, member: oldMember},
-                    to: {module: newModule, member: newMember}
+                    to: {module: newModule, member: newMember, alias: newAlias}
                 }) !== undefined;
 
                 return super.visitJsCompilationUnit(cu, ctx);
