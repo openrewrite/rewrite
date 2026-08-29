@@ -2177,18 +2177,18 @@ function qualifiedName(binding: {module: string; member?: string}): string {
     return key === undefined || key === '*' ? binding.module : `${binding.module}.${key}`;
 }
 
-/** Whether one import statement alone names `module`, so no other binding of it survives a move. */
+/**
+ * Whether one place in the file spells `module`, so no other binding of it survives a move. Every
+ * spelling counts, since `require` and a dynamic `import` bind a module as much as a statement does.
+ */
 function namesModuleOnce(cu: JS.CompilationUnit, module: string): boolean {
     let named = 0;
-    for (const stmt of cu.statements) {
-        const element = stmt.element;
-        const specifier = element?.kind === JS.Kind.Import
-            ? (element as JS.Import).moduleSpecifier?.element
-            : undefined;
-        if (specifier?.kind === J.Kind.Literal && (specifier as J.Literal).value === module && ++named > 1) {
-            return false;
+    walk(cu.statements, node => {
+        if (node.kind === J.Kind.Literal && (node as J.Literal).value === module) {
+            named++;
         }
-    }
+        return true;
+    });
     return named === 1;
 }
 
