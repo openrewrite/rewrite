@@ -300,6 +300,14 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         })
     }
 
+    protected async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, p: P): Promise<J | undefined> {
+        const ret = await super.visitExportSpecifier(exportSpecifier, p) as JS.ExportSpecifier;
+        return produce(ret, draft => {
+            // `type` is separated from the name it qualifies by that name's own prefix
+            draft.specifier.prefix.whitespace = draft.typeOnly.element ? " " : "";
+        });
+    }
+
     protected async visitForLoop(forLoop: J.ForLoop, p: P): Promise<J | undefined> {
         const ret = await super.visitForLoop(forLoop, p) as J.ForLoop;
         return produceAsync(ret, async draft => {

@@ -28,10 +28,12 @@
  */
 
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {BlankLinesStyle, IntelliJ, JavaScriptParser, SpacesStyle, typescript} from "../../../src/javascript";
+import {BlankLinesStyle, IntelliJ, JavaScriptParser, JavaScriptVisitor, JS, SpacesStyle, typescript} from "../../../src/javascript";
 import {AutoformatVisitor, SpacesVisitor} from "../../../src/javascript/format";
 import {create as produce, Draft} from "mutative";
 import {MarkersKind, NamedStyles, randomId, Style} from "../../../src";
+import {J} from "../../../src/java";
+import {ExecutionContext} from "../../../src/execution";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
 
@@ -97,6 +99,36 @@ describe('SpacesVisitor', () => {
                 import e, {f} from 'ef.js';
                 import g,
                     {h} from 'gh.js';
+                `
+                // @formatter:on
+            ));
+    });
+
+    test('an inline type specifier keeps one space before the name it qualifies', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                export {type  A, type	B as C, d} from 'm';
+                `,
+                `
+                export {type A, type B as C, d} from 'm';
+                `
+                // @formatter:on
+            ));
+    });
+
+    test('a cleared inline type marker leaves no space behind', () => {
+        spec.recipe = fromVisitor(new ClearInlineTypeThenSpaces());
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+                export {type A, type B as C, d} from 'm';
+                `,
+                `
+                export {A, B as C, d} from 'm';
                 `
                 // @formatter:on
             ));
@@ -371,3 +403,16 @@ const d = {x, y, z};`
         )
     });
 });
+
+class ClearInlineTypeThenSpaces extends JavaScriptVisitor<ExecutionContext> {
+    protected override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
+        const edited = await super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
+        return new SpacesVisitor<ExecutionContext>(spaces()).visit(edited, ctx);
+    }
+
+    protected override async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, ctx: ExecutionContext): Promise<J | undefined> {
+        return produce(exportSpecifier, draft => {
+            draft.typeOnly.element = false;
+        });
+    }
+}
