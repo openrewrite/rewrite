@@ -264,6 +264,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     @Override
     public J visitPropertyAssignment(JS.PropertyAssignment propertyAssignment, RpcReceiveQueue q) {
         return propertyAssignment
+                .withModifiers(q.receiveList(propertyAssignment.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
                 .getPadding().withName(q.receive(propertyAssignment.getPadding().getName(), el -> visitRightPadded(el, q)))
                 .withAssigmentToken(q.receiveAndGet(propertyAssignment.getAssigmentToken(), toEnum(JS.PropertyAssignment.AssigmentToken.class)))
                 .withInitializer(q.receive(propertyAssignment.getInitializer(), expr -> (Expression) visitNonNull(expr, q)));
