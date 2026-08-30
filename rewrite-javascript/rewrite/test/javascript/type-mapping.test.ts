@@ -1193,6 +1193,28 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('should order union constituents by signature, not by TypeScript type id', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'value') {
+                    return Type.isUnion(type) ? `Union[${type.bounds.map(b => Type.signature(b)).join(', ')}]` : 'NOT_UNION';
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        let value: string | Error = "hello";
+                    `,
+                    `
+                        let /*~~(Union[Error, String])~~>*/value: string | Error = "hello";
+                    `
+                )
+            );
+        });
+
         test('should map intersection type', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {

@@ -417,6 +417,7 @@ export namespace JS {
      */
     export interface PropertyAssignment extends JS, Statement, TypedTree {
         readonly kind: typeof Kind.PropertyAssignment;
+        readonly modifiers: J.Modifier[];
         readonly name: J.RightPadded<Expression>;
         readonly assigmentToken: PropertyAssignment.Token;
         readonly initializer?: Expression;
