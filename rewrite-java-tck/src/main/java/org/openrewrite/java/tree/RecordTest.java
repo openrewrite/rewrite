@@ -124,6 +124,34 @@ class RecordTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8723")
+    @Test
+    void namedAttributeAnnotationOnComponentWithCompactConstructor() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              
+              @Target({ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
+              @interface PluginImplConfig {
+                  String implNameProperty();
+              }
+              """
+          ),
+          java(
+            """
+              public record MyRecord(
+                  String type,
+                  @PluginImplConfig(implNameProperty = "type") Object config) {
+                  public MyRecord {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/6401")
     @Test
     void annotationsAndRecords() {
