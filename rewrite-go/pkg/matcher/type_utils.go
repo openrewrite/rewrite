@@ -368,9 +368,7 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		}
 	case *golang.Composite:
 		return n.Type
-	// A type spelling holds what the checker made of it. A spelling no checker
-	// saw — one a recipe built — falls back to its parts, in the shape the type
-	// mapper gives the Go type those parts spell.
+	// A type spelling holds what the checker made of it.
 	case *golang.FuncType:
 		return n.Type
 	case *golang.StructType:
@@ -385,8 +383,9 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		return n.Type
 	case *golang.IndexList:
 		return n.Type
-	// A pointer's parts give the type it points to; the type mapper draws no
-	// distinction between `T` and `*T`.
+	// The four below also read their parts, which is all a spelling no checker
+	// saw — one a recipe built — has to go on. A pointer's parts give the type
+	// it points to; the type mapper draws no distinction between `T` and `*T`.
 	case *golang.PointerType:
 		if n.Type != nil {
 			return n.Type

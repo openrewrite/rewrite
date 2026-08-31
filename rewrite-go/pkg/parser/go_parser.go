@@ -3193,6 +3193,8 @@ func (ctx *parseContext) valueTypeOf(expr ast.Expr) java.JavaType {
 
 // resultsType reads a result list's types off the syntax. A field declaring
 // several names contributes one result per name, the way go/types counts them.
+// A tuple naming one member it could not resolve would read as a type while
+// carrying a hole, so an unattributed member leaves the whole list unattributed.
 func (ctx *parseContext) resultsType(results *ast.FieldList) java.JavaType {
 	var types []java.JavaType
 	for _, field := range results.List {
@@ -3201,7 +3203,11 @@ func (ctx *parseContext) resultsType(results *ast.FieldList) java.JavaType {
 			n = 1
 		}
 		for i := 0; i < n; i++ {
-			types = append(types, ctx.valueTypeOf(field.Type))
+			t := ctx.valueTypeOf(field.Type)
+			if t == nil {
+				return nil
+			}
+			types = append(types, t)
 		}
 	}
 	return tupleType(types)
@@ -3916,8 +3922,9 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 	return &java.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
 }
 
-// mapEllipsis maps the `...` standing for an array's elided length in
-// `[...]T{...}`. It names no type, so the slot stays empty.
+// mapEllipsis maps a `...`: a parameter's `...T`, which mapFieldListAsParams
+// unwraps into VariableDeclarations.Varargs, and the elided array length of
+// `[...]T{...}`, which is the form that survives as a golang.Variadic.
 func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) java.Expression {
 	prefix := ctx.prefix(expr.Ellipsis)
 	ctx.skip(3) // "..."
