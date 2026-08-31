@@ -3709,7 +3709,7 @@ func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Spa
 	i := 0
 	for i < len(s.Comments) {
 		c := s.Comments[i]
-		if c.Kind != java.LineComment {
+		if c.Multiline {
 			break
 		}
 		name, sep, args, ok := parseDirective(c.Text)
@@ -3740,10 +3740,7 @@ func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Spa
 // like `nolint` aren't of the form `PREFIX:NAME` and are left as
 // regular comments.)
 func parseDirective(text string) (name, sep, args string, ok bool) {
-	if !strings.HasPrefix(text, "//") {
-		return "", "", "", false
-	}
-	inner := text[2:]
+	inner := text
 	colonIdx := strings.Index(inner, ":")
 	if colonIdx <= 0 {
 		return "", "", "", false
