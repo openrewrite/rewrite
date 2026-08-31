@@ -33,6 +33,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -189,7 +190,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 String artifact = pom.getValue(tag.getChildValue("artifactId").orElse(null));
                 if (group != null && artifact != null) {
                     accumulator.propertyConsumers
-                            .computeIfAbsent(propertyKey(mrr, propertyName), key -> new HashSet<>())
+                            .computeIfAbsent(propertyKey(mrr, propertyName), key -> ConcurrentHashMap.newKeySet())
                             .add(new GroupArtifact(group, artifact));
                 }
             }
@@ -464,11 +465,22 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             /**
              * Answered once per coordinate, as the POMs that reach the same property each see different
              * repositories, and would otherwise be able to reach opposite conclusions.
+             * <p>
+             * The probe deliberately runs outside of the map, rather than inside a {@code computeIfAbsent}
+             * mapping function: it blocks for as long as the download takes, and a mapping function that slow
+             * stalls every other writer whose key lands in the same bin. Losing the race costs only a repeated
+             * probe, which {@code MavenPomCache} on the execution context already dedupes, and the value that
+             * won is returned so that all callers still see a single verdict.
              */
             private boolean versionExists(GroupArtifact ga, String version, ExecutionContext ctx) {
-                return accumulator.versionExistence.computeIfAbsent(
-                        new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), version),
-                        gav -> downloadableVersion(ga, version, ctx));
+                GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), version);
+                Boolean known = accumulator.versionExistence.get(gav);
+                if (known != null) {
+                    return known;
+                }
+                boolean exists = downloadableVersion(ga, version, ctx);
+                Boolean won = accumulator.versionExistence.putIfAbsent(gav, exists);
+                return won != null ? won : exists;
             }
 
             private boolean downloadableVersion(GroupArtifact ga, String version, ExecutionContext ctx) {
@@ -710,15 +722,20 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Value
     public static class Accumulator {
-        Set<GroupArtifact> projectArtifacts = new HashSet<>();
-        Set<PomProperty> pomProperties = new HashSet<>();
+        Set<GroupArtifact> projectArtifacts = ConcurrentHashMap.newKeySet();
+        Set<PomProperty> pomProperties = ConcurrentHashMap.newKeySet();
 
         /**
          * Property to the dependencies whose version resolves through it, across all POMs in the project.
          */
-        Map<PropertyKey, Set<GroupArtifact>> propertyConsumers = new HashMap<>();
+        Map<PropertyKey, Set<GroupArtifact>> propertyConsumers = new ConcurrentHashMap<>();
 
-        Map<GroupArtifactVersion, Boolean> versionExistence = new HashMap<>();
+        /**
+         * Whether a version is published for a coordinate. Unlike the rest of the accumulator this is written
+         * during the edit phase, which runs source files in parallel, so every field here has to tolerate
+         * concurrent writers.
+         */
+        Map<GroupArtifactVersion, Boolean> versionExistence = new ConcurrentHashMap<>();
     }
 
     @Value
