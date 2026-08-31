@@ -55,6 +55,17 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         return async.withStatement(visitAndCast(async.getStatement(), p));
     }
 
+    public J visitShebang(Py.Shebang shebang, P p) {
+        shebang = shebang.withPrefix(visitSpace(shebang.getPrefix(), PySpace.Location.SHEBANG_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(shebang, p);
+        if (!(tempStatement instanceof Py.Shebang))
+        {
+            return tempStatement;
+        }
+        shebang = (Py.Shebang) tempStatement;
+        return shebang.withMarkers(visitMarkers(shebang.getMarkers(), p));
+    }
+
     public J visitAwait(Py.Await await, P p) {
         await = await.withPrefix(visitSpace(await.getPrefix(), PySpace.Location.AWAIT_PREFIX, p));
         Expression tempExpression = (Expression) visitExpression(await, p);

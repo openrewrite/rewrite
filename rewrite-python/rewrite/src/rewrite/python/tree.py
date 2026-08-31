@@ -51,6 +51,36 @@ class Async(Py, Statement):
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @dataclass(frozen=True, eq=False, slots=True)
+class Shebang(Py, Statement):
+    _id: UUID
+
+
+    _prefix: Space
+
+    @property
+    def prefix(self) -> Space:
+        return self._prefix
+
+
+    _markers: Markers
+
+    @property
+    def markers(self) -> Markers:
+        return self._markers
+
+
+    _text: str
+
+    @property
+    def text(self) -> str:
+        return self._text
+
+
+    def accept_python(self, v: PythonVisitor[P], p: P) -> J:
+        return v.visit_shebang(self, p)
+
+# noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
+@dataclass(frozen=True, eq=False, slots=True)
 class Await(Py, Expression):
     _id: UUID
 
