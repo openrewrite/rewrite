@@ -2919,6 +2919,7 @@ func (ctx *parseContext) mapPointerType(expr *ast.StarExpr) java.Expression {
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Elem:   elem,
+		Type:   ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3040,6 +3041,7 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 			Prefix:      prefix,
 			Length:      java.RightPadded[java.Expression]{Element: length, After: closePrefix},
 			ElementType: elt,
+			Type:        ctx.valueTypeOf(expr),
 		}
 	}
 
@@ -3401,6 +3403,7 @@ func (ctx *parseContext) mapMapType(expr *ast.MapType) java.Expression {
 		OpenBracket: lbrackPrefix,
 		Key:         java.RightPadded[java.Expression]{Element: key, After: rbrackPrefix},
 		Value:       value,
+		Type:        ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3461,6 +3464,7 @@ func (ctx *parseContext) mapChanType(expr *ast.ChanType) java.Expression {
 		Markers: markers,
 		Dir:     dir,
 		Value:   value,
+		Type:    ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3475,6 +3479,7 @@ func (ctx *parseContext) mapFuncType(expr *ast.FuncType) java.Expression {
 		Prefix:     prefix,
 		Parameters: params,
 		ReturnType: returnType,
+		Type:       ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3486,6 +3491,7 @@ func (ctx *parseContext) mapInterfaceType(expr *ast.InterfaceType) java.Expressi
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Body:   body,
+		Type:   ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3497,6 +3503,7 @@ func (ctx *parseContext) mapStructType(expr *ast.StructType) java.Expression {
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Body:   body,
+		Type:   ctx.valueTypeOf(expr),
 	}
 }
 

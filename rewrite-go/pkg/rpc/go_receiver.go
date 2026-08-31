@@ -229,6 +229,7 @@ func (r *GoReceiver) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
 		at.Length = coerceToExpressionRP(result)
 	}
 	at.ElementType = receiveValue(q, at.ElementType, func(e java.Expression) any { return r.Visit(e, q) })
+	at.Type = r.receiveType(at.Type, q)
 	return at
 }
 
@@ -258,6 +259,7 @@ func (r *GoReceiver) VisitMapType(mt *golang.MapType, p any) java.J {
 		mt.Key = coerceToExpressionRP(result)
 	}
 	mt.Value = receiveValue(q, mt.Value, func(e java.Expression) any { return r.Visit(e, q) })
+	mt.Type = r.receiveType(mt.Type, q)
 	return mt
 }
 
@@ -294,6 +296,7 @@ func (r *GoReceiver) VisitPointerType(pt *golang.PointerType, p any) java.J {
 	c := *pt
 	pt = &c
 	pt.Elem = receiveValue(q, pt.Elem, func(e java.Expression) any { return r.Visit(e, q) })
+	pt.Type = r.receiveType(pt.Type, q)
 	return pt
 }
 
@@ -311,6 +314,7 @@ func (r *GoReceiver) VisitChannel(ch *golang.Channel, p any) java.J {
 		ch.Dir = golang.ChanRecvOnly
 	}
 	ch.Value = receiveValue(q, ch.Value, func(e java.Expression) any { return r.Visit(e, q) })
+	ch.Type = r.receiveType(ch.Type, q)
 	return ch
 }
 
@@ -320,6 +324,7 @@ func (r *GoReceiver) VisitFuncType(ft *golang.FuncType, p any) java.J {
 	ft = &c
 	ft.Parameters = receiveContainer[java.Statement](r, q, ft.Parameters)
 	ft.ReturnType = receiveValue(q, ft.ReturnType, func(e java.Expression) any { return r.Visit(e, q) })
+	ft.Type = r.receiveType(ft.Type, q)
 	return ft
 }
 
@@ -328,6 +333,7 @@ func (r *GoReceiver) VisitStructType(st *golang.StructType, p any) java.J {
 	c := *st // shallow copy to avoid mutating remoteObjects baseline
 	st = &c
 	st.Body = receiveValue(q, st.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	st.Type = r.receiveType(st.Type, q)
 	return st
 }
 
@@ -336,6 +342,7 @@ func (r *GoReceiver) VisitInterfaceType(it *golang.InterfaceType, p any) java.J 
 	c := *it // shallow copy to avoid mutating remoteObjects baseline
 	it = &c
 	it.Body = receiveValue(q, it.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	it.Type = r.receiveType(it.Type, q)
 	return it
 }
 

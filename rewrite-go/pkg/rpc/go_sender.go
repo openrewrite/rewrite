@@ -223,6 +223,8 @@ func (s *GoSender) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
 		func(v any) { sendRightPadded(s, v, q) })
 	q.GetAndSend(at, func(v any) any { return v.(*golang.ArrayType).ElementType },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(at, func(v any) any { return AsRef(v.(*golang.ArrayType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return at
 }
 
@@ -251,6 +253,8 @@ func (s *GoSender) VisitMapType(mt *golang.MapType, p any) java.J {
 		func(v any) { sendRightPadded(s, v, q) })
 	q.GetAndSend(mt, func(v any) any { return v.(*golang.MapType).Value },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(mt, func(v any) any { return AsRef(v.(*golang.MapType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return mt
 }
 
@@ -283,6 +287,8 @@ func (s *GoSender) VisitPointerType(pt *golang.PointerType, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(pt, func(v any) any { return v.(*golang.PointerType).Elem },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(pt, func(v any) any { return AsRef(v.(*golang.PointerType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return pt
 }
 
@@ -302,6 +308,8 @@ func (s *GoSender) VisitChannel(ch *golang.Channel, p any) java.J {
 	}, nil)
 	q.GetAndSend(ch, func(v any) any { return v.(*golang.Channel).Value },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(ch, func(v any) any { return AsRef(v.(*golang.Channel).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return ch
 }
 
@@ -311,6 +319,8 @@ func (s *GoSender) VisitFuncType(ft *golang.FuncType, p any) java.J {
 		func(v any) { sendContainer(s, v, q) })
 	q.GetAndSend(ft, func(v any) any { return v.(*golang.FuncType).ReturnType },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(ft, func(v any) any { return AsRef(v.(*golang.FuncType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return ft
 }
 
@@ -318,6 +328,8 @@ func (s *GoSender) VisitStructType(st *golang.StructType, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(st, func(v any) any { return v.(*golang.StructType).Body },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(st, func(v any) any { return AsRef(v.(*golang.StructType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return st
 }
 
@@ -325,6 +337,8 @@ func (s *GoSender) VisitInterfaceType(it *golang.InterfaceType, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(it, func(v any) any { return v.(*golang.InterfaceType).Body },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(it, func(v any) any { return AsRef(v.(*golang.InterfaceType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return it
 }
 

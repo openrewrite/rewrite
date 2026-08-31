@@ -362,30 +362,48 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		return TypeOfExpression(n.Type.Tree.Element)
 	case *java.ControlParentheses:
 		return TypeOfExpression(n.Tree.Element)
-	// A pointer carries the type it points to; the type mapper draws no
-	// distinction between `T` and `*T`.
-	case *golang.PointerType:
-		return TypeOfExpression(n.Elem)
 	case *java.MethodInvocation:
 		if n.MethodType != nil {
 			return n.MethodType.ReturnType
 		}
 	case *golang.Composite:
 		return n.Type
-	// A composite type spelling holds no type slot of its own, so its type is
-	// the one its parts spell out — the same shape the type mapper builds for
-	// the Go type they name.
+	// A type spelling holds what the checker made of it. A spelling no checker
+	// saw — one a recipe built — falls back to its parts, in the shape the type
+	// mapper gives the Go type those parts spell.
+	case *golang.FuncType:
+		return n.Type
+	case *golang.StructType:
+		return n.Type
+	case *golang.InterfaceType:
+		return n.Type
+	// A pointer's parts give the type it points to; the type mapper draws no
+	// distinction between `T` and `*T`.
+	case *golang.PointerType:
+		if n.Type != nil {
+			return n.Type
+		}
+		return TypeOfExpression(n.Elem)
 	case *golang.MapType:
+		if n.Type != nil {
+			return n.Type
+		}
 		return &java.JavaTypeParameterized{
 			Type:           &java.JavaTypeClass{FullyQualifiedName: "map", Kind: "Class"},
 			TypeParameters: []java.JavaType{TypeOfExpression(n.Key.Element), TypeOfExpression(n.Value)},
 		}
 	case *golang.Channel:
+		if n.Type != nil {
+			return n.Type
+		}
 		return &java.JavaTypeParameterized{
 			Type:           &java.JavaTypeClass{FullyQualifiedName: channelName(n.Dir), Kind: "Class"},
 			TypeParameters: []java.JavaType{TypeOfExpression(n.Value)},
 		}
 	case *golang.ArrayType:
+		if n.Type != nil {
+			return n.Type
+		}
 		return &java.JavaTypeArray{ElemType: TypeOfExpression(n.ElementType)}
 	case *golang.Unary:
 		return n.Type

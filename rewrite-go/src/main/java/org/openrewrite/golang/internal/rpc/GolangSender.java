@@ -120,6 +120,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitGoArrayType(Go.ArrayType arrayType, RpcSendQueue q) {
         q.getAndSend(arrayType, a -> a.getPadding().getLength(), el -> visitRightPadded(el, q));
         q.getAndSend(arrayType, Go.ArrayType::getElementType, el -> visit(el, q));
+        q.getAndSend(arrayType, a -> Reference.asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return arrayType;
     }
 
@@ -128,6 +129,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         q.getAndSend(mapType, Go.MapType::getOpenBracket, space -> visitSpace(space, q));
         q.getAndSend(mapType, m -> m.getPadding().getKey(), el -> visitRightPadded(el, q));
         q.getAndSend(mapType, Go.MapType::getValue, el -> visit(el, q));
+        q.getAndSend(mapType, m -> Reference.asRef(m.getType()), type -> visitType(getValueNonNull(type), q));
         return mapType;
     }
 
@@ -154,6 +156,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     @Override
     public J visitPointerType(Go.PointerType pointerType, RpcSendQueue q) {
         q.getAndSend(pointerType, Go.PointerType::getElem, el -> visit(el, q));
+        q.getAndSend(pointerType, pt -> Reference.asRef(pt.getType()), type -> visitType(getValueNonNull(type), q));
         return pointerType;
     }
 
@@ -161,6 +164,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitChannel(Go.Channel channel, RpcSendQueue q) {
         q.getAndSend(channel, c -> c.getDir().name());
         q.getAndSend(channel, Go.Channel::getValue, el -> visit(el, q));
+        q.getAndSend(channel, c -> Reference.asRef(c.getType()), type -> visitType(getValueNonNull(type), q));
         return channel;
     }
 
@@ -168,12 +172,14 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitFuncType(Go.FuncType funcType, RpcSendQueue q) {
         q.getAndSend(funcType, f -> f.getPadding().getParameters(), el -> visitContainer(el, q));
         q.getAndSend(funcType, Go.FuncType::getReturnType, el -> visit(el, q));
+        q.getAndSend(funcType, f -> Reference.asRef(f.getType()), type -> visitType(getValueNonNull(type), q));
         return funcType;
     }
 
     @Override
     public J visitStructType(Go.StructType structType, RpcSendQueue q) {
         q.getAndSend(structType, Go.StructType::getBody, el -> visit(el, q));
+        q.getAndSend(structType, st -> Reference.asRef(st.getType()), type -> visitType(getValueNonNull(type), q));
         return structType;
     }
 
@@ -186,6 +192,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     @Override
     public J visitInterfaceType(Go.InterfaceType interfaceType, RpcSendQueue q) {
         q.getAndSend(interfaceType, Go.InterfaceType::getBody, el -> visit(el, q));
+        q.getAndSend(interfaceType, it -> Reference.asRef(it.getType()), type -> visitType(getValueNonNull(type), q));
         return interfaceType;
     }
 

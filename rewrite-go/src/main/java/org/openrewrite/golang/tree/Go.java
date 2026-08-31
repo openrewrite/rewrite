@@ -896,16 +896,10 @@ public interface Go extends J {
         @Getter
         Expression elementType;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -941,7 +935,7 @@ public interface Go extends J {
             }
 
             public Go.ArrayType withLength(JRightPadded<Expression> length) {
-                return t.length == length ? t : new Go.ArrayType(t.padding, t.id, t.prefix, t.markers, length, t.elementType);
+                return t.length == length ? t : new Go.ArrayType(t.padding, t.id, t.prefix, t.markers, length, t.elementType, t.type);
             }
         }
     }
@@ -991,16 +985,10 @@ public interface Go extends J {
         @Getter
         Expression value;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1036,7 +1024,7 @@ public interface Go extends J {
             }
 
             public Go.MapType withKey(JRightPadded<Expression> key) {
-                return t.key == key ? t : new Go.MapType(t.padding, t.id, t.prefix, t.markers, t.openBracket, key, t.value);
+                return t.key == key ? t : new Go.MapType(t.padding, t.id, t.prefix, t.markers, t.openBracket, key, t.value, t.type);
             }
         }
     }
@@ -1082,16 +1070,10 @@ public interface Go extends J {
         @Getter
         Expression elem;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1315,16 +1297,10 @@ public interface Go extends J {
         @Getter
         Expression value;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1379,16 +1355,10 @@ public interface Go extends J {
         @Nullable
         Expression returnType;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1424,7 +1394,7 @@ public interface Go extends J {
             }
 
             public Go.FuncType withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new Go.FuncType(t.padding, t.id, t.prefix, t.markers, parameters, t.returnType);
+                return t.parameters == parameters ? t : new Go.FuncType(t.padding, t.id, t.prefix, t.markers, parameters, t.returnType, t.type);
             }
         }
     }
@@ -1455,16 +1425,10 @@ public interface Go extends J {
         @Getter
         J.Block body;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1503,16 +1467,10 @@ public interface Go extends J {
         @Getter
         J.Block body;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {

@@ -123,7 +123,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     public J visitGoArrayType(Go.ArrayType arrayType, RpcReceiveQueue q) {
         return arrayType
                 .getPadding().withLength(q.receive(arrayType.getPadding().getLength(), el -> visitRightPadded(el, q)))
-                .withElementType(q.receive(arrayType.getElementType(), expr -> (Expression) visitNonNull(expr, q)));
+                .withElementType(q.receive(arrayType.getElementType(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(arrayType.getType(), type -> visitType(type, q)));
     }
 
     @Override
@@ -131,7 +132,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
         return mapType
                 .withOpenBracket(q.receive(mapType.getOpenBracket(), space -> visitSpace(space, q)))
                 .getPadding().withKey(q.receive(mapType.getPadding().getKey(), el -> visitRightPadded(el, q)))
-                .withValue(q.receive(mapType.getValue(), expr -> (Expression) visitNonNull(expr, q)));
+                .withValue(q.receive(mapType.getValue(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(mapType.getType(), type -> visitType(type, q)));
     }
 
     @Override
@@ -158,27 +160,31 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     @Override
     public J visitPointerType(Go.PointerType pointerType, RpcReceiveQueue q) {
         return pointerType
-                .withElem(q.receive(pointerType.getElem(), expr -> (Expression) visitNonNull(expr, q)));
+                .withElem(q.receive(pointerType.getElem(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(pointerType.getType(), type -> visitType(type, q)));
     }
 
     @Override
     public J visitChannel(Go.Channel channel, RpcReceiveQueue q) {
         return channel
                 .withDir(q.receiveAndGet(channel.getDir(), v -> Go.ChanDir.valueOf((String) v)))
-                .withValue(q.receive(channel.getValue(), expr -> (Expression) visitNonNull(expr, q)));
+                .withValue(q.receive(channel.getValue(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(channel.getType(), type -> visitType(type, q)));
     }
 
     @Override
     public J visitFuncType(Go.FuncType funcType, RpcReceiveQueue q) {
         return funcType
                 .getPadding().withParameters(q.receive(funcType.getPadding().getParameters(), el -> visitContainer(el, q)))
-                .withReturnType(q.receive(funcType.getReturnType(), expr -> (Expression) visitNonNull(expr, q)));
+                .withReturnType(q.receive(funcType.getReturnType(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(funcType.getType(), type -> visitType(type, q)));
     }
 
     @Override
     public J visitStructType(Go.StructType structType, RpcReceiveQueue q) {
         return structType
-                .withBody(q.receive(structType.getBody(), el -> (J.Block) visitNonNull(el, q)));
+                .withBody(q.receive(structType.getBody(), el -> (J.Block) visitNonNull(el, q)))
+                .withType(q.receive(structType.getType(), type -> visitType(type, q)));
     }
 
     @Override
@@ -190,7 +196,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     @Override
     public J visitInterfaceType(Go.InterfaceType interfaceType, RpcReceiveQueue q) {
         return interfaceType
-                .withBody(q.receive(interfaceType.getBody(), el -> (J.Block) visitNonNull(el, q)));
+                .withBody(q.receive(interfaceType.getBody(), el -> (J.Block) visitNonNull(el, q)))
+                .withType(q.receive(interfaceType.getType(), type -> visitType(type, q)));
     }
 
     @Override

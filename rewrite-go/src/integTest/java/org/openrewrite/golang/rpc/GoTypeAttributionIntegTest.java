@@ -154,4 +154,61 @@ class GoTypeAttributionIntegTest implements RewriteTest {
                 )
         );
     }
+
+    @Test
+    void conversionToAnUnnamedTypeCarriesItsType() {
+        List<JavaType> types = new ArrayList<>();
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type T struct{}
+
+                                func f(p *T, b4 [4]byte, m map[string]int, c chan int, fn func(), x any, s struct{ A int }) {
+                                	_ = (*T)(p)
+                                	_ = [4]byte(b4)
+                                	_ = (map[string]int)(m)
+                                	_ = (chan int)(c)
+                                	_ = (func())(fn)
+                                	_ = interface{}(x)
+                                	_ = (struct{ A int })(s)
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> {
+                            new JavaIsoVisitor<ExecutionContext>() {
+                                @Override
+                                public J.TypeCast visitTypeCast(J.TypeCast cast, ExecutionContext ctx) {
+                                    types.add(cast.getType());
+                                    return super.visitTypeCast(cast, ctx);
+                                }
+                            }.visit(cu, new InMemoryExecutionContext());
+
+                            assertThat(types).hasSize(7).doesNotContainNull();
+
+                            assertThat(TypeUtils.asFullyQualified(types.get(0))).as("(*T)(p)")
+                                    .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                                    .isEqualTo("main.T");
+
+                            assertThat(types.get(1)).as("[4]byte(b4)").isInstanceOfSatisfying(JavaType.Array.class,
+                                    a -> assertThat(a.getElemType().toString()).isEqualTo("byte"));
+
+                            assertThat(types.get(2)).as("(map[string]int)(m)").isInstanceOfSatisfying(JavaType.Parameterized.class,
+                                    t -> assertThat(t.getFullyQualifiedName()).isEqualTo("map"));
+
+                            assertThat(types.get(3)).as("(chan int)(c)").isInstanceOfSatisfying(JavaType.Parameterized.class,
+                                    t -> assertThat(t.getFullyQualifiedName()).isEqualTo("chan"));
+
+                            assertThat(types.get(4)).as("(func())(fn)").isInstanceOf(JavaType.Method.class);
+
+                            assertThat(TypeUtils.asFullyQualified(types.get(5))).as("interface{}(x)")
+                                    .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                                    .isEqualTo("any");
+
+                            assertThat(types.get(6)).as("(struct{ A int })(s)").isInstanceOfSatisfying(JavaType.Class.class,
+                                    t -> assertThat(t.getMembers()).extracting(JavaType.Variable::getName).containsExactly("A"));
+                        })
+                )
+        );
+    }
 }

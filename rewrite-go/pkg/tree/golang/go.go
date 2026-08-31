@@ -347,6 +347,7 @@ type ArrayType struct {
 	Markers     java.Markers
 	Length      java.RightPadded[java.Expression] // Element = `N` (Prefix = space after `[`), After = space before `]`
 	ElementType java.Expression                   // element type `T` (Prefix = space after `]`)
+	Type        java.JavaType
 }
 
 func (*ArrayType) IsTree()       {}
@@ -378,6 +379,7 @@ type MapType struct {
 	OpenBracket java.Space                        // space before `[`
 	Key         java.RightPadded[java.Expression] // After = space before `]`
 	Value       java.Expression
+	Type        java.JavaType
 }
 
 func (*MapType) IsTree()       {}
@@ -415,6 +417,7 @@ type PointerType struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Elem    java.Expression
+	Type    java.JavaType
 }
 
 func (*PointerType) IsTree()       {}
@@ -445,6 +448,7 @@ type Channel struct {
 	Markers java.Markers
 	Dir     ChanDir
 	Value   java.Expression
+	Type    java.JavaType
 }
 
 func (*Channel) IsTree()       {}
@@ -475,6 +479,7 @@ type FuncType struct {
 	Markers    java.Markers
 	Parameters java.Container[java.Statement]
 	ReturnType java.Expression // nil if no return type
+	Type       java.JavaType
 }
 
 func (*FuncType) IsTree()       {}
@@ -504,6 +509,7 @@ type StructType struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Body    *java.Block // contains VariableDeclarations for fields
+	Type    java.JavaType
 }
 
 func (*StructType) IsTree()       {}
@@ -533,6 +539,7 @@ type InterfaceType struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Body    *java.Block // contains MethodDeclaration (no body) or type refs for embedded interfaces
+	Type    java.JavaType
 }
 
 func (*InterfaceType) IsTree()       {}

@@ -382,13 +382,24 @@ func (m *typeMapper) mapChanType(ch *types.Chan) java.JavaType {
 	}
 }
 
+// isNamedClass reports whether a mapped type is a class Go gave a name.
+func isNamedClass(t java.JavaType) bool {
+	cls, ok := t.(*java.JavaTypeClass)
+	return ok && cls.FullyQualifiedName != ""
+}
+
 // structMembers extracts fields from a struct as JavaTypeVariable,
 // recording each field's owner for ownerType to find later.
 func (m *typeMapper) structMembers(s *types.Struct, owner java.JavaType) []*java.JavaTypeVariable {
 	var members []*java.JavaTypeVariable
 	for i := 0; i < s.NumFields(); i++ {
 		f := s.Field(i)
-		m.fieldOwner[f] = owner
+		// A named struct type and the `*types.Struct` it wraps share their field
+		// objects, and a recipe asks a field's owner for the name. An unnamed
+		// spelling therefore claims only a field no named type has claimed.
+		if _, claimed := m.fieldOwner[f]; !claimed || isNamedClass(owner) {
+			m.fieldOwner[f] = owner
+		}
 		members = append(members, &java.JavaTypeVariable{
 			Name:        f.Name(),
 			Owner:       owner,
