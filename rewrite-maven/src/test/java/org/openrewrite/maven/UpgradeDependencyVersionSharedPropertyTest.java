@@ -1031,6 +1031,112 @@ class UpgradeDependencyVersionSharedPropertyTest implements RewriteTest {
     }
 
     /**
+     * A module of this build can consume the property too, and it is the one consumer no repository can
+     * answer for — probing it 404s whether or not the bump is safe. Exempting it, which is the obvious way
+     * to keep that 404 from blocking every property a module touches, reintroduces the reported bug with an
+     * in-repo sibling in place of an external one.
+     * <p>
+     * There is deliberately no safe-direction twin here, and the absence is not the omission that #7491
+     * shipped: a module's own version never coincides with an arbitrary new version of an external artifact,
+     * so the gate has no branch that legitimately lets a module consumer through. What guards against this
+     * rule leaking into builds it has no business touching is
+     * {@link PropertyInLocalParent#bumpsTheParentPropertyAndLeavesEveryModuleOnIt()} — a multi-module build
+     * whose property is still raised, because there the modules consume no property of their own.
+     */
+    @Nested
+    class ProjectModuleNeighbour {
+
+        @Test
+        void decouplesTargetWhenAModuleOfThisBuildSharesTheProperty() {
+            rewriteRun(
+              spec -> spec.recipe(upgradeAnnotationsTo(UNSHARED)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany</groupId>
+                      <artifactId>my-parent</artifactId>
+                      <version>2.10.5</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>lib</module>
+                          <module>app</module>
+                      </modules>
+                  </project>
+                  """
+              ),
+              mavenProject("lib",
+                pomXml(
+                  """
+                    <project>
+                        <parent>
+                            <groupId>com.mycompany</groupId>
+                            <artifactId>my-parent</artifactId>
+                            <version>2.10.5</version>
+                        </parent>
+                        <artifactId>lib</artifactId>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("app",
+                pomXml(
+                  """
+                    <project>
+                        <parent>
+                            <groupId>com.mycompany</groupId>
+                            <artifactId>my-parent</artifactId>
+                            <version>2.10.5</version>
+                        </parent>
+                        <artifactId>app</artifactId>
+                        <properties>
+                            <shared.version>2.10.5</shared.version>
+                        </properties>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.fasterxml.jackson.core</groupId>
+                                <artifactId>jackson-annotations</artifactId>
+                                <version>${shared.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>com.mycompany</groupId>
+                                <artifactId>lib</artifactId>
+                                <version>${shared.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <parent>
+                            <groupId>com.mycompany</groupId>
+                            <artifactId>my-parent</artifactId>
+                            <version>2.10.5</version>
+                        </parent>
+                        <artifactId>app</artifactId>
+                        <properties>
+                            <shared.version>2.10.5</shared.version>
+                        </properties>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.fasterxml.jackson.core</groupId>
+                                <artifactId>jackson-annotations</artifactId>
+                                <version>2.21</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>com.mycompany</groupId>
+                                <artifactId>lib</artifactId>
+                                <version>${shared.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+    }
+
+    /**
      * {@code ${project.version}} and its siblings are intentional links to the project's own coordinates,
      * never versions to raise. {@code MavenVisitor#changeChildTagValue} refuses to touch them; a decouple
      * path that writes the version tag directly must refuse too, or it silently severs the link.

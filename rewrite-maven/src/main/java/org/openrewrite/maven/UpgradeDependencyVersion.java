@@ -135,7 +135,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 ResolvedPom pom = getResolutionResult().getPom();
-                accumulator.projectArtifacts.add(new GroupArtifact(pom.getGroupId(), pom.getArtifactId()));
+                GroupArtifact projectArtifact = new GroupArtifact(pom.getGroupId(), pom.getArtifactId());
+                accumulator.projectArtifacts.add(projectArtifact);
+                if (pom.getVersion() != null) {
+                    accumulator.projectArtifactVersions.put(projectArtifact, pom.getVersion());
+                }
                 return super.visitDocument(document, ctx);
             }
 
@@ -455,7 +459,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return true;
                 }
                 for (GroupArtifact consumer : consumers) {
-                    if (!accumulator.projectArtifacts.contains(consumer) && !versionExists(consumer, newerVersion, ctx)) {
+                    String moduleVersion = accumulator.projectArtifactVersions.get(consumer);
+                    if (moduleVersion != null) {
+                        // A module of this build publishes nothing to probe, so the only version that resolves
+                        // for it is the one it already carries. Exempting it instead would raise the property
+                        // out from under it, which breaks the module exactly as it breaks an external sibling.
+                        if (!newerVersion.equals(moduleVersion)) {
+                            return false;
+                        }
+                    } else if (!versionExists(consumer, newerVersion, ctx)) {
                         return false;
                     }
                 }
@@ -736,6 +748,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
          * concurrent writers.
          */
         Map<GroupArtifactVersion, Boolean> versionExistence = new ConcurrentHashMap<>();
+
+        /**
+         * The version each module of this build carries, for the consumers that no repository can answer for.
+         */
+        Map<GroupArtifact, String> projectArtifactVersions = new ConcurrentHashMap<>();
     }
 
     @Value
