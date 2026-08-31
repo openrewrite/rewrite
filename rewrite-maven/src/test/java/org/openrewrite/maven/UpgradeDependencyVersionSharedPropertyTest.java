@@ -1031,6 +1031,186 @@ class UpgradeDependencyVersionSharedPropertyTest implements RewriteTest {
     }
 
     /**
+     * A BOM coordinate and an artifact coordinate can share one property, and they are versioned on
+     * different schemes — which is the same mismatch that produced the report, one level up.
+     */
+    @Nested
+    class BomImport {
+
+        @Test
+        void decouplesTheImportWhenTheArtifactCannotFollowIt() {
+            rewriteRun(
+              spec -> spec.recipe(upgradeAnnotationsTo(UNSHARED)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <properties>
+                          <jackson.version>2.10.5</jackson.version>
+                      </properties>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.fasterxml.jackson</groupId>
+                                  <artifactId>jackson-bom</artifactId>
+                                  <version>${jackson.version}</version>
+                                  <type>pom</type>
+                                  <scope>import</scope>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-annotations</artifactId>
+                              <version>${jackson.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                // Asserted by shape: which jackson-bom release carries annotations 2.21 is Jackson's business.
+                spec -> spec.after(actual -> assertThat(actual)
+                  .as("the shared property is left as it was")
+                  .contains("<jackson.version>2.10.5</jackson.version>")
+                  .as("and the import no longer resolves through it")
+                  .doesNotContain("<version>${jackson.version}</version>")
+                  .as("and nothing is left unresolvable")
+                  .doesNotContain("Unable to download POM")
+                  .actual())
+              )
+            );
+        }
+    }
+
+    /**
+     * The dependency carries no {@code <version>} of its own, so the write lands on the managed entry
+     * instead. A different branch reaches the gate here than for a dependency that declares its own version.
+     */
+    @Nested
+    class ManagedWithoutVersionTag {
+
+        @Test
+        void decouplesTheManagedEntryWhenNeighbourLacksTheNewVersion() {
+            rewriteRun(
+              spec -> spec.recipe(upgradeAnnotationsTo(UNSHARED)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <properties>
+                          <jackson.version>2.10.5</jackson.version>
+                      </properties>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.fasterxml.jackson.core</groupId>
+                                  <artifactId>jackson-annotations</artifactId>
+                                  <version>${jackson.version}</version>
+                              </dependency>
+                              <dependency>
+                                  <groupId>com.fasterxml.jackson.core</groupId>
+                                  <artifactId>jackson-core</artifactId>
+                                  <version>${jackson.version}</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-annotations</artifactId>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-core</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <properties>
+                          <jackson.version>2.10.5</jackson.version>
+                      </properties>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.fasterxml.jackson.core</groupId>
+                                  <artifactId>jackson-annotations</artifactId>
+                                  <version>2.21</version>
+                              </dependency>
+                              <dependency>
+                                  <groupId>com.fasterxml.jackson.core</groupId>
+                                  <artifactId>jackson-core</artifactId>
+                                  <version>${jackson.version}</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-annotations</artifactId>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-core</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+    }
+
+    /**
+     * A version that merely contains a placeholder is not a version held in a property, and the recipe
+     * declines to touch it rather than guessing which part of it is the version. The boundary is pinned
+     * because the obvious repair — treating the text between the first {@code ${} and the last {@code }} as
+     * a property name — reaches for a property that does not exist and would write through the gate.
+     */
+    @Nested
+    class NotASingleProperty {
+
+        @Test
+        void leavesAVersionThatIsOnlyPartlyAPropertyAlone() {
+            rewriteRun(
+              spec -> spec.recipe(upgradeAnnotationsTo(UNSHARED)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <properties>
+                          <jackson.minor>10.5</jackson.minor>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-annotations</artifactId>
+                              <version>2.${jackson.minor}</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-core</artifactId>
+                              <version>2.${jackson.minor}</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+    }
+
+    /**
      * A module of this build can consume the property too, and it is the one consumer no repository can
      * answer for — probing it 404s whether or not the bump is safe. Exempting it, which is the obvious way
      * to keep that 404 from blocking every property a module touches, reintroduces the reported bug with an
