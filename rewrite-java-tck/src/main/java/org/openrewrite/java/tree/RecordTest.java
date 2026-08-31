@@ -126,26 +126,46 @@ class RecordTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/8723")
     @Test
-    void namedAttributeAnnotationOnComponentWithCompactConstructor() {
+    void namedAttributeAnnotationOnComponent() {
         rewriteRun(
           java(
             """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-              
+
               @Target({ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
-              @interface PluginImplConfig {
-                  String implNameProperty();
+              @interface A {
+                  String value();
               }
               """
           ),
           java(
             """
-              public record MyRecord(
-                  String type,
-                  @PluginImplConfig(implNameProperty = "type") Object config) {
-                  public MyRecord {
-                  }
+              public record MyRecord(@A(value = "a") String name) {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8723")
+    @Test
+    void namedAttributeAnnotationOnComponentFollowedByAdditionalSource() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+
+              @Target({ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
+              @interface A {
+                  String value();
+              }
+              """
+          ),
+          java(
+            """
+              public record MyRecord(@A(value = "a") String name, int age) {
               }
               """
           )
