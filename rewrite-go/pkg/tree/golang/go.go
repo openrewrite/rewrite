@@ -571,6 +571,7 @@ type TypeList struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Types   java.Container[java.Statement] // Before = space before `(`, last After = space before `)`
+	Type    java.JavaType
 }
 
 func (*TypeList) IsTree()       {}
@@ -607,6 +608,7 @@ type Union struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Types   []java.RightPadded[java.Expression]
+	Type    java.JavaType
 }
 
 func (*Union) IsTree()       {}
@@ -1122,6 +1124,7 @@ type IndexList struct {
 	Markers java.Markers
 	Target  java.Expression
 	Indices java.Container[java.Expression] // Before = space before `[`, Elements = type args, last After = space before `]`
+	Type    java.JavaType
 }
 
 func (*IndexList) IsTree()       {}
@@ -1342,6 +1345,7 @@ type Variadic struct {
 	Element java.Expression
 	Dots    java.Space
 	Postfix bool
+	Type    java.JavaType
 }
 
 func (*Variadic) IsTree()       {}

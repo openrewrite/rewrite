@@ -211,4 +211,72 @@ class GoTypeAttributionIntegTest implements RewriteTest {
                 )
         );
     }
+
+    @Test
+    void aTypeSpellingThatIsNotAConversionTargetCarriesItsTypeToo() {
+        List<JavaType> types = new ArrayList<>();
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Num interface {
+                                	~int | ~int8
+                                }
+
+                                func sum(xs ...int) (int, error) {
+                                	return 0, nil
+                                }
+
+                                func pick[A any, B any](a A, b B) A {
+                                	return a
+                                }
+
+                                func f(xs []int) {
+                                	_, _ = sum(xs...)
+                                	_ = pick[int, string]
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> {
+                            new GolangVisitor<ExecutionContext>() {
+                                @Override
+                                public J visitUnion(Go.Union union, ExecutionContext ctx) {
+                                    types.add(union.getType());
+                                    return super.visitUnion(union, ctx);
+                                }
+
+                                @Override
+                                public J visitGoVariadic(Go.Variadic variadic, ExecutionContext ctx) {
+                                    types.add(variadic.getType());
+                                    return super.visitGoVariadic(variadic, ctx);
+                                }
+
+                                @Override
+                                public J visitTypeList(Go.TypeList typeList, ExecutionContext ctx) {
+                                    types.add(typeList.getType());
+                                    return super.visitTypeList(typeList, ctx);
+                                }
+
+                                @Override
+                                public J visitIndexList(Go.IndexList indexList, ExecutionContext ctx) {
+                                    types.add(indexList.getType());
+                                    return super.visitIndexList(indexList, ctx);
+                                }
+                            }.visit(cu, new InMemoryExecutionContext());
+
+                            assertThat(types).hasSize(4).doesNotContainNull();
+
+                            assertThat(types.get(0)).as("~int | ~int8").isInstanceOf(JavaType.Intersection.class);
+
+                            assertThat(types.get(1)).as("(int, error)").isInstanceOfSatisfying(JavaType.Parameterized.class,
+                                    t -> assertThat(t.getFullyQualifiedName()).isEqualTo("go.tuple"));
+
+                            assertThat(types.get(2)).as("xs...").isInstanceOfSatisfying(JavaType.Array.class,
+                                    a -> assertThat(a.getElemType().toString()).isEqualTo("int"));
+
+                            assertThat(types.get(3)).as("pick[int, string]").isInstanceOf(JavaType.Method.class);
+                        })
+                )
+        );
+    }
 }

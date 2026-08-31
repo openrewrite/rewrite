@@ -203,13 +203,15 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     @Override
     public J visitTypeList(Go.TypeList typeList, RpcReceiveQueue q) {
         return typeList
-                .getPadding().withTypes(q.receive(typeList.getPadding().getTypes(), el -> visitContainer(el, q)));
+                .getPadding().withTypes(q.receive(typeList.getPadding().getTypes(), el -> visitContainer(el, q)))
+                .withType(q.receive(typeList.getType(), type -> visitType(type, q)));
     }
 
     @Override
     public J visitUnion(Go.Union union, RpcReceiveQueue q) {
         return union
-                .getPadding().withTypes(q.receiveList(union.getPadding().getTypes(), t -> visitRightPadded(t, q)));
+                .getPadding().withTypes(q.receiveList(union.getPadding().getTypes(), t -> visitRightPadded(t, q)))
+                .withType(q.receive(union.getType(), type -> visitType(type, q)));
     }
 
     @Override
@@ -277,7 +279,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     public J visitIndexList(Go.IndexList indexList, RpcReceiveQueue q) {
         return indexList
                 .withTarget(q.receive(indexList.getTarget(), expr -> (Expression) visitNonNull(expr, q)))
-                .getPadding().withIndices(q.receive(indexList.getPadding().getIndices(), el -> visitContainer(el, q)));
+                .getPadding().withIndices(q.receive(indexList.getPadding().getIndices(), el -> visitContainer(el, q)))
+                .withType(q.receive(indexList.getType(), type -> visitType(type, q)));
     }
 
     @Override
@@ -309,7 +312,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
         return variadic
                 .withElement(q.receive(variadic.getElement(), expr -> (Expression) visitNonNull(expr, q)))
                 .withDots(q.receive(variadic.getDots(), space -> visitSpace(space, q)))
-                .withPostfix(q.receive(variadic.isPostfix()));
+                .withPostfix(q.receive(variadic.isPostfix()))
+                .withType(q.receive(variadic.getType(), type -> visitType(type, q)));
     }
 
     // Delegation methods to JavaReceiver for RPC-specific visit methods

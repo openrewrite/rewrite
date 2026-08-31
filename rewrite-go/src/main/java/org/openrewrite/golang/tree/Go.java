@@ -1520,16 +1520,10 @@ public interface Go extends J {
             return getPadding().withTypes(JContainer.withElements(this.types, types));
         }
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1565,7 +1559,7 @@ public interface Go extends J {
             }
 
             public Go.TypeList withTypes(JContainer<Statement> types) {
-                return t.types == types ? t : new Go.TypeList(t.padding, t.id, t.prefix, t.markers, types);
+                return t.types == types ? t : new Go.TypeList(t.padding, t.id, t.prefix, t.markers, types, t.type);
             }
         }
     }
@@ -1607,16 +1601,10 @@ public interface Go extends J {
             return getPadding().withTypes(JRightPadded.withElements(this.types, types));
         }
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1652,7 +1640,7 @@ public interface Go extends J {
             }
 
             public Go.Union withTypes(List<JRightPadded<Expression>> types) {
-                return t.types == types ? t : new Go.Union(t.padding, t.id, t.prefix, t.markers, types);
+                return t.types == types ? t : new Go.Union(t.padding, t.id, t.prefix, t.markers, types, t.type);
             }
         }
     }
@@ -2398,16 +2386,10 @@ public interface Go extends J {
             return getPadding().withIndices(JContainer.withElements(this.indices, indices));
         }
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -2443,7 +2425,7 @@ public interface Go extends J {
             }
 
             public Go.IndexList withIndices(JContainer<Expression> indices) {
-                return t.indices == indices ? t : new Go.IndexList(t.padding, t.id, t.prefix, t.markers, t.target, indices);
+                return t.indices == indices ? t : new Go.IndexList(t.padding, t.id, t.prefix, t.markers, t.target, indices, t.type);
             }
         }
     }
@@ -2795,16 +2777,10 @@ public interface Go extends J {
         @Getter
         boolean postfix;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {

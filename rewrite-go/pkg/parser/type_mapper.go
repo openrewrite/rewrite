@@ -295,23 +295,11 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 
 	// Return type
 	results := sig.Results()
-	if results.Len() == 0 {
-		mt.ReturnType = &java.JavaTypePrimitive{Keyword: "void"}
-	} else if results.Len() == 1 {
-		mt.ReturnType = m.mapType(results.At(0).Type())
-	} else {
-		tupleParams := make([]java.JavaType, 0, results.Len())
-		for i := 0; i < results.Len(); i++ {
-			tupleParams = append(tupleParams, m.mapType(results.At(i).Type()))
-		}
-		mt.ReturnType = &java.JavaTypeParameterized{
-			Type: &java.JavaTypeClass{
-				FullyQualifiedName: "go.tuple",
-				Kind:               "Class",
-			},
-			TypeParameters: tupleParams,
-		}
+	resultTypes := make([]java.JavaType, 0, results.Len())
+	for i := 0; i < results.Len(); i++ {
+		resultTypes = append(resultTypes, m.mapType(results.At(i).Type()))
 	}
+	mt.ReturnType = tupleType(resultTypes)
 	params := sig.Params()
 	for i := 0; i < params.Len(); i++ {
 		p := params.At(i)
@@ -320,6 +308,22 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 	}
 
 	return mt
+}
+
+// tupleType is what a Go result list yields: nothing, the one type it names,
+// or the several it names bundled under `go.tuple`.
+func tupleType(results []java.JavaType) java.JavaType {
+	switch len(results) {
+	case 0:
+		return &java.JavaTypePrimitive{Keyword: "void"}
+	case 1:
+		return results[0]
+	default:
+		return &java.JavaTypeParameterized{
+			Type:           &java.JavaTypeClass{FullyQualifiedName: "go.tuple", Kind: "Class"},
+			TypeParameters: results,
+		}
+	}
 }
 
 // mapInterface maps an anonymous interface type. The empty one takes the Go

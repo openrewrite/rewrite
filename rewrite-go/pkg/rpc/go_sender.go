@@ -187,6 +187,8 @@ func (s *GoSender) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
 	q.GetAndSend(vr, func(v any) any { return v.(*golang.Variadic).Dots },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(vr, func(v any) any { return v.(*golang.Variadic).Postfix }, nil)
+	q.GetAndSend(vr, func(v any) any { return AsRef(v.(*golang.Variadic).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return vr
 }
 
@@ -346,6 +348,8 @@ func (s *GoSender) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(tl, func(v any) any { return v.(*golang.TypeList).Types },
 		func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(tl, func(v any) any { return AsRef(v.(*golang.TypeList).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return tl
 }
 
@@ -362,6 +366,8 @@ func (s *GoSender) VisitUnion(u *golang.Union, p any) java.J {
 		},
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(u, func(v any) any { return AsRef(v.(*golang.Union).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return u
 }
 
@@ -558,5 +564,7 @@ func (s *GoSender) VisitIndexList(il *golang.IndexList, p any) java.J {
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(il, func(v any) any { return v.(*golang.IndexList).Indices },
 		func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(il, func(v any) any { return AsRef(v.(*golang.IndexList).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return il
 }

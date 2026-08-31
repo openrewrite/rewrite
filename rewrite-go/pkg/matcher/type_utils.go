@@ -377,6 +377,14 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		return n.Type
 	case *golang.InterfaceType:
 		return n.Type
+	case *golang.Union:
+		return n.Type
+	case *golang.TypeList:
+		return n.Type
+	case *golang.Variadic:
+		return n.Type
+	case *golang.IndexList:
+		return n.Type
 	// A pointer's parts give the type it points to; the type mapper draws no
 	// distinction between `T` and `*T`.
 	case *golang.PointerType:

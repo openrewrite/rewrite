@@ -190,6 +190,7 @@ func (r *GoReceiver) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
 	vr.Element = receiveValue(q, vr.Element, func(e java.Expression) any { return r.Visit(e, q) })
 	vr.Dots = receiveValue(q, vr.Dots, func(s java.Space) any { return receiveSpace(s, q) })
 	vr.Postfix = receiveScalar[bool](q, vr.Postfix)
+	vr.Type = r.receiveType(vr.Type, q)
 	return vr
 }
 
@@ -351,6 +352,7 @@ func (r *GoReceiver) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	c := *tl // shallow copy to avoid mutating remoteObjects baseline
 	tl = &c
 	tl.Types = receiveContainer[java.Statement](r, q, tl.Types)
+	tl.Type = r.receiveType(tl.Type, q)
 	return tl
 }
 
@@ -363,6 +365,7 @@ func (r *GoReceiver) VisitUnion(u *golang.Union, p any) java.J {
 		coerceToExpressionRP); after != nil {
 		u.Types = after
 	}
+	u.Type = r.receiveType(u.Type, q)
 	return u
 }
 
@@ -504,5 +507,6 @@ func (r *GoReceiver) VisitIndexList(il *golang.IndexList, p any) java.J {
 	il = &c
 	il.Target = receiveValue(q, il.Target, func(e java.Expression) any { return r.Visit(e, q) })
 	il.Indices = receiveContainer[java.Expression](r, q, il.Indices)
+	il.Type = r.receiveType(il.Type, q)
 	return il
 }
