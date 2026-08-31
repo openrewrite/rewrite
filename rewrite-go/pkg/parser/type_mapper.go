@@ -295,23 +295,11 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 
 	// Return type
 	results := sig.Results()
-	if results.Len() == 0 {
-		mt.ReturnType = &java.JavaTypePrimitive{Keyword: "void"}
-	} else if results.Len() == 1 {
-		mt.ReturnType = m.mapType(results.At(0).Type())
-	} else {
-		tupleParams := make([]java.JavaType, 0, results.Len())
-		for i := 0; i < results.Len(); i++ {
-			tupleParams = append(tupleParams, m.mapType(results.At(i).Type()))
-		}
-		mt.ReturnType = &java.JavaTypeParameterized{
-			Type: &java.JavaTypeClass{
-				FullyQualifiedName: "go.tuple",
-				Kind:               "Class",
-			},
-			TypeParameters: tupleParams,
-		}
+	resultTypes := make([]java.JavaType, 0, results.Len())
+	for i := 0; i < results.Len(); i++ {
+		resultTypes = append(resultTypes, m.mapType(results.At(i).Type()))
 	}
+	mt.ReturnType = tupleType(resultTypes)
 	params := sig.Params()
 	for i := 0; i < params.Len(); i++ {
 		p := params.At(i)
@@ -320,6 +308,22 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 	}
 
 	return mt
+}
+
+// tupleType is what a Go result list yields: nothing, the one type it names,
+// or the several it names bundled under `go.tuple`.
+func tupleType(results []java.JavaType) java.JavaType {
+	switch len(results) {
+	case 0:
+		return &java.JavaTypePrimitive{Keyword: "void"}
+	case 1:
+		return results[0]
+	default:
+		return &java.JavaTypeParameterized{
+			Type:           &java.JavaTypeClass{FullyQualifiedName: "go.tuple", Kind: "Class"},
+			TypeParameters: results,
+		}
+	}
 }
 
 // mapInterface maps an anonymous interface type. The empty one takes the Go
@@ -382,13 +386,24 @@ func (m *typeMapper) mapChanType(ch *types.Chan) java.JavaType {
 	}
 }
 
+// isNamedClass reports whether a mapped type is a class Go gave a name.
+func isNamedClass(t java.JavaType) bool {
+	cls, ok := t.(*java.JavaTypeClass)
+	return ok && cls.FullyQualifiedName != ""
+}
+
 // structMembers extracts fields from a struct as JavaTypeVariable,
 // recording each field's owner for ownerType to find later.
 func (m *typeMapper) structMembers(s *types.Struct, owner java.JavaType) []*java.JavaTypeVariable {
 	var members []*java.JavaTypeVariable
 	for i := 0; i < s.NumFields(); i++ {
 		f := s.Field(i)
-		m.fieldOwner[f] = owner
+		// A named struct type and the `*types.Struct` it wraps share their field
+		// objects, and a recipe asks a field's owner for the name. An unnamed
+		// spelling therefore claims only a field no named type has claimed.
+		if _, claimed := m.fieldOwner[f]; !claimed || isNamedClass(owner) {
+			m.fieldOwner[f] = owner
+		}
 		members = append(members, &java.JavaTypeVariable{
 			Name:        f.Name(),
 			Owner:       owner,

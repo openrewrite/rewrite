@@ -1057,6 +1057,7 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 		return &golang.TypeList{
 			ID:    uuid.New(),
 			Types: java.Container[java.Statement]{Before: before, Elements: elements, Markers: markers},
+			Type:  ctx.resultsType(results),
 		}
 	}
 
@@ -1438,6 +1439,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 				Variable:   lhs,
 				Operator:   java.LeftPadded[golang.AssignmentOperator]{Before: opPrefix, Element: golang.AssignAndNot},
 				Assignment: rhs,
+				Type:       ctx.assignedType(stmt.Lhs[0], stmt.Rhs[0]),
 			}
 		}
 		if op, ok := mapAssignmentOp(stmt.Tok); ok {
@@ -1452,6 +1454,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 				Variable:   lhs,
 				Operator:   java.LeftPadded[java.AssignmentOperator]{Before: opPrefix, Element: op},
 				Assignment: rhs,
+				Type:       ctx.assignedType(stmt.Lhs[0], stmt.Rhs[0]),
 			}
 		}
 	}
@@ -2481,6 +2484,7 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 				Element: mapped,
 				Dots:    ellipsisPrefix,
 				Postfix: true,
+				Type:    ctx.valueTypeOf(arg),
 			}
 		}
 		after := java.EmptySpace
@@ -2919,6 +2923,7 @@ func (ctx *parseContext) mapPointerType(expr *ast.StarExpr) java.Expression {
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Elem:   elem,
+		Type:   ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2982,7 +2987,7 @@ func (ctx *parseContext) mapUnionType(expr *ast.BinaryExpr) *golang.Union {
 	if len(terms) > 0 {
 		prefix, terms[0].Element = hoistLeftPrefix(terms[0].Element)
 	}
-	return &golang.Union{ID: uuid.New(), Prefix: prefix, Types: terms}
+	return &golang.Union{ID: uuid.New(), Prefix: prefix, Types: terms, Type: ctx.valueTypeOf(expr)}
 }
 
 func (ctx *parseContext) appendUnionTerms(expr ast.Expr, terms *[]java.RightPadded[java.Expression]) {
@@ -3040,6 +3045,7 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 			Prefix:      prefix,
 			Length:      java.RightPadded[java.Expression]{Element: length, After: closePrefix},
 			ElementType: elt,
+			Type:        ctx.valueTypeOf(expr),
 		}
 	}
 
@@ -3185,6 +3191,28 @@ func (ctx *parseContext) valueTypeOf(expr ast.Expr) java.JavaType {
 	return ctx.mapper.mapType(t)
 }
 
+// resultsType reads a result list's types off the syntax. A field declaring
+// several names contributes one result per name, the way go/types counts them.
+// A tuple naming one member it could not resolve would read as a type while
+// carrying a hole, so an unattributed member leaves the whole list unattributed.
+func (ctx *parseContext) resultsType(results *ast.FieldList) java.JavaType {
+	var types []java.JavaType
+	for _, field := range results.List {
+		n := len(field.Names)
+		if n == 0 {
+			n = 1
+		}
+		for i := 0; i < n; i++ {
+			t := ctx.valueTypeOf(field.Type)
+			if t == nil {
+				return nil
+			}
+			types = append(types, t)
+		}
+	}
+	return tupleType(types)
+}
+
 // mapIndexListExpr maps a multi-index expression like `Map[int, string]` (generic instantiation).
 func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
@@ -3214,6 +3242,7 @@ func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) java.Expressi
 		Prefix:  prefix,
 		Target:  target,
 		Indices: java.Container[java.Expression]{Before: lbrackPrefix, Elements: elements},
+		Type:    ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3401,6 +3430,7 @@ func (ctx *parseContext) mapMapType(expr *ast.MapType) java.Expression {
 		OpenBracket: lbrackPrefix,
 		Key:         java.RightPadded[java.Expression]{Element: key, After: rbrackPrefix},
 		Value:       value,
+		Type:        ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3461,6 +3491,7 @@ func (ctx *parseContext) mapChanType(expr *ast.ChanType) java.Expression {
 		Markers: markers,
 		Dir:     dir,
 		Value:   value,
+		Type:    ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3475,6 +3506,7 @@ func (ctx *parseContext) mapFuncType(expr *ast.FuncType) java.Expression {
 		Prefix:     prefix,
 		Parameters: params,
 		ReturnType: returnType,
+		Type:       ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3486,6 +3518,7 @@ func (ctx *parseContext) mapInterfaceType(expr *ast.InterfaceType) java.Expressi
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Body:   body,
+		Type:   ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3497,6 +3530,7 @@ func (ctx *parseContext) mapStructType(expr *ast.StructType) java.Expression {
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Body:   body,
+		Type:   ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3888,7 +3922,9 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 	return &java.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
 }
 
-// mapEllipsis maps `...T` in function parameters (prefix variadic form).
+// mapEllipsis maps a `...`: a parameter's `...T`, which mapFieldListAsParams
+// unwraps into VariableDeclarations.Varargs, and the elided array length of
+// `[...]T{...}`, which is the form that survives as a golang.Variadic.
 func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) java.Expression {
 	prefix := ctx.prefix(expr.Ellipsis)
 	ctx.skip(3) // "..."
@@ -3899,6 +3935,7 @@ func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) java.Expression {
 		Element: elt,
 		Dots:    java.EmptySpace,
 		Postfix: false,
+		Type:    ctx.valueTypeOf(expr),
 	}
 }
 
