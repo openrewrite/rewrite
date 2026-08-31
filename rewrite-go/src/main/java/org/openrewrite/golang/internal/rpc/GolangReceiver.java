@@ -304,7 +304,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
         return assignOp
                 .withVariable(q.receive(assignOp.getVariable(), expr -> (Expression) visitNonNull(expr, q)))
                 .getPadding().withOperator(q.receive(assignOp.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(Go.AssignmentOperation.Type.class))))
-                .withAssignment(q.receive(assignOp.getAssignment(), expr -> (Expression) visitNonNull(expr, q)));
+                .withAssignment(q.receive(assignOp.getAssignment(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(assignOp.getType(), type -> visitType(type, q)));
     }
 
     @Override

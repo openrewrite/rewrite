@@ -180,6 +180,7 @@ func (r *GoReceiver) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p
 	a.Variable = receiveValue(q, a.Variable, func(e java.Expression) any { return r.Visit(e, q) })
 	a.Operator = receiveLeftPaddedEnum(r, q, a.Operator, golang.ParseAssignmentOperator)
 	a.Assignment = receiveValue(q, a.Assignment, func(e java.Expression) any { return r.Visit(e, q) })
+	a.Type = r.receiveType(a.Type, q)
 	return a
 }
 

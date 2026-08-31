@@ -177,6 +177,8 @@ func (s *GoSender) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p a
 	}, func(v any) { sendLeftPadded(s, v, q) })
 	q.GetAndSend(a, func(v any) any { return v.(*golang.AssignmentOperation).Assignment },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(a, func(v any) any { return AsRef(v.(*golang.AssignmentOperation).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return a
 }
 

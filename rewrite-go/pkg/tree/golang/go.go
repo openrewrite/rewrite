@@ -1310,6 +1310,7 @@ type AssignmentOperation struct {
 	Variable   java.Expression
 	Operator   java.LeftPadded[AssignmentOperator] // Before = space before the operator token
 	Assignment java.Expression
+	Type       java.JavaType
 }
 
 func (*AssignmentOperation) IsTree()       {}

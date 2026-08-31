@@ -300,6 +300,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         q.getAndSend(assignOp, Go.AssignmentOperation::getVariable, el -> visit(el, q));
         q.getAndSend(assignOp, a -> a.getPadding().getOperator(), op -> visitLeftPadded(op, q));
         q.getAndSend(assignOp, Go.AssignmentOperation::getAssignment, el -> visit(el, q));
+        q.getAndSend(assignOp, a -> Reference.asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return assignOp;
     }
 

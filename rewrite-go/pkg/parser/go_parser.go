@@ -1439,6 +1439,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 				Variable:   lhs,
 				Operator:   java.LeftPadded[golang.AssignmentOperator]{Before: opPrefix, Element: golang.AssignAndNot},
 				Assignment: rhs,
+				Type:       ctx.assignedType(stmt.Lhs[0], stmt.Rhs[0]),
 			}
 		}
 		if op, ok := mapAssignmentOp(stmt.Tok); ok {
@@ -1453,6 +1454,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 				Variable:   lhs,
 				Operator:   java.LeftPadded[java.AssignmentOperator]{Before: opPrefix, Element: op},
 				Assignment: rhs,
+				Type:       ctx.assignedType(stmt.Lhs[0], stmt.Rhs[0]),
 			}
 		}
 	}

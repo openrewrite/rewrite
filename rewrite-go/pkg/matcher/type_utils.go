@@ -419,6 +419,8 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 		return n.Type
 	case *java.AssignmentOperation:
 		return n.Type
+	case *golang.AssignmentOperation:
+		return n.Type
 	}
 	return nil
 }

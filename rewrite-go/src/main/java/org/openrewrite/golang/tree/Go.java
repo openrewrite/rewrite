@@ -2682,16 +2682,10 @@ public interface Go extends J {
             return getPadding().withOperator(this.operator.withElement(operator));
         }
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -2731,7 +2725,7 @@ public interface Go extends J {
             }
 
             public Go.AssignmentOperation withOperator(JLeftPadded<Type> operator) {
-                return t.operator == operator ? t : new Go.AssignmentOperation(t.padding, t.id, t.prefix, t.markers, t.variable, operator, t.assignment);
+                return t.operator == operator ? t : new Go.AssignmentOperation(t.padding, t.id, t.prefix, t.markers, t.variable, operator, t.assignment, t.type);
             }
         }
     }
