@@ -499,12 +499,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 MavenPomDownloader downloader = newPomDownloader(ctx);
                 List<MavenRepository> repositories = getResolutionResult().getPom().getRepositories();
                 try {
-                    MavenMetadata metadata = downloader.downloadMetadata(ga, null, repositories);
+                    // Recorded, because a metadata download that fails is not evidence that the version is
+                    // missing and is therefore answered as though it were present — which quietly returns the
+                    // whole check to the behaviour it exists to replace. The failure rows are the only place
+                    // a run says so.
+                    MavenMetadata metadata = metadataFailures.insertRows(ctx, () -> downloader.downloadMetadata(ga, null, repositories));
                     if (metadata.getVersioning().getVersions().contains(version)) {
                         return true;
                     }
                 } catch (MavenDownloadingException | IllegalStateException e) {
-                    // metadata that cannot be resolved is no evidence that the version is missing
                     return true;
                 }
                 try {
