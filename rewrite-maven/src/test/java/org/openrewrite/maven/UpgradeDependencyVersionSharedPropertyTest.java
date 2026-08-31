@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -766,6 +767,109 @@ class UpgradeDependencyVersionSharedPropertyTest implements RewriteTest {
                               </plugin>
                           </plugins>
                       </build>
+                  </project>
+                  """
+              )
+            );
+        }
+    }
+
+    /**
+     * A glob reaches the same gate, and every consumer of the property is targeted. On {@code main} the
+     * competing property writes race and the last one wins, breaking <em>both</em> dependencies — including
+     * the one the recipe was asked to upgrade. Checking the new version against every consumer subsumes the
+     * "targeted users must agree" phase that the Gradle recipe spells out separately.
+     */
+    @Nested
+    class GlobTargetsEveryConsumer {
+
+        @Test
+        void decouplesEveryTargetWhenTheyResolveToDifferentVersions() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "*", "2.x", null, true, null)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <properties>
+                          <jackson.version>2.10.5</jackson.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-annotations</artifactId>
+                              <version>${jackson.version}</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-core</artifactId>
+                              <version>${jackson.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                // Asserted by shape rather than by literal, since `2.x` tracks whatever Jackson last published.
+                spec -> spec.after(actual -> assertThat(actual)
+                  .as("the shared property is left as it was")
+                  .contains("<jackson.version>2.10.5</jackson.version>")
+                  .as("every target is decoupled from it, so nothing is left pointing at a stale version")
+                  .doesNotContain("${jackson.version}")
+                  .as("and no dependency is left unresolvable")
+                  .doesNotContain("Unable to download POM")
+                  .actual())
+              )
+            );
+        }
+
+        @Test
+        void bumpsPropertyWhenEveryTargetResolvesToTheSameVersion() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "*", SHARED, null, true, null)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <properties>
+                          <jackson.version>2.10.5</jackson.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-annotations</artifactId>
+                              <version>${jackson.version}</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-core</artifactId>
+                              <version>${jackson.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <properties>
+                          <jackson.version>2.15.2</jackson.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-annotations</artifactId>
+                              <version>${jackson.version}</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-core</artifactId>
+                              <version>${jackson.version}</version>
+                          </dependency>
+                      </dependencies>
                   </project>
                   """
               )
