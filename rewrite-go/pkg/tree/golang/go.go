@@ -1062,7 +1062,7 @@ type TypeAssertion struct {
 	Markers      java.Markers
 	Left         java.RightPadded[java.Expression] // After = space before `.`
 	AssertedType *java.ControlParentheses          // `(T)`
-	Type         java.JavaType                     // the result type (nullable)
+	Type         java.JavaType                     // the result type
 }
 
 func (*TypeAssertion) IsTree()       {}
@@ -1335,9 +1335,11 @@ func (n *AssignmentOperation) WithMarkers(markers java.Markers) *AssignmentOpera
 	return &c
 }
 
-// Variadic represents Go's `...` ellipsis: the `...T` parameter type
+// Variadic represents Go's `...` ellipsis where it stands for something other
+// than a parameter type: an array's elided length in `[...]T{...}`
 // (Postfix=false) and the `args...` call spread (Postfix=true). Dots is the
-// whitespace immediately before the `...` token in the postfix form.
+// whitespace immediately before the `...` token in the postfix form. A
+// parameter's `...T` is a VariableDeclarations whose Varargs slot holds the `...`.
 type Variadic struct {
 	ID      uuid.UUID
 	Prefix  java.Space

@@ -3914,7 +3914,8 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 	return &java.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
 }
 
-// mapEllipsis maps `...T` in function parameters (prefix variadic form).
+// mapEllipsis maps the `...` standing for an array's elided length in
+// `[...]T{...}`. It names no type, so the slot stays empty.
 func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) java.Expression {
 	prefix := ctx.prefix(expr.Ellipsis)
 	ctx.skip(3) // "..."

@@ -2737,15 +2737,14 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
-    // Variadic (Go-specific ellipsis: ...T parameter type, args... call spread)
+    // Variadic (Go-specific ellipsis: [...]T elided length, args... call spread)
     // ---------------------------------------------------------------
 
     /**
-     * Go's {@code ...} ellipsis, which is not a unary operator in Go's grammar:
-     * it appears as the parameter type form {@code ...T} (prefix, {@code postfix
-     * == false}) and the call-site spread {@code args...} (postfix, {@code
-     * postfix == true}). {@code dots} is the whitespace immediately before the
-     * {@code ...} token in the postfix form.
+     * Go's {@code ...} ellipsis where it stands for something other than a parameter type: an array's elided
+     * length in {@code [...]T{...}} ({@code postfix == false}) and the call-site spread {@code args...}
+     * ({@code postfix == true}). {@code dots} is the whitespace before the {@code ...} in the postfix form.
+     * A parameter's {@code ...T} is a {@link J.VariableDeclarations} whose {@code varargs} slot holds the dots.
      */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
