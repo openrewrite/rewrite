@@ -52,6 +52,7 @@ if TYPE_CHECKING:
         MultiImport,
         NamedArgument,
         Pass,
+        Shebang,
         Slice,
         SpecialParameter,
         Star,
@@ -484,6 +485,18 @@ class PythonVisitor(JavaVisitor[P]):
         pass_ = temp_stmt
         pass_ = pass_.replace(markers=self.visit_markers(pass_.markers, p))
         return pass_
+
+    def visit_shebang(self, shebang: Shebang, p: P) -> Optional[J]:
+        """Visit a shebang line."""
+        shebang = shebang.replace(
+            prefix=self.visit_space(shebang.prefix, p)
+        )
+        temp_stmt = cast(Statement, self.visit_statement(shebang, p))
+        if not isinstance(temp_stmt, type(shebang)):
+            return temp_stmt
+        shebang = temp_stmt
+        shebang = shebang.replace(markers=self.visit_markers(shebang.markers, p))
+        return shebang
 
     def visit_slice(self, slice_: Slice, p: P) -> J:
         """Visit a slice expression."""

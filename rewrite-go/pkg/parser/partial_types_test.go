@@ -30,6 +30,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // hostileImporter fails one import path — by panicking, as a toolchain too old
@@ -234,4 +235,32 @@ func findType(t *testing.T, cu *golang.CompilationUnit, name string) java.JavaTy
 		}
 	}
 	return nil
+}
+
+// A tuple is the one mapped type the parser builds from parts rather than
+// reading whole, so a member it cannot resolve must not become a hole in it:
+// the RPC sender keys a type list on each member's signature and a nil member
+// panics there.
+func TestUnattributedResultListNamesNothing(t *testing.T) {
+	gp := parser.NewGoParser()
+	gp.ParseOnly = true
+	cu, err := gp.Parse("p.go", "package main\n\nfunc f() (int, error) {\n\treturn 0, nil\n}\n")
+	require.NoError(t, err)
+
+	var found int
+	visitor.Init(&typeListWalker{onTypeList: func(tl *golang.TypeList) {
+		found++
+		assert.Nil(t, tl.Type, "a result list nothing attributed still named a type")
+	}}).Visit(cu, nil)
+	require.Equal(t, 1, found, "no result list in the tree")
+}
+
+type typeListWalker struct {
+	visitor.GoVisitor
+	onTypeList func(*golang.TypeList)
+}
+
+func (v *typeListWalker) VisitTypeList(tl *golang.TypeList, p any) java.J {
+	v.onTypeList(tl)
+	return v.GoVisitor.VisitTypeList(tl, p)
 }
