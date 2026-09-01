@@ -569,3 +569,104 @@ class TestRemoveImportScopeRules:
                 return clock, x
             """
         )
+
+
+class TestImportsInBlocks:
+    """Imports nested in a module-scope `if` body, where `if TYPE_CHECKING:` keeps them."""
+
+    def test_remove_nested_import_and_drop_emptied_block(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import List
+
+                x = 1
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                x = 1
+                """,
+            )
+        )
+
+    def test_keep_block_holding_other_imports(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import List
+                    from os.path import join
+
+                x = 1
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from os.path import join
+
+                x = 1
+                """,
+            )
+        )
+
+    def test_keep_import_when_emptying_would_lose_a_comment(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    # only needed for annotations
+                    from typing import List
+
+                x = 1
+                """
+            )
+        )
+
+    def test_keep_import_when_the_block_has_an_else(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import List
+                else:
+                    List = list
+
+                x = 1
+                """
+            )
+        )
+
+    def test_keep_nested_import_that_is_still_used(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import List
+
+                def f(x: List[int]) -> None: ...
+                """
+            )
+        )
