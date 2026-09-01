@@ -310,13 +310,19 @@ class ChangeImport(Recipe):
                 result = method.padding.replace(_select=new_padded_select)
                 if new_name and new_name != old_name:
                     result = result.replace(_name=result.name.replace(_simple_name=new_name))
-                # Update method_type declaring type and name
+                # A construction is owned by the class it builds and keeps the
+                # model's `<constructor>` name; a function is owned by its module.
                 if result.method_type is not None:
-                    result = result.replace(_method_type=dc_replace(
-                        result.method_type,
-                        _declaring_type=self._get_new_module_type(),
-                        _name=new_name or old_name,
-                    ))
+                    if result.method_type.is_constructor:
+                        new_type = dc_replace(result.method_type, _declaring_type=
+                            _create_module_type(f"{new_module}.{new_name or old_name}"))
+                    else:
+                        new_type = dc_replace(
+                            result.method_type,
+                            _declaring_type=self._get_new_module_type(),
+                            _name=new_name or old_name,
+                        )
+                    result = result.replace(_method_type=new_type)
                 return result
 
             def visit_field_access(self, field_access: FieldAccess, p: ExecutionContext) -> J:

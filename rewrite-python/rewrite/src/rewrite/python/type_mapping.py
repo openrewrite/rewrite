@@ -908,11 +908,11 @@ class PythonTypeMapping:
         return expr_type, None
 
     def import_alias_type(self, node: ast.alias) -> Optional[JavaType]:
-        """The canonical type of the symbol an import name binds, named at its
-        definition site (``from os.path import join`` yields a Method declared
-        in ``posixpath``). Functions become a whole :class:`JavaType.Method`,
-        not the return type expression positions use, so that callers can
-        derive an FQN from declaring type plus name.
+        """The type of the symbol an import name binds, named under the module the
+        source imported from — the module a call to it names too, with the defining
+        one on the marker :meth:`import_canonical_fqn` supplies. Functions become a
+        whole :class:`JavaType.Method`, not the return type expression positions use,
+        so that callers can derive an FQN from declaring type plus name.
         """
         type_id = self._lookup_type_id(node)
         if type_id is None:
@@ -929,7 +929,9 @@ class PythonTypeMapping:
                 module_name = node.name
             return self._create_class_type(module_name) if module_name else None
         if kind in _FUNCTION_KINDS:
-            written = self._from_import_module(type_id, node.asname or node.name)
+            # A bound method belongs to its class, which outranks any module
+            written = (None if descriptor.get('className')
+                       else self._from_import_module(type_id, node.asname or node.name))
             declaring = (self._create_class_type(written) if written
                          else self._get_declaration_declaring_type(descriptor))
             return self._create_method_from_descriptor(descriptor, declaring)
@@ -941,7 +943,9 @@ class PythonTypeMapping:
         whose own type carries its defining FQN already."""
         type_id = self._lookup_type_id(node)
         descriptor = self._type_registry.get(type_id) if type_id is not None else None
-        if descriptor is None or descriptor.get('kind') not in _FUNCTION_KINDS:
+        if descriptor is None or descriptor.get('kind') not in _FUNCTION_KINDS \
+                or descriptor.get('className'):
+            # A bound method is named under its class, which its own type carries
             return None
         module_name, name = descriptor.get('moduleName'), descriptor.get('name')
         if not module_name or not name:

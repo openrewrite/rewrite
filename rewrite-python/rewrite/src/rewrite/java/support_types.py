@@ -410,6 +410,12 @@ class JavaType(ABC):
             return self._name
 
         @property
+        def is_constructor(self) -> bool:
+            """The model names a construction ``<constructor>``; ``<init>`` is javac's
+            name for the same thing, which MethodMatcher accepts as an alias."""
+            return self._name in ('<constructor>', '<init>')
+
+        @property
         def return_type(self) -> Optional[JavaType]:
             return self._return_type
 
