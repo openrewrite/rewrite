@@ -21,6 +21,7 @@ package diff
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -39,11 +40,27 @@ const (
 	noNewlineMarker = `\ No newline at end of file`
 )
 
+// Option adjusts how Unified renders a diff.
+type Option func(*config)
+
+type config struct{ maxLines int }
+
+// Unlimited lifts the maxDiffLines cap, for consumers that feed the output to
+// a patch tool rather than to a reader.
+func Unlimited() Option {
+	return func(c *config) { c.maxLines = math.MaxInt }
+}
+
 // Unified renders a git-style unified diff of before against after,
 // or "" when they are identical.
-func Unified(before, after, path string) string {
+func Unified(before, after, path string, opts ...Option) string {
 	if before == after {
 		return ""
+	}
+
+	cfg := config{maxLines: maxDiffLines}
+	for _, opt := range opts {
+		opt(&cfg)
 	}
 
 	a := splitLines(before)
@@ -69,21 +86,17 @@ func Unified(before, after, path string) string {
 	edits := computeEdits(a, b)
 
 	out := []string{"--- a/" + path, "+++ b/" + path}
-	body := make([]string, 0, maxDiffLines)
+	body := make([]string, 0, min(cfg.maxLines, maxDiffLines))
 	truncated := false
 	for _, hunk := range groupIntoHunks(edits) {
-		if len(body) >= maxDiffLines {
-			truncated = true
-			break
-		}
-		body, truncated = formatHunk(body, maxDiffLines, edits, hunk, a, b, offset)
+		body, truncated = formatHunk(body, cfg.maxLines, edits, hunk, a, b, offset)
 		if truncated {
 			break
 		}
 	}
 	out = append(out, body...)
 	if truncated {
-		out = append(out, fmt.Sprintf("... diff truncated after %d lines", maxDiffLines))
+		out = append(out, fmt.Sprintf("... diff truncated after %d lines", cfg.maxLines))
 	}
 	return strings.Join(out, "\n") + "\n"
 }
@@ -234,9 +247,34 @@ func groupIntoHunks(edits []edit) []hunkRange {
 func formatHunk(out []string, limit int, edits []edit, hunk hunkRange, a, b []string, offset int) ([]string, bool) {
 	hunkEdits := edits[hunk.startEdit : hunk.endEdit+1]
 
+	// The hunk's own header occupies a line of the budget.
+	budget := limit - len(out) - 1
+	if budget <= 0 {
+		return out, true
+	}
+
+	n, truncated := len(hunkEdits), len(hunkEdits) > budget
+	if truncated {
+		// git refuses a hunk that ends on a +/- line before the end of the
+		// file, so the cut lands on the last context line that still leaves a
+		// change above it. A change run longer than the budget offers no such
+		// line and keeps the raw cut: it has no applicable prefix, and the cut
+		// still shows the leading mismatch.
+		n = budget
+		leading := firstChange(hunkEdits)
+		for k := budget; k > leading; k-- {
+			if e := hunkEdits[k-1]; e.kind == editEqual && a[e.aIndex] != noNewlineMarker {
+				n = k
+				break
+			}
+		}
+	}
+
+	// Counting the body first keeps the header's extents equal to what follows.
 	aCount, bCount := 0, 0
 	aStart, bStart := -1, -1
-	for _, e := range hunkEdits {
+	body := make([]string, 0, n)
+	for _, e := range hunkEdits[:n] {
 		if e.kind != editInsert {
 			if aStart < 0 {
 				aStart = e.aIndex
@@ -253,31 +291,36 @@ func formatHunk(out []string, limit int, edits []edit, hunk hunkRange, a, b []st
 				bCount++
 			}
 		}
+		switch {
+		case e.kind == editEqual && a[e.aIndex] == noNewlineMarker:
+			body = append(body, noNewlineMarker)
+		case e.kind == editEqual:
+			body = append(body, " "+a[e.aIndex])
+		case e.kind == editDelete && a[e.aIndex] == noNewlineMarker,
+			e.kind == editInsert && b[e.bIndex] == noNewlineMarker:
+			body = append(body, noNewlineMarker)
+		case e.kind == editDelete:
+			body = append(body, "-"+a[e.aIndex])
+		default:
+			body = append(body, "+"+b[e.bIndex])
+		}
 	}
 
 	out = append(out, fmt.Sprintf("@@ -%d,%d +%d,%d @@",
 		rangeStart(aStart, aCount, offset), aCount,
 		rangeStart(bStart, bCount, offset), bCount))
+	return append(out, body...), truncated
+}
 
-	for _, e := range hunkEdits {
-		if len(out) >= limit {
-			return out, true
-		}
-		switch {
-		case e.kind == editEqual && a[e.aIndex] == noNewlineMarker:
-			out = append(out, noNewlineMarker)
-		case e.kind == editEqual:
-			out = append(out, " "+a[e.aIndex])
-		case e.kind == editDelete && a[e.aIndex] == noNewlineMarker,
-			e.kind == editInsert && b[e.bIndex] == noNewlineMarker:
-			out = append(out, noNewlineMarker)
-		case e.kind == editDelete:
-			out = append(out, "-"+a[e.aIndex])
-		default:
-			out = append(out, "+"+b[e.bIndex])
+// firstChange reports where a hunk's leading context ends: a cut reaching
+// further back would leave the hunk with no changes in it.
+func firstChange(hunkEdits []edit) int {
+	for i, e := range hunkEdits {
+		if e.kind != editEqual {
+			return i
 		}
 	}
-	return out, false
+	return len(hunkEdits)
 }
 
 // rangeStart renders a hunk header's line number, using git's 0 for a side the
