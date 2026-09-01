@@ -104,6 +104,14 @@ _FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDesc
 
 # knownInstance descriptors carry no moduleName, and most of the singletons ty
 # reports live in `typing`. These `knownInstanceKind`s are the ones that don't.
+def _class_fqn(descriptor: Dict[str, Any]) -> str:
+    """A class descriptor's fully qualified name: builtins stay bare, everything
+    else is qualified by the module that defines it."""
+    class_name = descriptor.get('className', '')
+    module_name = descriptor.get('moduleName')
+    return f"{module_name}.{class_name}" if module_name and module_name != 'builtins' else class_name
+
+
 _KNOWN_INSTANCE_FQNS: Dict[str, str] = {
     'Range': 'range',
     'FunctoolsPartial': 'functools.partial',
@@ -669,28 +677,13 @@ class PythonTypeMapping:
             return class_type
 
         elif kind == 'classRef':
-            # A class defined outside the session's first-party boundary
-            # (stdlib / third-party). ty-types emits identity only — no members,
-            # methods, supertypes, or type parameters — so map it to a body-less
-            # JavaType.Class shell. This keeps attribution lean and slashes the
-            # JavaType payload that travels over RPC, which otherwise drags a
-            # class's whole member/supertype graph across third-party packages
-            # and stdlib. The FQN scheme matches the classLiteral/instance
-            # branches: builtins stay bare, everything else is module-qualified.
-            # `_create_class_type` returns a Class with only `_fully_qualified_name`
-            # and `_kind` set, leaving members/methods/supertype/interfaces/
-            # type_parameters as None — exactly the shell we want.
-            class_name = descriptor.get('className', '')
-            module_name = descriptor.get('moduleName')
-            if module_name and module_name != 'builtins':
-                fqn = f"{module_name}.{class_name}"
-            else:
-                fqn = class_name
-            shell = self._create_class_type(fqn)
-            # Hand the shell to the registered type factory (seam 2). The default
-            # factory leaves it as a shell; a table-backed alternative resolves
-            # it to a full type from V3 type tables. Deep mode never reaches here
-            # (no boundary ⇒ ty-types emits no classRef), so this is inert there.
+            # A class outside the session's first-party boundary (stdlib /
+            # third-party): ty-types emits identity only, so it maps to a
+            # body-less shell whose members/methods/supertype stay None.
+            shell = self._create_class_type(_class_fqn(descriptor))
+            # Seam 2: the default factory keeps the shell; a table-backed
+            # alternative resolves it from V3 type tables. Deep mode emits no
+            # classRef, so this is inert there.
             from rewrite.python.type_factory import get_java_type_factory
             return get_java_type_factory().resolve_class_ref(shell, descriptor)
 
@@ -1440,11 +1433,7 @@ class PythonTypeMapping:
         """Resolve a descriptor's class through its classLiteral so annotation,
         expression, and declaring-type positions all share one enriched object."""
         class_name = descriptor.get('className', '')
-        module_name = descriptor.get('moduleName')
-        if module_name and module_name != 'builtins':
-            fqn = f"{module_name}.{class_name}"
-        else:
-            fqn = class_name
+        fqn = _class_fqn(descriptor)
         class_id = descriptor.get('classId')
         if class_id is None and class_name:
             class_id = self._class_literal_index.get(class_name)
