@@ -3166,13 +3166,15 @@ public class GroovyParserVisitor {
             for (int i = 0; i < varExprs.size(); i++) {
                 VariableExpression varExpr = varExprs.get(i);
                 TypeTree innerType = visitVariableExpressionType(varExpr);
+                Space innerPrefix = innerType.getPrefix();
+                innerType = innerType.withPrefix(EMPTY);
                 J.Identifier name = doVisit(varExpr);
                 J.VariableDeclarations.NamedVariable nv = new J.VariableDeclarations.NamedVariable(
                         randomId(), name.getPrefix(), Markers.EMPTY,
                         name.withPrefix(EMPTY), emptyList(), null,
                         typeMapping.variableType(name.getSimpleName(), innerType.getType()));
                 J.VariableDeclarations innerDecl = new J.VariableDeclarations(
-                        randomId(), EMPTY, Markers.EMPTY, emptyList(), emptyList(),
+                        randomId(), innerPrefix, Markers.EMPTY, emptyList(), emptyList(),
                         innerType, null, singletonList(JRightPadded.build(nv)));
                 Space after = i < varExprs.size() - 1 ? sourceBefore(",") : sourceBefore(")");
                 tupleVars.add(JRightPadded.<J.VariableDeclarations>build(innerDecl).withAfter(after));
