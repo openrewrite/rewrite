@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.python.marker.CanonicalName;
 
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -76,6 +77,15 @@ class PythonImportNamesTest {
     @Test
     void aliasNameReadsTheAlias() {
         assertThat(PythonImportNames.aliasName(imp("numpy", "np", null))).isEqualTo("np");
+    }
+
+    @Test
+    void canonicalFqnPrefersTheMarker() {
+        JavaType.Method method = new JavaType.Method(null, 0, JavaType.ShallowClass.build("os.path"),
+                "join", null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
+        J.Import imp = imp("join", null, method)
+                .withMarkers(Markers.EMPTY.add(new CanonicalName(randomId(), "posixpath.join")));
+        assertThat(PythonImportNames.canonicalFqn(imp)).isEqualTo("posixpath.join");
     }
 
     @Test

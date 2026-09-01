@@ -19,6 +19,7 @@ from typing import Optional
 from rewrite.java.support_types import JavaType, JRightPadded, Space
 from rewrite.java.tree import Empty, FieldAccess, Identifier, Import
 from rewrite.markers import Markers
+from rewrite.python.markers import CanonicalName
 
 
 def get_qualid_name(qualid) -> str:
@@ -59,11 +60,12 @@ def get_alias_name(imp: Import) -> Optional[str]:
 
 
 def get_canonical_fqn(imp: Import) -> Optional[str]:
-    """The canonical fully qualified name of the symbol ``imp`` binds, read off
-    the type attributed to its qualid (see
-    ``PythonTypeMapping.import_alias_type``), or None when unattributed. Differs
-    from the written path for re-exports: ``from os.path import join`` yields
-    ``posixpath.join``."""
+    """The fully qualified name of the symbol ``imp`` binds, at the module defining
+    it, or None when unattributed: the :class:`CanonicalName` marker when that module
+    re-exports it under the written path, else the qualid's own type."""
+    canonical = imp.markers.find_first(CanonicalName)
+    if canonical is not None:
+        return canonical.fqn
     t = getattr(imp.qualid, 'type', None)
     if isinstance(t, JavaType.Method):
         declaring = t.declaring_type

@@ -37,7 +37,7 @@ Wildcards:
 from dataclasses import dataclass
 from typing import Optional, List
 
-from rewrite.java.tree import MethodInvocation, Identifier
+from rewrite.java.tree import MethodInvocation
 
 
 @dataclass
@@ -112,11 +112,14 @@ class MethodMatcher:
         return self._matches_arguments(method)
 
     def _matches_method_name(self, method: MethodInvocation) -> bool:
-        """Check if the method name matches."""
-        if not isinstance(method.name, Identifier):
-            return False
+        """Check if the method name matches.
 
-        return self._method_matcher.matches(method.name.simple_name)
+        The method type names what is called, which for a construction is
+        ``<constructor>`` rather than the class name at the call site. Java's
+        MethodMatcher reads the same name, so one pattern serves both.
+        """
+        return method.method_type is not None and \
+            self._method_matcher.matches(method.method_type.name)
 
     def _matches_arguments(self, method: MethodInvocation) -> bool:
         """Check if method arguments match the expected pattern."""
