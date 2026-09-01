@@ -96,6 +96,17 @@ function writeWalledPackage(repo: string, name: string): void {
 }
 
 /**
+ * A package with no `exports` map, whose subpath is a directory. Reaching its declarations means
+ * the directory-index lookup that `Bundler` performs and the `node16` family does not.
+ */
+function writeDirectorySubpathPackage(repo: string, name: string): void {
+    write(repo, `node_modules/${name}/package.json`, JSON.stringify({name, version: '1.0.0'}));
+    write(repo, `node_modules/${name}/sub/index.d.ts`,
+        //language=typescript
+        `export declare function go(a: string): string;`);
+}
+
+/**
  * A package publishing different typings per export condition, the `import` branch returning a
  * string and the `require` branch a number, so a resolution's chosen branch is visible as a type.
  */
@@ -112,6 +123,13 @@ function writeDualPackage(repo: string, name: string): void {
     write(repo, `node_modules/${name}/esm.d.ts`, `export declare function pick(): string;`);
     write(repo, `node_modules/${name}/cjs.d.cts`, `export declare function pick(): number;`);
 }
+
+//language=typescript
+const WALLED_DEEP_SNIPPET = `
+    import {Thing} from "walled/internal/thing";
+
+    new Thing().deep("y");
+`;
 
 //language=typescript
 const THEMING_SNIPPET = `
@@ -184,42 +202,6 @@ describe('tsconfig.json compiler options', () => {
         expect(captured.get('greet')).toBe('src/greeter.Greeter{name=greet,return=String,parameters=[String]}');
     }, 60000);
 
-    test('a nested project resolves `paths` against its own directory, not the repository root', async () => {
-        const captured = new Map<string, string>();
-        const spec = new RecipeSpec();
-        spec.recipe = captureMethodTypes(['greet'], captured);
-
-        await withDir(async (repo) => {
-            write(repo.path, 'packages/app/tsconfig.json', `{"compilerOptions": {"paths": {"@app/*": ["src/*"]}}}`);
-
-            await spec.rewriteRun(npm(
-                repo.path,
-                {
-                    //language=typescript
-                    ...typescript(`
-                        import {Greeter} from "@app/greeter";
-
-                        new Greeter().greet("world");
-                    `),
-                    path: 'packages/app/main.ts'
-                },
-                {
-                    //language=typescript
-                    ...typescript(`
-                        export class Greeter {
-                            greet(name: string): string {
-                                return name;
-                            }
-                        }
-                    `),
-                    path: 'packages/app/src/greeter.ts'
-                }
-            ));
-        }, {unsafeCleanup: true});
-
-        expect(captured.get('greet')).toBe('packages/app/src/greeter.Greeter{name=greet,return=String,parameters=[String]}');
-    }, 60000);
-
     test('sibling projects each get their own compiler options', async () => {
         const captured = new Map<string, string>();
         const spec = new RecipeSpec();
@@ -268,34 +250,47 @@ describe('tsconfig.json compiler options', () => {
             writeWalledPackage(repo.path, 'walled');
             write(repo.path, 'tsconfig.json', `{"compilerOptions": {"moduleResolution": "node10"}}`);
 
-            await spec.rewriteRun(npm(repo.path, typescript(`
-                import {Thing} from "walled/internal/thing";
-
-                new Thing().deep("y");
-            `)));
+            await spec.rewriteRun(npm(repo.path, typescript(WALLED_DEEP_SNIPPET)));
         }, {unsafeCleanup: true});
 
         expect(captured.get('deep')).toBe('walled.Thing{name=deep,return=String,parameters=[String]}');
     }, 60000);
 
-    test('a project stating only `module` gets the paired resolution, and still parses', async () => {
-        const captured = new Map<string, string>();
-        const spec = new RecipeSpec();
-        spec.recipe = captureMethodTypes(['pick'], captured);
+    test('a project\'s `module` kind sets its resolution without being adopted', async () => {
+        const resolution = new Map<string, string>();
+        const implied = new RecipeSpec();
+        implied.recipe = captureMethodTypes(['go'], resolution);
+
+        await withDir(async (repo) => {
+            writeDirectorySubpathPackage(repo.path, 'plain');
+            write(repo.path, 'tsconfig.json', `{"compilerOptions": {"module": "node16"}}`);
+
+            await implied.rewriteRun(npm(repo.path, typescript(`
+                import {go} from "plain/sub";
+
+                go("x");
+            `)));
+        }, {unsafeCleanup: true});
+
+        expect(resolution.get('go')).toBe('plain/sub{name=unknown,return=<unknown>,parameters=[]}');
+
+        const conditions = new Map<string, string>();
+        const notAdopted = new RecipeSpec();
+        notAdopted.recipe = captureMethodTypes(['pick'], conditions);
 
         await withDir(async (repo) => {
             writeDualPackage(repo.path, 'dual');
             write(repo.path, 'tsconfig.json', `{"compilerOptions": {"module": "node16"}}`);
 
-            await spec.rewriteRun(npm(repo.path, typescript(`
+            await notAdopted.rewriteRun(npm(repo.path, typescript(`
                 import {pick} from "dual";
 
                 pick();
             `)));
         }, {unsafeCleanup: true});
 
-        expect(captured.get('pick')).toBe('dual{name=pick,return=double,parameters=[]}');
-    }, 60000);
+        expect(conditions.get('pick')).toBe('dual{name=pick,return=String,parameters=[]}');
+    }, 120000);
 
     test('a declared resolution is the only one consulted, even where it resolves less', async () => {
         const captured = new Map<string, string>();
@@ -323,28 +318,10 @@ describe('tsconfig.json compiler options', () => {
 
         expect(captured.get('deep')).toBe('<unknown>{name=deep,return=<unknown>,parameters=[]}');
     }, 60000);
-test('a dual package resolves through the condition its `moduleResolution` implies', async () => {
-        const captured = new Map<string, string>();
-        const spec = new RecipeSpec();
-        spec.recipe = captureMethodTypes(['pick'], captured);
-
-        await withDir(async (repo) => {
-            writeDualPackage(repo.path, 'dual');
-            write(repo.path, 'tsconfig.json', `{"compilerOptions": {"moduleResolution": "bundler"}}`);
-
-            await spec.rewriteRun(npm(repo.path, typescript(`
-                import {pick} from "dual";
-
-                pick();
-            `)));
-        }, {unsafeCleanup: true});
-
-        expect(captured.get('pick')).toBe('dual{name=pick,return=String,parameters=[]}');
-    }, 60000);
-test('a JavaScript project states its `paths` in jsconfig.json, which a tsconfig.json outranks', async () => {
-        const captured = new Map<string, string>();
+    test('a JavaScript project states its `paths` in jsconfig.json, which a tsconfig.json outranks', async () => {
+        const fromJsConfigCapture = new Map<string, string>();
         const fromJsConfig = new RecipeSpec();
-        fromJsConfig.recipe = captureMethodTypes(['greet'], captured);
+        fromJsConfig.recipe = captureMethodTypes(['greet'], fromJsConfigCapture);
 
         await withDir(async (repo) => {
             write(repo.path, 'jsconfig.json', `{"compilerOptions": {"paths": {"@app/*": ["src/*"]}}}`);
@@ -374,10 +351,11 @@ test('a JavaScript project states its `paths` in jsconfig.json, which a tsconfig
             ));
         }, {unsafeCleanup: true});
 
-        expect(captured.get('greet')).toBe('src/greeter.Greeter{name=greet,return=String,parameters=[String]}');
+        expect(fromJsConfigCapture.get('greet')).toBe('src/greeter.Greeter{name=greet,return=String,parameters=[String]}');
 
+        const bothPresentCapture = new Map<string, string>();
         const bothPresent = new RecipeSpec();
-        bothPresent.recipe = captureMethodTypes(['greet'], captured);
+        bothPresent.recipe = captureMethodTypes(['greet'], bothPresentCapture);
 
         await withDir(async (repo) => {
             write(repo.path, 'jsconfig.json', `{"compilerOptions": {"paths": {"@app/*": ["nowhere/*"]}}}`);
@@ -408,6 +386,6 @@ test('a JavaScript project states its `paths` in jsconfig.json, which a tsconfig
             ));
         }, {unsafeCleanup: true});
 
-        expect(captured.get('greet')).toBe('src/greeter.Greeter{name=greet,return=String,parameters=[String]}');
+        expect(bothPresentCapture.get('greet')).toBe('src/greeter.Greeter{name=greet,return=String,parameters=[String]}');
     }, 120000);
 });

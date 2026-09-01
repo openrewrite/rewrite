@@ -17,9 +17,10 @@ import ts from "typescript";
 import * as path from "path";
 
 /**
- * The options that decide what a module specifier resolves to. Confined to those, because the
- * rest of a project's tsconfig only narrows attribution — `target` and `lib` shrink the global
- * scope, `strict` reshapes types — where the parser wants the widest view it can get.
+ * What a project gets to decide: where a module specifier resolves to, and which ambient
+ * declarations are in scope. The shape of the types themselves stays with the parser — `target`
+ * and `lib` bound the global scope, `strict` adds a `null` to every nullable type — which pins
+ * the widest view it can rather than the one a project compiles against.
  */
 const RESOLUTION_OPTIONS: string[] = [
     "baseUrl",
@@ -58,7 +59,7 @@ export interface ResolvedTsConfig {
  */
 export class TsConfigResolver {
     private readonly configByDir = new Map<string, string | undefined>();
-    private readonly optionsByConfig = new Map<string, ts.CompilerOptions>();
+    private readonly optionsByConfig = new Map<string, ts.CompilerOptions | undefined>();
     private readonly root?: string;
 
     /**
@@ -72,9 +73,8 @@ export class TsConfigResolver {
 
     forFile(filePath: string): ResolvedTsConfig {
         const configFilePath = this.findConfig(path.dirname(path.resolve(filePath)));
-        return configFilePath ?
-            {configFilePath, options: this.optionsFor(configFilePath)} :
-            {options: this.defaults};
+        const options = configFilePath === undefined ? undefined : this.optionsFor(configFilePath);
+        return options === undefined ? {options: this.defaults} : {configFilePath, options};
     }
 
     /** The nearest config file at or below the project root, searching upwards. */
@@ -109,25 +109,33 @@ export class TsConfigResolver {
         }
     }
 
-    private optionsFor(configFilePath: string): ts.CompilerOptions {
-        let options = this.optionsByConfig.get(configFilePath);
-        if (!options) {
-            this.optionsByConfig.set(configFilePath, options = this.merge(configFilePath));
+    private optionsFor(configFilePath: string): ts.CompilerOptions | undefined {
+        if (!this.optionsByConfig.has(configFilePath)) {
+            this.optionsByConfig.set(configFilePath, this.merge(configFilePath));
         }
-        return options;
+        return this.optionsByConfig.get(configFilePath);
     }
 
-    private merge(configFilePath: string): ts.CompilerOptions {
-        const {config, error} = ts.readConfigFile(configFilePath, ts.sys.readFile);
-        if (error || !config) {
-            return this.defaults;
+    /** Undefined where the config cannot be read, leaving the caller on its defaults. */
+    private merge(configFilePath: string): ts.CompilerOptions | undefined {
+        let projectOptions: ts.CompilerOptions;
+        try {
+            const {config, error} = ts.readConfigFile(configFilePath, ts.sys.readFile);
+            if (error || !config) {
+                return undefined;
+            }
+            // `readDirectory` answers empty because only `options` is read here; left to `ts.sys` it
+            // walks the whole tree under the config to build a file list, once per config found.
+            const parseConfigHost: ts.ParseConfigHost = {...ts.sys, readDirectory: () => []};
+            projectOptions = ts.parseJsonConfigFileContent(
+                config, parseConfigHost, path.dirname(configFilePath), undefined, configFilePath).options;
+        } catch {
+            return undefined;
         }
 
-        const {options: projectOptions} = ts.parseJsonConfigFileContent(
-            config, ts.sys, path.dirname(configFilePath), undefined, configFilePath);
-
-        // `baseUrl` takes precedence over `pathsBasePath`, so a default rooted at the repository
-        // would resolve a nested project's `paths` against the wrong directory.
+        // A project's `baseUrl` stands alone, including where it states none: `baseUrl` takes
+        // precedence over `pathsBasePath`, so a default rooted at the repository would resolve a
+        // nested project's `paths` against the wrong directory.
         const {baseUrl: _, ...defaults} = this.defaults;
 
         const resolution: ts.CompilerOptions = {};
@@ -164,5 +172,6 @@ function pairedModuleResolution(projectOptions: ts.CompilerOptions): ts.ModuleRe
 
 function isAtOrUnder(dir: string, root: string): boolean {
     const relative = path.relative(root, dir);
-    return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+    return relative === "" ||
+        (relative !== ".." && !relative.startsWith(".." + path.sep) && !path.isAbsolute(relative));
 }

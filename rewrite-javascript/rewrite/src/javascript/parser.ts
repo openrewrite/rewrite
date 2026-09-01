@@ -230,8 +230,10 @@ export class JavaScriptParser extends Parser {
             inputFiles.set(normalizedSourcePath, input);
             // Remove from cache if previously cached
             this.sourceFileCache && this.sourceFileCache.delete(normalizedSourcePath);
+        }
 
-            // Packages in a monorepo each configure their own module resolution.
+        // Packages in a monorepo each configure their own module resolution.
+        for (const normalizedSourcePath of inputFiles.keys()) {
             const {configFilePath, options} = this.tsConfig.forFile(normalizedSourcePath);
             const projectKey = configFilePath ?? "";
             projectOf.set(normalizedSourcePath, projectKey);
@@ -248,9 +250,6 @@ export class JavaScriptParser extends Parser {
         for (const sourcePath of inputFiles.keys()) {
             for (let dir = path.dirname(sourcePath); !inputDirectories.has(dir); dir = path.dirname(dir)) {
                 inputDirectories.add(dir);
-                if (path.dirname(dir) === dir) {
-                    break;
-                }
             }
         }
 
@@ -316,8 +315,13 @@ export class JavaScriptParser extends Parser {
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
             const normalizedFileName = path.normalize(fileName);
+            // A file's module format is baked in when it is created and follows from the requesting
+            // project's `moduleResolution`, so it belongs in the key of a cache several projects share.
+            const cacheKey = typeof languageVersion === 'number' ?
+                normalizedFileName :
+                `${languageVersion.impliedNodeFormat ?? ''}\0${normalizedFileName}`;
             // Check if the SourceFile is in the cache
-            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(normalizedFileName);
+            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(cacheKey);
             if (sourceFile) {
                 return sourceFile;
             }
@@ -352,7 +356,7 @@ export class JavaScriptParser extends Parser {
                 sourceFile = ts.createSourceFile(normalizedFileName, sourceText, sourceFileOptions, true, scriptKind);
                 // Cache the SourceFile if it's a dependency
                 if (!input && this.sourceFileCache) {
-                    this.sourceFileCache.set(normalizedFileName, sourceFile);
+                    this.sourceFileCache.set(cacheKey, sourceFile);
                 }
                 return sourceFile;
             }
@@ -382,7 +386,7 @@ export class JavaScriptParser extends Parser {
         // Custom module resolution to handle in-memory imports
         // This is required because TypeScript's default module resolution looks for files on disk,
         // but our source files only exist in memory (in the inputFiles map)
-        host.resolveModuleNameLiterals = (moduleLiterals, containingFile) => {
+        host.resolveModuleNameLiterals = (moduleLiterals, containingFile, _redirectedReference, _options, containingSourceFile) => {
             const resolvedModules: ts.ResolvedModuleWithFailedLookupLocations[] = [];
             const normalizedFileName = path.normalize(containingFile);
             const containingDir = path.dirname(normalizedFileName);
@@ -423,14 +427,17 @@ export class JavaScriptParser extends Parser {
                 }
 
                 // Fall back to TypeScript's default resolution for node_modules and absolute paths.
-                // Supplying no resolution mode leaves the export conditions to `moduleResolution`
-                // alone, so which branch of a dual package is read does not turn on how the
-                // importing file is classified.
+                // Passing the usage location's mode keeps export conditions tied to the module kind
+                // pinned above, so every project reads the same branch of a dual package whatever
+                // `moduleResolution` it states.
                 const result = ts.resolveModuleName(
                     moduleName,
                     normalizedFileName,
                     compilerOptions,
-                    host
+                    host,
+                    undefined,
+                    undefined,
+                    ts.getModeForUsageLocation(containingSourceFile, moduleLiteral, compilerOptions)
                 );
 
                 resolvedModules.push(result);
