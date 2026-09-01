@@ -203,6 +203,11 @@ class PythonTypeMapping:
         self._byte_offset_cache: Dict[Tuple[int, int], int] = {}
         self._lookup_cache: Dict[tuple, Optional[int]] = {}
 
+        # Lazily populated by _module_ast / _from_import_module
+        self._module_ast_parsed = False
+        self._module_ast_tree: Optional[ast.Module] = None
+        self._from_import_index: Optional[Dict[Tuple[int, str], str]] = None
+
         # ty-types data: populated by _build_index
         self._node_index: Dict[Tuple[int, int], Tuple[int, str]] = {}  # (start, end) -> (type_id, node_kind)
         self._node_index_by_start: Dict[int, List[Tuple[int, int, str]]] = {}  # start -> [(end, type_id, node_kind)]
@@ -1013,6 +1018,38 @@ class PythonTypeMapping:
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
 
+    def _module_ast(self) -> Optional[ast.Module]:
+        """This file's AST, parsed once, or None when the source doesn't parse."""
+        if not self._module_ast_parsed:
+            self._module_ast_parsed = True
+            try:
+                self._module_ast_tree = ast.parse(self._source)
+            except SyntaxError:
+                self._module_ast_tree = None
+        return self._module_ast_tree
+
+    def _from_import_module(self, type_id: int, bound_name: str) -> Optional[str]:
+        """The module an absolute ``from M import f`` in this file names ``f`` under.
+
+        Preferred over ty's definition site as a call's owner: it is the module the
+        receiver form ``os.path.join(...)`` and ``module_type`` name a re-export
+        under, and it survives the platform swapping ``posixpath`` for ``ntpath``.
+        Keyed by ty's type id, so a name rebound to something else misses.
+        """
+        if self._from_import_index is None:
+            index: Dict[Tuple[int, str], str] = {}
+            tree = self._module_ast()
+            for node in ast.walk(tree) if tree else ():
+                # A relative import's written form is not a module path
+                if not isinstance(node, ast.ImportFrom) or node.level or not node.module:
+                    continue
+                for alias in node.names:
+                    alias_id = self._lookup_type_id(alias)
+                    if alias_id is not None:
+                        index[(alias_id, alias.asname or alias.name)] = node.module
+            self._from_import_index = index
+        return self._from_import_index.get((type_id, bound_name))
+
     def module_type(self, module_fqn: str) -> Optional[JavaType.Class]:
         """A JavaType.Class for the module itself: FQN = the module name, public
         top-level functions as methods, public top-level constants as members.
@@ -1029,9 +1066,8 @@ class PythonTypeMapping:
         non-underscore names. Returns None when the module has no public
         module-level symbols.
         """
-        try:
-            tree = ast.parse(self._source)
-        except SyntaxError:
+        tree = self._module_ast()
+        if tree is None:
             return None
 
         all_names = _module_all_names(tree)
@@ -1281,17 +1317,19 @@ class PythonTypeMapping:
                         # boundMethod has className — use it for declaring type
                         if descriptor.get('className'):
                             return self._class_reference(descriptor)
-                        # A callable is owned by the module declaring it, `builtins`
-                        # included; only builtin *types* stay unqualified, since `str`
-                        # is the name a recipe matches that type against.
-                        module_name = descriptor.get('moduleName')
+                        # A function is owned by its module, `builtins` included;
+                        # only builtin *types* stay unqualified, since `str` is the
+                        # name a recipe matches that type against.
+                        module_name = (self._from_import_module(type_id, node.func.id)
+                                       or descriptor.get('moduleName'))
                         if module_name:
                             return self._create_class_type(module_name)
                     elif kind == 'classLiteral':
                         # Python has no constructor node: instantiation is a call to
-                        # the class name, so the same rule owns it by the class's
-                        # module and `collections OrderedDict(..)` matches every
-                        # import form.
+                        # the class name, owned by the module defining the class, so
+                        # `collections OrderedDict(..)` matches every import form. A
+                        # class keeps its defining module even when re-exported, as
+                        # `module_type` documents.
                         module_name = descriptor.get('moduleName')
                         if module_name:
                             return self._create_class_type(module_name)

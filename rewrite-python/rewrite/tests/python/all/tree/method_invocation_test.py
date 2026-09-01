@@ -308,15 +308,10 @@ def test_bare_function_declaring_type_has_module():
                     errors.append("MethodInvocation.method_type is None for join()")
                 else:
                     dt = method.method_type.declaring_type
-                    if dt is None:
-                        errors.append("method_type.declaring_type is None for join()")
-                    elif not hasattr(dt, '_fully_qualified_name') or (
-                        'posixpath' not in dt._fully_qualified_name and
-                        'ntpath' not in dt._fully_qualified_name
-                    ):
+                    if getattr(dt, '_fully_qualified_name', None) != 'os.path':
                         errors.append(
-                            f"declaring_type fqn is '{getattr(dt, '_fully_qualified_name', '?')}', "
-                            f"expected to contain 'posixpath' or 'ntpath' (os.path module)"
+                            f"declaring_type is '{getattr(dt, '_fully_qualified_name', dt)}', "
+                            f"expected 'os.path', the module the source imported from"
                         )
                 return method
 

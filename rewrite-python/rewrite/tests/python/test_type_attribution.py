@@ -408,6 +408,23 @@ class TestModuleFunctionDeclaringType:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    def test_rebound_import_name_is_owned_by_this_module(self):
+        source = '''
+            from json import dumps
+
+            def dumps(obj):
+                return ""
+
+            x = dumps({})
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            result = mapping.method_invocation_type(tree.body[2].value)
+            # `test` is the module _make_mapping writes the source to
+            assert result._declaring_type.fully_qualified_name == 'test'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
     def test_call_owner_is_the_module_declaring_the_callable(self):
         """A class is owned like a function is: `Foo` by `test`, the module
         _make_mapping writes the source to; `str` by `builtins`."""
