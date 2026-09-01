@@ -46,6 +46,7 @@ import {
     TextSpan
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
+import {TsConfigResolver} from "./tsconfig";
 import {create as produce} from "mutative";
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
@@ -90,9 +91,9 @@ type WithInvalidSyntaxSlots<T> = T & {
 
 export class JavaScriptParser extends Parser {
 
-    private readonly compilerOptions: ts.CompilerOptions;
+    private readonly tsConfig: TsConfigResolver;
     private readonly styles?: NamedStyles[];
-    private oldProgram?: ts.Program;
+    private readonly oldPrograms = new Map<string, ts.Program>();
     private readonly sourceFileCache?: Map<string, ts.SourceFile>;
 
     constructor(
@@ -105,7 +106,7 @@ export class JavaScriptParser extends Parser {
         }: JavaScriptParserOptions = {},
     ) {
         super({ctx, relativeTo});
-        this.compilerOptions = {
+        const defaultCompilerOptions: ts.CompilerOptions = {
             target: ts.ScriptTarget.Latest,
             // Bundler matches `exports` conditions leniently, so packages that publish types only under
             // an `import` condition resolve; it pairs with `preserve`, which `commonjs` cannot (TS5095).
@@ -132,6 +133,7 @@ export class JavaScriptParser extends Parser {
             types: types ?? ["*"],
             baseUrl: relativeTo || process.cwd()
         };
+        this.tsConfig = new TsConfigResolver(defaultCompilerOptions, relativeTo);
         this.styles = styles;
         this.sourceFileCache = sourceFileCache;
     }
@@ -208,12 +210,14 @@ export class JavaScriptParser extends Parser {
     // noinspection JSUnusedGlobalSymbols
     reset(): this {
         this.sourceFileCache && this.sourceFileCache.clear();
-        this.oldProgram = undefined;
+        this.oldPrograms.clear();
         return this;
     }
 
     override async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
         const inputFiles = new Map<SourcePath, ParserInput>();
+        const projectOf = new Map<SourcePath, string>();
+        const projects = new Map<string, { options: ts.CompilerOptions, rootNames: SourcePath[] }>();
 
         // Populate inputFiles map and remove from cache if necessary
         for (const input of inputs) {
@@ -228,8 +232,79 @@ export class JavaScriptParser extends Parser {
             this.sourceFileCache && this.sourceFileCache.delete(normalizedSourcePath);
         }
 
-        // Create a new CompilerHost within parseInputs
-        const host = ts.createCompilerHost(this.compilerOptions);
+        // Packages in a monorepo each configure their own module resolution.
+        for (const normalizedSourcePath of inputFiles.keys()) {
+            const {configFilePath, options} = this.tsConfig.forFile(normalizedSourcePath);
+            const projectKey = configFilePath ?? "";
+            projectOf.set(normalizedSourcePath, projectKey);
+            let project = projects.get(projectKey);
+            if (!project) {
+                projects.set(projectKey, project = {options, rootNames: []});
+            }
+            project.rootNames.push(normalizedSourcePath);
+        }
+
+        // Module resolution probes a directory before the files in it, so a directory holding
+        // nothing but in-memory inputs has to answer too, or those inputs are unreachable.
+        const inputDirectories = new Set<string>();
+        for (const sourcePath of inputFiles.keys()) {
+            for (let dir = path.dirname(sourcePath); !inputDirectories.has(dir); dir = path.dirname(dir)) {
+                inputDirectories.add(dir);
+            }
+        }
+
+        const compiled = new Map<string, { program: ts.Program, typeMapping: JavaScriptTypeMapping }>();
+        for (const [projectKey, {options, rootNames}] of projects) {
+            // TypeScript carries the previous program's bound files forward when the root paths match,
+            // so a parser held across parses of one path costs a fraction of a freshly built one.
+            const program = ts.createProgram(rootNames, options,
+                this.createCompilerHost(options, inputFiles, inputDirectories), this.oldPrograms.get(projectKey));
+            this.oldPrograms.set(projectKey, program);
+
+            // A JavaScriptTypeMapping deduplicates by `ts.Type.id`, which is only unique within
+            // the TypeChecker that issued it, so each program needs its own.
+            compiled.set(projectKey, {program, typeMapping: new JavaScriptTypeMapping(program.getTypeChecker(), this.relativeTo)});
+        }
+
+        for (const [sourcePath, input] of inputFiles) {
+            const {program, typeMapping} = compiled.get(projectOf.get(sourcePath)!)!;
+            const filePath = parserInputFile(input);
+            const sourceFile = program.getSourceFile(filePath);
+            if (!sourceFile) {
+                yield this.error(input, new Error('Parser returned undefined'));
+                continue;
+            }
+
+            if (hasFlowAnnotation(sourceFile)) {
+                yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
+                continue;
+            }
+
+            const syntaxErrors = checkSyntaxErrors(program, sourceFile);
+            if (syntaxErrors.length > 0) {
+                let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
+                yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
+                continue;
+            }
+
+            try {
+                yield await this.requirePrintEqualsInput(produce(
+                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
+                        .visit(sourceFile) as SourceFile,
+                    draft => {
+                        if (this.styles) {
+                            draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
+                        }
+                    }), input, escapeLoneSurrogates(sourceFile.getFullText()));
+            } catch (error) {
+                yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
+            }
+        }
+    }
+
+    private createCompilerHost(compilerOptions: ts.CompilerOptions, inputFiles: Map<SourcePath, ParserInput>,
+                               inputDirectories: Set<string>): ts.CompilerHost {
+        const host = ts.createCompilerHost(compilerOptions);
 
         // Set the current directory for module resolution
         if (this.relativeTo) {
@@ -240,8 +315,13 @@ export class JavaScriptParser extends Parser {
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
             const normalizedFileName = path.normalize(fileName);
+            // A file's module format is baked in when it is created and follows from the requesting
+            // project's `moduleResolution`, so it belongs in the key of a cache several projects share.
+            const cacheKey = typeof languageVersion === 'number' ?
+                normalizedFileName :
+                `${languageVersion.impliedNodeFormat ?? ''}\0${normalizedFileName}`;
             // Check if the SourceFile is in the cache
-            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(normalizedFileName);
+            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(cacheKey);
             if (sourceFile) {
                 return sourceFile;
             }
@@ -276,7 +356,7 @@ export class JavaScriptParser extends Parser {
                 sourceFile = ts.createSourceFile(normalizedFileName, sourceText, sourceFileOptions, true, scriptKind);
                 // Cache the SourceFile if it's a dependency
                 if (!input && this.sourceFileCache) {
-                    this.sourceFileCache.set(normalizedFileName, sourceFile);
+                    this.sourceFileCache.set(cacheKey, sourceFile);
                 }
                 return sourceFile;
             }
@@ -291,6 +371,11 @@ export class JavaScriptParser extends Parser {
             return inputFiles.has(normalizedFileName) || ts.sys.fileExists(normalizedFileName);
         };
 
+        host.directoryExists = (directoryName) => {
+            const normalizedDirectoryName = path.normalize(directoryName);
+            return inputDirectories.has(normalizedDirectoryName) || ts.sys.directoryExists(normalizedDirectoryName);
+        };
+
         // Override readFile
         host.readFile = (fileName) => {
             const normalizedFileName = path.normalize(fileName);
@@ -301,7 +386,7 @@ export class JavaScriptParser extends Parser {
         // Custom module resolution to handle in-memory imports
         // This is required because TypeScript's default module resolution looks for files on disk,
         // but our source files only exist in memory (in the inputFiles map)
-        host.resolveModuleNameLiterals = (moduleLiterals, containingFile) => {
+        host.resolveModuleNameLiterals = (moduleLiterals, containingFile, _redirectedReference, _options, containingSourceFile) => {
             const resolvedModules: ts.ResolvedModuleWithFailedLookupLocations[] = [];
             const normalizedFileName = path.normalize(containingFile);
             const containingDir = path.dirname(normalizedFileName);
@@ -341,12 +426,18 @@ export class JavaScriptParser extends Parser {
                     }
                 }
 
-                // Fall back to TypeScript's default resolution for node_modules and absolute paths
+                // Fall back to TypeScript's default resolution for node_modules and absolute paths.
+                // Passing the usage location's mode keeps export conditions tied to the module kind
+                // pinned above, so every project reads the same branch of a dual package whatever
+                // `moduleResolution` it states.
                 const result = ts.resolveModuleName(
                     moduleName,
                     normalizedFileName,
-                    this.compilerOptions,
-                    host
+                    compilerOptions,
+                    host,
+                    undefined,
+                    undefined,
+                    ts.getModeForUsageLocation(containingSourceFile, moduleLiteral, compilerOptions)
                 );
 
                 resolvedModules.push(result);
@@ -354,52 +445,7 @@ export class JavaScriptParser extends Parser {
             return resolvedModules;
         };
 
-        // TypeScript carries the previous program's bound files forward when the root paths match,
-        // so a parser held across parses of one path costs a fraction of a freshly built one.
-        const program = ts.createProgram([...inputFiles.keys()], this.compilerOptions, host, this.oldProgram);
-
-        // Update the oldProgram reference
-        this.oldProgram = program;
-
-        // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
-        // This ensures that TypeScript types with the same type.id map to the same Type instance,
-        // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
-        const typeChecker = program.getTypeChecker();
-        const typeMapping = new JavaScriptTypeMapping(typeChecker, this.relativeTo);
-
-        for (const input of inputFiles.values()) {
-            const filePath = parserInputFile(input);
-            const sourceFile = program.getSourceFile(filePath);
-            if (!sourceFile) {
-                yield this.error(input, new Error('Parser returned undefined'));
-                continue;
-            }
-
-            if (hasFlowAnnotation(sourceFile)) {
-                yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
-                continue;
-            }
-
-            const syntaxErrors = checkSyntaxErrors(program, sourceFile);
-            if (syntaxErrors.length > 0) {
-                let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
-                continue;
-            }
-
-            try {
-                yield await this.requirePrintEqualsInput(produce(
-                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
-                        .visit(sourceFile) as SourceFile,
-                    draft => {
-                        if (this.styles) {
-                            draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
-                        }
-                    }), input, escapeLoneSurrogates(sourceFile.getFullText()));
-            } catch (error) {
-                yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
-            }
-        }
+        return host;
     }
 }
 
