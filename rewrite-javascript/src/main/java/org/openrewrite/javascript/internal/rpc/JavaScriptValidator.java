@@ -239,6 +239,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
 
     @Override
     public JS.PropertyAssignment visitPropertyAssignment(JS.PropertyAssignment propertyAssignment, P p) {
+        visitAndValidate(propertyAssignment.getModifiers(), J.Modifier.class, p);
         visitAndValidateNonNull(propertyAssignment.getName(), Expression.class, p);
         visitAndValidate(propertyAssignment.getInitializer(), Expression.class, p);
         return propertyAssignment;

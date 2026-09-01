@@ -68,18 +68,26 @@ func TestWhitespaceValidationService_DetectsCorruption(t *testing.T) {
 	assert.False(t, svc.IsValid(cu), "IsValid should be false when Validate returned errors")
 }
 
-// TestWhitespaceValidationService_DetectsBadComment crafts a Comment
-// whose Text doesn't begin with `//` or `/*` — the printer would emit
-// it raw, so the validator must catch it.
+// TestWhitespaceValidationService_DetectsBadComment crafts comments whose
+// delimiter-free Text carries content it cannot hold — a line comment spanning
+// a newline and a block comment containing `*/` — which the printer would
+// re-emit as corrupted source, so the validator must catch both.
 func TestWhitespaceValidationService_DetectsBadComment(t *testing.T) {
-	cu := &golang.CompilationUnit{
+	lineSpansNewline := &golang.CompilationUnit{
 		Prefix: java.Space{
-			Comments: []java.Comment{{Text: "this is not a comment", Suffix: "\n"}},
+			Comments: []java.Comment{{Multiline: false, Text: "a\nb", Suffix: "\n"}},
+		},
+	}
+	blockClosesEarly := &golang.CompilationUnit{
+		Prefix: java.Space{
+			Comments: []java.Comment{{Multiline: true, Text: " x */ y ", Suffix: "\n"}},
 		},
 	}
 	svc := &recipes.WhitespaceValidationService{}
-	errs := svc.Validate(cu)
-	if len(errs) == 0 {
-		t.Fatal("expected validator to flag a non-comment Text")
+	if errs := svc.Validate(lineSpansNewline); len(errs) == 0 {
+		t.Fatal("expected validator to flag a line comment spanning a newline")
+	}
+	if errs := svc.Validate(blockClosesEarly); len(errs) == 0 {
+		t.Fatal("expected validator to flag a block comment containing */")
 	}
 }

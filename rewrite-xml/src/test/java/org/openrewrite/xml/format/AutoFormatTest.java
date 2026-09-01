@@ -88,6 +88,38 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3648")
+    @Test
+    void preserveAttributeContinuationIndent() {
+        rewriteRun(
+          xml(
+            """
+              <a b="c"
+                 d="e"/>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3648")
+    @Test
+    void preserveNestedAttributeContinuationIndent() {
+        rewriteRun(
+          xml(
+            """
+              <root>
+                <parent>
+                  <child first="1"
+                         second="2"/>
+                  <other first="1"
+                         second="2"/>
+                </parent>
+              </root>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1503")
     @Test
     void autoFormatXmlDecl() {

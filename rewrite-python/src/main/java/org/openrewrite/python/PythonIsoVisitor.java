@@ -33,6 +33,11 @@ public class PythonIsoVisitor<P> extends PythonVisitor<P>
     }
 
     @Override
+    public Py.Shebang visitShebang(Py.Shebang shebang, P p) {
+        return (Py.Shebang) super.visitShebang(shebang, p);
+    }
+
+    @Override
     public Py.Await visitAwait(Py.Await await, P p) {
         return (Py.Await) super.visitAwait(await, p);
     }

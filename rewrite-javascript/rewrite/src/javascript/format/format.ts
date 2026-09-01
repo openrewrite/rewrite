@@ -17,8 +17,8 @@ import {JS} from "../tree";
 import {JavaScriptVisitor} from "../visitor";
 import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../../java";
 import {create as produce, Draft} from "mutative";
-import {Cursor, isScope, Tree} from "../../tree";
-import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "../style";
+import {Cursor, isScope, isSourceFile, Tree} from "../../tree";
+import {BlankLinesStyle, getStyle, PrettierStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "../style";
 import {NamedStyles} from "../../style";
 import {produceAsync} from "../../visitor";
 import {Generator} from "../markers";
@@ -55,8 +55,9 @@ export const autoFormat = async <J2 extends J, P>(
  * 2. Styles from source file markers (NamedStyles)
  * 3. IntelliJ defaults
  *
- * When a PrettierStyle is present (either in the styles array or as a marker on the source file),
- * Prettier is used for formatting. Otherwise, built-in formatting visitors are used.
+ * A PrettierStyle, in the styles array or as a marker on the source file, formats through Prettier.
+ * The built-in visitors lay out a generated subtree Prettier cannot carry back, and any file
+ * without such a style.
  */
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     private readonly styles?: NamedStyles<string>[];
@@ -67,20 +68,27 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
-        // Check for PrettierStyle in styles array or as marker on source file
-        // If found, delegate entirely to Prettier (skip other formatting visitors)
         const prettierStyle = getPrettierStyle(tree, cursor, this.styles);
         if (prettierStyle) {
-            return applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
+            const formatted = await applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
+            if (formatted !== undefined) {
+                return formatted;
+            }
         }
+
+        // Style markers live on the source file, which is `tree` itself only when a whole file is being formatted
+        const styleSource = (isSourceFile(tree) ? tree : cursor?.firstEnclosing(isSourceFile)) ?? tree;
+        const tabsAndIndents = getStyle(StyleKind.TabsAndIndentsStyle, styleSource, this.styles) as TabsAndIndentsStyle;
+        const spaces = getStyle(StyleKind.SpacesStyle, styleSource, this.styles) as SpacesStyle;
 
         const visitors = [
             new NormalizeWhitespaceVisitor(this.stopAfter),
             new MinimumViableSpacingVisitor(this.stopAfter),
-            new BlankLinesVisitor(getStyle(StyleKind.BlankLinesStyle, tree, this.styles) as BlankLinesStyle, this.stopAfter),
-            new WrappingAndBracesVisitor(getStyle(StyleKind.WrappingAndBracesStyle, tree, this.styles) as WrappingAndBracesStyle, this.stopAfter),
-            new SpacesVisitor(getStyle(StyleKind.SpacesStyle, tree, this.styles) as SpacesStyle, this.stopAfter),
-            new TabsAndIndentsVisitor(getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle, this.stopAfter),
+            new BlankLinesVisitor(getStyle(StyleKind.BlankLinesStyle, styleSource, this.styles) as BlankLinesStyle, this.stopAfter),
+            new WrappingAndBracesVisitor(getStyle(StyleKind.WrappingAndBracesStyle, styleSource, this.styles) as WrappingAndBracesStyle, this.stopAfter),
+            new SpacesVisitor(prettierStyle ? spacesFrom(prettierStyle, spaces) : spaces, this.stopAfter),
+            new TabsAndIndentsVisitor(
+                prettierStyle ? tabsAndIndentsFrom(prettierStyle, tabsAndIndents) : tabsAndIndents, this.stopAfter),
         ]
 
         let t: R | undefined = tree as R;
@@ -93,6 +101,22 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
 
         return t;
     }
+}
+
+/** The brace spacing a Prettier configuration states, over the style the rest of the spacing comes from. */
+function spacesFrom(prettierStyle: PrettierStyle, fallback: SpacesStyle): SpacesStyle {
+    // Prettier's default, in force for a configuration that does not name it
+    const bracketSpacing = prettierStyle.config.bracketSpacing !== false;
+    return {...fallback, within: {...fallback.within, objectLiteralBraces: bracketSpacing, es6ImportExportBraces: bracketSpacing}};
+}
+
+/** The widths a Prettier configuration states, over the style the rest of the layout comes from. */
+function tabsAndIndentsFrom(prettierStyle: PrettierStyle, fallback: TabsAndIndentsStyle): TabsAndIndentsStyle {
+    const config = prettierStyle.config;
+    // Prettier's defaults, in force for a configuration that names neither
+    const tabWidth = typeof config.tabWidth === 'number' ? config.tabWidth : 2;
+    const useTabCharacter = config.useTabs === true;
+    return {...fallback, useTabCharacter, tabSize: tabWidth, indentSize: tabWidth, continuationIndent: tabWidth};
 }
 
 export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
@@ -227,11 +251,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 // Apply beforeComma rule to all elements except the last
                 // (last element's after is before closing bracket, not a comma)
                 for (let i = 0; i < draft.elements.length - 1; i++) {
-                    const afterWs = draft.elements[i].after.whitespace;
-                    // Preserve newlines - only adjust when on same line
-                    if (!afterWs.includes("\n")) {
-                        draft.elements[i].after.whitespace = this.style.other.beforeComma ? " " : "";
-                    }
+                    this.spaceAfterRightPaddedDraft(draft.elements[i], this.style.other.beforeComma);
                 }
             }
             if (draft.elements.length > 1) {
@@ -278,6 +298,14 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.moduleSpecifier.element.prefix.whitespace = " ";
             }
         })
+    }
+
+    protected async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, p: P): Promise<J | undefined> {
+        const ret = await super.visitExportSpecifier(exportSpecifier, p) as JS.ExportSpecifier;
+        return produce(ret, draft => {
+            // `type` is separated from the name it qualifies by that name's own prefix
+            draft.specifier.prefix.whitespace = draft.typeOnly.element ? " " : "";
+        });
     }
 
     protected async visitForLoop(forLoop: J.ForLoop, p: P): Promise<J | undefined> {
@@ -338,12 +366,16 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                         : "";
                 }
                 if (draft.importClause.namedBindings) {
-                    const hasDefaultImport = !!draft.importClause.name;
-                    if (hasDefaultImport || draft.importClause.typeOnly) {
-                        draft.importClause.namedBindings.prefix.whitespace = " ";
-                    }
+                    // `type`, or a default name and its comma, stands between keyword and bindings
+                    const afterClause = draft.importClause.name || draft.importClause.typeOnly ? " " : "";
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
+                        // For named imports the space before `{` sits in the container, as the parser
+                        // writes it; a newline there is layout, which spacing does not decide
+                        if (!ni.prefix.whitespace.includes("\n") && !ni.elements.before.whitespace.includes("\n")) {
+                            ni.prefix.whitespace = "";
+                            ni.elements.before.whitespace = afterClause;
+                        }
                         const isMultiLine = ni.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
                         if (!isMultiLine) {
                             const braceSpace = this.style.within.es6ImportExportBraces ? " " : "";
@@ -356,6 +388,8 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                                 lastAfter.whitespace = this.style.other.beforeComma ? " " : "";
                             }
                         }
+                    } else if (afterClause) {
+                        draft.importClause.namedBindings.prefix.whitespace = afterClause;
                     }
                 }
             }
@@ -364,6 +398,15 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.moduleSpecifier.element.prefix.whitespace = draft.importClause ? " " : "";
             }
         })
+    }
+
+    protected async visitImportSpecifier(importSpecifier: JS.ImportSpecifier, p: P): Promise<J | undefined> {
+        const ret = await super.visitImportSpecifier(importSpecifier, p) as JS.ImportSpecifier;
+        return produce(ret, draft => {
+            // The specifier's leading space is the brace and comma rules'; this is the
+            // gap between `type` and the name, which the name's own prefix carries
+            draft.specifier.prefix.whitespace = draft.importType.element ? " " : "";
+        });
     }
 
     protected async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, p: P): Promise<J | undefined> {

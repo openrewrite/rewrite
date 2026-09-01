@@ -36,6 +36,7 @@ from rewrite.python.template import (
 from rewrite.python.tree import (
     Py,
     Async,
+    Shebang,
     Await,
     Binary,
     ChainedAssignment,
@@ -136,6 +137,7 @@ __all__ = [
     "Py",
     # Python-specific types
     "Async",
+    "Shebang",
     "Await",
     "Binary",
     "ChainedAssignment",

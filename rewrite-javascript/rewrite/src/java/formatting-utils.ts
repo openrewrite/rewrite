@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {J} from "../java";
+import {Comment, J, TextComment} from "../java";
 import {create as produce} from "mutative";
 
 /**
@@ -73,34 +73,79 @@ export function spaceContainsNewline(space: J.Space | undefined): boolean {
     return space.comments.some(c => c.suffix.includes("\n"));
 }
 
+const isTextComment = (comment: Comment): comment is TextComment => comment.kind === J.Kind.TextComment;
+
 /**
- * Normalizes indentation in an entire Space, including both whitespace and comment suffixes.
- * Each newline followed by whitespace gets its indentation normalized to the target indent.
+ * Re-indents a line's leading whitespace when the enclosing construct moves from `oldMargin` to
+ * `newMargin`, preserving whatever indentation the line adds beyond the margin.
+ */
+function shiftIndent(indent: string, oldMargin: string, newMargin: string): string {
+    if (indent.startsWith(oldMargin)) {
+        return newMargin + indent.substring(oldMargin.length);
+    }
+    // The shift below counts characters, which stand in for columns only while all three indents
+    // use a single whitespace character; without a tab width, a line mixing them stays put.
+    if (new Set(indent + oldMargin + newMargin).size > 1) {
+        return indent;
+    }
+    const delta = newMargin.length - oldMargin.length;
+    return delta < 0 ? indent.substring(Math.min(-delta, indent.length)) : newMargin.substring(0, delta) + indent;
+}
+
+function reindentComment(comment: TextComment, oldMargin: string, newMargin: string): TextComment {
+    // A blank line has no content to align, and indenting it would only add trailing whitespace.
+    const text = comment.text.replace(/\n([ \t]*)/g, (match, indent: string, offset: number, full: string) =>
+        "\n\r".includes(full[offset + match.length]) ? match : "\n" + shiftIndent(indent, oldMargin, newMargin));
+    return text === comment.text ? comment : {...comment, text};
+}
+
+/**
+ * The indentation of the line a comment opens on, or `undefined` when the preceding whitespace
+ * holds no newline — the comment then trails other tokens and its column is not knowable here.
+ */
+function marginOf(precedingWhitespace: string): string | undefined {
+    const lastNewline = precedingWhitespace.lastIndexOf("\n");
+    return lastNewline < 0 ? undefined : precedingWhitespace.substring(lastNewline + 1);
+}
+
+/**
+ * Normalizes indentation in an entire Space: comment lines take `commentIndent` and the line the
+ * following token lands on takes `targetIndent`, with the interior lines of a multi-line comment
+ * shifting alongside the opening delimiter that the surrounding whitespace positions.
  *
  * @param space The Space to normalize
- * @param targetIndent The indentation to use after newlines
+ * @param targetIndent The indentation for the token this Space precedes
+ * @param commentIndent The indentation for comment lines, which can sit deeper than the token — a
+ *        block's `}` closes at the block's own column while the comments ahead of it belong with
+ *        the block's contents
  * @returns The normalized Space, or the original if unchanged
  */
-export function normalizeSpaceIndent(space: J.Space, targetIndent: string): J.Space {
+export function normalizeSpaceIndent(space: J.Space, targetIndent: string, commentIndent: string = targetIndent): J.Space {
     let changed = false;
+    const lastComment = space.comments.length - 1;
 
-    // Normalize whitespace
+    // Normalize whitespace, which precedes the first comment when there is one
     let newWhitespace = space.whitespace;
     if (space.whitespace.includes("\n")) {
-        newWhitespace = replaceIndentAfterLastNewline(space.whitespace, targetIndent);
+        newWhitespace = replaceIndentAfterLastNewline(space.whitespace, lastComment < 0 ? targetIndent : commentIndent);
         changed = changed || newWhitespace !== space.whitespace;
     }
 
-    // Normalize comment suffixes
-    const newComments = space.comments.map(comment => {
-        if (comment.suffix.includes("\n")) {
-            const newSuffix = replaceIndentAfterLastNewline(comment.suffix, targetIndent);
-            if (newSuffix !== comment.suffix) {
+    // Normalize comment suffixes and multi-line comment interiors
+    const newComments = space.comments.map((comment, i) => {
+        const margin = marginOf(i === 0 ? space.whitespace : space.comments[i - 1].suffix);
+        let result: Comment = margin !== undefined && margin !== commentIndent && isTextComment(comment) ?
+            reindentComment(comment, margin, commentIndent) : comment;
+        changed = changed || result !== comment;
+
+        if (result.suffix.includes("\n")) {
+            const newSuffix = replaceIndentAfterLastNewline(result.suffix, i === lastComment ? targetIndent : commentIndent);
+            if (newSuffix !== result.suffix) {
                 changed = true;
-                return {...comment, suffix: newSuffix};
+                result = {...result, suffix: newSuffix};
             }
         }
-        return comment;
+        return result;
     });
 
     if (!changed) {

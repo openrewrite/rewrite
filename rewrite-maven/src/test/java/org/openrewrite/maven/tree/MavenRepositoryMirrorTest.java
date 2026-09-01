@@ -16,6 +16,7 @@
 package org.openrewrite.maven.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 
 import java.util.List;
 
@@ -76,6 +77,27 @@ class MavenRepositoryMirrorTest {
         MavenRepository oneMirrored = oneMirror.apply(one);
         assertThat(oneMirrored).extracting(MavenRepository::getId).isEqualTo("mirror");
         assertThat(oneMirrored).extracting(MavenRepository::getUri).isEqualTo("https://mirror");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+    @Test
+    void mirrorWithoutPolicyKeepsTheMirroredRepositoryPolicy() {
+        MavenRepositoryMirror mirror = new MavenRepositoryMirror("mirror", "https://mirror", "*", null, null, null);
+
+        MavenRepository mirrored = mirror.apply(MavenRepository.MAVEN_CENTRAL);
+
+        assertThat(mirrored.getReleases()).isEqualTo("true");
+        assertThat(mirrored.getSnapshots()).isEqualTo("false");
+    }
+
+    @Test
+    void mirrorPolicyOverridesTheMirroredRepositoryPolicy() {
+        MavenRepositoryMirror mirror = new MavenRepositoryMirror("mirror", "https://mirror", "*", false, true, null);
+
+        MavenRepository mirrored = mirror.apply(MavenRepository.MAVEN_CENTRAL);
+
+        assertThat(mirrored.getReleases()).isEqualTo("false");
+        assertThat(mirrored.getSnapshots()).isEqualTo("true");
     }
 
     @Test

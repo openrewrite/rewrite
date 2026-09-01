@@ -33,6 +33,24 @@ class Async(Py, Statement):
     def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
 
 @dataclass(frozen=True)
+class Shebang(Py, Statement):
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _text: str
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def text(self) -> str: ...
+
+    def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
+
+@dataclass(frozen=True)
 class Await(Py, Expression):
     _id: UUID
     _prefix: Space
