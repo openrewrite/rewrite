@@ -929,9 +929,25 @@ class PythonTypeMapping:
                 module_name = node.name
             return self._create_class_type(module_name) if module_name else None
         if kind in _FUNCTION_KINDS:
-            return self._create_method_from_descriptor(
-                descriptor, self._get_declaration_declaring_type(descriptor))
+            written = self._from_import_module(type_id, node.asname or node.name)
+            declaring = (self._create_class_type(written) if written
+                         else self._get_declaration_declaring_type(descriptor))
+            return self._create_method_from_descriptor(descriptor, declaring)
         return self._resolve_type(type_id)
+
+    def import_canonical_fqn(self, node: ast.alias) -> Optional[str]:
+        """The :class:`CanonicalName` FQN for the symbol ``node`` binds, or None when
+        the module the source imported from is the one defining it — and for a class,
+        whose own type carries its defining FQN already."""
+        type_id = self._lookup_type_id(node)
+        descriptor = self._type_registry.get(type_id) if type_id is not None else None
+        if descriptor is None or descriptor.get('kind') not in _FUNCTION_KINDS:
+            return None
+        module_name, name = descriptor.get('moduleName'), descriptor.get('name')
+        if not module_name or not name:
+            return None
+        written = self._from_import_module(type_id, node.asname or node.name)
+        return f"{module_name}.{name}" if written and written != module_name else None
 
     def method_declaration_type(self, node: ast.FunctionDef) -> Optional[JavaType.Method]:
         """Get the method type for a function/method declaration.
@@ -1031,22 +1047,26 @@ class PythonTypeMapping:
     def _from_import_module(self, type_id: int, bound_name: str) -> Optional[str]:
         """The module an absolute ``from M import f`` in this file names ``f`` under.
 
-        Preferred over ty's definition site as a call's owner: it is the module the
-        receiver form ``os.path.join(...)`` and ``module_type`` name a re-export
-        under, and it survives the platform swapping ``posixpath`` for ``ntpath``.
-        Keyed by ty's type id, so a name rebound to something else misses.
+        Preferred over ty's definition site when naming the owner of a call or of the
+        name an import binds: it is the module the receiver form ``os.path.join(...)``
+        and ``module_type`` name a re-export under, and it survives the platform
+        swapping ``posixpath`` for ``ntpath``. Keyed by ty's type id, so a name
+        rebound to something else misses.
         """
         if self._from_import_index is None:
             index: Dict[Tuple[int, str], str] = {}
             tree = self._module_ast()
-            for node in ast.walk(tree) if tree else ():
+            # Module-level statements are indexed first and keep their entry: a name
+            # bound inside a function body reaches only that body, so it must not
+            # displace the file-wide binding of the same symbol.
+            for node in (*tree.body, *ast.walk(tree)) if tree else ():
                 # A relative import's written form is not a module path
                 if not isinstance(node, ast.ImportFrom) or node.level or not node.module:
                     continue
                 for alias in node.names:
                     alias_id = self._lookup_type_id(alias)
                     if alias_id is not None:
-                        index[(alias_id, alias.asname or alias.name)] = node.module
+                        index.setdefault((alias_id, alias.asname or alias.name), node.module)
             self._from_import_index = index
         return self._from_import_index.get((type_id, bound_name))
 
@@ -1317,9 +1337,9 @@ class PythonTypeMapping:
                         # boundMethod has className — use it for declaring type
                         if descriptor.get('className'):
                             return self._class_reference(descriptor)
-                        # A function is owned by its module, `builtins` included;
-                        # only builtin *types* stay unqualified, since `str` is the
-                        # name a recipe matches that type against.
+                        # A function is owned by its module, `builtins` included.
+                        # A builtin *type* named as an owner stays unqualified — the
+                        # `str` owning `"x".upper()`, minted by `_class_reference`.
                         module_name = (self._from_import_module(type_id, node.func.id)
                                        or descriptor.get('moduleName'))
                         if module_name:

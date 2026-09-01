@@ -420,14 +420,11 @@ class TestModuleFunctionDeclaringType:
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
             result = mapping.method_invocation_type(tree.body[2].value)
-            # `test` is the module _make_mapping writes the source to
-            assert result._declaring_type.fully_qualified_name == 'test'
+            assert result._declaring_type.fully_qualified_name == _SOURCE_MODULE
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
     def test_call_owner_is_the_module_declaring_the_callable(self):
-        """A class is owned like a function is: `Foo` by `test`, the module
-        _make_mapping writes the source to; `str` by `builtins`."""
         source = '''
             import collections
             from collections import OrderedDict
@@ -446,7 +443,7 @@ class TestModuleFunctionDeclaringType:
         try:
             owners = [mapping.method_invocation_type(tree.body[i].value)._declaring_type
                       .fully_qualified_name for i in (4, 5, 6, 7, 8)]
-            assert owners == ['json', 'collections', 'collections', 'test', 'builtins']
+            assert owners == ['json', 'collections', 'collections', _SOURCE_MODULE, 'builtins']
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -686,6 +683,10 @@ def _make_mapping(source: str) -> tuple:
     client.initialize(tmpdir)
     mapping = PythonTypeMapping(source, file_path, ty_client=client)
     return mapping, tree, tmpdir, client
+
+
+# The module name a source _make_mapping writes takes, from the `test.py` it creates
+_SOURCE_MODULE = 'test'
 
 
 def _cleanup_mapping(mapping, tmpdir, client):
@@ -3692,10 +3693,9 @@ class TestPydanticModelMembers:
 
 @requires_ty_types_cli
 class TestImportNameAttribution:
-    """Each import name's qualid carries the canonical type of the symbol it
-    binds (``from os.path import join`` binds ``posixpath.join``), which is
-    what lets the import machinery match imports by canonical FQN in addition
-    to the written path."""
+    """Each import name's qualid carries the type of the symbol it binds, named under
+    the module the source imported from — the module a call to it names too. The
+    defining module rides on a ``CanonicalName`` marker."""
 
     @staticmethod
     def _first_import(cu):
@@ -3716,13 +3716,26 @@ class TestImportNameAttribution:
         t = self._qualid_type('from os.path import join\n')
         assert isinstance(t, JavaType.Method), f"expected Method, got {t!r}"
         assert t.name == 'join'
-        assert t.declaring_type.fully_qualified_name == 'posixpath'
+        assert t.declaring_type.fully_qualified_name == 'os.path'
 
     def test_reexported_function_with_alias(self):
         t = self._qualid_type('from os.path import join as j\n')
         assert isinstance(t, JavaType.Method), f"expected Method, got {t!r}"
         assert t.name == 'join'
-        assert t.declaring_type.fully_qualified_name == 'posixpath'
+        assert t.declaring_type.fully_qualified_name == 'os.path'
+
+    def test_import_and_call_name_the_same_module(self):
+        from rewrite.python.import_utils import get_canonical_fqn
+        cu, tmpdir, client = _parse_with_types(
+            {'m.py': 'from os.path import join\nx = join("/tmp", "f")\n'})
+        try:
+            imp = self._first_import(cu)
+            call = cu.statements[1].assignment
+            assert imp.qualid.name.type.declaring_type.fully_qualified_name == \
+                call.method_type.declaring_type.fully_qualified_name == 'os.path'
+            assert get_canonical_fqn(imp) == 'posixpath.join'
+        finally:
+            _cleanup_parse(tmpdir, client)
 
     def test_reexported_class(self):
         t = self._qualid_type('from collections.abc import Iterable\n')
