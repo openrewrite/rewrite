@@ -65,6 +65,27 @@ class Quoted(Marker):
 
 
 @dataclass(frozen=True, eq=False, slots=True)
+class CanonicalName(Marker):
+    """The FQN of the symbol an import binds, at the module defining it, when the
+    module the source imported from re-exports it: `from os.path import join` binds
+    `posixpath.join`. Types name the module the source wrote, so this is where an
+    import's identity across spellings lives."""
+    _id: UUID
+
+    def with_id(self, id_: UUID) -> CanonicalName:
+        return replace_if_changed(self, _id=id_)
+
+    _fqn: str
+
+    @property
+    def fqn(self) -> str:
+        return self._fqn
+
+    def with_fqn(self, fqn: str) -> CanonicalName:
+        return replace_if_changed(self, _fqn=fqn)
+
+
+@dataclass(frozen=True, eq=False, slots=True)
 class SuppressNewline(Marker):
     """Marker to suppress trailing newline in compilation units."""
     _id: UUID

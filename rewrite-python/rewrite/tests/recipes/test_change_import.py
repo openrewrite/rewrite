@@ -338,6 +338,44 @@ class TestChangeImport:
         )
         assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
+    def test_type_attribution_on_a_rewritten_construction(self):
+        errors = []
+
+        def check_types(source_file):
+            class TypeChecker(PythonVisitor):
+                def visit_method_invocation(self, method, p):
+                    mt = method.method_type
+                    if mt is None:
+                        errors.append("method_type is None")
+                    elif not mt.is_constructor:
+                        errors.append(f"method_type.name is '{mt.name}', expected '<constructor>'")
+                    elif mt.declaring_type._fully_qualified_name != 'typing.OrderedDict':
+                        errors.append(f"declaring_type is '{mt.declaring_type._fully_qualified_name}', "
+                                      f"expected 'typing.OrderedDict', the class it now builds")
+                    return method
+
+            TypeChecker().visit(source_file, None)
+
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='OrderedDict',
+            new_module='typing',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections
+                d = collections.OrderedDict()
+                """,
+                """
+                import typing
+                d = typing.OrderedDict()
+                """,
+                after_recipe=check_types,
+            )
+        )
+        assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
     def test_change_from_import_renames_bare_references(self):
         """Change: from time import clock / clock() -> from time import perf_counter / perf_counter()"""
         spec = RecipeSpec(recipe=ChangeImport(
