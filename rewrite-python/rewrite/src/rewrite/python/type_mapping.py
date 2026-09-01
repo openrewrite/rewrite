@@ -1281,8 +1281,19 @@ class PythonTypeMapping:
                         # boundMethod has className — use it for declaring type
                         if descriptor.get('className'):
                             return self._class_reference(descriptor)
+                        # A callable is owned by the module declaring it, `builtins`
+                        # included; only builtin *types* stay unqualified, since `str`
+                        # is the name a recipe matches that type against.
                         module_name = descriptor.get('moduleName')
-                        if module_name and module_name != 'builtins':
+                        if module_name:
+                            return self._create_class_type(module_name)
+                    elif kind == 'classLiteral':
+                        # Python has no constructor node: instantiation is a call to
+                        # the class name, so the same rule owns it by the class's
+                        # module and `collections OrderedDict(..)` matches every
+                        # import form.
+                        module_name = descriptor.get('moduleName')
+                        if module_name:
                             return self._create_class_type(module_name)
 
         inferred = self._infer_declaring_type_from_ast(node)
@@ -1648,6 +1659,6 @@ class PythonTypeMapping:
         if descriptor.get('className'):
             return self._class_reference(descriptor)
         module_name = descriptor.get('moduleName')
-        if module_name and module_name != 'builtins':
+        if module_name:
             return self._create_class_type(module_name)
         return None

@@ -350,7 +350,7 @@ class TestTypeAttributionWithImports:
 
 @requires_ty_types_cli
 class TestModuleFunctionDeclaringType:
-    """Tests that module-level function calls produce the correct declaring type."""
+    """Tests that calls to module-level callables produce the correct declaring type."""
 
     def test_os_getcwd_declaring_type_is_os(self):
         """import os; os.getcwd() → declaring type FQN should be 'os'."""
@@ -405,6 +405,31 @@ class TestModuleFunctionDeclaringType:
             assert result._declaring_type is not None
             assert isinstance(result._declaring_type, JavaType.FullyQualified)
             assert result._declaring_type.fully_qualified_name == 'json'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_call_owner_is_the_module_declaring_the_callable(self):
+        """A class is owned like a function is: `Foo` by `test`, the module
+        _make_mapping writes the source to; `str` by `builtins`."""
+        source = '''
+            import collections
+            from collections import OrderedDict
+            from json import dumps
+
+            class Foo:
+                pass
+
+            a = dumps({})
+            b = OrderedDict()
+            c = collections.OrderedDict()
+            d = Foo()
+            e = str(1)
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            owners = [mapping.method_invocation_type(tree.body[i].value)._declaring_type
+                      .fully_qualified_name for i in (4, 5, 6, 7, 8)]
+            assert owners == ['json', 'collections', 'collections', 'test', 'builtins']
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 

@@ -106,6 +106,10 @@ def test_builtin_function_type_attribution():
                 else:
                     if method.method_type.name != 'len':
                         errors.append(f"method_type.name is '{method.method_type.name}', expected 'len'")
+                    dt = method.method_type.declaring_type
+                    # `builtins len(..)` is the pattern a MethodMatcher matches this call with
+                    if dt is None or dt._fully_qualified_name != 'builtins':
+                        errors.append(f"declaring_type is '{dt}', expected 'builtins'")
                     if method.method_type._return_type is None:
                         errors.append("method_type.return_type is None")
                     elif method.method_type._return_type != JavaType.Primitive.Int:
