@@ -1154,10 +1154,11 @@ class PythonTypeMapping:
             A JavaType.Method with full type information, or None if
             the type cannot be determined.
         """
-        # Extract method name
         method_name = self._extract_method_name(node)
         if not method_name:
             return None
+        if self._constructed_class(node) is not None:
+            method_name = '<constructor>'
 
         # Get declaring type
         declaring_type = self._get_declaring_type(node)
@@ -1274,6 +1275,14 @@ class PythonTypeMapping:
         # Fall back to placeholder names
         return self._generate_placeholder_names(node)
 
+    def _constructed_class(self, node: ast.Call) -> Optional[Dict[str, Any]]:
+        """The descriptor of the class ``node`` constructs, or None when it calls
+        something else. Python has no constructor node — a construction is a call to
+        the class name — so this is what tells the two apart."""
+        callee_id = self._lookup_func_type_id(node)
+        callee = self._type_registry.get(callee_id) if callee_id is not None else None
+        return callee if callee is not None and callee.get('kind') == 'classLiteral' else None
+
     def _lookup_func_type_id(self, node: ast.Call) -> Optional[int]:
         """Look up the type ID of the function/method being called."""
         if isinstance(node.func, ast.Attribute):
@@ -1308,14 +1317,12 @@ class PythonTypeMapping:
         wire-side HasMethod gate could not find a matching method use
         in ``TypesInUse``.
         """
-        callee_id = self._lookup_func_type_id(node)
-        callee = self._type_registry.get(callee_id) if callee_id is not None else None
-        if callee is not None and callee.get('kind') == 'classLiteral':
-            # Python has no constructor node: instantiation is a call to the class
-            # name, owned by the class as a Java constructor is, so one pattern covers
-            # constructing a type and calling its members. The module declares only its
-            # functions — `module_type` leaves a class to its own FQN.
-            return self._class_reference(callee)
+        constructed = self._constructed_class(node)
+        if constructed is not None:
+            # A construction is owned by the class, so one pattern covers constructing
+            # a type and calling its members. The module declares only its functions —
+            # `module_type` leaves a class to its own FQN.
+            return self._class_reference(constructed)
 
         if isinstance(node.func, ast.Attribute):
             receiver = node.func.value

@@ -126,6 +126,29 @@ def test_builtin_function_type_attribution():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
+def test_constructor_pattern_matches_a_construction():
+    from rewrite.python import MethodMatcher
+
+    matched = []
+
+    def check_types(source_file):
+        matcher = MethodMatcher.create('str <constructor>(..)')
+
+        class TypeChecker(PythonVisitor):
+            def visit_method_invocation(self, method, p):
+                matched.append(matcher.matches(method))
+                return method
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        'x = str(1)',
+        after_recipe=check_types,
+    ))
+    assert matched == [True]
+
+
 def test_string_method_type_attribution():
     """Verify type attribution on a string method call like str.upper()."""
     errors = []
