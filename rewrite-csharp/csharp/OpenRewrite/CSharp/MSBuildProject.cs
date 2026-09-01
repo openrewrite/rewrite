@@ -348,11 +348,12 @@ public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
         q.GetAndSend(after, rp => rp.HasInstallScripts);
         q.GetAndSend(after, rp => rp.HasXdtTransforms);
         q.GetAndSend(after, rp => rp.HasLegacyContentFolder);
-        // Send map as parallel lists: keys then values
-        q.GetAndSendList(after, rp => (IList<string>)new List<string>(rp.DependencyRanges.Keys),
+        // Send map as parallel lists: keys then values. Instances materialized by the RPC
+        // layer bypass the constructor, so the dictionary can be null.
+        q.GetAndSendList(after, rp => (IList<string>)(rp.DependencyRanges == null ? [] : new List<string>(rp.DependencyRanges.Keys)),
             k => k,
             k => q.GetAndSend(k, x => x));
-        q.GetAndSendList(after, rp => (IList<string>)new List<string>(rp.DependencyRanges.Values),
+        q.GetAndSendList(after, rp => (IList<string>)(rp.DependencyRanges == null ? [] : new List<string>(rp.DependencyRanges.Values)),
             v => v,
             v => q.GetAndSend(v, x => x));
     }
@@ -382,9 +383,11 @@ public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
         var hasInstallScripts = q.ReceiveAndGet<bool, bool>(before.HasInstallScripts, x => x);
         var hasXdtTransforms = q.ReceiveAndGet<bool, bool>(before.HasXdtTransforms, x => x);
         var hasLegacyContentFolder = q.ReceiveAndGet<bool, bool>(before.HasLegacyContentFolder, x => x);
-        // Receive parallel lists and zip into dictionary
-        var rangeKeys = ReceiveStringList(q, new List<string>(before.DependencyRanges.Keys));
-        var rangeValues = ReceiveStringList(q, new List<string>(before.DependencyRanges.Values));
+        // Receive parallel lists and zip into dictionary. The before instance can be an
+        // RPC-materialized skeleton whose dictionary is null.
+        var beforeRanges = before.DependencyRanges ?? new Dictionary<string, string>();
+        var rangeKeys = ReceiveStringList(q, new List<string>(beforeRanges.Keys));
+        var rangeValues = ReceiveStringList(q, new List<string>(beforeRanges.Values));
         var dependencyRanges = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < rangeKeys.Count && i < rangeValues.Count; i++)
         {

@@ -335,9 +335,12 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
             q.getAndSend(after, ResolvedPackage::isHasInstallScripts);
             q.getAndSend(after, ResolvedPackage::isHasXdtTransforms);
             q.getAndSend(after, ResolvedPackage::isHasLegacyContentFolder);
-            // Send map as parallel lists: keys then values
-            sendStringList(q, after, rp -> new ArrayList<>(rp.getDependencyRanges().keySet()));
-            sendStringList(q, after, rp -> new ArrayList<>(rp.getDependencyRanges().values()));
+            // Send map as parallel lists: keys then values. Instances materialized by the RPC
+            // layer bypass the constructor, so the map can be null despite @Builder.Default.
+            sendStringList(q, after, rp -> rp.dependencyRanges == null ?
+                    new ArrayList<>() : new ArrayList<>(rp.dependencyRanges.keySet()));
+            sendStringList(q, after, rp -> rp.dependencyRanges == null ?
+                    new ArrayList<>() : new ArrayList<>(rp.dependencyRanges.values()));
         }
 
         private static void sendStringList(RpcSendQueue q, ResolvedPackage after,
@@ -370,9 +373,11 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
                     .withHasInstallScripts(q.receive(before.hasInstallScripts))
                     .withHasXdtTransforms(q.receive(before.hasXdtTransforms))
                     .withHasLegacyContentFolder(q.receive(before.hasLegacyContentFolder));
-            // Receive parallel lists and zip into map
-            List<String> rangeKeys = receiveStringList(q, new ArrayList<>(before.dependencyRanges.keySet()));
-            List<String> rangeValues = receiveStringList(q, new ArrayList<>(before.dependencyRanges.values()));
+            // Receive parallel lists and zip into map. The before instance can be an RPC-materialized
+            // skeleton whose map is null despite @Builder.Default.
+            Map<String, String> beforeRanges = before.dependencyRanges == null ? emptyMap() : before.dependencyRanges;
+            List<String> rangeKeys = receiveStringList(q, new ArrayList<>(beforeRanges.keySet()));
+            List<String> rangeValues = receiveStringList(q, new ArrayList<>(beforeRanges.values()));
             Map<String, String> ranges = new LinkedHashMap<>();
             if (rangeKeys != null && rangeValues != null) {
                 for (int i = 0; i < rangeKeys.size() && i < rangeValues.size(); i++) {
