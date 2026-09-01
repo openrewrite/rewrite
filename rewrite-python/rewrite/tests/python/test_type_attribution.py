@@ -424,7 +424,7 @@ class TestModuleFunctionDeclaringType:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
-    def test_call_owner_is_the_module_declaring_the_callable(self):
+    def test_a_function_is_owned_by_its_module_and_a_construction_by_its_class(self):
         source = '''
             import collections
             from collections import OrderedDict
@@ -443,7 +443,9 @@ class TestModuleFunctionDeclaringType:
         try:
             owners = [mapping.method_invocation_type(tree.body[i].value)._declaring_type
                       .fully_qualified_name for i in (4, 5, 6, 7, 8)]
-            assert owners == ['json', 'collections', 'collections', _SOURCE_MODULE, 'builtins']
+            # `str` stays unqualified, the name it owns `"x".upper()` under
+            assert owners == ['json', 'collections.OrderedDict', 'collections.OrderedDict',
+                              f'{_SOURCE_MODULE}.Foo', 'str']
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 

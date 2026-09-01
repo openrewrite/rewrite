@@ -1308,6 +1308,15 @@ class PythonTypeMapping:
         wire-side HasMethod gate could not find a matching method use
         in ``TypesInUse``.
         """
+        callee_id = self._lookup_func_type_id(node)
+        callee = self._type_registry.get(callee_id) if callee_id is not None else None
+        if callee is not None and callee.get('kind') == 'classLiteral':
+            # Python has no constructor node: instantiation is a call to the class
+            # name, owned by the class as a Java constructor is, so one pattern covers
+            # constructing a type and calling its members. The module declares only its
+            # functions — `module_type` leaves a class to its own FQN.
+            return self._class_reference(callee)
+
         if isinstance(node.func, ast.Attribute):
             receiver = node.func.value
 
@@ -1337,20 +1346,10 @@ class PythonTypeMapping:
                         # boundMethod has className — use it for declaring type
                         if descriptor.get('className'):
                             return self._class_reference(descriptor)
-                        # A function is owned by its module, `builtins` included.
-                        # A builtin *type* named as an owner stays unqualified — the
-                        # `str` owning `"x".upper()`, minted by `_class_reference`.
+                        # A function is owned by its module, `builtins` included —
+                        # only a *type* drops that qualification (`_class_reference`).
                         module_name = (self._from_import_module(type_id, node.func.id)
                                        or descriptor.get('moduleName'))
-                        if module_name:
-                            return self._create_class_type(module_name)
-                    elif kind == 'classLiteral':
-                        # Python has no constructor node: instantiation is a call to
-                        # the class name, owned by the module defining the class, so
-                        # `collections OrderedDict(..)` matches every import form. A
-                        # class keeps its defining module even when re-exported, as
-                        # `module_type` documents.
-                        module_name = descriptor.get('moduleName')
                         if module_name:
                             return self._create_class_type(module_name)
 
