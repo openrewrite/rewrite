@@ -90,6 +90,13 @@ class TestRpcPlaceholderConstruction:
         uid = uuid4()
         assert placeholder.replace(_id=uid.int).id == uid
 
+    def test_placeholder_tree_id_property_is_none_safe(self):
+        # Reading `.id` on an all-None tree placeholder must return None, not
+        # raise `UUID(int=None)`.
+        from rewrite.rpc.receive_queue import make_dataclass_factory
+        placeholder = make_dataclass_factory(Identifier)()
+        assert placeholder.id is None
+
     def test_marker_factory_accepts_none_id(self):
         from rewrite.rpc.receive_queue import make_dataclass_factory
         placeholder = make_dataclass_factory(SearchResult)()
@@ -99,3 +106,17 @@ class TestRpcPlaceholderConstruction:
         from rewrite.rpc.receive_queue import make_dataclass_factory
         placeholder = make_dataclass_factory(Markers)()
         assert placeholder._id is None
+
+    def test_placeholder_marker_id_property_is_none_safe(self):
+        # The receiver reads `.id` on an all-None placeholder before the id is
+        # filled in (e.g. ``_receive_search_result`` does ``str(marker.id) if
+        # marker and marker.id else None``). The property must return None, not
+        # raise ``UUID(int=None)``.
+        from rewrite.rpc.receive_queue import make_dataclass_factory
+        placeholder = make_dataclass_factory(SearchResult)()
+        assert placeholder.id is None
+
+    def test_placeholder_markers_id_property_is_none_safe(self):
+        from rewrite.rpc.receive_queue import make_dataclass_factory
+        placeholder = make_dataclass_factory(Markers)()
+        assert placeholder.id is None
