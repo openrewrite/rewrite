@@ -1264,6 +1264,30 @@ class TestImportsInBlocks:
             )
         )
 
+    def test_a_rename_stops_when_a_match_survives_out_of_scope(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+            new_name='Map',
+        )).rewrite_run(
+            python(
+                """
+                import sys
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections import Mapping
+
+                if sys.version_info >= (3, 10):
+                    pass
+                else:
+                    from collections import Mapping
+                    m = Mapping()
+                """
+            )
+        )
+
     def test_both_import_forms_in_one_block_are_rewritten(self):
         self._callable_to_abc().rewrite_run(
             python(

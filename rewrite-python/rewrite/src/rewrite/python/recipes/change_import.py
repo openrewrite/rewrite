@@ -173,6 +173,9 @@ class ChangeImport(Recipe):
 
                 if not self.has_old_import and not self.has_direct_module_import:
                     return cu
+                if old_name and (new_alias or self.old_alias or new_name) != \
+                        (self.old_alias or old_name) and self._match_outside_module_scope(cu):
+                    return cu
 
                 # Visit to transform imports
                 result = super().visit_compilation_unit(cu, p)
@@ -237,6 +240,26 @@ class ChangeImport(Recipe):
                         if get_qualid_name(stmt.qualid) == old_module:
                             self.has_direct_module_import = True
                             self.module_alias = get_alias_name(stmt)
+
+            def _match_outside_module_scope(self, cu: CompilationUnit) -> bool:
+                """True when a match sits somewhere this recipe leaves alone. That import
+                goes on binding the old name, so renaming the references it serves would
+                leave them unresolved."""
+                in_scope = {stmt.id for stmt in cu.statements}
+                for block in module_scope_blocks(cu.statements):
+                    in_scope.update(stmt.id for stmt in block.statements)
+                found: List[bool] = []
+                outer = self
+
+                class Finder(PythonVisitor):
+                    def visit_multi_import(self, multi: MultiImport, p) -> J:
+                        if (multi.id not in in_scope and
+                                outer._check_for_old_import(multi) is not None):
+                            found.append(True)
+                        return multi
+
+                Finder().visit(cu, None)
+                return bool(found)
 
             def _at_module_level(self) -> bool:
                 """True for a statement of the compilation unit. Replacements are bound here
