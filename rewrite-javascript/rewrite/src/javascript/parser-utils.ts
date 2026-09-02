@@ -372,6 +372,8 @@ function commentRanges(text: string): Array<[number, number]> {
 
 export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile) {
     // Diagnostics arrive already localised and flattened, and carry offsets rather than a file.
+    // A malformed escape reports as syntactic inside a string but semantic inside a regex, so both
+    // are asked for even though only a parse error decides whether a file gets an LST.
     const diagnostics = [
         ...program.getSyntacticDiagnostics(sourceFile.fileName),
         ...program.getSemanticDiagnostics(sourceFile.fileName),
