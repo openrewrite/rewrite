@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import weakref
 from dataclasses import dataclass, replace as dataclass_replace
-from rewrite.utils import replace_if_changed
+from rewrite.utils import replace_if_changed, T
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TypeVar, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -19,11 +19,9 @@ from rewrite.java import (
 )
 from rewrite.python.support_types import Py, P
 
-_J = TypeVar('_J', bound=J)
 
-
-def _replace_delegating(wrapper: _J, wrapped_field: str, delegated: Tuple[str, ...],
-                        kwargs: Dict[str, Any]) -> _J:
+def _replace_delegating(wrapper: T, wrapped_field: str, delegated: Tuple[str, ...],
+                        kwargs: Dict[str, Any]) -> T:
     """Route writes to `delegated` onto the node `wrapper` holds in `wrapped_field`.
 
     A wrapper reading those properties off the node it wraps owns no field to write,
