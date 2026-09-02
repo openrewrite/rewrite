@@ -15,13 +15,14 @@
 """RemoveImport visitor for Python import handling."""
 
 from dataclasses import dataclass
-from typing import Optional, Set
+from typing import List, Optional, Sequence, Set
 
 from rewrite.java import J
-from rewrite.java.support_types import JContainer, JRightPadded
-from rewrite.java.tree import Identifier, Import, Space
+from rewrite.java.support_types import JContainer, JRightPadded, Statement
+from rewrite.java.tree import Identifier, If, Import, Space
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
-                                         get_canonical_fqn, referenced_names)
+                                         get_canonical_fqn, referenced_names,
+                                         unconditional_body)
 from rewrite.python.scope_utils import LocalBindings
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
@@ -179,59 +180,68 @@ class RemoveImport(PythonVisitor):
 
     def _remove_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Remove the import from the compilation unit."""
-        new_padded_stmts = []
+        kept = self._prune_statements(cu.padding.statements)
+        return cu if kept is None else cu.padding.replace(_statements=kept)
+
+    def _prune_statements(self, padded_statements: Sequence[JRightPadded]) -> Optional[List[JRightPadded]]:
+        """The statements with the import gone, or None to leave them as they are —
+        because nothing matched, or because a comment would go with the removal. One
+        prefix cannot carry two comments, so a collision abandons the removal."""
+        kept: List[JRightPadded] = []
+        inherited: Optional[Space] = None
         changed = False
-        removed_prefix = None
-
-        for index, padded in enumerate(cu.padding.statements):
+        for index, padded in enumerate(padded_statements):
             stmt = padded.element
-            if isinstance(stmt, Import) and not isinstance(stmt, MultiImport):
-                result = self._process_single_import(stmt)
-                if result is None:
-                    removed_prefix = prefix_to_inherit(stmt, index)
-                    changed = True
-                else:
-                    if removed_prefix is not None:
-                        padded = JRightPadded(
-                            padded.element.replace(prefix=removed_prefix),
-                            padded.after, padded.markers
-                        )
-                        removed_prefix = None
-                    new_padded_stmts.append(padded)
-                continue
             if isinstance(stmt, MultiImport):
-                result = self._process_multi_import(stmt)
-                if result is None:
-                    # Remove the entire statement; remember its prefix
-                    # so the next statement can inherit it if needed
-                    removed_prefix = prefix_to_inherit(stmt, index)
-                    changed = True
-                else:
-                    if result is not stmt:
-                        padded = JRightPadded(result, padded.after, padded.markers)
-                        changed = True
-                    # Transfer removed statement's prefix to this statement
-                    if removed_prefix is not None:
-                        padded = JRightPadded(
-                            padded.element.replace(prefix=removed_prefix),
-                            padded.after, padded.markers
-                        )
-                        removed_prefix = None
-                    new_padded_stmts.append(padded)
+                result: Optional[Statement] = self._process_multi_import(stmt)
+            elif isinstance(stmt, Import):
+                result = self._process_single_import(stmt)
+            elif isinstance(stmt, If):
+                result = self._prune_if_body(stmt)
             else:
-                # Transfer removed statement's prefix to the next statement
-                if removed_prefix is not None:
-                    new_padded_stmts.append(JRightPadded(
-                        stmt.replace(prefix=removed_prefix),
-                        padded.after, padded.markers
-                    ))
-                    removed_prefix = None
-                else:
-                    new_padded_stmts.append(padded)
+                result = stmt
 
-        if changed:
-            return cu.padding.replace(_statements=new_padded_stmts)
-        return cu
+            if result is None:
+                changed = True
+                if inherited is None:
+                    inherited = prefix_to_inherit(stmt, index)
+                elif stmt.prefix.comments:
+                    return None
+                continue
+            if result is not stmt:
+                padded = JRightPadded(result, padded.after, padded.markers)
+                changed = True
+            if inherited is not None:
+                if not padded.element.prefix.comments:
+                    padded = JRightPadded(
+                        padded.element.replace(prefix=inherited), padded.after, padded.markers
+                    )
+                elif inherited.comments:
+                    return None
+                inherited = None
+            kept.append(padded)
+        # A leftover prefix means nothing followed the removal to carry it, so a
+        # comment on the removed statement would be dropped with it.
+        if inherited is not None and inherited.comments:
+            return None
+        return kept if changed else None
+
+    def _prune_if_body(self, if_: If) -> Optional[If]:
+        """`if_` with the import gone from its body, or None once that empties it."""
+        body = unconditional_body(if_)
+        if body is None:
+            return if_
+        kept = self._prune_statements(body.padding.statements)
+        if kept is None:
+            return if_
+        if not kept:
+            return None
+        padded = if_.padding.then_part
+        return if_.padding.replace(
+            _then_part=JRightPadded(
+                body.padding.replace(_statements=kept), padded.after, padded.markers
+            )
+        )
 
     def _process_single_import(self, imp: Import) -> Optional[Import]:
         """Process a standalone J.Import. Return None to remove, or the original."""

@@ -1027,3 +1027,340 @@ class TestChangeImportPythonScopeRules:
                 perf_counter = 1
             """,
         )
+
+
+class TestImportsInBlocks:
+    """Imports nested in a module-scope `if` body, where `if TYPE_CHECKING:` keeps them."""
+
+    @staticmethod
+    def _callable_to_abc() -> RecipeSpec:
+        return RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Callable',
+            new_module='collections.abc',
+        ))
+
+    def test_sole_member_is_rewritten_in_place(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable
+
+                def f(x: Callable[[int], str]) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Callable
+
+                def f(x: Callable[[int], str]) -> None: ...
+                """,
+            )
+        )
+
+        RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+            new_name='Map',
+        )).rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections import Mapping
+
+                def f(x: Mapping) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Map
+
+                def f(x: Map) -> None: ...
+                """,
+            )
+        )
+
+    def test_split_leaves_the_new_import_in_the_block(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable, Optional
+
+                def f(x: Callable[[int], str], y: Optional[str]) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Optional
+                    from collections.abc import Callable
+
+                def f(x: Callable[[int], str], y: Optional[str]) -> None: ...
+                """,
+            )
+        )
+
+    def test_merges_into_an_existing_import_in_the_same_block(self):
+        """What keeps a sequence of alias moves from emitting one line per alias."""
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable, Optional
+                    from collections.abc import Sequence
+
+                def f(x: Callable[[int], str], y: Optional[Sequence[str]]) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Optional
+                    from collections.abc import Callable, Sequence
+
+                def f(x: Callable[[int], str], y: Optional[Sequence[str]]) -> None: ...
+                """,
+            )
+        )
+
+    def test_nested_direct_import_is_rewritten_in_place(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='urllib2',
+            new_module='urllib.request',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import urllib2
+
+                x = 1
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import urllib.request
+
+                x = 1
+                """,
+            )
+        )
+
+    def test_a_match_outside_module_scope_is_left_alone(self):
+        """Each file needs a module-scope match too, or the recipe returns before it looks."""
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                import sys
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable
+
+                if sys.version_info >= (3, 10):
+                    pass
+                else:
+                    from typing import Callable
+
+                def f(x: Callable[[int], str]) -> None: ...
+                """,
+                """
+                import sys
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Callable
+
+                if sys.version_info >= (3, 10):
+                    pass
+                else:
+                    from typing import Callable
+
+                def f(x: Callable[[int], str]) -> None: ...
+                """,
+            ),
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable
+
+                def g():
+                    from typing import Callable
+                    return Callable
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Callable
+
+                def g():
+                    from typing import Callable
+                    return Callable
+                """,
+            ),
+        )
+
+    def test_qualified_reference_binds_the_new_module_in_the_block(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import typing
+
+                def f(x: typing.Callable[[int], str]) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+
+                def f(x: collections.abc.Callable[[int], str]) -> None: ...
+                """,
+            )
+        )
+
+    def test_qualified_reference_does_not_duplicate_an_existing_import(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import typing
+                    import collections.abc
+
+                def f(x: typing.Callable[[int], str], y: collections.abc.Sequence) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+
+                def f(x: collections.abc.Callable[[int], str], y: collections.abc.Sequence) -> None: ...
+                """,
+            )
+        )
+
+    def test_a_rename_stops_when_a_match_survives_out_of_scope(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+            new_name='Map',
+        )).rewrite_run(
+            python(
+                """
+                import sys
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections import Mapping
+
+                if sys.version_info >= (3, 10):
+                    pass
+                else:
+                    from collections import Mapping
+                    m = Mapping()
+                """
+            )
+        )
+
+    def test_both_import_forms_in_one_block_are_rewritten(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from __future__ import annotations
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable
+                    import typing
+
+                def f(x: Callable[[int], str], y: typing.Callable[[int], int]) -> None: ...
+                """,
+                """
+                from __future__ import annotations
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Callable
+                    import collections.abc
+
+                def f(x: Callable[[int], str], y: collections.abc.Callable[[int], int]) -> None: ...
+                """,
+            )
+        )
+
+    def test_a_comment_on_the_replaced_statement_keeps_it_out_of_a_merge(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Sequence
+                    # only needed for annotations
+                    from typing import Callable
+
+                def f(x: Callable[[int], str], y: Sequence) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Sequence
+                    # only needed for annotations
+                    from collections.abc import Callable
+
+                def f(x: Callable[[int], str], y: Sequence) -> None: ...
+                """,
+            )
+        )
+
+    def test_split_leaves_the_comment_on_the_statement_it_describes(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    # only needed for annotations
+                    from typing import Callable, Optional
+
+                def f(x: Callable[[int], str], y: Optional[str]) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    # only needed for annotations
+                    from typing import Optional
+                    from collections.abc import Callable
+
+                def f(x: Callable[[int], str], y: Optional[str]) -> None: ...
+                """,
+            )
+        )
