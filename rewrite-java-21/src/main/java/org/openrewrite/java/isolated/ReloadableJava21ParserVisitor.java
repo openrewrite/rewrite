@@ -137,8 +137,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 ExpressionTree arg = node.getArguments().get(0);
                 if (arg instanceof JCAssign assign && assign.lhs instanceof JCIdent) {
                     // javac's `Annotate#enterAnnotation` builds an elided `value =` with `make.at(rhs.pos)`
-                    boolean attributeNameElidedInSource = assign.lhs.pos == assign.rhs.pos;
-                    if (attributeNameElidedInSource) {
+                    if (assign.lhs.pos == assign.rhs.pos) {
                         expressions = singletonList(convert(assign.rhs, t -> sourceBefore(")")));
                     } else {
                         expressions = singletonList(convert(arg, t -> sourceBefore(")")));
