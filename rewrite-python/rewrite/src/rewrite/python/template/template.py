@@ -155,13 +155,14 @@ class Template:
         else:
             result = template_tree
 
-        # Phase 2: parenthesize the result if it has lower precedence than
-        # the surrounding context, mirroring JavaTemplate.doApply().
+        # Phase 2: parenthesize the result for the slot it replaces, mirroring JavaTemplate.doApply().
         # This must happen before coordinates are applied, because
         # apply_coordinates may wrap the expression in ExpressionStatement.
         if result is not None and cursor is not None:
-            from .replacement import maybe_parenthesize
-            result = maybe_parenthesize(result, cursor)
+            from .precedence import enclosing_tree, maybe_parenthesize
+            target = cursor.value
+            if isinstance(target, J):
+                result = maybe_parenthesize(enclosing_tree(cursor.parent), target.id, result)
 
         # Phase 3: apply coordinates (prefix preservation, statement wrapping, auto-format)
         effective_coords = coordinates

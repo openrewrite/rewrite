@@ -26,7 +26,7 @@ from rewrite.java.support_types import Space, JRightPadded
 from rewrite.markers import Markers
 from rewrite.python.template import template, capture, pattern, Template, TemplateBuilder
 from rewrite.python.template.engine import TemplateEngine
-from rewrite.python.template.replacement import maybe_parenthesize
+from rewrite.python.template.precedence import enclosing_tree, maybe_parenthesize
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 from rewrite.visitor import Cursor
@@ -394,6 +394,11 @@ class TestMaybeParenthesize:
         )
 
     @staticmethod
+    def _at_slot(result, cursor: Cursor):
+        """Applies the outer boundary as Template.apply does, from the cursor on the node replaced."""
+        return maybe_parenthesize(enclosing_tree(cursor.parent), cursor.value.id, result)
+
+    @staticmethod
     def _cursor_chain(*nodes) -> Cursor:
         """Build a cursor chain from root → … → leaf."""
         cur = Cursor(None, Cursor.ROOT_VALUE)
@@ -407,7 +412,7 @@ class TestMaybeParenthesize:
         and_parent = self._binary(or_expr, j.Binary.Type.And, self._ident('z'))
         cursor = self._cursor_chain(and_parent, or_expr)
 
-        result = maybe_parenthesize(or_expr, cursor)
+        result = self._at_slot(or_expr, cursor)
         assert isinstance(result, j.Parentheses)
 
     def test_and_result_in_or_parent(self):
@@ -416,7 +421,7 @@ class TestMaybeParenthesize:
         or_parent = self._binary(and_expr, j.Binary.Type.Or, self._ident('z'))
         cursor = self._cursor_chain(or_parent, and_expr)
 
-        result = maybe_parenthesize(and_expr, cursor)
+        result = self._at_slot(and_expr, cursor)
         assert not isinstance(result, j.Parentheses)
 
     def test_or_result_under_not(self):
@@ -429,7 +434,7 @@ class TestMaybeParenthesize:
         )
         cursor = self._cursor_chain(not_parent, or_expr)
 
-        result = maybe_parenthesize(or_expr, cursor)
+        result = self._at_slot(or_expr, cursor)
         assert isinstance(result, j.Parentheses)
 
     def test_identifier_result_unchanged(self):
@@ -438,7 +443,7 @@ class TestMaybeParenthesize:
         and_parent = self._binary(ident, j.Binary.Type.And, self._ident('z'))
         cursor = self._cursor_chain(and_parent, ident)
 
-        result = maybe_parenthesize(ident, cursor)
+        result = self._at_slot(ident, cursor)
         assert result is ident
 
     def test_same_precedence_no_parens(self):
@@ -447,7 +452,7 @@ class TestMaybeParenthesize:
         outer = self._binary(inner, j.Binary.Type.And, self._ident('c'))
         cursor = self._cursor_chain(outer, inner)
 
-        result = maybe_parenthesize(inner, cursor)
+        result = self._at_slot(inner, cursor)
         assert not isinstance(result, j.Parentheses)
 
     def test_template_apply_parenthesizes_in_binary_context(self):
