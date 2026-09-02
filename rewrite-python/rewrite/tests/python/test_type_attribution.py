@@ -3793,7 +3793,6 @@ class FqnCase:
     source: str
     expected: str
     type_parameters: Optional[Tuple[object, ...]] = None
-    modules: Optional[Dict[str, str]] = None
     xfail: Optional[str] = None
 
 
@@ -3972,7 +3971,7 @@ class TestDescriptorFqnContract:
 
     @pytest.mark.parametrize('case', [_fqn_params(c) for c in _FQN_CASES])
     def test_descriptor_maps_to_fqn(self, case: FqnCase):
-        mapping, tree, tmpdir, client = _make_mapping(case.source, case.modules)
+        mapping, tree, tmpdir, client = _make_mapping(case.source)
         try:
             resolved = mapping.type(tree.body[-1].value)
             assert _fqn(resolved) == case.expected, \
@@ -4064,6 +4063,40 @@ class TestQualifiedNameForwardCompatibility:
             'fields': [],
         })
         assert _fqn(result) == 'a.Movie'
+
+    def test_value_and_declaring_agree_when_only_the_class_is_qualified(self):
+        # ty may qualify classLiteral before instance. An explicit classId names the
+        # class outright, so both paths must take its FQN rather than the instance's.
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {
+            'kind': 'classLiteral', 'className': 'Inner', 'moduleName': 'a.b',
+            'qualifiedName': 'a.b.Outer.Inner'}
+        mapping._type_registry[2] = {
+            'kind': 'instance', 'className': 'Inner', 'moduleName': 'a.b', 'classId': 1}
+        assert _fqn(mapping._resolve_type(2)) == 'a.b.Outer.Inner'
+        assert _fqn(mapping._resolve_declaring_type(2)) == 'a.b.Outer.Inner'
+
+    def test_same_name_in_another_module_is_not_borrowed_from_the_index(self):
+        # The classLiteral index is keyed by simple name, so without a classId it can
+        # offer an unrelated module's class; only an FQN match may be taken.
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {
+            'kind': 'classLiteral', 'className': 'Inner', 'moduleName': 'a.b',
+            'qualifiedName': 'a.b.Outer.Inner'}
+        mapping._class_literal_index['Inner'] = 1
+        mapping._type_registry[2] = {
+            'kind': 'instance', 'className': 'Inner', 'moduleName': 'z',
+            'qualifiedName': 'z.Inner'}
+        assert _fqn(mapping._resolve_type(2)) == 'z.Inner'
+        assert _fqn(mapping._resolve_declaring_type(2)) == 'z.Inner'
+
+    def test_member_qualified_enum_name_resolves_to_the_class(self):
+        # Holds under either reading of `qualifiedName` on a member descriptor.
+        _, result = self._resolve({
+            'kind': 'enumLiteral', 'className': 'Color', 'memberName': 'RED',
+            'qualifiedName': 'a.Color.RED',
+        })
+        assert _fqn(result) == 'a.Color'
 
     def test_new_type_uses_qualified_name(self):
         _, result = self._resolve({

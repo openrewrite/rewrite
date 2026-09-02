@@ -477,6 +477,11 @@ class PythonTypeMapping:
         """
         qualified = descriptor.get('qualifiedName')
         if qualified:
+            # A descriptor naming a member (an enum's `memberName`) is typed by its
+            # enclosing class, so a member-qualified path resolves to the class.
+            member = descriptor.get('memberName')
+            if member and qualified.endswith(f'.{member}'):
+                qualified = qualified[:-(len(member) + 1)]
             return (qualified[len('builtins.'):]
                     if qualified.startswith('builtins.') else qualified)
         # TODO drop this fallback once the floor is ty-types 0.0.72+, where every
@@ -486,6 +491,29 @@ class PythonTypeMapping:
         if module_name and module_name != 'builtins':
             return f"{module_name}.{name}"
         return name
+
+    def _resolved_class(self, descriptor: Dict[str, Any],
+                        fqn: str) -> Optional[JavaType.Class]:
+        """The enriched classLiteral naming this descriptor's class, if there is one.
+
+        A ``classId`` on the descriptor names that class outright, so it is
+        authoritative for the FQN even when the descriptor's own name is less
+        qualified. The by-simple-name index is a guess — two modules may declare
+        the same class name — so a match found that way is used only when its FQN
+        agrees with ``fqn``.
+        """
+        class_id = descriptor.get('classId')
+        authoritative = class_id is not None
+        if class_id is None:
+            class_id = self._class_literal_index.get(descriptor.get('className', ''))
+        if class_id is None:
+            return None
+        resolved = self._resolve_type(class_id)
+        if not isinstance(resolved, JavaType.Class):
+            return None
+        if authoritative or resolved.fully_qualified_name == fqn:
+            return resolved
+        return None
 
     def _descriptor_to_java_type(self, descriptor: Dict[str, Any]) -> Optional[JavaType]:
         """Convert a ty-types TypeDescriptor to a JavaType."""
@@ -498,18 +526,10 @@ class PythonTypeMapping:
 
             module_name = descriptor.get('moduleName')
 
-            # Resolve base class: prefer classId (enriched with supertypes/methods)
-            class_id = descriptor.get('classId')
-            if class_id is None:
-                # Look up classLiteral by className to get kind/supertypes/methods
-                class_id = self._class_literal_index.get(class_name)
-
-            if class_id is not None:
-                base_class = self._resolve_type(class_id)
-                if not isinstance(base_class, JavaType.Class):
-                    base_class = self._create_class_type(self._class_fqn(descriptor))
-            else:
-                base_class = self._create_class_type(self._class_fqn(descriptor))
+            # Prefer the classLiteral, which carries kind/supertypes/methods.
+            fqn = self._class_fqn(descriptor)
+            base_class = (self._resolved_class(descriptor, fqn)
+                          or self._create_class_type(fqn))
 
             # `tuple` has a single generic parameter, so typeArgs conflates
             # `tuple[int, str]` with `tuple[int | str, ...]`. Subclasses inherit
@@ -1526,16 +1546,8 @@ class PythonTypeMapping:
     def _class_reference(self, descriptor: Dict[str, Any]) -> JavaType.Class:
         """Resolve a descriptor's class through its classLiteral so annotation,
         expression, and declaring-type positions all share one enriched object."""
-        class_name = descriptor.get('className', '')
         fqn = self._class_fqn(descriptor)
-        class_id = descriptor.get('classId')
-        if class_id is None and class_name:
-            class_id = self._class_literal_index.get(class_name)
-        if class_id is not None:
-            resolved = self._resolve_type(class_id)
-            if isinstance(resolved, JavaType.Class) and resolved.fully_qualified_name == fqn:
-                return resolved
-        return self._create_class_type(fqn)
+        return self._resolved_class(descriptor, fqn) or self._create_class_type(fqn)
 
     def _declaring_type_from_descriptor(self, descriptor: Dict[str, Any]) -> Optional[JavaType.FullyQualified]:
         """Extract a declaring type (class/module) from a TypeDescriptor."""
