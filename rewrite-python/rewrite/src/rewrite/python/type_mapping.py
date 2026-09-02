@@ -203,10 +203,11 @@ class PythonTypeMapping:
         self._byte_offset_cache: Dict[Tuple[int, int], int] = {}
         self._lookup_cache: Dict[tuple, Optional[int]] = {}
 
-        # Lazily populated by _module_ast / _from_import_module
+        # Lazily populated by _module_ast / _from_import_module / _import_bindings
         self._module_ast_parsed = False
         self._module_ast_tree: Optional[ast.Module] = None
         self._from_import_index: Optional[Dict[Tuple[int, str], str]] = None
+        self._import_binding_index: Optional[Dict[str, str]] = None
 
         # ty-types data: populated by _build_index
         self._node_index: Dict[Tuple[int, int], Tuple[int, str]] = {}  # (start, end) -> (type_id, node_kind)
@@ -906,6 +907,106 @@ class PythonTypeMapping:
         if descriptor and self._is_variable_descriptor(descriptor):
             return expr_type, JavaType.Variable(_name=node.attr, _type=expr_type, _owner=receiver_type)
         return expr_type, None
+
+    def decorator_type(self, node: ast.expr) -> Optional[JavaType]:
+        """The type naming the decorator ``node`` applies, the way Java names an
+        annotation: the decorating function or class itself, under the module the source
+        imported it from — not the type applying it returns.
+
+        The written name an unshadowed import binding resolves says which module that is:
+        ``@pkg.api.tag`` names ``pkg.api.tag`` where ty names the ``pkg._impl`` defining it.
+        It also names a decorator ty cannot type at all.
+        """
+        type_id = self._lookup_type_id(node)
+        descriptor = self._type_registry.get(type_id) if type_id is not None else None
+        if descriptor is not None and descriptor.get('kind') == 'classLiteral':
+            # A resolved class beats the shell the written path would mint
+            return self._resolve_type(type_id)
+        fqn = self._import_binding_fqn(node)
+        if fqn:
+            return self._create_class_type(fqn)
+        if descriptor is not None and descriptor.get('kind') in _FUNCTION_KINDS:
+            name = descriptor.get('name')
+            # Keyed on ty's type id, so it resolves names the scope-blind
+            # binding index above treats as shadowed.
+            module = descriptor.get('moduleName')
+            if isinstance(node, ast.Name):
+                module = self._from_import_module(type_id, node.id) or module
+            if module and name and not descriptor.get('className'):
+                return self._create_class_type(f"{module}.{name}")
+        return self.type(node)
+
+    def _import_binding_fqn(self, node: ast.expr) -> Optional[str]:
+        """The FQN an unshadowed module-level import gives ``node``'s written name."""
+        suffix: List[str] = []
+        while isinstance(node, ast.Attribute):
+            suffix.append(node.attr)
+            node = node.value
+        if not isinstance(node, ast.Name):
+            return None
+        bound = self._import_bindings().get(node.id)
+        return '.'.join([bound, *reversed(suffix)]) if bound else None
+
+    def _import_bindings(self) -> Dict[str, str]:
+        """The FQN each of this file's absolute module-level imports names, keyed by the
+        name it binds, minus every name the file binds a second time.
+
+        Python binds a name once per scope, so an import nothing else rebinds says what a
+        reference to that name means whether or not ty could type it. Anything that could
+        rebind — an assignment, a ``def``, a parameter, a second import — disqualifies the
+        name rather than being scoped precisely, since a decorator naming a shadowed
+        symbol is not worth a false attribution.
+        """
+        if self._import_binding_index is None:
+            tree = self._module_ast()
+            bindings: Dict[str, str] = {}
+            shadowed: Set[str] = set()
+            top_level = set()
+
+            def bind(name: str, fqn: Optional[str]) -> None:
+                # `import a.b` after `import a` re-binds the root to the same FQN
+                if fqn is None or bindings.get(name, fqn) != fqn:
+                    shadowed.add(name)
+                else:
+                    bindings[name] = fqn
+
+            for stmt in tree.body if tree else ():
+                if isinstance(stmt, (ast.Import, ast.ImportFrom)):
+                    top_level.update(id(alias) for alias in stmt.names)
+                    # A relative import's written form is not a module path
+                    relative = isinstance(stmt, ast.ImportFrom) and (stmt.level or not stmt.module)
+                    for alias in stmt.names:
+                        if isinstance(stmt, ast.Import):
+                            # A non-aliased `import a.b` binds the root package `a`
+                            root = alias.name.split('.')[0]
+                            bind(alias.asname or root, alias.name if alias.asname else root)
+                        elif alias.name == '*':
+                            # A star import can bind any name, so nothing here is decidable
+                            self._import_binding_index = {}
+                            return self._import_binding_index
+                        elif relative:
+                            bind(alias.asname or alias.name, None)
+                        else:
+                            bind(alias.asname or alias.name, f"{stmt.module}.{alias.name}")
+
+            for node in ast.walk(tree) if tree else ():
+                if isinstance(node, ast.Name):
+                    if isinstance(node.ctx, (ast.Store, ast.Del)):
+                        shadowed.add(node.id)
+                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    shadowed.add(node.name)
+                elif isinstance(node, ast.arg):
+                    shadowed.add(node.arg)
+                elif isinstance(node, ast.ExceptHandler) and node.name:
+                    shadowed.add(node.name)
+                elif isinstance(node, (ast.Global, ast.Nonlocal)):
+                    shadowed.update(node.names)
+                elif isinstance(node, ast.alias) and id(node) not in top_level:
+                    shadowed.add(node.asname or node.name.split('.')[0])
+
+            self._import_binding_index = {name: fqn for name, fqn in bindings.items()
+                                          if name not in shadowed}
+        return self._import_binding_index
 
     def import_alias_type(self, node: ast.alias) -> Optional[JavaType]:
         """The type of the symbol an import name binds, named under the module the
