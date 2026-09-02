@@ -15,12 +15,35 @@
 """Shared utility functions for Python import handling."""
 
 import ast
-from typing import Optional, Tuple
+from typing import Iterator, Optional, Sequence, Tuple
 
-from rewrite.java.support_types import JavaType, JRightPadded, Space
-from rewrite.java.tree import Empty, FieldAccess, Identifier, Import
+from rewrite.java.support_types import JavaType, JRightPadded, Space, Statement
+from rewrite.java.tree import Block, Empty, FieldAccess, Identifier, If, Import
 from rewrite.markers import Markers
 from rewrite.python.markers import CanonicalName, Quoted
+
+
+def unconditional_body(if_: If) -> Optional[Block]:
+    """The body of an `if` that only adds bindings to the enclosing scope.
+
+    None once there is an `else`: the branches are then alternative bindings of
+    the same name, and honouring one would rewrite the other's binding too.
+    """
+    then_part = if_.then_part
+    return then_part if if_.else_part is None and isinstance(then_part, Block) else None
+
+
+def module_scope_blocks(statements: Sequence[Statement]) -> Iterator[Block]:
+    """The `if` bodies whose bindings land in the module scope.
+
+    `if TYPE_CHECKING:` is where files that defer their annotations keep their
+    typing imports.
+    """
+    for stmt in statements:
+        body = unconditional_body(stmt) if isinstance(stmt, If) else None
+        if body is not None:
+            yield body
+            yield from module_scope_blocks(body.statements)
 
 
 def get_qualid_name(qualid) -> str:

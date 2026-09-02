@@ -25,7 +25,9 @@ import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.python.tree.Py;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.openrewrite.python.internal.PythonImportNames.canonicalFqn;
@@ -69,7 +71,7 @@ public class PythonRemoveImportVisitor<P> extends RpcImportVisitor<P> {
 
     @Override
     boolean mightChange(Py.CompilationUnit cu) {
-        for (Statement statement : cu.getStatements()) {
+        for (Statement statement : moduleScopeStatements(cu.getStatements())) {
             if (statement instanceof J.Import) {
                 if (name == null && module.equals(nameString(((J.Import) statement).getQualid()))) {
                     return true;
@@ -79,6 +81,23 @@ public class PythonRemoveImportVisitor<P> extends RpcImportVisitor<P> {
             }
         }
         return false;
+    }
+
+    /**
+     * Every statement binding names in the module scope, {@code if} bodies included. Mirrors
+     * {@code module_scope_blocks} on the Python side, including its exclusion of an {@code if}
+     * that carries an {@code else}.
+     */
+    private static List<Statement> moduleScopeStatements(List<Statement> statements) {
+        List<Statement> flattened = new ArrayList<>(statements);
+        for (Statement statement : statements) {
+            if (statement instanceof J.If && ((J.If) statement).getElsePart() == null &&
+                    ((J.If) statement).getThenPart() instanceof J.Block) {
+                flattened.addAll(moduleScopeStatements(
+                        ((J.Block) ((J.If) statement).getThenPart()).getStatements()));
+            }
+        }
+        return flattened;
     }
 
     /**
