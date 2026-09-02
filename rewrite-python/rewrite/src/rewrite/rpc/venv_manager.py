@@ -8,6 +8,7 @@ there is nothing to pip-uninstall.
 import os
 import shutil
 import subprocess
+import sys
 from importlib import metadata
 from pathlib import Path
 from typing import Optional
@@ -21,7 +22,7 @@ def venv_python(venv_dir: Path) -> Path:
     return venv_dir / "bin" / "python"
 
 
-def _site_packages(venv_dir: Path) -> Optional[Path]:
+def site_packages(venv_dir: Path) -> Optional[Path]:
     if os.name == "nt":
         sp = venv_dir / "Lib" / "site-packages"
         return sp if sp.exists() else None
@@ -33,11 +34,11 @@ def installed_version(venv_dir: Path, dist: str) -> Optional[str]:
 
     Read off disk, so the recipe is never imported.
     """
-    site_packages = _site_packages(venv_dir)
-    if site_packages is None:
+    packages = site_packages(venv_dir)
+    if packages is None:
         return None
     target = _normalize_package_name(dist)
-    for distribution in metadata.distributions(path=[str(site_packages)]):
+    for distribution in metadata.distributions(path=[str(packages)]):
         name = distribution.metadata["Name"]
         if name and _normalize_package_name(name) == target:
             return distribution.version
@@ -71,6 +72,23 @@ def is_usable_venv(venv_dir: Path) -> bool:
         key, separator, value = line.partition("=")
         if separator and key.strip() == "home":
             return Path(value.strip()).exists()
+    return False
+
+
+def built_by_running_interpreter(venv_dir: Path) -> bool:
+    """True when this process can import the venv's packages.
+
+    A venv's ``site-packages`` carries bytecode and extension modules for the one interpreter
+    version it was built against; an unrecorded version reads as no match.
+    """
+    config = venv_dir / "pyvenv.cfg"
+    if not config.exists():
+        return False
+    running = [str(part) for part in sys.version_info[:2]]
+    for line in config.read_text().splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key.strip() in ("version", "version_info"):
+            return value.strip().split(".")[:2] == running
     return False
 
 

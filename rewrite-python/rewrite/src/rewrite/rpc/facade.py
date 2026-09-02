@@ -1,7 +1,8 @@
 """Facade request handling: route RPC operations across per-bundle children.
 
-In facade mode (``--recipe-install-dir`` set, not a child) the server holds no recipes itself: each
-bundle gets its own venv and child, and recipe execution routes to the owning child.
+In facade mode (``--recipe-install-dir`` set, not a child) each bundle gets its own venv. A lone
+bundle runs in the facade process and nothing here is consulted; from a second bundle on, each gets
+a child and recipe execution routes to the owning one.
 
 ``Print``/``GetObject`` are not routed: the working source file is owned outside the children, so
 a child's edit has to be pulled back into it (``hub_pull``) or it is never seen. That store and the
@@ -25,6 +26,10 @@ class Facade:
         self._is_local_visitor = is_local_visitor or (lambda name: False)
         self._bundle_by_visitor = {}    # visitor name (edit:/scan:) -> bundle
         self._bundle_by_recipe_id = {}  # prepared recipe id -> bundle
+
+    def routes_to_children(self):
+        """False when the only bundle runs in this process and the server's own handlers serve it."""
+        return self._children.has_children()
 
     def _owner(self, visitor_name):
         """The bundle that owns ``visitor_name``, or ``_LOCAL`` when the facade runs it itself."""

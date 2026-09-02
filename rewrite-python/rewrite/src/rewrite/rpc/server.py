@@ -1182,7 +1182,9 @@ def _get_marketplace():
             from rewrite.discovery import discover_root_recipes
             discover_root_recipes(_child_bundle, marketplace=_marketplace, attribution=_attribution,
                                   attribution_name=_attribution_name)
-        else:
+        elif not _facade_mode():
+            # A facade's is scoped the same way, to the bundles activate_bundle_in_process
+            # installs into it; ambient discovery belongs to a plain server.
             from rewrite.discovery import discover_recipes, recipe_name_set
             from rewrite import activate
 
@@ -1536,6 +1538,32 @@ def _collect_marketplace_rows(
         collect(category, [])
 
     return rows
+
+
+def activate_bundle_in_process(venv_dir: Path, bundle_dist: str,
+                               attribution_name: Optional[str] = None) -> List[dict]:
+    """Activate a recipe bundle in the facade's own process and return its marketplace rows.
+
+    The bundle's venv joins this process's path, which is what ``--child-bundle`` on the venv
+    interpreter buys a child. ``addsitedir`` appends, so the engine keeps the precedence
+    ``_child_env`` gives it in a child, and it processes the venv's ``.pth`` files.
+    """
+    import importlib
+    import site
+
+    from rewrite.discovery import discover_root_recipes
+    from rewrite.rpc import venv_manager
+
+    packages = venv_manager.site_packages(venv_dir)
+    if packages is not None:
+        site.addsitedir(str(packages))
+        importlib.invalidate_caches()
+
+    marketplace = _get_marketplace()
+    discover_root_recipes(bundle_dist, marketplace=marketplace, attribution=_attribution,
+                          attribution_name=attribution_name)
+    return _collect_marketplace_rows(
+        marketplace, recipe_filter=_attribution.recipes_for(attribution_name or bundle_dist))
 
 
 def _category_descriptor_to_dict(descriptor) -> dict:
@@ -2517,7 +2545,9 @@ def _get_facade():
         if removed:
             logger.info("Cleared %d pre-venv recipe artifact(s) from %s: %s",
                         len(removed), _recipe_install_dir, ", ".join(removed))
-        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir, upstream=_serve_child_object),
+        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir,
+                                        upstream=_serve_child_object,
+                                        activate=activate_bundle_in_process),
                          hub_pull=_hub_pull_child_edit,
                          local_visit=_hub_local_visit,
                          is_local_visitor=_hub_is_builtin_visitor)
@@ -2529,35 +2559,40 @@ def handle_request(method: str, params: dict) -> Any:
     if _facade_mode():
         facade = _get_facade()
 
-        if method == 'Evict':
+        # Bundle lifecycle is always the facade's. SetDataTableStore and Evict have no `return`:
+        # a bundle hosted in this process needs the store and the eviction here too.
+        if method == 'InstallRecipes':
+            return facade.install_recipes(params)
+        if method == 'GetMarketplace':
+            return facade.get_marketplace(params)
+        if method == 'SetDataTableStore':
+            facade.set_data_table_store(params)
+        elif method == 'Evict':
             facade.evict(params)
             _hub_release(params.get('id'))
-            return handle_evict(params)
-        facade_handlers = {
-            'InstallRecipes': facade.install_recipes,
-            'GetMarketplace': facade.get_marketplace,
-            'PrepareRecipe': facade.prepare_recipe,
-            'SetDataTableStore': facade.set_data_table_store,
-            'Visit': facade.visit,
-            'BatchVisit': facade.batch_visit,
-            'Generate': facade.generate,
-        }
-        facade_handler = facade_handlers.get(method)
-        if facade_handler:
-            # Acquire at the top level, before any child runs — acquiring inside a child's
-            # GetObject callback would deadlock (the child waits on us, Java on this request).
-            if method in ('Visit', 'BatchVisit'):
-                _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
-            return facade_handler(params)
-        if method in ('Print', 'GetObject'):
-            obj_id = params.get('treeId') or params.get('id')
-            source_file_type = params.get('sourceFileType')
-            # Java fetches non-tree objects by id as well (the execution context, cursors).
-            # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
-            # the two apart. Acquiring a non-tree would hand its property messages to a receiver
-            # that has no codec for them, desynchronizing the queue for every later object.
-            if obj_id is not None and source_file_type and obj_id not in _hub_tree:
-                _hub_acquire(obj_id, source_file_type)
+        elif facade.routes_to_children():
+            facade_handlers = {
+                'PrepareRecipe': facade.prepare_recipe,
+                'Visit': facade.visit,
+                'BatchVisit': facade.batch_visit,
+                'Generate': facade.generate,
+            }
+            facade_handler = facade_handlers.get(method)
+            if facade_handler:
+                # Acquire at the top level, before any child runs — acquiring inside a child's
+                # GetObject callback would deadlock (the child waits on us, Java on this request).
+                if method in ('Visit', 'BatchVisit'):
+                    _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
+                return facade_handler(params)
+            if method in ('Print', 'GetObject'):
+                obj_id = params.get('treeId') or params.get('id')
+                source_file_type = params.get('sourceFileType')
+                # Java fetches non-tree objects by id as well (the execution context, cursors).
+                # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
+                # the two apart. Acquiring a non-tree would hand its property messages to a receiver
+                # that has no codec for them, desynchronizing the queue for every later object.
+                if obj_id is not None and source_file_type and obj_id not in _hub_tree:
+                    _hub_acquire(obj_id, source_file_type)
 
     handlers = {
         'Parse': handle_parse,

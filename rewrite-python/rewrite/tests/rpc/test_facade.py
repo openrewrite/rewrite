@@ -204,6 +204,7 @@ def test_handle_request_answers_print_from_the_facades_own_tree(monkeypatch, tmp
     import rewrite.rpc.server as server
 
     class _FakeFacade:
+        def routes_to_children(self): return True
         def get_marketplace(self, params): ...
         def install_recipes(self, params): ...
         def prepare_recipe(self, params): ...
@@ -233,6 +234,7 @@ def test_handle_request_does_not_acquire_non_tree_objects(monkeypatch, tmp_path)
     import rewrite.rpc.server as server
 
     class _FakeFacade:
+        def routes_to_children(self): return True
         def get_marketplace(self, params): ...
         def install_recipes(self, params): ...
         def prepare_recipe(self, params): ...
@@ -264,6 +266,8 @@ def test_handle_request_routes_to_facade_in_facade_mode(monkeypatch, tmp_path):
     routed = {}
 
     class _FakeFacade:
+        def routes_to_children(self): return True
+
         def get_marketplace(self, params):
             routed["marketplace"] = True
             return ["facade-rows"]
@@ -528,3 +532,59 @@ def test_an_unknown_visitor_is_still_an_error():
         assert False, "expected a ValueError for a visitor no child owns"
     except ValueError as e:
         assert "No child owns visitor" in str(e)
+
+
+class _HostingFacade:
+    """A facade whose only bundle runs in this process, so there is nothing to route to."""
+
+    def routes_to_children(self): return False
+    def install_recipes(self, params): ...
+    def get_marketplace(self, params): ...
+    def evict(self, params): ...
+    def set_data_table_store(self, params): return True
+
+    def prepare_recipe(self, params): raise AssertionError("routed with no child to route to")
+    def visit(self, params): raise AssertionError("routed with no child to route to")
+    def batch_visit(self, params): raise AssertionError("routed with no child to route to")
+    def generate(self, params): raise AssertionError("routed with no child to route to")
+
+
+def test_a_lone_bundle_is_served_by_the_servers_own_handlers(monkeypatch, tmp_path):
+    """With one bundle the facade is a plain server: nothing is relayed, so the tree is never
+    materialized a second time in ``_hub_tree``."""
+    import rewrite.rpc.server as server
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)   # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _HostingFacade())
+    monkeypatch.setattr(server, "handle_batch_visit", lambda p: "local-batch")
+    monkeypatch.setattr(server, "handle_visit", lambda p: "local-visit")
+    monkeypatch.setattr(server, "handle_prepare_recipe", lambda p: "local-prepare")
+    monkeypatch.setattr(server, "handle_print", lambda p: "local-print")
+
+    acquired = []
+    monkeypatch.setattr(server, "_hub_acquire", lambda oid, sft: acquired.append(oid))
+
+    tree = {"treeId": "T", "sourceFileType": "py"}
+    assert server.handle_request("PrepareRecipe", {"id": "pkg.R"}) == "local-prepare"
+    assert server.handle_request("BatchVisit", tree) == "local-batch"
+    assert server.handle_request("Visit", tree) == "local-visit"
+    assert server.handle_request("Print", tree) == "local-print"
+    assert acquired == []
+    assert server._hub_tree == {}
+
+
+def test_the_data_table_store_reaches_a_bundle_hosted_in_this_process(monkeypatch, tmp_path):
+    """A hosted bundle emits its rows from this process, so the store is installed here as well as
+    broadcast to any children."""
+    import rewrite.rpc.server as server
+    from rewrite.data_table import CsvDataTableStore
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _HostingFacade())
+    monkeypatch.setattr(server, "_configured_data_table_store", None)
+
+    assert server.handle_request(
+        "SetDataTableStore", {"kind": "CSV", "outputDir": str(tmp_path / "tables")}) is True
+    assert isinstance(server._configured_data_table_store, CsvDataTableStore)

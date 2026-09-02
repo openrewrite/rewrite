@@ -1,7 +1,11 @@
-"""Facade orchestration: one isolated child per bundle, keyed by distribution name.
+"""Facade orchestration: bundles keyed by distribution name, isolated from each other.
 
-Children are spawned on demand. Recipe ownership is first-wins across bundles. ``venv_ops`` and
-``spawn`` are injectable for testing.
+A lone bundle is hosted in the facade's own process; a second one puts every bundle behind its own
+child, spawned on demand. Recipe ownership is first-wins across bundles.
+
+``activate`` is injected rather than imported: the server runs as ``__main__`` under
+``python -m rewrite.rpc.server``, so importing it by name here binds a second module object with
+its own, empty marketplace. ``venv_ops`` and ``spawn`` are injectable for testing.
 """
 from pathlib import Path
 
@@ -10,14 +14,17 @@ from rewrite.rpc import venv_manager
 from rewrite.rpc.child_connection import ChildConnection, child_command
 
 
-
 class BundleChildren:
-    def __init__(self, python_executable, venvs_root, upstream, *, spawn=None, venv_ops=None):
+    def __init__(self, python_executable, venvs_root, upstream, *, activate, spawn=None,
+                 venv_ops=None):
         self._python = python_executable
         self._venvs_root = Path(venvs_root)
         self._upstream = upstream
         self._spawn = spawn or ChildConnection.spawn
         self._venv_ops = venv_ops or venv_manager
+        self._activate = activate
+        self._hosted = None     # the bundle this process runs itself, if any
+        self._imported = None   # the bundle whose packages it has imported; it never takes another
         self._children = {}     # bundle_dist -> child connection
         self._descriptors = {}  # bundle_dist -> list[marketplace row]
         self._owner = {}        # recipe name -> bundle_dist (first-wins)
@@ -51,7 +58,7 @@ class BundleChildren:
             child.request("Evict", params)
 
     def install(self, bundle_dist: str, spec: str, force: bool = False, attribution_name=None):
-        """Create/reuse the bundle's venv, install ``spec``, spawn its child, cache its recipes.
+        """Create/reuse the bundle's venv, install ``spec``, activate its recipes, cache them.
 
         ``attribution_name`` labels the recipes with the identity the host keys the bundle by (a
         local install's supplied path); by default they carry the distribution's own name.
@@ -66,11 +73,33 @@ class BundleChildren:
             self._venv_ops.create_venv(self._python, venv_dir, clear=venv_dir.exists())
         self._venv_ops.install_into_venv(venv_dir, spec, force=force)
         self._versions[bundle_dist] = self._venv_ops.installed_version(venv_dir, bundle_dist)
-        rows = self._ensure_child(bundle_dist).request("GetMarketplace", {})
+        rows = self._discover(bundle_dist)
         self._descriptors[bundle_dist] = rows
         for row in rows:
             self._owner.setdefault(row["descriptor"]["name"], bundle_dist)  # first-wins
         return rows
+
+    def _discover(self, bundle_dist: str):
+        """Bring a bundle's recipes within reach and return its marketplace rows.
+
+        A bundle installed on its own has nothing to conflict with, so it is hosted here rather
+        than behind a child of its own. Imports are permanent, so only one bundle per process gets
+        the offer — a second one's packages would land beside the first's, venvs notwithstanding.
+        """
+        venv_dir = self._venv_dir(bundle_dist)
+        if (self._imported in (None, bundle_dist) and not self._children
+                and self._venv_ops.built_by_running_interpreter(venv_dir)):
+            self._hosted = self._imported = bundle_dist
+            return self._activate(venv_dir, bundle_dist, self._attribution.get(bundle_dist))
+        if self._hosted is not None:
+            # A bundle install completes before any of its recipes is prepared, so the hosted
+            # bundle has nothing in flight and its child re-reads the same recipes from the venv.
+            self._ensure_child(self._hosted)
+            self._hosted = None
+        return self._ensure_child(bundle_dist).request("GetMarketplace", {})
+
+    def has_children(self) -> bool:
+        return bool(self._children)
 
     def marketplace(self):
         merged, seen = [], set()
@@ -94,6 +123,8 @@ class BundleChildren:
 
     def uninstall(self, bundle_dist: str) -> None:
         bundle_dist = _normalize_package_name(bundle_dist)
+        if self._hosted == bundle_dist:
+            self._hosted = None  # _imported still names it: its modules stay here
         child = self._children.pop(bundle_dist, None)
         if child is not None:
             child.close()
