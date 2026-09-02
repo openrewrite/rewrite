@@ -54,10 +54,10 @@ val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 
 dependencies {
     implementation(project(":rewrite-core"))
-    runtimeOnly("org.projectlombok:lombok:1.18.46") // 1.18.48 relocated SuperBuilder
+    runtimeOnly("org.projectlombok:lombok:latest.release")
 
     // Add lombok dependency to the newly created lombok configuration
-    lombok("org.projectlombok:lombok:1.18.46") // 1.18.48 relocated SuperBuilder
+    lombok("org.projectlombok:lombok:latest.release")
     compileOnly(files(tools))
     compileOnly(files(unpackedAndRenamedLombokDir))
 }
