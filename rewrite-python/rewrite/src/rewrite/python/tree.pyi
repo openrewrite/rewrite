@@ -2,12 +2,12 @@
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar, List, Optional, Dict, Tuple
 from typing_extensions import Self
 from uuid import UUID
 import weakref
 
-from rewrite.utils import replace_if_changed
+from rewrite.utils import replace_if_changed, T
 from enum import Enum
 from pathlib import Path
 from rewrite import Checksum, FileAttributes, SourceFile, TreeVisitor, Markers, Cursor, PrinterFactory
@@ -284,12 +284,14 @@ class ExpressionStatement(Py, Expression, Statement):
     _id: UUID
     _expression: Expression
 
-    def replace(self, **kwargs: Any) -> Self: ...
+    def replace(self, **kwargs: Any) -> 'ExpressionStatement': ...
 
     @property
     def prefix(self) -> Space: ...
     @property
     def markers(self) -> Markers: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
     @property
     def expression(self) -> Expression: ...
 
