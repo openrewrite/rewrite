@@ -136,15 +136,13 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             List<JRightPadded<Expression>> expressions;
             if (node.getArguments().size() == 1) {
                 ExpressionTree arg = node.getArguments().get(0);
-                if (arg instanceof JCAssign assign && assign.lhs instanceof JCIdent attributeName) {
-                    int saveCursor = cursor;
-                    whitespace();
-                    boolean namedInSource = source.startsWith(attributeName.name.toString(), cursor);
-                    cursor = saveCursor;
-                    if (namedInSource) {
-                        expressions = singletonList(convert(arg, t -> sourceBefore(")")));
-                    } else {
+                if (arg instanceof JCAssign assign && assign.lhs instanceof JCIdent) {
+                    // javac's `Annotate#enterAnnotation` builds an elided `value =` with `make.at(rhs.pos)`
+                    boolean attributeNameElidedInSource = assign.lhs.pos == assign.rhs.pos;
+                    if (attributeNameElidedInSource) {
                         expressions = singletonList(convert(assign.rhs, t -> sourceBefore(")")));
+                    } else {
+                        expressions = singletonList(convert(arg, t -> sourceBefore(")")));
                     }
                 } else {
                     expressions = singletonList(convert(arg, t -> sourceBefore(")")));

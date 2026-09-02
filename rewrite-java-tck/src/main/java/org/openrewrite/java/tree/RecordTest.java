@@ -144,6 +144,12 @@ class RecordTest implements RewriteTest {
               public record MyRecord(@A(value = "a") String name) {
               }
               """
+          ),
+          java(
+            """
+              public record MyRecordWithBlanks( @A( /* don't trip */ value = "a" ) String name) {
+              }
+              """
           )
         );
     }
