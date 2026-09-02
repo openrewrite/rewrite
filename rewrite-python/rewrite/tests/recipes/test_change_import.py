@@ -1062,6 +1062,32 @@ class TestImportsInBlocks:
             )
         )
 
+        RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+            new_name='Map',
+        )).rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections import Mapping
+
+                def f(x: Mapping) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Map
+
+                def f(x: Map) -> None: ...
+                """,
+            )
+        )
+
     def test_split_leaves_the_new_import_in_the_block(self):
         self._callable_to_abc().rewrite_run(
             python(
@@ -1110,34 +1136,6 @@ class TestImportsInBlocks:
             )
         )
 
-    def test_renames_the_member_and_its_references(self):
-        spec = RecipeSpec(recipe=ChangeImport(
-            old_module='collections',
-            old_name='Mapping',
-            new_module='collections.abc',
-            new_name='Map',
-        ))
-        spec.rewrite_run(
-            python(
-                """
-                from typing import TYPE_CHECKING
-
-                if TYPE_CHECKING:
-                    from collections import Mapping
-
-                def f(x: Mapping) -> None: ...
-                """,
-                """
-                from typing import TYPE_CHECKING
-
-                if TYPE_CHECKING:
-                    from collections.abc import Map
-
-                def f(x: Map) -> None: ...
-                """,
-            )
-        )
-
     def test_nested_direct_import_is_rewritten_in_place(self):
         spec = RecipeSpec(recipe=ChangeImport(
             old_module='urllib2',
@@ -1164,20 +1162,61 @@ class TestImportsInBlocks:
             )
         )
 
-    def test_import_in_an_else_branch_is_left_alone(self):
+    def test_a_match_outside_module_scope_is_left_alone(self):
+        """Each file needs a module-scope match too, or the recipe returns before it looks."""
         self._callable_to_abc().rewrite_run(
             python(
                 """
                 import sys
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable
 
                 if sys.version_info >= (3, 10):
-                    from collections.abc import Callable
+                    pass
                 else:
                     from typing import Callable
 
                 def f(x: Callable[[int], str]) -> None: ...
+                """,
                 """
-            )
+                import sys
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Callable
+
+                if sys.version_info >= (3, 10):
+                    pass
+                else:
+                    from typing import Callable
+
+                def f(x: Callable[[int], str]) -> None: ...
+                """,
+            ),
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable
+
+                def g():
+                    from typing import Callable
+                    return Callable
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Callable
+
+                def g():
+                    from typing import Callable
+                    return Callable
+                """,
+            ),
         )
 
     def test_qualified_reference_binds_the_new_module_in_the_block(self):
@@ -1221,6 +1260,58 @@ class TestImportsInBlocks:
                     import collections.abc
 
                 def f(x: collections.abc.Callable[[int], str], y: collections.abc.Sequence) -> None: ...
+                """,
+            )
+        )
+
+    def test_both_import_forms_in_one_block_are_rewritten(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from __future__ import annotations
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable
+                    import typing
+
+                def f(x: Callable[[int], str], y: typing.Callable[[int], int]) -> None: ...
+                """,
+                """
+                from __future__ import annotations
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Callable
+                    import collections.abc
+
+                def f(x: Callable[[int], str], y: collections.abc.Callable[[int], int]) -> None: ...
+                """,
+            )
+        )
+
+    def test_a_comment_on_the_replaced_statement_keeps_it_out_of_a_merge(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Sequence
+                    # only needed for annotations
+                    from typing import Callable
+
+                def f(x: Callable[[int], str], y: Sequence) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Sequence
+                    # only needed for annotations
+                    from collections.abc import Callable
+
+                def f(x: Callable[[int], str], y: Sequence) -> None: ...
                 """,
             )
         )

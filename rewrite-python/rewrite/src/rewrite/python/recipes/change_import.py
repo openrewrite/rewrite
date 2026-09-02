@@ -15,7 +15,7 @@
 """Recipe to change Python imports from one module/name to another."""
 
 from dataclasses import dataclass, field, replace as dc_replace
-from typing import Any, List, Optional, Set, Tuple
+from typing import Any, List, Optional, Tuple
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
 from rewrite.category import CategoryDescriptor
@@ -150,7 +150,6 @@ class ChangeImport(Recipe):
             rewrote_qualified_refs: bool = False
             new_module_type: Optional[JavaType.Class] = None
             local_bindings: LocalBindings  # a fresh instance per compilation unit
-            block_import_ids: Set[Any]  # imports left to _rewrite_block_imports
             old_import_at_module_level: bool = False
             direct_module_import_at_module_level: bool = False
 
@@ -163,7 +162,6 @@ class ChangeImport(Recipe):
                 self.new_module_type = None
                 self.local_bindings = LocalBindings()
 
-                self.block_import_ids = set()
                 for stmt in cu.statements:
                     self._detect(stmt)
                 # Where the old import is found decides where the replacement goes.
@@ -171,9 +169,7 @@ class ChangeImport(Recipe):
                 self.direct_module_import_at_module_level = self.has_direct_module_import
                 for block in module_scope_blocks(cu.statements):
                     for stmt in block.statements:
-                        if isinstance(stmt, (Import, MultiImport)):
-                            self.block_import_ids.add(stmt.id)
-                            self._detect(stmt)
+                        self._detect(stmt)
 
                 if not self.has_old_import and not self.has_direct_module_import:
                     return cu
@@ -242,12 +238,16 @@ class ChangeImport(Recipe):
                             self.has_direct_module_import = True
                             self.module_alias = get_alias_name(stmt)
 
+            def _at_module_level(self) -> bool:
+                """True for a statement of the compilation unit. Replacements are bound here
+                or, by `_rewrite_block`, in a module-scope `if` body; a match deeper than that
+                would be removed with nothing put in its place."""
+                return isinstance(self.cursor.parent_tree_cursor().value, CompilationUnit)
+
             def visit_import(self, import_: Import, p: ExecutionContext) -> Optional[J]:  # ty: ignore[invalid-method-override]
                 if not self.has_old_import or old_name:
                     return import_
-                if import_.id in self.block_import_ids:
-                    return import_
-                if self.cursor.first_enclosing(MultiImport):
+                if not self._at_module_level():
                     return import_
                 alias = self._check_for_old_single_import(import_)
                 if alias is None:
@@ -257,7 +257,7 @@ class ChangeImport(Recipe):
             def visit_multi_import(self, multi: MultiImport, p: ExecutionContext) -> Optional[J]:  # ty: ignore[invalid-method-override]
                 if not self.has_old_import:
                     return multi
-                if multi.id in self.block_import_ids:
+                if not self._at_module_level():
                     return multi
 
                 alias = self._check_for_old_import(multi)
@@ -415,13 +415,11 @@ class ChangeImport(Recipe):
                     body.padding.replace(_statements=kept), padded.after, padded.markers))
 
             def _rewrite_block(self, padded_statements) -> Optional[List[JRightPadded]]:
-                """The block's statements with the match replaced by the new import, or None
+                """The block's statements with every match replaced by the new import, or None
                 when nothing in it matched. Nested `if` bodies are rewritten too."""
                 kept: List[JRightPadded] = []
                 changed = False
-                to_add: Optional[_Binding] = None
-                at = 0
-                prefix = Space.EMPTY
+                to_add: List[Tuple[_Binding, int, Space]] = []
                 for padded in padded_statements:
                     stmt = padded.element
                     if isinstance(stmt, If):
@@ -431,24 +429,21 @@ class ChangeImport(Recipe):
                             changed = True
                         kept.append(padded)
                         continue
-                    matched = False
-                    if to_add is None and isinstance(stmt, (Import, MultiImport)):
-                        reduced, to_add = self._match_in_block(stmt)
-                        matched = to_add is not None
-                    else:
-                        reduced = stmt
+                    reduced, binding = self._match_in_block(stmt)
                     if reduced is not stmt:
                         changed = True
                     if reduced is not None:
                         kept.append(padded if reduced is stmt else padded.replace(_element=reduced))
-                    if matched:
+                    if binding is not None:
                         # A comment on the statement describes what it imports, so it
                         # travels only when the whole statement is replaced.
                         prefix = (stmt.prefix if reduced is None
                                   else Space([], stmt.prefix.whitespace))
-                        at = len(kept)
-                if to_add is not None and self._place_import(kept, to_add, at, prefix):
-                    changed = True
+                        to_add.append((binding, len(kept), prefix))
+                # Back to front, so an insertion never shifts a pending position.
+                for binding, at, prefix in reversed(to_add):
+                    if self._place_import(kept, binding, at, prefix):
+                        changed = True
                 return kept if changed else None
 
             def _match_in_block(self, stmt: Statement) -> Tuple[Optional[Statement],
@@ -507,6 +502,9 @@ class ChangeImport(Recipe):
                         if any((get_alias_name(e.element) or get_qualid_name(e.element.qualid))
                                == bound for e in elements):
                             return False
+                        if prefix.comments:
+                            # A merge has nowhere to carry that comment.
+                            break
                         kept[index] = padded.replace(_element=stmt.padding.replace(
                             _names=JContainer(stmt.padding.names.before,
                                               insert_member(elements,

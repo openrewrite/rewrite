@@ -45,13 +45,6 @@ def module_scope_blocks(statements: Sequence[Statement]) -> Iterator[Block]:
             yield from module_scope_blocks(body.statements)
 
 
-def module_scope_statements(statements: Sequence[Statement]) -> Iterator[Statement]:
-    """Every statement binding names in the module scope, `if` bodies included."""
-    yield from statements
-    for block in module_scope_blocks(statements):
-        yield from block.statements
-
-
 def get_qualid_name(qualid) -> str:
     """Get the string representation of a qualified name."""
     if isinstance(qualid, Identifier):

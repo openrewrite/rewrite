@@ -637,6 +637,33 @@ class TestImportsInBlocks:
             )
         )
 
+    def test_keep_imports_when_a_later_removal_would_lose_a_comment(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import Callable
+                # typing is needed below
+                import typing
+                """
+            )
+        )
+
+    def test_keep_imports_when_the_next_statement_has_its_own_comment(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                # about the List import
+                from typing import List
+                # about x
+                x = 1
+                """
+            )
+        )
+
     def test_keep_import_when_the_block_has_an_else(self, arm):
         spec = RecipeSpec(recipe=from_visitor(
             _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
@@ -651,6 +678,25 @@ class TestImportsInBlocks:
                     List = list
 
                 x = 1
+                """
+            )
+        )
+
+    def test_keep_import_shadowed_only_by_a_type_checking_binding(self, arm):
+        """The block binding does not exist at run time, so it shadows nothing."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+                from typing import List
+
+                if TYPE_CHECKING:
+                    from mymod import List
+
+                def f() -> List[int]:
+                    return List()
                 """
             )
         )

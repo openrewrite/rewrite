@@ -84,13 +84,15 @@ public class PythonRemoveImportVisitor<P> extends RpcImportVisitor<P> {
     }
 
     /**
-     * Every statement binding names in the module scope, {@code if} bodies included. Mirrors the
-     * Python side's {@code module_scope_statements}, taken branch only.
+     * Every statement binding names in the module scope, {@code if} bodies included. Mirrors
+     * {@code module_scope_blocks} on the Python side, including its exclusion of an {@code if}
+     * that carries an {@code else}.
      */
     private static List<Statement> moduleScopeStatements(List<Statement> statements) {
         List<Statement> flattened = new ArrayList<>(statements);
         for (Statement statement : statements) {
-            if (statement instanceof J.If && ((J.If) statement).getThenPart() instanceof J.Block) {
+            if (statement instanceof J.If && ((J.If) statement).getElsePart() == null &&
+                    ((J.If) statement).getThenPart() instanceof J.Block) {
                 flattened.addAll(moduleScopeStatements(
                         ((J.Block) ((J.If) statement).getThenPart()).getStatements()));
             }

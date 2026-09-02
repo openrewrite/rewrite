@@ -21,8 +21,7 @@ from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded, Statement
 from rewrite.java.tree import Identifier, If, Import, Space
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
-                                         get_canonical_fqn, module_scope_statements,
-                                         unconditional_body)
+                                         get_canonical_fqn, unconditional_body)
 from rewrite.python.scope_utils import LocalBindings
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
@@ -116,7 +115,7 @@ class RemoveImport(PythonVisitor):
     def _bound_by_another_import(self, cu: CompilationUnit, target_name: str,
                                  removing: Import) -> bool:
         """True when some import other than ``removing`` binds ``target_name``."""
-        for stmt in module_scope_statements(cu.statements):
+        for stmt in cu.statements:
             if isinstance(stmt, MultiImport):
                 from_name = get_name_string(stmt.from_) if stmt.from_ is not None else None
                 for imp in stmt.names:
@@ -184,7 +183,8 @@ class RemoveImport(PythonVisitor):
 
     def _prune_statements(self, padded_statements: Sequence[JRightPadded]) -> Optional[List[JRightPadded]]:
         """The statements with the import gone, or None to leave them as they are —
-        because nothing matched, or because a comment would go with the removal."""
+        because nothing matched, or because a comment would go with the removal. One
+        prefix cannot carry two comments, so a collision abandons the removal."""
         kept: List[JRightPadded] = []
         inherited: Optional[Space] = None
         changed = False
@@ -203,6 +203,8 @@ class RemoveImport(PythonVisitor):
                 changed = True
                 if inherited is None:
                     inherited = prefix_to_inherit(stmt, index)
+                elif stmt.prefix.comments:
+                    return None
                 continue
             if result is not stmt:
                 padded = JRightPadded(result, padded.after, padded.markers)
@@ -213,7 +215,6 @@ class RemoveImport(PythonVisitor):
                         padded.element.replace(prefix=inherited), padded.after, padded.markers
                     )
                 elif inherited.comments:
-                    # Neither comment can be given up, and one prefix holds both.
                     return None
                 inherited = None
             kept.append(padded)
