@@ -112,6 +112,7 @@ class Template:
         *,
         values: Optional[Union['MatchResult', Dict[str, Any]]] = None,
         coordinates: Optional[PythonCoordinates] = None,
+        format: bool = True,
     ) -> Optional[J]:
         """
         Apply this template, returning the generated AST node.
@@ -120,6 +121,9 @@ class Template:
             cursor: Current position in the AST.
             values: Captured values from a pattern match, or a dict of values.
             coordinates: Where/how to insert (default: replace current).
+            format: Whether the result is fitted to where it lands. Pass False to assemble
+                several results into one subtree and format that subtree once, rather than
+                once per application. The anchor supplies the result's prefix either way.
 
         Returns:
             The generated AST node.
@@ -172,7 +176,7 @@ class Template:
                 effective_coords = PythonCoordinates.replace(tree)
 
         if effective_coords is not None and result is not None:
-            result = TemplateEngine.apply_coordinates(result, cursor, effective_coords)
+            result = TemplateEngine.apply_coordinates(result, cursor, effective_coords, format)
 
         return result
 

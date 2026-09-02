@@ -335,6 +335,41 @@ class TestTemplateApplyRecipe:
 class TestTemplateApply:
     """Tests for Template.apply()."""
 
+    def test_format_false_anchors_the_template_without_fitting_it(self):
+        """The template's own layout survives, while the anchor still supplies the prefix."""
+        def recipe(fmt: bool) -> Recipe:
+            v = capture('v')
+            pat = pattern("old({v})", v=v)
+            tmpl = template("wrapper(\n    new({v})\n)", v=v)
+
+            class Rule(Recipe):
+                @property
+                def name(self) -> str:
+                    return "test.Wrap"
+
+                @property
+                def display_name(self) -> str:
+                    return "Wrap"
+
+                @property
+                def description(self) -> str:
+                    return "Wraps a call in a template spanning several lines."
+
+                def editor(self):
+                    class Visitor(PythonVisitor[ExecutionContext]):
+                        def visit_method_invocation(self, method, p):
+                            method = super().visit_method_invocation(method, p)
+                            match = pat.match(method, self.cursor)
+                            return tmpl.apply(self.cursor, values=match, format=fmt) if match else method
+                    return Visitor()
+            return Rule()
+
+        before = "with lock:\n    old(v)\n"
+        RecipeSpec(recipe=recipe(True)).rewrite_run(python(
+            before, "with lock:\n    wrapper(\n        new(v)\n    )\n"))
+        RecipeSpec(recipe=recipe(False)).rewrite_run(python(
+            before, "with lock:\n    wrapper(\n    new(v)\n)\n"))
+
     def test_apply_no_captures_returns_tree(self):
         """Test that apply with no captures returns a tree."""
         tmpl = template("x + 1")
