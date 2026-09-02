@@ -193,8 +193,8 @@ class TestAutoParenthesization:
         assert isinstance(inner, j.Binary)
         assert inner.operator == j.Binary.Type.Or
 
-    def test_and_operand_in_and_no_parens(self):
-        """{a} and {b} with b=(x and y) should NOT add parens (same precedence)."""
+    def test_equal_precedence_right_operand_gets_parens(self):
+        """{a} and {b} with b=(x and y) parenthesizes, as every left-associative operator does."""
         tree = TemplateEngine.get_template_tree(
             "{a} and {b}", {'a': capture('a'), 'b': capture('b')}
         )
@@ -206,8 +206,7 @@ class TestAutoParenthesization:
         result = visitor.visit(tree, None)
 
         assert isinstance(result, j.Binary)
-        # Right operand should NOT be wrapped (same precedence)
-        assert isinstance(result.right, j.Binary)
+        assert isinstance(result.right, j.Parentheses)
 
     def test_or_operand_in_left_of_and_gets_parens(self):
         """{a} and {b} with a=(p or q) should produce (p or q) and b."""
