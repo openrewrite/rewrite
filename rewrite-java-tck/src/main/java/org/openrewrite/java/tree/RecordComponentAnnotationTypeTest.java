@@ -15,13 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
-import org.openrewrite.test.TypeValidation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,20 +30,21 @@ import static org.openrewrite.java.Assertions.java;
 
 /**
  * A record component's annotations are propagated to whichever of the component, the field, the accessor
- * method and the constructor parameter the annotation is applicable to (JLS 9.7.4). Only those applicable
- * to the component itself appear in {@code Symbol.RecordComponent#getAnnotationMirrors()}, while
- * {@code #getOriginalAnnos()} holds every annotation written in the record header. The two lists therefore
- * do not line up, and the parser attributes one from the other by index.
+ * method and the constructor parameter the annotation is applicable to (JLS 9.7.4), and javac attributes
+ * each one only where it landed. Whichever of those it was, the annotation keeps the type it was written
+ * with.
  */
 @MinimumJava17
 class RecordComponentAnnotationTypeTest implements RewriteTest {
 
     private static final String ANNOTATIONS = """
       import java.lang.annotation.ElementType;
+      import java.lang.annotation.Repeatable;
       import java.lang.annotation.Target;
 
       @Target(ElementType.METHOD)
       @interface OnMethod {
+          String value() default "";
       }
 
       @Target(ElementType.RECORD_COMPONENT)
@@ -54,6 +53,16 @@ class RecordComponentAnnotationTypeTest implements RewriteTest {
 
       @Target(ElementType.FIELD)
       @interface OnField {
+      }
+
+      @Target(ElementType.RECORD_COMPONENT)
+      @Repeatable(OnComponentRepeats.class)
+      @interface OnComponentRepeated {
+      }
+
+      @Target(ElementType.RECORD_COMPONENT)
+      @interface OnComponentRepeats {
+          OnComponentRepeated[] value();
       }
       """;
 
@@ -75,7 +84,6 @@ class RecordComponentAnnotationTypeTest implements RewriteTest {
     @Test
     void componentApplicableAnnotation() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(ANNOTATIONS),
           java(
             """
@@ -87,11 +95,9 @@ class RecordComponentAnnotationTypeTest implements RewriteTest {
         );
     }
 
-    @Disabled("Resolves to Unknown: the annotation reaches only the accessor, so it has no mirror on the component")
     @Test
     void accessorOnlyAnnotation() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(ANNOTATIONS),
           java(
             """
@@ -103,11 +109,9 @@ class RecordComponentAnnotationTypeTest implements RewriteTest {
         );
     }
 
-    @Disabled("OnMethod resolves to OnComponent: the mirror for the second annotation is attributed to the first")
     @Test
     void accessorOnlyAnnotationBeforeComponentApplicableOne() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(ANNOTATIONS),
           java(
             """
@@ -119,11 +123,9 @@ class RecordComponentAnnotationTypeTest implements RewriteTest {
         );
     }
 
-    @Disabled("OnMethod resolves to Unknown: the mirror list is shorter, so the trailing annotation is never attributed")
     @Test
     void componentApplicableAnnotationBeforeAccessorOnlyOne() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(ANNOTATIONS),
           java(
             """
@@ -135,11 +137,9 @@ class RecordComponentAnnotationTypeTest implements RewriteTest {
         );
     }
 
-    @Disabled("OnComponent resolves to Unknown: a field-only annotation shifts the mirror off its annotation")
     @Test
     void fieldOnlyAnnotationBeforeComponentApplicableOne() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(ANNOTATIONS),
           java(
             """
@@ -147,6 +147,34 @@ class RecordComponentAnnotationTypeTest implements RewriteTest {
               }
               """,
             annotationTypes("OnField -> OnField", "OnComponent -> OnComponent")
+          )
+        );
+    }
+
+    @Test
+    void accessorOnlyAnnotationWithAnArgument() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record AccessorOnlyWithArgument(@OnMethod("full_name") String name) {
+              }
+              """,
+            annotationTypes("OnMethod -> OnMethod")
+          )
+        );
+    }
+
+    @Test
+    void repeatedComponentApplicableAnnotations() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record Repeated(@OnComponentRepeated @OnComponentRepeated String name) {
+              }
+              """,
+            annotationTypes("OnComponentRepeated -> OnComponentRepeated", "OnComponentRepeated -> OnComponentRepeated")
           )
         );
     }

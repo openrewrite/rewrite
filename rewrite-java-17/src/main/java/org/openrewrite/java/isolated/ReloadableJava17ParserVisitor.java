@@ -19,6 +19,7 @@ package org.openrewrite.java.isolated;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
+import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
@@ -27,6 +28,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Pair;
 import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
@@ -59,6 +61,7 @@ import java.util.stream.Stream;
 
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
@@ -599,10 +602,65 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     private List<JCAnnotation> extractRecordComponentAnnotations(Symbol.RecordComponent rc) {
         List<JCAnnotation> annotations = rc.getOriginalAnnos();
-        for (int i = 0; i < rc.getAnnotationMirrors().size(); i++) {
-            annotations.get(i).getAnnotationType().setType((Type) rc.getAnnotationMirrors().get(i).getAnnotationType());
+        if (annotations.isEmpty()) {
+            return annotations;
+        }
+
+        // javac types each header annotation only where it landed (JLS 9.7.4), leaving these originals untyped
+        Map<Integer, JCAnnotation> onAccessor = rc.accessorMeth == null ? emptyMap() :
+                mapAnnotations(rc.accessorMeth.getModifiers().getAnnotations(), new HashMap<>());
+        List<Type> componentApplicableTypes = null;
+        for (JCAnnotation annotation : annotations) {
+            JCTree annotationType = annotation.getAnnotationType();
+            JCAnnotation accessorAnnotation = onAccessor.get(annotation.pos);
+            if (accessorAnnotation != null && accessorAnnotation.getAnnotationType().type != null) {
+                annotationType.setType(accessorAnnotation.getAnnotationType().type);
+                continue;
+            }
+            if (componentApplicableTypes == null) {
+                componentApplicableTypes = componentApplicableTypes(rc.getAnnotationMirrors());
+            }
+            // by name, as the mirrors cover only the component-applicable annotations and so never line up by index
+            Type type = typeNamed(annotationType.toString(), componentApplicableTypes);
+            if (type != null) {
+                annotationType.setType(type);
+            }
         }
         return annotations;
+    }
+
+    private static List<Type> componentApplicableTypes(List<Attribute.Compound> mirrors) {
+        List<Type> types = new ArrayList<>(mirrors.size());
+        for (Attribute.Compound mirror : mirrors) {
+            types.add(mirror.type);
+            // repeated annotations are attributed as the one container annotation that holds them
+            for (Pair<Symbol.MethodSymbol, Attribute> value : mirror.values) {
+                if (value.snd instanceof Attribute.Array) {
+                    for (Attribute repeated : ((Attribute.Array) value.snd).values) {
+                        if (repeated instanceof Attribute.Compound) {
+                            types.add(repeated.type);
+                        }
+                    }
+                }
+            }
+        }
+        return types;
+    }
+
+    private static @Nullable Type typeNamed(String writtenName, List<Type> types) {
+        Type enclosingTypeOmitted = null;
+        for (Type type : types) {
+            if (type.tsym != null) {
+                String qualifiedName = type.tsym.getQualifiedName().toString();
+                if (qualifiedName.equals(writtenName)) {
+                    return type;
+                }
+                if (enclosingTypeOmitted == null && qualifiedName.endsWith("." + writtenName)) {
+                    enclosingTypeOmitted = type;
+                }
+            }
+        }
+        return enclosingTypeOmitted;
     }
 
     @Override
