@@ -15,7 +15,7 @@ from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType,
 from rewrite.java import tree as j
 from rewrite.java.support_types import TextComment
 from . import tree as py
-from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
+from .markers import CanonicalName, KeywordArguments, KeywordOnlyArguments, Quoted
 from .type_mapping import PythonTypeMapping, compute_source_line_data
 
 T = TypeVar('T')
@@ -835,10 +835,12 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_alias(self, node):
         alias_type = self._type_mapping.import_alias_type(node)
+        canonical = self._type_mapping.import_canonical_fqn(node)
         return j.Import(
             random_id(),
             self.__whitespace(),
-            Markers.EMPTY,
+            Markers.EMPTY if canonical is None else
+            Markers(random_id(), [CanonicalName(random_id(), canonical)]),
             self.__pad_left(Space.EMPTY, False),
             self.__convert_qualified_name(node.name, alias_type),
             None if not node.asname else
@@ -2305,6 +2307,18 @@ class ParserVisitor(ast.NodeVisitor):
         # When extra_parens is non-empty, this is handled differently (prefix is set on the wrapped paren).
         if not extra_parens:
             name = name.replace(prefix=name_prefix)  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
+            # Name the decorator itself, as Java names an annotation type, rather than
+            # leave the reference typed as what applying it returns.
+            referenced = decorator.func if isinstance(decorator, ast.Call) else decorator
+            if isinstance(referenced, (ast.Name, ast.Attribute)):
+                decorator_type = self._type_mapping.decorator_type(referenced)
+                if decorator_type is not None:
+                    name = name.replace(type=decorator_type)  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
+                    if isinstance(name, j.FieldAccess):
+                        # Both halves of a dotted reference name the same decorator
+                        padded = name.padding.name
+                        name = name.padding.replace(_name=padded.replace(
+                            element=padded.element.replace(type=decorator_type)))
 
         # Wrap name in extra parentheses if present
         if extra_parens:
@@ -2590,6 +2604,14 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_Module(self, node: ast.Module) -> py.CompilationUnit:
+        statements = []
+        shebang = self.__shebang()
+        if shebang is not None:
+            statements.append(shebang)
+        if node.body:
+            statements.extend(self.__pad_statement(stmt) for stmt in node.body)
+        elif shebang is None:
+            statements.append(self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY))
         cu = py.CompilationUnit(
             random_id(),
             Space.EMPTY,
@@ -2600,12 +2622,38 @@ class ParserVisitor(ast.NodeVisitor):
             self._bom_marked,
             None,
             _EMPTY_LIST,
-            [self.__pad_statement(stmt) for stmt in node.body] if node.body else [
-                self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)],
+            statements,
             self.__whitespace()
         )
         # Parsing complete - all tokens should be consumed
         return cu
+
+    def __shebang(self) -> Optional[JRightPadded[py.Shebang]]:
+        """Capture a leading ``#!`` line as a first-class Shebang statement.
+
+        Python's tokenizer surfaces the shebang as an ordinary COMMENT token,
+        which would otherwise fold into the first statement's prefix. Mirroring
+        the JS/TS parser, the terminating newline is kept as the node's
+        ``after`` padding while any following blank lines stay with the next
+        statement's prefix.
+        """
+        idx = self._token_idx
+        while idx < len(self._tokens) and self._tokens[idx].type == token.ENCODING:
+            idx += 1
+        if idx >= len(self._tokens):
+            return None
+        tok = self._tokens[idx]
+        if tok.type != token.COMMENT or not tok.string.startswith('#!'):
+            return None
+        self._token_idx = idx + 1
+        shebang = py.Shebang(random_id(), Space.EMPTY, Markers.EMPTY, tok.string)
+        after = Space.EMPTY
+        if self._token_idx < len(self._tokens):
+            nl = self._tokens[self._token_idx]
+            if nl.type in (token.NEWLINE, token.NL):
+                after = Space(_EMPTY_LIST, nl.string)
+                self._token_idx += 1
+        return self.__pad_right(shebang, after)
 
     @contextlib.contextmanager
     def __type_context(self):

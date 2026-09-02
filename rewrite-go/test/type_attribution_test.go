@@ -17,6 +17,7 @@
 package test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,6 +27,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -216,6 +218,26 @@ func TestTypeAttributionAssignment(t *testing.T) {
 	}
 }
 
+func TestTypeAttributionCompoundAssignment(t *testing.T) {
+	src := "package main\n\nfunc f(m map[string]int) {\n" +
+		"\tx := 1\n\tx += 2\n\tm[\"k\"] &^= 4\n\t_ = x\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var got []string
+	forEachAssignmentOperation(cu, func(a *java.AssignmentOperation) {
+		got = append(got, matcher.GetFullyQualifiedName(a.Type))
+	})
+	// `&^=` maps to the golang node, so it needs its own walk.
+	forEachGoAssignmentOperation(cu, func(a *golang.AssignmentOperation) {
+		got = append(got, matcher.GetFullyQualifiedName(a.Type))
+	})
+	if want := []string{"int", "int"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("compound assignment types: got %v, want %v", got, want)
+	}
+}
+
 func TestTypeAttributionSliceType(t *testing.T) {
 	src := "package main\n\nvar xs []int\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)
@@ -237,6 +259,8 @@ func TestTypeAttributionSliceType(t *testing.T) {
 type assignmentWalker struct {
 	visitor.GoVisitor
 	onAssignment        func(*java.Assignment)
+	onAssignmentOp      func(*java.AssignmentOperation)
+	onGoAssignmentOp    func(*golang.AssignmentOperation)
 	onArrayType         func(*java.ArrayType)
 	onMethodDeclaration func(*java.MethodDeclaration)
 	onMethodInvocation  func(*java.MethodInvocation)
@@ -250,6 +274,20 @@ func (v *assignmentWalker) VisitAssignment(a *java.Assignment, p any) java.J {
 	return v.GoVisitor.VisitAssignment(a, p)
 }
 
+func (v *assignmentWalker) VisitAssignmentOperation(a *java.AssignmentOperation, p any) java.J {
+	if v.onAssignmentOp != nil {
+		v.onAssignmentOp(a)
+	}
+	return v.GoVisitor.VisitAssignmentOperation(a, p)
+}
+
+func (v *assignmentWalker) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p any) java.J {
+	if v.onGoAssignmentOp != nil {
+		v.onGoAssignmentOp(a)
+	}
+	return v.GoVisitor.VisitGoAssignmentOperation(a, p)
+}
+
 func (v *assignmentWalker) VisitArrayType(a *java.ArrayType, p any) java.J {
 	if v.onArrayType != nil {
 		v.onArrayType(a)
@@ -259,6 +297,14 @@ func (v *assignmentWalker) VisitArrayType(a *java.ArrayType, p any) java.J {
 
 func forEachAssignment(cu java.Tree, f func(*java.Assignment)) {
 	visitor.Init(&assignmentWalker{onAssignment: f}).Visit(cu, nil)
+}
+
+func forEachAssignmentOperation(cu java.Tree, f func(*java.AssignmentOperation)) {
+	visitor.Init(&assignmentWalker{onAssignmentOp: f}).Visit(cu, nil)
+}
+
+func forEachGoAssignmentOperation(cu java.Tree, f func(*golang.AssignmentOperation)) {
+	visitor.Init(&assignmentWalker{onGoAssignmentOp: f}).Visit(cu, nil)
 }
 
 func forEachArrayType(cu java.Tree, f func(*java.ArrayType)) {

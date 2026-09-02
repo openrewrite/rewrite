@@ -46,16 +46,24 @@ import {
     TextSpan
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
+import {CompilerOptions, TsConfigResolver} from "./tsconfig";
 import {create as produce} from "mutative";
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
 import {childAt, childCountOf, childrenOf, firstTokenOf, lastTokenOf} from "./token-navigation";
 import {Compiler} from "./ts7/program";
+import type {Project} from "typescript/unstable/sync";
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
     sourceFileCache?: Map<string, ts.SourceFile>,
+    /**
+     * Type packages to load whose declarations nothing imports. Unset leaves TypeScript's default,
+     * which reads `@types/*` and nothing else; a package declaring its modules ambiently needs
+     * naming here for those declarations to be in scope.
+     */
+    types?: string[],
 }
 
 function getScriptKindFromFileName(fileName: string): ts.ScriptKind {
@@ -75,9 +83,18 @@ function getScriptKindFromFileName(fileName: string): ts.ScriptKind {
     }
 }
 
+/**
+ * TypeScript's public typings model valid syntax only, so slots its parser still fills for invalid code —
+ * an initializer on a type member, a modifier on an object literal member — are missing from them.
+ */
+type WithInvalidSyntaxSlots<T> = T & {
+    initializer?: ts.Expression;
+    modifiers?: ts.NodeArray<ts.ModifierLike>;
+};
+
 export class JavaScriptParser extends Parser {
 
-    private readonly compilerOptions: Record<string, unknown>;
+    private readonly tsConfig: TsConfigResolver;
     private readonly styles?: NamedStyles[];
     private compiler?: Compiler;
     private readonly sourceFileCache?: Map<string, ts.SourceFile>;
@@ -88,10 +105,11 @@ export class JavaScriptParser extends Parser {
             relativeTo,
             styles,
             sourceFileCache,
+            types,
         }: JavaScriptParserOptions = {},
     ) {
         super({ctx, relativeTo});
-        this.compilerOptions = {
+        const defaultCompilerOptions: CompilerOptions = {
             target: "esnext",
             // Bundler matches `exports` conditions leniently, so packages that publish types only under
             // an `import` condition resolve; it pairs with `preserve`, which `commonjs` cannot (TS5095).
@@ -115,8 +133,13 @@ export class JavaScriptParser extends Parser {
             strict: false,
             // `types` defaults to `[]`, which attributes ambient `@types/*` packages only when named;
             // `*` enumerates everything under `node_modules/@types`.
-            types: ["*"],
+            types: types ?? ["*"],
+            // Every bare specifier is tried under the parsed project's own root before
+            // `node_modules`; TypeScript 7 has no `baseUrl` to state that with.
+            paths: {"*": [path.join(relativeTo || process.cwd(), "*")]},
         };
+        this.tsConfig = new TsConfigResolver(defaultCompilerOptions,
+            configFilePath => this.sharedCompiler().parseConfigFile(configFilePath), relativeTo);
         this.styles = styles;
         this.sourceFileCache = sourceFileCache;
     }
@@ -144,14 +167,17 @@ export class JavaScriptParser extends Parser {
         // There is no parser outside the compiler process, so even a parse that wants no types
         // goes through a session; it is opened for this file alone and released straight after.
         const absolutePath = path.resolve(this.relativeTo ?? process.cwd(), sourcePath);
-        const session = this.sharedCompiler().open(new Map([[absolutePath, sourceText]]), this.compilerOptions);
+        const {options} = this.tsConfig.forFile(absolutePath);
+        const session = this.sharedCompiler().open(new Map([[absolutePath, sourceText]]),
+            [{key: absolutePath, options, rootFiles: [absolutePath]}]);
+        const program = session.projectFor(absolutePath).program;
         let tsSourceFile;
         try {
-            tsSourceFile = session.project.program.getSourceFile(absolutePath);
+            tsSourceFile = program.getSourceFile(absolutePath);
             if (!tsSourceFile) {
                 return this.error(input, new Error('Parser returned undefined'));
             }
-            const errors = session.project.program.getSyntacticDiagnostics(absolutePath)
+            const errors = program.getSyntacticDiagnostics(absolutePath)
                 .filter(d => d.category === ts.DiagnosticCategory.Error);
             if (errors.length > 0) {
                 const errorMessages = errors.map(e => {
@@ -196,6 +222,8 @@ export class JavaScriptParser extends Parser {
 
     override async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
         const inputFiles = new Map<SourcePath, ParserInput>();
+        const projectOf = new Map<SourcePath, string>();
+        const projects = new Map<string, { options: CompilerOptions, rootNames: SourcePath[] }>();
 
         // Populate inputFiles map and remove from cache if necessary
         for (const input of inputs) {
@@ -210,57 +238,78 @@ export class JavaScriptParser extends Parser {
             this.sourceFileCache && this.sourceFileCache.delete(normalizedSourcePath);
         }
 
+        // Packages in a monorepo each configure their own module resolution.
+        for (const normalizedSourcePath of inputFiles.keys()) {
+            const {configFilePath, options} = this.tsConfig.forFile(normalizedSourcePath);
+            const projectKey = configFilePath ?? "";
+            projectOf.set(normalizedSourcePath, projectKey);
+            let project = projects.get(projectKey);
+            if (!project) {
+                projects.set(projectKey, project = {options, rootNames: []});
+            }
+            project.rootNames.push(normalizedSourcePath);
+        }
+
         // The compiler owns parsing and resolution, so the inputs are handed over as files it can
         // read and it resolves everything else against the real filesystem itself.
         const sources = new Map<string, string>();
         for (const [sourcePath, input] of inputFiles) {
             sources.set(sourcePath, parserInputRead(input));
         }
-        const session = this.sharedCompiler().open(sources, this.compilerOptions);
-        const program = session.project.program;
+        const session = this.sharedCompiler().open(sources, [...projects].map(
+            ([key, {options, rootNames}]) => ({key, options, rootFiles: rootNames})));
 
-        // Create a single JavaScriptTypeMapping instance to be shared across all files in this parse batch.
-        // This ensures that TypeScript types with the same type.id map to the same Type instance,
-        // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
-        const typeMapping = new JavaScriptTypeMapping(session.project.checker, this.relativeTo ?? process.cwd());
+        // A JavaScriptTypeMapping deduplicates by `Type.id`, which is only unique within the
+        // checker that issued it, so each project needs its own.
+        const typeMappings = new Map<string, JavaScriptTypeMapping>();
+        const typeMappingFor = (project: Project, projectKey: string) => {
+            let typeMapping = typeMappings.get(projectKey);
+            if (!typeMapping) {
+                typeMappings.set(projectKey, typeMapping =
+                    new JavaScriptTypeMapping(project.checker, this.relativeTo ?? process.cwd()));
+            }
+            return typeMapping;
+        };
 
         try {
-        for (const [filePath, input] of inputFiles) {
-            const sourceFile = program.getSourceFile(filePath);
-            if (!sourceFile) {
-                yield this.error(input, new Error('Parser returned undefined'));
-                continue;
-            }
+            for (const [sourcePath, input] of inputFiles) {
+                const projectKey = projectOf.get(sourcePath)!;
+                const project = session.projectFor(projectKey);
+                const sourceFile = project.program.getSourceFile(sourcePath);
+                if (!sourceFile) {
+                    yield this.error(input, new Error('Parser returned undefined'));
+                    continue;
+                }
 
-            if (hasFlowAnnotation(sourceFile)) {
-                yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
-                continue;
-            }
+                if (hasFlowAnnotation(sourceFile)) {
+                    yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
+                    continue;
+                }
 
-            // One request for the file's names, so the type mapping's questions are answered locally.
-            (session.project.checker as unknown as {prefetch?: (sf: typeof sourceFile) => void})
-                .prefetch?.(sourceFile);
+                // One request for the file's names, so the type mapping's questions are answered locally.
+                (project.checker as unknown as {prefetch?: (sf: typeof sourceFile) => void})
+                    .prefetch?.(sourceFile);
 
-            const syntaxErrors = checkSyntaxErrors(program, sourceFile);
-            if (syntaxErrors.length > 0) {
-                let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
-                continue;
-            }
+                const syntaxErrors = checkSyntaxErrors(project.program, sourceFile);
+                if (syntaxErrors.length > 0) {
+                    let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
+                    yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
+                    continue;
+                }
 
-            try {
-                yield produce(
-                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
-                        .visit(sourceFile) as SourceFile,
-                    draft => {
-                        if (this.styles) {
-                            draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
-                        }
-                    });
-            } catch (error) {
-                yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
+                try {
+                    yield await this.requirePrintEqualsInput(produce(
+                        new JavaScriptParserVisitor(sourceFile, this.relativePath(input),
+                            typeMappingFor(project, projectKey)).visit(sourceFile) as SourceFile,
+                        draft => {
+                            if (this.styles) {
+                                draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
+                            }
+                        }), input, escapeLoneSurrogates(sourceFile.getFullText()));
+                } catch (error) {
+                    yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
+                }
             }
-        }
         } finally {
             session.close();
         }
@@ -446,7 +495,12 @@ export class JavaScriptParserVisitor {
         | ts.FunctionDeclaration | ts.ParameterDeclaration | ts.MethodDeclaration | ts.EnumDeclaration | ts.InterfaceDeclaration
         | ts.PropertySignature | ts.ConstructorDeclaration | ts.ModuleDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration
         | ts.ArrowFunction | ts.IndexSignatureDeclaration | ts.TypeAliasDeclaration | ts.ExportDeclaration | ts.ExportAssignment | ts.FunctionExpression
-        | ts.ConstructorTypeNode | ts.TypeParameterDeclaration | ts.ImportDeclaration | ts.ImportEqualsDeclaration): J.Modifier[] {
+        | ts.ConstructorTypeNode | ts.TypeParameterDeclaration | ts.ImportDeclaration | ts.ImportEqualsDeclaration
+        | ts.PropertyAssignment | ts.ShorthandPropertyAssignment): J.Modifier[] {
+        if (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) {
+            const modifiers = (node as WithInvalidSyntaxSlots<typeof node>).modifiers;
+            return modifiers ? modifiers.filter(ts.isModifier).map(this.mapModifier) : [];
+        }
         if (ts.isVariableStatement(node) || ts.isModuleDeclaration(node) || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)
             || ts.isInterfaceDeclaration(node) || ts.isPropertyDeclaration(node) || ts.isPropertySignature(node) || ts.isParameter(node)
             || ts.isMethodDeclaration(node) || ts.isConstructorDeclaration(node) || ts.isArrowFunction(node)
@@ -1048,6 +1102,8 @@ export class JavaScriptParserVisitor {
     visitPropertySignature(node: ts.PropertySignature): J.VariableDeclarations {
         // FIXME We are mapping the literals in things like type ascii = { " ": 32; "!": 33; } to
         //  named variables, which is not a good use of this construct.
+
+        const initializer = (node as WithInvalidSyntaxSlots<ts.PropertySignature>).initializer;
         return {
             kind: J.Kind.VariableDeclarations,
             id: randomId(),
@@ -1066,6 +1122,7 @@ export class JavaScriptParserVisitor {
                         draft.markers = this.maybeAddOptionalMarker(draft, node);
                     }) as VariableDeclarator,
                     dimensionsAfterName: [],
+                    initializer: initializer && this.leftPadded(this.prefix(childAt(node, childrenOf(node).indexOf(initializer) - 1)), this.visit(initializer)),
                     variableType: this.mapVariableType(node)
                 },
                 emptySpace
@@ -1228,7 +1285,8 @@ export class JavaScriptParserVisitor {
 
     private mapTypeInfo(node: ts.MethodDeclaration | ts.PropertyDeclaration | ts.VariableDeclaration | ts.ParameterDeclaration
         | ts.PropertySignature | ts.MethodSignature | ts.ArrowFunction | ts.CallSignatureDeclaration | ts.GetAccessorDeclaration
-        | ts.FunctionDeclaration | ts.ConstructSignatureDeclaration | ts.FunctionExpression | ts.NamedTupleMember): JS.TypeInfo | undefined {
+        | ts.FunctionDeclaration | ts.ConstructSignatureDeclaration | ts.FunctionExpression | ts.NamedTupleMember
+        | ts.ConstructorDeclaration | ts.SetAccessorDeclaration): JS.TypeInfo | undefined {
         if (!node.type || ts.isReparsed(node.type)) {
             return undefined;
         }
@@ -1273,6 +1331,7 @@ export class JavaScriptParserVisitor {
             leadingAnnotations: this.mapDecorators(node),
             modifiers: this.mapModifiers(node),
             nameAnnotations: [],
+            returnTypeExpression: this.mapTypeInfo(node),
             name: {...this.mapIdentifier(constructorKeyword, constructorKeyword.getText(), false), type: methodType},
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             dimensionsAfterName: [],
@@ -1292,6 +1351,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 leadingAnnotations: this.mapDecorators(node),
                 modifiers: this.mapModifiers(node),
+                typeParameters: node.typeParameters && this.mapTypeParametersAsObject(node),
                 returnTypeExpression: this.mapTypeInfo(node),
                 name: name as ComputedPropertyName,
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
@@ -1307,6 +1367,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             leadingAnnotations: this.mapDecorators(node),
             modifiers: this.mapModifiers(node),
+            typeParameters: node.typeParameters && this.mapTypeParametersAsObject(node),
             returnTypeExpression: this.mapTypeInfo(node),
             nameAnnotations: [],
             name: name as J.Identifier,
@@ -1328,6 +1389,8 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 leadingAnnotations: this.mapDecorators(node),
                 modifiers: this.mapModifiers(node),
+                typeParameters: node.typeParameters && this.mapTypeParametersAsObject(node),
+                returnTypeExpression: this.mapTypeInfo(node),
                 name: name as ComputedPropertyName,
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
@@ -1342,6 +1405,8 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             leadingAnnotations: this.mapDecorators(node),
             modifiers: this.mapModifiers(node),
+            typeParameters: node.typeParameters && this.mapTypeParametersAsObject(node),
+            returnTypeExpression: this.mapTypeInfo(node),
             nameAnnotations: [],
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
@@ -4100,6 +4165,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
             name: this.rightPadded(this.visit(node.name), this.suffix(node.name)),
             assigmentToken: JS.PropertyAssignment.Token.Colon,
             initializer: this.visit(node.initializer)
@@ -4112,6 +4178,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
+            modifiers: this.mapModifiers(node),
             name: this.rightPadded(this.visit(node.name), this.suffix(node.name)),
             assigmentToken: JS.PropertyAssignment.Token.Equals,
             initializer: node.objectAssignmentInitializer && this.visit(node.objectAssignmentInitializer)
@@ -4495,7 +4562,8 @@ export class JavaScriptParserVisitor {
     }
 
     private mapTypeParametersAsObject(node: ts.MethodDeclaration | ts.MethodSignature | ts.FunctionDeclaration
-        | ts.CallSignatureDeclaration | ts.ConstructSignatureDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.TypeAliasDeclaration | ts.FunctionTypeNode | ts.ConstructorTypeNode): J.TypeParameters | undefined {
+        | ts.CallSignatureDeclaration | ts.ConstructSignatureDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.TypeAliasDeclaration | ts.FunctionTypeNode | ts.ConstructorTypeNode
+        | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration): J.TypeParameters | undefined {
         const typeParameters = node.typeParameters;
         if (!typeParameters) return undefined;
 
@@ -4647,6 +4715,8 @@ class FlowSyntaxNotSupportedError extends SyntaxError {
 
 const SURR_FIRST = 0xD800;
 const SURR_LAST = 0xDFFF;
+const HIGH_SURR_LAST = 0xDBFF;
+const LOW_SURR_FIRST = 0xDC00;
 
 /**
  * Extracts invalid UTF-16 surrogate pairs from a string literal's value source.
@@ -4660,6 +4730,26 @@ const SURR_LAST = 0xDFFF;
  * 1. Unicode escape sequences (\uXXXX) where XXXX is in the surrogate range
  * 2. Raw surrogate characters in the source (character codes 0xD800-0xDFFF)
  */
+/** The form {@link extractSurrogateEscapes} can hold, against which print idempotence is measured. */
+function escapeLoneSurrogates(source: string): string {
+    let escaped = '';
+    for (let j = 0; j < source.length; j++) {
+        const charCode = source.charCodeAt(j);
+        if (charCode >= SURR_FIRST && charCode <= SURR_LAST) {
+            const next = source.charCodeAt(j + 1);
+            if (charCode <= HIGH_SURR_LAST && next >= LOW_SURR_FIRST && next <= SURR_LAST) {
+                escaped += source.charAt(j) + source.charAt(j + 1);
+                j++;
+                continue;
+            }
+            escaped += "\\u" + charCode.toString(16).toUpperCase().padStart(4, '0');
+            continue;
+        }
+        escaped += source.charAt(j);
+    }
+    return escaped;
+}
+
 function extractSurrogateEscapes(valueSource: string): { cleanedSource: string, unicodeEscapes: J.LiteralUnicodeEscape[] } {
     const unicodeEscapes: J.LiteralUnicodeEscape[] = [];
     let cleanedSource = '';
@@ -4683,8 +4773,17 @@ function extractSurrogateEscapes(valueSource: string): { cleanedSource: string, 
             }
         }
 
-        // Check for raw surrogate characters in the source
+        // A raw surrogate pair spells one code point — an emoji, say — and is carried as itself. A lone
+        // surrogate is not text on its own and does not survive serialization (#6599), so it is held as a
+        // `\uXXXX` escape and prints back as one.
         if (charCode >= SURR_FIRST && charCode <= SURR_LAST) {
+            const next = valueSource.charCodeAt(j + 1);
+            if (charCode <= HIGH_SURR_LAST && next >= LOW_SURR_FIRST && next <= SURR_LAST) {
+                cleanedSource += c + valueSource.charAt(j + 1);
+                cleanedIndex += 2;
+                j++;
+                continue;
+            }
             const codePoint = charCode.toString(16).toUpperCase().padStart(4, '0');
             unicodeEscapes.push({ valueSourceIndex: cleanedIndex, codePoint });
             continue;

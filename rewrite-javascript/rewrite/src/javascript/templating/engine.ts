@@ -28,6 +28,15 @@ import {isExpression, isStatement} from '../parser-utils';
 import {randomId} from '../../uuid';
 import * as ts from "../compiler";
 import {DependencyWorkspace} from "../dependency-workspace";
+import {ModuleScopeBinding, moduleScopeBindings} from '../add-import';
+import {walk} from '../scope';
+import {isIdentifier} from '../../java';
+import {findMarker, MarkersKind, ParseExceptionResult} from '../../markers';
+
+/** A module a template's context binds, and whether the parse resolved it well enough to attribute. */
+export interface ContextBinding extends ModuleScopeBinding {
+    attributed: boolean;
+}
 import {Parameter} from "./types";
 
 /**
@@ -90,11 +99,13 @@ export function setTemplateSourceFileCache(cache?: Map<string, ts.SourceFile>): 
 // from one compile to the next; see `JavaScriptParser.parse`.
 const templateParsers: Map<string, JavaScriptParser> = new Map();
 
-function templateParser(workspaceDir?: string): JavaScriptParser {
-    const key = workspaceDir ?? "";
+function templateParser(workspaceDir?: string, types?: string[]): JavaScriptParser {
+    // `types` changes what the compiler loads, so parsers cannot be shared across differing sets.
+    // An empty list loads nothing where absence loads the defaults, so the two encode apart.
+    const key = `${workspaceDir ?? ""}::${JSON.stringify(types ?? null)}`;
     let parser = templateParsers.get(key);
     if (!parser) {
-        parser = new JavaScriptParser({relativeTo: workspaceDir, sourceFileCache: templateSourceFileCache});
+        parser = new JavaScriptParser({relativeTo: workspaceDir, sourceFileCache: templateSourceFileCache, types});
         templateParsers.set(key, parser);
     }
     return parser;
@@ -115,7 +126,8 @@ class TemplateCache {
         templateString: string,
         captures: (Capture | Any)[],
         contextStatements: string[],
-        dependencies: Record<string, string>
+        dependencies: Record<string, string>,
+        types: string[] | undefined
     ): string {
         // Use the actual template string (with placeholders) as the primary key
         const templateKey = templateString;
@@ -129,7 +141,7 @@ class TemplateCache {
         // Dependencies
         const depsKey = JSON.stringify(dependencies || {});
 
-        return `${templateKey}::${capturesKey}::${contextKey}::${depsKey}`;
+        return `${templateKey}::${capturesKey}::${contextKey}::${depsKey}::${JSON.stringify(types ?? null)}`;
     }
 
     /**
@@ -139,9 +151,10 @@ class TemplateCache {
         templateString: string,
         captures: (Capture | Any)[],
         contextStatements: string[],
-        dependencies: Record<string, string>
+        dependencies: Record<string, string>,
+        types?: string[]
     ): Promise<JS.CompilationUnit> {
-        const key = this.generateKey(templateString, captures, contextStatements, dependencies);
+        const key = this.generateKey(templateString, captures, contextStatements, dependencies, types);
 
         let cu = this.cache.get(key);
         if (cu) {
@@ -163,7 +176,7 @@ class TemplateCache {
 
         // Parse and cache (workspace only needed during parsing)
         // Use templateSourceFileCache if configured for ~3.2x speedup on dependency file parsing
-        const parser = templateParser(workspaceDir);
+        const parser = templateParser(workspaceDir, types);
         const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.tsx'});
         cu = (await parseGenerator.next()).value as JS.CompilationUnit;
 
@@ -193,6 +206,20 @@ export function clearTemplateCache(): void {
     templateCache.clear();
 }
 
+/** Whether a name reads as a TypeScript type reference: a dotted chain of identifiers. */
+function isTypeReference(name: string): boolean {
+    return /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(name);
+}
+
+/**
+ * The compiler's diagnostic for code that did not parse, as one line: the marker states it ahead
+ * of a stack, and its positions index the whole parsed text, context statements included.
+ */
+function parseFailureReason(cu: JS.CompilationUnit): string {
+    const failure = findMarker<ParseExceptionResult>(cu, MarkersKind.ParseExceptionResult);
+    return failure ? failure.message.split('\n')[0].replace(/:$/, '') : 'no statements';
+}
+
 /**
  * Internal template engine - handles the core templating logic.
  * Not exported from index, so only visible within the templating module.
@@ -208,35 +235,77 @@ export class TemplateEngine {
      * @param dependencies NPM dependencies for type attribution
      * @returns A Promise resolving to the extracted template AST
      */
+    /** The template parsed with its context, which is what gives its code types to attribute against. */
+    private static async parseWithContext(
+        templateParts: TemplateStringsArray,
+        parameters: Parameter[],
+        contextStatements: string[],
+        dependencies: Record<string, string>,
+        types: string[] | undefined
+    ): Promise<JS.CompilationUnit> {
+        // A capture's declared type reaches the parse as a declaration, so it belongs with context.
+        const preamble = TemplateEngine.parameterPreamble(parameters);
+        const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
+        const contextWithPreamble = preamble.length > 0
+            ? [...contextStatements, ...preamble]
+            : contextStatements;
+        return TemplateEngine.parseOrThrow('template', templateString, [], contextWithPreamble, dependencies, types);
+    }
+
+    /**
+     * The parse behind every template and pattern. Code that fails to parse yields a compilation
+     * unit with no statements, which every caller goes on to read, so it fails here naming the code.
+     */
+    private static async parseOrThrow(
+        kind: 'template' | 'pattern',
+        templateString: string,
+        captures: (Capture | Any)[],
+        contextStatements: string[],
+        dependencies: Record<string, string>,
+        types: string[] | undefined
+    ): Promise<JS.CompilationUnit> {
+        const cu = await templateCache.getOrParse(templateString, captures, contextStatements, dependencies, types);
+        if (!cu.statements || cu.statements.length === 0) {
+            throw new Error(`Failed to parse ${kind} code (${parseFailureReason(cu)}):\n${templateString}`);
+        }
+        return cu;
+    }
+
+    /**
+     * The modules the template's context binds, for the caller to bind in the file being edited.
+     * An `import` or `require` states one; anything else — a `declare`, a helper signature — types
+     * the template without asking for a binding.
+     */
+    static async getContextBindings(
+        templateParts: TemplateStringsArray,
+        parameters: Parameter[],
+        contextStatements: string[] = [],
+        dependencies: Record<string, string> = {},
+        types?: string[]
+    ): Promise<ContextBinding[]> {
+        const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types);
+        // The template's own code is the last statement, so everything ahead of it is context.
+        const context = {...cu, statements: cu.statements.slice(0, -1)};
+        const attributed = new Set<string>();
+        walk(context.statements, node => {
+            if (isIdentifier(node) && (node.type !== undefined || node.fieldType !== undefined)) {
+                attributed.add(node.simpleName);
+            }
+            return true;
+        });
+        return moduleScopeBindings(context)
+            .filter(b => b.module !== undefined)
+            .map(b => ({...b, attributed: attributed.has(b.name)}));
+    }
+
     static async getTemplateTree(
         templateParts: TemplateStringsArray,
         parameters: Parameter[],
         contextStatements: string[] = [],
-        dependencies: Record<string, string> = {}
+        dependencies: Record<string, string> = {},
+        types?: string[]
     ): Promise<J> {
-        // Generate type preamble for captures/parameters with types
-        const preamble = TemplateEngine.parameterPreamble(parameters);
-
-        // Build the template string with parameter placeholders
-        const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
-
-        // Add preamble to context statements (so they're skipped during extraction)
-        const contextWithPreamble = preamble.length > 0
-            ? [...contextStatements, ...preamble]
-            : contextStatements;
-
-        // Use cache to get or parse the compilation unit
-        const cu = await templateCache.getOrParse(
-            templateString,
-            [],
-            contextWithPreamble,
-            dependencies
-        );
-
-        // Check if there are any statements
-        if (!cu.statements || cu.statements.length === 0) {
-            throw new Error(`Failed to parse template code (no statements):\n${templateString}`);
-        }
+        const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types);
 
         // The template code is always the last statement (after context + preamble)
         const lastStatement = cu.statements[cu.statements.length - 1].element;
@@ -263,7 +332,7 @@ export class TemplateEngine {
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplateFromAst(
-        ast: JS.CompilationUnit,
+        ast: J,
         parameters: Parameter[],
         cursor: Cursor,
         coordinates: JavaCoordinates,
@@ -439,7 +508,10 @@ export class TemplateEngine {
         // Handle Type.Class and Type.ShallowClass - return their fully qualified names
         if (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) {
             const classType = type as Type.Class;
-            return classType.fullyQualifiedName;
+            // A module qualifies its types by where they come from — `src/a.Foo` — and a path that
+            // is no type reference cannot be declared for. Naming a module's type takes a `context`
+            // statement of the caller's own, which `type` then names.
+            return isTypeReference(classType.fullyQualifiedName) ? classType.fullyQualifiedName : 'any';
         }
 
         // Handle Type.Primitive - map to TypeScript primitive types
@@ -490,7 +562,8 @@ export class TemplateEngine {
         templateParts: TemplateStringsArray,
         captures: (Capture | Any | RawCode)[],
         contextStatements: string[] = [],
-        dependencies: Record<string, string> = {}
+        dependencies: Record<string, string> = {},
+        types?: string[]
     ): Promise<J> {
         const preamble = TemplateEngine.capturePreamble(captures);
 
@@ -526,18 +599,14 @@ export class TemplateEngine {
             !(c instanceof RawCode || (c && typeof c === 'object' && (c as any)[RAW_CODE_SYMBOL]))
         ) as (Capture | Any)[];
 
-        // Use cache to get or parse the compilation unit
-        const cu = await templateCache.getOrParse(
+        const cu = await TemplateEngine.parseOrThrow(
+            'pattern',
             templateString,
             actualCaptures,
             contextWithPreamble,
-            dependencies
+            dependencies,
+            types
         );
-
-        // Check if there are any statements
-        if (!cu.statements || cu.statements.length === 0) {
-            throw new Error(`Failed to parse pattern code (no statements):\n${templateString}`);
-        }
 
         // The pattern code is always the last statement (after context + preamble)
         const lastStatement = cu.statements[cu.statements.length - 1].element;

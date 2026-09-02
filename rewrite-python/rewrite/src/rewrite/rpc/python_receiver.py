@@ -29,7 +29,7 @@ from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
     StatementExpression, MultiImport, KeyValue, DictLiteral, CollectionLiteral,
-    FormattedString, Pass, TrailingElseWrapper, ComprehensionExpression,
+    FormattedString, Pass, Shebang, TrailingElseWrapper, ComprehensionExpression,
     TypeAlias, YieldFrom, UnionType, VariableScope, Del, SpecialParameter,
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
@@ -129,6 +129,8 @@ class PythonRpcReceiver:
             return self._visit_formatted_string(tree, q)
         elif isinstance(tree, Pass):
             return self._visit_pass(tree, q)
+        elif isinstance(tree, Shebang):
+            return self._visit_shebang(tree, q)
         elif isinstance(tree, TrailingElseWrapper):
             return self._visit_trailing_else_wrapper(tree, q)
         elif isinstance(tree, ComprehensionExpression.Condition):
@@ -297,6 +299,10 @@ class PythonRpcReceiver:
     def _visit_pass(self, pass_: Pass, q: RpcReceiveQueue) -> Pass:
         # No additional fields beyond id/prefix/markers
         return pass_
+
+    def _visit_shebang(self, shebang: Shebang, q: RpcReceiveQueue) -> Shebang:
+        text = q.receive(shebang.text)
+        return replace_if_changed(shebang, text=text)
 
     def _visit_trailing_else_wrapper(self, tew: TrailingElseWrapper, q: RpcReceiveQueue) -> TrailingElseWrapper:
         statement = q.receive(tew.statement)
@@ -1811,7 +1817,7 @@ def _register_parse_error_codec():
 def _register_python_marker_codecs():
     """Register codecs for Python-specific marker types."""
     from rewrite.python.markers import (
-        KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline,
+        CanonicalName, KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline,
         PrintSyntax, ExecSyntax
     )
     from rewrite.rpc.receive_queue import register_codec_with_both_names
@@ -1851,6 +1857,26 @@ def _register_python_marker_codecs():
         _receive_keyword_only_arguments,
         lambda: KeywordOnlyArguments(random_id()),
         _send_keyword_only_arguments
+    )
+
+    # CanonicalName - has id and fqn (str)
+    def _receive_canonical_name(marker: CanonicalName, q: RpcReceiveQueue) -> CanonicalName:
+        new_id = q.receive_defined(marker.id)
+        new_fqn = q.receive_defined(marker.fqn)
+        if new_id is marker.id and new_fqn is marker.fqn:
+            return marker
+        return marker.with_id(new_id).with_fqn(new_fqn)
+
+    def _send_canonical_name(marker: CanonicalName, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
+        q.get_and_send(marker, lambda x: x.fqn)
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.CanonicalName',
+        CanonicalName,
+        _receive_canonical_name,
+        lambda: CanonicalName(random_id(), ''),
+        _send_canonical_name
     )
 
     # Quoted - has id and style (enum)

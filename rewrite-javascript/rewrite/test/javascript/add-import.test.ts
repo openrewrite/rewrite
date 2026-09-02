@@ -166,6 +166,23 @@ function createAddImportWithTemplateVisitor(
     };
 }
 
+/** Marks a file the way parsing a project whose .prettierrc was picked up marks it. */
+function withPrettierStyle(cu: JS.CompilationUnit, config: Record<string, unknown>, ignored = false): JS.CompilationUnit {
+    return {
+        ...cu,
+        markers: {...cu.markers, markers: [...cu.markers.markers, prettierStyle(randomId(), config, undefined, ignored)]}
+    };
+}
+
+function addImportUnderPrettier(config: Record<string, unknown>, module: string, member: string): JavaScriptVisitor<any> {
+    const addImport = new AddImport({module, member, onlyIfReferenced: false});
+    return new class extends JavaScriptVisitor<any> {
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+            return await addImport.visit(withPrettierStyle(cu, config), p);
+        }
+    };
+}
+
 describe('AddImport visitor', () => {
     describe('named imports', () => {
         test('should add named import when referenced', async () => {
@@ -378,6 +395,31 @@ describe('AddImport visitor', () => {
             expect(() => {
                 new AddImport({ module: "react", member: "default" });
             }).toThrow("When member is 'default', the alias parameter is required");
+        });
+
+        test('a pinned alias gets a default import of its own beside the one already there', async () => {
+            // The alias is taken verbatim, so the default import already there does not answer the
+            // request; two statements binding the same export are legal.
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({
+                module: 'react',
+                member: 'default',
+                alias: 'R',
+                onlyIfReferenced: false
+            }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import React from 'react';
+                    `,
+                    `
+                        import React from 'react';
+                        import R from 'react';
+                    `
+                )
+            );
         });
     });
 
@@ -639,6 +681,23 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('binds the name it was given even where an alias already imports that member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile as rf} from 'fs';
+                    `,
+                    `
+                        import {readFile, readFile as rf} from 'fs';
+                    `
+                )
+            );
+        });
     });
 
     describe('CommonJS require detection', () => {
@@ -691,6 +750,45 @@ describe('AddImport visitor', () => {
                         function example() {
                             read('test.txt', (err, data) => {});
                         }
+                    `
+                )
+            );
+        });
+
+        test('a CommonJS file gains no import, unlike one that merely requires alongside its imports', async () => {
+            const addReadFile = () => fromVisitor(
+                new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            const commonJs = new RecipeSpec();
+            commonJs.recipe = addReadFile();
+            //language=javascript
+            await commonJs.rewriteRun(
+                javascript(
+                    `
+                        const other = require('other');
+
+                        readFile('test.txt');
+                    `
+                )
+            );
+
+            // The require is the file's only binding of `fs`, so the style it suggests is CommonJS;
+            // the file is an ES module all the same, and that is what decides.
+            const mixed = new RecipeSpec();
+            mixed.recipe = addReadFile();
+            //language=typescript
+            await mixed.rewriteRun(
+                typescript(
+                    `
+                        import path from 'path';
+
+                        const fs = require('fs');
+                    `,
+                    `
+                        import path from 'path';
+                        import {readFile} from 'fs';
+
+                        const fs = require('fs');
                     `
                 )
             );
@@ -1318,6 +1416,22 @@ describe('AddImport visitor', () => {
                 new AddImport({ module: "react", sideEffectOnly: true, onlyIfReferenced: true });
             }).toThrow("Cannot combine sideEffectOnly with onlyIfReferenced");
         });
+
+        test('a file that binds its modules with require gains no side-effect import', async () => {
+            // A side-effect import binds no name, but `import` still makes the file an ES module,
+            // where its own `require` calls do not resolve.
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'core-js/stable', sideEffectOnly: true}));
+
+            //language=javascript
+            await spec.rewriteRun(
+                javascript(
+                    `
+                        const other = require('other');
+                    `
+                )
+            );
+        });
     });
 
     describe('namespace imports', () => {
@@ -1451,6 +1565,26 @@ describe('AddImport visitor', () => {
                         function example() {
                             const bytes = crypto.randomBytes(16);
                         }
+                    `
+                )
+            );
+        });
+
+        test('a namespace import does not answer a request for a named member', async () => {
+            // The namespace object binds no member name of its own, and one clause holds either
+            // `* as fs` or `{readFile}`, never both, so the named binding needs its own statement.
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as fs from 'fs';
+                    `,
+                    `
+                        import * as fs from 'fs';
+                        import {readFile} from 'fs';
                     `
                 )
             );
@@ -1849,6 +1983,67 @@ describe('AddImport visitor', () => {
                         import { readFile } from 'fs';
 
                         const x = 1;
+                    `
+                )
+            );
+        });
+
+        test('a Prettier configuration outranks the brace spacing the file itself writes', async () => {
+            const spec = new RecipeSpec();
+            // The configuration names no `bracketSpacing`, so Prettier's own default of `true` holds
+            spec.recipe = fromVisitor(addImportUnderPrettier({singleQuote: true}, 'lib2', 'New'));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {Old} from 'lib';
+                    `,
+                    `
+                        import {Old} from 'lib';
+                        import { New } from 'lib2';
+                    `
+                )
+            );
+        });
+
+        test('a Prettier configuration outranks an explicitly requested quote', async () => {
+            const spec = new RecipeSpec();
+            const addImport = new AddImport({module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false});
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    return await addImport.visit(withPrettierStyle(cu, {singleQuote: true}), p);
+                }
+            });
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const x = 1;
+                    `,
+                    `
+                        import { readFile } from 'fs';
+
+                        const x = 1;
+                    `
+                )
+            );
+        });
+
+        test('a merged import Prettier can no longer fit on one line wraps', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(addImportUnderPrettier(
+                {printWidth: 80, singleQuote: true}, '@scope/a-long-module', 'SomethingWithAnEvenLongerName'));
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import { AlphaComponent } from '@scope/a-long-module';
+                    `,
+                    `
+                        import {
+                          AlphaComponent,
+                          SomethingWithAnEvenLongerName,
+                        } from '@scope/a-long-module';
                     `
                 )
             );
@@ -2318,40 +2513,9 @@ describe('AddImport visitor', () => {
             );
         });
 
-        /** Stands in for a project whose .prettierrc was picked up at parse time. */
-        function createAddImportWithPrettierStyleVisitor(singleQuote: boolean): JavaScriptVisitor<any> {
-            return new class extends JavaScriptVisitor<any> {
-                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    const namedStyles: NamedStyles = {
-                        kind: MarkersKind.NamedStyles,
-                        id: randomId(),
-                        name: "test-prettier",
-                        displayName: "Test Prettier",
-                        tags: [],
-                        styles: [prettierStyle(randomId(), {singleQuote})]
-                    };
-
-                    let result: JS.CompilationUnit = {
-                        ...cu,
-                        markers: {
-                            ...cu.markers,
-                            markers: [...cu.markers.markers, namedStyles]
-                        }
-                    };
-
-                    const addImport = new AddImport({
-                        module: 'fs',
-                        member: 'readFile',
-                        onlyIfReferenced: false
-                    });
-                    return await addImport.visit(result, p) as JS.CompilationUnit;
-                }
-            };
-        }
-
         test('honors a PrettierStyle marker with singleQuote disabled', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(createAddImportWithPrettierStyleVisitor(false));
+            spec.recipe = fromVisitor(addImportUnderPrettier({singleQuote: false}, 'fs', 'readFile'));
 
             await spec.rewriteRun(
                 typescript(
@@ -2359,7 +2523,7 @@ describe('AddImport visitor', () => {
                         const x = 1;
                     `,
                     `
-                        import {readFile} from "fs";
+                        import { readFile } from "fs";
 
                         const x = 1;
                     `
@@ -2369,7 +2533,7 @@ describe('AddImport visitor', () => {
 
         test('a PrettierStyle marker outranks the dominant string literal quote', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = fromVisitor(createAddImportWithPrettierStyleVisitor(true));
+            spec.recipe = fromVisitor(addImportUnderPrettier({singleQuote: true}, 'fs', 'readFile'));
 
             await spec.rewriteRun(
                 typescript(
@@ -2378,7 +2542,7 @@ describe('AddImport visitor', () => {
                         const b = "two";
                     `,
                     `
-                        import {readFile} from 'fs';
+                        import { readFile } from 'fs';
 
                         const a = "one";
                         const b = "two";
@@ -2535,23 +2699,11 @@ describe('AddImport visitor', () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    const namedStyles: NamedStyles = {
-                        kind: MarkersKind.NamedStyles,
-                        id: randomId(),
-                        name: "test-prettier",
-                        displayName: "Test Prettier",
-                        tags: [],
-                        styles: [prettierStyle(randomId(), {singleQuote: true}, undefined, true)]
-                    };
-                    const marked: JS.CompilationUnit = {
-                        ...cu,
-                        markers: {...cu.markers, markers: [...cu.markers.markers, namedStyles]}
-                    };
                     return await new AddImport({
                         module: 'fs',
                         member: 'readFile',
                         onlyIfReferenced: false
-                    }).visit(marked, p);
+                    }).visit(withPrettierStyle(cu, {singleQuote: true}, true), p);
                 }
             }());
 
@@ -2855,13 +3007,13 @@ describe('AddImport visitor', () => {
             expect(bound.name).toBe('readFile');
         });
 
-        test('a binding renamed where it is declared does not answer a request that named no preference', async () => {
+        test('a binding renamed where it is declared answers a request that named no preference', async () => {
             const spec = new RecipeSpec();
             const bound: string[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    bound.push(maybeAddImport(this, {module: 'react', member: 'useState', onlyIfReferenced: false}));
-                    bound.push(maybeAddImport(this, {module: 'fs/promises', member: 'writeFile', onlyIfReferenced: false}));
+                    bound.push(maybeAddImport(this, {module: 'react', member: 'useState', onlyIfReferenced: false})!);
+                    bound.push(maybeAddImport(this, {module: 'fs/promises', member: 'writeFile', onlyIfReferenced: false})!);
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -2874,19 +3026,11 @@ describe('AddImport visitor', () => {
 
                         useS(0);
                         wf('x');
-                    `,
-                    `
-                        import {useState as useS, useState} from 'react';
-                        import {writeFile} from 'fs/promises';
-                        const {writeFile: wf} = require('fs/promises');
-
-                        useS(0);
-                        wf('x');
                     `
                 )
             );
 
-            expect(bound).toEqual(['useState', 'writeFile']);
+            expect(bound).toEqual(['useS', 'wf']);
         });
 
         test('a namespace or type declaration shadows an import just as a value declaration does', async () => {
@@ -2894,8 +3038,8 @@ describe('AddImport visitor', () => {
             const bound: string[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    bound.push(maybeAddImport(this, {module: 'm', member: 'join', onlyIfReferenced: false}));
-                    bound.push(maybeAddImport(this, {module: 'n', member: 'shape', onlyIfReferenced: false}));
+                    bound.push(maybeAddImport(this, {module: 'm', member: 'join', onlyIfReferenced: false})!);
+                    bound.push(maybeAddImport(this, {module: 'n', member: 'shape', onlyIfReferenced: false})!);
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -2925,11 +3069,11 @@ describe('AddImport visitor', () => {
             const preferred: string[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false}));
-                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false}));
+                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false})!);
+                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false})!);
 
-                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Theming', onlyIfReferenced: false}));
-                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Th', onlyIfReferenced: false}));
+                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Theming', onlyIfReferenced: false})!);
+                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Th', onlyIfReferenced: false})!);
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -2954,7 +3098,7 @@ describe('AddImport visitor', () => {
 
         test('a name bound through any binding pattern is occupied without answering for the module', async () => {
             const spec = new RecipeSpec();
-            const bound: string[] = [];
+            const bound: (string | undefined)[] = [];
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
                     bound.push(maybeAddImport(this, {module: 'm', member: 'b', onlyIfReferenced: false}));
@@ -2967,7 +3111,7 @@ describe('AddImport visitor', () => {
             await spec.rewriteRun(
                 typescript(
                     `
-                        const {a: {b}} = require('other');
+                        const {a: {b}} = getOther();
                         const [e] = window;
 
                         b();
@@ -2977,7 +3121,7 @@ describe('AddImport visitor', () => {
                         import z from 'other';
                         import e_1 from 'p';
 
-                        const {a: {b}} = require('other');
+                        const {a: {b}} = getOther();
                         const [e] = window;
 
                         b();
@@ -3020,7 +3164,7 @@ describe('AddImport visitor', () => {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                     if ((method.name as J.Identifier)?.simpleName === 'anchor') {
                         bound.push(maybeAddImport(this,
-                            {module: `m${bound.length}`, member: 'merge', onlyIfReferenced: false}));
+                            {module: `m${bound.length}`, member: 'merge', onlyIfReferenced: false})!);
                     }
                     return super.visitMethodInvocation(method, p);
                 }
@@ -3084,7 +3228,7 @@ describe('AddImport visitor', () => {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                     if ((method.name as J.Identifier)?.simpleName === 'anchor') {
                         bound.push(maybeAddImport(this,
-                            {module: 'sap/base/util/merge', member: 'merge', onlyIfReferenced: false}));
+                            {module: 'sap/base/util/merge', member: 'merge', onlyIfReferenced: false})!);
                     }
                     return super.visitMethodInvocation(method, p);
                 }

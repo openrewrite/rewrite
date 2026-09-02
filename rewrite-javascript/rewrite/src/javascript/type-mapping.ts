@@ -21,6 +21,20 @@ import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
 import {declarationsOf, declaredNameOf, fullyQualifiedNameOf, signatureKeyOf, typeAtLocation, valueDeclarationOf} from "./ts7/checker";
 import {isScanned} from "./token-navigation";
 
+/**
+ * TypeScript orders union constituents by internal type id, which varies with what the checker resolved
+ * earlier in the run; ordering by signature keeps a union's signature the same across parses. Intersections
+ * keep the order they were written in and are left alone. Call once `bounds` is attached to its owner, so
+ * a constituent that reaches back into it reads the whole constituent list rather than an empty one.
+ */
+function sortBySignature(bounds: Type[]): void {
+    const keys = new Map<Type, string>(bounds.map(b => [b, Type.signature(b)]));
+    bounds.sort((a, b) => {
+        const ka = keys.get(a)!, kb = keys.get(b)!;
+        return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+}
+
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
     // TypeScript assigns stable IDs to all types, so we don't need secondary caches
@@ -1607,6 +1621,7 @@ export class JavaScriptTypeMapping {
 
         // Update the bounds in the union we created
         (union as any).bounds = bounds;
+        sortBySignature(bounds);
 
         return union;
     }

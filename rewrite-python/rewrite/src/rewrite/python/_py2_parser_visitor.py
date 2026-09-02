@@ -62,6 +62,27 @@ class Py2ParserVisitor:
         else:
             self._bom_marked = False
 
+        # Peel a leading ``#!`` line off before parso sees it, so it becomes a
+        # first-class Shebang statement rather than folding into the first leaf's
+        # prefix as a comment (mirrors the Python 3 parser). The terminating
+        # newline is kept as the node's ``after`` padding; the remainder is parsed
+        # normally so any following blank lines stay with the next statement.
+        self._shebang_text: Optional[str] = None
+        self._shebang_after: str = ''
+        if source.startswith('#!'):
+            line_end = len(source)
+            for idx, ch in enumerate(source):
+                if ch in ('\n', '\r'):
+                    line_end = idx
+                    break
+            self._shebang_text = source[:line_end]
+            if line_end < len(source) and source[line_end] == '\r' and \
+                    line_end + 1 < len(source) and source[line_end + 1] == '\n':
+                self._shebang_after = '\r\n'
+            elif line_end < len(source):
+                self._shebang_after = source[line_end]
+            source = source[line_end + len(self._shebang_after):]
+
         self._source_without_bom = source
 
         # Parse with parso
@@ -78,6 +99,12 @@ class Py2ParserVisitor:
         """
         # Convert parso tree to LST statements
         statements, end_ws = self._convert_module(self._tree)
+
+        # Prepend the peeled shebang as the first statement.
+        if self._shebang_text is not None:
+            shebang = py.Shebang(random_id(), Space.EMPTY, Markers.EMPTY, self._shebang_text)
+            after = Space([], self._shebang_after) if self._shebang_after else Space.EMPTY
+            statements.insert(0, JRightPadded(shebang, after, Markers.EMPTY))
 
         # Combine block end-whitespace (from trailing ``;`` lines) with
         # the file's terminal whitespace recovered from the endmarker.
@@ -114,7 +141,7 @@ class Py2ParserVisitor:
         trailing ``;`` line).
         """
         statements, end_ws = self._convert_stmt_block_children(module.children)
-        if not statements:
+        if not statements and self._shebang_text is None:
             statements.append(JRightPadded(
                 j.Empty(random_id(), Space.EMPTY, Markers.EMPTY),
                 Space.EMPTY,

@@ -15,37 +15,7 @@
  */
 import {J, Type} from '../../java';
 import {JavaScriptVisitor} from '../visitor';
-import {Cursor} from '../../tree';
-import {ModuleBinding} from './types';
-
-/**
- * Whether the template's dependencies bring a workspace that could resolve `module`.
- */
-export function isResolvable(module: string, dependencies: Record<string, string>): boolean {
-    const segments = module.split('/');
-    const pkg = module.startsWith('@') ? segments.slice(0, 2).join('/') : segments[0];
-    return Object.prototype.hasOwnProperty.call(dependencies, pkg);
-}
-
-/**
- * What a declared binding's name is parsed against, ahead of the template and so out of its output.
- * An import is what carries attribution, and costs a module resolution to get it; a declaration
- * names the binding for a module no workspace could have resolved anyway.
- */
-export function bindingContextStatement(name: string, binding: ModuleBinding, dependencies: Record<string, string>): string {
-    if (!isResolvable(binding.module, dependencies)) {
-        return binding.typeOnly ? `type ${name} = any;` : `declare const ${name}: any;`;
-    }
-    const type = binding.typeOnly ? 'type ' : '';
-    if (binding.member === '*') {
-        return `import ${type}* as ${name} from '${binding.module}';`;
-    }
-    if (binding.member === undefined || binding.member === 'default') {
-        return `import ${type}${name} from '${binding.module}';`;
-    }
-    const specifier = binding.member === name ? name : `${binding.member} as ${name}`;
-    return `import ${type}{${specifier}} from '${binding.module}';`;
-}
+import {isValueReference} from '../scope';
 
 /**
  * Renames the identifiers a template uses for its declared bindings to the names the file
@@ -73,33 +43,10 @@ class RenameBindingsVisitor extends JavaScriptVisitor<undefined> {
         const resolved = resolvedModule(identifier);
         const refersToBinding = resolved !== undefined
             ? resolved === this.modules[identifier.simpleName]
-            : !namesItsParent(this.cursor, identifier);
+            : isValueReference(this.cursor, identifier);
 
         return refersToBinding ? {...identifier, simpleName: renamed} as J.Identifier : identifier;
     }
-}
-
-/** Whether the parent is naming this identifier — as a property, a method, a declaration — rather than referencing it. */
-function namesItsParent(cursor: Cursor, identifier: J.Identifier): boolean {
-    let c: Cursor | undefined = cursor.parent;
-    while (c && isPadding(c.value)) {
-        c = c.parent;
-    }
-    const parent = c?.value as { kind?: string; name?: unknown; select?: unknown } | undefined;
-
-    // A call names a member of whatever it selects from. With nothing selected there is no member,
-    // and its `name` is a reference to the function being called.
-    if (parent?.kind === J.Kind.MethodInvocation && !parent.select) {
-        return false;
-    }
-
-    const name = parent?.name;
-    return name === identifier || (name as { element?: unknown } | undefined)?.element === identifier;
-}
-
-function isPadding(value: unknown): boolean {
-    const kind = (value as { kind?: string } | undefined)?.kind;
-    return kind === J.Kind.RightPadded || kind === J.Kind.LeftPadded || kind === J.Kind.Container;
 }
 
 /** The module an identifier's attribution traces back to, following the owning-class chain to its root. */

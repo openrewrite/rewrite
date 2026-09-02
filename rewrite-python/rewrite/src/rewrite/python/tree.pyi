@@ -2,12 +2,12 @@
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar, List, Optional, Dict, Tuple
 from typing_extensions import Self
 from uuid import UUID
 import weakref
 
-from rewrite.utils import replace_if_changed
+from rewrite.utils import replace_if_changed, T
 from enum import Enum
 from pathlib import Path
 from rewrite import Checksum, FileAttributes, SourceFile, TreeVisitor, Markers, Cursor, PrinterFactory
@@ -29,6 +29,24 @@ class Async(Py, Statement):
     def markers(self) -> Markers: ...
     @property
     def statement(self) -> Statement: ...
+
+    def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
+
+@dataclass(frozen=True)
+class Shebang(Py, Statement):
+    _id: UUID
+    _prefix: Space
+    _markers: Markers
+    _text: str
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def prefix(self) -> Space: ...
+    @property
+    def markers(self) -> Markers: ...
+    @property
+    def text(self) -> str: ...
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
 
@@ -266,12 +284,14 @@ class ExpressionStatement(Py, Expression, Statement):
     _id: UUID
     _expression: Expression
 
-    def replace(self, **kwargs: Any) -> Self: ...
+    def replace(self, **kwargs: Any) -> 'ExpressionStatement': ...
 
     @property
     def prefix(self) -> Space: ...
     @property
     def markers(self) -> Markers: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
     @property
     def expression(self) -> Expression: ...
 

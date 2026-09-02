@@ -164,6 +164,22 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_only_if_referenced_finds_a_reference_inside_a_string_annotation(self, arm):
+        """A compound forward reference names the symbol, so it is a reference."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'typing', 'Any', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                m: "Dict[Any, Any]" = {}
+                """,
+                """
+                from typing import Any
+                m: "Dict[Any, Any]" = {}
+                """,
+            )
+        )
+
     def test_only_if_referenced_finds_a_reference_in_a_comprehension(self, arm):
         """The only reference is inside a comprehension, a Python-specific node."""
         spec = RecipeSpec(recipe=from_visitor(

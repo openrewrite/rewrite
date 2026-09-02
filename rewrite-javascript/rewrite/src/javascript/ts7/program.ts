@@ -16,6 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {API, type Project, type Snapshot} from "typescript/unstable/sync";
+import type {SourceFile} from "typescript/unstable/ast";
 import type {FileSystem} from "typescript/unstable/fs";
 import {memoizing} from "./checker";
 
@@ -24,8 +25,15 @@ import {memoizing} from "./checker";
 // filesystem callbacks, and returning undefined defers to the real filesystem for node_modules and
 // the bundled lib files, which the server then resolves against on its own.
 
+/** One program within a parse: the files it is rooted at, and the options they compile under. */
+export interface ProjectRequest {
+    readonly key: string;
+    readonly options: Record<string, unknown>;
+    readonly rootFiles: readonly string[];
+}
+
 export interface ParseSession {
-    readonly project: Project;
+    projectFor(key: string): Project;
 
     close(): void;
 }
@@ -39,75 +47,107 @@ export class Compiler {
     private readonly files = new Map<string, string>();
     private api: API | undefined;
     private snapshot: Snapshot | undefined;
-    private openConfig: string | undefined;
+    private openConfigs: string[] = [];
     private projectCount = 0;
 
     constructor(private readonly root: string) {
     }
 
     /**
-     * Opens a project over `sources`, which are keyed by absolute path and exist only in memory.
-     * `compilerOptions` is written into the tsconfig the compiler reads.
+     * Opens one project per entry in `projects` over `sources`, which are keyed by absolute path
+     * and exist only in memory. Each project's `options` are written into the tsconfig the compiler
+     * reads for it.
      */
-    open(
-        sources: ReadonlyMap<string, string>,
-        compilerOptions: Record<string, unknown>,
-        rootFiles?: readonly string[],
-    ): ParseSession {
+    open(sources: ReadonlyMap<string, string>, projects: readonly ProjectRequest[]): ParseSession {
+        // The compiler is reached over a protocol that cannot carry a lone surrogate.
+        const restore = new Set<string>();
         for (const [file, text] of sources) {
-            this.files.set(file, text);
+            const carriable = wellFormed(text);
+            this.files.set(file, carriable);
+            // A byte order mark is dropped from the text the compiler reports while its node
+            // positions go on counting it, so those files are given their own text back as well.
+            if (carriable !== text || text.charCodeAt(0) === BYTE_ORDER_MARK) {
+                restore.add(file);
+            }
         }
-        // Each batch gets its own config, so the compiler reads a fresh one rather than being told
-        // that a file it has already parsed now says something else.
-        const configPath = path.join(this.root, `tsconfig.${this.projectCount++}.json`);
-        // The program is rooted at the files it was given. A glob would take in everything under
-        // `root`, which for a parse rooted at a project directory is the whole project.
-        const roots = rootFiles ?? [...sources.keys()];
-        this.files.set(configPath, JSON.stringify(roots.length > 0
-            ? {compilerOptions, files: roots}
-            : {compilerOptions, include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]}));
 
-        const api = this.api ??= new API({cwd: this.root, fs: this.fileSystem()});
-        const previous = {snapshot: this.snapshot, config: this.openConfig};
+        const configOf = new Map<string, string>();
+        for (const {key, options, rootFiles} of projects) {
+            // Each batch gets its own config, so the compiler reads a fresh one rather than being
+            // told that a file it has already parsed now says something else.
+            const configPath = path.join(this.root, `tsconfig.${this.projectCount++}.json`);
+            configOf.set(key, configPath);
+            // The program is rooted at the files it was given. A glob would take in everything
+            // under `root`, which for a parse rooted at a project directory is the whole project.
+            this.files.set(configPath, JSON.stringify(rootFiles.length > 0
+                ? {compilerOptions: options, files: rootFiles}
+                : {compilerOptions: options, include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]}));
+        }
+        const configPaths = [...configOf.values()];
+
+        const api = this.compilerApi();
+        const previous = {snapshot: this.snapshot, configs: this.openConfigs};
         // A path parsed before may carry different text now, and the compiler holds what it read
         // last, so every source is announced as changed rather than left to look unchanged.
-        const changed = [...sources.keys(), configPath];
+        const changed = [...sources.keys(), ...configPaths];
         this.snapshot = api.updateSnapshot({
-            openProjects: [configPath],
-            ...(previous.config ? {closeProjects: [previous.config]} : {}),
+            openProjects: configPaths,
+            ...(previous.configs.length > 0 ? {closeProjects: previous.configs} : {}),
             fileChanges: {changed},
         });
-        this.openConfig = configPath;
+        this.openConfigs = configPaths;
         previous.snapshot?.dispose();
+        const snapshot = this.snapshot;
 
-        const project = this.snapshot.getProjects().find(p => p.configFileName === configPath)
-            ?? this.snapshot.getProjects()[0];
-        if (!project) {
-            throw new Error(`TypeScript did not open a project at ${configPath}`);
-        }
-        const checker = memoizing(project.checker);
-        const remembering = new Proxy(project, {
-            get: (target, property: string, receiver) =>
-                property === "checker" ? checker : Reflect.get(target, property, receiver),
-        });
-        return {project: remembering, close: () => this.forget(sources.keys(), configPath)};
+        const opened = new Map<string, Project>();
+        return {
+            projectFor: key => {
+                let project = opened.get(key);
+                if (!project) {
+                    const configPath = configOf.get(key);
+                    const found = configPath === undefined ? undefined : snapshot.getProject(configPath);
+                    if (!found) {
+                        throw new Error(`TypeScript did not open a project at ${configPath ?? key}`);
+                    }
+                    restoreInputText(found, sources, restore);
+                    const checker = memoizing(found.checker);
+                    opened.set(key, project = new Proxy(found, {
+                        get: (target, property: string, receiver) =>
+                            property === "checker" ? checker : Reflect.get(target, property, receiver),
+                    }));
+                }
+                return project;
+            },
+            close: () => this.forget(sources.keys(), configPaths),
+        };
+    }
+
+    /** The project options `configFilePath` states, with `extends` resolved, as tsconfig JSON names. */
+    parseConfigFile(configFilePath: string): Record<string, unknown> {
+        return this.compilerApi().parseConfigFile(configFilePath).options;
     }
 
     /** Shuts the compiler down. A later `open` starts a new one. */
     close(): void {
         this.snapshot?.dispose();
         this.snapshot = undefined;
-        this.openConfig = undefined;
+        this.openConfigs = [];
         this.api?.close();
         this.api = undefined;
         this.files.clear();
     }
 
-    private forget(sources: Iterable<string>, configPath: string): void {
+    private compilerApi(): API {
+        return this.api ??= new API({cwd: this.root, fs: this.fileSystem()});
+    }
+
+    private forget(sources: Iterable<string>, configPaths: Iterable<string>): void {
         for (const file of sources) {
             this.files.delete(file);
         }
-        this.files.delete(configPath);
+        for (const configPath of configPaths) {
+            this.files.delete(configPath);
+        }
     }
 
     private fileSystem(): FileSystem {
@@ -162,14 +202,38 @@ export class Compiler {
     }
 }
 
-/** Opens a project for a single use, shutting the compiler down with it. */
+const BYTE_ORDER_MARK = 0xFEFF;
+
+/**
+ * `text` with each unpaired surrogate replaced by U+FFFD, one character for one so that offsets
+ * are unmoved. The methods that do it postdate the `lib` this project compiles against.
+ */
+function wellFormed(text: string): string {
+    const string = text as unknown as { isWellFormed(): boolean, toWellFormed(): string };
+    return string.isWellFormed() ? text : string.toWellFormed();
+}
+
+/** Puts a file's own text on its {@link SourceFile}, in place of what the compiler read. */
+function restoreInputText(project: Project, sources: ReadonlyMap<string, string>,
+                          restore: ReadonlySet<string>): void {
+    for (const rootFile of project.rootFiles) {
+        const text = restore.has(rootFile) ? sources.get(rootFile) : undefined;
+        if (text !== undefined) {
+            Object.defineProperty(project.program.getSourceFile(rootFile), "text",
+                {value: text, configurable: true});
+        }
+    }
+}
+
+/** Opens a single project for a single use, shutting the compiler down with it. */
 export function openSession(
     root: string,
     sources: ReadonlyMap<string, string>,
     compilerOptions: Record<string, unknown>,
     rootFiles?: readonly string[],
-): ParseSession {
+): {project: Project, close(): void} {
     const compiler = new Compiler(root);
-    const session = compiler.open(sources, compilerOptions, rootFiles);
-    return {project: session.project, close: () => compiler.close()};
+    const key = "";
+    const session = compiler.open(sources, [{key, options: compilerOptions, rootFiles: rootFiles ?? [...sources.keys()]}]);
+    return {project: session.projectFor(key), close: () => compiler.close()};
 }

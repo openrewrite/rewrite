@@ -78,6 +78,12 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitShebang(Py.Shebang shebang, RpcSendQueue q) {
+        q.getAndSend(shebang, Py.Shebang::getText);
+        return shebang;
+    }
+
+    @Override
     public J visitAwait(Py.Await await, RpcSendQueue q) {
         q.getAndSend(await, Py.Await::getExpression, el -> visit(el, q));
         q.getAndSend(await, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));

@@ -88,12 +88,16 @@ export function valueDeclarationOf(symbol: Symbol7): Node | undefined {
     return symbol.valueDeclaration?.resolve();
 }
 
+/** The compiler's own name for the scope a `declare global` block augments. */
+const GLOBAL_SCOPE = "__global";
+
 /** The dotted chain of symbol names from `symbol` up to the outermost symbol enclosing it. */
 export function fullyQualifiedNameOf(symbol: Symbol7): string {
     const parts: string[] = [];
     let current: Symbol7 | undefined = symbol;
     while (current) {
-        parts.unshift(declaredNameOf(current));
+        const name = declaredNameOf(current);
+        parts.unshift(name === GLOBAL_SCOPE ? "global" : name);
         current = current.getParent();
     }
     return parts.join(".");

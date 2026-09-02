@@ -16,26 +16,73 @@
 import {Cursor, isTree} from "../tree";
 import {J} from "../java";
 import {JS} from "./tree";
+// scope.ts sits below the visitor, so this stays type-only.
+import type {JavaScriptVisitor} from "./visitor";
 
-/** The names code at some position can reach unqualified. */
+const noNames: ReadonlySet<string> = new Set();
+
+/** One scope: the names it binds itself, the scopes around it, and what they answer together. */
 export interface Scope {
+    /** The names this scope binds itself, which is not what it reaches: for that, ask `declares`. */
+    names(): ReadonlySet<string>;
+
+    /**
+     * Visits this scope and then each one enclosing it, innermost first, stopping where `visit`
+     * returns false. Builds a scope per step, so `declares` is the cheaper way to ask about a
+     * name already in hand.
+     */
+    walk(visit: (scope: Scope) => boolean): void;
+
     /** Whether this scope or one enclosing it binds `name`. */
     declares(name: string): boolean;
 
-    names(): ReadonlySet<string>;
+    /**
+     * The node owning the innermost scope that binds `name` — the compilation unit for a
+     * module-scope binding, otherwise the function, block or loop holding it — or undefined where
+     * nothing in scope does. A caller holding a declaration asks whether this is the node it came
+     * from: anything nearer shadows it.
+     */
+    declaringScope(name: string): J | undefined;
 }
 
 /**
- * What the code at `cursor` can name: what every enclosing scope binds, plus the declarations that
- * hoist into those scopes from blocks that do not enclose it. Where a declaration's shape leaves its
- * reach unreadable the answer counts it rather than miss it, so a name reported here may not truly
- * reach the cursor.
+ * The innermost scope holding `cursor`, which a visitor's own cursor rarely is: it stands on
+ * whatever node it is visiting. Where a declaration's shape leaves its reach unreadable the answer
+ * counts it rather than miss it, so a name reported here may not truly reach the cursor.
  */
 export function scopeOf(cursor: Cursor): Scope {
-    let resolved: Set<string> | undefined;
-    const names = () => resolved ??= namesInScope(cursor);
-    return {declares: name => names().has(name), names};
+    return scopeAt(enclosingScopeCursor(cursor) ?? cursor);
 }
+
+function scopeAt(cursor: Cursor): Scope {
+    return {
+        names: () => frameBindings(cursor.value, cursor.parent?.value),
+        walk: visit => {
+            for (let c: Cursor | undefined = cursor; c; c = enclosingScopeCursor(c.parent)) {
+                if (!visit(scopeAt(c))) {
+                    return;
+                }
+            }
+        },
+        declares: name => declaringScopeOf(cursor, name) !== undefined,
+        declaringScope: name => declaringScopeOf(cursor, name)
+    };
+}
+
+function enclosingScopeCursor(from: Cursor | undefined): Cursor | undefined {
+    for (let c = from; c; c = c.parent) {
+        if (scopeKinds.has((c.value as { kind?: string } | undefined)?.kind!)) {
+            return c;
+        }
+    }
+    return undefined;
+}
+
+/** The nodes {@link readBindings} answers for; everything else binds nothing and is not a scope. */
+const scopeKinds = new Set<string>([
+    JS.Kind.CompilationUnit, J.Kind.Block, J.Kind.MethodDeclaration, J.Kind.Lambda,
+    J.Kind.ClassDeclaration, J.Kind.TryCatch, J.Kind.ForLoop, J.Kind.ForEachLoop, JS.Kind.ForInLoop
+]);
 
 /**
  * Every name the file declares, wherever it sits. A binding the whole file shares is referenced from
@@ -43,7 +90,43 @@ export function scopeOf(cursor: Cursor): Scope {
  * shadow it at one of them.
  */
 export function namesDeclaredIn(cu: JS.CompilationUnit): ReadonlySet<string> {
-    const cached = declared.get(cu);
+    return namesDeclaredWithin(cu);
+}
+
+/**
+ * Every name the file spells, declared or not — what a name has to be absent from to be free. An
+ * ambient global is spelled and declared nowhere, and binding over one would capture its uses.
+ */
+export function namesUsedIn(cu: JS.CompilationUnit): ReadonlySet<string> {
+    return namesUsedWithin(cu);
+}
+
+/** As {@link namesUsedIn}, over one subtree, for a name that only has to be free across that much. */
+export function namesUsedWithin(node: unknown, cacheKey: object = node as object): ReadonlySet<string> {
+    if (cacheKey === null || typeof cacheKey !== 'object') {
+        return noNames;
+    }
+    const cached = used.get(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    const names = new Set<string>();
+    walk(node, node => {
+        if (node.kind === J.Kind.Identifier) {
+            names.add((node as J.Identifier).simpleName);
+        }
+        return true;
+    });
+    used.set(cacheKey, names);
+    return names;
+}
+
+/** As {@link namesDeclaredIn}, over one subtree, for a binding shared across only that much of a file. */
+export function namesDeclaredWithin(node: unknown, cacheKey: object = node as object): ReadonlySet<string> {
+    if (cacheKey === null || typeof cacheKey !== 'object') {
+        return noNames;
+    }
+    const cached = declared.get(cacheKey);
     if (cached) {
         return cached;
     }
@@ -54,6 +137,8 @@ export function namesDeclaredIn(cu: JS.CompilationUnit): ReadonlySet<string> {
         if (node.kind !== J.Kind.ClassDeclaration) {
             return true;
         }
+        // The walk ends at this branch, so the class's own type parameters are read here.
+        typeParameterNames(node).forEach(name => names.add(name));
         // A member's name is not one the file binds, though the code inside one still declares names.
         for (const member of (node as J.ClassDeclaration).body?.statements ?? []) {
             const element = unwrap(member);
@@ -61,9 +146,9 @@ export function namesDeclaredIn(cu: JS.CompilationUnit): ReadonlySet<string> {
         }
         return false;
     };
-    walk(cu.statements, collect);
+    walk(node, collect);
 
-    declared.set(cu, names);
+    declared.set(cacheKey, names);
     return names;
 }
 
@@ -107,36 +192,56 @@ function unnamedMembers(bound: { name: string }[]): { name: string }[] {
     return bound.map(({name}) => ({name}));
 }
 
-function namesInScope(cursor: Cursor): Set<string> {
-    const names = new Set<string>();
+function declaringScopeOf(cursor: Cursor, name: string): J | undefined {
     for (let c: Cursor | undefined = cursor; c; c = c.parent) {
-        for (const name of frameBindings(c.value, c.parent?.value)) {
-            names.add(name);
+        if (frameBindings(c.value, c.parent?.value).has(name)) {
+            return c.value;
         }
+    }
+    return undefined;
+}
+
+/**
+ * What one node on the cursor path binds, `parent` being the node it hangs from. Only these two
+ * answers turn on the parent; a node alone settles the rest, which is what makes them cacheable.
+ */
+function frameBindings(node: any, parent: any): ReadonlySet<string> {
+    // A class body holds members, which are reached through an instance rather than by name.
+    if (node?.kind === J.Kind.Block && parent?.kind === J.Kind.ClassDeclaration) {
+        return noNames;
+    }
+    // A function expression is the only function whose own name its body reaches: a declaration's
+    // name belongs to the enclosing block, a method's to an instance.
+    if (node?.kind === J.Kind.MethodDeclaration && parent?.kind === JS.Kind.StatementExpression) {
+        const self = bindingNames((node as J.MethodDeclaration).name).map(bound => bound.name);
+        return new Set([...self, ...ownBindings(node)]);
+    }
+    return ownBindings(node);
+}
+
+function ownBindings(node: any): ReadonlySet<string> {
+    if (typeof node !== 'object' || node === null) {
+        return noNames;
+    }
+    let names = frames.get(node);
+    if (!names) {
+        frames.set(node, names = new Set(readBindings(node)));
     }
     return names;
 }
 
-/** What one node on the cursor path binds, `parent` being the node it hangs from. */
-function frameBindings(node: any, parent: any): string[] {
-    switch (node?.kind) {
+
+function readBindings(node: any): string[] {
+    switch (node.kind) {
         case JS.Kind.CompilationUnit: {
             const statements = (node as JS.CompilationUnit).statements;
             return [...declaredNames(statements), ...hoistedNames(statements)];
         }
         case J.Kind.Block:
-            // A class body holds members, which are reached through an instance rather than by name.
-            return parent?.kind === J.Kind.ClassDeclaration ? [] : declaredNames((node as J.Block).statements);
+            return blockScopedNames((node as J.Block).statements);
         case J.Kind.MethodDeclaration: {
             const method = node as J.MethodDeclaration;
-            // A function expression is the only function whose own name its body reaches: a
-            // declaration's name belongs to the enclosing block, a method's to an instance.
-            const self = parent?.kind === JS.Kind.StatementExpression ? bindingNames(method.name) : [];
-            return [
-                ...self.map(bound => bound.name),
-                ...declaredNames(method.parameters.elements),
-                ...hoistedNames(method.body)
-            ];
+            return [...declaredNames(method.parameters.elements), ...hoistedNames(method.body)];
         }
         case J.Kind.Lambda: {
             const lambda = node as J.Lambda;
@@ -155,6 +260,31 @@ function frameBindings(node: any, parent: any): string[] {
         default:
             return [];
     }
+}
+
+/**
+ * The names statements bind in the block holding them — the complement of what
+ * {@link hoistedNames} claims, so `function (x) { var x = 1; }` reads as one binding, not two.
+ */
+function blockScopedNames(statements: any[]): string[] {
+    return statements.flatMap(statement => {
+        const element = unwrap(statement);
+        switch (element?.kind) {
+            case J.Kind.MethodDeclaration:
+                return [];
+            case J.Kind.VariableDeclarations:
+            case JS.Kind.ScopedVariableDeclarations:
+                return isBlockScoped(element) ? declarationNames(element) : [];
+            case J.Kind.Case:
+                return blockScopedNames((element as J.Case).statements.elements);
+            default:
+                return declarationNames(element);
+        }
+    });
+}
+
+function isBlockScoped(declaration: any): boolean {
+    return ((declaration.modifiers ?? []) as J.Modifier[]).some(m => blockScoped.has(m.keyword!));
 }
 
 /** The names statements declare directly in the scope holding them. */
@@ -180,12 +310,28 @@ function declarationNames(statement: any): string[] {
             return bindingNames(unwrap((statement as JS.NamespaceDeclaration).name)).map(bound => bound.name);
         case JS.Kind.TypeDeclaration:
             return bindingNames(unwrap((statement as JS.TypeDeclaration).name)).map(bound => bound.name);
+        case J.Kind.TypeParameter:
+            // Reached by namesDeclaredWithin's walk, never through a statement list: a type
+            // parameter binds across the declaration carrying it, not in the scope that one sits in.
+            return bindingNames((statement as J.TypeParameter).name).map(bound => bound.name);
         case J.Kind.Case:
             // The cases of a switch share the block it opens, so each one's declarations bind in all.
             return declaredNames((statement as J.Case).statements.elements);
         default:
             return [];
     }
+}
+
+/**
+ * The names a declaration's type parameters bind. A class keeps them in a container and everything
+ * else in a `J.TypeParameters`, and both hold the same right-padded list.
+ */
+function typeParameterNames(node: any): string[] {
+    const held = node?.typeParameters;
+    const parameters = held?.kind === J.Kind.TypeParameters
+        ? (held as J.TypeParameters).typeParameters
+        : (held as J.Container<J.TypeParameter> | undefined)?.elements;
+    return (parameters ?? []).flatMap(parameter => declarationNames(unwrap(parameter)));
 }
 
 /** The names an import binds, which for an aliased or namespace specifier is the alias. */
@@ -217,10 +363,13 @@ function aliasedName(specifier: J | undefined): string[] {
 const blockScoped = new Set(['let', 'const', 'using']);
 
 // A walk of an immutable subtree has one answer, so it runs once. Keyed on the subtree itself, a
-// replaced one is walked afresh: every call site in a function asks what that body hoists, and every
-// import added to a file asks what that file declares.
+// replaced one is walked afresh: every call site in a function asks what that body hoists, every
+// import added to a file asks what that file declares, and every scope is asked what it binds by
+// each of the call sites it encloses.
 const hoisted = new WeakMap<object, string[]>();
-const declared = new WeakMap<JS.CompilationUnit, ReadonlySet<string>>();
+const declared = new WeakMap<object, ReadonlySet<string>>();
+const used = new WeakMap<object, ReadonlySet<string>>();
+const frames = new WeakMap<object, ReadonlySet<string>>();
 
 /**
  * The names blocks under `scope` hoist out to it. A `var` or function declaration reaches the whole
@@ -244,7 +393,7 @@ function hoistedNames(scope: any): string[] {
                 return false;
             case J.Kind.VariableDeclarations:
             case JS.Kind.ScopedVariableDeclarations:
-                if (!((node.modifiers ?? []) as J.Modifier[]).some(m => blockScoped.has(m.keyword!))) {
+                if (!isBlockScoped(node)) {
                     names.push(...declarationNames(node));
                 }
                 return false;
@@ -267,8 +416,13 @@ function hoistedNames(scope: any): string[] {
     return names;
 }
 
-/** Visits every LST node under `node`, leaving a subtree unvisited where `visit` returns false. */
-function walk(node: unknown, visit: (node: any) => boolean): void {
+/**
+ * Visits every LST node under `node`, leaving a subtree unvisited where `visit` returns false.
+ * `visit` sees nodes, never the padding holding them. Only what `isTree` accepts is descended
+ * into, which a `JavaType` is not, so the walk stays in the tree the source spells rather than
+ * entering the type graph — cyclic and shared, where it would not terminate.
+ */
+export function walk(node: unknown, visit: (node: any) => boolean): void {
     if (Array.isArray(node)) {
         node.forEach(child => walk(child, visit));
         return;
@@ -287,4 +441,77 @@ function walk(node: unknown, visit: (node: any) => boolean): void {
 /** The element a padding wrapper holds, or the node itself. */
 function unwrap(node: any): any {
     return node?.kind === J.Kind.RightPadded || node?.kind === J.Kind.LeftPadded ? unwrap(node.element) : node;
+}
+
+/** `cursor` is protected on `TreeVisitor` and these APIs are free functions, so reaching it takes a cast. */
+export function cursorOf(visitor: JavaScriptVisitor<any>): Cursor | undefined {
+    return (visitor as unknown as {cursor?: Cursor}).cursor;
+}
+
+/** The compilation unit a cursor sits in, or the one a visitor is currently positioned in. */
+export function compilationUnitOf(from: Cursor | JavaScriptVisitor<any>): JS.CompilationUnit | undefined {
+    const cursor = from instanceof Cursor ? from : cursorOf(from);
+    return cursor?.firstEnclosing((v): v is JS.CompilationUnit => v?.kind === JS.Kind.CompilationUnit);
+}
+
+/** `preferred`, or the first `preferred_N` that `isTaken` rejects, so a new name never shadows one in scope. */
+export function deconflict(preferred: string, isTaken: (name: string) => boolean): string {
+    if (!isTaken(preferred)) {
+        return preferred;
+    }
+    for (let suffix = 1; ; suffix++) {
+        const candidate = `${preferred}_${suffix}`;
+        if (!isTaken(candidate)) {
+            return candidate;
+        }
+    }
+}
+
+/**
+ * The `J.VariableDeclarations` a statement declares — itself for a bare `const x = …`, one per
+ * declarator for `const a = …, b = …`, which the parser wraps in a `JS.ScopedVariableDeclarations`
+ * instead.
+ */
+export function declarationsOf(statement: J | undefined): J.VariableDeclarations[] {
+    if (statement?.kind === J.Kind.VariableDeclarations) {
+        return [statement as J.VariableDeclarations];
+    }
+    if (statement?.kind === JS.Kind.ScopedVariableDeclarations) {
+        return (statement as JS.ScopedVariableDeclarations).variables
+            .map(v => v.element)
+            .filter((v): v is J.VariableDeclarations => v?.kind === J.Kind.VariableDeclarations);
+    }
+    return [];
+}
+
+/**
+ * Whether the identifier references a binding rather than naming one, which is what tells a rename
+ * which occurrences to follow. A name its parent introduces does not — a property, a method, a
+ * variable, a type parameter — nor one drawn from a namespace of its own: a statement label,
+ * declaring (`x:`) or referencing (`break x`), and a JSX attribute's prop. Position is all this
+ * reads: an import specifier's own name answers true, and a type position reads alike to a value.
+ */
+export function isValueReference(cursor: Cursor, identifier: J.Identifier): boolean {
+    let c: Cursor | undefined = cursor.parent;
+    while (c && isPadding(c.value)) {
+        c = c.parent;
+    }
+    const parent = c?.value as
+        { kind?: string; name?: unknown; key?: unknown; label?: unknown; select?: unknown } | undefined;
+
+    // A call names a member of whatever it selects from. With nothing selected there is no member,
+    // and its `name` is a reference to the function being called.
+    if (parent?.kind === J.Kind.MethodInvocation && !parent.select) {
+        return true;
+    }
+
+    // A JSX attribute keeps its prop name on `key`; the three label-bearing nodes keep theirs on
+    // `label`. Every other kind that names rather than references keeps it on `name`.
+    const named = parent?.kind === JS.Kind.JsxAttribute ? parent.key : (parent?.name ?? parent?.label);
+    return named !== identifier && (named as { element?: unknown } | undefined)?.element !== identifier;
+}
+
+function isPadding(value: unknown): boolean {
+    const kind = (value as { kind?: string } | undefined)?.kind;
+    return kind === J.Kind.RightPadded || kind === J.Kind.LeftPadded || kind === J.Kind.Container;
 }
