@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import weakref
 from dataclasses import dataclass, replace as dataclass_replace
-from rewrite.utils import replace_if_changed
+from rewrite.utils import replace_if_changed, T
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -18,6 +18,28 @@ from rewrite.java import (
     Block, Identifier, Import, TypeParameter,
 )
 from rewrite.python.support_types import Py, P
+
+
+def _replace_delegating(wrapper: T, wrapped_field: str, delegated: Tuple[str, ...],
+                        kwargs: Dict[str, Any]) -> T:
+    """Route writes to `delegated` onto the node `wrapper` holds in `wrapped_field`.
+
+    A wrapper reading those properties off the node it wraps owns no field to write,
+    so `replace(_prefix=...)` has to reach through.
+    """
+    inner: Dict[str, Any] = {}
+    for name in delegated:
+        for key in (name, '_' + name):
+            if key in kwargs:
+                inner['_' + name] = kwargs.pop(key)
+    if inner:
+        wrapped = getattr(wrapper, wrapped_field)
+        for key in (wrapped_field[1:], wrapped_field):
+            if key in kwargs:
+                wrapped = kwargs.pop(key)
+        kwargs[wrapped_field] = wrapped.replace(**inner)
+    return replace_if_changed(wrapper, **kwargs)
+
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @dataclass(frozen=True, eq=False, slots=True)
@@ -528,12 +550,19 @@ class ExpressionStatement(Py, Expression, Statement):
     def markers(self) -> Markers:
         return self._expression.markers
 
+    @property
+    def type(self) -> Optional[JavaType]:
+        return self._expression.type
+
     _expression: Expression
 
     @property
     def expression(self) -> Expression:
         return self._expression
 
+
+    def replace(self, **kwargs) -> 'ExpressionStatement':
+        return _replace_delegating(self, '_expression', ('prefix', 'markers', 'type'), kwargs)
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
         return v.visit_expression_statement(self, p)
@@ -590,15 +619,10 @@ class StatementExpression(Py, Expression, Statement):
 
 
     def replace(self, **kwargs) -> 'StatementExpression':
-        """Replace fields, handling delegated prefix/markers specially."""
-        # Handle delegated properties by modifying the inner statement
-        if 'prefix' in kwargs:
-            new_statement = self._statement.replace(prefix=kwargs.pop('prefix'))  # Statement base class doesn't have replace
-            kwargs['statement'] = new_statement
-        if 'markers' in kwargs:
-            new_statement = kwargs.get('statement', self._statement).replace(markers=kwargs.pop('markers'))
-            kwargs['statement'] = new_statement
-        return replace_if_changed(self, **kwargs)
+        # A Statement has no type, so there is nothing for a type write to land on.
+        kwargs.pop('type', None)
+        kwargs.pop('_type', None)
+        return _replace_delegating(self, '_statement', ('prefix', 'markers'), kwargs)
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
         return v.visit_statement_expression(self, p)
