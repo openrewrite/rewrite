@@ -2867,6 +2867,60 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     /**
+     * Reproduces a case where the runtime environment (e.g. the Moderne CLI) has attached a
+     * {@link GradleProject} marker to the settings script. The plugin-provided dependency
+     * insertion path must not synthesize a top-level {@code dependencies { }} block there — it
+     * would be invalid Gradle DSL for a settings script.
+     */
+    @Test
+    void doesNotAddPluginProvidedDirectDependencyToSettingsGradle() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null))
+            .beforeRecipe(sourceFiles -> {
+                GradleProject buildProjectMarker = sourceFiles.stream()
+                  .filter(sf -> sf.getSourcePath().toString().endsWith("build.gradle"))
+                  .findFirst()
+                  .flatMap(sf -> sf.getMarkers().findFirst(GradleProject.class))
+                  .orElse(null);
+                if (buildProjectMarker != null) {
+                    for (int i = 0; i < sourceFiles.size(); i++) {
+                        SourceFile sf = sourceFiles.get(i);
+                        if (sf.getSourcePath().toString().endsWith("settings.gradle")) {
+                            sourceFiles.set(i, sf.withMarkers(sf.getMarkers().setByType(buildProjectMarker)));
+                        }
+                    }
+                }
+            }),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """,
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0"
+              }
+              """
+          ),
+          settingsGradle(
+            //language=groovy
+            """
+              rootProject.name = "sample"
+              """
+          )
+        );
+    }
+
+    /**
      * Transitive dependencies from plugins should not be upgraded by this recipe.
      * kotlin-stdlib is a transitive dependency of kotlin-stdlib-jdk8 which is added by the Kotlin plugin.
      */

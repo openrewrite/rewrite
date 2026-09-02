@@ -584,6 +584,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             if (gradleProject == null) {
                 return sourceFile;
             }
+            // Plugin-provided dependencies are project configurations (e.g. runtimeClasspath); they are not valid
+            // top-level DSL in a settings script, so restrict synthesis to build scripts.
+            String path = sourceFile.getSourcePath().toString();
+            if (!path.endsWith("build.gradle") && !path.endsWith("build.gradle.kts")) {
+                return sourceFile;
+            }
 
             DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
 
