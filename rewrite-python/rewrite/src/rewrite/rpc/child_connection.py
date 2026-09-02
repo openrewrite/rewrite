@@ -41,14 +41,18 @@ class ChildConnection:
                         f"child issued a '{callback_method}' callback but no upstream is configured")
                 try:
                     result = self._upstream(callback_method, msg.get("params", {}))
-                    self._write({"jsonrpc": "2.0", "id": child_id, "result": result})
+                    response = {"jsonrpc": "2.0", "id": child_id, "result": result}
                 except Exception as e:
-                    # Carry the traceback in `data` — the same field the child's own
+                    # Carry the traceback in `data` — the same field the peer's own
                     # error responses use — so the failing side is diagnosable from
                     # the other end of the wire.
-                    self._write({"jsonrpc": "2.0", "id": child_id,
-                                 "error": {"code": -32603, "message": str(e),
-                                           "data": traceback.format_exc()}})
+                    response = {"jsonrpc": "2.0", "id": child_id,
+                                "error": {"code": -32603, "message": str(e),
+                                          "data": traceback.format_exc()}}
+                # Notifications (no id, e.g. Evict) get no reply — a null-id response
+                # would fail every in-flight request on the peer's reader.
+                if child_id is not None:
+                    self._write(response)
 
     def close(self) -> None:
         try:

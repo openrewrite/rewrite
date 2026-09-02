@@ -3,6 +3,7 @@ import sys
 
 from rewrite.rpc.child_connection import ChildConnection
 
+
 # A minimal stub child: read one Content-Length framed JSON-RPC request, reply with a canned result
 # echoing the request id, so the framing is exercised without a real peer.
 def _stub_process(stub):
@@ -36,7 +37,6 @@ out.flush()
 '''
 
 
-
 def test_child_connection_round_trips_a_request(tmp_path):
     stub = tmp_path / "stub.py"
     stub.write_text(STUB)
@@ -46,7 +46,6 @@ def test_child_connection_round_trips_a_request(tmp_path):
     finally:
         conn.close()
     assert result == [{"descriptor": {"name": "stub.recipe"}}]
-
 
 
 STUB_WITH_CALLBACK = r'''
@@ -102,3 +101,56 @@ def test_child_connection_relays_callbacks_to_upstream(tmp_path):
 
     assert seen == [("GetObject", {"id": "tree-1"})]        # child's callback relayed up
     assert result == {"got": {"data": "from-java"}}          # Java's response fed back to the child
+
+
+STUB_WITH_NOTIFICATION = r'''
+import sys, json
+buf = sys.stdin.buffer
+out = sys.stdout.buffer
+
+def read():
+    cl = None
+    while True:
+        line = buf.readline()
+        if not line:
+            return None
+        s = line.decode("ascii").strip()
+        if s == "":
+            break
+        if s.lower().startswith("content-length:"):
+            cl = int(s.split(":", 1)[1])
+    if cl is None:
+        return None
+    body = b""
+    while len(body) < cl:
+        body += buf.read(cl - len(body))
+    return json.loads(body.decode("utf-8"))
+
+def write(msg):
+    data = json.dumps(msg).encode("utf-8")
+    out.write(("Content-Length: %d\r\n\r\n" % len(data)).encode("ascii"))
+    out.write(data)
+    out.flush()
+
+req = read()
+write({"jsonrpc": "2.0", "method": "Evict", "params": {"id": "tree-1"}})   # a notification: no id
+write({"jsonrpc": "2.0", "id": 99, "method": "GetObject", "params": {}})   # then a real callback
+answer = read()   # the reply to 99, unless the notification was answered and this is that instead
+write({"jsonrpc": "2.0", "id": req["id"], "result": answer["id"]})
+'''
+
+
+def test_a_notification_is_handled_but_not_answered(tmp_path):
+    """Java sends Evict as a notification. Answering one puts a null-id response on the wire, which
+    fails every request the peer has in flight."""
+    stub = tmp_path / "stub.py"
+    stub.write_text(STUB_WITH_NOTIFICATION)
+
+    handled = []
+    conn = ChildConnection(_stub_process(stub), upstream=lambda m, p: handled.append((m, p)))
+
+    # The peer reads one message after the notification: it must be the reply to the callback,
+    # not a null-id answer to something that asked for none.
+    assert conn.request("Visit", {}) == 99
+    assert handled == [("Evict", {"id": "tree-1"}), ("GetObject", {})]
+
