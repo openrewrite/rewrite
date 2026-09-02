@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -139,7 +140,7 @@ class PnpmLockPatcherTest {
                 Arrays.asList(
                         PackageEdit.builder()
                                 .name("is-odd").oldVersion("").newVersion("3.0.1").newIntegrity(IS_ODD_301)
-                                .newDependencies(Collections.singletonMap("is-number", "^6.0.0"))
+                                .newDependencies(singletonMap("is-number", "^6.0.0"))
                                 .scope("dependencies").kind(PackageEdit.Kind.ADD)
                                 .metadata(EntryMetadata.builder().engines(engines(">=4")).build())
                                 .build(),

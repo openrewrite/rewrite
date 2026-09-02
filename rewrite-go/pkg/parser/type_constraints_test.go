@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -32,9 +34,7 @@ import (
 func interfaceBodyTypeExpr(t *testing.T, src string) java.Expression {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("constraints.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err, "parse")
 	for _, rp := range cu.Statements {
 		td, ok := rp.Element.(*golang.TypeDecl)
 		if !ok {
@@ -44,13 +44,9 @@ func interfaceBodyTypeExpr(t *testing.T, src string) java.Expression {
 		if !ok {
 			continue
 		}
-		if len(it.Body.Statements) != 1 {
-			t.Fatalf("expected 1 interface body element, got %d", len(it.Body.Statements))
-		}
+		require.Len(t, it.Body.Statements, 1, "expected 1 interface body element")
 		vd, ok := it.Body.Statements[0].Element.(*java.VariableDeclarations)
-		if !ok {
-			t.Fatalf("expected body element to be *java.VariableDeclarations, got %T", it.Body.Statements[0].Element)
-		}
+		require.Truef(t, ok, "expected body element to be *java.VariableDeclarations, got %T", it.Body.Statements[0].Element)
 		return vd.TypeExpr
 	}
 	t.Fatalf("no interface type declaration found")
@@ -60,9 +56,7 @@ func interfaceBodyTypeExpr(t *testing.T, src string) java.Expression {
 func assertRoundTrip(t *testing.T, src string) {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("constraints.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err, "parse")
 	if printed := printer.Print(cu); printed != src {
 		t.Errorf("round-trip mismatch\n--- expected ---\n%q\n--- actual ---\n%q", src, printed)
 	}
@@ -76,17 +70,11 @@ func TestUnionConstraintIsUnionType(t *testing.T) {
 	typeExpr := interfaceBodyTypeExpr(t, src)
 
 	union, ok := typeExpr.(*golang.Union)
-	if !ok {
-		t.Fatalf("expected TypeExpr to be *golang.Union, got %T", typeExpr)
-	}
-	if len(union.Types) != 3 {
-		t.Fatalf("expected 3 union terms, got %d", len(union.Types))
-	}
+	require.Truef(t, ok, "expected TypeExpr to be *golang.Union, got %T", typeExpr)
+	require.Len(t, union.Types, 3, "expected 3 union terms")
 	for i, term := range union.Types {
 		ut, ok := term.Element.(*golang.UnderlyingType)
-		if !ok {
-			t.Fatalf("term %d: expected *golang.UnderlyingType, got %T", i, term.Element)
-		}
+		require.Truef(t, ok, "term %d: expected *golang.UnderlyingType, got %T", i, term.Element)
 		if _, ok := ut.Element.(*java.Identifier); !ok {
 			t.Fatalf("term %d: expected underlying *java.Identifier, got %T", i, ut.Element)
 		}
@@ -100,9 +88,7 @@ func TestStandaloneApproximationIsUnderlyingType(t *testing.T) {
 	typeExpr := interfaceBodyTypeExpr(t, src)
 
 	ut, ok := typeExpr.(*golang.UnderlyingType)
-	if !ok {
-		t.Fatalf("expected TypeExpr to be *golang.UnderlyingType, got %T", typeExpr)
-	}
+	require.Truef(t, ok, "expected TypeExpr to be *golang.UnderlyingType, got %T", typeExpr)
 	if id, ok := ut.Element.(*java.Identifier); !ok || id.Name != "int" {
 		t.Fatalf("expected underlying Identifier(int), got %T (%v)", ut.Element, fmt.Sprintf("%v", ut.Element))
 	}
@@ -116,12 +102,8 @@ func TestUnionOfNamedConstraints(t *testing.T) {
 	typeExpr := interfaceBodyTypeExpr(t, src)
 
 	union, ok := typeExpr.(*golang.Union)
-	if !ok {
-		t.Fatalf("expected TypeExpr to be *golang.Union, got %T", typeExpr)
-	}
-	if len(union.Types) != 2 {
-		t.Fatalf("expected 2 union terms, got %d", len(union.Types))
-	}
+	require.Truef(t, ok, "expected TypeExpr to be *golang.Union, got %T", typeExpr)
+	require.Len(t, union.Types, 2, "expected 2 union terms")
 	for i, term := range union.Types {
 		if _, ok := term.Element.(*java.Identifier); !ok {
 			t.Fatalf("term %d: expected *java.Identifier, got %T", i, term.Element)
@@ -137,16 +119,10 @@ func TestApproximationOverSliceType(t *testing.T) {
 	typeExpr := interfaceBodyTypeExpr(t, src)
 
 	union, ok := typeExpr.(*golang.Union)
-	if !ok {
-		t.Fatalf("expected TypeExpr to be *golang.Union, got %T", typeExpr)
-	}
-	if len(union.Types) != 2 {
-		t.Fatalf("expected 2 union terms, got %d", len(union.Types))
-	}
+	require.Truef(t, ok, "expected TypeExpr to be *golang.Union, got %T", typeExpr)
+	require.Len(t, union.Types, 2, "expected 2 union terms")
 	first, ok := union.Types[0].Element.(*golang.UnderlyingType)
-	if !ok {
-		t.Fatalf("term 0: expected *golang.UnderlyingType, got %T", union.Types[0].Element)
-	}
+	require.Truef(t, ok, "term 0: expected *golang.UnderlyingType, got %T", union.Types[0].Element)
 	if _, ok := first.Element.(*java.ArrayType); !ok {
 		t.Fatalf("term 0: expected underlying *java.ArrayType (slice), got %T", first.Element)
 	}
@@ -160,12 +136,8 @@ func TestUnionOfPointerTypes(t *testing.T) {
 	typeExpr := interfaceBodyTypeExpr(t, src)
 
 	union, ok := typeExpr.(*golang.Union)
-	if !ok {
-		t.Fatalf("expected TypeExpr to be *golang.Union, got %T", typeExpr)
-	}
-	if len(union.Types) != 2 {
-		t.Fatalf("expected 2 union terms, got %d", len(union.Types))
-	}
+	require.Truef(t, ok, "expected TypeExpr to be *golang.Union, got %T", typeExpr)
+	require.Len(t, union.Types, 2, "expected 2 union terms")
 	for i, term := range union.Types {
 		if _, ok := term.Element.(*golang.PointerType); !ok {
 			t.Fatalf("term %d: expected *golang.PointerType, got %T", i, term.Element)
@@ -181,12 +153,8 @@ func TestUnionOfQualifiedNames(t *testing.T) {
 	typeExpr := interfaceBodyTypeExpr(t, src)
 
 	union, ok := typeExpr.(*golang.Union)
-	if !ok {
-		t.Fatalf("expected TypeExpr to be *golang.Union, got %T", typeExpr)
-	}
-	if len(union.Types) != 2 {
-		t.Fatalf("expected 2 union terms, got %d", len(union.Types))
-	}
+	require.Truef(t, ok, "expected TypeExpr to be *golang.Union, got %T", typeExpr)
+	require.Len(t, union.Types, 2, "expected 2 union terms")
 	for i, term := range union.Types {
 		if _, ok := term.Element.(*java.FieldAccess); !ok {
 			t.Fatalf("term %d: expected *java.FieldAccess, got %T", i, term.Element)
@@ -202,12 +170,8 @@ func TestPlainUnionOfPrimitives(t *testing.T) {
 	typeExpr := interfaceBodyTypeExpr(t, src)
 
 	union, ok := typeExpr.(*golang.Union)
-	if !ok {
-		t.Fatalf("expected TypeExpr to be *golang.Union, got %T", typeExpr)
-	}
-	if len(union.Types) != 10 {
-		t.Fatalf("expected 10 union terms, got %d", len(union.Types))
-	}
+	require.Truef(t, ok, "expected TypeExpr to be *golang.Union, got %T", typeExpr)
+	require.Len(t, union.Types, 10, "expected 10 union terms")
 	for i, term := range union.Types {
 		if _, ok := term.Element.(*java.Identifier); !ok {
 			t.Fatalf("term %d: expected *java.Identifier, got %T", i, term.Element)
@@ -223,12 +187,8 @@ func TestUnionOfQualifiedNameAndSlice(t *testing.T) {
 	typeExpr := interfaceBodyTypeExpr(t, src)
 
 	union, ok := typeExpr.(*golang.Union)
-	if !ok {
-		t.Fatalf("expected TypeExpr to be *golang.Union, got %T", typeExpr)
-	}
-	if len(union.Types) != 2 {
-		t.Fatalf("expected 2 union terms, got %d", len(union.Types))
-	}
+	require.Truef(t, ok, "expected TypeExpr to be *golang.Union, got %T", typeExpr)
+	require.Len(t, union.Types, 2, "expected 2 union terms")
 	if _, ok := union.Types[0].Element.(*java.FieldAccess); !ok {
 		t.Fatalf("term 0: expected *java.FieldAccess (qualified name), got %T", union.Types[0].Element)
 	}

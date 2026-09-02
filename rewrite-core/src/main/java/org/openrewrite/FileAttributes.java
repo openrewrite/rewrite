@@ -53,9 +53,9 @@ public class FileAttributes implements RpcCodec<FileAttributes> {
         if (Files.exists(path)) {
             try {
                 BasicFileAttributes basicFileAttributes = Files.readAttributes(path, BasicFileAttributes.class);
-                return new FileAttributes(ZonedDateTime.from(basicFileAttributes.creationTime().toInstant().atZone(ZoneId.systemDefault())),
-                        ZonedDateTime.from(basicFileAttributes.lastAccessTime().toInstant().atZone(ZoneId.systemDefault())),
-                        ZonedDateTime.from(basicFileAttributes.lastModifiedTime().toInstant().atZone(ZoneId.systemDefault())),
+                return new FileAttributes(basicFileAttributes.creationTime().toInstant().atZone(ZoneId.systemDefault()),
+                        basicFileAttributes.lastModifiedTime().toInstant().atZone(ZoneId.systemDefault()),
+                        basicFileAttributes.lastAccessTime().toInstant().atZone(ZoneId.systemDefault()),
                         Files.isReadable(path),
                         Files.isWritable(path),
                         Files.isExecutable(path),
@@ -65,23 +65,31 @@ public class FileAttributes implements RpcCodec<FileAttributes> {
         return null;
     }
 
+    /**
+     * Timestamps travel as ISO-8601 strings; the wire mapper writes a raw {@link ZonedDateTime}
+     * as an epoch number, dropping the zone and nanos. Field order is the protocol; peers mirror it.
+     */
     @Override
     public void rpcSend(FileAttributes after, RpcSendQueue q) {
-        q.getAndSend(after, FileAttributes::getCreationTime);
-        q.getAndSend(after, FileAttributes::getLastModifiedTime);
-        q.getAndSend(after, FileAttributes::getLastAccessTime);
+        q.getAndSend(after, a -> iso(a.getCreationTime()));
+        q.getAndSend(after, a -> iso(a.getLastModifiedTime()));
+        q.getAndSend(after, a -> iso(a.getLastAccessTime()));
         q.getAndSend(after, FileAttributes::isReadable);
         q.getAndSend(after, FileAttributes::isWritable);
         q.getAndSend(after, FileAttributes::isExecutable);
         q.getAndSend(after, FileAttributes::getSize);
     }
 
+    private static @Nullable String iso(@Nullable ZonedDateTime time) {
+        return time == null ? null : time.toString();
+    }
+
     @Override
     public FileAttributes rpcReceive(FileAttributes before, RpcReceiveQueue q) {
         return before
-                .withCreationTime(q.receive(before.getCreationTime()))
-                .withLastModifiedTime(q.receive(before.getLastModifiedTime()))
-                .withLastAccessTime(q.receive(before.getLastAccessTime()))
+                .withCreationTime(q.receiveAndGet(before.getCreationTime(), (String iso) -> ZonedDateTime.parse(iso)))
+                .withLastModifiedTime(q.receiveAndGet(before.getLastModifiedTime(), (String iso) -> ZonedDateTime.parse(iso)))
+                .withLastAccessTime(q.receiveAndGet(before.getLastAccessTime(), (String iso) -> ZonedDateTime.parse(iso)))
                 .withReadable(q.receive(before.isReadable()))
                 .withWritable(q.receive(before.isWritable()))
                 .withExecutable(q.receive(before.isExecutable()))

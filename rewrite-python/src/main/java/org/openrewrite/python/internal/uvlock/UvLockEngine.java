@@ -51,6 +51,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.sort;
 
 /**
  * Native {@code uv.lock} regeneration with minimal-update semantics (ADR 0009): the old
@@ -1471,7 +1472,7 @@ public final class UvLockEngine {
                         extra.add(canonical);
                     }
                     // uv records edge extras sorted, unlike declared requires-dist extras (g3-multi-extras)
-                    Collections.sort(extra);
+                    sort(extra);
                 }
                 edges.add(new UvLockDependency(target, null, null, extra, marker));
             }

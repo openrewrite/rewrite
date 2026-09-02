@@ -21,6 +21,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -42,9 +44,7 @@ func (v *markBinaryVisitor) VisitBinary(bin *java.Binary, p any) java.J {
 
 func TestCollectSearchResultIDsEmpty(t *testing.T) {
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if got := visitor.CollectSearchResultIDs(cu); len(got) != 0 {
 		t.Fatalf("expected no search results, got %v", got)
 	}
@@ -52,18 +52,14 @@ func TestCollectSearchResultIDsEmpty(t *testing.T) {
 
 func TestCollectSearchResultIDsAfterMark(t *testing.T) {
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\n\nvar x = 1 + 2\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	mark := java.NewSearchResult("found a binary expr")
 	v := &markBinaryVisitor{marker: mark}
 	visitor.Init(v)
 
 	result := v.Visit(cu, recipe.NewExecutionContext()).(java.Tree)
 	ids := visitor.CollectSearchResultIDs(result)
-	if len(ids) != 1 {
-		t.Fatalf("expected exactly one search result id, got %d (%v)", len(ids), ids)
-	}
+	require.Len(t, ids, 1, "expected exactly one search result id")
 	if ids[0] != mark.Ident {
 		t.Fatalf("collected id %v does not match marker id %v", ids[0], mark.Ident)
 	}
@@ -90,9 +86,7 @@ func TestCollectSearchResultIDsOnGoModNode(t *testing.T) {
 	ids := visitor.CollectSearchResultIDs(gm)
 
 	// then
-	if len(ids) != 1 || ids[0] != mark.Ident {
-		t.Fatalf("expected [%v], got %v", mark.Ident, ids)
-	}
+	require.Falsef(t, len(ids) != 1 || ids[0] != mark.Ident, "expected [%v", mark.Ident)
 }
 
 // rewriteMarkerVisitor swaps the ID of every SearchResult it encounters via
@@ -114,9 +108,7 @@ func (v *rewriteMarkerVisitor) VisitMarker(m java.Marker, p any) java.Marker {
 func TestVisitMarkerRewritesInPlace(t *testing.T) {
 	// given
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\n\nvar x = 1 + 2\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	marked := visitor.Init(&markBinaryVisitor{marker: java.NewSearchResult("orig")}).
 		Visit(cu, recipe.NewExecutionContext()).(java.Tree)
 
@@ -127,16 +119,12 @@ func TestVisitMarkerRewritesInPlace(t *testing.T) {
 
 	// then
 	ids := visitor.CollectSearchResultIDs(rewritten)
-	if len(ids) != 1 || ids[0] != newID {
-		t.Fatalf("expected VisitMarker to rewrite the id to %v, got %v", newID, ids)
-	}
+	require.Falsef(t, len(ids) != 1 || ids[0] != newID, "expected VisitMarker to rewrite the id to %v", newID)
 }
 
 func TestCollectSearchResultIDsDedupes(t *testing.T) {
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\n\nvar x = 1 + 2 + 3\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	// Same marker (same UUID) attached to two binary expressions: collector
 	// should only return it once.
 	mark := java.NewSearchResult("dup")
@@ -145,7 +133,5 @@ func TestCollectSearchResultIDsDedupes(t *testing.T) {
 
 	result := v.Visit(cu, recipe.NewExecutionContext()).(java.Tree)
 	ids := visitor.CollectSearchResultIDs(result)
-	if len(ids) != 1 {
-		t.Fatalf("expected dedup to produce 1 id, got %d (%v)", len(ids), ids)
-	}
+	require.Len(t, ids, 1, "expected dedup to produce 1 id")
 }

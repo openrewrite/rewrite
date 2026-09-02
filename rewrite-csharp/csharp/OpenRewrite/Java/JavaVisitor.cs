@@ -29,6 +29,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         return tree switch
         {
             Annotation ann => VisitAnnotation(ann, p),
+            Modifier mod => VisitModifier(mod, p),
             Block blk => VisitBlock(blk, p),
             ClassDeclaration cd => VisitClassDeclaration(cd, p),
             EnumValueSet evs => VisitEnumValueSet(evs, p),
@@ -228,6 +229,19 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithArguments(VisitContainer(node.Arguments, p));
     }
 
+    public virtual J VisitModifier(Modifier modifier, P p)
+    {
+        return modifier
+            .WithPrefix(VisitSpace(modifier.Prefix, p))
+            .WithMarkers(VisitMarkers(modifier.Markers, p))
+            .WithAnnotations(ListUtils.Map(modifier.Annotations, ann => Visit(ann, p) as Annotation));
+    }
+
+    protected IList<Modifier> VisitModifiers(IList<Modifier> modifiers, P p)
+    {
+        return ListUtils.Map(modifiers, m => Visit(m, p) as Modifier);
+    }
+
     // -----------------------------------------------------------------------
     // Block : Statement
     // -----------------------------------------------------------------------
@@ -241,6 +255,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not Block node) return stmtResult;
 
         return node
+            .WithStatic(VisitRightPadded(node.Static, p)!)
             .WithEnd(VisitSpace(node.End, p))
             .WithStatements(ListUtils.Map(node.Statements, stmt => VisitRightPadded(stmt, p)));
     }
@@ -261,7 +276,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         return node
             .WithLeadingAnnotations(ListUtils.Map(node.LeadingAnnotations, ann => Visit(ann, p) as Annotation))
-            .WithClassKind(node.ClassKind.WithAnnotations(newKindAnnotations))
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
+            .WithClassKind(node.ClassKind
+                .WithPrefix(VisitSpace(node.ClassKind.Prefix, p))
+                .WithAnnotations(newKindAnnotations))
             .WithName((Identifier)Visit(node.Name, p)!)
             .WithTypeParameters(VisitContainer(node.TypeParameters, p))
             .WithPrimaryConstructor(VisitContainer(node.PrimaryConstructor, p))
@@ -315,6 +333,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         return node
             .WithLeadingAnnotations(ListUtils.Map(node.LeadingAnnotations, ann => Visit(ann, p) as Annotation))
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
             .WithTypeParameters(VisitContainer(node.TypeParameters, p))
             .WithReturnTypeExpression((TypeTree?)Visit(node.ReturnTypeExpression, p))
             .WithName((Identifier)Visit(node.Name, p)!)
@@ -762,6 +781,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         return node
             .WithVariable((Expression)Visit(node.Variable, p)!)
+            .WithOperator(VisitLeftPadded(node.Operator, p)!)
             .WithAssignmentValue((Expression)Visit(node.AssignmentValue, p)!)
             .WithType(VisitType(node.Type, p));
     }
@@ -782,6 +802,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not Unary node) return exprResult;
 
         return node
+            .WithOperator(VisitLeftPadded(node.Operator, p)!)
             .WithExpression((Expression)Visit(node.Expression, p)!)
             .WithType(VisitType(node.Type, p));
     }
@@ -830,6 +851,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         return node
             .WithLeadingAnnotations(ListUtils.Map(node.LeadingAnnotations, ann => Visit(ann, p) as Annotation))
+            .WithModifiers(VisitModifiers(node.Modifiers, p))
             .WithTypeExpression((TypeTree?)Visit(node.TypeExpression, p))
             .WithVarargs(node.Varargs != null ? VisitSpace(node.Varargs, p) : null)
             .WithVariables(ListUtils.Map(node.Variables, v => VisitRightPadded(v, p)));
@@ -996,10 +1018,18 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var exprResult = VisitExpression(at, p);
         if (exprResult is not ArrayType node) return exprResult;
 
-        return node
+        node = node
             .WithElementType((TypeTree)Visit(node.ElementType, p)!)
-            .WithAnnotations(node.Annotations != null ? ListUtils.Map(node.Annotations, ann => Visit(ann, p) as Annotation) : null)
-            .WithType(VisitType(node.Type, p));
+            .WithAnnotations(node.Annotations != null ? ListUtils.Map(node.Annotations, ann => Visit(ann, p) as Annotation) : null);
+
+        if (node.Dimension != null)
+        {
+            node = node.WithDimension(node.Dimension
+                .WithBefore(VisitSpace(node.Dimension.Before, p))
+                .WithElement(VisitSpace(node.Dimension.Element, p)));
+        }
+
+        return node.WithType(VisitType(node.Type, p));
     }
 
     // -----------------------------------------------------------------------
@@ -1192,6 +1222,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithPrefix(VisitSpace(typeParameter.Prefix, p))
             .WithMarkers(VisitMarkers(typeParameter.Markers, p))
             .WithAnnotations(ListUtils.Map(typeParameter.Annotations, ann => Visit(ann, p) as Annotation))
+            .WithModifiers(VisitModifiers(typeParameter.Modifiers, p))
             .WithName((Expression)Visit(typeParameter.Name, p)!)
             .WithBounds(VisitContainer(typeParameter.Bounds, p));
     }

@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.unmodifiableList;
 import static org.openrewrite.Validated.invalid;
 
 @RequiredArgsConstructor
@@ -66,13 +67,13 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private final List<Recipe> uninitializedRecipes = new ArrayList<>();
 
     @Setter
-    private volatile List<Recipe> recipeList = Collections.emptyList();
+    private volatile List<Recipe> recipeList = emptyList();
 
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
 
     @Getter
     @Setter
-    private volatile List<Recipe> preconditions = Collections.emptyList();
+    private volatile List<Recipe> preconditions = emptyList();
 
     public void addPrecondition(Recipe recipe) {
         uninitializedPreconditions.add(recipe);
@@ -142,7 +143,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 result.add(recipe);
             }
         }
-        return Collections.unmodifiableList(result);
+        return unmodifiableList(result);
     }
 
     private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,

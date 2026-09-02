@@ -23,14 +23,18 @@ import (
 )
 
 type CompilationUnit struct {
-	ID          uuid.UUID
-	Prefix      java.Space
-	Markers     java.Markers
-	SourcePath  string
-	PackageDecl *java.RightPadded[*java.Identifier] // `package main`
-	Imports     *java.Container[*java.Import]       // nil if no imports
-	Statements  []java.RightPadded[java.Statement]  // top-level declarations
-	EOF         java.Space
+	ID         uuid.UUID
+	Prefix     java.Space
+	Markers    java.Markers
+	SourcePath string
+	// CharsetBomMarked reports a leading UTF-8 BOM. Go's scanner ignores
+	// one, so it is part of how the file is encoded rather than anything
+	// the tree models.
+	CharsetBomMarked bool
+	PackageDecl      *java.RightPadded[*java.Identifier] // `package main`
+	Imports          *java.Container[*java.Import]       // nil if no imports
+	Statements       []java.RightPadded[java.Statement]  // top-level declarations
+	EOF              java.Space
 }
 
 func (*CompilationUnit) IsTree()       {}
@@ -243,7 +247,8 @@ type Composite struct {
 	Prefix   java.Space
 	Markers  java.Markers
 	TypeExpr java.Expression                 // nil for untyped composite literals
-	Elements java.Container[java.Expression] // Before = space before `{`, elements, last After = space before `}`
+	Elements java.Container[java.Expression] // Before = space between TypeExpr and `{`, empty when untyped; last After = space before `}`
+	Type     java.JavaType
 }
 
 func (*Composite) IsTree()       {}
@@ -342,6 +347,7 @@ type ArrayType struct {
 	Markers     java.Markers
 	Length      java.RightPadded[java.Expression] // Element = `N` (Prefix = space after `[`), After = space before `]`
 	ElementType java.Expression                   // element type `T` (Prefix = space after `]`)
+	Type        java.JavaType
 }
 
 func (*ArrayType) IsTree()       {}
@@ -373,6 +379,7 @@ type MapType struct {
 	OpenBracket java.Space                        // space before `[`
 	Key         java.RightPadded[java.Expression] // After = space before `]`
 	Value       java.Expression
+	Type        java.JavaType
 }
 
 func (*MapType) IsTree()       {}
@@ -410,6 +417,7 @@ type PointerType struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Elem    java.Expression
+	Type    java.JavaType
 }
 
 func (*PointerType) IsTree()       {}
@@ -440,6 +448,7 @@ type Channel struct {
 	Markers java.Markers
 	Dir     ChanDir
 	Value   java.Expression
+	Type    java.JavaType
 }
 
 func (*Channel) IsTree()       {}
@@ -470,6 +479,7 @@ type FuncType struct {
 	Markers    java.Markers
 	Parameters java.Container[java.Statement]
 	ReturnType java.Expression // nil if no return type
+	Type       java.JavaType
 }
 
 func (*FuncType) IsTree()       {}
@@ -499,6 +509,7 @@ type StructType struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Body    *java.Block // contains VariableDeclarations for fields
+	Type    java.JavaType
 }
 
 func (*StructType) IsTree()       {}
@@ -528,6 +539,7 @@ type InterfaceType struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Body    *java.Block // contains MethodDeclaration (no body) or type refs for embedded interfaces
+	Type    java.JavaType
 }
 
 func (*InterfaceType) IsTree()       {}
@@ -559,6 +571,7 @@ type TypeList struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Types   java.Container[java.Statement] // Before = space before `(`, last After = space before `)`
+	Type    java.JavaType
 }
 
 func (*TypeList) IsTree()       {}
@@ -595,6 +608,7 @@ type Union struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Types   []java.RightPadded[java.Expression]
+	Type    java.JavaType
 }
 
 func (*Union) IsTree()       {}
@@ -973,8 +987,106 @@ func (n *CommClause) WithMarkers(markers java.Markers) *CommClause {
 	return &c
 }
 
+// Select is Go's `select { ... }` statement. It looks like a `switch` but is a
+// distinct construct with no Java equivalent, so it is not mapped to java.Switch:
+// its clauses are golang.CommClause, which are not java.Case, and a JavaVisitor
+// walking java.Switch.getCases() must never encounter them.
+type Select struct {
+	ID      uuid.UUID
+	Prefix  java.Space
+	Markers java.Markers
+	Body    *java.Block // contains CommClause clauses
+}
+
+func (*Select) IsTree()      {}
+func (*Select) IsJ()         {}
+func (*Select) IsStatement() {}
+
+func (n *Select) WithPrefix(prefix java.Space) *Select {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Select) WithMarkers(markers java.Markers) *Select {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // Used for Go function literals which are parsed as MethodDeclaration (a Statement)
 // but can appear in return statements, assignments, and call arguments.
+// ExpressionStatement wraps an Expression standing in statement
+// position — `(h())`, which J.Parentheses alone cannot represent.
+type ExpressionStatement struct {
+	ID         uuid.UUID
+	Prefix     java.Space
+	Markers    java.Markers
+	Expression java.Expression
+}
+
+func (*ExpressionStatement) IsTree()      {}
+func (*ExpressionStatement) IsJ()         {}
+func (*ExpressionStatement) IsStatement() {}
+
+func (n *ExpressionStatement) WithPrefix(prefix java.Space) *ExpressionStatement {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ExpressionStatement) WithMarkers(markers java.Markers) *ExpressionStatement {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// TypeAssertion is Go's postfix `x.(T)`, which reads an interface's dynamic
+// type where J.TypeCast converts. The left expression is right-padded, so its
+// padding holds what stands before the dot — a space, or a comment.
+type TypeAssertion struct {
+	ID           uuid.UUID
+	Prefix       java.Space
+	Markers      java.Markers
+	Left         java.RightPadded[java.Expression] // After = space before `.`
+	AssertedType *java.ControlParentheses          // `(T)`
+	Type         java.JavaType                     // the result type
+}
+
+func (*TypeAssertion) IsTree()       {}
+func (*TypeAssertion) IsJ()          {}
+func (*TypeAssertion) IsExpression() {}
+
+func (n *TypeAssertion) WithPrefix(prefix java.Space) *TypeAssertion {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeAssertion) WithMarkers(markers java.Markers) *TypeAssertion {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 type StatementExpression struct {
 	ID        uuid.UUID
 	Prefix    java.Space
@@ -1012,6 +1124,7 @@ type IndexList struct {
 	Markers java.Markers
 	Target  java.Expression
 	Indices java.Container[java.Expression] // Before = space before `[`, Elements = type args, last After = space before `]`
+	Type    java.JavaType
 }
 
 func (*IndexList) IsTree()       {}
@@ -1081,6 +1194,7 @@ type Unary struct {
 	Markers    java.Markers
 	Operator   java.LeftPadded[UnaryOperator] // Before = space before the operator token
 	Expression java.Expression
+	Type       java.JavaType
 }
 
 func (*Unary) IsTree()       {}
@@ -1196,6 +1310,7 @@ type AssignmentOperation struct {
 	Variable   java.Expression
 	Operator   java.LeftPadded[AssignmentOperator] // Before = space before the operator token
 	Assignment java.Expression
+	Type       java.JavaType
 }
 
 func (*AssignmentOperation) IsTree()       {}
@@ -1221,9 +1336,11 @@ func (n *AssignmentOperation) WithMarkers(markers java.Markers) *AssignmentOpera
 	return &c
 }
 
-// Variadic represents Go's `...` ellipsis: the `...T` parameter type
+// Variadic represents Go's `...` ellipsis where it stands for something other
+// than a parameter type: an array's elided length in `[...]T{...}`
 // (Postfix=false) and the `args...` call spread (Postfix=true). Dots is the
-// whitespace immediately before the `...` token in the postfix form.
+// whitespace immediately before the `...` token in the postfix form. A
+// parameter's `...T` is a VariableDeclarations whose Varargs slot holds the `...`.
 type Variadic struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -1231,6 +1348,7 @@ type Variadic struct {
 	Element java.Expression
 	Dots    java.Space
 	Postfix bool
+	Type    java.JavaType
 }
 
 func (*Variadic) IsTree()       {}
@@ -1254,13 +1372,6 @@ func (n *Variadic) WithMarkers(markers java.Markers) *Variadic {
 	c.Markers = markers
 	return &c
 }
-
-// SelectStmt is a marker on Switch indicating it's a `select` statement instead of `switch`.
-type SelectStmt struct {
-	Ident uuid.UUID
-}
-
-func (s SelectStmt) ID() uuid.UUID { return s.Ident }
 
 // TypeSwitchGuard is a marker on Switch indicating it's a type switch with
 // a type assertion guard like `switch x.(type)` or `switch v := x.(type)`.
@@ -1293,6 +1404,17 @@ type StructTag struct {
 }
 
 func (s StructTag) ID() uuid.UUID { return s.Ident }
+
+// StructTagQuote records which string literal delimiter a struct tag was
+// written with. The tag itself is modelled as LeadingAnnotations, which
+// carry its keys and values but not the quoting; absent this marker the
+// printer writes a raw string.
+type StructTagQuote struct {
+	Ident uuid.UUID
+	Quote string // "`" or `"`
+}
+
+func (s StructTagQuote) ID() uuid.UUID { return s.Ident }
 
 // ConstDecl is a marker on VariableDeclarations indicating `const` instead of `var`.
 type ConstDecl struct {

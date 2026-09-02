@@ -25,6 +25,8 @@ import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.*;
 
+import static java.util.Collections.*;
+
 /**
  * Diffs a freshly resolved {@link ResolutionGraph} against the existing {@code package-lock.json} and expresses
  * the difference as {@link PackageEdit}s for {@link NpmLockPatcher} — so untouched entries keep their bytes and
@@ -50,8 +52,9 @@ final class NpmLockDiff {
         Lock lock = Lock.parse(existingLock);
         requireRootEntryMirrors(root, lock);
 
-        Map<String, String> bindings = bindNodesToKeys(graph, root, lock);
-        Set<String> fresh = hoistUnbound(graph, root, bindings);
+        Matched matched = bindNodesToKeys(graph, root, lock);
+        Map<String, String> bindings = matched.bindings;
+        Set<String> fresh = hoistUnbound(graph, root, bindings, matched.pinnedPlacements);
         requireReproducibleFreshPlacements(graph, root, bindings, fresh);
 
         Set<String> peerProviders = peerProviderKeys(graph);
@@ -66,35 +69,52 @@ final class NpmLockDiff {
             PackageEdit edit = fresh.contains(nodeKey) ?
                     addEdit(root, slot, node, key, peer) :
                     boundEdit(root, lock, slot, node, key, peer);
+            if (edit != null && matched.duplicatedNodes.contains(nodeKey)) {
+                // The version sits at several node_modules paths; one edit cannot rewrite them all in step.
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, slot,
+                        slot + "@" + versionOf(nodeKey) + " is installed at multiple places and changed (not yet patched)");
+            }
             if (edit != null) {
                 prunes |= edit.isPrunesOrphans();
                 edits.add(edit);
             }
         }
 
-        edits.addAll(removalEdits(graph, root, lock, bindings, prunes));
+        edits.addAll(removalEdits(graph, root, lock, bindings, prunes, matched.pinnedPlacements));
         return edits;
     }
 
     // --- matching ----------------------------------------------------------
 
     /**
+     * The outcome of matching graph nodes to installed keys: the primary placement of each node, the extra
+     * (duplicate) placements to pin, and which nodes are placed at more than one path.
+     */
+    private static final class Matched {
+        final Map<String, String> bindings = new LinkedHashMap<>();          // nodeKey -> primary lock key
+        final Map<String, String> pinnedPlacements = new LinkedHashMap<>();  // extra duplicate lock key -> version
+        final Set<String> duplicatedNodes = new LinkedHashSet<>();           // nodeKeys placed at >1 path
+    }
+
+    /**
      * Bind graph nodes to installed keys slot-by-slot: the root importer's declared version claims the
      * top-level slot, remaining versions match keys holding exactly that version, and a lone leftover pair
-     * binds as an in-place move. Anything else is ambiguous and fails loud.
+     * binds as an in-place move. A version npm placed at several node_modules paths (a nested dep that cannot
+     * dedupe across sibling requirers) binds its first placement and pins the rest, so an unchanged closure
+     * preserves every copy. Anything else is ambiguous and fails loud.
      */
-    private static Map<String, String> bindNodesToKeys(ResolutionGraph graph, ResolutionGraph.Importer root,
-                                                       Lock lock) {
+    private static Matched bindNodesToKeys(ResolutionGraph graph, ResolutionGraph.Importer root, Lock lock) {
         Map<String, List<String>> graphSlots = new LinkedHashMap<>();
         for (String nodeKey : graph.getNodes().keySet()) {
             graphSlots.computeIfAbsent(slotOf(nodeKey), k -> new ArrayList<>()).add(nodeKey);
         }
 
-        Map<String, String> bindings = new LinkedHashMap<>();
+        Matched matched = new Matched();
+        Map<String, String> bindings = matched.bindings;
         for (Map.Entry<String, List<String>> e : graphSlots.entrySet()) {
             String slot = e.getKey();
             List<String> nodeKeys = new ArrayList<>(e.getValue());
-            List<String> lockKeys = new ArrayList<>(lock.keysBySlot.getOrDefault(slot, Collections.emptyList()));
+            List<String> lockKeys = new ArrayList<>(lock.keysBySlot.getOrDefault(slot, emptyList()));
 
             // The root's directly-declared version claims the top-level slot, as npm hoists root directs.
             String declared = root.getResolved().get(slot);
@@ -112,13 +132,15 @@ final class NpmLockDiff {
                         matches.add(lockKey);
                     }
                 }
-                if (matches.size() > 1) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, slot,
-                            slot + "@" + version + " is installed at multiple places (" + matches + ")");
-                }
-                if (matches.size() == 1) {
+                if (!matches.isEmpty()) {
                     bindings.put(nodeKey, matches.get(0));
-                    lockKeys.remove(matches.get(0));
+                    if (matches.size() > 1) {
+                        matched.duplicatedNodes.add(nodeKey);
+                        for (String extra : matches.subList(1, matches.size())) {
+                            matched.pinnedPlacements.put(extra, version);
+                        }
+                    }
+                    lockKeys.removeAll(matches);
                     it.remove();
                 }
             }
@@ -130,7 +152,7 @@ final class NpmLockDiff {
             }
             // Leftover graph versions place fresh; leftover lock keys become removals.
         }
-        return bindings;
+        return matched;
     }
 
     /**
@@ -139,7 +161,7 @@ final class NpmLockDiff {
      * holds the same version, nesting one level deeper past a conflict. Returns the freshly placed node keys.
      */
     private static Set<String> hoistUnbound(ResolutionGraph graph, ResolutionGraph.Importer root,
-                                            Map<String, String> bindings) {
+                                            Map<String, String> bindings, Map<String, String> pinnedPlacements) {
         Map<String, Map<String, String>> shelf = new HashMap<>();
         Set<String> visited = new HashSet<>();
         Deque<String[]> queue = new ArrayDeque<>();
@@ -148,6 +170,10 @@ final class NpmLockDiff {
             shelf.computeIfAbsent(prefixOf(key), k -> new HashMap<>()).put(slotOf(key), versionOf(b.getKey()));
             visited.add(b.getKey());
             queue.add(new String[]{b.getKey(), key});
+        }
+        // A version pinned at extra node_modules paths is seeded too, so the walk dedupes rather than re-placing.
+        for (Map.Entry<String, String> p : pinnedPlacements.entrySet()) {
+            shelf.computeIfAbsent(prefixOf(p.getKey()), k -> new HashMap<>()).put(slotOf(p.getKey()), p.getValue());
         }
         Set<String> fresh = new LinkedHashSet<>();
 
@@ -238,7 +264,7 @@ final class NpmLockDiff {
             deepestFirst.add(parentDir.isEmpty() ? NM : parentDir + NM);
             cursor = nm < 0 ? "" : trimTrailingSlash(cursor.substring(0, nm));
         }
-        Collections.reverse(deepestFirst);
+        reverse(deepestFirst);
         return deepestFirst;
     }
 
@@ -404,10 +430,8 @@ final class NpmLockDiff {
     private static PackageEdit addEdit(ResolutionGraph.Importer root, String slot, ResolvedNode node,
                                        String key, boolean peer) {
         VersionManifest m = node.getManifest();
-        if (!slot.equals(m.getName())) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, slot,
-                    slot + " aliases " + m.getName() + "; a fresh alias entry cannot yet be patched in");
-        }
+        // An alias entry sits at its declared slot but records the real package name as its `name` field.
+        String aliasName = slot.equals(m.getName()) ? null : m.getName();
         EntryMetadata metadata = addMetadata(node, peer);
         VersionManifest.Dist dist = m.getDist();
         if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
@@ -416,6 +440,7 @@ final class NpmLockDiff {
         }
         return PackageEdit.builder()
                 .name(slot)
+                .aliasName(aliasName)
                 .oldVersion("")
                 .newVersion(m.getVersion())
                 .newResolved(dist.getTarball())
@@ -547,10 +572,10 @@ final class NpmLockDiff {
     /** How a moved entry's dependency edge set changed: drops orphan-prune, gains graft the full new map. */
     private static EdgeDelta edgeDelta(String slot, JsonNode entry, VersionManifest m) {
         Set<String> oldEdges = fieldKeys(entry.get("dependencies"));
-        Set<String> newEdges = m.getDependencies() == null ? Collections.emptySet() : m.getDependencies().keySet();
+        Set<String> newEdges = m.getDependencies() == null ? emptySet() : m.getDependencies().keySet();
         Set<String> oldOptional = fieldKeys(entry.get("optionalDependencies"));
         Set<String> newOptional = m.getOptionalDependencies() == null ?
-                Collections.emptySet() : m.getOptionalDependencies().keySet();
+                emptySet() : m.getOptionalDependencies().keySet();
         if (!oldOptional.equals(newOptional)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, slot,
                     slot + " changed its optionalDependencies on upgrade (not yet patched)");
@@ -583,7 +608,7 @@ final class NpmLockDiff {
         boolean any = false;
 
         Map<String, String> oldEngines = stringMap(entry.get("engines"));
-        Map<String, String> newEngines = m.getEngines() == null ? Collections.emptyMap() : m.getEngines();
+        Map<String, String> newEngines = m.getEngines() == null ? emptyMap() : m.getEngines();
         if (!oldEngines.equals(newEngines)) {
             b.engines(newEngines.isEmpty() ? null : newEngines).enginesChanged(true);
             any = true;
@@ -629,7 +654,7 @@ final class NpmLockDiff {
         }
 
         Map<String, String> oldPeers = stringMap(entry.get("peerDependencies"));
-        Map<String, String> newPeers = m.getPeerDependencies() == null ? Collections.emptyMap() : m.getPeerDependencies();
+        Map<String, String> newPeers = m.getPeerDependencies() == null ? emptyMap() : m.getPeerDependencies();
         if (!oldPeers.equals(newPeers)) {
             b.peerDependencies(newPeers.isEmpty() ? null : newPeers).peerDependenciesChanged(true);
             any = true;
@@ -726,8 +751,10 @@ final class NpmLockDiff {
      * rides an orphan-pruning bump's GC, and with no such bump nothing can prove it collectable, so it defers.
      */
     private static List<PackageEdit> removalEdits(ResolutionGraph graph, ResolutionGraph.Importer root,
-                                                  Lock lock, Map<String, String> bindings, boolean prunes) {
+                                                  Lock lock, Map<String, String> bindings, boolean prunes,
+                                                  Map<String, String> pinnedPlacements) {
         Set<String> boundKeys = new HashSet<>(bindings.values());
+        boundKeys.addAll(pinnedPlacements.keySet());
         List<PackageEdit> removals = new ArrayList<>();
         for (String key : lock.installedKeys) {
             if (boundKeys.contains(key)) {
@@ -910,7 +937,7 @@ final class NpmLockDiff {
                 return scope.getKey();
             }
         }
-        if (root.getDeclared().getOrDefault("peerDependencies", Collections.emptyMap()).containsKey(slot)) {
+        if (root.getDeclared().getOrDefault("peerDependencies", emptyMap()).containsKey(slot)) {
             return "peerDependencies";
         }
         return "dependencies";
@@ -936,7 +963,7 @@ final class NpmLockDiff {
 
     private static Set<String> fieldKeys(@Nullable JsonNode obj) {
         if (obj == null || !obj.isObject()) {
-            return Collections.emptySet();
+            return emptySet();
         }
         Set<String> keys = new LinkedHashSet<>();
         obj.fieldNames().forEachRemaining(keys::add);
@@ -945,7 +972,7 @@ final class NpmLockDiff {
 
     private static Map<String, String> stringMap(@Nullable JsonNode obj) {
         if (obj == null || !obj.isObject()) {
-            return Collections.emptyMap();
+            return emptyMap();
         }
         Map<String, String> map = new LinkedHashMap<>();
         obj.fields().forEachRemaining(f -> map.put(f.getKey(), f.getValue().asText()));

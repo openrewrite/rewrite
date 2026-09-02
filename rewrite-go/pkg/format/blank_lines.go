@@ -19,6 +19,7 @@ package format
 import (
 	"strings"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -28,12 +29,14 @@ import (
 //   - Any run of >1 blank line collapses to one (anywhere in the
 //     compilation unit — gofmt's `1 blank line max` rule applies
 //     uniformly inside blocks AND between top-level decls).
-//   - Block.End loses any leading blank line so the closing brace
-//     sits flush against the last statement.
-//   - The first statement of a block has no blank line above it.
+//   - A declaration list — the fields of a struct, the methods of an
+//     interface — sits flush against its braces, while a statement
+//     block keeps a blank line written against either of its own. A
+//     comment against a brace keeps the blank line separating it either
+//     way, since the separation reads as the comment's own.
 //
-// The first-statement rule operates on the statement node's own Prefix —
-// the parser attaches inter-statement whitespace to the outermost element.
+// The flush rule operates on the first statement's own Prefix, since the
+// parser attaches inter-statement whitespace to the outermost element.
 type BlankLinesVisitor struct {
 	visitor.GoVisitor
 	stopAfterTracker
@@ -64,11 +67,15 @@ func (v *BlankLinesVisitor) VisitSpace(s java.Space, p any) java.Space {
 
 func (v *BlankLinesVisitor) VisitBlock(block *java.Block, p any) java.J {
 	out := v.GoVisitor.VisitBlock(block, p).(*java.Block)
-	out = out.WithEnd(adjustSpace(out.End, stripLeadingBlankLines))
+	if !v.isDeclarationList() {
+		return out
+	}
+	if len(out.End.Comments) == 0 {
+		out = out.WithEnd(adjustSpace(out.End, stripLeadingBlankLines))
+	}
 
-	// Strip any leading blank line above the first statement, whose Prefix
-	// carries the inter-statement whitespace.
-	if len(out.Statements) > 0 && out.Statements[0].Element != nil {
+	if len(out.Statements) > 0 && out.Statements[0].Element != nil &&
+		len(getPrefix(out.Statements[0].Element).Comments) == 0 {
 		first := out.Statements[0]
 		if updated, ok := transformPrefix(first.Element, stripLeadingBlankLinesSpace).(java.Statement); ok {
 			first.Element = updated
@@ -76,6 +83,21 @@ func (v *BlankLinesVisitor) VisitBlock(block *java.Block, p any) java.J {
 		}
 	}
 	return out
+}
+
+// isDeclarationList reports whether the block being visited holds declarations
+// rather than statements, which is what decides whether it sits flush against
+// its braces.
+func (v *BlankLinesVisitor) isDeclarationList() bool {
+	parent := v.Cursor().Parent()
+	if parent == nil {
+		return false
+	}
+	switch parent.Value().(type) {
+	case *golang.StructType, *golang.InterfaceType:
+		return true
+	}
+	return false
 }
 
 func stripLeadingBlankLinesSpace(s java.Space) java.Space {
@@ -92,16 +114,22 @@ func adjustSpace(s java.Space, f func(string) string) java.Space {
 	return s
 }
 
-// stripLeadingBlankLines collapses any "\n\n+" run at the start to a
-// single "\n", preserving any trailing indent.
+// stripLeadingBlankLines collapses the first run of newlines in ws to a single
+// one, preserving both the trailing indent and anything ahead of that run,
+// which is the previous line's trailing whitespace.
 func stripLeadingBlankLines(ws string) string {
-	if !strings.HasPrefix(ws, "\n\n") {
+	start := strings.IndexByte(ws, '\n')
+	if start < 0 {
 		return ws
 	}
-	for strings.HasPrefix(ws, "\n\n") {
-		ws = ws[1:]
+	end := start
+	for end < len(ws) && ws[end] == '\n' {
+		end++
 	}
-	return ws
+	if end-start < 2 {
+		return ws
+	}
+	return ws[:start] + "\n" + ws[end:]
 }
 
 // capInternalBlankLines walks ws and collapses any internal run of

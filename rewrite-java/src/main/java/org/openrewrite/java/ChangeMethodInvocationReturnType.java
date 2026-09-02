@@ -99,7 +99,9 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                     return mv;
                 }
 
-                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(returnTypeExpression + " __typePlaceholder__").contextSensitive();
+                boolean needsSemicolon = getCursor().getParentTreeCursor().getValue() instanceof J.Block;
+                String template = returnTypeExpression + " __typePlaceholder__" + (needsSemicolon ? ";" : "");
+                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(template).contextSensitive();
                 List<String> stubs = synthesizeStubsForTypeAttribution(newReturnType);
                 if (!stubs.isEmpty()) {
                     templateBuilder.javaParser(JavaParser.fromJavaVersion().dependsOn(stubs.toArray(new String[0])));

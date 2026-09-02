@@ -65,7 +65,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void doWhileLoop() {
         rewriteRun(
@@ -98,7 +98,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void nestedIf() {
         rewriteRun(
@@ -115,7 +115,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void ifElseExpressionLiteralOperands() {
         rewriteRun(
@@ -267,7 +267,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithTo() {
         rewriteRun(
@@ -282,7 +282,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithUntil() {
         rewriteRun(
@@ -297,7 +297,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithToVariable() {
         rewriteRun(
@@ -313,7 +313,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithUntilVariable() {
         rewriteRun(
@@ -329,7 +329,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithToExpression() {
         rewriteRun(
@@ -345,7 +345,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithUntilExpression() {
         rewriteRun(
@@ -361,7 +361,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithCollection() {
         rewriteRun(
@@ -377,7 +377,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void simpleAssignment() {
         rewriteRun(
@@ -391,7 +391,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void compoundAssignment() {
         rewriteRun(

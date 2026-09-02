@@ -99,8 +99,7 @@ public abstract class ScalaTemplateRecipe extends Recipe {
                 }
                 c = c.withImports(ListUtils.map(c.getImports(), i -> visitAndCast(i, p)));
                 c = c.withStatements(ListUtils.map(c.getStatements(), s -> visitAndCast(s, p)));
-                c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
-                return c;
+                return c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
             }
 
             @Override

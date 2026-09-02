@@ -197,6 +197,20 @@ public class GroovyParserVisitor {
         }
 
         for (ClassNode aClass : ast.getClasses()) {
+            if (aClass.getName().equals(ast.getMainClassName())) {
+                for (FieldNode field : aClass.getFields()) {
+                    if (isFieldDeclaration(field)) {
+                        // The @Field transform leaves a null ConstantExpression in the script body, but the generated
+                        // script field retains the declaration's type and initializer. Restore the source annotation
+                        // and replace that placeholder statement with the field.
+                        ClassNode fieldAnnotationType = new ClassNode(Field.class);
+                        if (field.getAnnotations(fieldAnnotationType).isEmpty()) {
+                            field.addAnnotation(new AnnotationNode(fieldAnnotationType));
+                        }
+                        sortedByPosition.put(pos(field), field);
+                    }
+                }
+            }
             // skip over the synthetic script class
             if (!aClass.getName().equals(ast.getMainClassName()) || !aClass.getName().endsWith("doesntmatter")) {
                 // synthetic helper classes Groovy generates for traits hold the bodies of trait methods/fields;
@@ -943,7 +957,7 @@ public class GroovyParserVisitor {
                     typeMapping.variableType(field)
             );
 
-            if (field.getInitialExpression() != null) {
+            if (field.getInitialExpression() != null && !(field.getInitialExpression() instanceof EmptyExpression)) {
                 Space beforeAssign = sourceBefore("=");
                 Expression initializer = visitor.doVisit(field.getInitialExpression());
                 namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
@@ -3152,13 +3166,15 @@ public class GroovyParserVisitor {
             for (int i = 0; i < varExprs.size(); i++) {
                 VariableExpression varExpr = varExprs.get(i);
                 TypeTree innerType = visitVariableExpressionType(varExpr);
+                Space innerPrefix = innerType.getPrefix();
+                innerType = innerType.withPrefix(EMPTY);
                 J.Identifier name = doVisit(varExpr);
                 J.VariableDeclarations.NamedVariable nv = new J.VariableDeclarations.NamedVariable(
                         randomId(), name.getPrefix(), Markers.EMPTY,
                         name.withPrefix(EMPTY), emptyList(), null,
                         typeMapping.variableType(name.getSimpleName(), innerType.getType()));
                 J.VariableDeclarations innerDecl = new J.VariableDeclarations(
-                        randomId(), EMPTY, Markers.EMPTY, emptyList(), emptyList(),
+                        randomId(), innerPrefix, Markers.EMPTY, emptyList(), emptyList(),
                         innerType, null, singletonList(JRightPadded.build(nv)));
                 Space after = i < varExprs.size() - 1 ? sourceBefore(",") : sourceBefore(")");
                 tupleVars.add(JRightPadded.<J.VariableDeclarations>build(innerDecl).withAfter(after));
@@ -3507,6 +3523,11 @@ public class GroovyParserVisitor {
             RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
             classVisitor.visitMethod(methodNode);
             return JRightPadded.build(classVisitor.pollQueue());
+        } else if (node instanceof FieldNode) {
+            FieldNode fieldNode = (FieldNode) node;
+            RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
+            classVisitor.visitField(fieldNode);
+            return JRightPadded.build(classVisitor.pollQueue());
         } else if (node instanceof ImportNode) {
             ImportNode importNode = (ImportNode) node;
             Space importPrefix = sourceBefore("import");
@@ -3630,6 +3651,15 @@ public class GroovyParserVisitor {
 
     private static LineColumn pos(ASTNode node) {
         return new LineColumn(node.getLineNumber(), node.getColumnNumber());
+    }
+
+    private boolean isFieldDeclaration(FieldNode field) {
+        if (!appearsInSource(field)) {
+            return false;
+        }
+        int offset = sourceLineNumberOffsets[field.getLineNumber() - 1] + field.getColumnNumber() - 1;
+        return source.startsWith("@" + Field.class.getSimpleName(), offset) ||
+                source.startsWith("@" + Field.class.getCanonicalName(), offset);
     }
 
     private static boolean isSynthetic(ASTNode node) {

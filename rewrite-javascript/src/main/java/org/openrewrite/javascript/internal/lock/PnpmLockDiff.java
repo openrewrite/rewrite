@@ -24,6 +24,8 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.util.*;
 
+import static java.util.Collections.*;
+
 /**
  * Diffs a freshly resolved {@link ResolutionGraph} against the existing {@code pnpm-lock.yaml} (lockfileVersion 9)
  * and expresses the difference as {@link PackageEdit}s for {@link PnpmLockPatcher}. pnpm is content-addressed —
@@ -58,7 +60,7 @@ final class PnpmLockDiff {
         for (Map.Entry<String, List<String>> e : graphByName.entrySet()) {
             String name = e.getKey();
             List<String> nodeKeys = new ArrayList<>(e.getValue());
-            List<String> lockKeys = new ArrayList<>(lock.keysByName.getOrDefault(name, Collections.emptyList()));
+            List<String> lockKeys = new ArrayList<>(lock.keysByName.getOrDefault(name, emptyList()));
 
             // Exact version matches are retained entries.
             for (Iterator<String> it = nodeKeys.iterator(); it.hasNext(); ) {
@@ -158,7 +160,7 @@ final class PnpmLockDiff {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, name,
                     name + "@" + m.getVersion() + " has no registry integrity");
         }
-        Set<String> oldEdges = lock.snapshotDepNames.getOrDefault(lockKey, Collections.emptySet());
+        Set<String> oldEdges = lock.snapshotDepNames.getOrDefault(lockKey, emptySet());
         Map<String, String> newEdges = layout.snapshotDependencies(nodeKey);
         if (!oldEdges.containsAll(newEdges.keySet())) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
@@ -490,7 +492,7 @@ final class PnpmLockDiff {
                     refs.add(providerKey + computeSuffix(providerKey, visiting));
                 }
             }
-            Collections.sort(refs);
+            sort(refs);
             StringBuilder sb = new StringBuilder();
             for (String ref : refs) {
                 sb.append('(').append(ref).append(')');
@@ -582,7 +584,7 @@ final class PnpmLockDiff {
 
         private static Set<String> declaredPeerNames(ResolvedNode node) {
             Map<String, String> peers = node.getManifest().getPeerDependencies();
-            return peers == null ? Collections.emptySet() : peers.keySet();
+            return peers == null ? emptySet() : peers.keySet();
         }
     }
 }

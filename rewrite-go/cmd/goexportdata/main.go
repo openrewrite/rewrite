@@ -1,0 +1,198 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Command goexportdata writes the export data for a set of packages into a Go
+// package a recipe module embeds, so its templates attribute against the real
+// API offline. Run it where the packages resolve; commit what it writes.
+// See doc/recipe-authoring.md: Shipped export data.
+//
+//	goexportdata -o internal/jsonv2exportdata encoding/json/v2 encoding/json/jsontext
+package main
+
+import (
+	"bytes"
+	"flag"
+	"fmt"
+	"go/format"
+	"go/token"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"text/template"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/exportdata"
+)
+
+const (
+	blobDir  = "blobs"
+	shimFile = "exportdata.go"
+)
+
+func main() {
+	out := flag.String("o", "", "directory to write the generated package into")
+	dir := flag.String("C", ".", "module directory the import paths resolve in")
+	pkg := flag.String("pkg", "", "name of the generated package (default: the -o directory's name)")
+	flag.Parse()
+
+	if *out == "" || flag.NArg() == 0 {
+		fmt.Fprintf(os.Stderr, "usage: goexportdata -o <dir> [-C <module dir>] [-pkg <name>] <import path>...\n")
+		os.Exit(2)
+	}
+	if err := generate(*dir, *out, flag.Args(), *pkg); err != nil {
+		fmt.Fprintln(os.Stderr, "goexportdata:", err)
+		os.Exit(1)
+	}
+}
+
+func generate(moduleDir, outDir string, importPaths []string, pkgName string) error {
+	if pkgName == "" {
+		pkgName = filepath.Base(outDir)
+	}
+	if !token.IsIdentifier(pkgName) || token.IsKeyword(pkgName) {
+		return fmt.Errorf("%q is not a usable package name; pass -pkg", pkgName)
+	}
+	for _, path := range importPaths {
+		if err := checkImportPath(path); err != nil {
+			return err
+		}
+	}
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	// Blobs are built beside the existing set and swapped in at the end, so a
+	// path that fails to compile leaves the previous set in place.
+	staging, err := os.MkdirTemp(outDir, ".goexportdata-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(staging)
+
+	for _, path := range importPaths {
+		blob, err := exportDataFor(moduleDir, path)
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		name := filepath.Join(staging, filepath.FromSlash(exportdata.BlobName(path)))
+		if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(name, blob, 0o644); err != nil {
+			return err
+		}
+	}
+
+	shim, err := renderShim(importPaths, pkgName)
+	if err != nil {
+		return err
+	}
+
+	// The shim embeds the whole directory, so a blob left from a previous run
+	// would keep shadowing the toolchain for a path Paths no longer names.
+	blobs := filepath.Join(outDir, blobDir)
+	if err := os.RemoveAll(blobs); err != nil {
+		return err
+	}
+	if err := os.Rename(staging, blobs); err != nil {
+		return err
+	}
+	// MkdirTemp makes the staging directory private to its owner; the blobs
+	// travel with the repository and are read by whoever builds it.
+	if err := os.Chmod(blobs, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, shimFile), shim, 0o644)
+}
+
+// checkImportPath rejects spellings the blob layout cannot express: a
+// relative path escapes the embedded directory and cannot be read back
+// through an fs.FS. What a name expands to is settled by go list's output.
+func checkImportPath(path string) error {
+	if path == "" || strings.HasPrefix(path, ".") || strings.Contains(path, "...") {
+		return fmt.Errorf("%q: pass one full import path per package", path)
+	}
+	return nil
+}
+
+func exportDataFor(moduleDir, importPath string) ([]byte, error) {
+	cmd := exec.Command("go", "list", "-export", "-f", "{{.Export}}", importPath)
+	cmd.Dir = moduleDir
+	// `go` reports progress on stderr while it downloads, which must stay out
+	// of the one path stdout carries.
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("go list -export: %w: %s", err, bytes.TrimSpace(stderr.Bytes()))
+	}
+	archivePath := strings.TrimSpace(string(out))
+	if archivePath == "" {
+		return nil, fmt.Errorf("go list reported no export data")
+	}
+	if strings.ContainsAny(archivePath, "\r\n") {
+		return nil, fmt.Errorf("names %d packages; pass one at a time",
+			strings.Count(archivePath, "\n")+1)
+	}
+	archive, err := os.ReadFile(archivePath)
+	if err != nil {
+		return nil, err
+	}
+	// An archive an importer reads but the packer does not recognize still
+	// makes a usable blob; only its size is worse.
+	blob, err := exportdata.Pack(archive)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "goexportdata: %s: keeping the unpacked archive: %v\n", importPath, err)
+		return archive, nil
+	}
+	return blob, nil
+}
+
+var shimTemplate = template.Must(template.New("shim").Parse(`// Code generated by goexportdata. DO NOT EDIT.
+
+package {{.Package}}
+
+import (
+	"embed"
+	"io/fs"
+)
+
+//go:embed all:{{.BlobDir}}
+var blobs embed.FS
+
+// FS holds the export data for Paths, ready to hand to a template's
+// ExportData option.
+var FS, _ = fs.Sub(blobs, "{{.BlobDir}}")
+
+// Paths are the import paths FS covers, for exportdata.Verify to check.
+var Paths = []string{
+{{- range .Paths}}
+	{{printf "%q" .}},
+{{- end}}
+}
+`))
+
+func renderShim(importPaths []string, pkgName string) ([]byte, error) {
+	var buf bytes.Buffer
+	err := shimTemplate.Execute(&buf, struct {
+		Package string
+		BlobDir string
+		Paths   []string
+	}{pkgName, blobDir, importPaths})
+	if err != nil {
+		return nil, err
+	}
+	return format.Source(buf.Bytes())
+}

@@ -44,6 +44,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
@@ -63,6 +64,8 @@ public class MavenPomDownloader {
             .withJitter(0.1)
             .withMaxRetries(5)
             .build();
+
+    private static final Duration THROTTLE_COOLDOWN = Duration.ofSeconds(60);
 
     private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
 
@@ -161,7 +164,14 @@ public class MavenPomDownloader {
             });
         } catch (FailsafeException failsafeException) {
             if (failsafeException.getCause() instanceof HttpSenderResponseException) {
-                throw (HttpSenderResponseException) failsafeException.getCause();
+                HttpSenderResponseException e = (HttpSenderResponseException) failsafeException.getCause();
+                if (e.isThrottled()) {
+                    String endpoint = endpointOrNull(URI.create(request.getUrl().toString()));
+                    if (endpoint != null) {
+                        ctx.getThrottledEndpoints().put(endpoint, Instant.now().plus(THROTTLE_COOLDOWN));
+                    }
+                }
+                throw e;
             }
             throw failsafeException;
         } catch (UncheckedIOException e) {
@@ -169,6 +179,26 @@ public class MavenPomDownloader {
         } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }
+    }
+
+    /**
+     * Whether the repository's endpoint answered HTTP 429 recently enough that it is still cooling down.
+     */
+    private boolean throttled(MavenRepository repo) {
+        Map<String, Instant> throttled = ctx.getThrottledEndpoints();
+        if (throttled.isEmpty()) {
+            return false;
+        }
+        String endpoint = endpointOrNull(URI.create(repo.getUri()));
+        Instant until = endpoint == null ? null : throttled.get(endpoint);
+        if (until == null) {
+            return false;
+        }
+        if (Instant.now().isBefore(until)) {
+            return true;
+        }
+        throttled.remove(endpoint, until);
+        return false;
     }
 
     private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
@@ -258,14 +288,11 @@ public class MavenPomDownloader {
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "metadata");
 
         MavenMetadata mavenMetadata = null;
-        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
         List<String> attemptedUris = new ArrayList<>();
         for (MavenRepository repo : normalizedRepos) {
             ctx.getResolutionListener().repository(repo, containingPom);
-            if (gav.getVersion() != null && !repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
-                continue;
-            }
             attemptedUris.add(repo.getUri());
             Optional<MavenMetadata> result = mavenCache.getMavenMetadata(URI.create(repo.getUri()), gav);
             if (result == null) {
@@ -363,9 +390,10 @@ public class MavenPomDownloader {
      * @return Metadata or null if the metadata cannot be derived.
      */
     private @Nullable MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, IOException, MavenDownloadingException {
-        if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null) {
+        if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null || throttled(repo)) {
             // Do not derive metadata if we cannot navigate/browse the artifacts.
             // Do not derive metadata if a specific version has been defined.
+            // Do not derive metadata from an endpoint that has just answered 429 to the metadata request.
             return null;
         }
 
@@ -879,7 +907,7 @@ public class MavenPomDownloader {
         // Return lazy iterable
         return () -> new Iterator<MavenRepository>() {
             private final Iterator<MavenRepository> repoIterator = repositoriesById.values().iterator();
-            private final Map<@Nullable String, MavenRepository> seen = new LinkedHashMap<>();
+            private final Set<String> seen = new HashSet<>();
             private @Nullable MavenRepository next;
 
             private @Nullable MavenRepository findNext() {
@@ -889,7 +917,11 @@ public class MavenPomDownloader {
 
                     if (normalized != null &&
                         (acceptsVersion == null || repositoryAcceptsVersion(normalized, acceptsVersion, containingPom)) &&
-                        seen.put(normalized.getId(), normalized) == null) {
+                        seen.add(uriKey(normalized))) {
+                        if (throttled(normalized)) {
+                            ctx.getResolutionListener().repositoryAccessFailedPreviously(normalized.getUri());
+                            continue;
+                        }
                         return normalized;
                     }
                 }
@@ -1259,6 +1291,24 @@ public class MavenPomDownloader {
         return host == null ? null : host + ':' + uri.getPort();
     }
 
+    /**
+     * Repositories are deduplicated by the URI that would be asked rather than by id: the id is Maven's
+     * override key, but two declarations of one URL under different ids would cost a request each.
+     */
+    private static String uriKey(MavenRepository repository) {
+        String uri = repository.getUri();
+        if (uri.endsWith("/")) {
+            uri = uri.substring(0, uri.length() - 1);
+        }
+        // Scheme and host are case-insensitive; the path is not
+        int authorityStart = uri.indexOf("://");
+        if (authorityStart < 0) {
+            return uri;
+        }
+        int pathStart = uri.indexOf('/', authorityStart + 3);
+        return pathStart < 0 ? uri.toLowerCase() : uri.substring(0, pathStart).toLowerCase() + uri.substring(pathStart);
+    }
+
     private MavenRepository applyMirrors(MavenRepository repository) {
         return MavenRepositoryMirror.apply(mirrors, repository);
     }
@@ -1299,6 +1349,10 @@ public class MavenPomDownloader {
 
         public boolean isAccessDenied() {
             return responseCode != null && 400 < responseCode && responseCode <= 403;
+        }
+
+        public boolean isThrottled() {
+            return responseCode != null && responseCode == 429;
         }
 
         // Any response code below 100 implies that no connection was made. Sometimes 0 or -1 is used for connection failures.

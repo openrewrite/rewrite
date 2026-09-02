@@ -27,9 +27,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.synchronizedMap;
 
 /**
@@ -74,7 +78,7 @@ public class DependencyWorkspace {
      * @return Path to the workspace directory containing .venv
      */
     static Path getOrCreateWorkspace(String pyprojectContent) {
-        return getOrCreateWorkspace(pyprojectContent, Collections.emptyMap());
+        return getOrCreateWorkspace(pyprojectContent, emptyMap());
     }
 
     /**
@@ -169,7 +173,7 @@ public class DependencyWorkspace {
      */
     static @Nullable Path getOrCreateRequirementsWorkspace(String requirementsContent,
                                                             @Nullable Path originalFilePath) {
-        return getOrCreateRequirementsWorkspace(requirementsContent, originalFilePath, Collections.emptyMap());
+        return getOrCreateRequirementsWorkspace(requirementsContent, originalFilePath, emptyMap());
     }
 
     /**
@@ -282,7 +286,7 @@ public class DependencyWorkspace {
      */
     public static @Nullable Path getOrCreateSetuptoolsWorkspace(String manifestContent,
                                                                 @Nullable Path projectDir) {
-        return getOrCreateSetuptoolsWorkspace(manifestContent, projectDir, Collections.emptyMap());
+        return getOrCreateSetuptoolsWorkspace(manifestContent, projectDir, emptyMap());
     }
 
     /**

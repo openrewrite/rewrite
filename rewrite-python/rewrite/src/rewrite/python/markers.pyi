@@ -48,6 +48,19 @@ class Quoted(Marker):
     def with_style(self, style: Style) -> Quoted: ...
 
 @dataclass(frozen=True)
+class CanonicalName(Marker):
+    _id: UUID
+    _fqn: str
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def fqn(self) -> str: ...
+
+    def with_id(self, id_: UUID) -> CanonicalName: ...
+    def with_fqn(self, fqn: str) -> CanonicalName: ...
+
+@dataclass(frozen=True)
 class SuppressNewline(Marker):
     _id: UUID
 

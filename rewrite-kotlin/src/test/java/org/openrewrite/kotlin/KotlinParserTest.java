@@ -27,9 +27,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
@@ -105,7 +105,7 @@ class KotlinParserTest implements RewriteTest {
         List<SourceFile> results = parser
           .parseInputs(singletonList(throwingInput), null, new InMemoryExecutionContext(t -> {
           }))
-          .collect(Collectors.toList());
+          .collect(toList());
 
         // dependsOn must not leak into the returned stream on the error path
         assertThat(results)

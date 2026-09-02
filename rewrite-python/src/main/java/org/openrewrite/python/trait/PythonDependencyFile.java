@@ -15,7 +15,8 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 
-import java.util.*;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**

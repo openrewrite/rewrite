@@ -19,6 +19,8 @@ package parser_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -29,19 +31,13 @@ import (
 func firstStatementInBody(t *testing.T, src string) java.Statement {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("body.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err, "parse")
 	if len(cu.Statements) == 0 {
 		t.Fatalf("no top-level statements parsed")
 	}
 	fn, ok := cu.Statements[0].Element.(*java.MethodDeclaration)
-	if !ok {
-		t.Fatalf("expected first statement to be *java.MethodDeclaration, got %T", cu.Statements[0].Element)
-	}
-	if fn.Body == nil || len(fn.Body.Statements) == 0 {
-		t.Fatalf("function body is empty")
-	}
+	require.Truef(t, ok, "expected first statement to be *java.MethodDeclaration, got %T", cu.Statements[0].Element)
+	require.False(t, fn.Body == nil || len(fn.Body.Statements) == 0, "function body is empty")
 	return fn.Body.Statements[0].Element
 }
 
@@ -71,14 +67,10 @@ func TestIfConditionIsControlParentheses(t *testing.T) {
 
 	// when
 	ifStmt, ok := firstStatementInBody(t, src).(*java.If)
-	if !ok {
-		t.Fatalf("expected *java.If")
-	}
+	require.True(t, ok, "expected *java.If")
 
 	// then
-	if ifStmt.Condition == nil {
-		t.Fatalf("condition must be a *java.ControlParentheses, got nil")
-	}
+	require.NotNil(t, ifStmt.Condition, "condition must be a *java.ControlParentheses, got nil")
 	if _, ok := ifStmt.Condition.Tree.Element.(*java.Identifier); !ok {
 		t.Fatalf("expected the condition to wrap the bare *java.Identifier, got %T", ifStmt.Condition.Tree.Element)
 	}
@@ -95,19 +87,13 @@ func TestIfWithInitIsWrapped(t *testing.T) {
 
 	// then
 	wrapper, ok := stmt.(*golang.StatementWithInit)
-	if !ok {
-		t.Fatalf("expected *golang.StatementWithInit, got %T", stmt)
-	}
-	if wrapper.Init.Element == nil {
-		t.Fatalf("wrapper must carry the init statement")
-	}
+	require.Truef(t, ok, "expected *golang.StatementWithInit, got %T", stmt)
+	require.NotNil(t, wrapper.Init.Element, "wrapper must carry the init statement")
 	if _, ok := wrapper.Statement.(*java.If); !ok {
 		t.Fatalf("wrapper must hold the inner *java.If, got %T", wrapper.Statement)
 	}
 	// The prefix (whitespace before `if`) belongs on the outermost node.
-	if wrapper.Prefix.Whitespace != "\n\t" {
-		t.Fatalf("expected wrapper to carry the prefix %q, got %q", "\n\t", wrapper.Prefix.Whitespace)
-	}
+	require.Equalf(t, "\n\t", wrapper.Prefix.Whitespace, "expected wrapper to carry the prefix %q", "\n\t")
 	if inner := wrapper.Statement.(*java.If); inner.Prefix.Whitespace != "" || len(inner.Prefix.Comments) != 0 {
 		t.Fatalf("inner if must be prefix-less, got %+v", inner.Prefix)
 	}
@@ -124,9 +110,7 @@ func TestSwitchWithInitIsWrapped(t *testing.T) {
 
 	// then
 	wrapper, ok := stmt.(*golang.StatementWithInit)
-	if !ok {
-		t.Fatalf("expected *golang.StatementWithInit, got %T", stmt)
-	}
+	require.Truef(t, ok, "expected *golang.StatementWithInit, got %T", stmt)
 	if _, ok := wrapper.Statement.(*java.Switch); !ok {
 		t.Fatalf("wrapper must hold the inner *java.Switch, got %T", wrapper.Statement)
 	}

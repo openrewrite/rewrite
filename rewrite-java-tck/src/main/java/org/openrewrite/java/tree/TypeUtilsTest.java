@@ -116,6 +116,47 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void isOverrideProtectedInDifferentPackage() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+              public class Superclass {
+                  protected void foo() { }
+              }
+              """
+          ),
+          java(
+            """
+              package bar;
+              import foo.Superclass;
+              class Clazz extends Superclass {
+                  @Override protected void foo() { }
+              }
+              """,
+            typeIsPresent()
+          )
+        );
+    }
+
+    @Test
+    void isNotOverrideOfProtectedObjectMethodFromInterface() {
+        rewriteRun(
+          java(
+            """
+              interface Reproducer extends Cloneable {
+                  Reproducer clone();
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                var cloneMethodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+                assertThat(TypeUtils.findOverriddenMethod(cloneMethodType)).isEmpty();
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1759")
     @Test
     void isOverrideParameterizedInterface() {

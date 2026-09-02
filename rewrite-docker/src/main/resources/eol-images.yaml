@@ -765,6 +765,11 @@
   eolDate: "2026-02-10"
   suggestedReplacement: 
 
+- imageName: golang
+  tagPatterns: ["1.25", "1.25.*", "1.25-*"]
+  eolDate: "2026-08-19"
+  suggestedReplacement: 
+
 # Official OpenJDK image (deprecated in 2022, recommends eclipse-temurin)
 - imageName: openjdk
   tagPatterns: ["7", "7-*", "7u*"]

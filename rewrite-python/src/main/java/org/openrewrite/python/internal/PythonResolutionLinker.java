@@ -28,9 +28,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 /**
  * Overlays resolved-dependency information from a parsed lock file onto a
@@ -74,8 +74,7 @@ public final class PythonResolutionLinker {
         marker = marker.withOptionalDependencies(linkMap(marker.getOptionalDependencies(), resolvedDeps));
         marker = marker.withDependencyGroups(linkMap(marker.getDependencyGroups(), resolvedDeps));
         marker = marker.withConstraintDependencies(link(marker.getConstraintDependencies(), resolvedDeps));
-        marker = marker.withOverrideDependencies(link(marker.getOverrideDependencies(), resolvedDeps));
-        return marker;
+        return marker.withOverrideDependencies(link(marker.getOverrideDependencies(), resolvedDeps));
     }
 
     /**
@@ -93,7 +92,7 @@ public final class PythonResolutionLinker {
         for (ResolvedDependency dep : resolved) {
             String newVersion = updatedVersion(dep, versionUpdates);
             List<String> depNames = dep.getDependencies() == null ? emptyList() :
-                    dep.getDependencies().stream().map(ResolvedDependency::getName).collect(Collectors.toList());
+                    dep.getDependencies().stream().map(ResolvedDependency::getName).collect(toList());
             packages.add(new UnlinkedPackage(dep.getName(),
                     newVersion != null ? newVersion : dep.getVersion(), dep.getSource(), depNames));
         }
@@ -114,7 +113,7 @@ public final class PythonResolutionLinker {
                     .findFirst()
                     .orElse(null);
             return found != null ? dep.withResolved(found) : dep;
-        }).collect(Collectors.toList());
+        }).collect(toList());
     }
 
     public static Map<String, List<Dependency>> linkMap(Map<String, List<Dependency>> depMap,

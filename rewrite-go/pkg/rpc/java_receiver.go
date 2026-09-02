@@ -649,6 +649,23 @@ func (r *JavaReceiver) VisitParentheses(parens *java.Parentheses, p any) java.J 
 	return parens
 }
 
+func (r *JavaReceiver) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ptt // shallow copy to avoid mutating remoteObjects baseline
+	ptt = &c
+	// annotations
+	if after := receiveTypedList(q, ptt.Annotations,
+		func(v any) any { return r.Visit(v.(java.Tree), q) },
+		func(v any) *java.Annotation { return v.(*java.Annotation) }); after != nil {
+		ptt.Annotations = after
+	}
+	// parenthesizedType
+	if result := q.Receive(ptt.Type, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
+		ptt.Type = result.(*java.Parentheses)
+	}
+	return ptt
+}
+
 func (r *JavaReceiver) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *tc // shallow copy to avoid mutating remoteObjects baseline

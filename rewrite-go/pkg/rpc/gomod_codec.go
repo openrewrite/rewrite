@@ -127,8 +127,8 @@ func receiveGoMod(gm *golang.GoMod, q *ReceiveQueue) *golang.GoMod {
 	gm.SourcePath = receiveScalar[string](q, gm.SourcePath)
 	gm.Charset = receiveScalar[string](q, gm.Charset)
 	gm.CharsetBomMarked = receiveScalar[bool](q, gm.CharsetBomMarked)
-	q.Receive(nil, nil) // checksum
-	q.Receive(nil, nil) // fileAttributes
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	gm.Statements = recvGoModStmtList(q, gm.Statements)
 	gm.Eof = recvGoModSpace(q, gm.Eof)
 	return gm

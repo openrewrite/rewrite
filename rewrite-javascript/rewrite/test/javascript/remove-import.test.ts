@@ -585,6 +585,40 @@ describe('RemoveImport visitor', () => {
             );
         });
 
+        test('should remove a destructured require member bound under another name', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const {readFile: rf, writeFile} = require('fs');
+
+                        function example() {
+                            writeFile('test.txt', 'content', () => {
+                            });
+                        }
+                    `,
+                    `
+                        const {writeFile} = require('fs');
+
+                        function example() {
+                            writeFile('test.txt', 'content', () => {
+                            });
+                        }
+                    `
+                ),
+                // `readFile` here reads a property of `a`, not a member of the module, so nothing
+                // the module exports is bound and there is nothing to remove even though it is unused.
+                typescript(
+                    `
+                        const {a: {readFile}} = require('fs');
+                    `
+                )
+            );
+        });
+
         test('should remove destructured require', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));

@@ -31,10 +31,11 @@ import org.openrewrite.marker.Markers;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -111,20 +112,20 @@ class MarkerRoundTripTest {
                         new GoResolutionResult.Replace("github.com/x/y", null, "../local/y", null),
                         new GoResolutionResult.Replace("github.com/a/b", "v1.0.0", "github.com/forked/b", "v1.0.1")
                 ),
-                Collections.singletonList(
+                singletonList(
                         new GoResolutionResult.Exclude("github.com/bad", "v0.0.1")
                 ),
                 Arrays.asList(
                         new GoResolutionResult.Retract("v0.0.5", "deleted main.go"),
                         new GoResolutionResult.Retract("[v1.0.0, v1.0.5]", null)
                 ),
-                Collections.singletonList(
+                singletonList(
                         new GoResolutionResult.ResolvedDependency(
                                 "github.com/google/uuid", "v1.6.0",
                                 "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=",
                                 "h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=",
                                 false, true, null, null, "1.22",
-                                Collections.singletonList(
+                                singletonList(
                                         new GoResolutionResult.ModuleRef("golang.org/x/mod", "v0.35.0")))
                 ),
                 Arrays.asList(
@@ -155,12 +156,12 @@ class MarkerRoundTripTest {
                 null,
                 null,
                 "go.mod",
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyList()
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                emptyList()
         );
         cu = cu.withMarkers(cu.getMarkers().addIfAbsent(marker));
 
@@ -183,14 +184,14 @@ class MarkerRoundTripTest {
                         "1.22",
                         null,
                         "go.mod",
-                        Collections.singletonList(
+                        singletonList(
                                 new GoResolutionResult.Require("github.com/google/uuid", "v1.6.0", false)
                         ),
-                        Collections.emptyList(),
-                        Collections.emptyList(),
-                        Collections.emptyList(),
-                        Collections.emptyList(),
-                        Collections.emptyList()
+                        emptyList(),
+                        emptyList(),
+                        emptyList(),
+                        emptyList(),
+                        emptyList()
                 ));
         cu = cu.withMarkers(markers);
 
@@ -215,17 +216,17 @@ class MarkerRoundTripTest {
                 .addIfAbsent(new GoProject(projectId, "example/foo", "example.com/foo"))
                 .addIfAbsent(new GoResolutionResult(
                         gomodId, "example.com/foo", "1.22", null, "go.mod",
-                        Collections.singletonList(
+                        singletonList(
                                 new GoResolutionResult.Require("github.com/google/uuid", "v1.6.0", false)),
-                        Collections.emptyList(), Collections.emptyList(),
-                        Collections.emptyList(),
-                        Collections.singletonList(
+                        emptyList(), emptyList(),
+                        emptyList(),
+                        singletonList(
                                 new GoResolutionResult.ResolvedDependency(
                                         "github.com/google/uuid", "v1.6.0", "h1:abc=", "h1:def=",
                                         false, true, null, null, "1.22",
-                                        Collections.singletonList(
+                                        singletonList(
                                                 new GoResolutionResult.ModuleRef("golang.org/x/mod", "v0.35.0")))),
-                        Collections.singletonList(
+                        singletonList(
                                 new GoResolutionResult.PackageModule("github.com/google/uuid",
                                         "github.com/google/uuid", "v1.6.0", false)))));
 

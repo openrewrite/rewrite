@@ -297,20 +297,23 @@ def test_handle_request_routes_to_facade_in_facade_mode(monkeypatch, tmp_path):
 
 def test_hub_release_rolls_each_childs_ref_table_back_in_lockstep():
     import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
 
     server._hub_tree["T"] = object()
     server._hub_served[("A", "T")] = object()
     # child A had 2 refs before this file, then the file introduced refs 3 and 4
-    server._hub_send_refs["A"] = {10: ("before-1", 1), 11: ("before-2", 2),
-                                  12: ("from-file", 3), 13: ("from-file", 4)}
-    server._hub_send_next["A"] = 4
+    refs = server._hub_send_refs["A"] = ReferenceMap()
+    survivors = [object(), object()]
+    for obj in survivors + [object(), object()]:
+        refs.create(obj)
     server._hub_send_checkpoint[("A", "T")] = 2
 
     server._hub_release("T")
 
     # only the refs this file introduced are dropped; the pre-file ones survive
-    assert sorted(n for _, n in server._hub_send_refs["A"].values()) == [1, 2]
-    assert server._hub_send_next["A"] == 2          # counter rewound so the next file re-ADDs
+    assert [refs.get(obj) for obj in survivors] == [1, 2]
+    assert len(refs) == 2
+    assert refs.snapshot() == 2                     # counter rewound so the next file re-ADDs
     assert "T" not in server._hub_tree
     assert ("A", "T") not in server._hub_served
     assert ("A", "T") not in server._hub_send_checkpoint
@@ -404,7 +407,7 @@ def _print_python(cu) -> str:
 
 def _isolated_hub(monkeypatch, server):
     """Fresh hub state so this test neither sees nor leaves module-global tables."""
-    for name in ("_hub_tree", "_hub_served", "_hub_send_refs", "_hub_send_next",
+    for name in ("_hub_tree", "_hub_served", "_hub_send_refs",
                  "_hub_send_checkpoint", "local_objects"):
         monkeypatch.setattr(server, name, {})
 
@@ -496,7 +499,7 @@ def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monke
 
     server._hub_acquire(tree_id, sft)
     server._hub_serve_child(bundle, tree_id, sft)      # child now holds this file and its refs
-    assert server._hub_send_next[bundle] > 0
+    assert server._hub_send_refs[bundle].snapshot() > 0
 
     results = server._hub_local_visit([{"visitor": "Delete"}, {"visitor": "Later"}],
                                       {"treeId": tree_id, "sourceFileType": sft})
@@ -510,8 +513,8 @@ def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monke
     assert tree_id not in server._hub_tree
     assert (bundle, tree_id) not in server._hub_served
     assert (bundle, tree_id) not in server._hub_send_checkpoint
-    assert server._hub_send_refs[bundle] == {}
-    assert server._hub_send_next[bundle] == 0
+    assert len(server._hub_send_refs[bundle]) == 0
+    assert server._hub_send_refs[bundle].snapshot() == 0
 
     # So a child asking for it again is told the file is gone rather than served a stale tree.
     assert server._hub_serve_child(bundle, tree_id, sft) == [

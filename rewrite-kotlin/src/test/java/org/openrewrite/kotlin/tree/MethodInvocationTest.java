@@ -669,7 +669,7 @@ class MethodInvocationTest implements RewriteTest {
               val surface = Surface()
               val z = surface[4, 2]
               """,
-            spec -> spec.afterRecipe(cu -> {
+            spec -> spec.afterRecipe(cu ->
                 assertThat(((J.VariableDeclarations) cu.getStatements().get(cu.getStatements().size() - 1))).satisfies(
                     z ->
                         assertThat(((J.MethodInvocation) z.getVariables().getFirst().getInitializer())).satisfies(
@@ -680,8 +680,7 @@ class MethodInvocationTest implements RewriteTest {
                                 assertThat(get.getArguments()).hasSize(2);
                             }
                         )
-                );
-            })
+                ))
           )
         );
     }

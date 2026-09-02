@@ -15,12 +15,14 @@
 """RemoveImport visitor for Python import handling."""
 
 from dataclasses import dataclass
-from typing import Optional, Set
+from typing import List, Optional, Sequence, Set
 
 from rewrite.java import J
-from rewrite.java.support_types import JContainer, JRightPadded
-from rewrite.java.tree import Identifier, Import, Space
-from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, get_canonical_fqn
+from rewrite.java.support_types import JContainer, JRightPadded, Statement
+from rewrite.java.tree import Identifier, If, Import, Space
+from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
+                                         get_canonical_fqn, referenced_names,
+                                         unconditional_body)
 from rewrite.python.scope_utils import LocalBindings
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
@@ -167,8 +169,9 @@ class RemoveImport(PythonVisitor):
                     self.in_import = False
 
             def visit_identifier(self, ident: Identifier, p) -> J:
-                if not self.in_import and not bindings.is_bound(self.cursor, ident.simple_name):
-                    used.add(ident.simple_name)
+                if not self.in_import:
+                    used.update(name for name in referenced_names(ident)
+                                if not bindings.is_bound(self.cursor, name))
                 return ident
 
         collector = UsageCollector()
@@ -177,59 +180,68 @@ class RemoveImport(PythonVisitor):
 
     def _remove_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Remove the import from the compilation unit."""
-        new_padded_stmts = []
+        kept = self._prune_statements(cu.padding.statements)
+        return cu if kept is None else cu.padding.replace(_statements=kept)
+
+    def _prune_statements(self, padded_statements: Sequence[JRightPadded]) -> Optional[List[JRightPadded]]:
+        """The statements with the import gone, or None to leave them as they are —
+        because nothing matched, or because a comment would go with the removal. One
+        prefix cannot carry two comments, so a collision abandons the removal."""
+        kept: List[JRightPadded] = []
+        inherited: Optional[Space] = None
         changed = False
-        removed_prefix = None
-
-        for index, padded in enumerate(cu.padding.statements):
+        for index, padded in enumerate(padded_statements):
             stmt = padded.element
-            if isinstance(stmt, Import) and not isinstance(stmt, MultiImport):
-                result = self._process_single_import(stmt)
-                if result is None:
-                    removed_prefix = prefix_to_inherit(stmt, index)
-                    changed = True
-                else:
-                    if removed_prefix is not None:
-                        padded = JRightPadded(
-                            padded.element.replace(prefix=removed_prefix),
-                            padded.after, padded.markers
-                        )
-                        removed_prefix = None
-                    new_padded_stmts.append(padded)
-                continue
             if isinstance(stmt, MultiImport):
-                result = self._process_multi_import(stmt)
-                if result is None:
-                    # Remove the entire statement; remember its prefix
-                    # so the next statement can inherit it if needed
-                    removed_prefix = prefix_to_inherit(stmt, index)
-                    changed = True
-                else:
-                    if result is not stmt:
-                        padded = JRightPadded(result, padded.after, padded.markers)
-                        changed = True
-                    # Transfer removed statement's prefix to this statement
-                    if removed_prefix is not None:
-                        padded = JRightPadded(
-                            padded.element.replace(prefix=removed_prefix),
-                            padded.after, padded.markers
-                        )
-                        removed_prefix = None
-                    new_padded_stmts.append(padded)
+                result: Optional[Statement] = self._process_multi_import(stmt)
+            elif isinstance(stmt, Import):
+                result = self._process_single_import(stmt)
+            elif isinstance(stmt, If):
+                result = self._prune_if_body(stmt)
             else:
-                # Transfer removed statement's prefix to the next statement
-                if removed_prefix is not None:
-                    new_padded_stmts.append(JRightPadded(
-                        stmt.replace(prefix=removed_prefix),
-                        padded.after, padded.markers
-                    ))
-                    removed_prefix = None
-                else:
-                    new_padded_stmts.append(padded)
+                result = stmt
 
-        if changed:
-            return cu.padding.replace(_statements=new_padded_stmts)
-        return cu
+            if result is None:
+                changed = True
+                if inherited is None:
+                    inherited = prefix_to_inherit(stmt, index)
+                elif stmt.prefix.comments:
+                    return None
+                continue
+            if result is not stmt:
+                padded = JRightPadded(result, padded.after, padded.markers)
+                changed = True
+            if inherited is not None:
+                if not padded.element.prefix.comments:
+                    padded = JRightPadded(
+                        padded.element.replace(prefix=inherited), padded.after, padded.markers
+                    )
+                elif inherited.comments:
+                    return None
+                inherited = None
+            kept.append(padded)
+        # A leftover prefix means nothing followed the removal to carry it, so a
+        # comment on the removed statement would be dropped with it.
+        if inherited is not None and inherited.comments:
+            return None
+        return kept if changed else None
+
+    def _prune_if_body(self, if_: If) -> Optional[If]:
+        """`if_` with the import gone from its body, or None once that empties it."""
+        body = unconditional_body(if_)
+        if body is None:
+            return if_
+        kept = self._prune_statements(body.padding.statements)
+        if kept is None:
+            return if_
+        if not kept:
+            return None
+        padded = if_.padding.then_part
+        return if_.padding.replace(
+            _then_part=JRightPadded(
+                body.padding.replace(_statements=kept), padded.after, padded.markers
+            )
+        )
 
     def _process_single_import(self, imp: Import) -> Optional[Import]:
         """Process a standalone J.Import. Return None to remove, or the original."""
@@ -250,13 +262,12 @@ class RemoveImport(PythonVisitor):
             return self._remove_name_from_import(multi)
 
     def _remove_module_import(self, multi: MultiImport) -> Optional[MultiImport]:
-        """Remove an entire module import (import X or from X import ...)."""
+        """Remove the import that binds the module itself."""
         if multi.from_ is not None:
             # This is a "from X import Y" statement
-            syntactic = get_name_string(multi.from_) == self.module
             new_padded = [
                 padded_imp for padded_imp in multi.padding.names.padding.elements
-                if not (syntactic or self._canonical_module_matches(padded_imp.element))
+                if not self._canonical_module_matches(padded_imp.element)
                 or not self._is_removable(padded_imp.element,
                                           get_qualid_name(padded_imp.element.qualid))
             ]
@@ -273,10 +284,9 @@ class RemoveImport(PythonVisitor):
 
     def _canonical_module_matches(self, imp: Import) -> bool:
         """True when ``imp`` binds the requested module itself (``from os import
-        path`` for ``os.path``). Membership is deliberately not enough: a module
-        is the canonical home of every symbol re-exported through it, so
-        matching members would sweep up imports written against other modules.
-        """
+        path`` for ``os.path``). Membership is deliberately not enough, written
+        (``from typing import Any``) or canonical (``typing`` is the home of every
+        symbol re-exported through it): a member binds the member, not the module."""
         return get_canonical_fqn(imp) == self.module
 
     def _remove_name_from_import(self, multi: MultiImport) -> Optional[MultiImport]:
@@ -312,11 +322,12 @@ class RemoveImport(PythonVisitor):
         if len(new_padded) == len(existing_padded):
             return multi
 
-        # Fix up the first element's prefix to not have a leading space
-        # (only relevant if the removed element was the first one)
+        # Whatever separated the statement from its first name — nothing, or the line break
+        # and indent of a parenthesized import — belongs to whichever name is first now.
         first = new_padded[0]
-        if first.element.prefix != Space.EMPTY:
-            new_padded[0] = first.replace(_element=first.element.replace(prefix=Space.EMPTY))
+        leading = existing_padded[0].element.prefix
+        if first.element.prefix != leading:
+            new_padded[0] = first.replace(_element=first.element.replace(prefix=leading))
 
         return MultiImport(
             multi.id,

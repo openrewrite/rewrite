@@ -51,6 +51,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -150,6 +151,21 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .containsExactly("settings-provided", "local-provided");
             }))
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+    @Test
+    void repositoriesDeclaredUnderDifferentIdsForTheSameUriAreAskedOnce() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var repositories = List.of(
+          MavenRepository.builder().id("first").uri("https://repo.example.com/maven").knownToExist(true).build(),
+          MavenRepository.builder().id("second").uri("https://REPO.example.com/maven/").knownToExist(true).build(),
+          MavenRepository.builder().id("third").uri("https://repo.example.com/other/").knownToExist(true).build()
+        );
+
+        assertThat(new MavenPomDownloader(ctx).distinctNormalizedRepositories(repositories, null, null))
+          .extracting(MavenRepository::getId)
+          .containsExactly("first", "third");
     }
 
     @Nested
@@ -1334,6 +1350,94 @@ class MavenPomDownloaderTest implements RewriteTest {
                 var normalizedRepo = downloader.normalizeRepository(originalRepo, MavenExecutionContextView.view(ctx), null);
                 assertThat(normalizedRepo).isEqualTo(originalRepo);
             });
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+        @Test
+        void throttledEndpointIsNotAskedAgainUntilItsCooldownElapses() {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            List<String> skipped = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repositoryAccessFailedPreviously(String uri) {
+                    skipped.add(uri);
+                }
+            });
+            var downloader = new MavenPomDownloader(ctx);
+            mockServer(429, mockRepo -> {
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .knownToExist(true)
+                  .build());
+
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "first"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                // The maven-metadata.xml request only: a host that just answered 429 is not asked for a directory listing too
+                assertThat(mockRepo.getRequestCount()).isEqualTo(1);
+
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "second"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(mockRepo.getRequestCount()).isEqualTo(1);
+                assertThat(skipped).containsExactly(repositories.get(0).getUri());
+
+                ctx.getThrottledEndpoints().replaceAll((endpoint, until) -> Instant.EPOCH);
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "second"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(mockRepo.getRequestCount()).isEqualTo(2);
+            });
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+        @Test
+        void mirrorKeepsThePolicyOfEachRepositoryItMirrors() throws Exception {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            try (MockWebServer mirror = getMockServer()) {
+                List<String> metadataRequests = synchronizedList(new ArrayList<>());
+                mirror.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if (recordedRequest.getPath() != null && recordedRequest.getPath().endsWith("maven-metadata.xml")) {
+                            metadataRequests.add(recordedRequest.getPath());
+                            return new MockResponse().setResponseCode(200).setBody(
+                              //language=xml
+                              """
+                                <metadata>
+                                  <groupId>org.example</groupId>
+                                  <artifactId>lib</artifactId>
+                                  <versioning>
+                                    <versions>
+                                      <version>1.0-SNAPSHOT</version>
+                                    </versions>
+                                  </versioning>
+                                </metadata>
+                                """);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("");
+                    }
+                });
+                mirror.start();
+                ctx.setMirrors(List.of(new MavenRepositoryMirror("mirror",
+                  "https://%s:%d/maven/".formatted(mirror.getHostName(), mirror.getPort()), "*", null, null, null)));
+                var downloader = new MavenPomDownloader(ctx);
+                var gav = new GroupArtifactVersion("org.example", "lib", "1.0-SNAPSHOT");
+
+                // Central does not serve snapshots, and mirroring it does not change that
+                assertThatThrownBy(() -> downloader.downloadMetadata(gav, null, List.of(MAVEN_CENTRAL)))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(metadataRequests).isEmpty();
+
+                // A mirrored repository that does accept snapshots brings the mirror into the lookup
+                var snapshots = MavenRepository.builder()
+                  .id("snapshots")
+                  .uri("https://snapshots.example.com/maven")
+                  .releases(false)
+                  .snapshots(true)
+                  .build();
+                MavenMetadata metadata = downloader.downloadMetadata(gav, null, List.of(MAVEN_CENTRAL, snapshots));
+                assertThat(metadata.getVersioning().getVersions()).containsExactly("1.0-SNAPSHOT");
+                assertThat(metadataRequests).hasSize(1);
+            }
         }
 
         @Test

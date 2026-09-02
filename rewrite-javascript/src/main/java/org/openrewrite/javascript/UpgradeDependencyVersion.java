@@ -32,9 +32,12 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -117,7 +120,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
 
     private List<MatchedDependency> findMatches(SourceFile pkg) {
         NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return Collections.emptyList();
+        if (marker == null) return emptyList();
         Predicate<String> nameMatcher = buildNameMatcher();
         List<MatchedDependency> result = new ArrayList<>();
         collectMatches(result, "dependencies", marker.getDependencies(), nameMatcher);

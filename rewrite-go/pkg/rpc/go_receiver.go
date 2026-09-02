@@ -80,8 +80,8 @@ func (r *GoReceiver) receiveParseError(pe *java.ParseError, q *ReceiveQueue) *ja
 	pe.SourcePath = receiveScalar[string](q, pe.SourcePath)
 	pe.CharsetName = receiveScalar[string](q, pe.CharsetName)
 	pe.CharsetBomMarked = receiveScalar[bool](q, pe.CharsetBomMarked)
-	q.Receive(nil, nil) // checksum
-	q.Receive(nil, nil) // fileAttributes
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	pe.Text = receiveScalar[string](q, pe.Text)
 	return pe
 }
@@ -92,24 +92,9 @@ func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) jav
 	cu = &c
 	cu.SourcePath = receiveScalar[string](q, cu.SourcePath)
 	q.Receive(nil, nil) // charset
-	q.Receive(nil, nil) // charsetBomMarked
-	// checksum — Checksum.rpcSend sends: algorithm (string), value (byte[])
-	q.Receive(nil, func(v any) any {
-		receiveScalar[string](q, "") // algorithm
-		q.Receive(nil, nil)          // value
-		return nil
-	})
-	// fileAttributes — FileAttributes.rpcSend sends 7 sub-fields
-	q.Receive(nil, func(v any) any {
-		q.Receive(nil, nil) // creationTime
-		q.Receive(nil, nil) // lastModifiedTime
-		q.Receive(nil, nil) // lastAccessTime
-		q.Receive(nil, nil) // isReadable
-		q.Receive(nil, nil) // isWritable
-		q.Receive(nil, nil) // isExecutable
-		q.Receive(nil, nil) // size
-		return nil
-	})
+	cu.CharsetBomMarked = receiveScalar[bool](q, cu.CharsetBomMarked)
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	// packageDecl
 	var beforePkgDecl any
 	if cu.PackageDecl != nil {
@@ -174,6 +159,7 @@ func (r *GoReceiver) VisitGoUnary(u *golang.Unary, p any) java.J {
 	u = &c
 	u.Operator = receiveLeftPaddedEnum(r, q, u.Operator, golang.ParseUnaryOperator)
 	u.Expression = receiveValue(q, u.Expression, func(e java.Expression) any { return r.Visit(e, q) })
+	u.Type = r.receiveType(u.Type, q)
 	return u
 }
 
@@ -194,6 +180,7 @@ func (r *GoReceiver) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p
 	a.Variable = receiveValue(q, a.Variable, func(e java.Expression) any { return r.Visit(e, q) })
 	a.Operator = receiveLeftPaddedEnum(r, q, a.Operator, golang.ParseAssignmentOperator)
 	a.Assignment = receiveValue(q, a.Assignment, func(e java.Expression) any { return r.Visit(e, q) })
+	a.Type = r.receiveType(a.Type, q)
 	return a
 }
 
@@ -204,6 +191,7 @@ func (r *GoReceiver) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
 	vr.Element = receiveValue(q, vr.Element, func(e java.Expression) any { return r.Visit(e, q) })
 	vr.Dots = receiveValue(q, vr.Dots, func(s java.Space) any { return receiveSpace(s, q) })
 	vr.Postfix = receiveScalar[bool](q, vr.Postfix)
+	vr.Type = r.receiveType(vr.Type, q)
 	return vr
 }
 
@@ -220,6 +208,7 @@ func (r *GoReceiver) VisitComposite(comp *golang.Composite, p any) java.J {
 	comp = &c
 	comp.TypeExpr = receiveValue(q, comp.TypeExpr, func(e java.Expression) any { return r.Visit(e, q) })
 	comp.Elements = receiveContainer[java.Expression](r, q, comp.Elements)
+	comp.Type = r.receiveType(comp.Type, q)
 	return comp
 }
 
@@ -242,6 +231,7 @@ func (r *GoReceiver) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
 		at.Length = coerceToExpressionRP(result)
 	}
 	at.ElementType = receiveValue(q, at.ElementType, func(e java.Expression) any { return r.Visit(e, q) })
+	at.Type = r.receiveType(at.Type, q)
 	return at
 }
 
@@ -271,7 +261,28 @@ func (r *GoReceiver) VisitMapType(mt *golang.MapType, p any) java.J {
 		mt.Key = coerceToExpressionRP(result)
 	}
 	mt.Value = receiveValue(q, mt.Value, func(e java.Expression) any { return r.Visit(e, q) })
+	mt.Type = r.receiveType(mt.Type, q)
 	return mt
+}
+
+func (r *GoReceiver) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ta
+	ta = &c
+	if result := q.Receive(ta.Left, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		ta.Left = result.(java.RightPadded[java.Expression])
+	}
+	ta.AssertedType = receiveValue(q, ta.AssertedType, func(e *java.ControlParentheses) any { return r.Visit(e, q) })
+	ta.Type = r.receiveType(ta.Type, q)
+	return ta
+}
+
+func (r *GoReceiver) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *es
+	es = &c
+	es.Expression = receiveValue(q, es.Expression, func(e java.Expression) any { return r.Visit(e, q) })
+	return es
 }
 
 func (r *GoReceiver) VisitStatementExpression(se *golang.StatementExpression, p any) java.J {
@@ -287,6 +298,7 @@ func (r *GoReceiver) VisitPointerType(pt *golang.PointerType, p any) java.J {
 	c := *pt
 	pt = &c
 	pt.Elem = receiveValue(q, pt.Elem, func(e java.Expression) any { return r.Visit(e, q) })
+	pt.Type = r.receiveType(pt.Type, q)
 	return pt
 }
 
@@ -304,6 +316,7 @@ func (r *GoReceiver) VisitChannel(ch *golang.Channel, p any) java.J {
 		ch.Dir = golang.ChanRecvOnly
 	}
 	ch.Value = receiveValue(q, ch.Value, func(e java.Expression) any { return r.Visit(e, q) })
+	ch.Type = r.receiveType(ch.Type, q)
 	return ch
 }
 
@@ -313,6 +326,7 @@ func (r *GoReceiver) VisitFuncType(ft *golang.FuncType, p any) java.J {
 	ft = &c
 	ft.Parameters = receiveContainer[java.Statement](r, q, ft.Parameters)
 	ft.ReturnType = receiveValue(q, ft.ReturnType, func(e java.Expression) any { return r.Visit(e, q) })
+	ft.Type = r.receiveType(ft.Type, q)
 	return ft
 }
 
@@ -321,6 +335,7 @@ func (r *GoReceiver) VisitStructType(st *golang.StructType, p any) java.J {
 	c := *st // shallow copy to avoid mutating remoteObjects baseline
 	st = &c
 	st.Body = receiveValue(q, st.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	st.Type = r.receiveType(st.Type, q)
 	return st
 }
 
@@ -329,6 +344,7 @@ func (r *GoReceiver) VisitInterfaceType(it *golang.InterfaceType, p any) java.J 
 	c := *it // shallow copy to avoid mutating remoteObjects baseline
 	it = &c
 	it.Body = receiveValue(q, it.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	it.Type = r.receiveType(it.Type, q)
 	return it
 }
 
@@ -337,6 +353,7 @@ func (r *GoReceiver) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	c := *tl // shallow copy to avoid mutating remoteObjects baseline
 	tl = &c
 	tl.Types = receiveContainer[java.Statement](r, q, tl.Types)
+	tl.Type = r.receiveType(tl.Type, q)
 	return tl
 }
 
@@ -349,6 +366,7 @@ func (r *GoReceiver) VisitUnion(u *golang.Union, p any) java.J {
 		coerceToExpressionRP); after != nil {
 		u.Types = after
 	}
+	u.Type = r.receiveType(u.Type, q)
 	return u
 }
 
@@ -476,11 +494,20 @@ func (r *GoReceiver) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	return cc
 }
 
+func (r *GoReceiver) VisitSelect(sel *golang.Select, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *sel // shallow copy to avoid mutating remoteObjects baseline
+	sel = &c
+	sel.Body = receiveValue(q, sel.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	return sel
+}
+
 func (r *GoReceiver) VisitIndexList(il *golang.IndexList, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *il // shallow copy to avoid mutating remoteObjects baseline
 	il = &c
 	il.Target = receiveValue(q, il.Target, func(e java.Expression) any { return r.Visit(e, q) })
 	il.Indices = receiveContainer[java.Expression](r, q, il.Indices)
+	il.Type = r.receiveType(il.Type, q)
 	return il
 }
