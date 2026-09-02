@@ -14,12 +14,13 @@
 
 """Shared utility functions for Python import handling."""
 
-from typing import Iterator, Optional, Sequence
+import ast
+from typing import Iterator, Optional, Sequence, Tuple
 
 from rewrite.java.support_types import JavaType, JRightPadded, Space, Statement
 from rewrite.java.tree import Block, Empty, FieldAccess, Identifier, If, Import
 from rewrite.markers import Markers
-from rewrite.python.markers import CanonicalName
+from rewrite.python.markers import CanonicalName, Quoted
 
 
 def unconditional_body(if_: If) -> Optional[Block]:
@@ -103,6 +104,19 @@ def get_canonical_fqn(imp: Import) -> Optional[str]:
     if isinstance(t, JavaType.FullyQualified) and not isinstance(t, JavaType.Unknown):
         return getattr(t, 'fully_qualified_name', None) or None
     return None
+
+
+def referenced_names(ident: Identifier) -> Tuple[str, ...]:
+    """The names ``ident`` looks up. A quoted identifier is a forward reference
+    holding a whole expression, so its names come from parsing it; a string that
+    is not an expression names nothing."""
+    if ident.markers.find_first(Quoted) is None:
+        return (ident.simple_name,)
+    try:
+        reference = ast.parse(ident.simple_name.strip(), mode='eval')
+    except (SyntaxError, ValueError):
+        return ()
+    return tuple(node.id for node in ast.walk(reference) if isinstance(node, ast.Name))
 
 
 def pad_right(elem) -> JRightPadded:

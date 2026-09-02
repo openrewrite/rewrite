@@ -21,7 +21,8 @@ from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded, Statement
 from rewrite.java.tree import Identifier, If, Import, Space
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
-                                         get_canonical_fqn, unconditional_body)
+                                         get_canonical_fqn, referenced_names,
+                                         unconditional_body)
 from rewrite.python.scope_utils import LocalBindings
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
@@ -168,8 +169,9 @@ class RemoveImport(PythonVisitor):
                     self.in_import = False
 
             def visit_identifier(self, ident: Identifier, p) -> J:
-                if not self.in_import and not bindings.is_bound(self.cursor, ident.simple_name):
-                    used.add(ident.simple_name)
+                if not self.in_import:
+                    used.update(name for name in referenced_names(ident)
+                                if not bindings.is_bound(self.cursor, name))
                 return ident
 
         collector = UsageCollector()
@@ -260,13 +262,12 @@ class RemoveImport(PythonVisitor):
             return self._remove_name_from_import(multi)
 
     def _remove_module_import(self, multi: MultiImport) -> Optional[MultiImport]:
-        """Remove an entire module import (import X or from X import ...)."""
+        """Remove the import that binds the module itself."""
         if multi.from_ is not None:
             # This is a "from X import Y" statement
-            syntactic = get_name_string(multi.from_) == self.module
             new_padded = [
                 padded_imp for padded_imp in multi.padding.names.padding.elements
-                if not (syntactic or self._canonical_module_matches(padded_imp.element))
+                if not self._canonical_module_matches(padded_imp.element)
                 or not self._is_removable(padded_imp.element,
                                           get_qualid_name(padded_imp.element.qualid))
             ]
@@ -283,10 +284,9 @@ class RemoveImport(PythonVisitor):
 
     def _canonical_module_matches(self, imp: Import) -> bool:
         """True when ``imp`` binds the requested module itself (``from os import
-        path`` for ``os.path``). Membership is deliberately not enough: a module
-        is the canonical home of every symbol re-exported through it, so
-        matching members would sweep up imports written against other modules.
-        """
+        path`` for ``os.path``). Membership is deliberately not enough, written
+        (``from typing import Any``) or canonical (``typing`` is the home of every
+        symbol re-exported through it): a member binds the member, not the module."""
         return get_canonical_fqn(imp) == self.module
 
     def _remove_name_from_import(self, multi: MultiImport) -> Optional[MultiImport]:
@@ -322,11 +322,12 @@ class RemoveImport(PythonVisitor):
         if len(new_padded) == len(existing_padded):
             return multi
 
-        # Fix up the first element's prefix to not have a leading space
-        # (only relevant if the removed element was the first one)
+        # Whatever separated the statement from its first name — nothing, or the line break
+        # and indent of a parenthesized import — belongs to whichever name is first now.
         first = new_padded[0]
-        if first.element.prefix != Space.EMPTY:
-            new_padded[0] = first.replace(_element=first.element.replace(prefix=Space.EMPTY))
+        leading = existing_padded[0].element.prefix
+        if first.element.prefix != leading:
+            new_padded[0] = first.replace(_element=first.element.replace(prefix=leading))
 
         return MultiImport(
             multi.id,
