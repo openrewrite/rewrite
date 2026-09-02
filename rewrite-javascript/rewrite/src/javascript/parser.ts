@@ -237,6 +237,10 @@ export class JavaScriptParser extends Parser {
                 continue;
             }
 
+            // One request for the file's names, so the type mapping's questions are answered locally.
+            (session.project.checker as unknown as {prefetch?: (sf: typeof sourceFile) => void})
+                .prefetch?.(sourceFile);
+
             const syntaxErrors = checkSyntaxErrors(program, sourceFile);
             if (syntaxErrors.length > 0) {
                 let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');

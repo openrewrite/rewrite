@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {API, type Project, type Snapshot} from "typescript/unstable/sync";
 import type {FileSystem} from "typescript/unstable/fs";
+import {memoizing} from "./checker";
 
 // The compiler runs as its own process that owns parsing and module resolution, so a program is
 // described to it rather than built here: sources the parser holds in memory are served through
@@ -84,7 +85,12 @@ export class Compiler {
         if (!project) {
             throw new Error(`TypeScript did not open a project at ${configPath}`);
         }
-        return {project, close: () => this.forget(sources.keys(), configPath)};
+        const checker = memoizing(project.checker);
+        const remembering = new Proxy(project, {
+            get: (target, property: string, receiver) =>
+                property === "checker" ? checker : Reflect.get(target, property, receiver),
+        });
+        return {project: remembering, close: () => this.forget(sources.keys(), configPath)};
     }
 
     /** Shuts the compiler down. A later `open` starts a new one. */

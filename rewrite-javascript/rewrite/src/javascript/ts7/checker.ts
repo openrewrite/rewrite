@@ -116,3 +116,103 @@ export function signatureKeyOf(checker: Checker, signature: Signature): string {
     const returnType = checker.getReturnTypeOfSignature(signature);
     return `(${parameters}) => ${returnType ? checker.typeToString(returnType) : "?"}`;
 }
+
+/**
+ * The checker with its answers remembered. Every question crosses a process boundary, and the
+ * parser asks the same ones repeatedly — a symbol's type at a location four times over, a type's
+ * arguments six — so the answers are held for the life of the project they were asked about.
+ */
+export interface MemoizingChecker extends Checker {
+    /** Asks about every name in a file at once, so the questions that follow are answered locally. */
+    prefetch(sourceFile: SourceFile): void;
+}
+
+export function memoizing(checker: Checker): MemoizingChecker {
+    const perNode = new WeakMap<object, Map<string, unknown>>();
+    const perId = new Map<string, unknown>();
+
+    const byNode = <T>(method: string, node: object, compute: () => T): T => {
+        let slots = perNode.get(node);
+        if (!slots) {
+            perNode.set(node, slots = new Map());
+        }
+        if (!slots.has(method)) {
+            slots.set(method, compute());
+        }
+        return slots.get(method) as T;
+    };
+    const byId = <T>(key: string, compute: () => T): T => {
+        if (!perId.has(key)) {
+            perId.set(key, compute());
+        }
+        return perId.get(key) as T;
+    };
+
+    // A name is what the parser asks about, and asking for all of them in one request costs a single
+    // round trip where asking one at a time costs thousands.
+    const prefetch = (sourceFile: SourceFile): void => {
+        const names: Node[] = [];
+        const walk = (node: Node): void => {
+            if (isIdentifier(node)) {
+                names.push(node);
+            }
+            node.forEachChild(child => {
+                walk(child);
+                return undefined;
+            });
+        };
+        walk(sourceFile as unknown as Node);
+        if (names.length === 0) {
+            return;
+        }
+        const symbols = checker.getSymbolAtLocation(names);
+        const types = checker.getTypeAtLocation(names);
+        names.forEach((name, i) => {
+            byNode("getSymbolAtLocation", name, () => symbols[i]);
+            byNode("getTypeAtLocation", name, () => types[i]);
+        });
+    };
+
+    // Only the questions whose answer depends on nothing but the arguments are remembered; the rest
+    // reach the checker as they are.
+    return new Proxy(checker, {
+        get(target, property: string, receiver) {
+            if (property === "prefetch") {
+                return prefetch;
+            }
+            const value = Reflect.get(target, property, receiver);
+            if (typeof value !== "function") {
+                return value;
+            }
+            const call = (value as (...a: unknown[]) => unknown).bind(target);
+            switch (property) {
+                case "getTypeAtLocation":
+                case "getSymbolAtLocation":
+                case "getTypeFromTypeNode":
+                case "getResolvedSignature":
+                    return (node: object) => Array.isArray(node)
+                        ? call(node)
+                        : byNode(property, node, () => call(node));
+                case "getTypeOfSymbolAtLocation":
+                    return (symbol: {id: number}, location: object) =>
+                        byNode(`${property}:${symbol?.id}`, location, () => call(symbol, location));
+                case "getDeclaredTypeOfSymbol":
+                case "getAliasedSymbol":
+                case "getTypeOfSymbol":
+                    return (symbol: {id: number} | unknown[]) => Array.isArray(symbol)
+                        ? call(symbol)
+                        : byId(`${property}:${(symbol as {id: number})?.id}`, () => call(symbol));
+                case "getTypeArguments":
+                case "getPropertiesOfType":
+                case "getBaseTypes":
+                case "getReturnTypeOfSignature":
+                    return (type: {id: number}) => byId(`${property}:${type?.id}`, () => call(type));
+                case "getSignaturesOfType":
+                    return (type: {id: number}, kind: unknown) =>
+                        byId(`${property}:${type?.id}:${String(kind)}`, () => call(type, kind));
+                default:
+                    return call;
+            }
+        },
+    }) as MemoizingChecker;
+}
