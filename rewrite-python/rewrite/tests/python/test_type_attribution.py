@@ -2515,7 +2515,9 @@ def _parse_with_types(files: dict, main_filename: str = 'm.py'):
     files = {name: dedent(src) for name, src in files.items()}
     tmpdir = tempfile.mkdtemp()
     for name, src in files.items():
-        with open(os.path.join(tmpdir, name), 'w') as f:
+        path = os.path.join(tmpdir, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
             f.write(src)
     client = TyTypesClient()
     client.initialize(tmpdir)
@@ -3837,3 +3839,45 @@ class TestDecoratorAttribution:
             'from deco import require\n\nrequire = None\n\n@require\ndef f():\n    pass\n')
         assert not (isinstance(t, JavaType.Class) and
                     t.fully_qualified_name == 'deco.require'), f"falsely attributed {t!r}"
+
+    # A package re-exporting from a private module, the shape pytest and click have
+    PACKAGE = {
+        'pkg/__init__.py': '',
+        'pkg/_impl.py': 'def tag(fn):\n    return fn\n',
+        'pkg/api.py': 'from pkg._impl import tag\n',
+    }
+
+    def _assert_named_in_package(self, src, fqn):
+        cu, tmpdir, client = _parse_with_types({**self.PACKAGE, 'm.py': src})
+        try:
+            t = cu.statements[-1].leading_annotations[0].annotation_type.type
+            assert isinstance(t, JavaType.Class), f"expected Class, got {t!r}"
+            assert t.fully_qualified_name == fqn
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_dotted_decorator_types_the_identifier_too(self):
+        cu, tmpdir, client = _parse_with_types(
+            {'deco.py': self.DECORATORS, 'm.py': 'import deco\n\n@deco.wrap\ndef f():\n    pass\n'})
+        try:
+            at = cu.statements[-1].leading_annotations[0].annotation_type
+            assert at.type.fully_qualified_name == 'deco.wrap'
+            assert at.name.type is at.type
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_decorator_the_file_defines_itself(self):
+        self._assert_named('def wrap(fn):\n    return fn\n\n@wrap\ndef f():\n    pass\n', 'm.wrap')
+
+    def test_dotted_decorator_names_the_module_re_exporting_it(self):
+        self._assert_named_in_package(
+            'import pkg.api\n\n@pkg.api.tag\ndef f():\n    pass\n', 'pkg.api.tag')
+
+    def test_re_export_survives_an_unrelated_rebinding_of_the_name(self):
+        self._assert_named_in_package(
+            'from pkg.api import tag\n\ndef g(tag):\n    return tag\n\n@tag\ndef f():\n    pass\n',
+            'pkg.api.tag')
+
+    def test_a_package_and_its_submodule_bind_the_same_root(self):
+        self._assert_named_in_package(
+            'import pkg\nimport pkg.api\n\n@pkg.api.tag\ndef f():\n    pass\n', 'pkg.api.tag')

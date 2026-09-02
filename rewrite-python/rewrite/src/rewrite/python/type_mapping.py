@@ -913,26 +913,28 @@ class PythonTypeMapping:
         annotation: the decorating function or class itself, under the module the source
         imported it from — not the type applying it returns.
 
-        A decorator an untyped factory produced (Django's
-        ``require_GET = require_http_methods(["GET"])``) has no type ty can infer at all,
-        so an unshadowed import binding stands in for one.
+        The written name an unshadowed import binding resolves says which module that is:
+        ``@pkg.api.tag`` names ``pkg.api.tag`` where ty names the ``pkg._impl`` defining it.
+        It also names a decorator ty cannot type at all.
         """
         type_id = self._lookup_type_id(node)
         descriptor = self._type_registry.get(type_id) if type_id is not None else None
-        if descriptor is not None:
-            kind = descriptor.get('kind')
-            if kind == 'classLiteral':
-                return self._resolve_type(type_id)
-            # A bound method belongs to its class, whose own type the receiver carries
-            if kind in _FUNCTION_KINDS and not descriptor.get('className'):
-                name = descriptor.get('name')
-                module = descriptor.get('moduleName')
-                if isinstance(node, ast.Name):
-                    module = self._from_import_module(type_id, node.id) or module
-                if module and name:
-                    return self._create_class_type(f"{module}.{name}")
+        if descriptor is not None and descriptor.get('kind') == 'classLiteral':
+            # A resolved class beats the shell the written path would mint
+            return self._resolve_type(type_id)
         fqn = self._import_binding_fqn(node)
-        return self._create_class_type(fqn) if fqn else self.type(node)
+        if fqn:
+            return self._create_class_type(fqn)
+        if descriptor is not None and descriptor.get('kind') in _FUNCTION_KINDS:
+            name = descriptor.get('name')
+            # Keyed on ty's type id, so it resolves names the scope-blind
+            # binding index above treats as shadowed.
+            module = descriptor.get('moduleName')
+            if isinstance(node, ast.Name):
+                module = self._from_import_module(type_id, node.id) or module
+            if module and name and not descriptor.get('className'):
+                return self._create_class_type(f"{module}.{name}")
+        return self.type(node)
 
     def _import_binding_fqn(self, node: ast.expr) -> Optional[str]:
         """The FQN an unshadowed module-level import gives ``node``'s written name."""
@@ -962,7 +964,8 @@ class PythonTypeMapping:
             top_level = set()
 
             def bind(name: str, fqn: Optional[str]) -> None:
-                if fqn is None or name in bindings:
+                # `import a.b` after `import a` re-binds the root to the same FQN
+                if fqn is None or bindings.get(name, fqn) != fqn:
                     shadowed.add(name)
                 else:
                     bindings[name] = fqn

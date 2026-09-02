@@ -2314,6 +2314,11 @@ class ParserVisitor(ast.NodeVisitor):
                 decorator_type = self._type_mapping.decorator_type(referenced)
                 if decorator_type is not None:
                     name = name.replace(type=decorator_type)  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
+                    if isinstance(name, j.FieldAccess):
+                        # Both halves of a dotted reference name the same decorator
+                        padded = name.padding.name
+                        name = name.padding.replace(_name=padded.replace(
+                            element=padded.element.replace(type=decorator_type)))
 
         # Wrap name in extra parentheses if present
         if extra_parens:
