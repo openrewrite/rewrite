@@ -211,11 +211,23 @@ def slot_constraints(parent: J, child_id: UUID) -> Optional[SlotConstraints]:
             if any(_id_of(element) == child_id for element in parent.elements) else None
 
     if isinstance(parent, py.KeyValue):
-        return SlotConstraints(Precedence.NAMED_EXPRESSION) \
+        # A dict entry and a keyword argument each take an `expression`, which a `:=` is not
+        return SlotConstraints(Precedence.LAMBDA) \
             if child_id in (_id_of(parent.key), _id_of(parent.value)) else None
 
     if isinstance(parent, py.NamedArgument):
-        return SlotConstraints(Precedence.NAMED_EXPRESSION) if _id_of(parent.value) == child_id else None
+        return SlotConstraints(Precedence.LAMBDA) if _id_of(parent.value) == child_id else None
+
+    if isinstance(parent, py.ComprehensionExpression):
+        # A clause is visited without a cursor entry of its own, so its slots are answered here
+        if _id_of(parent.result) == child_id:
+            return SlotConstraints(Precedence.NAMED_EXPRESSION)
+        for clause in parent.clauses:
+            # `for v in x` and `if x` both read an `or_test`, so a conditional here dangles its `else`
+            if _id_of(clause.iterated_list) == child_id or \
+                    any(_id_of(condition.expression) == child_id for condition in clause.conditions or []):
+                return SlotConstraints(Precedence.OR)
+        return None
 
     if isinstance(parent, py.Star):
         return SlotConstraints(Precedence.OR) if _id_of(parent.expression) == child_id else None

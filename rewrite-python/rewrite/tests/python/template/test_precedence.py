@@ -140,3 +140,32 @@ def test_a_bare_generator_survives_only_as_a_call_s_sole_argument():
         "a = collect(v for v in vs)\n",
         "a = sorted((v for v in vs), reverse=True)\n",
     ))
+
+
+def test_a_slot_that_takes_a_plain_expression_rejects_a_walrus():
+    RecipeSpec(recipe=_rule("kw({x})", "f(k={x})")).rewrite_run(python(
+        "a = kw(n := 1)\n",
+        "a = f(k=(n := 1))\n",
+    ))
+    RecipeSpec(recipe=_rule("entry({x})", "{1: {x}}")).rewrite_run(python(
+        "a = entry(n := 1)\n",
+        "a = {1: (n := 1)}\n",
+    ))
+
+
+def test_a_comprehension_clause_takes_an_or_test():
+    RecipeSpec(recipe=_rule("over({x})", "[v for v in {x}]")).rewrite_run(python(
+        "a = over(p if c else q)\n",
+        "a = [v for v in (p if c else q)]\n",
+    ))
+    RecipeSpec(recipe=_rule("keep({x})", "[v for v in vs if {x}]")).rewrite_run(python(
+        "a = keep(p if c else q)\n",
+        "a = [v for v in vs if (p if c else q)]\n",
+    ))
+
+
+def test_a_comprehension_result_takes_an_expression():
+    RecipeSpec(recipe=_rule("d[{x}]", "[{x} for v in vs]")).rewrite_run(python(
+        "a = d[p, q]\n",
+        "a = [(p, q) for v in vs]\n",
+    ))
