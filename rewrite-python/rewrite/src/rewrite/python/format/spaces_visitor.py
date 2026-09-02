@@ -289,6 +289,11 @@ class SpacesVisitor(PythonVisitor):
 
         return b
 
+    def visit_unary(self, unary: j.Unary, p: P) -> J:
+        u: j.Unary = cast(j.Unary, super().visit_unary(unary, p))
+        # `not` is a keyword, so its separator is not style-configurable.
+        return u.replace(expression=space_before(u.expression, u.operator == j.Unary.Type.Not))
+
     def visit_if(self, if_: If, p: P) -> J:
         if_: j.If = cast(If, super().visit_if(if_, p))
 
