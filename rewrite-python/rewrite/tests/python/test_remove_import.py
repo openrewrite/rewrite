@@ -116,6 +116,45 @@ class TestMaybeRemoveImport:
             )
         )
 
+    def test_parenthesized_import_keeps_its_layout(self, arm):
+        """Every remaining name keeps the line break and indent it was written with,
+        whether or not the removed name was the first one."""
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'Any', only_if_unused=False))).rewrite_run(
+            python(
+                """\
+                from typing import (
+                    TYPE_CHECKING,
+                    Any,
+                    Dict,
+                )
+                """,
+                """\
+                from typing import (
+                    TYPE_CHECKING,
+                    Dict,
+                )
+                """,
+            )
+        )
+
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'TYPE_CHECKING', only_if_unused=False))).rewrite_run(
+            python(
+                """\
+                from typing import (
+                    TYPE_CHECKING,
+                    Any,
+                )
+                """,
+                """\
+                from typing import (
+                    Any,
+                )
+                """,
+            )
+        )
+
     def test_keep_import_when_used(self, arm):
         """Don't remove an import when the name is still used and only_if_unused=True."""
         spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'os.path', 'join')))
@@ -417,6 +456,19 @@ class TestCanonicalRemoveImport:
             )
         )
 
+    def test_whole_module_removal_spares_members_written_against_that_module(self, arm):
+        """`Optional` binds `Optional`, not the `typing` module, so a request for
+        the module leaves it alone however unused it is."""
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', only_if_unused=False))).rewrite_run(
+            python(
+                """
+                from typing import Optional
+                x = 1
+                """,
+            )
+        )
+
 
 class TestRemoveImportUsageScoping:
     """``only_if_unused`` counts every reference the enclosing scopes do not
@@ -568,4 +620,63 @@ class TestRemoveImportScopeRules:
                 clock = 1
                 return clock, x
             """
+        )
+
+
+class TestRemoveImportStringAnnotations:
+    """A string annotation is a forward reference, so the names inside it are
+    load-bearing: whatever resolves the annotation later needs their imports."""
+
+    @staticmethod
+    def _assert_type_hints_resolve(source_file):
+        """The output is only correct if the annotations it kept still resolve, which
+        a text assertion cannot show: dropping an import leaves valid Python."""
+        import types
+        import typing
+
+        module = types.ModuleType('after_recipe')
+        exec(source_file.print_all(), module.__dict__)
+        typing.get_type_hints(module)
+
+    def test_names_inside_a_compound_reference_keep_their_imports(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing')))
+        spec.rewrite_run(
+            python(
+                """\
+                import typing
+                from typing import Any
+
+                m: "typing.Dict[Any, Any]" = {}
+                """,
+                after_recipe=self._assert_type_hints_resolve,
+            )
+        )
+
+    def test_bare_reference_keeps_its_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'Any')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any
+
+                m: "Any" = None
+                """,
+            )
+        )
+
+    def test_name_absent_from_the_reference_is_still_removed(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'Optional')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any, Optional
+
+                m: "Dict[Any, Any]" = {}
+                """,
+                """\
+                from typing import Any
+
+                m: "Dict[Any, Any]" = {}
+                """,
+            )
         )
