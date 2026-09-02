@@ -8,6 +8,7 @@ there is nothing to pip-uninstall.
 import os
 import shutil
 import subprocess
+import sys
 from importlib import metadata
 from pathlib import Path
 from typing import Optional
@@ -21,7 +22,7 @@ def venv_python(venv_dir: Path) -> Path:
     return venv_dir / "bin" / "python"
 
 
-def _site_packages(venv_dir: Path) -> Optional[Path]:
+def site_packages(venv_dir: Path) -> Optional[Path]:
     if os.name == "nt":
         sp = venv_dir / "Lib" / "site-packages"
         return sp if sp.exists() else None
@@ -33,11 +34,11 @@ def installed_version(venv_dir: Path, dist: str) -> Optional[str]:
 
     Read off disk, so the recipe is never imported.
     """
-    site_packages = _site_packages(venv_dir)
-    if site_packages is None:
+    packages = site_packages(venv_dir)
+    if packages is None:
         return None
     target = _normalize_package_name(dist)
-    for distribution in metadata.distributions(path=[str(site_packages)]):
+    for distribution in metadata.distributions(path=[str(packages)]):
         name = distribution.metadata["Name"]
         if name and _normalize_package_name(name) == target:
             return distribution.version
@@ -61,17 +62,28 @@ def is_usable_venv(venv_dir: Path) -> bool:
     (``.../cpython-3.12.11-...``), so upgrading or pruning the interpreter orphans every venv
     built on it. Checking only for the interpreter file would miss this on Windows, where ``venv``
     *copies* ``python.exe`` — it outlives its base and the venv still looks intact.
+
+    The recorded version must match this interpreter too: its ``site-packages`` carries bytecode
+    and extension modules for the one version it was built against, and this process imports them.
     """
     if not venv_python(venv_dir).exists():
         return False
     config = venv_dir / "pyvenv.cfg"
     if not config.exists():
         return False  # interrupted before configuration; treat as unbuilt
+    home_exists = False
+    running = [str(part) for part in sys.version_info[:2]]
+    version_matches = False
     for line in config.read_text().splitlines():
         key, separator, value = line.partition("=")
-        if separator and key.strip() == "home":
-            return Path(value.strip()).exists()
-    return False
+        if not separator:
+            continue
+        key, value = key.strip(), value.strip()
+        if key == "home":
+            home_exists = Path(value).exists()
+        elif key in ("version", "version_info") and not version_matches:
+            version_matches = value.split(".")[:2] == running
+    return home_exists and version_matches
 
 
 def install_into_venv(venv_dir: Path, spec: str, force: bool = False) -> None:
