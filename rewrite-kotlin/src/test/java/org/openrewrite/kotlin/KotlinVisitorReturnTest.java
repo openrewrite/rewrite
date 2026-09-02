@@ -59,6 +59,48 @@ class KotlinVisitorReturnTest implements RewriteTest {
         );
     }
 
+    /**
+     * A bare valueless {@code return} wraps a {@link J.Return} whose expression is {@code null}. Because
+     * {@code K.Return} is an {@code Expression}, a {@code JavaVisitor.visitExpression} fires on it and may call
+     * {@link Expression#getType()}. That must return {@code null} rather than throwing a {@link NullPointerException}.
+     */
+    @Test
+    void getTypeOnBareReturnDoesNotThrow() {
+        rewriteRun(
+          spec -> spec.recipe(new TouchExpressionType()),
+          kotlin(
+            """
+              fun test() {
+                  return
+              }
+              """
+          )
+        );
+    }
+
+    static class TouchExpressionType extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Touch the type of every expression";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Calls `getType()` on every expression to exercise `K.Return.getType()` on a bare return.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new JavaVisitor<ExecutionContext>() {
+                @Override
+                public J visitExpression(Expression expression, ExecutionContext ctx) {
+                    expression.getType();
+                    return super.visitExpression(expression, ctx);
+                }
+            };
+        }
+    }
+
     static class UnwrapReturn extends Recipe {
         @Override
         public String getDisplayName() {
