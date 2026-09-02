@@ -102,9 +102,6 @@ public class PythonRemoveImportVisitor<P> extends RpcImportVisitor<P> {
                 }
                 return false;
             }
-            if (module.equals(nameString(from))) {
-                return true;
-            }
             for (J.Import member : multi.getNames()) {
                 if (module.equals(canonicalFqn(member))) {
                     return true;

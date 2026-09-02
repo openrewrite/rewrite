@@ -24,7 +24,8 @@ from rewrite.java import J
 from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded
 from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Literal, Space
 from rewrite.markers import Markers
-from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, get_canonical_fqn, pad_right
+from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
+                                         get_canonical_fqn, pad_right, referenced_names)
 from rewrite.python.tree import CompilationUnit, ExpressionStatement, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
@@ -224,7 +225,7 @@ class AddImport(PythonVisitor):
                     self.in_import = False
 
             def visit_identifier(self, ident: Identifier, p) -> J:
-                if not self.in_import and ident.simple_name == target_name:
+                if not self.in_import and target_name in referenced_names(ident):
                     self.found = True
                 return ident
 
