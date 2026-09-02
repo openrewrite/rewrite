@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
@@ -34,6 +35,7 @@ import static org.openrewrite.java.Assertions.java;
  * each one only where it landed. Whichever of those it was, the annotation keeps the type it was written
  * with.
  */
+@Issue("https://github.com/openrewrite/rewrite/pull/8751")
 @MinimumJava17
 class RecordComponentAnnotationTypeTest implements RewriteTest {
 
@@ -158,6 +160,20 @@ class RecordComponentAnnotationTypeTest implements RewriteTest {
           java(
             """
               record AccessorOnlyWithArgument(@OnMethod("full_name") String name) {
+              }
+              """,
+            annotationTypes("OnMethod -> OnMethod")
+          )
+        );
+    }
+
+    @Test
+    void accessorOnlyAnnotationWithAWrittenAttributeName() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record AccessorOnlyWithNamedArgument(@OnMethod(value = "full_name") String name) {
               }
               """,
             annotationTypes("OnMethod -> OnMethod")
