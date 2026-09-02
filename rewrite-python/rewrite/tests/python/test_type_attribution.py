@@ -3768,3 +3768,72 @@ class TestImportNameAttribution:
     def test_unresolvable_import_stays_untyped(self):
         t = self._qualid_type('from nonexistent_module_xyz import something\n')
         assert t is None or isinstance(t, JavaType.Unknown)
+
+
+@requires_ty_types_cli
+class TestDecoratorAttribution:
+    """A decorator's annotation type names the function or class it applies, under the
+    module the source imported it from — not the type applying it returns."""
+
+    DECORATORS = """
+        def wrap(fn):
+            return fn
+
+
+        def factory(*methods):
+            def decorator(fn):
+                return fn
+            return decorator
+
+
+        require = factory("GET")
+
+
+        class Registered:
+            def __init__(self, cls):
+                self.cls = cls
+    """
+
+    def _decorator_type(self, src):
+        cu, tmpdir, client = _parse_with_types({'deco.py': self.DECORATORS, 'm.py': src})
+        try:
+            return cu.statements[-1].leading_annotations[0].annotation_type.type
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def _assert_named(self, src, fqn):
+        t = self._decorator_type(src)
+        assert isinstance(t, JavaType.Class), f"expected Class, got {t!r}"
+        assert t.fully_qualified_name == fqn
+
+    def test_function_decorator(self):
+        self._assert_named('from deco import wrap\n\n@wrap\ndef f():\n    pass\n', 'deco.wrap')
+
+    def test_decorator_factory_call_names_the_factory(self):
+        self._assert_named("from deco import factory\n\n@factory('GET')\ndef f():\n    pass\n",
+                           'deco.factory')
+
+    def test_aliased_decorator_names_the_symbol_imported(self):
+        self._assert_named('from deco import wrap as w\n\n@w\ndef f():\n    pass\n', 'deco.wrap')
+
+    def test_dotted_decorator(self):
+        self._assert_named('import deco\n\n@deco.wrap\ndef f():\n    pass\n', 'deco.wrap')
+
+    def test_class_decorator_keeps_its_class_type(self):
+        self._assert_named('from deco import Registered\n\n@Registered\nclass C:\n    pass\n',
+                           'deco.Registered')
+
+    def test_decorator_an_untyped_factory_produced(self):
+        # ty has no type for `require` at all; the import binding is what names it
+        self._assert_named('from deco import require\n\n@require\ndef f():\n    pass\n',
+                           'deco.require')
+
+    def test_decorator_on_class_from_untyped_factory(self):
+        self._assert_named('from deco import require\n\n@require\nclass C:\n    pass\n',
+                           'deco.require')
+
+    def test_rebound_name_is_not_attributed_from_its_import(self):
+        t = self._decorator_type(
+            'from deco import require\n\nrequire = None\n\n@require\ndef f():\n    pass\n')
+        assert not (isinstance(t, JavaType.Class) and
+                    t.fully_qualified_name == 'deco.require'), f"falsely attributed {t!r}"

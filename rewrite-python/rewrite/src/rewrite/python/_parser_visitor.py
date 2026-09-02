@@ -2307,6 +2307,13 @@ class ParserVisitor(ast.NodeVisitor):
         # When extra_parens is non-empty, this is handled differently (prefix is set on the wrapped paren).
         if not extra_parens:
             name = name.replace(prefix=name_prefix)  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
+            # Name the decorator itself, as Java names an annotation type, rather than
+            # leave the reference typed as what applying it returns.
+            referenced = decorator.func if isinstance(decorator, ast.Call) else decorator
+            if isinstance(referenced, (ast.Name, ast.Attribute)):
+                decorator_type = self._type_mapping.decorator_type(referenced)
+                if decorator_type is not None:
+                    name = name.replace(type=decorator_type)  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
 
         # Wrap name in extra parentheses if present
         if extra_parens:
