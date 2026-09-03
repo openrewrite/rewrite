@@ -88,10 +88,10 @@ def detect_from_project(project_path: Union[str, Path, None]) -> Optional[str]:
     * ``pyproject.toml`` ``[project].classifiers`` for
       ``Programming Language :: Python :: <ver>``.
     * ``pyproject.toml`` ``[project].requires-python`` when it pins a major
-      version (e.g. ``"<3"`` or ``">=2.7,<3"`` resolves to ``"2.7"``).
+      version (e.g. ``">=2.7,<3"`` resolves to ``"2.7"``).
     * ``setup.cfg`` ``[metadata].classifiers`` (same shape as pyproject).
 
-    The most specific version found wins; if multiple major versions are
+    A Python 3 span resolves to its floor; if multiple major versions are
     declared (e.g. both ``2.7`` and ``3.10``), returns ``None`` because the
     project supports both and per-file detection should decide.
     """
@@ -134,12 +134,22 @@ def _classifier_versions(text: str):
         yield ver
 
 
+# A clause that sets a floor. ``<`` and ``<=`` cap the range and ``!=`` punches
+# a hole in it; neither says what the lowest admitted version is.
+_LOWER_BOUND = re.compile(r"(?:^|,)\s*(?:>=?|~=|==)?\s*(?P<ver>\d+(?:\.\d+)?)")
+
+# An upper bound excluding every 3.x, which leaves only Python 2. ``<=3`` is
+# not one: it admits 3.0.
+_EXCLUDES_PY3 = re.compile(r"<\s*3(\.0)?\s*(,|$)")
+
+
 def _requires_python(pyproject_text: str) -> Optional[str]:
     """Best-effort parse of ``requires-python`` from a pyproject.toml.
 
     Avoids a TOML dependency; only looks for the ``requires-python = "..."``
-    line under any section. Returns the most restrictive major version
-    implied by the constraint, or None if it spans both 2 and 3.
+    line under any section. Returns the lowest version the constraint admits,
+    keeping its minor (``">=3.10"`` -> ``"3.10"``, matching how ty reads the
+    same field), or None where it names no floor or spans both 2 and 3.
     """
     m = re.search(
         r'(?m)^\s*requires-python\s*=\s*"([^"]+)"', pyproject_text
@@ -147,22 +157,22 @@ def _requires_python(pyproject_text: str) -> Optional[str]:
     if not m:
         return None
     spec = m.group(1)
-    allows_two = bool(re.search(r"(^|,)\s*[<>=!~]*\s*2(\.|\b)", spec))
-    allows_three = bool(re.search(r"(^|,)\s*[<>=!~]*\s*3(\.|\b)", spec))
-    upper_excludes_three = bool(re.search(r"<\s*3(\.|\b)", spec))
-    if allows_two and upper_excludes_three:
+    floors = _LOWER_BOUND.findall(spec)
+    py2 = [v for v in floors if v.split(".", 1)[0] == "2"]
+    py3 = [v for v in floors if v.split(".", 1)[0] == "3"]
+    if not py3 and _EXCLUDES_PY3.search(spec):
         return "2.7"
-    if allows_three and not allows_two:
-        return "3"
+    if py3 and not py2:
+        return _lowest(py3)
     return None
 
 
 def _resolve(versions) -> Optional[str]:
     """Reduce a set of version strings to a single effective version.
 
-    * Multiple major versions → ``None`` (project supports both; defer).
-    * Any Py2 entry → most specific Py2 version found.
-    * Otherwise → most specific Py3 version found.
+    Multiple major versions yield ``None`` — the project supports both, so
+    per-file detection has to decide. A Python 3 span resolves to its floor,
+    the one version every line of the project has to work on.
     """
     if not versions:
         return None
@@ -170,13 +180,17 @@ def _resolve(versions) -> Optional[str]:
     majors = {v.split(".", 1)[0] for v in versions}
     if "2" in majors and "3" in majors:
         return None
+    if "2" in majors:
+        # parso implements a single Python 2 grammar, so 2.7 is the only value
+        # the Py2 parser can act on.
+        return "2.7"
 
-    py2 = sorted(v for v in versions if v.startswith("2"))
-    if py2:
-        return py2[-1]
+    return _lowest(versions)
 
-    py3 = sorted(v for v in versions if v.startswith("3"))
-    if py3:
-        return py3[-1]
 
-    return None
+def _lowest(versions) -> str:
+    """The numerically lowest version, preferring those carrying a minor: a
+    bare ``"3"`` names no stdlib surface and would otherwise mask ``"3.10"``."""
+    with_minor = [v for v in versions if "." in v]
+    return min(with_minor or list(versions),
+               key=lambda v: tuple(int(part) for part in v.split(".")))
