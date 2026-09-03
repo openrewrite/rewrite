@@ -26,7 +26,6 @@ import csv
 import json
 import logging
 import os
-import re
 import select
 import sys
 import tempfile
@@ -45,6 +44,8 @@ except ImportError:  # not available on Windows
     resource = None
 
 from rewrite.discovery import RecipeAttribution, RecipeName, _normalize_package_name
+from rewrite.python._version_detect import (
+    detect_from_project, detect_from_source, requested_python_version, ty_python_version)
 from rewrite.rpc.reference import ReferenceMap
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
@@ -338,7 +339,6 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
     Values starting with "2" select the parso-based Py2ParserVisitor; anything
     else uses the ast-based Python 3 parser.
     """
-    from rewrite.python._version_detect import detect_from_source
 
     effective_version = (
         language_level
@@ -526,9 +526,8 @@ def handle_parse(params: dict) -> List[str]:
     # Resolve project-level language version once per request; per-file
     # detection (shebang / magic comment) can still override this inside
     # parse_python_source.
-    from rewrite.python._version_detect import detect_from_project
     project_language_level = detect_from_project(relative_to) if relative_to else None
-    ty_python_version = _ty_python_version(language_level, project_language_level)
+    ty_version = ty_python_version(language_level, project_language_level)
 
     # Create a ty-types client for this parse batch
     ty_client = None
@@ -538,7 +537,7 @@ def handle_parse(params: dict) -> List[str]:
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
         ty_client = TyTypesClient(virtual_env=dependency_path,
-                                  python_version=ty_python_version)
+                                  python_version=ty_version)
         if relative_to:
             ty_client.initialize(relative_to)
         else:
@@ -637,9 +636,8 @@ def handle_parse_project(params: dict) -> List[dict]:
 
     # Resolve project-level language version once for the whole walk; each
     # file may still override it via in-source signals inside parse_python_source.
-    from rewrite.python._version_detect import detect_from_project
     project_language_level = detect_from_project(project_path)
-    ty_python_version = _ty_python_version(language_level, project_language_level)
+    ty_version = ty_python_version(language_level, project_language_level)
 
     results = []
 
@@ -649,7 +647,7 @@ def handle_parse_project(params: dict) -> List[dict]:
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
         ty_client = TyTypesClient(virtual_env=dependency_path,
-                                  python_version=ty_python_version)
+                                  python_version=ty_version)
         ty_client.initialize(project_path)
     except (ImportError, RuntimeError):
         pass
@@ -828,28 +826,10 @@ def _typeshed_stdlib_dir() -> Path:
     raise ValueError(f"no typeshed stdlib/VERSIONS under {env}")
 
 
-def _requested_python_version(value: Any) -> Optional[str]:
-    """The value if it looks like a Python minor version ("3.12"), else None."""
-    return value if isinstance(value, str) and re.fullmatch(r'\d+\.\d+', value) else None
-
-
-def _ty_python_version(*levels: Optional[str]) -> Optional[str]:
-    """The first language level precise enough to name a stdlib surface to ty.
-
-    One ty session serves a whole batch, so callers pass only levels holding
-    for all of it — never a per-file shebang or magic comment.
-    """
-    for level in levels:
-        version = _requested_python_version(level)
-        if version:
-            return version
-    return None
-
-
 def _write_stdlib_ty_config(stdlib: Path, python_version: Optional[str]) -> str:
     """Throwaway ty.toml dir pointing ty's typeshed at the checkout so it resolves as the
     stdlib and names modules os, not stdlib.os — matching the parser's stdlib attribution."""
-    version = _requested_python_version(python_version) \
+    version = requested_python_version(python_version) \
               or '%d.%d' % (sys.version_info.major, sys.version_info.minor)
     ty_config_dir = tempfile.mkdtemp(prefix='ty-stdlib-')
     with open(os.path.join(ty_config_dir, 'ty.toml'), 'w') as f:
@@ -967,7 +947,7 @@ def handle_dependency_types(params: dict) -> List[dict]:
     name = params.get('name')
     version = params.get('version')
     # Stdlib stubs are version-conditioned; a malformed value falls back to the interpreter minor.
-    python_version = _requested_python_version(params.get('pythonVersion'))
+    python_version = requested_python_version(params.get('pythonVersion'))
     if not name:
         raise ValueError("DependencyTypes requires a dependency name")
 

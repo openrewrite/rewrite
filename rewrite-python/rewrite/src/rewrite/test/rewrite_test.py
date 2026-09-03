@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass, field
+from contextlib import contextmanager
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from uuid import uuid4
@@ -101,6 +102,22 @@ def from_visitor(visitor: TreeVisitor[Any, ExecutionContext]) -> Recipe:
 
 
 @dataclass
+class _Workspace:
+    """Where a run's sources sit on disk while they parse."""
+
+    paths: Dict[int, Path]
+    written: Dict[int, str]
+    ty_client: Optional[Any]
+
+    def source_path(self, spec: SourceSpec) -> Path:
+        return self.paths[id(spec)]
+
+    def file_path(self, spec: SourceSpec) -> Optional[str]:
+        # Only a ty session reads this path; an untyped parse has no use for it.
+        return self.written.get(id(spec)) if self.ty_client is not None else None
+
+
+@dataclass
 class RecipeSpec:
     """
     Configuration for running recipe tests.
@@ -139,16 +156,10 @@ class RecipeSpec:
     type_attribution: bool = True
 
     def with_recipe(self, recipe: Recipe) -> "RecipeSpec":
-        return RecipeSpec(recipe=recipe, execution_context=self.execution_context,
-                          check_parse_print_idempotence=self.check_parse_print_idempotence,
-                          allow_empty_diff=self.allow_empty_diff,
-                          type_attribution=self.type_attribution)
+        return replace(self, recipe=recipe)
 
     def with_allow_empty_diff(self, value: bool) -> "RecipeSpec":
-        return RecipeSpec(recipe=self.recipe, execution_context=self.execution_context,
-                          check_parse_print_idempotence=self.check_parse_print_idempotence,
-                          allow_empty_diff=value,
-                          type_attribution=self.type_attribution)
+        return replace(self, allow_empty_diff=value)
 
     def with_recipes(self, *recipes: Recipe) -> "RecipeSpec":
         if len(recipes) == 1:
@@ -172,17 +183,18 @@ class RecipeSpec:
         Raises:
             AssertionError: If any validation fails
         """
-        # Group specs by kind
-        specs_by_kind = self._group_by_kind(list(source_specs))
+        specs = list(source_specs)
+        specs_by_kind = self._group_by_kind(specs)
 
         # Parse and validate all source files
         all_parsed: List[Tuple[SourceSpec, SourceFile]] = []
-        for kind, specs in specs_by_kind.items():
-            parsed = self._parse(specs)
-            self._expect_no_parse_failures(parsed)
-            if self.check_parse_print_idempotence:
-                self._expect_parse_print_idempotence(parsed)
-            all_parsed.extend(parsed)
+        with self._workspace(specs) as workspace:
+            for kind, kind_specs in specs_by_kind.items():
+                parsed = self._parse(kind_specs, workspace)
+                self._expect_no_parse_failures(parsed)
+                if self.check_parse_print_idempotence:
+                    self._expect_parse_print_idempotence(parsed)
+                all_parsed.extend(parsed)
 
         # Apply before_recipe hooks (after idempotence check, before recipe execution)
         all_parsed = [
@@ -217,7 +229,9 @@ class RecipeSpec:
             groups[spec.kind].append(spec)
         return groups
 
-    def _parse(self, specs: List[SourceSpec]) -> List[Tuple[SourceSpec, SourceFile]]:
+    def _parse(
+        self, specs: List[SourceSpec], workspace: "_Workspace"
+    ) -> List[Tuple[SourceSpec, SourceFile]]:
         """Parse all specs using the appropriate parser."""
         result: List[Tuple[SourceSpec, SourceFile]] = []
 
@@ -227,77 +241,112 @@ class RecipeSpec:
                 continue
 
             if spec.kind != "python":
-                # Only Python specs are parsed (e.g., toml specs from pyproject()
-                # are consumed by uv() and don't need parsing)
+                # Non-Python specs shape the workspace rather than being parsed:
+                # a pyproject() is there to declare the project.
                 continue
 
-            # Determine source path
-            source_path = spec.path or Path(f"_{uuid4().hex}.{spec.ext}")
-
-            # Parse the source
-            source = dedent(spec.before)
-            parsed = self._parse_python(source, source_path, spec.project_root)
+            parsed = self._parse_python(
+                dedent(spec.before),
+                workspace.source_path(spec),
+                workspace.file_path(spec),
+                workspace.ty_client,
+            )
 
             result.append((spec, parsed))
 
         return result
 
+    @contextmanager
+    def _workspace(self, specs: List[SourceSpec]):
+        """Hold every source in the run in one directory while it parses.
+
+        ty reads the sources and the project metadata from there, so a declared
+        Python version picks the typeshed and the sources resolve against each
+        other. ``uv()`` supplies its dependency workspace through the specs;
+        otherwise the run owns one.
+        """
+        import shutil
+        import tempfile
+        from rewrite.python._version_detect import detect_from_project, ty_python_version
+
+        paths = {id(spec): spec.path or Path(f"_{uuid4().hex}.{spec.ext}") for spec in specs}
+
+        if not self.type_attribution:
+            yield _Workspace(paths, {}, None)
+            return
+
+        root = next((spec.project_root for spec in specs if spec.project_root), None)
+        owns_root = root is None
+        if owns_root:
+            root = tempfile.mkdtemp()
+
+        written: Dict[int, str] = {}
+        created: List[Path] = []
+        ty_client = None
+        try:
+            for spec in specs:
+                if spec.before is None:
+                    continue
+                logical = paths[id(spec)]
+                if logical.is_absolute() or ".." in logical.parts:
+                    # The run removes what it writes, so a path leading out of the
+                    # workspace would write and delete on the caller's tree.
+                    raise ValueError(f"a source path stays inside the workspace: {logical}")
+                destination = Path(root) / logical
+                created.extend(p for p in reversed(destination.parents) if not p.exists())
+                if not destination.exists():
+                    created.append(destination)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(dedent(spec.before))
+                written[id(spec)] = str(destination)
+
+            try:
+                from rewrite.python.ty_client import TyTypesClient
+                # handle_parse resolves this same version for a real parse.
+                ty_client = TyTypesClient(python_version=ty_python_version(detect_from_project(root)))
+                ty_client.initialize(root)
+            except (ImportError, RuntimeError):
+                ty_client = None
+
+            yield _Workspace(paths, written, ty_client)
+        finally:
+            if ty_client is not None:
+                ty_client.shutdown()
+            if owns_root:
+                shutil.rmtree(root, ignore_errors=True)
+            else:
+                # A uv() workspace is cached across runs and holds the project's own
+                # files — among them the pyproject.toml it was built from — so give
+                # back what this run added and nothing else.
+                for path in reversed(created):
+                    try:
+                        if path.is_dir():
+                            path.rmdir()
+                        else:
+                            path.unlink()
+                    except OSError:
+                        pass
+
     def _parse_python(
         self,
         source: str,
         source_path: Path,
-        project_root: Optional[str] = None,
+        file_path: Optional[str],
+        ty_client: Optional[Any],
     ) -> CompilationUnit:
         """Parse Python source code into a CompilationUnit.
 
-        Args:
-            source: Python source code.
-            source_path: Logical path for the source file.
-            project_root: Optional workspace directory for type attribution
-                (e.g., from ``uv()``).  When ``None`` a temporary directory is
-                created and cleaned up after parsing.
+        ``source_path`` is the logical path the tree carries; ``file_path`` is where
+        the source sits in the workspace, and is None for an untyped parse.
         """
-        import tempfile
-        import os
         from rewrite.python._parser_visitor import ParserVisitor
 
-        ty_client = None
-        workspace = project_root
-        owns_workspace = workspace is None
-        file_path = None
-
-        if self.type_attribution:
-            try:
-                from rewrite.python.ty_client import TyTypesClient
-                if owns_workspace:
-                    workspace = tempfile.mkdtemp()
-                file_name = source_path.name if source_path.name else 'test.py'
-                file_path = os.path.join(workspace, file_name)
-                with open(file_path, 'w') as f:
-                    f.write(source)
-                ty_client = TyTypesClient()
-                ty_client.initialize(workspace)
-            except (ImportError, RuntimeError):
-                file_path = None
-
-        try:
-            visitor = ParserVisitor(source, file_path, ty_client)
-            # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
-            source_for_ast = source[1:] if source.startswith('\ufeff') else source
-            tree = ast.parse(source_for_ast)
-            cu = visitor.visit_Module(tree)
-            return cu.replace(source_path=source_path)
-        finally:
-            if ty_client is not None:
-                ty_client.shutdown()
-            if owns_workspace and workspace is not None:
-                import shutil
-                shutil.rmtree(workspace, ignore_errors=True)
-            elif file_path is not None:
-                try:
-                    os.unlink(file_path)
-                except OSError:
-                    pass
+        visitor = ParserVisitor(source, file_path, ty_client)
+        # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
+        source_for_ast = source[1:] if source.startswith('\ufeff') else source
+        tree = ast.parse(source_for_ast)
+        cu = visitor.visit_Module(tree)
+        return cu.replace(source_path=source_path)
 
     def _expect_no_parse_failures(
         self, parsed: List[Tuple[SourceSpec, SourceFile]]
