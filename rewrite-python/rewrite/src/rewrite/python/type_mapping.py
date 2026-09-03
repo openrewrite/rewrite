@@ -29,7 +29,7 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
 
 from ..java import JavaType
 
@@ -118,6 +118,19 @@ _KNOWN_INSTANCE_FQNS: Dict[str, str] = {
     'FunctoolsPartial': 'functools.partial',
     'FunctoolsPartialCall': 'functools.partial',
 }
+
+
+def _module_scope_statements(body: Sequence[ast.stmt]) -> Iterator[ast.stmt]:
+    """``body`` plus the statements an `if` with no `else` nests, since those bind into
+    the scope around it.
+
+    `import_utils.unconditional_body` is the same rule over the LST, for `RemoveImport`;
+    attribution runs during parse, where only `ast` exists. Keep the two in step.
+    """
+    for stmt in body:
+        yield stmt
+        if isinstance(stmt, ast.If) and not stmt.orelse:
+            yield from _module_scope_statements(stmt.body)
 
 
 def _module_all_names(tree: ast.Module) -> Optional[Set[str]]:
@@ -1050,10 +1063,11 @@ class PythonTypeMapping:
             tree = self._module_ast()
             bindings: Dict[str, str] = {}
             members: Dict[str, Tuple[str, str]] = {}
-            top_level = {id(alias) for stmt in (tree.body if tree else ())
-                         if isinstance(stmt, (ast.Import, ast.ImportFrom))
-                         for alias in stmt.names}
-            shadowed = self._rebound_names(tree, top_level)
+            module_scope = list(_module_scope_statements(tree.body if tree else ()))
+            module_level_aliases = {id(alias) for stmt in module_scope
+                                    if isinstance(stmt, (ast.Import, ast.ImportFrom))
+                                    for alias in stmt.names}
+            shadowed = self._rebound_names(tree, module_level_aliases)
 
             def bind(name: str, fqn: Optional[str]) -> None:
                 # `import a.b` after `import a` re-binds the root to the same FQN
@@ -1062,7 +1076,7 @@ class PythonTypeMapping:
                 else:
                     bindings[name] = fqn
 
-            for stmt in tree.body if tree else ():
+            for stmt in module_scope:
                 if isinstance(stmt, (ast.Import, ast.ImportFrom)):
                     # A relative import's written form is not a module path
                     relative = isinstance(stmt, ast.ImportFrom) and (stmt.level or not stmt.module)
@@ -1088,8 +1102,9 @@ class PythonTypeMapping:
                                               if name not in shadowed}
         return self._import_binding_index
 
-    def _rebound_names(self, tree: Optional[ast.Module], top_level: Set[int]) -> Set[str]:
-        """Every name this file binds somewhere other than one of its own top-level
+    def _rebound_names(self, tree: Optional[ast.Module],
+                       module_level_aliases: Set[int]) -> Set[str]:
+        """Every name this file binds somewhere other than one of its own module-level
         imports. Coarse on purpose: a name bound twice is one whose references cannot be
         read off an import, and declining to attribute costs less than attributing wrong.
         """
@@ -1107,7 +1122,7 @@ class PythonTypeMapping:
                     names.add(node.name)
                 elif isinstance(node, (ast.Global, ast.Nonlocal)):
                     names.update(node.names)
-                elif isinstance(node, ast.alias) and id(node) not in top_level:
+                elif isinstance(node, ast.alias) and id(node) not in module_level_aliases:
                     names.add(node.asname or node.name.split('.')[0])
             self._shadowed_names = names
         return set(self._shadowed_names)
