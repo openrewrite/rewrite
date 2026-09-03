@@ -26,6 +26,7 @@ import pytest
 
 from rewrite.java import JavaType
 from rewrite.python.visitor import PythonVisitor
+from rewrite.test import RecipeSpec, pyproject, python
 from rewrite.rpc import server
 
 
@@ -111,3 +112,42 @@ def test_version_outside_ty_support_keeps_the_rest_of_attribution(tmp_path):
     # ty declines a version it ships no stubs for by failing initialization,
     # which takes every type down with it unless the version is given up.
     assert found["getdefaultlocale"] == ("locale", True)
+
+
+def _return_types_through_harness(classifier_version):
+    """Map each call to its method type's return type, reaching the parser the way a
+    recipe author does — ``rewrite_run`` rather than the RPC handler.
+    """
+    found = {}
+
+    class Collect(PythonVisitor):
+        def visit_method_invocation(self, mi, p):
+            found[mi.name.simple_name] = mi.method_type.return_type if mi.method_type else None
+            return super().visit_method_invocation(mi, p)
+
+    def collect(cu):
+        Collect().visit(cu, None)
+
+    RecipeSpec().rewrite_run(
+        pyproject(
+            '[project]\nname = "demo"\nversion = "0.1.0"\n'
+            'classifiers = ["Programming Language :: Python :: %s"]\n' % classifier_version
+        ),
+        python(SOURCE, before_recipe=collect),
+    )
+    return found
+
+
+@requires_ty_types_cli
+def test_rewrite_run_parses_under_the_declared_version():
+    on_310 = _return_types_through_harness("3.10")
+    on_313 = _return_types_through_harness("3.13")
+
+    # gettext.lgettext is in 3.10's typeshed and gone from 3.11's, so only the
+    # declared version can give it a signature.
+    assert on_310["lgettext"] == JavaType.Primitive.String
+    assert isinstance(on_313["lgettext"], JavaType.Unknown)
+
+    # Resolves under both, so the lgettext split is typeshed content, not a failed parse.
+    for found in (on_310, on_313):
+        assert not isinstance(found["getdefaultlocale"], JavaType.Unknown)
