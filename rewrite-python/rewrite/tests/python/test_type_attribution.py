@@ -3132,7 +3132,7 @@ class TestDependencyPathForwarding:
     _captured: list = []
 
     class _StubTyClient:
-        def __init__(self, virtual_env=None):
+        def __init__(self, virtual_env=None, python_version=None):
             TestDependencyPathForwarding._captured.append(virtual_env)
 
         def initialize(self, project_root):

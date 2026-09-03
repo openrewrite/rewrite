@@ -125,7 +125,33 @@ class TestProjectDetection:
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nrequires-python = ">=3.10"\n'
         )
-        assert detect_from_project(tmp_path) == "3"
+        assert detect_from_project(tmp_path) == "3.10"
+
+    def test_several_py3_versions_yield_the_lowest(self, tmp_path):
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nclassifiers = ['
+            '"Programming Language :: Python :: 3.12", '
+            '"Programming Language :: Python :: 3.10"]\n'
+        )
+        assert detect_from_project(tmp_path) == "3.10"
+
+    def test_several_py2_versions_resolve_to_the_only_parso_grammar(self, tmp_path):
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nclassifiers = ['
+            '"Programming Language :: Python :: 2.6", '
+            '"Programming Language :: Python :: 2.7"]\n'
+        )
+        # Any other 2.x turns every Py2-syntax file into a ParseError.
+        assert detect_from_project(tmp_path) == "2.7"
+
+    def test_requires_python_ignores_bounds_that_set_no_floor(self, tmp_path):
+        pyproject = tmp_path / "pyproject.toml"
+
+        pyproject.write_text('[project]\nrequires-python = "<3.13,>=3.9"\n')
+        assert detect_from_project(tmp_path) == "3.9"
+
+        pyproject.write_text('[project]\nrequires-python = "!=3.9.*,>=3.8"\n')
+        assert detect_from_project(tmp_path) == "3.8"
 
     def test_setup_cfg_classifier(self, tmp_path):
         (tmp_path / "setup.cfg").write_text(
