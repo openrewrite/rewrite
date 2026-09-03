@@ -1817,7 +1817,7 @@ def _register_parse_error_codec():
 def _register_python_marker_codecs():
     """Register codecs for Python-specific marker types."""
     from rewrite.python.markers import (
-        CanonicalName, KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline,
+        KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline,
         PrintSyntax, ExecSyntax
     )
     from rewrite.rpc.receive_queue import register_codec_with_both_names
@@ -1857,26 +1857,6 @@ def _register_python_marker_codecs():
         _receive_keyword_only_arguments,
         lambda: KeywordOnlyArguments(random_id()),
         _send_keyword_only_arguments
-    )
-
-    # CanonicalName - has id and fqn (str)
-    def _receive_canonical_name(marker: CanonicalName, q: RpcReceiveQueue) -> CanonicalName:
-        new_id = q.receive_defined(marker.id)
-        new_fqn = q.receive_defined(marker.fqn)
-        if new_id is marker.id and new_fqn is marker.fqn:
-            return marker
-        return marker.with_id(new_id).with_fqn(new_fqn)
-
-    def _send_canonical_name(marker: CanonicalName, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: id_to_str(x._id))
-        q.get_and_send(marker, lambda x: x.fqn)
-
-    register_codec_with_both_names(
-        'org.openrewrite.python.marker.CanonicalName',
-        CanonicalName,
-        _receive_canonical_name,
-        lambda: CanonicalName(random_id(), ''),
-        _send_canonical_name
     )
 
     # Quoted - has id and style (enum)

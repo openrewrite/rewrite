@@ -20,7 +20,7 @@ from typing import Iterator, Optional, Sequence, Tuple
 from rewrite.java.support_types import JavaType, JRightPadded, Space, Statement
 from rewrite.java.tree import Block, Empty, FieldAccess, Identifier, If, Import
 from rewrite.markers import Markers
-from rewrite.python.markers import CanonicalName, Quoted
+from rewrite.python.markers import Quoted
 
 
 def unconditional_body(if_: If) -> Optional[Block]:
@@ -84,12 +84,8 @@ def get_alias_name(imp: Import) -> Optional[str]:
 
 
 def get_canonical_fqn(imp: Import) -> Optional[str]:
-    """The fully qualified name of the symbol ``imp`` binds, at the module defining
-    it, or None when unattributed: the :class:`CanonicalName` marker when that module
-    re-exports it under the written path, else the qualid's own type."""
-    canonical = imp.markers.find_first(CanonicalName)
-    if canonical is not None:
-        return canonical.fqn
+    """The fully qualified name of the symbol ``imp`` binds, at the module defining it,
+    read off the qualid's own type, or None when unattributed."""
     t = getattr(imp.qualid, 'type', None)
     if isinstance(t, JavaType.Method):
         declaring = t.declaring_type

@@ -3704,24 +3704,54 @@ class TestPydanticModelMembers:
         assert 'greeting' in [m._name for m in cls._methods]
 
 
+def _first_import(cu):
+    """The first import name a compilation unit binds."""
+    from rewrite.python.tree import MultiImport
+    stmt = cu.statements[0]
+    return stmt.names[0] if isinstance(stmt, MultiImport) else stmt
+
+
+@requires_ty_types_cli
+class TestSymbolIdentityAcrossImportForms:
+    """A function's identity is its declaring type's FQN plus its name, the module ty
+    defines it in — the same pair however the source spelled the import, as a class's
+    own FQN already is."""
+
+    def _assert_names(self, source, owner, name):
+        cu, tmpdir, client = _parse_with_types({'m.py': source})
+        try:
+            call = cu.statements[1]
+            assert (call.method_type.declaring_type.fully_qualified_name,
+                    call.method_type.name) == (owner, name)
+            qualid_type = _first_import(cu).qualid.type
+            if isinstance(qualid_type, JavaType.Method):
+                assert (qualid_type.declaring_type.fully_qualified_name,
+                        qualid_type.name) == (owner, name)
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    # `asyncio` re-exports the `sleep` that `asyncio.tasks` defines, written through
+    # the facade, through the defining module, and as an attribute of the package.
+    @pytest.mark.parametrize('source', [
+        'from asyncio import sleep\nsleep(1)\n',
+        'from asyncio.tasks import sleep\nsleep(1)\n',
+        'import asyncio\nasyncio.sleep(1)\n',
+    ], ids=['through-facade', 'through-definer', 'as-attribute'])
+    def test_a_reexported_function_has_one_identity(self, source):
+        self._assert_names(source, 'asyncio.tasks', 'sleep')
+
+    def test_a_platform_module_is_named_by_its_portable_alias(self):
+        self._assert_names('from posixpath import join\njoin("a", "b")\n', 'os.path', 'join')
+
+
 @requires_ty_types_cli
 class TestImportNameAttribution:
-    """Each import name's qualid carries the type of the symbol it binds, named under
-    the module the source imported from — the module a call to it names too. The
-    defining module rides on a ``CanonicalName`` marker."""
-
-    @staticmethod
-    def _first_import(cu):
-        from rewrite.python.tree import MultiImport
-        stmt = cu.statements[0]
-        if isinstance(stmt, MultiImport):
-            return stmt.names[0]
-        return stmt
+    """Each import name's qualid carries the type of the symbol it binds."""
 
     def _qualid_type(self, src):
         cu, tmpdir, client = _parse_with_types({'m.py': src})
         try:
-            return self._first_import(cu).qualid.type
+            return _first_import(cu).qualid.type
         finally:
             _cleanup_parse(tmpdir, client)
 
@@ -3742,11 +3772,11 @@ class TestImportNameAttribution:
         cu, tmpdir, client = _parse_with_types(
             {'m.py': 'from os.path import join\nx = join("/tmp", "f")\n'})
         try:
-            imp = self._first_import(cu)
+            imp = _first_import(cu)
             call = cu.statements[1].assignment
             assert imp.qualid.name.type.declaring_type.fully_qualified_name == \
                 call.method_type.declaring_type.fully_qualified_name == 'os.path'
-            assert get_canonical_fqn(imp) == 'posixpath.join'
+            assert get_canonical_fqn(imp) == 'os.path.join'
         finally:
             _cleanup_parse(tmpdir, client)
 
@@ -4232,11 +4262,14 @@ class TestDecoratorAttribution:
         assert not (isinstance(t, JavaType.Class) and
                     t.fully_qualified_name == 'deco.require'), f"falsely attributed {t!r}"
 
-    # A package re-exporting from a private module, the shape pytest and click have
+    # A package re-exporting from a private module, the shape pytest and click have.
+    # `require` is what an untyped factory produced, so ty has no type for it.
     PACKAGE = {
         'pkg/__init__.py': '',
-        'pkg/_impl.py': 'def tag(fn):\n    return fn\n',
-        'pkg/api.py': 'from pkg._impl import tag\n',
+        'pkg/_impl.py': 'def tag(fn):\n    return fn\n\n\n'
+                        'def factory(m):\n    def d(fn):\n        return fn\n    return d\n\n\n'
+                        'require = factory("GET")\n',
+        'pkg/api.py': 'from pkg._impl import tag, require\n',
     }
 
     def _assert_named_in_package(self, src, fqn):
@@ -4261,15 +4294,16 @@ class TestDecoratorAttribution:
     def test_decorator_the_file_defines_itself(self):
         self._assert_named('def wrap(fn):\n    return fn\n\n@wrap\ndef f():\n    pass\n', 'm.wrap')
 
-    def test_dotted_decorator_names_the_module_re_exporting_it(self):
+    def test_decorator_names_the_module_defining_it(self):
         self._assert_named_in_package(
-            'import pkg.api\n\n@pkg.api.tag\ndef f():\n    pass\n', 'pkg.api.tag')
+            'import pkg.api\n\n@pkg.api.tag\ndef f():\n    pass\n', 'pkg._impl.tag')
 
-    def test_re_export_survives_an_unrelated_rebinding_of_the_name(self):
         self._assert_named_in_package(
-            'from pkg.api import tag\n\ndef g(tag):\n    return tag\n\n@tag\ndef f():\n    pass\n',
-            'pkg.api.tag')
+            'from pkg.api import tag\n\n@tag\ndef f():\n    pass\n', 'pkg._impl.tag')
 
     def test_a_package_and_its_submodule_bind_the_same_root(self):
+        """`import pkg` then `import pkg.api` binds `pkg` once, so the written path
+        still names a decorator ty cannot type."""
         self._assert_named_in_package(
-            'import pkg\nimport pkg.api\n\n@pkg.api.tag\ndef f():\n    pass\n', 'pkg.api.tag')
+            'import pkg\nimport pkg.api\n\n@pkg.api.require\ndef f():\n    pass\n',
+            'pkg.api.require')
