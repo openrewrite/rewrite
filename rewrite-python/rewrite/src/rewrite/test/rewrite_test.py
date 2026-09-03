@@ -35,6 +35,7 @@ from rewrite.parser import ParseError
 from rewrite.markers import ParseExceptionResult
 
 from .spec import SourceSpec, AfterRecipeText, dedent
+from .well_formed import assert_well_formed
 
 if TYPE_CHECKING:
     from rewrite.tree import SourceFile
@@ -391,6 +392,8 @@ class RecipeSpec:
 
             # Get the result (may be None if no change, or the changed file)
             after_sf = result_map.get(source_file.id)
+            if after_sf is not None:
+                assert_well_formed(after_sf)
 
             if spec.after is None:
                 # No change expected

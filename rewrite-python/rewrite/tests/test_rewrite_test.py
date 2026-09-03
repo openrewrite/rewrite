@@ -15,15 +15,18 @@
 """Tests for the Python test harness."""
 
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
+from rewrite.markers import Markers
 from rewrite.test import RecipeSpec, python, pyproject, uv, from_visitor, dedent
 from rewrite.test.spec import SourceSpec
 from rewrite.python.visitor import PythonVisitor
-from rewrite.python.tree import CompilationUnit
-from rewrite.java import J, JavaType
+from rewrite.java.tree import MethodInvocation, Yield
+from rewrite.python.tree import Await, CompilationUnit
+from rewrite.java import J, JavaType, Space
 
 
 class TestDedent:
@@ -495,3 +498,40 @@ class TestUvHelper:
                 ),
             )
         )
+
+
+def _await(node: J) -> Await:
+    return Await(uuid4(), node.prefix, Markers.EMPTY, node.replace(prefix=Space([], ' ')), None)
+
+
+class TestWellFormedness:
+    """The harness rejects an `after` tree whose slots hold the wrong node kind."""
+
+    def test_expression_in_statement_list_slot(self):
+        class AwaitEveryCall(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+                return _await(mi)
+
+        spec = RecipeSpec(recipe=from_visitor(AwaitEveryCall()))
+        with pytest.raises(AssertionError, match=r"CompilationUnit\.statements\[0\] holds Await, expected Statement"):
+            spec.rewrite_run(python("foo()", "await foo()"))
+
+    def test_expression_in_single_statement_slot(self):
+        class AwaitEveryYield(PythonVisitor[ExecutionContext]):
+            def visit_yield(self, y: Yield, ctx: ExecutionContext) -> J:
+                return _await(y)
+
+        spec = RecipeSpec(recipe=from_visitor(AwaitEveryYield()))
+        with pytest.raises(AssertionError, match=r"StatementExpression\.statement holds Await, expected Statement"):
+            spec.rewrite_run(
+                python(
+                    """
+                    def f():
+                        yield 1
+                    """,
+                    """
+                    def f():
+                        await yield 1
+                    """,
+                )
+            )
