@@ -623,3 +623,48 @@ def test_facade_visit_checkpoints_its_own_ref_tables_so_evict_rolls_them_back(mo
     assert server.local_refs.get(kept) == 1
     assert server.local_refs.snapshot() == 1
     assert sorted(server.remote_refs) == [1]
+
+
+def test_reset_clears_the_hub_tables_too(monkeypatch):
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    _isolated_hub(monkeypatch, server)
+    tree = object()
+    server._hub_tree["T"] = tree
+    server._hub_served[("A", "T")] = tree
+    server._hub_send_refs["A"] = ReferenceMap()
+    server._hub_send_refs["A"].create(object())
+    server._hub_recv_refs["A"] = {1: object()}
+    server._hub_send_checkpoint[("A", "T")] = 0
+    server._hub_recv_checkpoint[("A", "T")] = -1
+
+    server.handle_reset({})
+
+    assert not server._hub_tree
+    assert not server._hub_served
+    assert not server._hub_send_refs
+    assert not server._hub_recv_refs
+    assert not server._hub_send_checkpoint
+    assert not server._hub_recv_checkpoint
+
+
+def test_reset_reaches_the_children(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+
+    broadcast = []
+
+    class _FakeChildren(_EditingChildren):
+        def broadcast_reset(self, params):
+            broadcast.append(params)
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", Facade(_FakeChildren()))
+    _isolated_hub(monkeypatch, server)
+
+    assert server.handle_request("Reset", {}) is True
+
+    # The hub's per-bundle ref maps and the child's own are two ends of one table: dropping only
+    # the hub's would leave the child citing ids the hub can no longer resolve.
+    assert broadcast == [{}]

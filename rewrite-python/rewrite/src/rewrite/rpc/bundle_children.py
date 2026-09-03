@@ -50,6 +50,10 @@ class BundleChildren:
         for child in self._children.values():
             child.request("Evict", params)
 
+    def broadcast_reset(self, params: dict) -> None:
+        for child in self._children.values():
+            child.request("Reset", params)
+
     def install(self, bundle_dist: str, spec: str, force: bool = False, attribution_name=None):
         """Create/reuse the bundle's venv, install ``spec``, spawn its child, cache its recipes.
 

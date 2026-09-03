@@ -133,6 +133,10 @@ class Facade:
         self._children.broadcast_evict(params)
         return True
 
+    def reset(self, params: dict) -> bool:
+        self._children.broadcast_reset(params)
+        return True
+
     def set_data_table_store(self, params: dict) -> bool:
         self._children.set_data_table_store(params)
         return True

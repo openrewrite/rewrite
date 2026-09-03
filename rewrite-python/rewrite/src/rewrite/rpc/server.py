@@ -1130,6 +1130,12 @@ def handle_reset(params: dict) -> bool:
     _ref_checkpoints.clear()
     _local_ref_checkpoints.clear()
     local_refs.clear()
+    _hub_tree.clear()
+    _hub_served.clear()
+    _hub_send_refs.clear()
+    _hub_recv_refs.clear()
+    _hub_send_checkpoint.clear()
+    _hub_recv_checkpoint.clear()
 
     logger.info("Reset: cleared all cached state")
     return True
@@ -2548,6 +2554,9 @@ def handle_request(method: str, params: dict) -> Any:
             facade.evict(params)
             _hub_release(params.get('id'))
             return handle_evict(params)
+        if method == 'Reset':
+            facade.reset(params)
+            return handle_reset(params)
         facade_handlers = {
             'InstallRecipes': facade.install_recipes,
             'GetMarketplace': facade.get_marketplace,
