@@ -29,7 +29,7 @@ to fall through to the next layer.
 
 import re
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 # `# -*- python: 2 -*-` / `# -*- python: 2.7 -*-` — mirrors PEP-263's encoding
 # declaration style. Must appear on line 1 or 2 of the source.
@@ -44,6 +44,24 @@ _SHEBANG_RE = re.compile(r"^#!.*\bpython(?P<ver>\d+(?:\.\d+)?)\b")
 _CLASSIFIER_RE = re.compile(
     r"Programming Language\s*::\s*Python\s*::\s*(?P<ver>\d+(?:\.\d+)?)"
 )
+
+
+def requested_python_version(value: Any) -> Optional[str]:
+    """The value if it looks like a Python minor version ("3.12"), else None."""
+    return value if isinstance(value, str) and re.fullmatch(r"\d+\.\d+", value) else None
+
+
+def ty_python_version(*levels: Optional[str]) -> Optional[str]:
+    """The first language level precise enough to name a stdlib surface to ty.
+
+    One ty session serves a whole batch, so callers pass only levels holding
+    for all of it — never a per-file shebang or magic comment.
+    """
+    for level in levels:
+        version = requested_python_version(level)
+        if version:
+            return version
+    return None
 
 
 def detect_from_source(source: str) -> Optional[str]:

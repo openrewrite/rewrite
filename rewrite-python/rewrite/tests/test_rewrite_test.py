@@ -14,6 +14,8 @@
 
 """Tests for the Python test harness."""
 
+from pathlib import Path
+
 import pytest
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
@@ -21,7 +23,7 @@ from rewrite.test import RecipeSpec, python, pyproject, uv, from_visitor, dedent
 from rewrite.test.spec import SourceSpec
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.tree import CompilationUnit
-from rewrite.java import J
+from rewrite.java import J, JavaType
 
 
 class TestDedent:
@@ -340,6 +342,65 @@ def _uv_available() -> bool:
     """Check if uv is installed."""
     import shutil
     return shutil.which("uv") is not None
+
+
+def _ty_types_available() -> bool:
+    """Check if the ty-types CLI is installed."""
+    import shutil
+    try:
+        from ty_types.__main__ import find_ty_types_bin  # noqa: F401
+        return True
+    except Exception:
+        return shutil.which("ty-types") is not None
+
+
+class TestWorkspace:
+    """Tests for the directory a run parses its sources under."""
+
+    @pytest.mark.skipif(not _ty_types_available(), reason="ty-types not installed")
+    def test_sources_in_a_run_resolve_against_each_other(self):
+        returns = {}
+
+        class Collect(PythonVisitor):
+            def visit_method_invocation(self, mi, p):
+                returns[mi.name.simple_name] = (
+                    mi.method_type.return_type if mi.method_type else None
+                )
+                return super().visit_method_invocation(mi, p)
+
+        def collect(cu):
+            Collect().visit(cu, None)
+
+        RecipeSpec().rewrite_run(
+            python("def answer() -> int:\n    return 42\n", path=Path("helper.py")),
+            python("import helper\n\nvalue = helper.answer()\n", before_recipe=collect),
+        )
+
+        # Resolved through the import, which names a module of the same directory.
+        assert returns["answer"] == JavaType.Primitive.Int
+
+    def test_a_source_path_leading_out_of_the_workspace_is_rejected(self):
+        with pytest.raises(ValueError, match="inside the workspace"):
+            RecipeSpec().rewrite_run(python("x = 1\n", path=Path("../escaped.py")))
+
+    @pytest.mark.skipif(not _uv_available(), reason="uv not installed")
+    def test_a_borrowed_workspace_keeps_its_own_files(self):
+        specs = uv(
+            pyproject(
+                """
+                [project]
+                name = "test"
+                version = "0.0.0"
+                requires-python = ">=3.10"
+                """
+            ),
+            python("x = 1\n"),
+        )
+        root = Path(specs[0].project_root)
+
+        RecipeSpec().rewrite_run(*specs)
+
+        assert (root / "pyproject.toml").is_file()
 
 
 class TestPyprojectHelper:
