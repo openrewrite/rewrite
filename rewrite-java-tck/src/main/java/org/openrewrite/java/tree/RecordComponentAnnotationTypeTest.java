@@ -34,6 +34,9 @@ import static org.openrewrite.java.Assertions.java;
  * method and the constructor parameter the annotation is applicable to (JLS 9.7.4), and javac attributes
  * each one only where it landed. Whichever of those it was, the annotation keeps the type it was written
  * with.
+ * <p>
+ * These assert the type each annotation resolves to rather than leaning on type validation, which only
+ * sees whether a type is present: an annotation that took its neighbour's type is well formed and passes.
  */
 @Issue("https://github.com/openrewrite/rewrite/pull/8751")
 @MinimumJava17
@@ -55,6 +58,10 @@ class RecordComponentAnnotationTypeTest implements RewriteTest {
 
       @Target(ElementType.FIELD)
       @interface OnField {
+      }
+
+      @Target({ElementType.RECORD_COMPONENT, ElementType.FIELD})
+      @interface OnComponentAndField {
       }
 
       @Target(ElementType.RECORD_COMPONENT)
@@ -149,6 +156,20 @@ class RecordComponentAnnotationTypeTest implements RewriteTest {
               }
               """,
             annotationTypes("OnField -> OnField", "OnComponent -> OnComponent")
+          )
+        );
+    }
+
+    @Test
+    void accessorOnlyAnnotationBeforeOneThatAlsoReachesTheField() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record AccessorOnlyBeforeComponentAndField(@OnMethod @OnComponentAndField String name) {
+              }
+              """,
+            annotationTypes("OnMethod -> OnMethod", "OnComponentAndField -> OnComponentAndField")
           )
         );
     }
