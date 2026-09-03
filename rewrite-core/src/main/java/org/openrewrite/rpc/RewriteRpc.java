@@ -229,14 +229,7 @@ public class RewriteRpc {
                 }
             }
         });
-        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, (id, opts) -> {
-            RecipeListing listing = marketplace.findRecipe(id);
-            if (listing != null) {
-                return listing.prepare(RewriteRpc.this.resolvers, opts);
-            }
-            // Fall back to loading by class name if not found in marketplace
-            return new RecipeLoader(null).load(id, opts);
-        }));
+        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, this::loadRecipe));
         jsonRpc.rpc("Parse", new Parse.Handler(localObjects, () -> parsers));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
         jsonRpc.rpc("SetDataTableStore", new SetDataTableStore.Handler(
@@ -515,17 +508,28 @@ public class RewriteRpc {
     Recipe recipeFromPrepareResponse(PrepareRecipeResponse r) {
         if (r.getDelegatesTo() != null) {
             PrepareRecipeResponse.DelegatesTo d = r.getDelegatesTo();
-            RecipeListing listing = marketplace.findRecipe(d.getRecipeName());
-            if (listing == null) {
-                throw new IllegalStateException(
-                        "Remote declared delegatesTo " + d.getRecipeName() +
-                        " but no recipe found in marketplace.");
-            }
-            return listing.prepare(resolvers, d.getOptions());
+            return loadRecipe(d.getRecipeName(), d.getOptions());
         }
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(),
                 matchAll(r.getEditPreconditions()), r.getScanVisitor(), matchAll(r.getScanPreconditions()),
                 r.getRecipeList());
+    }
+
+    /**
+     * Marketplace first, then the class by name: a peer may name a recipe (inbound PrepareRecipe or
+     * an outbound delegatesTo) that this process has on its classpath without listing it.
+     */
+    private Recipe loadRecipe(String name, Map<String, Object> options) {
+        RecipeListing listing = marketplace.findRecipe(name);
+        if (listing != null) {
+            return listing.prepare(resolvers, options);
+        }
+        try {
+            return new RecipeLoader(null).load(name, options);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("Recipe " + name +
+                                            " is neither in the marketplace nor loadable from the classpath", e);
+        }
     }
 
     private @Nullable TreeVisitor<?, ExecutionContext> matchAll(List<PrepareRecipeResponse.Precondition> preconditions) {

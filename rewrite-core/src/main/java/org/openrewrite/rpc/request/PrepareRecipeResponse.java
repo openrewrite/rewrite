@@ -41,8 +41,8 @@ public class PrepareRecipeResponse {
 
     /**
      * When non-null, the remote declares that this recipe delegates entirely
-     * to a Java recipe. The host should load the recipe locally via the
-     * marketplace instead of wrapping it in an RpcRecipe.
+     * to a Java recipe. The host instantiates it locally (marketplace, then
+     * classpath) instead of wrapping it in an RpcRecipe.
      */
     @Nullable
     DelegatesTo delegatesTo;

@@ -38,6 +38,7 @@ import org.openrewrite.marketplace.*;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.marker.RecipesThatMadeChanges;
+import org.openrewrite.rpc.request.PrepareRecipeResponse;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -304,6 +305,20 @@ class RewriteRpcTest implements RewriteTest {
         Recipe recipe = client.prepareRecipe("org.openrewrite.text.Find",
           Map.of("find", "hello"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Find text");
+    }
+
+    @Test
+    void delegatesToLoadsFromClasspathWhenMarketplaceMisses() {
+        // FindSourceFiles is on the classpath but outside the org.openrewrite.text scan of `env`
+        FindSourceFiles expected = new FindSourceFiles("**/*.txt");
+        assertThat(marketplace.findRecipe(expected.getName())).isNull();
+
+        PrepareRecipeResponse response = new PrepareRecipeResponse("1", expected.getDescriptor(),
+          "", List.of(), null, List.of(),
+          new PrepareRecipeResponse.DelegatesTo(expected.getName(), Map.of("filePattern", "**/*.txt")),
+          null);
+
+        assertThat(client.recipeFromPrepareResponse(response)).isEqualTo(expected);
     }
 
     @Test
