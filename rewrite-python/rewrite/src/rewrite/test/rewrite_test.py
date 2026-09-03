@@ -193,6 +193,8 @@ class RecipeSpec:
             for kind, kind_specs in specs_by_kind.items():
                 parsed = self._parse(kind_specs, workspace)
                 self._expect_no_parse_failures(parsed)
+                for _, sf in parsed:
+                    assert_well_formed(sf)
                 if self.check_parse_print_idempotence:
                     self._expect_parse_print_idempotence(parsed)
                 all_parsed.extend(parsed)
