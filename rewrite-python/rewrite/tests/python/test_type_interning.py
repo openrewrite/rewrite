@@ -159,11 +159,12 @@ def test_same_named_typed_dicts_in_two_modules_keep_their_own_fields(tmp_path):
     fields = {}
     for result in results:
         for java_type in _java_types(server.local_objects[result['id']]).values():
-            if getattr(java_type, 'fully_qualified_name', None) == 'Movie':
-                fields[result['sourcePath']] = sorted(
+            fqn = getattr(java_type, 'fully_qualified_name', None)
+            if fqn in ('a_mod.Movie', 'b_mod.Movie'):
+                fields[fqn] = sorted(
                     m.name for m in (getattr(java_type, '_members', None) or []))
 
-    assert fields == {'a_mod.py': ['name'], 'b_mod.py': ['director', 'year']}
+    assert fields == {'a_mod.Movie': ['name'], 'b_mod.Movie': ['director', 'year']}
 
 
 @requires_ty_types_cli

@@ -36,6 +36,24 @@ class InstalledEnvParserTest {
     }
 
     @Test
+    void envIsIntactOnlyWhileItsPackagesAreOnDisk(@TempDir Path env) throws IOException {
+        Path sitePackages = env.resolve("lib/python3.12/site-packages");
+        writeDistInfo(sitePackages, "a", "1.0.0", """
+          Metadata-Version: 2.4
+          Name: a
+          Version: 1.0.0
+          """);
+        assertThat(InstalledEnvParser.isIntact(env)).isTrue();
+
+        Path distInfo = sitePackages.resolve("a-1.0.0.dist-info");
+        Files.delete(distInfo.resolve("METADATA"));
+        assertThat(InstalledEnvParser.isIntact(env)).isFalse();
+
+        Files.delete(distInfo);
+        assertThat(InstalledEnvParser.isIntact(env)).isFalse();
+    }
+
+    @Test
     void linksTransitiveDependenciesDeeply(@TempDir Path env) throws IOException {
         Path sitePackages = env.resolve("lib/python3.12/site-packages");
         writeDistInfo(sitePackages, "a", "1.0.0", """

@@ -3877,14 +3877,13 @@ class FqnCase:
     """One row of the descriptor→FQN contract. ``source``'s last statement is a
     bare expression; the type attributed to it must be keyed by ``expected``.
     ``type_parameters``, when set, additionally pins the resolved generic
-    arguments. ``xfail`` names the reason the mapping does not yet honour the row.
+    arguments.
     """
     id: str
     kind: str
     source: str
     expected: str
     type_parameters: Optional[Tuple[object, ...]] = None
-    xfail: Optional[str] = None
 
 
 # The fully-qualified name each ty descriptor kind must map to. `test.py` is the
@@ -4000,7 +3999,6 @@ _FQN_CASES = (
             m
         ''',
         expected='test.Movie',
-        xfail='ty emits no module on typedDict, so the value maps to bare `Movie`',
     ),
     FqnCase(
         id='new_type',
@@ -4013,7 +4011,6 @@ _FQN_CASES = (
             u
         ''',
         expected='test.UserId',
-        xfail='ty emits no module on newType, so the value maps to bare `UserId`',
     ),
     FqnCase(
         id='nested_class_instance',
@@ -4027,7 +4024,6 @@ _FQN_CASES = (
             o
         ''',
         expected='test.Outer.Inner',
-        xfail='the FQN is built as moduleName + className, which drops the enclosing class',
     ),
 )
 
@@ -4042,8 +4038,7 @@ def _fqn(java_type) -> Optional[str]:
 
 
 def _fqn_params(case: FqnCase):
-    marks = [pytest.mark.xfail(reason=case.xfail, strict=True)] if case.xfail else []
-    return pytest.param(case, id=case.id, marks=marks)
+    return pytest.param(case, id=case.id)
 
 
 @requires_ty_types_cli
@@ -4052,8 +4047,6 @@ class TestDescriptorFqnContract:
     type table resolves only when its entries carry the FQNs attribution mints at
     parse time: an unqualified name fails to resolve and collides with its
     namesakes.
-
-    TODO drop every `xfail` in this class once the floor is ty-types 0.0.72+.
     """
 
     @pytest.mark.parametrize('case', [_fqn_params(c) for c in _FQN_CASES])
@@ -4069,9 +4062,6 @@ class TestDescriptorFqnContract:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason='ty emits no module on typedDict, so both map to bare `Movie`')
     def test_same_named_typed_dicts_in_different_modules_stay_distinct(self):
         source = '''
             from typing import TypedDict
@@ -4105,9 +4095,9 @@ class TestDescriptorFqnContract:
 
 
 class TestQualifiedNameForwardCompatibility:
-    """The xfailed rows of the FQN contract, driven from descriptors that carry
-    ``qualifiedName``. Hand-built, since the pinned ty-types CLI does not emit the
-    field yet — these pin the behaviour the first release carrying it will trigger.
+    """Descriptor-level coverage of ``_class_fqn`` and the declaring-type path,
+    driven from hand-built descriptors so each shape is pinned independently of
+    what a given ty-types build emits.
     """
 
     @staticmethod
@@ -4123,7 +4113,6 @@ class TestQualifiedNameForwardCompatibility:
         })
         assert _fqn(result) == 'a.b.Outer.Inner'
 
-    # TODO drop with the `_class_fqn` fallback once the floor is ty-types 0.0.72+.
     def test_class_literal_falls_back_to_module_name(self):
         _, result = self._resolve({
             'kind': 'classLiteral', 'className': 'Inner', 'moduleName': 'a.b',
