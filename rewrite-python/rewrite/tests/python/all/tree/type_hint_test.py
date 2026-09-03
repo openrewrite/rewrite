@@ -156,6 +156,11 @@ def test_function_parameter_with_parenthesized_quoted_type_hint():
     ))
 
 
+def test_prefixed_string_type_hint_keeps_its_prefix():
+    # language=python
+    RecipeSpec().rewrite_run(python(r"""foo: r"List[\d]" = None"""))
+
+
 def test_variable_with_implicit_string_concat_type_hint():
     # language=python - type hint with implicit string concatenation
     RecipeSpec().rewrite_run(python('''X: """List[int]"""'☃' = []'''))
