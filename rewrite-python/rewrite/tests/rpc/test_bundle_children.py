@@ -31,6 +31,19 @@ class _FakeChild:
         self.closed = True
 
 
+def _behind_children(venvs_root, spawn, venv_ops):
+    """A fixture past in-process hosting: a lone bundle runs in the facade's own process, and these
+    tests are about the child path a second bundle takes, so one bundle is already behind a child."""
+    bc = BundleChildren("py", venvs_root, upstream=lambda m, p: None, spawn=spawn,
+                        venv_ops=venv_ops, activate=_never_hosted)
+    bc._children["other"] = _FakeChild([])
+    return bc
+
+
+def _never_hosted(venv_dir, bundle_dist, attribution_name):
+    raise AssertionError(f"{bundle_dist} should have gone to a child")
+
+
 def test_install_marketplace_owner_route_uninstall_and_shutdown(tmp_path):
     ops = SimpleNamespace(created=[], installed=[], removed=[])
     ops.venv_python = _fake_venv_python
@@ -39,6 +52,7 @@ def test_install_marketplace_owner_route_uninstall_and_shutdown(tmp_path):
     ops.install_into_venv = lambda d, spec, force=False: ops.installed.append((d, spec, force))
     ops.installed_version = lambda d, dist: f"{dist}-1.0"
     ops.remove_venv = lambda d: ops.removed.append(d)
+    ops.built_by_running_interpreter = lambda d: True
 
     spawned = {}
 
@@ -48,8 +62,7 @@ def test_install_marketplace_owner_route_uninstall_and_shutdown(tmp_path):
         spawned[bundle] = child
         return child
 
-    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
-                        spawn=fake_spawn, venv_ops=ops)
+    bc = _behind_children(tmp_path / "venvs", fake_spawn, ops)
 
     # install: venv created + package installed + child spawned + marketplace cached + ownership
     rows = bc.install("pkga", "pkga==1.0")
@@ -87,6 +100,8 @@ def _ops_recording(created, installed):
     ops.create_venv = lambda py, d, clear=False: (created.append(d), _make_venv(d))
     ops.install_into_venv = lambda d, spec, force=False: installed.append(d)
     ops.installed_version = lambda d, dist: "1.0.0"
+    ops.built_by_running_interpreter = lambda d: True
+    ops.remove_venv = lambda d: None
     return ops
 
 
@@ -97,8 +112,7 @@ def test_set_data_table_store_broadcasts_to_live_children_and_replays_on_spawn(t
         bundle = cmd[cmd.index("--child-bundle") + 1]
         return _FakeChild([{"descriptor": {"name": f"{bundle}.R"}}])
 
-    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
-                        spawn=fake_spawn, venv_ops=_ops_recording(created, installed))
+    bc = _behind_children(tmp_path / "venvs", fake_spawn, _ops_recording(created, installed))
 
     bc.install("pkga", "pkga")                       # a live child before the store is configured
     live = bc._children["pkga"]
@@ -116,8 +130,7 @@ def test_broadcast_evict_fans_out_to_live_children(tmp_path):
         bundle = cmd[cmd.index("--child-bundle") + 1]
         return _FakeChild([{"descriptor": {"name": f"{bundle}.R"}}])
 
-    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
-                        spawn=fake_spawn, venv_ops=_ops_recording([], []))
+    bc = _behind_children(tmp_path / "venvs", fake_spawn, _ops_recording([], []))
     bc.install("pkga", "pkga")
     bc.install("pkgb", "pkgb")
 
@@ -133,8 +146,7 @@ def test_install_reuses_an_existing_venv_but_still_upgrades(tmp_path):
     def fake_spawn(cmd, upstream=None, exclude_paths=()):
         return _FakeChild([{"descriptor": {"name": "pkg.R"}}])
 
-    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
-                        spawn=fake_spawn, venv_ops=_ops_recording(created, installed))
+    bc = _behind_children(tmp_path / "venvs", fake_spawn, _ops_recording(created, installed))
 
     # a real venv from a prior session (it has an interpreter) is reused, not recreated...
     _make_venv(tmp_path / "venvs" / "pkg")
@@ -152,8 +164,7 @@ def test_install_rebuilds_a_directory_that_is_not_a_venv(tmp_path):
     def fake_spawn(cmd, upstream=None, exclude_paths=()):
         return _FakeChild([{"descriptor": {"name": "pkg.R"}}])
 
-    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
-                        spawn=fake_spawn, venv_ops=_ops_recording(created, installed))
+    bc = _behind_children(tmp_path / "venvs", fake_spawn, _ops_recording(created, installed))
 
     legacy = tmp_path / "venvs" / "pkg"          # e.g. ~/.moderne/recipes/pip/pkg/__init__.py
     legacy.mkdir(parents=True)
@@ -172,6 +183,7 @@ def test_install_rebuilds_a_venv_orphaned_by_a_python_upgrade(tmp_path):
     ops.create_venv = lambda py, d, clear=False: (ops.created.append((d, clear)), _make_venv(d))
     ops.install_into_venv = lambda d, spec, force=False: ops.installed.append(d)
     ops.installed_version = lambda d, dist: "2.0"
+    ops.built_by_running_interpreter = lambda d: True
 
     def fake_spawn(cmd, upstream=None, exclude_paths=()):
         return _FakeChild([{"descriptor": {"name": "pkg.R"}}])
@@ -179,8 +191,7 @@ def test_install_rebuilds_a_venv_orphaned_by_a_python_upgrade(tmp_path):
     venv_dir = tmp_path / "venvs" / "pkg"
     _make_venv(venv_dir)                           # looks like a venv; its base is gone
 
-    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
-                        spawn=fake_spawn, venv_ops=ops)
+    bc = _behind_children(tmp_path / "venvs", fake_spawn, ops)
     orphaned_child = _FakeChild([])                # a child still bound to the dead venv
     bc._children["pkg"] = orphaned_child
 
@@ -201,8 +212,7 @@ def test_child_is_denied_the_shared_venvs_root_on_its_path(tmp_path):
         return _FakeChild([{"descriptor": {"name": "pkg.R"}}])
 
     venvs_root = tmp_path / "venvs"
-    bc = BundleChildren("py", venvs_root, upstream=lambda m, p: None,
-                        spawn=fake_spawn, venv_ops=_ops_recording(created, installed))
+    bc = _behind_children(venvs_root, fake_spawn, _ops_recording(created, installed))
     bc.install("pkg", "pkg")
 
     assert seen["exclude_paths"] == (str(venvs_root),)
@@ -216,8 +226,7 @@ def test_local_install_spawns_the_child_with_the_supplied_attribution_name(tmp_p
         spawned["cmd"] = cmd
         return _FakeChild([{"descriptor": {"name": "pkg.R"}}])
 
-    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
-                        spawn=fake_spawn, venv_ops=_ops_recording(created, installed))
+    bc = _behind_children(tmp_path / "venvs", fake_spawn, _ops_recording(created, installed))
     bc.install("my-local-recipes", "/abs/path/to/src", force=True,
                attribution_name="/abs/path/to/src")
 
@@ -240,6 +249,7 @@ def test_install_normalizes_distribution_name_so_spellings_dedup(tmp_path):
     ops.create_venv = _create
     ops.install_into_venv = lambda d, spec, force=False: ops.installed.append(d)
     ops.installed_version = lambda d, dist: "9.9"
+    ops.built_by_running_interpreter = lambda d: True
 
     spawned = []
 
@@ -247,8 +257,7 @@ def test_install_normalizes_distribution_name_so_spellings_dedup(tmp_path):
         spawned.append(cmd[cmd.index("--child-bundle") + 1])
         return _FakeChild([{"descriptor": {"name": "R"}}])
 
-    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
-                        spawn=fake_spawn, venv_ops=ops)
+    bc = _behind_children(tmp_path / "venvs", fake_spawn, ops)
 
     # PEP 503 treats these as the same distribution -> one venv, one child, one normalized key.
     bc.install("Foo-Bar", "Foo-Bar")
@@ -257,3 +266,87 @@ def test_install_normalizes_distribution_name_so_spellings_dedup(tmp_path):
     assert ops.created == [tmp_path / "venvs" / "foo_bar"]        # created once, normalized dir
     assert spawned == ["foo_bar"]                                 # one child, spawned once
     assert bc.request("FOO.BAR", "Visit", {}) == {"ran": "Visit"}  # any spelling routes to it
+
+
+def _hosting(rows_by_dist, hosted):
+    """A stand-in for the server's in-process activation, recording what it was asked to host."""
+    def activate(venv_dir, bundle_dist, attribution_name):
+        hosted.append((venv_dir, bundle_dist, attribution_name))
+        return rows_by_dist(bundle_dist)
+    return activate
+
+
+def test_a_lone_bundle_runs_in_the_facades_own_process(tmp_path):
+    """One bundle has nothing to be isolated from, so it earns no child and no tree relay."""
+    hosted = []
+
+    def fake_spawn(cmd, upstream=None, exclude_paths=()):
+        raise AssertionError("a lone bundle must not spawn a child")
+
+    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
+                        spawn=fake_spawn, venv_ops=_ops_recording([], []),
+                        activate=_hosting(lambda d: [{"descriptor": {"name": f"{d}.R"}}], hosted))
+
+    rows = bc.install("pkga", "pkga")
+
+    assert hosted == [(tmp_path / "venvs" / "pkga", "pkga", None)]
+    assert rows == [{"descriptor": {"name": "pkga.R"}}]
+    assert bc.owner("pkga.R") == "pkga"      # ownership still resolves...
+    assert bc.has_children() is False        # ...but to this process, so nothing is routed
+
+
+def test_a_second_bundle_puts_the_first_behind_a_child(tmp_path):
+    """Two bundles can conflict, which is what #8275's per-bundle venv and child are for."""
+    spawned = {}
+
+    def fake_spawn(cmd, upstream=None, exclude_paths=()):
+        bundle = cmd[cmd.index("--child-bundle") + 1]
+        spawned[bundle] = _FakeChild([{"descriptor": {"name": f"{bundle}.R"}}])
+        return spawned[bundle]
+
+    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
+                        spawn=fake_spawn, venv_ops=_ops_recording([], []),
+                        activate=_hosting(lambda d: [{"descriptor": {"name": f"{d}.R"}}], []))
+
+    bc.install("pkga", "pkga")
+    bc.install("pkgb", "pkgb")
+
+    assert set(spawned) == {"pkga", "pkgb"}   # including the bundle that had been in-process
+    assert bc.has_children() is True
+    assert bc.request("pkga", "Visit", {}) == {"ran": "Visit"}
+
+
+def test_a_venv_built_by_another_python_is_left_to_a_child(tmp_path):
+    """Only a child running on the venv's own interpreter can import its packages."""
+    ops = _ops_recording([], [])
+    ops.built_by_running_interpreter = lambda d: False
+    spawned = []
+
+    def fake_spawn(cmd, upstream=None, exclude_paths=()):
+        spawned.append(cmd[cmd.index("--child-bundle") + 1])
+        return _FakeChild([{"descriptor": {"name": "pkg.R"}}])
+
+    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None, spawn=fake_spawn,
+                        venv_ops=ops, activate=_never_hosted)
+    bc.install("pkg", "pkg")
+
+    assert spawned == ["pkg"]
+
+
+def test_a_process_hosts_one_bundles_packages_and_no_other(tmp_path):
+    """Uninstalling the hosted bundle does not un-import it, so the next one starts behind a child."""
+    spawned = []
+
+    def fake_spawn(cmd, upstream=None, exclude_paths=()):
+        spawned.append(cmd[cmd.index("--child-bundle") + 1])
+        return _FakeChild([{"descriptor": {"name": "pkgb.R"}}])
+
+    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None, spawn=fake_spawn,
+                        venv_ops=_ops_recording([], []),
+                        activate=lambda venv, dist, name: [{"descriptor": {"name": f"{dist}.R"}}])
+
+    bc.install("pkga", "pkga")
+    bc.uninstall("pkga")
+    bc.install("pkgb", "pkgb")
+
+    assert spawned == ["pkgb"]
