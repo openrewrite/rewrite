@@ -61,8 +61,9 @@ def _project(root, classifier_version):
     return root
 
 
-def _declaring_types(root):
-    """Map each call in the project to its method type's declaring-type FQN.
+def _call_facts(root):
+    """Map each call in the project to its declaring-type FQN and whether the typeshed
+    gave it a signature.
 
     ``JavaType.Unknown`` is truthy and carries no name, so an unresolved
     declaring type reports as None rather than being mistaken for a hit.
@@ -73,10 +74,12 @@ def _declaring_types(root):
         def visit_method_invocation(self, mi, p):
             method_type = mi.method_type
             declaring = getattr(method_type, 'declaring_type', None) if method_type else None
+            return_type = getattr(method_type, 'return_type', None) if method_type else None
             found[mi.name.simple_name] = (
                 declaring.fully_qualified_name
                 if declaring is not None and hasattr(declaring, '_fully_qualified_name')
-                else None
+                else None,
+                return_type is not None and not isinstance(return_type, JavaType.Unknown),
             )
             return super().visit_method_invocation(mi, p)
 
@@ -89,25 +92,26 @@ def _declaring_types(root):
 
 @requires_ty_types_cli
 def test_declared_version_selects_typeshed(tmp_path):
-    on_310 = _declaring_types(_project(tmp_path / "p310", "3.10"))
-    on_313 = _declaring_types(_project(tmp_path / "p313", "3.13"))
+    on_310 = _call_facts(_project(tmp_path / "p310", "3.10"))
+    on_313 = _call_facts(_project(tmp_path / "p313", "3.13"))
 
-    # gettext.lgettext is in 3.10's typeshed and gone from 3.11's.
-    assert on_310["lgettext"] == "gettext"
-    assert on_313["lgettext"] is None
+    # gettext.lgettext is in 3.10's typeshed and gone from 3.11's. Its owner is the
+    # module the import binds either way, so the signature is what the typeshed decides.
+    assert on_310["lgettext"] == ("gettext", True)
+    assert on_313["lgettext"] == ("gettext", False)
 
     # In both, so the pair varies only by typeshed content, not by whether
     # attribution ran at all.
-    assert on_310["getdefaultlocale"] == on_313["getdefaultlocale"] == "locale"
+    assert on_310["getdefaultlocale"] == on_313["getdefaultlocale"] == ("locale", True)
 
 
 @requires_ty_types_cli
 def test_version_outside_ty_support_keeps_the_rest_of_attribution(tmp_path):
-    found = _declaring_types(_project(tmp_path / "p399", "3.99"))
+    found = _call_facts(_project(tmp_path / "p399", "3.99"))
 
     # ty declines a version it ships no stubs for by failing initialization,
     # which takes every type down with it unless the version is given up.
-    assert found["getdefaultlocale"] == "locale"
+    assert found["getdefaultlocale"] == ("locale", True)
 
 
 def _return_types_through_harness(classifier_version):
