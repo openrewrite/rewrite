@@ -370,7 +370,8 @@ class TyTypesClient:
         return False
 
     def get_types(self, file_path: str, timeout: float = 30,
-                  include_display: bool = False) -> Optional[Dict[str, Any]]:
+                  include_display: bool = False,
+                  include_bindings: bool = False) -> Optional[Dict[str, Any]]:
         """Get all node types for a Python file.
 
         Args:
@@ -379,12 +380,16 @@ class TyTypesClient:
                      Some files with recursive types can cause ty to hang.
             include_display: Whether to include display strings in type
                            descriptors (default False — uses structured data).
+            include_bindings: Whether each name and attribute reference carries the
+                           module and qualified name binding it. Costs roughly 10%
+                           inference time and 17% payload.
         """
         if not self._initialized:
             return None
         result = self._send_request(
             "getTypes",
-            {"file": file_path, "includeDisplay": include_display},
+            {"file": file_path, "includeDisplay": include_display,
+             "includeBindings": include_bindings},
             timeout=timeout,
         )
         if result:
