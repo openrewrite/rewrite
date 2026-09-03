@@ -99,9 +99,8 @@ public final class InstalledEnvParser {
     /**
      * Whether {@code env} still holds the packages it was installed with: site-packages carries at
      * least one {@code *.dist-info}, and each has the METADATA every wheel is required to write.
-     * A {@code $TMPDIR} reaper evicts by access time, and uv's installed files carry their wheel's
-     * timestamps rather than the install's, so it strips package contents out of an env whose
-     * directory skeleton and freshly written marker files both survive.
+     * A {@code $TMPDIR} reaper evicts by access time, which uv's installed files inherit from their
+     * wheel rather than from the install, so it empties an env whose skeleton and markers survive.
      */
     public static boolean isIntact(Path env) {
         Path sitePackages = findSitePackages(env);
