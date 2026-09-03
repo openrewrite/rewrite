@@ -1586,8 +1586,8 @@ public interface K extends J {
 
         @Override
         public @Nullable JavaType getType() {
-            //noinspection DataFlowIssue
-            return expression.getExpression().getType();
+            Expression returnedExpression = expression.getExpression();
+            return returnedExpression == null ? null : returnedExpression.getType();
         }
 
         @Override
