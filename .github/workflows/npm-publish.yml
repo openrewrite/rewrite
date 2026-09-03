@@ -121,6 +121,9 @@ jobs:
           echo "dist_tag=next"  >> "$GITHUB_OUTPUT"
 
       - shell: bash
+        env:
+          CODEGENOME_USERNAME: ${{ secrets.CODEGENOME_USERNAME }}
+          CODEGENOME_TOKEN: ${{ secrets.CODEGENOME_TOKEN }}
         run: |
           ARGS=()
           if [[ -n '${{ steps.ver.outputs.version }}' ]]; then
