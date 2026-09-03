@@ -399,14 +399,14 @@ class TestMaybeAddImport:
 
 class TestCanonicalAddImportDedup:
     """An existing import already satisfies a requested (module, name) when
-    its canonical FQN matches (``os.path.join`` is canonically
-    ``posixpath.join``), not just when its written path does."""
+    its canonical FQN matches (``posixpath.join`` is canonically ``os.path.join``),
+    not just when its written path does."""
 
     def test_canonical_request_matches_written_from_import(self, arm):
-        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'posixpath', 'join'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os.path', 'join'))).rewrite_run(
             python(
                 """
-                from os.path import join
+                from posixpath import join
                 x = join('a', 'b')
                 """,
             )

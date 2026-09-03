@@ -102,6 +102,15 @@ _PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
 # ty-types descriptor kinds that map to JavaType.Method
 _FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDescriptor'))
 
+# `os.path` binds whichever of these the running platform provides, so a symbol
+# defined in one has no portable defining name. `os.path` names the same module
+# object on every platform, so it is the one to key them by.
+_ALIASED_MODULES: Dict[str, str] = {
+    'posixpath': 'os.path',
+    'ntpath': 'os.path',
+    'genericpath': 'os.path',
+}
+
 # knownInstance descriptors carry no moduleName, and most of the singletons ty
 # reports live in `typing`. These `knownInstanceKind`s are the ones that don't.
 _KNOWN_INSTANCE_FQNS: Dict[str, str] = {
@@ -203,10 +212,9 @@ class PythonTypeMapping:
         self._byte_offset_cache: Dict[Tuple[int, int], int] = {}
         self._lookup_cache: Dict[tuple, Optional[int]] = {}
 
-        # Lazily populated by _module_ast / _from_import_module / _import_bindings
+        # Lazily populated by _module_ast / _import_bindings
         self._module_ast_parsed = False
         self._module_ast_tree: Optional[ast.Module] = None
-        self._from_import_index: Optional[Dict[Tuple[int, str], str]] = None
         self._import_binding_index: Optional[Dict[str, str]] = None
 
         # ty-types data: populated by _build_index
@@ -601,8 +609,7 @@ class PythonTypeMapping:
             return JavaType.Union(_bounds=resolved_bounds)
 
         elif kind == 'module':
-            module_name = descriptor.get('moduleName', '')
-            return self._create_class_type(module_name)
+            return self._module_class(descriptor.get('moduleName', ''))
 
         elif kind in _FUNCTION_KINDS:
             # Use structured return type if available
@@ -954,30 +961,26 @@ class PythonTypeMapping:
 
     def decorator_type(self, node: ast.expr) -> Optional[JavaType]:
         """The type naming the decorator ``node`` applies, the way Java names an
-        annotation: the decorating function or class itself, under the module the source
-        imported it from — not the type applying it returns.
+        annotation: the decorating function or class itself, under the module defining
+        it — not the type applying it returns.
 
-        The written name an unshadowed import binding resolves says which module that is:
-        ``@pkg.api.tag`` names ``pkg.api.tag`` where ty names the ``pkg._impl`` defining it.
-        It also names a decorator ty cannot type at all.
+        An unshadowed import binding names a decorator ty cannot type at all.
         """
         type_id = self._lookup_type_id(node)
         descriptor = self._type_registry.get(type_id) if type_id is not None else None
-        if descriptor is not None and descriptor.get('kind') == 'classLiteral':
-            # A resolved class beats the shell the written path would mint
-            return self._resolve_type(type_id)
+        if descriptor is not None:
+            if descriptor.get('kind') == 'classLiteral':
+                # A classLiteral carries the class body; an FQN alone mints a shell
+                return self._resolve_type(type_id)
+            name = descriptor.get('name')
+            module = descriptor.get('moduleName')
+            if descriptor.get('kind') in _FUNCTION_KINDS and module and name \
+                    and not descriptor.get('className'):
+                return self._create_class_type(
+                    f"{_ALIASED_MODULES.get(module, module)}.{name}")
         fqn = self._import_binding_fqn(node)
         if fqn:
             return self._create_class_type(fqn)
-        if descriptor is not None and descriptor.get('kind') in _FUNCTION_KINDS:
-            name = descriptor.get('name')
-            # Keyed on ty's type id, so it resolves names the scope-blind
-            # binding index above treats as shadowed.
-            module = descriptor.get('moduleName')
-            if isinstance(node, ast.Name):
-                module = self._from_import_module(type_id, node.id) or module
-            if module and name and not descriptor.get('className'):
-                return self._create_class_type(f"{module}.{name}")
         return self.type(node)
 
     def _import_binding_fqn(self, node: ast.expr) -> Optional[str]:
@@ -1053,11 +1056,11 @@ class PythonTypeMapping:
         return self._import_binding_index
 
     def import_alias_type(self, node: ast.alias) -> Optional[JavaType]:
-        """The type of the symbol an import name binds, named under the module the
-        source imported from — the module a call to it names too, with the defining
-        one on the marker :meth:`import_canonical_fqn` supplies. Functions become a
-        whole :class:`JavaType.Method`, not the return type expression positions use,
-        so that callers can derive an FQN from declaring type plus name.
+        """The type of the symbol an import name binds, named under the module defining
+        it — the module a call to it names too, whichever module the source imported
+        through. Functions become a whole :class:`JavaType.Method`, not the return type
+        expression positions use, so that callers can derive an FQN from declaring type
+        plus name.
         """
         type_id = self._lookup_type_id(node)
         if type_id is None:
@@ -1072,31 +1075,11 @@ class PythonTypeMapping:
             # package `a`, while the qualid names the full dotted path.
             if not node.asname and '.' in node.name and node.name != module_name:
                 module_name = node.name
-            return self._create_class_type(module_name) if module_name else None
+            return self._module_class(module_name) if module_name else None
         if kind in _FUNCTION_KINDS:
-            # A bound method belongs to its class, which outranks any module
-            written = (None if descriptor.get('className')
-                       else self._from_import_module(type_id, node.asname or node.name))
-            declaring = (self._create_class_type(written) if written
-                         else self._get_declaration_declaring_type(descriptor))
-            return self._create_method_from_descriptor(descriptor, declaring)
+            return self._create_method_from_descriptor(
+                descriptor, self._get_declaration_declaring_type(descriptor))
         return self._resolve_type(type_id)
-
-    def import_canonical_fqn(self, node: ast.alias) -> Optional[str]:
-        """The :class:`CanonicalName` FQN for the symbol ``node`` binds, or None when
-        the module the source imported from is the one defining it — and for a class,
-        whose own type carries its defining FQN already."""
-        type_id = self._lookup_type_id(node)
-        descriptor = self._type_registry.get(type_id) if type_id is not None else None
-        if descriptor is None or descriptor.get('kind') not in _FUNCTION_KINDS \
-                or descriptor.get('className'):
-            # A bound method is named under its class, which its own type carries
-            return None
-        module_name, name = descriptor.get('moduleName'), descriptor.get('name')
-        if not module_name or not name:
-            return None
-        written = self._from_import_module(type_id, node.asname or node.name)
-        return f"{module_name}.{name}" if written and written != module_name else None
 
     def method_declaration_type(self, node: ast.FunctionDef) -> Optional[JavaType.Method]:
         """Get the method type for a function/method declaration.
@@ -1193,32 +1176,6 @@ class PythonTypeMapping:
                 self._module_ast_tree = None
         return self._module_ast_tree
 
-    def _from_import_module(self, type_id: int, bound_name: str) -> Optional[str]:
-        """The module an absolute ``from M import f`` in this file names ``f`` under.
-
-        Preferred over ty's definition site when naming the owner of a call or of the
-        name an import binds: it is the module the receiver form ``os.path.join(...)``
-        and ``module_type`` name a re-export under, and it survives the platform
-        swapping ``posixpath`` for ``ntpath``. Keyed by ty's type id, so a name
-        rebound to something else misses.
-        """
-        if self._from_import_index is None:
-            index: Dict[Tuple[int, str], str] = {}
-            tree = self._module_ast()
-            # Module-level statements are indexed first and keep their entry: a name
-            # bound inside a function body reaches only that body, so it must not
-            # displace the file-wide binding of the same symbol.
-            for node in (*tree.body, *ast.walk(tree)) if tree else ():
-                # A relative import's written form is not a module path
-                if not isinstance(node, ast.ImportFrom) or node.level or not node.module:
-                    continue
-                for alias in node.names:
-                    alias_id = self._lookup_type_id(alias)
-                    if alias_id is not None:
-                        index.setdefault((alias_id, alias.asname or alias.name), node.module)
-            self._from_import_index = index
-        return self._from_import_index.get((type_id, bound_name))
-
     def module_type(self, module_fqn: str) -> Optional[JavaType.Class]:
         """A JavaType.Class for the module itself: FQN = the module name, public
         top-level functions as methods, public top-level constants as members.
@@ -1228,11 +1185,11 @@ class PythonTypeMapping:
         under a class named after the module (see
         ``_declaring_type_from_descriptor``), so an enumeration of the module's
         public types must define that class for such references to resolve.
-        Re-exported bindings (``from .utils import echo`` in ``__init__.py``) are
-        included under their binding name, since attribution names them the same
-        way; re-exported classes are not — a class reference keeps its defining
-        FQN. The public surface is ``__all__`` when declared, else the
-        non-underscore names. Returns None when the module has no public
+        A re-exported callable (``from .utils import echo`` in ``__init__.py``) is a
+        method of the module defining it, which is where attribution names it; a
+        re-exported value is a member here, since a reference to it resolves through
+        the module that binds it. The public surface is ``__all__`` when declared,
+        else the non-underscore names. Returns None when the module has no public
         module-level symbols.
         """
         tree = self._module_ast()
@@ -1246,7 +1203,7 @@ class PythonTypeMapping:
         methods: Dict[str, JavaType.Method] = {}
         members: Dict[str, JavaType.Variable] = {}
 
-        def add_binding(name: str, node: ast.AST) -> None:
+        def add_binding(name: str, node: ast.AST, defines: bool = True) -> None:
             if not _is_public(name, all_names) or name in methods or name in members:
                 return
             type_id = self._lookup_type_id(node)
@@ -1254,6 +1211,8 @@ class PythonTypeMapping:
             if descriptor is None:
                 return
             if descriptor.get('kind') in _FUNCTION_KINDS:
+                if not defines:
+                    return
                 method = self._create_method_from_descriptor(descriptor, module_class, name=name)
                 if method is not None:
                     methods[name] = method
@@ -1276,7 +1235,7 @@ class PythonTypeMapping:
             elif isinstance(stmt, ast.ImportFrom):
                 for alias in stmt.names:
                     if alias.name != '*':
-                        add_binding(alias.asname or alias.name, alias)
+                        add_binding(alias.asname or alias.name, alias, defines=False)
             # plain `import x` binds a module object, never module-level API
 
         if not methods and not members:
@@ -1473,6 +1432,27 @@ class PythonTypeMapping:
             # `module_type` leaves a class to its own FQN.
             return self._class_reference(constructed)
 
+        # The callee names what is called; a receiver names only the module a call was
+        # reached through, which differs for a re-exported function. A value receiver
+        # owns its calls, so it is read below instead: `"x".upper()` is `str`'s.
+        callee_id = (self._lookup_func_type_id(node)
+                     if not isinstance(node.func, ast.Attribute)
+                     or self._names_a_module(node.func.value) else None)
+        callee = self._type_registry.get(callee_id) if callee_id is not None else None
+        if callee is not None:
+            kind = callee.get('kind')
+            if kind == 'module':
+                return self._module_class(callee.get('moduleName', ''))
+            if kind in _FUNCTION_KINDS:
+                # boundMethod has className — use it for declaring type
+                if callee.get('className'):
+                    return self._class_reference(callee)
+                # A function is owned by its module, `builtins` included —
+                # only a *type* drops that qualification (`_class_reference`).
+                module_name = callee.get('moduleName')
+                if module_name:
+                    return self._module_class(module_name)
+
         if isinstance(node.func, ast.Attribute):
             receiver = node.func.value
 
@@ -1489,28 +1469,13 @@ class PythonTypeMapping:
                 if resolved is not None:
                     return resolved
 
-        elif isinstance(node.func, ast.Name):
-            # For function calls, look up the function name
-            type_id = self._lookup_type_id(node.func)
-            if type_id is not None:
-                descriptor = self._type_registry.get(type_id)
-                if descriptor:
-                    kind = descriptor.get('kind')
-                    if kind == 'module':
-                        return self._create_class_type(descriptor.get('moduleName', ''))
-                    elif kind in _FUNCTION_KINDS:
-                        # boundMethod has className — use it for declaring type
-                        if descriptor.get('className'):
-                            return self._class_reference(descriptor)
-                        # A function is owned by its module, `builtins` included —
-                        # only a *type* drops that qualification (`_class_reference`).
-                        module_name = (self._from_import_module(type_id, node.func.id)
-                                       or descriptor.get('moduleName'))
-                        if module_name:
-                            return self._create_class_type(module_name)
-
         inferred = self._infer_declaring_type_from_ast(node)
         return inferred if inferred is not None else _UNKNOWN
+
+    def _names_a_module(self, node: ast.expr) -> bool:
+        type_id = self._lookup_type_id(node)
+        descriptor = self._type_registry.get(type_id) if type_id is not None else None
+        return descriptor is not None and descriptor.get('kind') == 'module'
 
     def _resolve_declaring_type(self, type_id: int) -> Optional[JavaType.FullyQualified]:
         """Resolve a type ID to a declaring type, maximizing object reuse.
@@ -1566,8 +1531,7 @@ class PythonTypeMapping:
         kind = descriptor.get('kind')
 
         if kind == 'module':
-            module_name = descriptor.get('moduleName', '')
-            return self._create_class_type(module_name)
+            return self._module_class(descriptor.get('moduleName', ''))
 
         elif kind == 'instance':
             return self._class_reference(descriptor)
@@ -1837,6 +1801,10 @@ class PythonTypeMapping:
         self._type_cache[key] = class_type
         return class_type
 
+    def _module_class(self, module_name: str) -> JavaType.Class:
+        """The class standing for a module, under its portable name."""
+        return self._create_class_type(_ALIASED_MODULES.get(module_name, module_name))
+
     def _get_node_text(self, node: ast.expr) -> str:
         """Get the source text for an AST node."""
         if node.end_lineno is not None and node.end_col_offset is not None:
@@ -1864,5 +1832,5 @@ class PythonTypeMapping:
             return self._class_reference(descriptor)
         module_name = descriptor.get('moduleName')
         if module_name:
-            return self._create_class_type(module_name)
+            return self._module_class(module_name)
         return None

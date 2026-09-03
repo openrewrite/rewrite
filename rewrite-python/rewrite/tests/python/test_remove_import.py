@@ -369,15 +369,15 @@ class TestMaybeRemoveImport:
 
 class TestCanonicalRemoveImport:
     """A requested (module, name) also matches an import by its canonical FQN
-    (``os.path.join`` is canonically ``posixpath.join``), not just by its
+    (``posixpath.join`` is canonically ``os.path.join``), not just by its
     written path."""
 
     def test_remove_reexported_function_by_canonical_fqn(self, arm):
         RecipeSpec(recipe=from_visitor(
-            _remove_import_visitor(arm, 'posixpath', 'join', only_if_unused=False))).rewrite_run(
+            _remove_import_visitor(arm, 'os.path', 'join', only_if_unused=False))).rewrite_run(
             python(
                 """
-                from os.path import join
+                from posixpath import join
                 x = 1
                 """,
                 """
@@ -402,14 +402,14 @@ class TestCanonicalRemoveImport:
 
     def test_canonical_removal_keeps_other_names(self, arm):
         RecipeSpec(recipe=from_visitor(
-            _remove_import_visitor(arm, 'posixpath', 'join', only_if_unused=False))).rewrite_run(
+            _remove_import_visitor(arm, 'os.path', 'join', only_if_unused=False))).rewrite_run(
             python(
                 """
-                from os.path import exists, join
+                from posixpath import exists, join
                 x = 1
                 """,
                 """
-                from os.path import exists
+                from posixpath import exists
                 x = 1
                 """,
             )

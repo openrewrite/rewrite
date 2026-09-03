@@ -15,7 +15,7 @@ from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType,
 from rewrite.java import tree as j
 from rewrite.java.support_types import TextComment
 from . import tree as py
-from .markers import CanonicalName, KeywordArguments, KeywordOnlyArguments, Quoted
+from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
 from .type_mapping import PythonTypeMapping, compute_source_line_data
 
 T = TypeVar('T')
@@ -835,12 +835,10 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_alias(self, node):
         alias_type = self._type_mapping.import_alias_type(node)
-        canonical = self._type_mapping.import_canonical_fqn(node)
         return j.Import(
             random_id(),
             self.__whitespace(),
-            Markers.EMPTY if canonical is None else
-            Markers(random_id(), [CanonicalName(random_id(), canonical)]),
+            Markers.EMPTY,
             self.__pad_left(Space.EMPTY, False),
             self.__convert_qualified_name(node.name, alias_type),
             None if not node.asname else
