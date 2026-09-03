@@ -97,6 +97,32 @@ public final class InstalledEnvParser {
     }
 
     /**
+     * Whether {@code env} still holds the packages it was installed with: site-packages carries at
+     * least one {@code *.dist-info}, and each has the METADATA every wheel is required to write.
+     * A {@code $TMPDIR} reaper evicts by access time, and uv's installed files carry their wheel's
+     * timestamps rather than the install's, so it strips package contents out of an env whose
+     * directory skeleton and freshly written marker files both survive.
+     */
+    public static boolean isIntact(Path env) {
+        Path sitePackages = findSitePackages(env);
+        if (sitePackages == null) {
+            return false;
+        }
+        boolean any = false;
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(sitePackages, "*.dist-info")) {
+            for (Path distInfo : ds) {
+                if (!Files.isRegularFile(distInfo.resolve("METADATA"))) {
+                    return false;
+                }
+                any = true;
+            }
+        } catch (IOException e) {
+            return false;
+        }
+        return any;
+    }
+
+    /**
      * Link transitive dependencies by reading each package's {@code dist-info/METADATA}
      * ({@code Requires-Dist} entries) from {@code sitePackages}, building the graph via
      * {@link PythonResolutionLinker#buildGraph}. Packages are matched to dist-info

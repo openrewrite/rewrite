@@ -16,12 +16,14 @@
 package org.openrewrite.python;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.python.internal.InstalledEnvParser;
 import org.openrewrite.python.internal.PackageManagerExecutor;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -35,9 +37,8 @@ class DependencyWorkspaceTest {
         Path workspace = DependencyWorkspace.getOrCreateRequirementsWorkspace(requirements, null);
         assumeTrue(workspace != null, "could not create workspace (uv install failed?)");
 
-        // Simulate macOS periodic tmp cleanup, which deletes files older than three
-        // days from $TMPDIR but leaves the directory skeleton (including .venv) in
-        // place. The leftover directory occupies the path the rebuild moves into.
+        // Deleting the marker files invalidates the workspace without removing the
+        // directory the rebuild has to move into.
         Files.deleteIfExists(workspace.resolve("freeze.txt"));
         Files.deleteIfExists(workspace.resolve("version.txt"));
         // A fresh JVM would not have the (now invalid) workspace in the in-memory cache.
@@ -47,5 +48,24 @@ class DependencyWorkspaceTest {
         assertThat(rebuilt).isNotNull();
         assertThat(rebuilt.resolve("freeze.txt")).exists();
         assertThat(rebuilt.resolve("version.txt")).exists();
+    }
+
+    @Test
+    void rebuildsWorkspaceWhoseInstalledPackagesWereReaped() throws IOException {
+        assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
+
+        String requirements = "six==1.16.0\n";
+        Path workspace = DependencyWorkspace.getOrCreateRequirementsWorkspace(requirements, null);
+        assumeTrue(workspace != null, "could not create workspace (uv install failed?)");
+
+        // Gut the venv the way a $TMPDIR reaper does: package files go, marker files stay.
+        Path sitePackages = requireNonNull(InstalledEnvParser.findSitePackages(workspace.resolve(".venv")));
+        Files.delete(sitePackages.resolve("six-1.16.0.dist-info").resolve("METADATA"));
+        DependencyWorkspace.clearCache();
+
+        Path rebuilt = DependencyWorkspace.getOrCreateRequirementsWorkspace(requirements, null);
+        assertThat(rebuilt).isNotNull();
+        assertThat(requireNonNull(InstalledEnvParser.findSitePackages(rebuilt.resolve(".venv")))
+                .resolve("six-1.16.0.dist-info").resolve("METADATA")).exists();
     }
 }

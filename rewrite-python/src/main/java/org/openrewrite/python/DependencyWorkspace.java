@@ -17,6 +17,7 @@ package org.openrewrite.python;
 
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.python.internal.InstalledEnvParser;
 import org.openrewrite.python.internal.PackageManagerExecutor;
 
 import java.io.IOException;
@@ -396,7 +397,7 @@ public class DependencyWorkspace {
 
     private static boolean isRequirementsWorkspaceValid(Path workspaceDir) {
         return Files.exists(workspaceDir) &&
-                Files.isDirectory(workspaceDir.resolve(".venv")) &&
+                InstalledEnvParser.isIntact(workspaceDir.resolve(".venv")) &&
                 Files.exists(workspaceDir.resolve("freeze.txt")) &&
                 hasCurrentVersion(workspaceDir);
     }
@@ -441,7 +442,7 @@ public class DependencyWorkspace {
 
     private static boolean isWorkspaceValid(Path workspaceDir) {
         return Files.exists(workspaceDir) &&
-                Files.isDirectory(workspaceDir.resolve(".venv")) &&
+                InstalledEnvParser.isIntact(workspaceDir.resolve(".venv")) &&
                 Files.exists(workspaceDir.resolve("pyproject.toml")) &&
                 hasCurrentVersion(workspaceDir);
     }
