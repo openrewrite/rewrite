@@ -51,14 +51,14 @@ class DependencyWorkspaceTest {
     }
 
     @Test
-    void rebuildsWorkspaceWhoseInstalledPackagesWereReaped() throws IOException {
+    void rebuildsWorkspaceWhoseInstalledPackagesWentMissing() throws IOException {
         assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
 
         String requirements = "six==1.16.0\n";
         Path workspace = DependencyWorkspace.getOrCreateRequirementsWorkspace(requirements, null);
         assumeTrue(workspace != null, "could not create workspace (uv install failed?)");
 
-        // Gut the venv the way a $TMPDIR reaper does: package files go, marker files stay.
+        // A venv emptied from outside the cache: package files go, marker files stay.
         Path sitePackages = requireNonNull(InstalledEnvParser.findSitePackages(workspace.resolve(".venv")));
         Files.delete(sitePackages.resolve("six-1.16.0.dist-info").resolve("METADATA"));
         DependencyWorkspace.clearCache();
