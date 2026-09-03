@@ -3800,6 +3800,25 @@ class TestSymbolTheStubsDoNotDeclare:
         owner, _ = self._call_names('def g():\n    from lib import gone\ngone()\n')
         assert owner is None, 'a function-scope import binds only inside that function'
 
+    @pytest.mark.parametrize('source', [
+        'import sys\nif sys.version_info < (3, 11):\n    from lib import gone\ngone()\n',
+        'import sys\nif sys.platform == "linux":\n    if sys.version_info < (3, 11):\n'
+        '        from lib import gone\ngone()\n',
+    ], ids=['guarded', 'nested-guards'])
+    def test_an_import_under_an_unconditional_if_binds_at_module_scope(self, source):
+        assert self._call_names(source, -1) == ('lib', 'gone')
+
+    def test_an_import_with_an_else_branch_is_not_attributed(self):
+        owner, _ = self._call_names(
+            'import sys\nif sys.version_info < (3, 11):\n    from lib import gone\n'
+            'else:\n    from lib import present\ngone()\n', -1)
+        assert owner is None, 'the branches are alternatives, so neither one binds'
+
+    def test_an_import_in_a_try_is_not_attributed(self):
+        owner, _ = self._call_names(
+            'try:\n    from lib import gone\nexcept ImportError:\n    pass\ngone()\n', -1)
+        assert owner is None, 'a `try` body is not one of the scopes this reads'
+
     def test_a_receiver_names_the_module_its_import_binds(self):
         cu, tmpdir, client = _parse_with_types(
             {'m.py': 'import nosuchmod\nimport nosuch.pkg as np\n'
