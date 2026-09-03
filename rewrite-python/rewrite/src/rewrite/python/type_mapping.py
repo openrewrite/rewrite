@@ -467,6 +467,66 @@ class PythonTypeMapping:
         self._type_id_cache[type_id] = result
         return result
 
+    def _class_fqn(self, descriptor: Dict[str, Any], name_key: str = 'className') -> str:
+        """The fully-qualified name a class-bearing descriptor is keyed by.
+
+        ty's ``qualifiedName`` is the dotted path of the enclosing modules *and*
+        classes, so it is authoritative where present; ``moduleName`` alone leaves
+        a nested class named as if it were top-level. ``builtins`` is stripped
+        either way, keeping ``int`` and ``list`` unqualified.
+        """
+        qualified = descriptor.get('qualifiedName')
+        member = descriptor.get('memberName') or (
+            descriptor.get('name') if descriptor.get('kind') in _FUNCTION_KINDS else None)
+        if qualified and member:
+            # The descriptor names a member — an enum member, a method — but the type
+            # wanted is its owning class, one segment up. Only trust the reduction when
+            # that segment really is `className`, so an enum member sharing its class's
+            # name (`class Color(Enum): Color = 1`) doesn't strip the class away.
+            owner, _, last = qualified.rpartition('.')
+            class_name = descriptor.get('className')
+            if last == member:
+                qualified = (owner if class_name and owner.rsplit('.', 1)[-1] == class_name
+                             else None)
+        if qualified:
+            return (qualified[len('builtins.'):]
+                    if qualified.startswith('builtins.') else qualified)
+        # TODO drop this fallback once the floor is ty-types 0.0.72+, where every
+        # class-bearing descriptor carries `qualifiedName`.
+        name = descriptor.get(name_key) or ''
+        if not name:
+            return ''
+        module_name = descriptor.get('moduleName')
+        if module_name and module_name != 'builtins':
+            return f"{module_name}.{name}"
+        return name
+
+    def _resolved_class(self, descriptor: Dict[str, Any],
+                        fqn: str) -> Optional[JavaType.Class]:
+        """The enriched classLiteral naming this descriptor's class, if there is one.
+
+        A ``classId`` on the descriptor names that class outright, so it is
+        authoritative for the FQN even when the descriptor's own name is less
+        qualified. The by-simple-name index is a guess — two modules may declare
+        the same class name — so a match found that way is used only when its FQN
+        agrees with ``fqn`` — or when ``fqn`` is the bare class name, which the
+        index hit can only improve on.
+        """
+        class_name = descriptor.get('className', '')
+        class_id = descriptor.get('classId')
+        authoritative = class_id is not None
+        if class_id is None:
+            class_id = self._class_literal_index.get(class_name)
+        if class_id is None:
+            return None
+        resolved = self._resolve_type(class_id)
+        # An empty name is a placeholder mid-cycle, which cannot name the class yet.
+        if not isinstance(resolved, JavaType.Class) or not resolved.fully_qualified_name:
+            return None
+        if authoritative or resolved.fully_qualified_name == fqn or fqn == class_name:
+            return resolved
+        return None
+
     def _descriptor_to_java_type(self, descriptor: Dict[str, Any]) -> Optional[JavaType]:
         """Convert a ty-types TypeDescriptor to a JavaType."""
         kind = descriptor.get('kind')
@@ -478,21 +538,10 @@ class PythonTypeMapping:
 
             module_name = descriptor.get('moduleName')
 
-            # Resolve base class: prefer classId (enriched with supertypes/methods)
-            class_id = descriptor.get('classId')
-            if class_id is None:
-                # Look up classLiteral by className to get kind/supertypes/methods
-                class_id = self._class_literal_index.get(class_name)
-
-            if class_id is not None:
-                base_class = self._resolve_type(class_id)
-                if not isinstance(base_class, JavaType.Class):
-                    base_class = self._create_class_type(class_name)
-            else:
-                if module_name and module_name != 'builtins':
-                    base_class = self._create_class_type(f"{module_name}.{class_name}")
-                else:
-                    base_class = self._create_class_type(class_name)
+            # Prefer the classLiteral, which carries kind/supertypes/methods. Shared
+            # with the declaring-type path so an expression and its declaring type
+            # cannot drift apart.
+            base_class = self._class_reference(descriptor)
 
             # `tuple` has a single generic parameter, so typeArgs conflates
             # `tuple[int, str]` with `tuple[int | str, ...]`. Subclasses inherit
@@ -565,12 +614,7 @@ class PythonTypeMapping:
             return _UNKNOWN
 
         elif kind == 'classLiteral':
-            class_name = descriptor.get('className', '')
-            module_name = descriptor.get('moduleName')
-            if module_name and module_name != 'builtins':
-                fqn = f"{module_name}.{class_name}"
-            else:
-                fqn = class_name
+            fqn = self._class_fqn(descriptor)
 
             # Create a fresh JavaType.Class per type_id rather than deduplicating
             # by FQN. ty-types can emit multiple classLiterals with the same FQN
@@ -685,7 +729,8 @@ class PythonTypeMapping:
             if not name:
                 return _UNKNOWN
             class_type = self._create_class_type(
-                name, shallow=False, cache_key=self._typed_dict_key(name))
+                self._class_fqn(descriptor, 'name'), shallow=False,
+                cache_key=self._typed_dict_key(descriptor, name))
             fields = descriptor.get('fields', [])
             if fields and getattr(class_type, '_members', None) is None:
                 variables = []
@@ -730,9 +775,8 @@ class PythonTypeMapping:
             return _UNKNOWN
 
         elif kind == 'newType':
-            name = descriptor.get('name', '')
-            if name:
-                return self._create_class_type(name)
+            if descriptor.get('name'):
+                return self._create_class_type(self._class_fqn(descriptor, 'name'))
             return _UNKNOWN
 
         elif kind == 'intersection':
@@ -746,8 +790,9 @@ class PythonTypeMapping:
             return _UNKNOWN
 
         elif kind in ('enumLiteral', 'enumComplement'):
-            class_name = descriptor.get('className', '')
-            class_type = self._create_class_type(class_name)
+            # An enum member is keyed by its enum *class*, so that a member reference
+            # and the class itself resolve to the same FQN.
+            class_type = self._class_reference(descriptor)
             class_type._kind = JavaType.FullyQualified.Kind.Enum
             return class_type
 
@@ -777,9 +822,8 @@ class PythonTypeMapping:
                 if result is not None:
                     return result
             # Fall back to creating a class from the alias name
-            name = descriptor.get('name', '')
-            if name:
-                return self._create_class_type(name)
+            if descriptor.get('name'):
+                return self._create_class_type(self._class_fqn(descriptor, 'name'))
             return _UNKNOWN
 
         elif kind == 'typeVar':
@@ -1514,20 +1558,8 @@ class PythonTypeMapping:
     def _class_reference(self, descriptor: Dict[str, Any]) -> JavaType.Class:
         """Resolve a descriptor's class through its classLiteral so annotation,
         expression, and declaring-type positions all share one enriched object."""
-        class_name = descriptor.get('className', '')
-        module_name = descriptor.get('moduleName')
-        if module_name and module_name != 'builtins':
-            fqn = f"{module_name}.{class_name}"
-        else:
-            fqn = class_name
-        class_id = descriptor.get('classId')
-        if class_id is None and class_name:
-            class_id = self._class_literal_index.get(class_name)
-        if class_id is not None:
-            resolved = self._resolve_type(class_id)
-            if isinstance(resolved, JavaType.Class) and resolved.fully_qualified_name == fqn:
-                return resolved
-        return self._create_class_type(fqn)
+        fqn = self._class_fqn(descriptor)
+        return self._resolved_class(descriptor, fqn) or self._create_class_type(fqn)
 
     def _declaring_type_from_descriptor(self, descriptor: Dict[str, Any]) -> Optional[JavaType.FullyQualified]:
         """Extract a declaring type (class/module) from a TypeDescriptor."""
@@ -1543,7 +1575,9 @@ class PythonTypeMapping:
         elif kind == 'typedDict':
             name = descriptor.get('name', '')
             if name:
-                return self._create_class_type(name, cache_key=self._typed_dict_key(name))
+                return self._create_class_type(
+                    self._class_fqn(descriptor, 'name'),
+                    cache_key=self._typed_dict_key(descriptor, name))
             return None
 
         elif kind == 'subclassOf':
@@ -1559,9 +1593,8 @@ class PythonTypeMapping:
             return None
 
         elif kind == 'newType':
-            name = descriptor.get('name', '')
-            if name:
-                return self._create_class_type(name)
+            if descriptor.get('name'):
+                return self._create_class_type(self._class_fqn(descriptor, 'name'))
             return None
 
         elif kind == 'intersection':
@@ -1775,11 +1808,13 @@ class PythonTypeMapping:
         param._type_parameters = [base]
         return param
 
-    def _typed_dict_key(self, name: str) -> str:
-        """The cache key for a TypedDict named ``name``. ty names a TypedDict
-        without qualifying it, so the key is scoped to this file to keep the same
-        name in two modules apart in the session-wide cache."""
-        return f"{self._file_path}#{name}"
+    def _typed_dict_key(self, descriptor: Dict[str, Any], name: str) -> Optional[str]:
+        """The session cache key for a TypedDict named ``name``, or None to key it
+        by its FQN. An unqualified name is scoped to this file so the same name in
+        two modules stays apart; a ``qualifiedName`` is already unique, and scoping
+        it would keep two files from sharing one interned type."""
+        # TODO drop with the `_class_fqn` fallback once the floor is ty-types 0.0.72+.
+        return None if descriptor.get('qualifiedName') else f"{self._file_path}#{name}"
 
     def _create_class_type(self, fqn: str, shallow: bool = True,
                            cache_key: Optional[str] = None) -> JavaType.Class:
