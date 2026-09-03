@@ -3894,7 +3894,6 @@ _FQN_CASES = (
             Color.RED
         ''',
         expected='test.Color',
-        xfail='ty emits no moduleName on enumLiteral, so the member maps to bare `Color`',
     ),
     FqnCase(
         id='typed_dict',
@@ -3958,15 +3957,12 @@ def _fqn_params(case: FqnCase):
 
 @requires_ty_types_cli
 class TestDescriptorFqnContract:
-    """The FQN each ty descriptor kind maps to, stated as a table.
+    """The FQN each ty descriptor kind maps to, stated as a table. A dependency
+    type table resolves only when its entries carry the FQNs attribution mints at
+    parse time: an unqualified name fails to resolve and collides with its
+    namesakes.
 
-    A Python dependency type table resolves only when its entries carry the same
-    FQNs attribution mints at parse time, so an unqualified name both fails to
-    resolve (an `ArgKind` enum member never links to the `mypy.nodes.ArgKind`
-    class) and collides (three distinct `ParseError` classes become one).
-
-    TODO drop every `xfail` in this class once the floor is ty-types 0.0.72+ — the
-    mapping already honours `qualifiedName`, so those rows pass on that release.
+    TODO drop every `xfail` in this class once the floor is ty-types 0.0.72+.
     """
 
     @pytest.mark.parametrize('case', [_fqn_params(c) for c in _FQN_CASES])
@@ -4044,11 +4040,13 @@ class TestQualifiedNameForwardCompatibility:
         assert _fqn(result) == 'a.b.Inner'
 
     def test_nested_instance_uses_qualified_name(self):
-        _, result = self._resolve({
+        mapping, result = self._resolve({
             'kind': 'instance', 'className': 'Inner', 'moduleName': 'a.b',
             'qualifiedName': 'a.b.Outer.Inner',
         })
         assert _fqn(result) == 'a.b.Outer.Inner'
+        # An invocation binds only when the declaring path agrees.
+        assert _fqn(mapping._resolve_declaring_type(400)) == 'a.b.Outer.Inner'
 
     def test_builtins_stays_unqualified(self):
         _, result = self._resolve({
@@ -4058,11 +4056,45 @@ class TestQualifiedNameForwardCompatibility:
         assert _fqn(result) == 'list'
 
     def test_typed_dict_uses_qualified_name(self):
-        _, result = self._resolve({
+        mapping, result = self._resolve({
             'kind': 'typedDict', 'name': 'Movie', 'qualifiedName': 'a.Movie',
             'fields': [],
         })
         assert _fqn(result) == 'a.Movie'
+        # An invocation binds only when the declaring path agrees.
+        assert _fqn(mapping._resolve_declaring_type(400)) == 'a.Movie'
+
+    def test_method_qualified_name_reduces_to_its_owning_class(self):
+        # A boundMethod's `qualifiedName` names the method; a declaring type is the
+        # class, so taking it verbatim would stop MethodMatcher binding anything.
+        mapping = PythonTypeMapping("", file_path=None)
+        desc = {'kind': 'boundMethod', 'className': 'C', 'moduleName': 'a',
+                'name': 'm', 'qualifiedName': 'a.C.m'}
+        assert _fqn(mapping._class_reference(desc)) == 'a.C'
+        assert _fqn(mapping._get_declaration_declaring_type(desc)) == 'a.C'
+
+    def test_member_named_after_its_own_class_keeps_the_class(self):
+        # `class Color(Enum): Color = 1` is legal, so a suffix match alone would
+        # strip the class segment and leave the module.
+        mapping = PythonTypeMapping("", file_path=None)
+        assert mapping._class_fqn({
+            'kind': 'enumLiteral', 'className': 'Color', 'memberName': 'Color',
+            'qualifiedName': 'a.Color'}) != 'a'
+
+    def test_absent_name_yields_no_fqn(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        assert mapping._class_fqn({'kind': 'newType', 'name': None,
+                                   'moduleName': 'a'}, 'name') == ''
+
+    def test_class_mid_resolution_is_not_named_by_its_placeholder(self):
+        # A cycle placeholder has no name yet, so the descriptor's own FQN is better.
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'classLiteral', 'className': 'C',
+                                     'moduleName': 'a'}
+        mapping._type_registry[2] = {'kind': 'instance', 'className': 'C',
+                                     'moduleName': 'a', 'classId': 1}
+        mapping._resolving_type_ids.add(1)
+        assert _fqn(mapping._class_reference(mapping._type_registry[2])) == 'a.C'
 
     def test_value_and_declaring_agree_when_only_the_class_is_qualified(self):
         # ty may qualify classLiteral before instance. An explicit classId names the
@@ -4099,10 +4131,12 @@ class TestQualifiedNameForwardCompatibility:
         assert _fqn(result) == 'a.Color'
 
     def test_new_type_uses_qualified_name(self):
-        _, result = self._resolve({
+        mapping, result = self._resolve({
             'kind': 'newType', 'name': 'UserId', 'qualifiedName': 'a.UserId',
         })
         assert _fqn(result) == 'a.UserId'
+        # An invocation binds only when the declaring path agrees.
+        assert _fqn(mapping._resolve_declaring_type(400)) == 'a.UserId'
 
     def test_enum_literal_uses_qualified_name(self):
         _, result = self._resolve({
@@ -4128,19 +4162,6 @@ class TestQualifiedNameForwardCompatibility:
         })
         assert _fqn(result) == 'a.Alias'
 
-    @pytest.mark.parametrize('kind,extra', [
-        ('typedDict', {'name': 'Movie', 'qualifiedName': 'a.Movie', 'fields': []}),
-        ('newType', {'name': 'UserId', 'qualifiedName': 'a.UserId'}),
-        ('instance', {'className': 'Inner', 'moduleName': 'a.b',
-                      'qualifiedName': 'a.b.Outer.Inner'}),
-    ])
-    def test_declaring_type_side_agrees(self, kind, extra):
-        # A declaring type is resolved by a separate path, and an invocation only
-        # matches a declaration when both mint the same FQN.
-        mapping = PythonTypeMapping("", file_path=None)
-        mapping._type_registry[400] = {'kind': kind, **extra}
-        declaring = mapping._resolve_declaring_type(400)
-        assert _fqn(declaring) == extra['qualifiedName']
 
 
 @requires_ty_types_cli

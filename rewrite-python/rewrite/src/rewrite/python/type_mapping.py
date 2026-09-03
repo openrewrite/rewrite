@@ -476,17 +476,26 @@ class PythonTypeMapping:
         either way, keeping ``int`` and ``list`` unqualified.
         """
         qualified = descriptor.get('qualifiedName')
+        member = descriptor.get('memberName') or (
+            descriptor.get('name') if descriptor.get('kind') in _FUNCTION_KINDS else None)
+        if qualified and member:
+            # The descriptor names a member — an enum member, a method — but the type
+            # wanted is its owning class, one segment up. Only trust the reduction when
+            # that segment really is `className`, so an enum member sharing its class's
+            # name (`class Color(Enum): Color = 1`) doesn't strip the class away.
+            owner, _, last = qualified.rpartition('.')
+            class_name = descriptor.get('className')
+            if last == member:
+                qualified = (owner if class_name and owner.rsplit('.', 1)[-1] == class_name
+                             else None)
         if qualified:
-            # A descriptor naming a member (an enum's `memberName`) is typed by its
-            # enclosing class, so a member-qualified path resolves to the class.
-            member = descriptor.get('memberName')
-            if member and qualified.endswith(f'.{member}'):
-                qualified = qualified[:-(len(member) + 1)]
             return (qualified[len('builtins.'):]
                     if qualified.startswith('builtins.') else qualified)
         # TODO drop this fallback once the floor is ty-types 0.0.72+, where every
         # class-bearing descriptor carries `qualifiedName`.
-        name = descriptor.get(name_key, '')
+        name = descriptor.get(name_key) or ''
+        if not name:
+            return ''
         module_name = descriptor.get('moduleName')
         if module_name and module_name != 'builtins':
             return f"{module_name}.{name}"
@@ -500,18 +509,21 @@ class PythonTypeMapping:
         authoritative for the FQN even when the descriptor's own name is less
         qualified. The by-simple-name index is a guess — two modules may declare
         the same class name — so a match found that way is used only when its FQN
-        agrees with ``fqn``.
+        agrees with ``fqn`` — or when ``fqn`` is the bare class name, which the
+        index hit can only improve on.
         """
+        class_name = descriptor.get('className', '')
         class_id = descriptor.get('classId')
         authoritative = class_id is not None
         if class_id is None:
-            class_id = self._class_literal_index.get(descriptor.get('className', ''))
+            class_id = self._class_literal_index.get(class_name)
         if class_id is None:
             return None
         resolved = self._resolve_type(class_id)
-        if not isinstance(resolved, JavaType.Class):
+        # An empty name is a placeholder mid-cycle, which cannot name the class yet.
+        if not isinstance(resolved, JavaType.Class) or not resolved.fully_qualified_name:
             return None
-        if authoritative or resolved.fully_qualified_name == fqn:
+        if authoritative or resolved.fully_qualified_name == fqn or fqn == class_name:
             return resolved
         return None
 
@@ -526,10 +538,10 @@ class PythonTypeMapping:
 
             module_name = descriptor.get('moduleName')
 
-            # Prefer the classLiteral, which carries kind/supertypes/methods.
-            fqn = self._class_fqn(descriptor)
-            base_class = (self._resolved_class(descriptor, fqn)
-                          or self._create_class_type(fqn))
+            # Prefer the classLiteral, which carries kind/supertypes/methods. Shared
+            # with the declaring-type path so an expression and its declaring type
+            # cannot drift apart.
+            base_class = self._class_reference(descriptor)
 
             # `tuple` has a single generic parameter, so typeArgs conflates
             # `tuple[int, str]` with `tuple[int | str, ...]`. Subclasses inherit
@@ -778,9 +790,9 @@ class PythonTypeMapping:
             return _UNKNOWN
 
         elif kind in ('enumLiteral', 'enumComplement'):
-            # An enum member is keyed by its enum *class*, so that a member
-            # reference and the class itself resolve to the same FQN.
-            class_type = self._create_class_type(self._class_fqn(descriptor))
+            # An enum member is keyed by its enum *class*, so that a member reference
+            # and the class itself resolve to the same FQN.
+            class_type = self._class_reference(descriptor)
             class_type._kind = JavaType.FullyQualified.Kind.Enum
             return class_type
 
