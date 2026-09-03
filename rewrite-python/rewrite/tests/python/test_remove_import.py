@@ -787,16 +787,24 @@ class TestRemoveImportStringAnnotations:
         module = types.ModuleType('after_recipe')
         exec(source_file.print_all(), module.__dict__)
         typing.get_type_hints(module)
+        for value in list(module.__dict__.values()):
+            if isinstance(value, types.FunctionType):
+                typing.get_type_hints(value)
 
-    def test_names_inside_a_compound_reference_keep_their_imports(self, arm):
+    @pytest.mark.parametrize('annotation_position, source', [
+        ('variable', 'm: "typing.Dict[Any, Any]" = {}'),
+        ('parameter', 'def f(m: "typing.Dict[Any, Any]") -> None: ...'),
+        ('return', 'def f() -> "typing.Dict[Any, Any]": ...'),
+    ])
+    def test_names_inside_a_compound_reference_keep_their_imports(self, arm, annotation_position, source):
         spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing')))
         spec.rewrite_run(
             python(
-                """\
+                f"""\
                 import typing
                 from typing import Any
 
-                m: "typing.Dict[Any, Any]" = {}
+                {source}
                 """,
                 after_recipe=self._assert_type_hints_resolve,
             )

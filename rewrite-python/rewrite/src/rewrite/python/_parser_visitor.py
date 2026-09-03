@@ -2228,13 +2228,11 @@ class ParserVisitor(ast.NodeVisitor):
             return_type = None
         else:
             arrow = self.__source_before('->')
-            with self.__type_context():
-                returns = self.__convert(node.returns)
             return_type = py.TypeHint(
                 random_id(),
                 arrow,
                 Markers.EMPTY,
-                returns,
+                self.__convert_type(node.returns),
                 self._type_mapping.type(node.returns)
             )
         body = self.__convert_block(node.body)
@@ -2953,6 +2951,7 @@ class ParserVisitor(ast.NodeVisitor):
                         Markers.EMPTY,
                         converted.replace(prefix=Space.EMPTY)
                     )
+                expression = converted
                 # Unwrap parenthesized literals to get to the Literal inside
                 while isinstance(converted, j.Parentheses):
                     converted = converted.tree
@@ -2968,6 +2967,16 @@ class ParserVisitor(ast.NodeVisitor):
                 quote_start = 0
                 while quote_start < len(source) and source[quote_start] not in ('"', "'"):
                     quote_start += 1
+
+                if 0 < quote_start < len(source):
+                    # The Quoted marker records only the quote style, so a string carrying a
+                    # prefix (r, b, u) stays a literal, where value_source holds the prefix.
+                    return py.ExpressionTypeTree(
+                        random_id(),
+                        expression.prefix,
+                        Markers.EMPTY,
+                        expression.replace(prefix=Space.EMPTY)
+                    )
 
                 if quote_start < len(source):
                     quote_char = source[quote_start]
