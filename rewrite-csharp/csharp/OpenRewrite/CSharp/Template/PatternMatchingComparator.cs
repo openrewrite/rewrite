@@ -62,8 +62,8 @@ internal class PatternMatchingComparator
     /// </summary>
     internal static J UnwrapParentheses(J node)
     {
-        while (node is Parentheses p)
-            node = p.InnerTree;
+        while (node is Parentheses p){
+            node = p.InnerTree;}
         return node;
     }
 
@@ -87,27 +87,27 @@ internal class PatternMatchingComparator
                 }
                 // Evaluate constraint before binding — pass the pattern placeholder's
                 // resolved type so typed captures can compare JavaType-to-JavaType
-                if (!EvaluateConstraint(_captures[captureName], candidate, cursor, patternId.Type))
-                    return false;
+                if (!EvaluateConstraint(_captures[captureName], candidate, cursor, patternId.Type)){
+                    return false;}
                 _bindings[captureName] = candidate;
                 return true;
             }
         }
 
         // Different node types — check for cross-type equivalences before failing
-        if (pattern.GetType() != candidate.GetType())
-            return MatchCrossType(pattern, candidate, cursor);
+        if (pattern.GetType() != candidate.GetType()){
+            return MatchCrossType(pattern, candidate, cursor);}
 
         // NullSafe: a pattern with ?. only matches candidates with ?.
         // but a pattern without ?. matches both (asymmetric — patterns are lenient)
-        if (TreeHelper.HasNullSafe(pattern) && !TreeHelper.HasNullSafe(candidate))
-            return false;
+        if (TreeHelper.HasNullSafe(pattern) && !TreeHelper.HasNullSafe(candidate)){
+            return false;}
 
         // Semantic matching for method invocations: when both resolve to the same
         // static method (same declaring type + name), skip receiver comparison.
         bool matched;
-        if (pattern is MethodInvocation patMethod && candidate is MethodInvocation candMethod)
-            matched = MatchMethodInvocation(patMethod, candMethod, cursor);
+        if (pattern is MethodInvocation patMethod && candidate is MethodInvocation candMethod){
+            matched = MatchMethodInvocation(patMethod, candMethod, cursor);}
         else if (pattern is Binary patBin && candidate is Binary candBin)
         {
             // Generic property-based comparison with backtracking for commutative ops
@@ -117,17 +117,17 @@ internal class PatternMatchingComparator
             {
                 // Restore bindings and try commuted (swapped) operands for == and !=
                 _bindings.Clear();
-                foreach (var kvp in savedBindings)
-                    _bindings[kvp.Key] = kvp.Value;
+                foreach (var kvp in savedBindings){
+                    _bindings[kvp.Key] = kvp.Value;}
                 matched = MatchCommutedBinary(patBin, candBin, cursor);
             }
         }
-        else
-            matched = MatchProperties(pattern, candidate, cursor);
+        else{
+            matched = MatchProperties(pattern, candidate, cursor);}
 
         // Record NullSafe associations for captures used as Select in MI/FA
-        if (matched)
-            RecordNullSafeForCaptures(pattern, candidate);
+        if (matched){
+            RecordNullSafeForCaptures(pattern, candidate);}
 
         return matched;
     }
@@ -146,8 +146,8 @@ internal class PatternMatchingComparator
             var candNullSafe = candMi.Markers.FindFirst<NullSafe>();
             if (candNullSafe != null && patMi.Markers.FindFirst<NullSafe>() == null)
             {
-                if (FindSelectCaptureName(patMi.Select) is { } captureName)
-                    _nullSafeBindings[captureName] = candNullSafe;
+                if (FindSelectCaptureName(patMi.Select) is { } captureName){
+                    _nullSafeBindings[captureName] = candNullSafe;}
             }
         }
         else if (pattern is FieldAccess patFa && candidate is FieldAccess candFa)
@@ -155,8 +155,8 @@ internal class PatternMatchingComparator
             var candNullSafe = candFa.Markers.FindFirst<NullSafe>();
             if (candNullSafe != null && patFa.Markers.FindFirst<NullSafe>() == null)
             {
-                if (FindTargetCaptureName(patFa.Target) is { } captureName)
-                    _nullSafeBindings[captureName] = candNullSafe;
+                if (FindTargetCaptureName(patFa.Target) is { } captureName){
+                    _nullSafeBindings[captureName] = candNullSafe;}
             }
         }
         else if (pattern is ArrayAccess patAa && candidate is ArrayAccess candAa)
@@ -164,8 +164,8 @@ internal class PatternMatchingComparator
             var candNullSafe = candAa.Markers.FindFirst<NullSafe>();
             if (candNullSafe != null && patAa.Markers.FindFirst<NullSafe>() == null)
             {
-                if (FindTargetCaptureName(patAa.Indexed) is { } captureName)
-                    _nullSafeBindings[captureName] = candNullSafe;
+                if (FindTargetCaptureName(patAa.Indexed) is { } captureName){
+                    _nullSafeBindings[captureName] = candNullSafe;}
             }
         }
     }
@@ -179,8 +179,8 @@ internal class PatternMatchingComparator
         if (select?.Element is Identifier ident)
         {
             var name = Placeholder.FromPlaceholder(ident.SimpleName);
-            if (name != null && _captures.ContainsKey(name))
-                return name;
+            if (name != null && _captures.ContainsKey(name)){
+                return name;}
         }
         return null;
     }
@@ -193,8 +193,8 @@ internal class PatternMatchingComparator
         if (target is Identifier ident)
         {
             var name = Placeholder.FromPlaceholder(ident.SimpleName);
-            if (name != null && _captures.ContainsKey(name))
-                return name;
+            if (name != null && _captures.ContainsKey(name)){
+                return name;}
         }
         return null;
     }
@@ -355,8 +355,8 @@ internal class PatternMatchingComparator
             var patternValue = prop.GetValue(pattern);
             var candidateValue = prop.GetValue(candidate);
 
-            if (!MatchValue(patternValue, candidateValue, cursor))
-                return false;
+            if (!MatchValue(patternValue, candidateValue, cursor)){
+                return false;}
         }
         return true;
     }
@@ -368,15 +368,15 @@ internal class PatternMatchingComparator
     private bool MatchCommutedBinary(Binary pattern, Binary candidate, Cursor cursor)
     {
         var op = pattern.Operator.Element;
-        if (op != Binary.OperatorType.Equal && op != Binary.OperatorType.NotEqual)
-            return false;
+        if (op != Binary.OperatorType.Equal && op != Binary.OperatorType.NotEqual){
+            return false;}
 
-        if (!HasLiteral(pattern) && !HasLiteral(candidate))
-            return false;
+        if (!HasLiteral(pattern) && !HasLiteral(candidate)){
+            return false;}
 
         // Operator must still match
-        if (!MatchPaddedElement(pattern.Operator, candidate.Operator, cursor))
-            return false;
+        if (!MatchPaddedElement(pattern.Operator, candidate.Operator, cursor)){
+            return false;}
 
         // Try swapped: pattern.Left ↔ candidate.Right, pattern.Right ↔ candidate.Left
         return MatchNode(pattern.Left, candidate.Right, cursor)
@@ -447,17 +447,17 @@ internal class PatternMatchingComparator
     private bool MatchCrossType(J pattern, J candidate, Cursor cursor)
     {
         // Binary(expr == null) pattern ↔ IsPattern(expr is null) candidate
-        if (pattern is Binary patBin && candidate is IsPattern candIsP)
-            return MatchBinaryPatternToIsNullCandidate(patBin, candIsP, cursor);
+        if (pattern is Binary patBin && candidate is IsPattern candIsP){
+            return MatchBinaryPatternToIsNullCandidate(patBin, candIsP, cursor);}
         // IsPattern(expr is null) pattern ↔ Binary(expr == null) candidate
-        if (pattern is IsPattern patIsP && candidate is Binary candBin)
-            return MatchIsNullPatternToBinaryCandidate(patIsP, candBin, cursor);
+        if (pattern is IsPattern patIsP && candidate is Binary candBin){
+            return MatchIsNullPatternToBinaryCandidate(patIsP, candBin, cursor);}
 
         // Identifier ↔ FieldAccess for static members and type references
-        if (pattern is FieldAccess patFA && candidate is Identifier candId)
-            return MatchFieldAccessToIdentifier(patFA, candId);
-        if (pattern is Identifier patId2 && candidate is FieldAccess candFA)
-            return MatchIdentifierToFieldAccess(patId2, candFA);
+        if (pattern is FieldAccess patFA && candidate is Identifier candId){
+            return MatchFieldAccessToIdentifier(patFA, candId);}
+        if (pattern is Identifier patId2 && candidate is FieldAccess candFA){
+            return MatchIdentifierToFieldAccess(patId2, candFA);}
 
         return false;
     }
@@ -482,15 +482,10 @@ internal class PatternMatchingComparator
         }
 
         // Type reference: System.Console ↔ Console (same FullyQualified type)
-        if (pattern.Type is JavaType.Class patTypeFq
+        return pattern.Type is JavaType.Class patTypeFq
             && candidate.Type is JavaType.Class candTypeFq
             && patTypeFq.FullyQualifiedName == candTypeFq.FullyQualifiedName
-            && candidate.FieldType == null && pattern.Name.Element.FieldType == null)
-        {
-            return true;
-        }
-
-        return false;
+            && candidate.FieldType == null && pattern.Name.Element.FieldType == null;
     }
 
     /// <summary>
@@ -508,18 +503,18 @@ internal class PatternMatchingComparator
     /// </summary>
     private bool MatchBinaryPatternToIsNullCandidate(Binary patternBinary, IsPattern candidateIsPattern, Cursor cursor)
     {
-        if (patternBinary.Operator.Element != Binary.OperatorType.Equal)
-            return false;
+        if (patternBinary.Operator.Element != Binary.OperatorType.Equal){
+            return false;}
 
-        if (candidateIsPattern.Pattern?.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
-            return false;
+        if (candidateIsPattern.Pattern?.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value)){
+            return false;}
 
         // pattern: {s} == null → match {s} against candidate's expression
-        if (IsNullLiteral(patternBinary.Right))
-            return MatchNode(patternBinary.Left, candidateIsPattern.Expression, cursor);
+        if (IsNullLiteral(patternBinary.Right)){
+            return MatchNode(patternBinary.Left, candidateIsPattern.Expression, cursor);}
         // pattern: null == {s} → match {s} against candidate's expression
-        if (IsNullLiteral(patternBinary.Left))
-            return MatchNode(patternBinary.Right, candidateIsPattern.Expression, cursor);
+        if (IsNullLiteral(patternBinary.Left)){
+            return MatchNode(patternBinary.Right, candidateIsPattern.Expression, cursor);}
 
         return false;
     }
@@ -530,18 +525,18 @@ internal class PatternMatchingComparator
     /// </summary>
     private bool MatchIsNullPatternToBinaryCandidate(IsPattern patternIsPattern, Binary candidateBinary, Cursor cursor)
     {
-        if (candidateBinary.Operator.Element != Binary.OperatorType.Equal)
-            return false;
+        if (candidateBinary.Operator.Element != Binary.OperatorType.Equal){
+            return false;}
 
-        if (patternIsPattern.Pattern?.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
-            return false;
+        if (patternIsPattern.Pattern?.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value)){
+            return false;}
 
         // candidate: expr == null → match pattern's expression against candidate's left
-        if (IsNullLiteral(candidateBinary.Right))
-            return MatchNode(patternIsPattern.Expression, candidateBinary.Left, cursor);
+        if (IsNullLiteral(candidateBinary.Right)){
+            return MatchNode(patternIsPattern.Expression, candidateBinary.Left, cursor);}
         // candidate: null == expr → match pattern's expression against candidate's right
-        if (IsNullLiteral(candidateBinary.Left))
-            return MatchNode(patternIsPattern.Expression, candidateBinary.Right, cursor);
+        if (IsNullLiteral(candidateBinary.Left)){
+            return MatchNode(patternIsPattern.Expression, candidateBinary.Right, cursor);}
 
         return false;
     }
@@ -559,36 +554,36 @@ internal class PatternMatchingComparator
     private bool MatchValue(object? patternValue, object? candidateValue, Cursor cursor)
     {
         // Both null
-        if (patternValue == null && candidateValue == null)
-            return true;
+        if (patternValue == null && candidateValue == null){
+            return true;}
         // One null — but a pattern container with only zero-min variadic captures
         // can match a null candidate (e.g., pattern `Fact({args})` vs `[Fact]` with no parens)
         if (patternValue == null || candidateValue == null)
         {
-            if (patternValue != null && candidateValue == null && TreeHelper.IsContainer(patternValue))
-                return MatchContainerAgainstNull(patternValue, cursor);
+            if (patternValue != null && candidateValue == null && TreeHelper.IsContainer(patternValue)){
+                return MatchContainerAgainstNull(patternValue, cursor);}
             return false;
         }
 
         // J tree nodes — recursive structural match
-        if (patternValue is J pj && candidateValue is J cj)
-            return MatchNode(pj, cj, cursor);
+        if (patternValue is J pj && candidateValue is J cj){
+            return MatchNode(pj, cj, cursor);}
 
         // JRightPadded<T> — unwrap and compare the element
-        if (TreeHelper.IsRightPadded(patternValue) && TreeHelper.IsRightPadded(candidateValue))
-            return MatchPaddedElement(patternValue, candidateValue, cursor);
+        if (TreeHelper.IsRightPadded(patternValue) && TreeHelper.IsRightPadded(candidateValue)){
+            return MatchPaddedElement(patternValue, candidateValue, cursor);}
 
         // JLeftPadded<T> — unwrap and compare the element
-        if (TreeHelper.IsLeftPadded(patternValue) && TreeHelper.IsLeftPadded(candidateValue))
-            return MatchPaddedElement(patternValue, candidateValue, cursor);
+        if (TreeHelper.IsLeftPadded(patternValue) && TreeHelper.IsLeftPadded(candidateValue)){
+            return MatchPaddedElement(patternValue, candidateValue, cursor);}
 
         // JContainer<T> — compare elements with variadic support
-        if (TreeHelper.IsContainer(patternValue) && TreeHelper.IsContainer(candidateValue))
-            return MatchContainer(patternValue, candidateValue, cursor);
+        if (TreeHelper.IsContainer(patternValue) && TreeHelper.IsContainer(candidateValue)){
+            return MatchContainer(patternValue, candidateValue, cursor);}
 
         // IList — compare element-by-element
-        if (patternValue is IList patternList && candidateValue is IList candidateList)
-            return MatchList(patternList, candidateList, cursor);
+        if (patternValue is IList patternList && candidateValue is IList candidateList){
+            return MatchList(patternList, candidateList, cursor);}
 
         // Primitive values (string, int, enum, bool, etc.)
         return Equals(patternValue, candidateValue);
@@ -612,8 +607,8 @@ internal class PatternMatchingComparator
         var patternElements = TreeHelper.GetContainerElements(patternContainer);
         var candidateElements = TreeHelper.GetContainerElements(candidateContainer);
 
-        if (patternElements == null || candidateElements == null)
-            return patternElements == null && candidateElements == null;
+        if (patternElements == null || candidateElements == null){
+            return patternElements == null && candidateElements == null;}
 
         return MatchPaddedList(patternElements, candidateElements, cursor);
     }
@@ -626,8 +621,8 @@ internal class PatternMatchingComparator
     private bool MatchContainerAgainstNull(object patternContainer, Cursor cursor)
     {
         var patternElements = TreeHelper.GetContainerElements(patternContainer);
-        if (patternElements == null || patternElements.Count == 0)
-            return true;
+        if (patternElements == null || patternElements.Count == 0){
+            return true;}
 
         foreach (var el in patternElements)
         {
@@ -669,8 +664,8 @@ internal class PatternMatchingComparator
         int pi, int ci, Cursor cursor)
     {
         // All pattern elements matched; ensure no unconsumed candidates remain
-        if (pi >= patternElements.Count)
-            return ci >= candidateElements.Count;
+        if (pi >= patternElements.Count){
+            return ci >= candidateElements.Count;}
 
         var patternEl = patternElements[pi];
         var innerPattern = TreeHelper.UnwrapPadded(patternEl) ?? patternEl;
@@ -692,8 +687,8 @@ internal class PatternMatchingComparator
                     if (inner is Identifier id)
                     {
                         var name = Placeholder.FromPlaceholder(id.SimpleName);
-                        if (name != null && _captures.TryGetValue(name, out var cap) && IsVariadic(cap))
-                            continue;
+                        if (name != null && _captures.TryGetValue(name, out var cap) && IsVariadic(cap)){
+                            continue;}
                     }
                     nonVariadicRemaining++;
                 }
@@ -713,20 +708,20 @@ internal class PatternMatchingComparator
                     }
 
                     // Evaluate variadic constraint before binding
-                    if (!EvaluateVariadicConstraint(captureObj, captured.AsReadOnly(), cursor))
-                        continue;
+                    if (!EvaluateVariadicConstraint(captureObj, captured.AsReadOnly(), cursor)){
+                        continue;}
 
                     // Save bindings for backtracking
                     var savedBindings = new Dictionary<string, object>(_bindings);
                     _bindings[captureName] = captured.AsReadOnly();
 
-                    if (MatchPaddedListRecursive(patternElements, candidateElements, pi + 1, ci + consume, cursor))
-                        return true;
+                    if (MatchPaddedListRecursive(patternElements, candidateElements, pi + 1, ci + consume, cursor)){
+                        return true;}
 
                     // Backtrack
                     _bindings.Clear();
-                    foreach (var kvp in savedBindings)
-                        _bindings[kvp.Key] = kvp.Value;
+                    foreach (var kvp in savedBindings){
+                        _bindings[kvp.Key] = kvp.Value;}
                 }
 
                 return false;
@@ -734,11 +729,11 @@ internal class PatternMatchingComparator
         }
 
         // Non-variadic: need a candidate element to match against
-        if (ci >= candidateElements.Count)
-            return false;
+        if (ci >= candidateElements.Count){
+            return false;}
 
-        if (!MatchValue(patternEl, candidateElements[ci], cursor))
-            return false;
+        if (!MatchValue(patternEl, candidateElements[ci], cursor)){
+            return false;}
 
         return MatchPaddedListRecursive(patternElements, candidateElements, pi + 1, ci + 1, cursor);
     }
@@ -748,13 +743,13 @@ internal class PatternMatchingComparator
     /// </summary>
     private bool MatchList(IList patternList, IList candidateList, Cursor cursor)
     {
-        if (patternList.Count != candidateList.Count)
-            return false;
+        if (patternList.Count != candidateList.Count){
+            return false;}
 
         for (int i = 0; i < patternList.Count; i++)
         {
-            if (!MatchValue(patternList[i], candidateList[i], cursor))
-                return false;
+            if (!MatchValue(patternList[i], candidateList[i], cursor)){
+                return false;}
         }
         return true;
     }
@@ -764,8 +759,8 @@ internal class PatternMatchingComparator
 
     private static (int min, int max) GetVariadicBounds(object captureObj)
     {
-        if (captureObj is not ICapture capture)
-            return (0, int.MaxValue);
+        if (captureObj is not ICapture capture){
+            return (0, int.MaxValue);}
         return (capture.MinCount ?? 0, capture.MaxCount ?? int.MaxValue);
     }
 

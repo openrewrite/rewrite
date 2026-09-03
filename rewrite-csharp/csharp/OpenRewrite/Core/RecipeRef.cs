@@ -76,7 +76,7 @@ public class RecipeRef : TreeVisitor<Tree, ExecutionContext>
     /// </summary>
     public override Tree? Visit(Tree? tree, ExecutionContext ctx)
     {
-        if (tree == null) return null;
+        if (tree == null){ return null;}
         if (LocalVisitor != null)
         {
             return LocalVisitor.Visit(tree, ctx);

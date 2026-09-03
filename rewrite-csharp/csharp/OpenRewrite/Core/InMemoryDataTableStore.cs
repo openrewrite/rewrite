@@ -48,8 +48,8 @@ public class InMemoryDataTableStore : IDataTableStore
         if (group != null)
         {
             var key = BucketKey(dataTableName, group);
-            if (!_buckets.TryGetValue(key, out var bucket))
-                return [];
+            if (!_buckets.TryGetValue(key, out var bucket)){
+                return [];}
             List<object> snapshot;
             lock (bucket.Rows) { snapshot = [..bucket.Rows]; }
             return snapshot;

@@ -195,9 +195,7 @@ class AddImport(PythonVisitor):
             return False
         if alias is not None and import_alias != alias:
             return False
-        if alias is None and import_alias is not None:
-            return False
-        return True
+        return not (alias is None and import_alias is not None)
 
     def _is_referenced(self, cu: CompilationUnit) -> bool:
         """Check if the identifier we're importing is actually used."""

@@ -41,8 +41,9 @@ import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+
 @SuppressWarnings({"unused", "DataFlowIssue"})
-public class Assertions {
+public final class Assertions {
 
     private Assertions() {
     }

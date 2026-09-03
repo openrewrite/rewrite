@@ -35,9 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
-import static org.openrewrite.yaml.MergeYaml.InsertMode.After;
-import static org.openrewrite.yaml.MergeYaml.InsertMode.Before;
-import static org.openrewrite.yaml.MergeYaml.InsertMode.Last;
+import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
 
 @SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
 class MergeYamlTest implements RewriteTest {

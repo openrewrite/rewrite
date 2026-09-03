@@ -157,7 +157,7 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                 exc -> exc.getModulePath() + "@" + exc.getVersion(),
                 exc -> exc.rpcSend(exc, q));
         q.getAndSendListAsRef(after, r -> r.getRetracts() != null ? r.getRetracts() : emptyList(),
-                ret -> ret.getVersionRange(),
+                GoResolutionResult.Retract::getVersionRange,
                 ret -> ret.rpcSend(ret, q));
         q.getAndSendListAsRef(after, r -> r.getResolvedDependencies() != null ? r.getResolvedDependencies() : emptyList(),
                 rd -> rd.getModulePath() + "@" + rd.getVersion(),

@@ -115,6 +115,8 @@ private fun Cursor.isInsideMethodAnnotated(annotationSimpleName: String): Boolea
 
 private fun Cursor.isInsideOverridingMethodNamed(name: String): Boolean {
     val method = firstEnclosing(J.MethodDeclaration::class.java) ?: return false
-    if (method.simpleName != name) return false
+    if (method.simpleName != name) {
+        return false
+    }
     return method.leadingAnnotations.any { it.simpleName == "Override" }
 }

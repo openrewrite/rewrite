@@ -76,7 +76,7 @@ class MavenArtifactDownloaderTest {
 
         List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
         for (ResolvedDependency runtimeDependency : runtimeDependencies) {
-            if (!("bom".equals(runtimeDependency.getType()))) {
+            if (!"bom".equals(runtimeDependency.getType())) {
                 assertNotNull(
                   downloader.downloadArtifact(runtimeDependency),
                         "%s:%s:%s:%s failed to download".formatted(
@@ -120,7 +120,7 @@ class MavenArtifactDownloaderTest {
 
         List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
         for (ResolvedDependency runtimeDependency : runtimeDependencies) {
-            if (!("bom".equals(runtimeDependency.getType()))) {
+            if (!"bom".equals(runtimeDependency.getType())) {
                 assertNotNull(
                   downloader.downloadArtifact(runtimeDependency),
                         "%s:%s:%s:%s failed to download".formatted(

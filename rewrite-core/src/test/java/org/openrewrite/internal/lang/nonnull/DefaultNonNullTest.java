@@ -19,12 +19,12 @@ import org.jspecify.annotations.Nullable;
 
 public class DefaultNonNullTest {
 
-    private String yourCoolNonNullName = "sally";
+    private final String yourCoolNonNullName = "sally";
 
     String coolNonNullName = "fred";
 
     @SuppressWarnings("ConstantConditions")
-    private String aCoolNonNullName = null;
+    private String aCoolNonNullName;
 
     @Nullable
     protected String myLessCoolNullableName;

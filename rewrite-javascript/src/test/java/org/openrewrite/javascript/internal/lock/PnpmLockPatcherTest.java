@@ -17,8 +17,8 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
-import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
+import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.io.ByteArrayOutputStream;

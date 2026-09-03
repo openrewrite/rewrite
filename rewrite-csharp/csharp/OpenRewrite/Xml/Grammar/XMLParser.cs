@@ -61,7 +61,7 @@ public partial class XMLParser : Parser {
 		S=35, DIRECTIVE_OPEN=36, DIRECTIVE_CLOSE=37, SLASH=38, EQUALS=39, STRING=40, 
 		Name=41;
 	public const int
-		RULE_document = 0, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4, 
+		RULE_document, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4, 
 		RULE_intsubset = 5, RULE_markupdecl = 6, RULE_declSep = 7, RULE_externalid = 8, 
 		RULE_processinginstruction = 9, RULE_content = 10, RULE_element = 11, 
 		RULE_jspdirective = 12, RULE_jspscriptlet = 13, RULE_jspexpression = 14, 
@@ -138,18 +138,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterDocument(this);
+			if (typedListener != null){ typedListener.EnterDocument(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitDocument(this);
+			if (typedListener != null){ typedListener.ExitDocument(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitDocument(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitDocument(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -220,18 +220,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterProlog(this);
+			if (typedListener != null){ typedListener.EnterProlog(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitProlog(this);
+			if (typedListener != null){ typedListener.ExitProlog(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitProlog(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitProlog(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -314,18 +314,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterXmldecl(this);
+			if (typedListener != null){ typedListener.EnterXmldecl(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitXmldecl(this);
+			if (typedListener != null){ typedListener.ExitXmldecl(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitXmldecl(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitXmldecl(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -390,18 +390,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterMisc(this);
+			if (typedListener != null){ typedListener.EnterMisc(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitMisc(this);
+			if (typedListener != null){ typedListener.ExitMisc(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitMisc(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitMisc(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -486,18 +486,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterDoctypedecl(this);
+			if (typedListener != null){ typedListener.EnterDoctypedecl(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitDoctypedecl(this);
+			if (typedListener != null){ typedListener.ExitDoctypedecl(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitDoctypedecl(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitDoctypedecl(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -581,18 +581,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterIntsubset(this);
+			if (typedListener != null){ typedListener.EnterIntsubset(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitIntsubset(this);
+			if (typedListener != null){ typedListener.ExitIntsubset(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitIntsubset(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitIntsubset(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -670,18 +670,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterMarkupdecl(this);
+			if (typedListener != null){ typedListener.EnterMarkupdecl(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitMarkupdecl(this);
+			if (typedListener != null){ typedListener.ExitMarkupdecl(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitMarkupdecl(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitMarkupdecl(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -778,18 +778,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterDeclSep(this);
+			if (typedListener != null){ typedListener.EnterDeclSep(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitDeclSep(this);
+			if (typedListener != null){ typedListener.ExitDeclSep(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitDeclSep(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitDeclSep(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -825,18 +825,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterExternalid(this);
+			if (typedListener != null){ typedListener.EnterExternalid(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitExternalid(this);
+			if (typedListener != null){ typedListener.ExitExternalid(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitExternalid(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitExternalid(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -886,18 +886,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterProcessinginstruction(this);
+			if (typedListener != null){ typedListener.EnterProcessinginstruction(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitProcessinginstruction(this);
+			if (typedListener != null){ typedListener.ExitProcessinginstruction(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitProcessinginstruction(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitProcessinginstruction(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -975,18 +975,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterContent(this);
+			if (typedListener != null){ typedListener.EnterContent(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitContent(this);
+			if (typedListener != null){ typedListener.ExitContent(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitContent(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitContent(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -1114,18 +1114,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterElement(this);
+			if (typedListener != null){ typedListener.EnterElement(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitElement(this);
+			if (typedListener != null){ typedListener.ExitElement(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitElement(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitElement(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -1246,18 +1246,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterJspdirective(this);
+			if (typedListener != null){ typedListener.EnterJspdirective(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitJspdirective(this);
+			if (typedListener != null){ typedListener.ExitJspdirective(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitJspdirective(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitJspdirective(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -1316,18 +1316,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterJspscriptlet(this);
+			if (typedListener != null){ typedListener.EnterJspscriptlet(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitJspscriptlet(this);
+			if (typedListener != null){ typedListener.ExitJspscriptlet(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitJspscriptlet(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitJspscriptlet(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -1363,18 +1363,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterJspexpression(this);
+			if (typedListener != null){ typedListener.EnterJspexpression(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitJspexpression(this);
+			if (typedListener != null){ typedListener.ExitJspexpression(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitJspexpression(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitJspexpression(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -1410,18 +1410,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterJspdeclaration(this);
+			if (typedListener != null){ typedListener.EnterJspdeclaration(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitJspdeclaration(this);
+			if (typedListener != null){ typedListener.ExitJspdeclaration(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitJspdeclaration(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitJspdeclaration(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -1457,18 +1457,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterJspcomment(this);
+			if (typedListener != null){ typedListener.EnterJspcomment(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitJspcomment(this);
+			if (typedListener != null){ typedListener.ExitJspcomment(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitJspcomment(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitJspcomment(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -1505,18 +1505,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterReference(this);
+			if (typedListener != null){ typedListener.EnterReference(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitReference(this);
+			if (typedListener != null){ typedListener.ExitReference(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitReference(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitReference(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -1562,18 +1562,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterAttribute(this);
+			if (typedListener != null){ typedListener.EnterAttribute(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitAttribute(this);
+			if (typedListener != null){ typedListener.ExitAttribute(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitAttribute(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitAttribute(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 
@@ -1615,18 +1615,18 @@ public partial class XMLParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.EnterChardata(this);
+			if (typedListener != null){ typedListener.EnterChardata(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
 			IXMLParserListener typedListener = listener as IXMLParserListener;
-			if (typedListener != null) typedListener.ExitChardata(this);
+			if (typedListener != null){ typedListener.ExitChardata(this);}
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
 			IXMLParserVisitor<TResult> typedVisitor = visitor as IXMLParserVisitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitChardata(this);
-			else return visitor.VisitChildren(this);
+			if (typedVisitor != null){ return typedVisitor.VisitChardata(this);}
+			else{ return visitor.VisitChildren(this);}
 		}
 	}
 

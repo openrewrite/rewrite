@@ -85,7 +85,7 @@ class CanonicalJsonEmitterTest {
     @Test
     void rejectsFloats() {
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("f", 1.5d);
+        map.put("f", 1.5D);
         assertThatThrownBy(() -> CanonicalJsonEmitter.emit(map))
           .isInstanceOf(IllegalArgumentException.class);
     }

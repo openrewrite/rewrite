@@ -40,7 +40,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
-public class Assertions {
+public final class Assertions {
     private Assertions() {
     }
 

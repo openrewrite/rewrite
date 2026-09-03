@@ -287,7 +287,7 @@ public class GroovyParser implements Parser {
         @Nullable
         private JavaTypeFactory typeFactory;
 
-        private boolean logCompilationWarningsAndErrors = false;
+        private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
         private final List<Consumer<CompilerConfiguration>> compilerCustomizers = new ArrayList<>();
 

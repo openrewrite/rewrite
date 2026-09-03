@@ -96,8 +96,8 @@ public class AddToTagVisitor<P>(Tag scope, Tag tagToAdd, Comparison<Content>? ta
                 {
                     var prefix = child.Prefix;
                     var lastNewline = prefix.LastIndexOf('\n');
-                    if (lastNewline >= 0)
-                        return prefix[(lastNewline + 1)..];
+                    if (lastNewline >= 0){
+                        return prefix[(lastNewline + 1)..];}
                 }
             }
         }
@@ -107,8 +107,8 @@ public class AddToTagVisitor<P>(Tag scope, Tag tagToAdd, Comparison<Content>? ta
         {
             var closingPrefix = tag.ClosingTag.Prefix;
             var lastNewline = closingPrefix.LastIndexOf('\n');
-            if (lastNewline >= 0)
-                return closingPrefix[(lastNewline + 1)..] + "  ";
+            if (lastNewline >= 0){
+                return closingPrefix[(lastNewline + 1)..] + "  ";}
         }
 
         return "    ";

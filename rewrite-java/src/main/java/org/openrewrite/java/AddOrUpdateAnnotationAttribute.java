@@ -260,7 +260,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (isFullyQualifiedClass()) {
                     JavaType.ShallowClass fqn = JavaType.ShallowClass.build(attributeValue.substring(0, attributeValue.length() - 6));
                     builder
-                            .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;\npublic interface %s {}\n", fqn.getPackageName(), fqn.getClassName())))
+                            .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;%npublic interface %s {}%n", fqn.getPackageName(), fqn.getClassName())))
                             .imports(fqn.getFullyQualifiedName());
                 }
                 return builder.build();

@@ -36,7 +36,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
 
     public override J? Visit(Tree? tree, RpcReceiveQueue q)
     {
-        if (tree == null) return null;
+        if (tree == null){ return null;}
 
         // ExpressionStatement wraps expression in JRightPadded on the Java side.
         // C#'s model has a bare Expression, so we intercept here and receive in the
@@ -1081,8 +1081,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
 
     private static string DeriveEndDelimiter(string startDelimiter)
     {
-        if (startDelimiter.Contains("\"\"\""))
-            return "\"\"\"";
+        if (startDelimiter.Contains("\"\"\"")){
+            return "\"\"\"";}
         return "\"";
     }
 

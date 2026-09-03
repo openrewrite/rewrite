@@ -20,7 +20,7 @@ import {Cursor} from "../tree";
 import {Markers} from "../markers";
 
 class PlainTextPrinter extends PlainTextVisitor<PrintOutputCapture> {
-    private static readonly TEXT_MARKER_WRAPPER = (out: string): string => `~~${out}${out ? "~~" : ""}>`;
+    private static readonly const TEXT_MARKER_WRAPPER = (out: string): string => `~~${out}${out ? "~~" : ""}>`;
 
     async visitText(text: PlainText, p: PrintOutputCapture): Promise<PlainText | undefined> {
         await this.visitMarkableText(text.markers, text.text, p);

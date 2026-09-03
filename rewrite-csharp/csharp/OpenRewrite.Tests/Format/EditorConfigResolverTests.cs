@@ -30,8 +30,8 @@ public class EditorConfigResolverTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_tempDir))
-            Directory.Delete(_tempDir, recursive: true);
+        if (Directory.Exists(_tempDir)){
+            Directory.Delete(_tempDir, recursive: true);}
     }
 
     private string CreateFile(string relativePath, string content)

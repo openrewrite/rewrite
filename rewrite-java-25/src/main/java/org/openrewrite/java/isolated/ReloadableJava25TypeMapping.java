@@ -651,7 +651,9 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
             for (Attribute.Compound a : sym.getDeclarationAttributes()) {
                 JavaType.Annotation annotation = annotationType(a);
-                if (annotation == null) continue;
+                if (annotation == null) {
+                    continue;
+                }
                 annotations.add(annotation);
             }
         }
@@ -668,7 +670,7 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             Object value = annotationElementValue(attr.snd.getValue());
             JavaType.Method element = requireNonNull(methodDeclarationType(attr.fst, annotType));
             JavaType.Annotation.ElementValue elementValue = value instanceof Object[] ?
-                    JavaType.Annotation.ArrayElementValue.from(element, ((Object[]) value)) :
+                    JavaType.Annotation.ArrayElementValue.from(element, (Object[]) value) :
                     JavaType.Annotation.SingleElementValue.from(element, value);
             elementValues.add(elementValue);
         }

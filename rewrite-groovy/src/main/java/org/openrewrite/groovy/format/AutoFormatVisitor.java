@@ -44,7 +44,7 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
         if (tree == null) {
             tree = cursor.getValue();
         }
-        JavaSourceFile cu = (tree instanceof JavaSourceFile) ?
+        JavaSourceFile cu = tree instanceof JavaSourceFile ?
                 (JavaSourceFile) tree :
                 cursor.firstEnclosingOrThrow(JavaSourceFile.class);
 

@@ -102,7 +102,7 @@ class PrintIdempotencyIntegTest {
                 .collect(toList());
 
         assertNoParseErrors(sources);
-        assertThat(sources).filteredOn(s -> s instanceof Go.CompilationUnit).hasSize(TRICKY_SOURCES.size());
+        assertThat(sources).filteredOn(Go.CompilationUnit.class::isInstance).hasSize(TRICKY_SOURCES.size());
     }
 
     @Test
@@ -136,15 +136,15 @@ class PrintIdempotencyIntegTest {
                 .collect(toList());
 
         assertThat(sources)
-                .filteredOn(s -> s instanceof ParseError)
+                .filteredOn(ParseError.class::isInstance)
                 .extracting(s -> s.getSourcePath().toString())
                 .containsExactly("broken.go");
     }
 
     private static void assertNoParseErrors(List<SourceFile> sources) {
         List<ParseError> parseErrors = sources.stream()
-                .filter(s -> s instanceof ParseError)
-                .map(s -> (ParseError) s)
+                .filter(ParseError.class::isInstance)
+                .map(ParseError.class::cast)
                 .collect(toList());
         assertThat(parseErrors)
                 .as("expected zero parse errors; got:\n%s", parseErrors.stream()

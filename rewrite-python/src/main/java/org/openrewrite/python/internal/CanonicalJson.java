@@ -152,7 +152,7 @@ public final class CanonicalJson {
                     out.append("\\f");
                     break;
                 default:
-                    if (c >= 0x20 && c < 0x7f) {
+                    if (c >= 0x20 && c < 0x7F) {
                         out.append(c);
                     } else {
                         out.append("\\u")

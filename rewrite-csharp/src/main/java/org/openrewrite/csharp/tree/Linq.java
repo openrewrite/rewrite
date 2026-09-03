@@ -20,9 +20,9 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.csharp.CSharpVisitor;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.marker.Markers;
 
 import java.lang.ref.WeakReference;
 import java.util.List;

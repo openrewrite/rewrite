@@ -23,6 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.tree.Docker;
+
 import java.util.regex.Pattern;
 
 /**

@@ -94,10 +94,10 @@ public sealed class Capture<T> : ICapture where T : J
         Func<T, CaptureConstraintContext, bool>? constraint = null,
         VariadicOptions<T>? variadic = null)
     {
-        if (constraint != null && variadic != null)
+        if (constraint != null && variadic != null){
             throw new ArgumentException(
                 "A capture cannot have both a single-node constraint and variadic options. " +
-                "Use VariadicOptions.Constraint for list-level constraints.");
+                "Use VariadicOptions.Constraint for list-level constraints.");}
 
         Name = name;
         Type = type;
@@ -129,10 +129,10 @@ public sealed class Capture<T> : ICapture where T : J
             var matched = context.PatternType != null
                 ? TypeUtils.IsAssignableTo(expr.Type, context.PatternType)
                 : TypeUtils.IsAssignableTo(expr.Type, ResolveCSharpAlias(Type));
-            if (!matched) return false;
+            if (!matched){ return false;}
         }
 
-        if (Constraint == null) return true;
+        if (Constraint == null){ return true;}
         // The `is T` check acts as an implicit type guard: if the candidate is not
         // assignable to T, the constraint fails without invoking the delegate.
         return candidate is T typed && Constraint(typed, context);
@@ -166,9 +166,9 @@ public sealed class Capture<T> : ICapture where T : J
     /// <inheritdoc />
     public bool EvaluateVariadicConstraint(IReadOnlyList<object> captured, CaptureConstraintContext context)
     {
-        if (Variadic?.Constraint == null) return true;
+        if (Variadic?.Constraint == null){ return true;}
         var typed = captured.OfType<T>().ToList();
-        if (typed.Count != captured.Count) return false;
+        if (typed.Count != captured.Count){ return false;}
         return Variadic.Constraint(typed.AsReadOnly(), context);
     }
 }

@@ -579,7 +579,7 @@ class ParserVisitor(ast.NodeVisitor):
             self.__pad_right(body, Space.EMPTY)
         )
 
-        return loop if not node.orelse else py.TrailingElseWrapper(
+        return  py.TrailingElseWrapper(
             random_id(),
             loop.prefix,
             Markers.EMPTY,
@@ -588,7 +588,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self.__source_before('else'),
                 self.__convert_block(node.orelse)
             )
-        )
+        ) if node.orelse elseloop
 
     def visit_AsyncFor(self, node):
         return py.Async(
@@ -616,7 +616,7 @@ class ParserVisitor(ast.NodeVisitor):
             self.__pad_right(self.__convert_block(node.body), Space.EMPTY)
         )
 
-        return while_ if not node.orelse else py.TrailingElseWrapper(
+        return  py.TrailingElseWrapper(
             random_id(),
             while_.prefix,
             Markers.EMPTY,
@@ -625,7 +625,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self.__source_before('else'),
                 self.__convert_block(node.orelse)
             )
-        )
+        ) if node.orelse elsewhile_
 
     def visit_If(self, node):
         # Handle both 'if' and 'elif' keywords - elif is used when this If is nested in an else clause
@@ -685,7 +685,7 @@ class ParserVisitor(ast.NodeVisitor):
             )
         else:
             resources_container = JContainer(
-                items_prefix if not parenthesized else Space.EMPTY,
+                 Space.EMPTY if parenthesized elseitems_prefix,
                 resources,
                 Markers.build(random_id(), [OmitParentheses(random_id())])
             )
@@ -778,13 +778,13 @@ class ParserVisitor(ast.NodeVisitor):
                                    self.__convert_block(node.finalbody)) if node.finalbody else None
         try_ = j.Try(random_id(), prefix, Markers.EMPTY, JContainer.empty(), body, handlers, finally_)
 
-        return try_ if not node.orelse else py.TrailingElseWrapper(
+        return  py.TrailingElseWrapper(
             random_id(),
             try_.prefix,
             Markers.EMPTY,
             try_.replace(prefix=Space.EMPTY),
             else_block
-        )
+        ) if node.orelse elsetry_
 
     def visit_Import(self, node):
         if len(node.names) == 1:
@@ -841,8 +841,8 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             self.__pad_left(Space.EMPTY, False),
             self.__convert_qualified_name(node.name, alias_type),
-            None if not node.asname else
-            self.__pad_left(self.__source_before('as'), self.__convert_name(node.asname, alias_type))
+            
+            self.__pad_left(self.__source_before('as'), self.__convert_name(node.asname, alias_type)) if node.asname elseNone
         )
 
     def visit_keyword(self, node):
@@ -1001,7 +1001,7 @@ class ParserVisitor(ast.NodeVisitor):
             if i == 0:
                 gen_result = j.Parentheses(
                     random_id(),
-                    prefix if not extra_parens else paren_prefix,
+                     paren_prefix if extra_parens elseprefix,
                     Markers.EMPTY,
                     self.__pad_right(gen_result, suffix)
                 )
@@ -1536,13 +1536,13 @@ class ParserVisitor(ast.NodeVisitor):
                                    self.__convert_block(node.finalbody)) if node.finalbody else None
         try_ = j.Try(random_id(), prefix, Markers.EMPTY, JContainer.empty(), body, handlers, finally_)
 
-        return try_ if not node.orelse else py.TrailingElseWrapper(
+        return  py.TrailingElseWrapper(
             random_id(),
             try_.prefix,
             Markers.EMPTY,
             try_.replace(prefix=Space.EMPTY),
             else_block
-        )
+        ) if node.orelse elsetry_
 
     def visit_TypeVar(self, node) -> j.TypeParameter:
         """Visit a TypeVar (e.g., T, T: int, T = int, or T: int = "default")."""
@@ -2128,10 +2128,10 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             JContainer(
                 Space.EMPTY,
-                [self.__pad_right(j.Empty(random_id(), self.__source_before('}'), Markers.EMPTY),
-                                  Space.EMPTY)] if not node.keys else
+                
                 [self.__map_dict_entry(k, v, i == len(node.keys) - 1) for i, (k, v) in
-                 enumerate(zip(node.keys, node.values))],
+                 enumerate(zip(node.keys, node.values))] if node.keys else[self.__pad_right(j.Empty(random_id(), self.__source_before('}'), Markers.EMPTY),
+                                  Space.EMPTY)],
                 Markers.EMPTY
             ),
             self._type_mapping.type(node)
@@ -2290,10 +2290,10 @@ class ParserVisitor(ast.NodeVisitor):
                 all_args = decorator.args + decorator.keywords
                 args = JContainer(
                     self.__source_before('('),
-                    [self.__pad_right(j.Empty(random_id(), self.__source_before(')'), Markers.EMPTY),
-                                      Space.EMPTY)] if not all_args else
+                    
                     [self.__pad_list_element(self.__convert(a), i == len(all_args) - 1, end_delim=')') for i, a in
-                     enumerate(all_args)],
+                     enumerate(all_args)] if all_args else[self.__pad_right(j.Empty(random_id(), self.__source_before(')'), Markers.EMPTY),
+                                      Space.EMPTY)],
                     Markers.EMPTY
                 )
         else:
@@ -2884,7 +2884,7 @@ class ParserVisitor(ast.NodeVisitor):
             if i == 0:
                 result = j.Parentheses(
                     random_id(),
-                    prefix if not extra_parens else paren_prefix,
+                     paren_prefix if extra_parens elseprefix,
                     Markers.EMPTY,
                     self.__pad_right(result, suffix)
                 )

@@ -620,7 +620,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             return null;
         }
 
-        return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
+        return before == left.getBefore() && t == left.getElement() ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
     @Override
@@ -651,7 +651,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
         Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), newRight.getAfter());
         Markers markers = visitMarkers(right.getMarkers(), newRight.getMarkers());
-        return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
+        return after == right.getAfter() && t == right.getElement() && markers == right.getMarkers() ?
                 right : new JRightPadded<>(t, after, markers);
     }
 
@@ -2153,7 +2153,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
         Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), newRight.getAfter());
         Markers markers = visitMarkers(right.getMarkers(), newRight.getMarkers());
-        return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
+        return after == right.getAfter() && t == right.getElement() && markers == right.getMarkers() ?
                 right : new JRightPadded<>(t, after, markers);
     }
 

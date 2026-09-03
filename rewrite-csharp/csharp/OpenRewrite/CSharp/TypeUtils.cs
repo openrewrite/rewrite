@@ -38,7 +38,7 @@ public static class TypeUtils
     /// </summary>
     public static bool IsAssignableTo(JavaType? type, string fullyQualifiedName)
     {
-        if (type == null) return false;
+        if (type == null){ return false;}
 
         // Primitives (int, bool, string, etc.) have no Class representation —
         // map to their .NET FQN and compare directly
@@ -49,11 +49,11 @@ public static class TypeUtils
         }
 
         // Arrays implement a known set of non-generic interfaces
-        if (type is JavaType.Array)
-            return IsArrayAssignableTo(fullyQualifiedName);
+        if (type is JavaType.Array){
+            return IsArrayAssignableTo(fullyQualifiedName);}
 
         var cls = AsClass(type);
-        if (cls == null) return false;
+        if (cls == null){ return false;}
 
         return IsAssignableToInternal(cls, fullyQualifiedName, new HashSet<string>());
     }
@@ -72,11 +72,11 @@ public static class TypeUtils
     /// </summary>
     public static bool IsAssignableTo(JavaType? type, JavaType? targetType)
     {
-        if (type == null || targetType == null) return false;
+        if (type == null || targetType == null){ return false;}
 
         // Both primitives: same kind means match
-        if (type is JavaType.Primitive candPrim && targetType is JavaType.Primitive targetPrim)
-            return candPrim.Kind == targetPrim.Kind;
+        if (type is JavaType.Primitive candPrim && targetType is JavaType.Primitive targetPrim){
+            return candPrim.Kind == targetPrim.Kind;}
 
         // Nullable<T>: both Nullable<T> and T are assignable to Nullable<T>
         if (targetType is JavaType.Parameterized { TypeParameters: [var innerType] } nullableParam
@@ -84,8 +84,8 @@ public static class TypeUtils
         {
             // Nullable<T> → Nullable<T>
             if (type is JavaType.Parameterized { TypeParameters: [var sourceInner] } sourceParam
-                && GetFullyQualifiedName(sourceParam.Type) == "System.Nullable")
-                return IsAssignableTo(sourceInner, innerType);
+                && GetFullyQualifiedName(sourceParam.Type) == "System.Nullable"){
+                return IsAssignableTo(sourceInner, innerType);}
 
             // T → Nullable<T>
             return IsAssignableTo(type, innerType);
@@ -95,12 +95,12 @@ public static class TypeUtils
         // This handles both open generics (with GenericTypeVariable wildcards) and concrete
         // generics (where all type args must match exactly).
         if (targetType is JavaType.Parameterized targetParam
-            && targetParam.TypeParameters is { Count: > 0 })
-            return IsAssignableToParameterized(type, targetParam);
+            && targetParam.TypeParameters is { Count: > 0 }){
+            return IsAssignableToParameterized(type, targetParam);}
 
         // Fall back to raw FQN comparison
         var targetFqn = GetFullyQualifiedName(targetType);
-        if (targetFqn == null) return false;
+        if (targetFqn == null){ return false;}
 
         return IsAssignableTo(type, targetFqn);
     }
@@ -110,7 +110,7 @@ public static class TypeUtils
     /// </summary>
     public static bool IsAssignableTo(JavaType? type, IReadOnlyCollection<string> fullyQualifiedNames)
     {
-        if (type == null) return false;
+        if (type == null){ return false;}
 
         // Primitives have no Class representation — map to FQN and check
         if (type is JavaType.Primitive prim2)
@@ -120,12 +120,12 @@ public static class TypeUtils
         }
 
         var cls = AsClass(type);
-        if (cls == null) return false;
+        if (cls == null){ return false;}
 
         foreach (var fqn in fullyQualifiedNames)
         {
-            if (IsAssignableToInternal(cls, fqn, new HashSet<string>()))
-                return true;
+            if (IsAssignableToInternal(cls, fqn, new HashSet<string>())){
+                return true;}
         }
         return false;
     }
@@ -136,7 +136,7 @@ public static class TypeUtils
     public static bool Implements(JavaType? type, string interfaceFqn)
     {
         var cls = AsClass(type);
-        if (cls == null) return false;
+        if (cls == null){ return false;}
 
         return ImplementsInternal(cls, interfaceFqn, new HashSet<string>());
     }
@@ -147,17 +147,17 @@ public static class TypeUtils
     public static bool InheritsFrom(JavaType? type, string baseClassFqn)
     {
         var cls = AsClass(type);
-        if (cls == null) return false;
+        if (cls == null){ return false;}
 
         var current = AsClass(cls.Supertype);
         var seen = new HashSet<string>();
         while (current != null)
         {
-            if (!seen.Add(current.FullyQualifiedName))
+            if (!seen.Add(current.FullyQualifiedName)){
                 break; // Cycle protection
 
-            if (string.Equals(current.FullyQualifiedName, baseClassFqn, StringComparison.Ordinal))
-                return true;
+            }if (string.Equals(current.FullyQualifiedName, baseClassFqn, StringComparison.Ordinal)){
+                return true;}
 
             current = AsClass(current.Supertype);
         }
@@ -170,7 +170,7 @@ public static class TypeUtils
     public static bool HasMethod(JavaType? type, string methodName)
     {
         var cls = AsClass(type);
-        if (cls == null) return false;
+        if (cls == null){ return false;}
 
         return HasMethodInternal(cls, methodName, new HashSet<string>());
     }
@@ -235,16 +235,16 @@ public static class TypeUtils
 
     private static bool IsAssignableToInternal(JavaType.Class cls, string fqn, HashSet<string> seen)
     {
-        if (!seen.Add(cls.FullyQualifiedName))
+        if (!seen.Add(cls.FullyQualifiedName)){
             return false; // Cycle protection
 
-        if (string.Equals(cls.FullyQualifiedName, fqn, StringComparison.Ordinal))
-            return true;
+        }if (string.Equals(cls.FullyQualifiedName, fqn, StringComparison.Ordinal)){
+            return true;}
 
         // Check supertype
         var super = AsClass(cls.Supertype);
-        if (super != null && IsAssignableToInternal(super, fqn, seen))
-            return true;
+        if (super != null && IsAssignableToInternal(super, fqn, seen)){
+            return true;}
 
         // Check interfaces
         if (cls.Interfaces != null)
@@ -252,8 +252,8 @@ public static class TypeUtils
             foreach (var iface in cls.Interfaces)
             {
                 var ifaceCls = AsClass(iface);
-                if (ifaceCls != null && IsAssignableToInternal(ifaceCls, fqn, seen))
-                    return true;
+                if (ifaceCls != null && IsAssignableToInternal(ifaceCls, fqn, seen)){
+                    return true;}
             }
         }
 
@@ -262,53 +262,50 @@ public static class TypeUtils
 
     private static bool ImplementsInternal(JavaType.Class cls, string interfaceFqn, HashSet<string> seen)
     {
-        if (!seen.Add(cls.FullyQualifiedName))
-            return false;
+        if (!seen.Add(cls.FullyQualifiedName)){
+            return false;}
 
         if (cls.Interfaces != null)
         {
             foreach (var iface in cls.Interfaces)
             {
                 var ifaceCls = AsClass(iface);
-                if (ifaceCls == null) continue;
+                if (ifaceCls == null){ continue;}
 
-                if (string.Equals(ifaceCls.FullyQualifiedName, interfaceFqn, StringComparison.Ordinal))
-                    return true;
+                if (string.Equals(ifaceCls.FullyQualifiedName, interfaceFqn, StringComparison.Ordinal)){
+                    return true;}
 
                 // Check super-interfaces
-                if (ImplementsInternal(ifaceCls, interfaceFqn, seen))
-                    return true;
+                if (ImplementsInternal(ifaceCls, interfaceFqn, seen)){
+                    return true;}
             }
         }
 
         // Also check supertype's interfaces
         var super = AsClass(cls.Supertype);
-        if (super != null)
-            return ImplementsInternal(super, interfaceFqn, seen);
+        if (super != null){
+            return ImplementsInternal(super, interfaceFqn, seen);}
 
         return false;
     }
 
     private static bool HasMethodInternal(JavaType.Class cls, string methodName, HashSet<string> seen)
     {
-        if (!seen.Add(cls.FullyQualifiedName))
-            return false;
+        if (!seen.Add(cls.FullyQualifiedName)){
+            return false;}
 
         if (cls.Methods != null)
         {
             foreach (var method in cls.Methods)
             {
-                if (string.Equals(method.Name, methodName, StringComparison.Ordinal))
-                    return true;
+                if (string.Equals(method.Name, methodName, StringComparison.Ordinal)){
+                    return true;}
             }
         }
 
         // Check supertype
         var super = AsClass(cls.Supertype);
-        if (super != null && HasMethodInternal(super, methodName, seen))
-            return true;
-
-        return false;
+        return super != null && HasMethodInternal(super, methodName, seen);
     }
 
     /// <summary>
@@ -320,7 +317,7 @@ public static class TypeUtils
     private static bool IsAssignableToParameterized(JavaType type, JavaType.Parameterized target)
     {
         var targetFqn = GetFullyQualifiedName(target.Type);
-        if (targetFqn == null) return false;
+        if (targetFqn == null){ return false;}
 
         // Collect all parameterized types in the candidate's hierarchy that match the target FQN
         var matching = new List<JavaType.Parameterized>();
@@ -329,8 +326,8 @@ public static class TypeUtils
         // Check if any matching parameterized type satisfies the type argument constraints
         foreach (var match in matching)
         {
-            if (TypeParametersMatch(match.TypeParameters, target.TypeParameters))
-                return true;
+            if (TypeParametersMatch(match.TypeParameters, target.TypeParameters)){
+                return true;}
         }
 
         return false;
@@ -346,15 +343,15 @@ public static class TypeUtils
     private static void CollectParameterizedMatches(JavaType? type, string targetFqn,
         List<JavaType.Parameterized> results, HashSet<string> seen)
     {
-        if (type == null) return;
+        if (type == null){ return;}
 
         if (type is JavaType.Parameterized param)
         {
             var rawFqn = GetFullyQualifiedName(param.Type);
             if (rawFqn != null)
             {
-                if (string.Equals(rawFqn, targetFqn, StringComparison.Ordinal))
-                    results.Add(param);
+                if (string.Equals(rawFqn, targetFqn, StringComparison.Ordinal)){
+                    results.Add(param);}
 
                 // Continue walking the underlying class's hierarchy, resolving
                 // type parameters in supertypes/interfaces using the actual type args
@@ -376,18 +373,18 @@ public static class TypeUtils
         else if (type is JavaType.Array arr)
         {
             // T[] implements IEnumerable<T>, IList<T>, etc. — synthesize matches
-            if (arr.ElemType != null)
-                CollectArrayParameterizedMatches(arr.ElemType, targetFqn, results);
+            if (arr.ElemType != null){
+                CollectArrayParameterizedMatches(arr.ElemType, targetFqn, results);}
         }
         else if (type is JavaType.Class cls)
         {
-            if (!seen.Add(cls.FullyQualifiedName)) return;
+            if (!seen.Add(cls.FullyQualifiedName)){ return;}
 
             CollectParameterizedMatches(cls.Supertype, targetFqn, results, seen);
             if (cls.Interfaces != null)
             {
-                foreach (var iface in cls.Interfaces)
-                    CollectParameterizedMatches(iface, targetFqn, results, seen);
+                foreach (var iface in cls.Interfaces){
+                    CollectParameterizedMatches(iface, targetFqn, results, seen);}
             }
         }
     }
@@ -404,26 +401,26 @@ public static class TypeUtils
     private static JavaType.Parameterized? MaybeResolveParameters(
         JavaType.Parameterized source, JavaType.FullyQualified? target)
     {
-        if (target is not JavaType.Parameterized targetParam)
-            return null;
+        if (target is not JavaType.Parameterized targetParam){
+            return null;}
 
         var sourceClass = source.Type as JavaType.Class;
-        if (sourceClass?.TypeParameters == null || source.TypeParameters == null)
-            return null;
+        if (sourceClass?.TypeParameters == null || source.TypeParameters == null){
+            return null;}
 
-        if (sourceClass.TypeParameters.Count != source.TypeParameters.Count)
-            return null;
+        if (sourceClass.TypeParameters.Count != source.TypeParameters.Count){
+            return null;}
 
         // Build substitution map: formal type param → actual type arg
         var map = new Dictionary<string, JavaType>();
         for (int i = 0; i < sourceClass.TypeParameters.Count; i++)
         {
-            if (sourceClass.TypeParameters[i] is JavaType.GenericTypeVariable gtv)
-                map[gtv.Name] = source.TypeParameters[i];
+            if (sourceClass.TypeParameters[i] is JavaType.GenericTypeVariable gtv){
+                map[gtv.Name] = source.TypeParameters[i];}
         }
 
-        if (map.Count == 0 || targetParam.TypeParameters == null)
-            return null;
+        if (map.Count == 0 || targetParam.TypeParameters == null){
+            return null;}
 
         // Apply substitution to the target's type parameters
         var resolved = new List<JavaType>(targetParam.TypeParameters.Count);
@@ -432,7 +429,7 @@ public static class TypeUtils
         {
             var sub = SubstituteTypeParam(tp, map);
             resolved.Add(sub);
-            if (!ReferenceEquals(sub, tp)) changed = true;
+            if (!ReferenceEquals(sub, tp)){ changed = true;}
         }
 
         return changed ? new JavaType.Parameterized(targetParam.Type, resolved) : targetParam;
@@ -445,8 +442,8 @@ public static class TypeUtils
     /// </summary>
     private static JavaType SubstituteTypeParam(JavaType type, Dictionary<string, JavaType> map)
     {
-        if (type is JavaType.GenericTypeVariable gtv && map.TryGetValue(gtv.Name, out var replacement))
-            return replacement;
+        if (type is JavaType.GenericTypeVariable gtv && map.TryGetValue(gtv.Name, out var replacement)){
+            return replacement;}
 
         if (type is JavaType.Parameterized param && param.TypeParameters != null)
         {
@@ -456,10 +453,10 @@ public static class TypeUtils
             {
                 var sub = SubstituteTypeParam(tp, map);
                 substituted.Add(sub);
-                if (!ReferenceEquals(sub, tp)) changed = true;
+                if (!ReferenceEquals(sub, tp)){ changed = true;}
             }
-            if (changed)
-                return new JavaType.Parameterized(param.Type, substituted);
+            if (changed){
+                return new JavaType.Parameterized(param.Type, substituted);}
         }
 
         return type;
@@ -473,8 +470,8 @@ public static class TypeUtils
     /// </summary>
     private static bool TypeParametersMatch(IList<JavaType>? candidateParams, IList<JavaType>? targetParams)
     {
-        if (targetParams == null || targetParams.Count == 0) return true;
-        if (candidateParams == null || candidateParams.Count != targetParams.Count) return false;
+        if (targetParams == null || targetParams.Count == 0){ return true;}
+        if (candidateParams == null || candidateParams.Count != targetParams.Count){ return false;}
 
         for (int i = 0; i < targetParams.Count; i++)
         {
@@ -484,15 +481,15 @@ public static class TypeUtils
             if (targetParam is JavaType.GenericTypeVariable gtv)
             {
                 // Unbounded type variable — any type matches
-                if (gtv.Bounds == null || gtv.Bounds.Count == 0)
-                    continue;
+                if (gtv.Bounds == null || gtv.Bounds.Count == 0){
+                    continue;}
 
                 // Bounded — candidate must be assignable to all bounds
                 foreach (var bound in gtv.Bounds)
                 {
                     var boundFqn = GetFullyQualifiedName(bound);
-                    if (boundFqn != null && !IsAssignableTo(candidateParam, boundFqn))
-                        return false;
+                    if (boundFqn != null && !IsAssignableTo(candidateParam, boundFqn)){
+                        return false;}
                 }
             }
             else
@@ -501,8 +498,8 @@ public static class TypeUtils
                 var targetFqn = GetFullyQualifiedName(targetParam);
                 var candidateFqn = GetFullyQualifiedName(candidateParam);
                 if (targetFqn == null || candidateFqn == null ||
-                    !string.Equals(targetFqn, candidateFqn, StringComparison.Ordinal))
-                    return false;
+                    !string.Equals(targetFqn, candidateFqn, StringComparison.Ordinal)){
+                    return false;}
             }
         }
         return true;

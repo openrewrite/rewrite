@@ -93,8 +93,8 @@ public class MethodMatcher
     /// </summary>
     public bool Matches(MethodInvocation mi)
     {
-        if (mi.MethodType != null)
-            return Matches(mi.MethodType);
+        if (mi.MethodType != null){
+            return Matches(mi.MethodType);}
 
         // Fallback: name-only matching when type info is unavailable
         return _methodNamePattern.IsMatch(mi.Name.SimpleName);
@@ -106,18 +106,15 @@ public class MethodMatcher
     public bool Matches(JavaType.Method methodType)
     {
         // Check method name
-        if (!_methodNamePattern.IsMatch(methodType.Name))
-            return false;
+        if (!_methodNamePattern.IsMatch(methodType.Name)){
+            return false;}
 
         // Check declaring type
-        if (!MatchesDeclaringType(methodType))
-            return false;
+        if (!MatchesDeclaringType(methodType)){
+            return false;}
 
         // Check arguments
-        if (!MatchesArguments(methodType))
-            return false;
-
-        return true;
+        return MatchesArguments(methodType);
     }
 
     /// <summary>
@@ -125,8 +122,8 @@ public class MethodMatcher
     /// </summary>
     public bool Matches(MethodDeclaration md)
     {
-        if (md.MethodType != null)
-            return Matches(md.MethodType);
+        if (md.MethodType != null){
+            return Matches(md.MethodType);}
 
         return _methodNamePattern.IsMatch(md.Name.SimpleName);
     }
@@ -134,22 +131,22 @@ public class MethodMatcher
     private bool MatchesDeclaringType(JavaType.Method methodType)
     {
         var declaring = methodType.DeclaringType;
-        if (declaring == null)
+        if (declaring == null){
             return true; // Can't check — allow match
 
-        var fqn = TypeUtils.GetFullyQualifiedName(declaring);
-        if (fqn == null)
-            return true;
+        }var fqn = TypeUtils.GetFullyQualifiedName(declaring);
+        if (fqn == null){
+            return true;}
 
-        if (_declaringTypePattern.IsMatch(fqn))
-            return true;
+        if (_declaringTypePattern.IsMatch(fqn)){
+            return true;}
 
         // Check supertypes if matchOverrides is enabled
         if (_matchOverrides)
         {
             var cls = TypeUtils.AsClass(declaring);
-            if (cls != null)
-                return MatchesTypeHierarchy(cls, new HashSet<string>());
+            if (cls != null){
+                return MatchesTypeHierarchy(cls, new HashSet<string>());}
         }
 
         return false;
@@ -157,23 +154,23 @@ public class MethodMatcher
 
     private bool MatchesTypeHierarchy(JavaType.Class cls, HashSet<string> seen)
     {
-        if (!seen.Add(cls.FullyQualifiedName))
-            return false;
+        if (!seen.Add(cls.FullyQualifiedName)){
+            return false;}
 
-        if (_declaringTypePattern.IsMatch(cls.FullyQualifiedName))
-            return true;
+        if (_declaringTypePattern.IsMatch(cls.FullyQualifiedName)){
+            return true;}
 
         var super = TypeUtils.AsClass(cls.Supertype);
-        if (super != null && MatchesTypeHierarchy(super, seen))
-            return true;
+        if (super != null && MatchesTypeHierarchy(super, seen)){
+            return true;}
 
         if (cls.Interfaces != null)
         {
             foreach (var iface in cls.Interfaces)
             {
                 var ifaceCls = TypeUtils.AsClass(iface);
-                if (ifaceCls != null && MatchesTypeHierarchy(ifaceCls, seen))
-                    return true;
+                if (ifaceCls != null && MatchesTypeHierarchy(ifaceCls, seen)){
+                    return true;}
             }
         }
 
@@ -182,22 +179,22 @@ public class MethodMatcher
 
     private bool MatchesArguments(JavaType.Method methodType)
     {
-        if (_hasWildcardArgs && _argMatchers.Length == 0)
+        if (_hasWildcardArgs && _argMatchers.Length == 0){
             return true; // (..) matches anything
 
-        var paramTypes = methodType.ParameterTypes;
+        }var paramTypes = methodType.ParameterTypes;
         var paramCount = paramTypes?.Count ?? 0;
 
         if (!_hasWildcardArgs)
         {
             // Exact argument count match required
-            if (_argMatchers.Length != paramCount)
-                return false;
+            if (_argMatchers.Length != paramCount){
+                return false;}
 
             for (var i = 0; i < _argMatchers.Length; i++)
             {
-                if (!_argMatchers[i].Matches(paramTypes![i]))
-                    return false;
+                if (!_argMatchers[i].Matches(paramTypes![i])){
+                    return false;}
             }
             return true;
         }
@@ -210,25 +207,25 @@ public class MethodMatcher
     {
         var paramCount = paramTypes?.Count ?? 0;
 
-        if (mi >= _argMatchers.Length)
-            return pi >= paramCount;
+        if (mi >= _argMatchers.Length){
+            return pi >= paramCount;}
 
         if (_argMatchers[mi] is WildcardArgMatcher)
         {
             // ".." matches zero or more args — try greedy to lazy
             for (var consume = paramCount - pi; consume >= 0; consume--)
             {
-                if (MatchArgsWithWildcard(paramTypes, mi + 1, pi + consume))
-                    return true;
+                if (MatchArgsWithWildcard(paramTypes, mi + 1, pi + consume)){
+                    return true;}
             }
             return false;
         }
 
-        if (pi >= paramCount)
-            return false;
+        if (pi >= paramCount){
+            return false;}
 
-        if (!_argMatchers[mi].Matches(paramTypes![pi]))
-            return false;
+        if (!_argMatchers[mi].Matches(paramTypes![pi])){
+            return false;}
 
         return MatchArgsWithWildcard(paramTypes, mi + 1, pi + 1);
     }
@@ -313,8 +310,8 @@ public class MethodMatcher
         {
             _pattern = pattern;
             // If the pattern is a C# keyword, also match the fully-qualified name
-            if (KeywordToFqn.TryGetValue(originalGlob, out var fqn))
-                _fqnPattern = GlobToRegex(fqn);
+            if (KeywordToFqn.TryGetValue(originalGlob, out var fqn)){
+                _fqnPattern = GlobToRegex(fqn);}
         }
 
         public override bool Matches(JavaType paramType)
@@ -322,8 +319,8 @@ public class MethodMatcher
             var fqn = TypeUtils.GetFullyQualifiedName(paramType);
             if (fqn != null)
             {
-                if (_pattern.IsMatch(fqn)) return true;
-                if (_fqnPattern != null && _fqnPattern.IsMatch(fqn)) return true;
+                if (_pattern.IsMatch(fqn)){ return true;}
+                if (_fqnPattern != null && _fqnPattern.IsMatch(fqn)){ return true;}
 
                 // Match the simple name (last segment) against the pattern.
                 // This allows patterns like "String" to match "System.String".
@@ -331,14 +328,14 @@ public class MethodMatcher
                 if (lastDot >= 0)
                 {
                     var simpleName = fqn[(lastDot + 1)..];
-                    if (_pattern.IsMatch(simpleName)) return true;
+                    if (_pattern.IsMatch(simpleName)){ return true;}
                 }
             }
 
             // Also match simple name for primitives/keywords
             if (paramType is JavaType.Primitive prim)
             {
-                if (_pattern.IsMatch(prim.Keyword)) return true;
+                if (_pattern.IsMatch(prim.Keyword)){ return true;}
             }
 
             return false;

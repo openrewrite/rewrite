@@ -149,7 +149,7 @@ public final class CanonicalJsonEmitter {
                     out.append("\\f");
                     break;
                 default:
-                    if (c >= 0x20 && c < 0x7f) {
+                    if (c >= 0x20 && c < 0x7F) {
                         out.append(c);
                     } else {
                         // ensure_ascii: lowercase hex; astral chars fall out as surrogate pairs

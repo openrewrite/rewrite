@@ -234,7 +234,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             if (piTexts.Count > 1)
             {
                 var sb = new System.Text.StringBuilder();
-                foreach (var it in piTexts) sb.Append(it.Text);
+                foreach (var it in piTexts){ sb.Append(it.Text);}
                 piText = piText.WithText(sb.ToString());
             }
 

@@ -18,12 +18,7 @@ package org.openrewrite.python.internal.uvlock;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.internal.pep440.PythonVersion;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 

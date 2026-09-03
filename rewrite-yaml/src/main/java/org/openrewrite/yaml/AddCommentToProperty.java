@@ -70,9 +70,9 @@ public class AddCommentToProperty extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
-                NameCaseConvention.LOWER_CAMEL :
-                NameCaseConvention.EXACT).compile(propertyKey);
+        Compiled keyMatcher = (Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.EXACT :
+                NameCaseConvention.LOWER_CAMEL).compile(propertyKey);
 
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             @Override

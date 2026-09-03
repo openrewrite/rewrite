@@ -59,7 +59,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     private final String source;
     private final boolean charsetBomMarked;
 
-    private int cursor = 0;
+    private int cursor;
 
     /**
      * Heredoc markers seen on the current line whose bodies have not been reached yet. The bodies
@@ -2676,7 +2676,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         if (parameters.block != null) {
             collected.add(parameters.block);
         }
-        collected.removeIf(p -> p instanceof Nodes.ImplicitRestNode);
+        collected.removeIf(Nodes.ImplicitRestNode.class::isInstance);
         collected.sort(Comparator.comparingInt(p -> p.startOffset));
         into.addAll(collected);
     }

@@ -129,7 +129,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
                 return document;
             }
 
-            int depth = 0;
+            int depth;
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 // Depth 0 the expected prefix is always "" for all styles
@@ -171,7 +171,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
 
     private static boolean indentMatchesStyle(String prefix, int depth, TabsAndIndentsStyle s) {
         String lastLineOfPrefix = prefix.substring(prefix.lastIndexOf("\n") + 1);
-        String expectedPrefix = (s.getUseTabCharacter()) ?
+        String expectedPrefix = s.getUseTabCharacter() ?
                 StringUtils.repeat("\t", depth) :
                 StringUtils.repeat(" ", s.getIndentSize() * depth);
         return lastLineOfPrefix.equals(expectedPrefix);
@@ -179,7 +179,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
 
     private static boolean continuationIndentMatchesStyle(String prefix, int depth, TabsAndIndentsStyle s) {
         String lastLineOfPrefix = prefix.substring(prefix.lastIndexOf("\n") + 1);
-        String expectedPrefix = (s.getUseTabCharacter()) ?
+        String expectedPrefix = s.getUseTabCharacter() ?
                 StringUtils.repeat("\t", depth) + StringUtils.repeat("\t", s.getContinuationIndentSize()) :
                 StringUtils.repeat(" ", s.getIndentSize() * depth) + StringUtils.repeat(" ", s.getContinuationIndentSize());
         return lastLineOfPrefix.equals(expectedPrefix);

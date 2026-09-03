@@ -308,8 +308,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var a = super.visitAttribute(attribute, p);
                     if (matcher.matches(getCursor())) {
                         var match = a.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return a;
@@ -320,8 +318,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var a = super.visitAttributeAccess(attributeAccess, p);
                     if (matcher.matches(getCursor())) {
                         var match = a.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return a;
@@ -332,8 +328,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var b = super.visitBinary(binary, p);
                     if (matcher.matches(getCursor())) {
                         var match = b.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return b;
@@ -344,8 +338,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var b = super.visitBlock(block, p);
                     if (matcher.matches(getCursor())) {
                         var match = b.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return b;
@@ -356,8 +348,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var c = super.visitConditional(conditional, p);
                     if (matcher.matches(getCursor())) {
                         var match = c.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return c;
@@ -368,8 +358,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var c = super.visitConfigFile(configFile, p);
                     if (matcher.matches(getCursor())) {
                         var match = c.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return c;
@@ -380,8 +368,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var e = super.visitEmpty(empty, p);
                     if (matcher.matches(getCursor())) {
                         var match = e.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return e;
@@ -392,8 +378,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var f = super.visitForIntro(forIntro, p);
                     if (matcher.matches(getCursor())) {
                         var match = f.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return f;
@@ -404,8 +388,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var f = super.visitForObject(forObject, p);
                     if (matcher.matches(getCursor())) {
                         var match = f.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return f;
@@ -416,8 +398,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var f = super.visitForTuple(forTuple, p);
                     if (matcher.matches(getCursor())) {
                         var match = f.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return f;
@@ -428,8 +408,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var f = super.visitFunctionCall(functionCall, p);
                     if (matcher.matches(getCursor())) {
                         var match = f.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return f;
@@ -440,8 +418,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var h = super.visitHeredocTemplate(heredocTemplate, p);
                     if (matcher.matches(getCursor())) {
                         var match = h.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return h;
@@ -452,8 +428,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var i = super.visitIdentifier(identifier, p);
                     if (matcher.matches(getCursor())) {
                         var match = i.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return i;
@@ -464,8 +438,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var i = super.visitIndex(index, p);
                     if (matcher.matches(getCursor())) {
                         var match = i.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return i;
@@ -476,8 +448,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var i = super.visitIndexPosition(indexPosition, p);
                     if (matcher.matches(getCursor())) {
                         var match = i.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return i;
@@ -488,8 +458,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var l = super.visitLiteral(literal, p);
                     if (matcher.matches(getCursor())) {
                         var match = l.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return l;
@@ -500,8 +468,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var o = super.visitObjectValue(objectValue, p);
                     if (matcher.matches(getCursor())) {
                         var match = o.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return o;
@@ -512,8 +478,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var pp = super.visitParentheses(parentheses, p);
                     if (matcher.matches(getCursor())) {
                         var match = pp.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return pp;
@@ -524,8 +488,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var q = super.visitQuotedTemplate(template, p);
                     if (matcher.matches(getCursor())) {
                         var match = q.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return q;
@@ -536,8 +498,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var s = super.visitSplat(splat, p);
                     if (matcher.matches(getCursor())) {
                         var match = s.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return s;
@@ -548,8 +508,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var s = super.visitSplatOperator(splatOperator, p);
                     if (matcher.matches(getCursor())) {
                         var match = s.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return s;
@@ -560,8 +518,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var t = super.visitTemplateInterpolation(template, p);
                     if (matcher.matches(getCursor())) {
                         var match = t.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return t;
@@ -572,8 +528,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var t = super.visitTuple(tuple, p);
                     if (matcher.matches(getCursor())) {
                         var match = t.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return t;
@@ -584,8 +538,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var u = super.visitUnary(unary, p);
                     if (matcher.matches(getCursor())) {
                         var match = u.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return u;
@@ -596,8 +548,6 @@ class JsonPathMatcherTest implements RewriteTest {
                     var v = super.visitVariableExpression(variableExpression, p);
                     if (matcher.matches(getCursor())) {
                         var match = v.printTrimmed(getCursor().getParentOrThrow());
-                        if (printMatches) {
-                        }
                         p.add(match);
                     }
                     return v;

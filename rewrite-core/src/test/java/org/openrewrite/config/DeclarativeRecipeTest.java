@@ -610,7 +610,7 @@ class DeclarativeRecipeTest implements RewriteTest {
             return new TreeVisitor<>() {
                 @Override
                 public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    var text = ((PlainText) tree);
+                    var text = (PlainText) tree;
                     assert text != null;
                     return text.withText(text.getText().replaceAll(find, replace));
                 }

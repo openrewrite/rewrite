@@ -91,8 +91,8 @@ public class DotNetBuildContext
     public static bool IsBuildFile(string sourcePath)
     {
         var fileName = Path.GetFileName(sourcePath);
-        if (BuildFileNames.Contains(fileName))
-            return true;
+        if (BuildFileNames.Contains(fileName)){
+            return true;}
 
         var ext = Path.GetExtension(sourcePath);
         return ext.Length > 0 && BuildFileExtensions.Contains(ext);
@@ -104,8 +104,8 @@ public class DotNetBuildContext
     /// </summary>
     public void CaptureIfBuildFile(Document doc)
     {
-        if (!IsBuildFile(doc.SourcePath))
-            return;
+        if (!IsBuildFile(doc.SourcePath)){
+            return;}
 
         lock (_lock)
         {
@@ -144,11 +144,11 @@ public class DotNetBuildContext
                     relativePath.Contains($"{Path.DirectorySeparatorChar}node_modules{Path.DirectorySeparatorChar}") ||
                     relativePath.StartsWith($"bin{Path.DirectorySeparatorChar}") ||
                     relativePath.StartsWith($"obj{Path.DirectorySeparatorChar}") ||
-                    relativePath.StartsWith($".git{Path.DirectorySeparatorChar}"))
-                    continue;
+                    relativePath.StartsWith($".git{Path.DirectorySeparatorChar}")){
+                    continue;}
 
-                if (!IsBuildFile(file))
-                    continue;
+                if (!IsBuildFile(file)){
+                    continue;}
 
                 try
                 {
@@ -204,10 +204,10 @@ public class DotNetBuildContext
         // Write disk-captured files first (skipping any that have LST versions)
         foreach (var (relativePath, content) in diskFiles)
         {
-            if (exclude != null && string.Equals(relativePath, exclude, StringComparison.OrdinalIgnoreCase))
-                continue;
-            if (lstPaths.Contains(relativePath))
-                continue;
+            if (exclude != null && string.Equals(relativePath, exclude, StringComparison.OrdinalIgnoreCase)){
+                continue;}
+            if (lstPaths.Contains(relativePath)){
+                continue;}
 
             WriteFile(rootDir, relativePath, content);
         }
@@ -215,8 +215,8 @@ public class DotNetBuildContext
         // Write LST-captured files (printed at materialization time)
         foreach (var (relativePath, doc) in lstFiles)
         {
-            if (exclude != null && string.Equals(relativePath, exclude, StringComparison.OrdinalIgnoreCase))
-                continue;
+            if (exclude != null && string.Equals(relativePath, exclude, StringComparison.OrdinalIgnoreCase)){
+                continue;}
 
             var content = XmlParser.Print(doc);
             WriteFile(rootDir, relativePath, content);
@@ -227,8 +227,8 @@ public class DotNetBuildContext
     {
         var fullPath = Path.Combine(rootDir, relativePath);
         var dir = Path.GetDirectoryName(fullPath);
-        if (dir != null)
-            Directory.CreateDirectory(dir);
+        if (dir != null){
+            Directory.CreateDirectory(dir);}
 
         File.WriteAllText(fullPath, content);
     }

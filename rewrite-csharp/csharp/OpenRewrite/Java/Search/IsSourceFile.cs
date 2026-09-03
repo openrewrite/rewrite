@@ -42,9 +42,9 @@ public class IsSourceFile : TreeVisitor<Tree, ExecutionContext>
 
     public override Tree? Visit(Tree? tree, ExecutionContext ctx)
     {
-        if (tree is not SourceFile sf) return tree;
+        if (tree is not SourceFile sf){ return tree;}
         var path = sf.SourcePath;
-        if (string.IsNullOrEmpty(path)) return tree;
+        if (string.IsNullOrEmpty(path)){ return tree;}
         if (MatchGlob(_filePattern, path))
         {
             return SearchResult.Found(tree);

@@ -42,8 +42,8 @@ public class RpcFixture : IDisposable
         // Log stderr from Java process asynchronously
         _javaProcess.ErrorDataReceived += (_, e) =>
         {
-            if (e.Data != null)
-                Console.Error.WriteLine($"[Java RPC] {e.Data}");
+            if (e.Data != null){
+                Console.Error.WriteLine($"[Java RPC] {e.Data}");}
         };
         _javaProcess.BeginErrorReadLine();
 
@@ -123,11 +123,11 @@ public class RpcFixture : IDisposable
             }
         }
 
-        if (!string.IsNullOrEmpty(envFile) && File.Exists(envFile))
-            return envFile;
+        if (!string.IsNullOrEmpty(envFile) && File.Exists(envFile)){
+            return envFile;}
 
-        if (sdkRelativeFile != null && File.Exists(sdkRelativeFile))
-            return sdkRelativeFile;
+        if (sdkRelativeFile != null && File.Exists(sdkRelativeFile)){
+            return sdkRelativeFile;}
 
         throw new InvalidOperationException(
             "Cannot locate the Java RPC test server classpath. Either set " +
@@ -149,8 +149,8 @@ public class RpcFixture : IDisposable
         //       symlink (the convention for source-linked SDK in Conductor / consumer
         //       repos), then derive the classpath from the symlink target.
         var sdkAssembly = typeof(OpenRewrite.CSharp.CSharpParser).Assembly.Location;
-        if (string.IsNullOrEmpty(sdkAssembly))
-            return null;
+        if (string.IsNullOrEmpty(sdkAssembly)){
+            return null;}
 
         var dir = Path.GetDirectoryName(sdkAssembly);
         while (dir != null)

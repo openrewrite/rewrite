@@ -51,11 +51,11 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     /**
      * Track position within the file by character
      */
-    private int cursor = 0;
+    private int cursor;
     /**
      * Track parsing position within the file by Unicode code point
      */
-    private int codePointCursor = 0;
+    private int codePointCursor;
 
     public HclParserVisitor(Path path, String source, Charset charset, boolean charsetBomMarked, @Nullable FileAttributes fileAttributes) {
         this.path = path;
@@ -100,7 +100,8 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Override
     public Hcl visitBinaryOp(HCLParser.BinaryOpContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            Expression left, right;
+            Expression left;
+            Expression right;
 
             // left can be unaryOp or exprTerm, right can be another operation or exprTerm
             if (c.unaryOp() != null) {
@@ -838,26 +839,29 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     if ('#' == source.charAt(delimIndex)) {
                         inSingleLineComment = true;
-                    } else switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = !inMultiLineComment;
-                            delimIndex += 1;
-                            break;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex += 1;
-                            break;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex += 1;
-                            break;
+                    } else {
+                        switch (source.substring(delimIndex, delimIndex + 2)) {
+                            case "//":
+                                inSingleLineComment = !inMultiLineComment;
+                                delimIndex += 1;
+                                break;
+                            case "/*":
+                                inMultiLineComment = true;
+                                delimIndex += 1;
+                                break;
+                            case "*/":
+                                inMultiLineComment = false;
+                                delimIndex += 1;
+                                break;
+                        }
                     }
                 }
 
                 if (!inMultiLineComment && !inSingleLineComment) {
-                    if (stop != null && source.charAt(delimIndex) == stop)
+                    if (stop != null && source.charAt(delimIndex) == stop) {
                         return -1; // reached stop word before finding the delimiter
 
+                    }
                     if (source.startsWith(untilDelim, delimIndex)) {
                         break; // found it!
                     }

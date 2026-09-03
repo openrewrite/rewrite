@@ -209,11 +209,6 @@ class PsiElementIrAssociations(private val typeMapping: KotlinIrTypeMapping, pri
 //                // println()
 //            }
             return null
-        } else {
-//            val m = elementMap[psiElement]
-//            if (m != null && m.stream().map { it.ir }.noneMatch(f)) {
-//                // println()
-//            }
         }
         return ir(psiElement, f)
     }

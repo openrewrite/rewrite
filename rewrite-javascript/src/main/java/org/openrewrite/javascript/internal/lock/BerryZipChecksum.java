@@ -43,7 +43,7 @@ public final class BerryZipChecksum {
     // DOS date/time encoding.
     private static final int DOS_TIME = 44608;
     private static final int DOS_DATE = 2262;
-    private static final int VERSION_MADE_BY = 0x033f; // unix, zip spec 6.3
+    private static final int VERSION_MADE_BY = 0x033F; // unix, zip spec 6.3
 
     private BerryZipChecksum() {
     }
@@ -78,7 +78,7 @@ public final class BerryZipChecksum {
                 ensureDir(target.endsWith("/") ? target : target + "/", dirs, entries);
             } else {
                 ensureDir(target.substring(0, target.lastIndexOf('/') + 1), dirs, entries);
-                int mode = (tar.mode & 0111) != 0 ? 0755 : 0644;
+                int mode = (tar.mode & 73) != 0 ? 493 : 420;
                 entries.add(new Entry(target, false, mode, tar.data));
             }
         }
@@ -93,7 +93,7 @@ public final class BerryZipChecksum {
         int prev = dir.lastIndexOf('/', dir.length() - 2);
         ensureDir(prev < 0 ? "" : dir.substring(0, prev + 1), dirs, entries);
         dirs.add(dir);
-        entries.add(new Entry(dir, true, 0755, new byte[0]));
+        entries.add(new Entry(dir, true, 493, new byte[0]));
     }
 
     private static byte[] serialize(List<Entry> entries) {
@@ -110,7 +110,7 @@ public final class BerryZipChecksum {
             int versionNeeded = e.directory ? 20 : 10;
 
             ByteArrayOutputStream lh = new ByteArrayOutputStream();
-            u32(lh, 0x04034b50);
+            u32(lh, 0x04034B50);
             u16(lh, versionNeeded);
             u16(lh, 0);
             u16(lh, 0);
@@ -123,8 +123,8 @@ public final class BerryZipChecksum {
             u16(lh, 0);
             writeAll(local, lh.toByteArray(), nameBytes, e.data);
 
-            long extAttr = (((e.directory ? 040000L : 0100000L) | e.mode) << 16) & 0xFFFFFFFFL;
-            u32(central, 0x02014b50);
+            long extAttr = (((e.directory ? 16384L : 32768L) | e.mode) << 16) & 0xFFFFFFFFL;
+            u32(central, 0x02014B50);
             u16(central, VERSION_MADE_BY);
             u16(central, versionNeeded);
             u16(central, 0);
@@ -150,7 +150,7 @@ public final class BerryZipChecksum {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write(localBytes, 0, localBytes.length);
         out.write(centralBytes, 0, centralBytes.length);
-        u32(out, 0x06054b50);
+        u32(out, 0x06054B50);
         u16(out, 0);
         u16(out, 0);
         u16(out, entries.size());
@@ -254,15 +254,15 @@ public final class BerryZipChecksum {
     }
 
     private static void u16(ByteArrayOutputStream out, int v) {
-        out.write(v & 0xff);
-        out.write((v >>> 8) & 0xff);
+        out.write(v & 0xFF);
+        out.write((v >>> 8) & 0xFF);
     }
 
     private static void u32(ByteArrayOutputStream out, long v) {
-        out.write((int) (v & 0xff));
-        out.write((int) ((v >>> 8) & 0xff));
-        out.write((int) ((v >>> 16) & 0xff));
-        out.write((int) ((v >>> 24) & 0xff));
+        out.write((int) (v & 0xFF));
+        out.write((int) ((v >>> 8) & 0xFF));
+        out.write((int) ((v >>> 16) & 0xFF));
+        out.write((int) ((v >>> 24) & 0xFF));
     }
 
     private static void writeAll(ByteArrayOutputStream out, byte[]... parts) {
@@ -274,8 +274,8 @@ public final class BerryZipChecksum {
     private static String hex(byte[] bytes) {
         StringBuilder sb = new StringBuilder(bytes.length * 2);
         for (byte b : bytes) {
-            sb.append(Character.forDigit((b >> 4) & 0xf, 16));
-            sb.append(Character.forDigit(b & 0xf, 16));
+            sb.append(Character.forDigit((b >> 4) & 0xF, 16));
+            sb.append(Character.forDigit(b & 0xF, 16));
         }
         return sb.toString();
     }

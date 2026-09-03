@@ -81,7 +81,9 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
@@ -97,7 +99,9 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                    if (marker == null) return tree;
+                    if (marker == null) {
+                        return tree;
+                    }
                     NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                 }
@@ -108,7 +112,9 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
 
     private boolean matchesChange(SourceFile pkg) {
         NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return false;
+        if (marker == null) {
+            return false;
+        }
         if (scope != null) {
             return containsIn(getScopeDeps(marker, scope));
         }
@@ -118,8 +124,14 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
     }
 
     private boolean containsIn(@Nullable List<Dependency> deps) {
-        if (deps == null) return false;
-        for (Dependency d : deps) if (oldPackageName.equals(d.getName())) return true;
+        if (deps == null) {
+            return false;
+        }
+        for (Dependency d : deps) {
+            if (oldPackageName.equals(d.getName())) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -140,7 +152,9 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
@@ -162,16 +176,24 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 }
 
                 Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
+                if (packagePath == null) {
+                    return tree;
+                }
                 NodeDependencyScan.ProjectState rootPs = acc.projects.get(packagePath);
-                if (rootPs == null) return tree;
+                if (rootPs == null) {
+                    return tree;
+                }
 
                 for (Path importer : NodeDependencyScan.lockImporters(acc, packagePath, rootPs)) {
                     NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
-                    if (ips == null) continue;
+                    if (ips == null) {
+                        continue;
+                    }
                     if (ips.modifiedPackageJson == null) {
                         SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
-                        if (pkg == null) pkg = ips.capturedPackageJson;
+                        if (pkg == null) {
+                            pkg = ips.capturedPackageJson;
+                        }
                         if (pkg != null && matchesChange(pkg)) {
                             ensureComputed(ips, pkg, ctx);
                             if (ips.modifiedPackageJson != null) {
@@ -192,7 +214,9 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
             }
 
             private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
-                if (ps.modifiedPackageJson != null) return;
+                if (ps.modifiedPackageJson != null) {
+                    return;
+                }
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg,
                         doc -> PackageJsonHelper.changeDependency(doc, oldPackageName, newPackageName, newVersion, scope),

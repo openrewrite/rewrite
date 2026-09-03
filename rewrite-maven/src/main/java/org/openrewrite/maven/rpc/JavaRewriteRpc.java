@@ -31,6 +31,7 @@ import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeClassLoader;
@@ -40,7 +41,6 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.marketplace.MavenRecipeBundleResolver;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
-import org.openrewrite.Parser;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.xml.XmlParser;
 

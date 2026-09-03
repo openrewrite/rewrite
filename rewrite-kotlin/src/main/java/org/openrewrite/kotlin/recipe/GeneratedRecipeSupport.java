@@ -9,12 +9,6 @@
  */
 package org.openrewrite.kotlin.recipe;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -37,6 +31,8 @@ import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
 import org.openrewrite.kotlin.tree.K;
+
+import java.util.*;
 
 /**
  * Runtime support for the recipe authoring DSL's K2 compiler plugin

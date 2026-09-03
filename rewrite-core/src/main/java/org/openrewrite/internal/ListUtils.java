@@ -215,7 +215,8 @@ public final class ListUtils {
 
         if (newLs != ls && nullEncountered) {
             //noinspection StatementWithEmptyBody
-            while (newLs.remove(null)) ;
+            while (newLs.remove(null)) {
+            }
         }
 
         //noinspection NullableProblems
@@ -254,7 +255,8 @@ public final class ListUtils {
 
         if (newLs != ls && nullEncountered) {
             //noinspection StatementWithEmptyBody
-            while (newLs.remove(null)) ;
+            while (newLs.remove(null)) {
+            }
         }
 
         //noinspection NullableProblems

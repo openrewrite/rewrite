@@ -76,7 +76,9 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
@@ -92,7 +94,9 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                    if (marker == null) return tree;
+                    if (marker == null) {
+                        return tree;
+                    }
                     NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                 }
@@ -103,15 +107,23 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
 
     private boolean matchesAdd(SourceFile pkg) {
         NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return false;
+        if (marker == null) {
+            return false;
+        }
         return notIn(marker.getDependencies()) && notIn(marker.getDevDependencies())
                 && notIn(marker.getPeerDependencies()) && notIn(marker.getOptionalDependencies())
                 && notIn(marker.getBundledDependencies());
     }
 
     private boolean notIn(@Nullable List<Dependency> deps) {
-        if (deps == null) return true;
-        for (Dependency d : deps) if (packageName.equals(d.getName())) return false;
+        if (deps == null) {
+            return true;
+        }
+        for (Dependency d : deps) {
+            if (packageName.equals(d.getName())) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -121,7 +133,9 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
@@ -143,16 +157,24 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
                 }
 
                 Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
+                if (packagePath == null) {
+                    return tree;
+                }
                 NodeDependencyScan.ProjectState rootPs = acc.projects.get(packagePath);
-                if (rootPs == null) return tree;
+                if (rootPs == null) {
+                    return tree;
+                }
 
                 for (Path importer : NodeDependencyScan.lockImporters(acc, packagePath, rootPs)) {
                     NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
-                    if (ips == null) continue;
+                    if (ips == null) {
+                        continue;
+                    }
                     if (ips.modifiedPackageJson == null) {
                         SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
-                        if (pkg == null) pkg = ips.capturedPackageJson;
+                        if (pkg == null) {
+                            pkg = ips.capturedPackageJson;
+                        }
                         if (pkg != null && matchesAdd(pkg)) {
                             ensureComputed(ips, pkg, ctx);
                             if (ips.modifiedPackageJson != null) {
@@ -173,7 +195,9 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
             }
 
             private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
-                if (ps.modifiedPackageJson != null) return;
+                if (ps.modifiedPackageJson != null) {
+                    return;
+                }
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg,
                         doc -> PackageJsonHelper.addDependency(doc, packageName, version, targetScope()),

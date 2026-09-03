@@ -289,7 +289,7 @@ class LazyWheelMetadataReaderTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
         // local header
-        le32(out, 0x04034b50L);
+        le32(out, 0x04034B50L);
         le16(out, 45); // version needed
         le16(out, 0);  // flags
         le16(out, 0);  // method: stored
@@ -304,7 +304,7 @@ class LazyWheelMetadataReaderTest {
         out.writeBytes(metadata);
 
         long cdOffset = out.size();
-        le32(out, 0x02014b50L);
+        le32(out, 0x02014B50L);
         le16(out, 45); // version made by
         le16(out, 45); // version needed
         le16(out, 0);  // flags
@@ -325,7 +325,7 @@ class LazyWheelMetadataReaderTest {
         long cdSize = out.size() - cdOffset;
 
         long zip64RecordOffset = out.size();
-        le32(out, 0x06064b50L);
+        le32(out, 0x06064B50L);
         le64(out, 44); // size of remainder of record
         le16(out, 45);
         le16(out, 45);
@@ -337,13 +337,13 @@ class LazyWheelMetadataReaderTest {
         le64(out, cdOffset);
 
         // zip64 locator
-        le32(out, 0x07064b50L);
+        le32(out, 0x07064B50L);
         le32(out, 0);
         le64(out, zip64RecordOffset);
         le32(out, 1);
 
         // EOCD with sentinel values
-        le32(out, 0x06054b50L);
+        le32(out, 0x06054B50L);
         le16(out, 0);
         le16(out, 0);
         le16(out, 0xFFFF);

@@ -178,7 +178,7 @@ public class Find extends Recipe {
                     AtomicBoolean isFirstMatch = new AtomicBoolean(true);
 
                     List<PlainText.Snippet> matchedSnippets = processMatches(snippetText, matcher, sourceFilePath, ctx,
-                            (text) -> {
+                            text -> {
                                 int matchStart = matcher.start() + snippetOffset;
                                 int matchEnd = matcher.end() + snippetOffset;
 

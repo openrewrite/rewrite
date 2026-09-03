@@ -27,6 +27,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
+import org.openrewrite.yaml.marker.OmitColon;
 import org.openrewrite.yaml.tree.Yaml;
 import org.openrewrite.yaml.tree.YamlKey;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -36,8 +37,6 @@ import org.yaml.snakeyaml.parser.ParserImpl;
 import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
-
-import org.openrewrite.yaml.marker.OmitColon;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -546,11 +545,11 @@ public class YamlParser implements org.openrewrite.Parser {
                     Yaml.Mapping m = super.visitMapping(mapping, p);
                     String opening = m.getOpeningBracePrefix();
                     if (!StringUtils.isBlank(opening)) {
-                        m = m.withOpeningBracePrefix((restoreUuidPlaceholders(opening)));
+                        m = m.withOpeningBracePrefix(restoreUuidPlaceholders(opening));
                     }
                     String closing = m.getClosingBracePrefix();
                     if (!StringUtils.isBlank(closing)) {
-                        m = m.withClosingBracePrefix((restoreUuidPlaceholders(closing)));
+                        m = m.withClosingBracePrefix(restoreUuidPlaceholders(closing));
                     }
                     return m;
                 }
@@ -566,11 +565,11 @@ public class YamlParser implements org.openrewrite.Parser {
                     Yaml.Sequence s = super.visitSequence(sequence, p);
                     String opening = s.getOpeningBracketPrefix();
                     if (!StringUtils.isBlank(opening)) {
-                        s = s.withOpeningBracketPrefix((restoreUuidPlaceholders(opening)));
+                        s = s.withOpeningBracketPrefix(restoreUuidPlaceholders(opening));
                     }
                     String closing = s.getClosingBracketPrefix();
                     if (!StringUtils.isBlank(closing)) {
-                        s = s.withClosingBracketPrefix((restoreUuidPlaceholders(closing)));
+                        s = s.withClosingBracketPrefix(restoreUuidPlaceholders(closing));
                     }
                     return s;
                 }
@@ -626,7 +625,7 @@ public class YamlParser implements org.openrewrite.Parser {
             if (prefixStart == -1) {
                 prefixStart = commentAwareIndexOf('-', eventPrefix);
             }
-            prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
+            prefix = prefixStart > -1 && eventPrefix.length() > prefixStart + 1 ? eventPrefix.substring(prefixStart + 1) : "";
         }
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
     }
@@ -828,7 +827,7 @@ public class YamlParser implements org.openrewrite.Parser {
         void push(Yaml.Block block);
     }
 
-    private static class MappingBuilder implements BlockBuilder {
+    private static final class MappingBuilder implements BlockBuilder {
         private final String prefix;
 
         @Nullable
@@ -898,7 +897,7 @@ public class YamlParser implements org.openrewrite.Parser {
         }
     }
 
-    private static class SequenceBuilder implements BlockBuilder {
+    private static final class SequenceBuilder implements BlockBuilder {
         private final String prefix;
 
         @Nullable

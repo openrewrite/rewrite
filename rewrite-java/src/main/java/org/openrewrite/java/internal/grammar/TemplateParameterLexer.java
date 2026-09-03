@@ -15,11 +15,11 @@
  */
 // Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/TemplateParameterLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
-import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.misc.*;
@@ -31,10 +31,23 @@ public class TemplateParameterLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8, 
-		LSBRACK=9, RSBRACK=10, AND=11, Extends=12, Super=13, FullyQualifiedName=14, 
-		Number=15, Identifier=16, S=17;
+    public static final int LPAREN = 1;
+    public static final int RPAREN = 2;
+    public static final int DOT = 3;
+    public static final int COLON = 4;
+    public static final int COMMA = 5;
+    public static final int LBRACK = 6;
+    public static final int RBRACK = 7;
+    public static final int WILDCARD = 8;
+    public static final int LSBRACK = 9;
+    public static final int RSBRACK = 10;
+    public static final int AND = 11;
+    public static final int Extends = 12;
+    public static final int Super = 13;
+    public static final int FullyQualifiedName = 14;
+    public static final int Number = 15;
+    public static final int Identifier = 16;
+    public static final int S = 17;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};
@@ -126,30 +139,27 @@ public class TemplateParameterLexer extends Lexer {
 
 	@Override
 	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
-		switch (ruleIndex) {
-		case 16:
-			return JavaLetter_sempred((RuleContext)_localctx, predIndex);
-		case 17:
-			return JavaLetterOrDigit_sempred((RuleContext)_localctx, predIndex);
-		}
+        if (ruleIndex == 16) {
+            return javaLetterSempred((RuleContext) _localctx, predIndex);
+        } else if (ruleIndex == 17) {
+            return javaLetterOrDigitSempred((RuleContext) _localctx, predIndex);
+        }
 		return true;
 	}
-	private boolean JavaLetter_sempred(RuleContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 0:
-			return Character.isJavaIdentifierStart(_input.LA(-1));
-		case 1:
-			return Character.isJavaIdentifierStart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)));
-		}
+	private boolean javaLetterSempred(RuleContext _localctx, int predIndex) {
+        if (predIndex == 0) {
+            return Character.isJavaIdentifierStart(_input.LA(-1));
+        } else if (predIndex == 1) {
+            return Character.isJavaIdentifierStart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1)));
+        }
 		return true;
 	}
-	private boolean JavaLetterOrDigit_sempred(RuleContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 2:
-			return Character.isJavaIdentifierPart(_input.LA(-1));
-		case 3:
-			return Character.isJavaIdentifierPart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)));
-		}
+	private boolean javaLetterOrDigitSempred(RuleContext _localctx, int predIndex) {
+        if (predIndex == 2) {
+            return Character.isJavaIdentifierPart(_input.LA(-1));
+        } else if (predIndex == 3) {
+            return Character.isJavaIdentifierPart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1)));
+        }
 		return true;
 	}
 

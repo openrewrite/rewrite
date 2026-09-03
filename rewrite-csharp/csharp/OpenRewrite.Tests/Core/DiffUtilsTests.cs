@@ -66,8 +66,8 @@ public class DiffUtilsTests
     {
         // Changes far enough apart to produce separate hunks (>6 lines apart with 3-line context)
         var lines = new List<string>();
-        for (var i = 0; i < 20; i++)
-            lines.Add($"line{i}");
+        for (var i = 0; i < 20; i++){
+            lines.Add($"line{i}");}
 
         var beforeLines = new List<string>(lines);
         var afterLines = new List<string>(lines);

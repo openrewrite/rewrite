@@ -196,7 +196,7 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         return tag;
     }
 
-    private yamlMarkerWrapper = (out: string): string => `~~${out}${out ? "~~" : ""}>`;
+    private const yamlMarkerWrapper = (out: string): string => `~~${out}${out ? "~~" : ""}>`;
 
     private async beforeSyntax(yaml: Yaml, p: PrintOutputCapture): Promise<void> {
         await this.beforeSyntaxWithMarkers(yaml.prefix, yaml.markers, p);

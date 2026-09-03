@@ -54,12 +54,12 @@ internal static class AttributeMapping
         MapMethodSymbol mapMethod)
     {
         var attributes = symbol.GetAttributes();
-        if (attributes.Length == 0) return null;
+        if (attributes.Length == 0){ return null;}
 
         List<JavaType.FullyQualified>? annotations = null;
         foreach (var attribute in attributes)
         {
-            if (MapAnnotation(attribute, mapType, mapMember, mapMethod) is not { } mapped) continue;
+            if (MapAnnotation(attribute, mapType, mapMember, mapMethod) is not { } mapped){ continue;}
             (annotations ??= new List<JavaType.FullyQualified>(attributes.Length)).Add(mapped);
         }
         return annotations;
@@ -101,7 +101,7 @@ internal static class AttributeMapping
                 JavaType? element =
                     MapAnnotationElement(attributeClass, constructor.Parameters[i].Name, mapType, mapMember)
                     ?? (JavaType?)mapMethod(constructor);
-                if (element == null) continue;
+                if (element == null){ continue;}
                 (values ??= []).Add(
                     MapAnnotationElementValue(element, attribute.ConstructorArguments[i], mapType, mapMember));
             }
@@ -109,7 +109,7 @@ internal static class AttributeMapping
 
         foreach (var named in attribute.NamedArguments)
         {
-            if (MapAnnotationElement(attributeClass, named.Key, mapType, mapMember) is not { } element) continue;
+            if (MapAnnotationElement(attributeClass, named.Key, mapType, mapMember) is not { } element){ continue;}
             (values ??= []).Add(MapAnnotationElementValue(element, named.Value, mapType, mapMember));
         }
 
@@ -214,7 +214,7 @@ internal static class AttributeMapping
     private static JavaType.Variable? MapEnumConstant(
         TypedConstant constant, Func<ITypeSymbol?, JavaType?> mapType, MapMember mapMember)
     {
-        if (constant.Type is not INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType) return null;
+        if (constant.Type is not INamedTypeSymbol { TypeKind: TypeKind.Enum } enumType){ return null;}
 
         foreach (var member in enumType.GetMembers())
         {

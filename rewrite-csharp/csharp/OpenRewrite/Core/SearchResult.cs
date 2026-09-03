@@ -37,13 +37,13 @@ public sealed class SearchResult(Guid id, string? description) : Marker, IRpcCod
     public static T Found<T>(T tree, string? description = null) where T : Tree
     {
         var newMarkers = tree.Markers.Add(new SearchResult(Guid.NewGuid(), description));
-        if (tree is J j)
-            return (T)J.SetMarkers(j, newMarkers);
+        if (tree is J j){
+            return (T)J.SetMarkers(j, newMarkers);}
 
         var withMarkers = tree.GetType().GetMethod("WithMarkers", [typeof(Markers)]);
-        if (withMarkers == null)
+        if (withMarkers == null){
             throw new InvalidOperationException(
-                $"{tree.GetType().FullName} does not expose WithMarkers(Markers), so markers cannot be attached to it.");
+                $"{tree.GetType().FullName} does not expose WithMarkers(Markers), so markers cannot be attached to it.");}
 
         return (T)withMarkers.Invoke(tree, [newMarkers])!;
     }

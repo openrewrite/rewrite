@@ -79,8 +79,8 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
     private J AddMarkerIfNeeded(J node, Space space)
     {
         var indices = FindDirectiveIndices(space);
-        if (indices.Count == 0)
-            return node;
+        if (indices.Count == 0){
+            return node;}
 
         var marker = new DirectiveBoundaryMarker(Guid.NewGuid(), indices);
         var newMarkers = node.Markers.Add(marker);

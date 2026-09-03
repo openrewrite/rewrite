@@ -30,8 +30,8 @@ public class StructuralEqualityComparatorTests
     {
         var cu = _parser.Parse(expressionStatement);
         var member = cu.Members[0].Element;
-        if (member is ExpressionStatement es)
-            return es.Expression;
+        if (member is ExpressionStatement es){
+            return es.Expression;}
         throw new InvalidOperationException(
             $"Expected ExpressionStatement, got {member.GetType().Name}");
     }

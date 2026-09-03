@@ -59,8 +59,8 @@ public class XmlVisitor<P> : TreeVisitor<Xml, P>
     public virtual Xml VisitDocument(Document document, P p)
     {
         var d = document;
-        if (d.Prolog != null)
-            d = d.WithProlog(VisitAndCast(d.Prolog, p));
+        if (d.Prolog != null){
+            d = d.WithProlog(VisitAndCast(d.Prolog, p));}
         d = d.WithRoot((Tag)VisitNonNull(d.Root, p));
         return d;
     }
@@ -68,8 +68,8 @@ public class XmlVisitor<P> : TreeVisitor<Xml, P>
     public virtual Xml VisitProlog(Prolog prolog, P p)
     {
         var pl = prolog;
-        if (pl.XmlDecl != null)
-            pl = pl.WithXmlDecl(VisitAndCast(pl.XmlDecl, p));
+        if (pl.XmlDecl != null){
+            pl = pl.WithXmlDecl(VisitAndCast(pl.XmlDecl, p));}
         pl = pl.WithMiscList(ListUtils.Map(pl.MiscList, m => (Misc?)Visit(m, p)));
         pl = pl.WithJspDirectives(ListUtils.Map(pl.JspDirectives, j => VisitAndCast(j, p)));
         return pl;
@@ -89,10 +89,10 @@ public class XmlVisitor<P> : TreeVisitor<Xml, P>
     {
         var t = tag;
         t = t.WithAttributes(ListUtils.Map(t.Attributes, a => VisitAndCast(a, p)));
-        if (t.ContentList != null)
-            t = t.WithContentList(ListUtils.Map(t.ContentList, c => (Content?)Visit(c, p)));
-        if (t.ClosingTag != null)
-            t = t.WithClosingTag(VisitAndCast(t.ClosingTag, p));
+        if (t.ContentList != null){
+            t = t.WithContentList(ListUtils.Map(t.ContentList, c => (Content?)Visit(c, p)));}
+        if (t.ClosingTag != null){
+            t = t.WithClosingTag(VisitAndCast(t.ClosingTag, p));}
         return t;
     }
 
@@ -111,8 +111,8 @@ public class XmlVisitor<P> : TreeVisitor<Xml, P>
     {
         var d = docTypeDecl;
         d = d.WithInternalSubset(ListUtils.Map(d.InternalSubset, i => VisitAndCast(i, p)));
-        if (d.ExternalSubsetsNode != null)
-            d = d.WithExternalSubsetsNode(VisitAndCast(d.ExternalSubsetsNode, p));
+        if (d.ExternalSubsetsNode != null){
+            d = d.WithExternalSubsetsNode(VisitAndCast(d.ExternalSubsetsNode, p));}
         return d;
     }
 

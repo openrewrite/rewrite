@@ -257,9 +257,7 @@ class FieldAccessTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
               @Override
               public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
-                  if ("completed".equals(fieldAccess.getSimpleName())) {
-                      // TODO Type is not nullable, but field is nullable
-                  }
+                  "completed".equals(fieldAccess.getSimpleName());
                   return super.visitFieldAccess(fieldAccess, ctx);
               }
           })),

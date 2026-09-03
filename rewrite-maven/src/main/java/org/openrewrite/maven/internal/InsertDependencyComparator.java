@@ -40,20 +40,20 @@ public class InsertDependencyComparator implements Comparator<Content> {
         }
 
         // Assign initial positions based on current order, keeping comments with their dependencies
-        float position = 0f;
+        float position = 0F;
         for (Map.Entry<Xml.Tag, List<Content>> entry : dependencyWithPrecedingComments.entrySet()) {
             // Position the comments just before their dependency
             for (Content comment : entry.getValue()) {
                 positions.put(comment, position);
-                position += 0.1f;
+                position += 0.1F;
             }
             positions.put(entry.getKey(), position);
-            position += 1.0f;
+            position += 1.0F;
         }
 
         for (Content comment : currentComments) {
             positions.put(comment, position);
-            position += 0.1f;
+            position += 0.1F;
         }
 
         List<Xml.Tag> dependencies = new ArrayList<>(dependencyWithPrecedingComments.keySet());
@@ -80,10 +80,10 @@ public class InsertDependencyComparator implements Comparator<Content> {
         // Put `dependencyTag` at the proper place in the positions map
         if (afterDependency == null) {
             // Insert at the beginning - position it before the first dependency
-            positions.put(dependencyTag, -0.5f);
+            positions.put(dependencyTag, -0.5F);
         } else {
             // Insert after the specified dependency - position it between that dependency and the next
-            positions.put(dependencyTag, positions.get(afterDependency) + 0.5f);
+            positions.put(dependencyTag, positions.get(afterDependency) + 0.5F);
         }
     }
 

@@ -143,7 +143,7 @@ public class UnfoldProperties extends Recipe {
                 List<String> result = new ArrayList<>();
                 List<String> parts = Arrays.asList(key.split("\\."));
                 outer:
-                for (int i = 0; i < parts.size(); ) {
+                for (int i = 0; i < parts.size(); i++) {
                     for (String group : keepTogether) {
                         List<String> groupParts = Arrays.asList(group.split("\\."));
                         if (i + groupParts.size() <= parts.size()) {
@@ -156,7 +156,6 @@ public class UnfoldProperties extends Recipe {
                         }
                     }
                     result.add(parts.get(i));
-                    i++;
                 }
 
                 if (!applyTo.isEmpty()) {
@@ -209,7 +208,7 @@ public class UnfoldProperties extends Recipe {
                     List<String> firstBracketMatches = matches(key, valueOfFirstBracket, parentKey);
                     for (String firstBracketMatch : firstBracketMatches) {
                         if (key.startsWith(firstBracketMatch) && key.length() > firstBracketMatch.length()) {
-                            result.addAll(matches(key.substring(firstBracketMatch.length() + 1), secondBracket, (!parentKey.isEmpty() ? parentKey + "." : parentKey) + valueOfFirstBracket));
+                            result.addAll(matches(key.substring(firstBracketMatch.length() + 1), secondBracket, (parentKey.isEmpty() ? parentKey : parentKey + ".") + valueOfFirstBracket));
                         }
                     }
                     // For nested entries, check if parentKey already satisfies the first bracket condition

@@ -130,7 +130,7 @@ class AutoFormatTest implements RewriteTest {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                     J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                    if (m.getSimpleName().equals("bar")) {
+                    if ("bar".equals(m.getSimpleName())) {
                         return autoFormat(m, ctx);
                     }
                     return m;

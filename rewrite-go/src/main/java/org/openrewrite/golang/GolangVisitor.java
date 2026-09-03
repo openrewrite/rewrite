@@ -17,11 +17,11 @@ package org.openrewrite.golang;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
+import org.openrewrite.golang.marker.TrailingComma;
+import org.openrewrite.golang.tree.Go;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.golang.marker.TrailingComma;
-import org.openrewrite.golang.tree.Go;
 import org.openrewrite.marker.Marker;
 
 public class GolangVisitor<P> extends JavaVisitor<P> {

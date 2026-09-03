@@ -62,17 +62,17 @@ public class BlankLinesVisitor<P> extends GolangVisitor<P> {
                     sb.append(c);
                 }
                 // skip additional newlines and any whitespace between them
-            } else if (c == '\r') {
-                // skip \r (handled by NormalizeLineBreaks)
-            } else if (c == ' ' || c == '\t') {
-                if (consecutiveNewlines > 2) {
-                    // skip whitespace in collapsed blank lines
+            } else if (c != '\r') {
+     if (c == ' ' || c == '\t') {
+                    if (consecutiveNewlines <= 2) {
+                        sb.append(c);
+                        // skip whitespace in collapsed blank lines
+                    }
                 } else {
+                    consecutiveNewlines = 0;
                     sb.append(c);
                 }
-            } else {
-                consecutiveNewlines = 0;
-                sb.append(c);
+                // skip \r (handled by NormalizeLineBreaks)
             }
         }
         // Preserve original indentation after last newline

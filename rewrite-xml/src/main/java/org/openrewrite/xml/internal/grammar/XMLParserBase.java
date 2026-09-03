@@ -36,7 +36,7 @@ public abstract class XMLParserBase extends Parser {
      * parser driver for HTML-like sources (.jsp, .html, ...). Defaults to {@code false} so that strict XML
      * parsing is unaffected.
      */
-    public boolean htmlMode = false;
+    public boolean htmlMode;
 
     private static final Set<String> VOID_ELEMENTS = new HashSet<>(Arrays.asList(
             "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"));

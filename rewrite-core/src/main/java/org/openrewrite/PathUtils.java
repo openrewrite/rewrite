@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 
-public class PathUtils {
+public final class PathUtils {
     private PathUtils() {
     }
 
@@ -203,8 +203,8 @@ public class PathUtils {
             }
             // Find the pattern between pattIdxStart & pattIdxTmp in path between
             // pathIdxStart & pathIdxEnd
-            int patLength = (patIdxTmp - pattIdxStart - 1);
-            int strLength = (pathIdxEnd - pathIdxStart + 1);
+            int patLength = patIdxTmp - pattIdxStart - 1;
+            int strLength = pathIdxEnd - pathIdxStart + 1;
             int foundIdx = -1;
             strLoop:
             for (int i = 0; i <= strLength - patLength; i++) {

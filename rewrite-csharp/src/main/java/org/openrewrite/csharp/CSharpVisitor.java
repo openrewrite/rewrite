@@ -1344,7 +1344,7 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
             return null;
         }
 
-        return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
+        return before == left.getBefore() && t == left.getElement() ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
     public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, CsRightPadded.Location loc, P p) {
@@ -1369,7 +1369,7 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
 
         Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
         Markers markers = visitMarkers(right.getMarkers(), p);
-        return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
+        return after == right.getAfter() && t == right.getElement() && markers == right.getMarkers() ?
                 right : new JRightPadded<>(t, after, markers);
     }
 

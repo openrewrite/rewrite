@@ -226,7 +226,9 @@ public final class PackageJsonOverrides {
         } else {
             StringBuilder sb = new StringBuilder();
             for (DependencyPathSegment seg : path) {
-                if (sb.length() > 0) sb.append(">");
+                if (sb.length() > 0) {
+                    sb.append(">");
+                }
                 sb.append(seg.getVersion() != null ? seg.getName() + "@" + seg.getVersion() : seg.getName());
             }
             sb.append(">").append(packageName);
@@ -247,7 +249,9 @@ public final class PackageJsonOverrides {
                                                String topLevelKey,
                                                String entryKey,
                                                String entryValue) {
-        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
         Json.JsonObject root = (Json.JsonObject) doc.getValue();
 
         Json.JsonObject existingScope = findObjectMember(root, topLevelKey);
@@ -281,7 +285,9 @@ public final class PackageJsonOverrides {
      * {@code pnpm.overrides} objects as needed. Preserves formatting.
      */
     private static Json.Document setPnpmOverridesEntry(Json.Document doc, String key, String value) {
-        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
         Json.JsonObject root = (Json.JsonObject) doc.getValue();
 
         Json.JsonObject pnpmObj = findObjectMember(root, "pnpm");

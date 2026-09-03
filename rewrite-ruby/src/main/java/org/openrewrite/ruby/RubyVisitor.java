@@ -15,9 +15,9 @@
  */
 package org.openrewrite.ruby;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.ruby.tree.Rb;

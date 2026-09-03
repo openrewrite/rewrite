@@ -30,7 +30,7 @@ import java.util.Locale;
  * Only valid for indexes hosted on pypi.org; returns null on any failure so callers
  * always fall back to the Simple API.
  */
-public class PypiJsonApi {
+public final class PypiJsonApi {
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 

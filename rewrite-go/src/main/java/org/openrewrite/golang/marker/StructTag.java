@@ -40,7 +40,7 @@ public class StructTag implements Marker, RpcCodec<StructTag> {
     @Override
     public StructTag rpcReceive(StructTag before, RpcReceiveQueue q) {
         UUID id = q.receiveAndGet(before.getId(), UUID::fromString);
-        String valueSource = q.<String, String>receiveAndGet(
+        String valueSource = q.receiveAndGet(
                 before.getTag() != null ? before.getTag().getValueSource() : null, s -> s);
         J.Literal tag;
         if (before.getTag() != null) {

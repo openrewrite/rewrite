@@ -130,7 +130,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         abstract class SharedTests {
             private final @Nullable Boolean onlyDirect;
 
-            public SharedTests(@Nullable Boolean onlyDirect) {
+            protected SharedTests(@Nullable Boolean onlyDirect) {
                 this.onlyDirect = onlyDirect;
             }
 
@@ -265,7 +265,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         abstract class SharedOnlyDirectDisabledTests {
             private final @Nullable Boolean onlyDirect;
 
-            public SharedOnlyDirectDisabledTests(@Nullable Boolean onlyDirect) {
+            protected SharedOnlyDirectDisabledTests(@Nullable Boolean onlyDirect) {
                 this.onlyDirect = onlyDirect;
             }
 
@@ -365,7 +365,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         abstract class SharedOnlyDirectEnabledTests {
             private final @Nullable Boolean onlyDirect;
 
-            public SharedOnlyDirectEnabledTests(@Nullable Boolean onlyDirect) {
+            protected SharedOnlyDirectEnabledTests(@Nullable Boolean onlyDirect) {
                 this.onlyDirect = onlyDirect;
             }
 

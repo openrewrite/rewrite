@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  * packaging's {@code _cmpkey} exactly, including trailing-zero-trimmed release comparison,
  * dev/pre/post sentinel ordering and per-segment local version comparison.
  */
-public class PythonVersion implements Comparable<PythonVersion> {
+public final class PythonVersion implements Comparable<PythonVersion> {
     // Port of packaging's VERSION_PATTERN, full-matched with surrounding whitespace allowed.
     private static final Pattern PATTERN = Pattern.compile(
             "[\\p{IsWhite_Space}]*" +

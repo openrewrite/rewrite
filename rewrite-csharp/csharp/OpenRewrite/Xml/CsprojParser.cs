@@ -57,7 +57,7 @@ public class CsprojParser
     /// </summary>
     public IList<Document> ParseAll(IList<(string sourceStr, string sourcePath)> files)
     {
-        if (files.Count == 0) return [];
+        if (files.Count == 0){ return [];}
 
         string? tempDir = null;
         try
@@ -71,7 +71,7 @@ public class CsprojParser
             {
                 var filePath = Path.Combine(tempDir, sourcePath);
                 var dir = Path.GetDirectoryName(filePath);
-                if (dir != null) Directory.CreateDirectory(dir);
+                if (dir != null){ Directory.CreateDirectory(dir);}
                 File.WriteAllText(filePath, sourceStr);
             }
 
@@ -83,16 +83,16 @@ public class CsprojParser
                 if (IsProjectFile(sourcePath))
                 {
                     var marker = MSBuildProjectHelper.CreateMarker(doc, tempDir);
-                    if (marker != null)
-                        doc = doc.WithMarkers(doc.Markers.Add(marker));
+                    if (marker != null){
+                        doc = doc.WithMarkers(doc.Markers.Add(marker));}
                 }
                 else if (Accept(sourcePath))
                 {
                     // props/targets carry a basic marker (no restore attempt) — recipes use
                     // marker presence as the "this is an MSBuild build file" gate.
                     var marker = MSBuildProjectHelper.CreateMarker(doc);
-                    if (marker != null)
-                        doc = doc.WithMarkers(doc.Markers.Add(marker));
+                    if (marker != null){
+                        doc = doc.WithMarkers(doc.Markers.Add(marker));}
                 }
                 results.Add(doc);
             }
@@ -110,8 +110,8 @@ public class CsprojParser
                 if (Accept(sourcePath))
                 {
                     var marker = MSBuildProjectHelper.CreateMarker(doc);
-                    if (marker != null)
-                        doc = doc.WithMarkers(doc.Markers.Add(marker));
+                    if (marker != null){
+                        doc = doc.WithMarkers(doc.Markers.Add(marker));}
                 }
                 results.Add(doc);
             }

@@ -32,11 +32,7 @@ import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
-import static org.openrewrite.golang.Assertions.expectMethodType;
-import static org.openrewrite.golang.Assertions.expectType;
-import static org.openrewrite.golang.Assertions.go;
-import static org.openrewrite.golang.Assertions.goMod;
-import static org.openrewrite.golang.Assertions.goProject;
+import static org.openrewrite.golang.Assertions.*;
 
 /**
  * A recipe that matches calls into a dependency needs those calls attributed, and the go.mod

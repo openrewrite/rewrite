@@ -28,7 +28,7 @@ internal static class Placeholder
 
     public static string? FromPlaceholder(string identifier)
     {
-        if (!IsPlaceholder(identifier)) return null;
+        if (!IsPlaceholder(identifier)){ return null;}
         return identifier[Prefix.Length..^Suffix.Length];
     }
 

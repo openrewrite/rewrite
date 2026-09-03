@@ -53,7 +53,7 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.invalid;
 
 public class YamlResourceLoader implements ResourceLoader {
-    int refCount = 0;
+    int refCount;
 
     private static final PropertyPlaceholderHelper propertyPlaceholderHelper =
             new PropertyPlaceholderHelper("${", "}", ":");
@@ -299,7 +299,7 @@ public class YamlResourceLoader implements ResourceLoader {
                         Map<String, Object> maintainerMap = (Map<String, Object>) rawMaintainer;
                         String maintainerName = (String) maintainerMap.get("maintainer");
                         String logoString = (String) maintainerMap.get("logo");
-                        URI logo = (logoString == null) ? null : URI.create(logoString);
+                        URI logo = logoString == null ? null : URI.create(logoString);
                         maintainers.add(new Maintainer(maintainerName, logo));
                     }
                 }

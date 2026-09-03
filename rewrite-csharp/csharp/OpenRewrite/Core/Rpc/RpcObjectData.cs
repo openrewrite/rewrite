@@ -34,11 +34,11 @@ public sealed class RpcObjectData
 
     public T? GetValue<T>()
     {
-        if (Value is null)
-            return default;
+        if (Value is null){
+            return default;}
 
-        if (Value is T t)
-            return t;
+        if (Value is T t){
+            return t;}
 
         throw new InvalidOperationException(
             $"Cannot convert value of type {Value.GetType()} to {typeof(T).Name}");

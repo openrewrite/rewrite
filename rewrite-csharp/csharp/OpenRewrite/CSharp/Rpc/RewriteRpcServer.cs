@@ -269,7 +269,7 @@ public class RewriteRpcServer
         using var globalJsonGuard = GlobalJsonGuard.Neutralize(rootDir);
 
         var requirePrintEqualsInput = true;
-        if (request.Options?.TryGetValue("org.openrewrite.requirePrintEqualsInput", out var val) == true)
+        if (request.Options?.TryGetValue("org.openrewrite.requirePrintEqualsInput", out var val))
         {
             // SystemTextJsonFormatter delivers object-typed option values as JsonElement.
             requirePrintEqualsInput = val switch
@@ -292,8 +292,8 @@ public class RewriteRpcServer
         var projectIndex = 0;
         foreach (var project in projectList)
         {
-            if (!seenProjects.Add(project.FilePath!))
-                continue;
+            if (!seenProjects.Add(project.FilePath!)){
+                continue;}
 
             projectIndex++;
             Log.Debug("RPC ParseSolution: parsing project [{ProjectIndex}/{ProjectCount}] {ProjectName}",
@@ -353,8 +353,8 @@ public class RewriteRpcServer
                 var marker = solutionParser.RestoredLockFiles.TryGetValue(projectFullPath, out var lockFile)
                     ? MSBuildProjectHelper.CreateMarker(csprojDoc, lockFile, Path.GetDirectoryName(projectFullPath)!)
                     : MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
-                if (marker != null)
-                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
+                if (marker != null){
+                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));}
                 _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
                 response.Items.Add(new ParseSolutionResponseItem
                 {
@@ -404,10 +404,10 @@ public class RewriteRpcServer
         var fullPath = Path.GetFullPath(path);
         if (OperatingSystem.IsMacOS())
         {
-            if (fullPath.StartsWith("/var/"))
-                fullPath = "/private" + fullPath;
-            else if (fullPath.StartsWith("/tmp/"))
-                fullPath = "/private" + fullPath;
+            if (fullPath.StartsWith("/var/")){
+                fullPath = "/private" + fullPath;}
+            else if (fullPath.StartsWith("/tmp/")){
+                fullPath = "/private" + fullPath;}
         }
         return fullPath;
     }
@@ -607,10 +607,10 @@ public class RewriteRpcServer
                 _ => Core.MarkerPrinter.Default
             };
             var capture = new PrintOutputCapture<int>(0, markerPrinter);
-            if (tree is OpenRewrite.Xml.Xml)
-                new OpenRewrite.Xml.XmlPrinter<int>().Visit((OpenRewrite.Xml.Xml)tree, capture);
-            else
-                new CSharpPrinter<int>().Visit(tree, capture);
+            if (tree is OpenRewrite.Xml.Xml){
+                new OpenRewrite.Xml.XmlPrinter<int>().Visit((OpenRewrite.Xml.Xml)tree, capture);}
+            else{
+                new CSharpPrinter<int>().Visit(tree, capture);}
             return capture.ToString();
         }
         catch (Exception ex)
@@ -661,7 +661,7 @@ public class RewriteRpcServer
                 {
                     var next = q.Take();
                     remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
-                    if (next.State == END_OF_OBJECT) break;
+                    if (next.State == END_OF_OBJECT){ break;}
                 }
                 catch { break; }
             }
@@ -972,8 +972,8 @@ public class RewriteRpcServer
     {
         var stagingCsproj = EnsureRecipesProject(packageName, ".staging");
         var addArgs = $"add \"{stagingCsproj}\" package {packageName}";
-        if (!string.IsNullOrWhiteSpace(requestedVersion))
-            addArgs += $" --version {requestedVersion}";
+        if (!string.IsNullOrWhiteSpace(requestedVersion)){
+            addArgs += $" --version {requestedVersion}";}
         RunDotnet(addArgs);
 
         // dotnet add package preserves the requested constraint verbatim in the csproj;
@@ -1058,12 +1058,12 @@ public class RewriteRpcServer
             var assemblyFileName = Path.GetFileNameWithoutExtension(dll);
 
             // Skip assemblies already loaded in the host
-            if (hostAssemblyNames.Contains(assemblyFileName))
-                continue;
+            if (hostAssemblyNames.Contains(assemblyFileName)){
+                continue;}
 
             // Skip well-known framework/SDK assemblies that don't contain recipes
-            if (IsFrameworkAssembly(assemblyFileName))
-                continue;
+            if (IsFrameworkAssembly(assemblyFileName)){
+                continue;}
 
             try
             {
@@ -1104,8 +1104,8 @@ public class RewriteRpcServer
             .FirstOrDefault(a => string.Equals(a.Name, "OpenRewrite.CSharp",
                 StringComparison.OrdinalIgnoreCase));
 
-        if (openRewriteRef?.Version == null || hostVersion == null)
-            return;
+        if (openRewriteRef?.Version == null || hostVersion == null){
+            return;}
 
         var pluginRefVersion = openRewriteRef.Version;
         if (pluginRefVersion.Major != hostVersion.Major ||
@@ -1500,14 +1500,14 @@ public class RewriteRpcServer
         {
             // Parse visitor name and instantiate
             var parts = item.Visitor.Split(':', 2);
-            if (parts.Length != 2)
-                throw new ArgumentException($"Invalid visitor name format: {item.Visitor}");
+            if (parts.Length != 2){
+                throw new ArgumentException($"Invalid visitor name format: {item.Visitor}");}
 
             var phase = parts[0];
             var recipeId = parts[1];
 
-            if (!_preparedRecipes.TryGetValue(recipeId, out var recipe))
-                throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
+            if (!_preparedRecipes.TryGetValue(recipeId, out var recipe)){
+                throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");}
 
             ITreeVisitor<ExecutionContext> visitor;
             if (recipe is IScanningRecipe scanning)
@@ -1526,7 +1526,7 @@ public class RewriteRpcServer
 
             var modified = !ReferenceEquals(tree, result);
             var deleted = result == null;
-            if (modified) modifiedCount++;
+            if (modified){ modifiedCount++;}
 
 
             // Diff SearchResult IDs against the running set
@@ -1593,7 +1593,7 @@ public class RewriteRpcServer
     private static HashSet<string> CollectSearchResultIds(Tree? tree)
     {
         var ids = new HashSet<string>();
-        if (tree == null) return ids;
+        if (tree == null){ return ids;}
 
         new SearchResultCollector(ids).Visit(tree, 0);
         return ids;
@@ -1699,8 +1699,8 @@ public class RewriteRpcServer
             }
         ).GetAwaiter().GetResult();
 
-        if (response.Count == 0)
-            throw new InvalidOperationException($"Parse returned no results for {sourcePath}");
+        if (response.Count == 0){
+            throw new InvalidOperationException($"Parse returned no results for {sourcePath}");}
 
         var id2 = response[0];
         return (SourceFile)GetObjectFromRemoteAsync(id2, sourceFileType).GetAwaiter().GetResult();
@@ -1889,8 +1889,8 @@ public class RewriteRpcServer
     /// </summary>
     private object? GetOrCreateAccumulator(string recipeId, IScanningRecipe recipe, ExecutionContext ctx)
     {
-        if (_recipeAccumulators.TryGetValue(recipeId, out var acc))
-            return acc;
+        if (_recipeAccumulators.TryGetValue(recipeId, out var acc)){
+            return acc;}
         
         acc = recipe.InitialValue(ctx);
         _recipeAccumulators[recipeId] = acc;
@@ -2198,10 +2198,10 @@ public sealed class DurationWireConverter : JsonConverter<string?>
 
     public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options)
     {
-        if (value is null)
-            writer.WriteNullValue();
-        else
-            writer.WriteStringValue(value);
+        if (value is null){
+            writer.WriteNullValue();}
+        else{
+            writer.WriteStringValue(value);}
     }
 }
 

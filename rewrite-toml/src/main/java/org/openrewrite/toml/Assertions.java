@@ -23,7 +23,7 @@ import org.openrewrite.toml.tree.Toml;
 
 import java.util.function.Consumer;
 
-public class Assertions {
+public final class Assertions {
     private Assertions() {
     }
 

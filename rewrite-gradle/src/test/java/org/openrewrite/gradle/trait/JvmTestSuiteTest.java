@@ -155,7 +155,7 @@ class JvmTestSuiteTest implements RewriteTest {
         @Test
         void addDependency() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe((recipe) -> new JvmTestSuite.Matcher().asVisitor((suite, ctx) ->
+              spec -> spec.recipe(RewriteTest.toRecipe(recipe -> new JvmTestSuite.Matcher().asVisitor((suite, ctx) ->
                 suite.addDependency("implementation", "com.google.guava", "guava", "29.0-jre", null, null, null, new MavenMetadataFailures(recipe), null, ctx).visitNonNull(suite.getTree(), ctx, suite.getCursor().getParentOrThrow())))),
               buildGradle(
                 """
@@ -348,7 +348,7 @@ class JvmTestSuiteTest implements RewriteTest {
         @Test
         void addDependency() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe((recipe) -> new JvmTestSuite.Matcher().asVisitor((suite, ctx) ->
+              spec -> spec.recipe(RewriteTest.toRecipe(recipe -> new JvmTestSuite.Matcher().asVisitor((suite, ctx) ->
                 suite.addDependency("implementation", "com.google.guava", "guava", "29.0-jre", null, null, null, new MavenMetadataFailures(recipe), null, ctx).visitNonNull(suite.getTree(), ctx, suite.getCursor().getParentOrThrow())))),
               buildGradleKts(
                 """

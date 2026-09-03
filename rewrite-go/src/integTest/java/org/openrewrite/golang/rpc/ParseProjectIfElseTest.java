@@ -92,8 +92,8 @@ class ParseProjectIfElseTest {
                 .collect(toList());
 
         List<ParseError> parseErrors = sources.stream()
-                .filter(s -> s instanceof ParseError)
-                .map(s -> (ParseError) s)
+                .filter(ParseError.class::isInstance)
+                .map(ParseError.class::cast)
                 .collect(toList());
 
         assertThat(parseErrors)

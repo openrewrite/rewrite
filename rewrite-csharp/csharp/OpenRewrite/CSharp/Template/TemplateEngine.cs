@@ -85,8 +85,8 @@ internal static class TemplateEngine
         // Compute preamble first — it affects the scaffold shape and must be part of the cache key
         var preamble = BuildScaffoldPreamble(captures);
         var cacheKey = BuildCacheKey(code, preamble, usings, context, dependencies, scaffoldKind);
-        if (GlobalCache.TryGetValue(cacheKey, out var cached))
-            return cached;
+        if (GlobalCache.TryGetValue(cacheKey, out var cached)){
+            return cached;}
 
         var result = ParseInternal(code, preamble, usings, context, dependencies, scaffoldKind);
         GlobalCache.TryAdd(cacheKey, result);
@@ -176,17 +176,17 @@ internal static class TemplateEngine
                     if (typeParamBounds.TryGetValue(name, out var existingBounds))
                     {
                         // Same name already declared — check for conflicts
-                        if (!string.Equals(existingBounds, bounds, StringComparison.Ordinal))
+                        if (!string.Equals(existingBounds, bounds, StringComparison.Ordinal)){
                             throw new InvalidOperationException(
                                 $"Conflicting bounds for type parameter '{name}': " +
-                                $"'{existingBounds ?? "(none)"}' vs '{bounds ?? "(none)"}'");
+                                $"'{existingBounds ?? "(none)"}' vs '{bounds ?? "(none)"}'");}
                     }
                     else
                     {
                         typeParamBounds[name] = bounds;
                         typeParamNames.Add(name);
-                        if (bounds != null)
-                            whereClauses.Add($"where {name} : {bounds}");
+                        if (bounds != null){
+                            whereClauses.Add($"where {name} : {bounds}");}
                     }
                 }
             }
@@ -234,10 +234,10 @@ internal static class TemplateEngine
 
         foreach (var u in usings)
         {
-            if (u.TrimStart().StartsWith("using "))
-                sb.AppendLine(u);
-            else
-                sb.AppendLine($"using {u};");
+            if (u.TrimStart().StartsWith("using ")){
+                sb.AppendLine(u);}
+            else{
+                sb.AppendLine($"using {u};");}
         }
 
         foreach (var c in context)
@@ -279,8 +279,8 @@ internal static class TemplateEngine
                 sb.Append("    ");
                 sb.Append(code);
                 var trimmedMember = code.TrimEnd();
-                if (trimmedMember.Length > 0 && trimmedMember[^1] != ';' && trimmedMember[^1] != '}')
-                    sb.Append(';');
+                if (trimmedMember.Length > 0 && trimmedMember[^1] != ';' && trimmedMember[^1] != '}'){
+                    sb.Append(';');}
                 sb.AppendLine();
                 break;
 
@@ -296,8 +296,8 @@ internal static class TemplateEngine
                 sb.Append("        ");
                 sb.Append(code);
                 var trimmed = code.TrimEnd();
-                if (trimmed.Length > 0 && trimmed[^1] != ';' && trimmed[^1] != '}')
-                    sb.Append(';');
+                if (trimmed.Length > 0 && trimmed[^1] != ';' && trimmed[^1] != '}'){
+                    sb.Append(';');}
                 sb.AppendLine();
                 sb.AppendLine("    }");
                 break;
@@ -315,8 +315,8 @@ internal static class TemplateEngine
     private static J ExtractTemplateNode(CompilationUnit cu, string originalCode, ScaffoldKind? scaffoldKind)
     {
         var classDecl = FindFirst<ClassDeclaration>(cu.Members);
-        if (classDecl == null)
-            throw new InvalidOperationException("Template scaffold did not produce a class declaration");
+        if (classDecl == null){
+            throw new InvalidOperationException("Template scaffold did not produce a class declaration");}
 
         switch (scaffoldKind)
         {
@@ -347,19 +347,19 @@ internal static class TemplateEngine
     {
         var methodDecl = FindFirst<MethodDeclaration>(classDecl.Body.Statements
             .Select(s => s.Element).ToList());
-        if (methodDecl?.Body == null)
-            throw new InvalidOperationException("Template scaffold did not produce a method declaration");
+        if (methodDecl?.Body == null){
+            throw new InvalidOperationException("Template scaffold did not produce a method declaration");}
 
         var statements = methodDecl.Body.Statements;
-        if (statements.Count == 0)
-            throw new InvalidOperationException("Template code did not produce any statements");
+        if (statements.Count == 0){
+            throw new InvalidOperationException("Template code did not produce any statements");}
 
         if (statements.Count == 1)
         {
             var stmt = statements[0].Element;
             // Unwrap ExpressionStatement to get the inner expression
-            if (stmt is ExpressionStatement es)
-                return StripPrefix(es.Expression);
+            if (stmt is ExpressionStatement es){
+                return StripPrefix(es.Expression);}
 
             return StripPrefix(stmt);
         }
@@ -376,15 +376,15 @@ internal static class TemplateEngine
     {
         var methodDecl = FindFirst<MethodDeclaration>(classDecl.Body.Statements
             .Select(s => s.Element).ToList());
-        if (methodDecl?.Body == null)
-            throw new InvalidOperationException("Template scaffold did not produce a method declaration");
+        if (methodDecl?.Body == null){
+            throw new InvalidOperationException("Template scaffold did not produce a method declaration");}
 
         var statements = methodDecl.Body.Statements;
-        if (statements.Count == 0)
-            throw new InvalidOperationException("Template code did not produce any statements");
+        if (statements.Count == 0){
+            throw new InvalidOperationException("Template code did not produce any statements");}
 
-        if (statements.Count == 1)
-            return StripPrefix(statements[0].Element);
+        if (statements.Count == 1){
+            return StripPrefix(statements[0].Element);}
 
         return methodDecl.Body.WithMarkers(
             methodDecl.Body.Markers.Add(SyntheticBlockContainer.Instance));
@@ -405,8 +405,8 @@ internal static class TemplateEngine
                 if (namedVar?.Name.SimpleName == "__v__")
                 {
                     var initializer = namedVar.Initializer;
-                    if (initializer == null)
-                        throw new InvalidOperationException("Template scaffold field __v__ has no initializer");
+                    if (initializer == null){
+                        throw new InvalidOperationException("Template scaffold field __v__ has no initializer");}
                     return StripPrefix(initializer.Element);
                 }
             }
@@ -426,11 +426,11 @@ internal static class TemplateEngine
             .Where(s => !IsPreambleField(s.Element))
             .ToList();
 
-        if (members.Count == 0)
-            throw new InvalidOperationException("Template code did not produce any class members");
+        if (members.Count == 0){
+            throw new InvalidOperationException("Template code did not produce any class members");}
 
-        if (members.Count == 1)
-            return StripPrefix(members[0].Element);
+        if (members.Count == 1){
+            return StripPrefix(members[0].Element);}
 
         // Multiple members: return the class body with preamble fields removed
         return classDecl.Body.WithStatements(members);
@@ -447,14 +447,14 @@ internal static class TemplateEngine
         {
             if (padded.Element is AnnotatedStatement annotated)
             {
-                if (annotated.AttributeLists.Count == 0)
+                if (annotated.AttributeLists.Count == 0){
                     throw new InvalidOperationException(
-                        "Template scaffold produced an annotated method with no attribute lists");
+                        "Template scaffold produced an annotated method with no attribute lists");}
 
                 var attrList = annotated.AttributeLists[0];
-                if (attrList.Attributes.Count == 0)
+                if (attrList.Attributes.Count == 0){
                     throw new InvalidOperationException(
-                        "Template scaffold produced an attribute list with no attributes");
+                        "Template scaffold produced an attribute list with no attributes");}
 
                 return StripPrefix(attrList.Attributes[0].Element);
             }
@@ -491,8 +491,8 @@ internal static class TemplateEngine
         if (stmt is VariableDeclarations varDecl)
         {
             var name = varDecl.Variables.FirstOrDefault()?.Element.Name;
-            if (name != null && Placeholder.FromPlaceholder(name.SimpleName) != null)
-                return true;
+            if (name != null && Placeholder.FromPlaceholder(name.SimpleName) != null){
+                return true;}
         }
         return false;
     }
@@ -501,7 +501,7 @@ internal static class TemplateEngine
     {
         foreach (var stmt in statements)
         {
-            if (stmt is T t) return t;
+            if (stmt is T t){ return t;}
         }
         return default;
     }
@@ -510,7 +510,7 @@ internal static class TemplateEngine
     {
         foreach (var padded in statements)
         {
-            if (padded.Element is T t) return t;
+            if (padded.Element is T t){ return t;}
         }
         return default;
     }
@@ -522,8 +522,8 @@ internal static class TemplateEngine
     private static J StripPrefix(J node)
     {
         // ExpressionStatement delegates prefix to its inner expression
-        if (node is ExpressionStatement es)
-            return es.WithExpression((Expression)StripPrefix(es.Expression));
+        if (node is ExpressionStatement es){
+            return es.WithExpression((Expression)StripPrefix(es.Expression));}
 
         return J.SetPrefix(node, Space.Empty);
     }
@@ -578,20 +578,20 @@ internal static class TemplateEngine
     internal static J AutoFormat(J tree, Cursor cursor)
     {
         var cu = cursor.FirstEnclosing<CompilationUnit>();
-        if (cu == null)
-            return tree;
+        if (cu == null){
+            return tree;}
 
         // The cursor's value is the original node being replaced.
         // Unwrap JRightPadded/JLeftPadded if the cursor points to a padding wrapper.
         var original = cursor.Value as J ?? UnwrapPaddingElement(cursor.Value);
-        if (original == null)
-            return tree;
+        if (original == null){
+            return tree;}
 
         // Synthetic block containers hold multiple statements that will be spliced
         // into the parent block. Format each statement individually at the parent level
         // so Roslyn sees them as direct siblings, not block-internal children.
-        if (tree is Block blk && blk.Markers.FindFirst<SyntheticBlockContainer>() != null)
-            return AutoFormatSyntheticBlock(blk, cu, original);
+        if (tree is Block blk && blk.Markers.FindFirst<SyntheticBlockContainer>() != null){
+            return AutoFormatSyntheticBlock(blk, cu, original);}
 
         return AutoFormatSingle(tree, cu, original);
     }
@@ -742,8 +742,8 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
         if (selectCaptureName != null && mi.Markers.FindFirst<NullSafe>() == null)
         {
             var nullSafe = _values.GetNullSafe(selectCaptureName);
-            if (nullSafe != null)
-                mi = mi.WithMarkers(mi.Markers.Add(nullSafe));
+            if (nullSafe != null){
+                mi = mi.WithMarkers(mi.Markers.Add(nullSafe));}
         }
 
         // Substitute variadic placeholder in arguments
@@ -778,8 +778,8 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
         if (targetCaptureName != null && fieldAccess.Markers.FindFirst<NullSafe>() == null)
         {
             var nullSafe = _values.GetNullSafe(targetCaptureName);
-            if (nullSafe != null)
-                fieldAccess = fieldAccess.WithMarkers(fieldAccess.Markers.Add(nullSafe));
+            if (nullSafe != null){
+                fieldAccess = fieldAccess.WithMarkers(fieldAccess.Markers.Add(nullSafe));}
         }
 
         return fieldAccess;
@@ -798,8 +798,8 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
         if (indexedCaptureName != null && arrayAccess.Markers.FindFirst<NullSafe>() == null)
         {
             var nullSafe = _values.GetNullSafe(indexedCaptureName);
-            if (nullSafe != null)
-                arrayAccess = arrayAccess.WithMarkers(arrayAccess.Markers.Add(nullSafe));
+            if (nullSafe != null){
+                arrayAccess = arrayAccess.WithMarkers(arrayAccess.Markers.Add(nullSafe));}
         }
 
         return arrayAccess;
@@ -826,16 +826,16 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
                     if (expanded == null)
                     {
                         expanded = new List<JRightPadded<Expression>>();
-                        for (int k = 0; k < i; k++)
-                            expanded.Add(elements[k]);
+                        for (int k = 0; k < i; k++){
+                            expanded.Add(elements[k]);}
                     }
                     // Expand captured args (may be empty, removing the placeholder)
                     for (int j = 0; j < capturedList.Count; j++)
                     {
                         var capturedArg = capturedList[j];
                         // First element inherits the placeholder's prefix
-                        if (j == 0)
-                            capturedArg = J.SetPrefix(capturedArg, ident.Prefix);
+                        if (j == 0){
+                            capturedArg = J.SetPrefix(capturedArg, ident.Prefix);}
                         expanded.Add(new JRightPadded<Expression>(
                             capturedArg, Space.Empty, Markers.Empty));
                     }
@@ -860,8 +860,8 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
     /// </summary>
     private Annotation ExpandVariadicAnnotationArgs(Annotation annotation)
     {
-        if (annotation.Arguments == null)
-            return annotation;
+        if (annotation.Arguments == null){
+            return annotation;}
 
         var elements = annotation.Arguments.Elements;
         List<JRightPadded<Expression>>? expanded = null;
@@ -878,14 +878,14 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
                     if (expanded == null)
                     {
                         expanded = new List<JRightPadded<Expression>>();
-                        for (int k = 0; k < i; k++)
-                            expanded.Add(elements[k]);
+                        for (int k = 0; k < i; k++){
+                            expanded.Add(elements[k]);}
                     }
                     for (int j = 0; j < capturedList.Count; j++)
                     {
                         var capturedArg = capturedList[j];
-                        if (j == 0)
-                            capturedArg = J.SetPrefix(capturedArg, ident.Prefix);
+                        if (j == 0){
+                            capturedArg = J.SetPrefix(capturedArg, ident.Prefix);}
                         expanded.Add(new JRightPadded<Expression>(
                             capturedArg, Space.Empty, Markers.Empty));
                     }

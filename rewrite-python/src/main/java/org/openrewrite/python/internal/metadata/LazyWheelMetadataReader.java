@@ -38,15 +38,15 @@ import java.util.zip.ZipInputStream;
  * record and central directory, then a ranged read of just the METADATA entry. When the server
  * ignores Range, the single full response is streamed instead — never a second full download.
  */
-public class LazyWheelMetadataReader {
+public final class LazyWheelMetadataReader {
     private static final int DEFAULT_TAIL_BYTES = 128 * 1024;
     private static final Pattern METADATA_ENTRY = Pattern.compile("[^/]+\\.dist-info/METADATA");
 
-    private static final long EOCD_SIG = 0x06054b50L;
-    private static final long CEN_SIG = 0x02014b50L;
-    private static final long LOC_SIG = 0x04034b50L;
-    private static final long ZIP64_EOCD_SIG = 0x06064b50L;
-    private static final long ZIP64_LOCATOR_SIG = 0x07064b50L;
+    private static final long EOCD_SIG = 0x06054B50L;
+    private static final long CEN_SIG = 0x02014B50L;
+    private static final long LOC_SIG = 0x04034B50L;
+    private static final long ZIP64_EOCD_SIG = 0x06064B50L;
+    private static final long ZIP64_LOCATOR_SIG = 0x07064B50L;
 
     private LazyWheelMetadataReader() {
     }

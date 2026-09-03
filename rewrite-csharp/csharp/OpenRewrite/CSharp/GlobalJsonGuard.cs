@@ -86,10 +86,10 @@ internal sealed class GlobalJsonGuard : IDisposable
                         continue;
                     }
 
-                    if (!File.Exists(file))
+                    if (!File.Exists(file)){
                         continue; // Absent (e.g. left over from a prior crash) — git recovery handles it.
 
-                    var bytes = File.ReadAllBytes(file);
+                    }var bytes = File.ReadAllBytes(file);
                     File.Delete(file);
                     Active[file] = new Entry { RefCount = 1, Bytes = bytes };
                     guard._heldPaths.Add(file);
@@ -112,8 +112,8 @@ internal sealed class GlobalJsonGuard : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_disposed)
-            return;
+        if (_disposed){
+            return;}
         _disposed = true;
 
         foreach (var file in _heldPaths)
@@ -122,12 +122,14 @@ internal sealed class GlobalJsonGuard : IDisposable
             {
                 lock (Sync)
                 {
-                    if (!Active.TryGetValue(file, out var entry))
-                        continue;
+                    if (!Active.TryGetValue(file, out var entry)){
+                        continue;}
 
                     entry.RefCount--;
-                    if (entry.RefCount > 0)
+                    if (entry.RefCount > 0){
                         continue; // Another guard still needs it gone.
+
+                    } // Another guard still needs it gone.
 
                     Active.Remove(file);
 
@@ -162,13 +164,13 @@ internal sealed class GlobalJsonGuard : IDisposable
         try
         {
             var workDir = GitCli.DiscoverWorkTree(rootDir);
-            if (workDir == null)
+            if (workDir == null){
                 return; // Not inside a git repository — nothing to recover.
 
-            if (!GitCli.HasHead(workDir))
+            }if (!GitCli.HasHead(workDir)){
                 return; // Unborn branch (no commits) — nothing is tracked yet.
 
-            var normRoot = RealPath(rootDir);
+            }var normRoot = RealPath(rootDir);
 
             // List the tracked global.json files (mirrors `git ls-files` filtered to
             // global.json) rather than scanning the whole working tree: there are only ever a
@@ -178,21 +180,21 @@ internal sealed class GlobalJsonGuard : IDisposable
                 var full = RealPath(Path.Combine(workDir, rel));
 
                 // Only recover files under the directory we were asked to guard.
-                if (!IsUnder(full, normRoot))
-                    continue;
+                if (!IsUnder(full, normRoot)){
+                    continue;}
 
-                if (File.Exists(full))
+                if (File.Exists(full)){
                     continue; // Present — not a leftover deletion.
 
-                lock (Sync)
+                }lock (Sync)
                 {
-                    if (Active.ContainsKey(full))
+                    if (Active.ContainsKey(full)){
                         continue; // An active guard removed this on purpose — don't fight it.
-                }
+                } }
 
                 // Force-restore the committed version into the working tree.
-                if (GitCli.RestoreFromHead(workDir, rel))
-                    Log.Debug("global.json: recovered {Path} from git (left deleted by a prior run)", full);
+                if (GitCli.RestoreFromHead(workDir, rel)){
+                    Log.Debug("global.json: recovered {Path} from git (left deleted by a prior run)", full);}
             }
         }
         catch (Exception ex)
@@ -213,8 +215,8 @@ internal sealed class GlobalJsonGuard : IDisposable
 
     private static IEnumerable<string> FindGlobalJsonFiles(string rootDir)
     {
-        if (!Directory.Exists(rootDir))
-            return Array.Empty<string>();
+        if (!Directory.Exists(rootDir)){
+            return Array.Empty<string>();}
         try
         {
             return Directory.EnumerateFiles(rootDir, FileName, SearchOption.AllDirectories)

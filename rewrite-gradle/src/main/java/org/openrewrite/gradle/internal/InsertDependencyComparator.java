@@ -51,7 +51,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
         }
 
         if (dependencies.isEmpty()) {
-            positions.put(dependencyToAdd, statements.size() + 0.5f);
+            positions.put(dependencyToAdd, statements.size() + 0.5F);
             return;
         }
 
@@ -77,7 +77,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
             if (!(s instanceof J.MethodInvocation || (s instanceof J.Return && ((J.Return) s).getExpression() instanceof J.MethodInvocation))) {
                 continue;
             }
-            positions.put(dependencyToAdd, positions.get(s) + (isFirst ? -0.5f : 0.5f));
+            positions.put(dependencyToAdd, positions.get(s) + (isFirst ? -0.5F : 0.5F));
             break;
         }
     }

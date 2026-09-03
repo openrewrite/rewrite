@@ -39,8 +39,8 @@ public class CSharpUnwrapParentheses<P> : CSharpVisitor<P>
             if (tree.Prefix.Equals(Space.Empty))
             {
                 var parent = Cursor.ParentTree.Value;
-                if (parent is Return or Throw)
-                    tree = J.SetPrefix(tree, Space.SingleSpace);
+                if (parent is Return or Throw){
+                    tree = J.SetPrefix(tree, Space.SingleSpace);}
             }
             return tree;
         }
@@ -53,19 +53,19 @@ public class CSharpUnwrapParentheses<P> : CSharpVisitor<P>
     /// </summary>
     public static bool IsUnwrappable(Cursor parensCursor)
     {
-        if (parensCursor.Value is not Parentheses<Expression> parens) return false;
+        if (parensCursor.Value is not Parentheses<Expression> parens){ return false;}
         var parent = parensCursor.ParentTree.Value;
 
         // Cannot unwrap structural parentheses required by control-flow statements
-        if (parent is If or Switch or WhileLoop or ForLoop or ForEachLoop or TypeCast) return false;
-        if (parent is DoWhileLoop doWhile && parens.Id == doWhile.Condition.Element.Id) return false;
+        if (parent is If or Switch or WhileLoop or ForLoop or ForEachLoop or TypeCast){ return false;}
+        if (parent is DoWhileLoop doWhile && parens.Id == doWhile.Condition.Element.Id){ return false;}
 
         // Cannot unwrap inside unary when inner is a compound expression
         if (parent is Unary or CsUnary)
         {
             var inner = parens.Tree.Element;
-            if (inner is Binary or CsBinary or Assignment or AssignmentOperation or Ternary or IsPattern)
-                return false;
+            if (inner is Binary or CsBinary or Assignment or AssignmentOperation or Ternary or IsPattern){
+                return false;}
         }
 
         // General case: delegate to precedence check
@@ -75,12 +75,12 @@ public class CSharpUnwrapParentheses<P> : CSharpVisitor<P>
             if (inner is Expression innerExpr)
             {
                 bool isRight = false;
-                if (parent is Binary parentBinary)
-                    isRight = parentBinary.Right.Id == parens.Id;
-                else if (parent is CsBinary parentCsBinary)
-                    isRight = parentCsBinary.Right.Id == parens.Id;
-                if (CSharpPrecedences.NeedsParentheses(innerExpr, parentExpr, isRight))
-                    return false;
+                if (parent is Binary parentBinary){
+                    isRight = parentBinary.Right.Id == parens.Id;}
+                else if (parent is CsBinary parentCsBinary){
+                    isRight = parentCsBinary.Right.Id == parens.Id;}
+                if (CSharpPrecedences.NeedsParentheses(innerExpr, parentExpr, isRight)){
+                    return false;}
             }
         }
 

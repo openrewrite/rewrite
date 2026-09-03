@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.semver.Semver.isVersion;
 
-public class SetRange extends LatestRelease {
+public final class SetRange extends LatestRelease {
     private static final Pattern SET_RANGE_PATTERN = Pattern.compile("([\\[(])(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)?\\s*,\\s*(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)?([\\])])");
 
     private final String upper;

@@ -76,8 +76,8 @@ public class CSharpTypeMappingTests : RewriteTest
 
         public override J VisitVariableDeclarations(VariableDeclarations multiVariable, int p)
         {
-            if (multiVariable.Variables.Any(v => v.Element.Name.SimpleName == name))
-                Found = multiVariable;
+            if (multiVariable.Variables.Any(v => v.Element.Name.SimpleName == name)){
+                Found = multiVariable;}
             return base.VisitVariableDeclarations(multiVariable, p);
         }
     }
@@ -153,7 +153,7 @@ public class CSharpTypeMappingTests : RewriteTest
         var tp1 = paramType.TypeParameters[1];
         Assert.True(
             tp1 is JavaType.Primitive { Kind: JavaType.Primitive.PrimitiveKind.Int } ||
-            TypeUtils.GetFullyQualifiedName(tp1)?.Contains("Int32") == true,
+            TypeUtils.GetFullyQualifiedName(tp1)?.Contains("Int32"),
             $"Expected int type but got: {tp1.GetType().Name}");
     }
 
@@ -186,13 +186,13 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.NotNull(dictClass!.Interfaces);
         var idict = dictClass.Interfaces!
             .Select(TypeUtils.AsClass)
-            .FirstOrDefault(c => c?.FullyQualifiedName.Contains("IDictionary") == true);
+            .FirstOrDefault(c => c?.FullyQualifiedName.Contains("IDictionary"));
         Assert.NotNull(idict);
 
         // Find the Parameterized form of the IDictionary interface
         var idictParam = dictClass.Interfaces!
             .OfType<JavaType.Parameterized>()
-            .FirstOrDefault(p => TypeUtils.GetFullyQualifiedName(p.Type)?.Contains("IDictionary") == true);
+            .FirstOrDefault(p => TypeUtils.GetFullyQualifiedName(p.Type)?.Contains("IDictionary"));
 
         // The interface should be parameterized with GenericTypeVariables
         // (TKey, TValue from the Dictionary definition), NOT concrete types
@@ -820,7 +820,7 @@ public class CSharpTypeMappingTests : RewriteTest
     {
         for (JavaType.Class? c = from; c != null; c = c.Supertype as JavaType.Class)
         {
-            if (c.FullyQualifiedName == fullyQualifiedName) return c;
+            if (c.FullyQualifiedName == fullyQualifiedName){ return c;}
         }
         throw new Xunit.Sdk.XunitException(
             $"{fullyQualifiedName} not found in the supertype chain of {from.FullyQualifiedName}");

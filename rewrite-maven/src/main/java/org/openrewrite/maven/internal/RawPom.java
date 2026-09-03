@@ -465,8 +465,8 @@ public class RawPom {
                     .dependencyManagement(mapDependencyManagement(getDependencyManagement()))
                     .repositories(mapRepositories(getRepositories()))
                     .pluginRepositories(mapPluginRepositories(getPluginRepositories()))
-                    .plugins(mapPlugins((build != null) ? build.getPlugins() : null))
-                    .pluginManagement(mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null));
+                    .plugins(mapPlugins(build != null ? build.getPlugins() : null))
+                    .pluginManagement(mapPlugins(build != null && build.getPluginManagement() != null ? build.getPluginManagement().getPlugins() : null));
         }
         return builder.build();
     }
@@ -503,8 +503,8 @@ public class RawPom {
                             mapDependencyManagement(p.getDependencyManagement()),
                             mapRepositories(p.getRepositories()),
                             mapPluginRepositories(p.getPluginRepositories()),
-                            mapPlugins((build != null) ? build.getPlugins() : null),
-                            mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
+                            mapPlugins(build != null ? build.getPlugins() : null),
+                            mapPlugins(build != null && build.getPluginManagement() != null ? build.getPluginManagement().getPlugins() : null)
                     ));
                 }
 

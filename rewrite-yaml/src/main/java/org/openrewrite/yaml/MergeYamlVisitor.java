@@ -26,13 +26,7 @@ import org.openrewrite.yaml.MergeYaml.InsertMode;
 import org.openrewrite.yaml.trait.BlockScalar;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -80,7 +74,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private boolean shouldAutoFormat = true;
 
     @Nullable
-    private String linebreak = null;
+    private String linebreak;
 
     private String linebreak() {
         if (linebreak == null) {
@@ -495,7 +489,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
         List<T> mutatedEntries = new ArrayList<>();
         boolean hasInsertedBeforeOrAfterElements = false;
-        int insertIndex = -1, closeIndex = -1;
+        int insertIndex = -1;
+        int closeIndex = -1;
         for (int i = 0; i < ls.size(); i++) {
             T existingEntry = ls.get(i);
             if (!hasInsertedBeforeOrAfterElements && insertMode == Before && insertProperty.equals(getValue.apply(existingEntry))) {

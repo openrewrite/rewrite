@@ -39,7 +39,7 @@ public static class PreprocessorSourceTransformer
         foreach (var line in EnumerateLines(source))
         {
             var trimmed = line.TrimStart();
-            if (!trimmed.StartsWith('#')) continue;
+            if (!trimmed.StartsWith('#')){ continue;}
 
             var afterHash = trimmed[1..].TrimStart();
 
@@ -106,8 +106,8 @@ public static class PreprocessorSourceTransformer
                 condition = StripLineComment(condition);
                 bool groupActive = stack.Count == 0 || stack.Peek().branchActive;
                 bool condResult = EvaluateCondition(condition, localDefines);
-                if (invertedLines != null && invertedLines.Contains(i))
-                    condResult = !condResult;
+                if (invertedLines != null && invertedLines.Contains(i)){
+                    condResult = !condResult;}
                 bool branchActive = groupActive && condResult;
                 stack.Push((groupActive, branchActive, branchActive));
                 result[i] = GhostForDirective(i, directiveLineToIndex);
@@ -141,7 +141,7 @@ public static class PreprocessorSourceTransformer
                 if (active && !ignoreFileDefines)
                 {
                     var sym = afterHash[7..].Trim();
-                    if (sym.Length > 0) localDefines.Add(sym);
+                    if (sym.Length > 0){ localDefines.Add(sym);}
                 }
                 result[i] = active ? lines[i] : "";
             }
@@ -153,7 +153,7 @@ public static class PreprocessorSourceTransformer
                 if (active && !ignoreFileDefines)
                 {
                     var sym = afterHash[6..].Trim();
-                    if (sym.Length > 0) localDefines.Remove(sym);
+                    if (sym.Length > 0){ localDefines.Remove(sym);}
                 }
                 result[i] = active ? lines[i] : "";
             }
@@ -170,8 +170,8 @@ public static class PreprocessorSourceTransformer
 
     private static string GhostForDirective(int lineNumber, Dictionary<int, int>? directiveLineToIndex)
     {
-        if (directiveLineToIndex != null && directiveLineToIndex.TryGetValue(lineNumber, out var index))
-            return $"//DIRECTIVE:{index}";
+        if (directiveLineToIndex != null && directiveLineToIndex.TryGetValue(lineNumber, out var index)){
+            return $"//DIRECTIVE:{index}";}
         return "";
     }
 
@@ -193,7 +193,7 @@ public static class PreprocessorSourceTransformer
         for (int i = 0; i < lines.Length; i++)
         {
             var trimmed = lines[i].TrimStart();
-            if (!trimmed.StartsWith('#')) continue;
+            if (!trimmed.StartsWith('#')){ continue;}
 
             var afterHash = trimmed[1..].TrimStart();
 
@@ -273,12 +273,12 @@ public static class PreprocessorSourceTransformer
                 var defined = new HashSet<string>();
                 for (int j = 0; j < symbolList.Count && j < 30; j++)
                 {
-                    if ((bits & (1 << j)) != 0)
-                        defined.Add(symbolList[j]);
+                    if ((bits & (1 << j)) != 0){
+                        defined.Add(symbolList[j]);}
                 }
 
-                if (defined.SetEquals(allDefined))
-                    continue;
+                if (defined.SetEquals(allDefined)){
+                    continue;}
 
                 var clean = Transform(source, defined, directiveLineToIndex, ignoreFileDefines: true);
                 if (!seen.ContainsKey(clean))
@@ -309,8 +309,8 @@ public static class PreprocessorSourceTransformer
         var groups = new Dictionary<int, List<DirectiveLine>>();
         foreach (var d in directives)
         {
-            if (!groups.ContainsKey(d.GroupId))
-                groups[d.GroupId] = [];
+            if (!groups.ContainsKey(d.GroupId)){
+                groups[d.GroupId] = [];}
             groups[d.GroupId].Add(d);
         }
 
@@ -321,14 +321,14 @@ public static class PreprocessorSourceTransformer
         {
             if (d.Kind == PreprocessorDirectiveKind.If)
             {
-                if (groupStack.Count > 0)
-                    parentOf[d.GroupId] = groupStack.Peek();
+                if (groupStack.Count > 0){
+                    parentOf[d.GroupId] = groupStack.Peek();}
                 groupStack.Push(d.GroupId);
             }
             else if (d.Kind == PreprocessorDirectiveKind.Endif)
             {
-                if (groupStack.Count > 0)
-                    groupStack.Pop();
+                if (groupStack.Count > 0){
+                    groupStack.Pop();}
             }
         }
 
@@ -369,8 +369,8 @@ public static class PreprocessorSourceTransformer
 
             foreach (var dir in groupDirs)
             {
-                if (dir.Kind == PreprocessorDirectiveKind.Endif)
-                    continue;
+                if (dir.Kind == PreprocessorDirectiveKind.Endif){
+                    continue;}
 
                 if (dir.Kind == PreprocessorDirectiveKind.If)
                 {
@@ -481,12 +481,12 @@ public static class PreprocessorSourceTransformer
         List<DirectiveLine> directives,
         List<(string CleanSource, HashSet<string> DefinedSymbols)> branches)
     {
-        if (directives.Count == 0 || branches.Count == 0) return;
+        if (directives.Count == 0 || branches.Count == 0){ return;}
 
         // Pre-split each branch's clean source into lines
         var branchLines = new string[branches.Count][];
-        for (int b = 0; b < branches.Count; b++)
-            branchLines[b] = SplitLines(branches[b].CleanSource);
+        for (int b = 0; b < branches.Count; b++){
+            branchLines[b] = SplitLines(branches[b].CleanSource);}
 
         // For each non-Endif directive, find the first branch where the section
         // after that directive has non-empty content
@@ -526,8 +526,8 @@ public static class PreprocessorSourceTransformer
         var current = directives[currentIndex];
         for (int i = currentIndex + 1; i < directives.Count; i++)
         {
-            if (directives[i].GroupId == current.GroupId)
-                return directives[i].LineNumber;
+            if (directives[i].GroupId == current.GroupId){
+                return directives[i].LineNumber;}
         }
         // If no next directive found in group, return a large number
         return int.MaxValue;
@@ -541,8 +541,8 @@ public static class PreprocessorSourceTransformer
         for (int i = startLine; i < endLine && i < lines.Length; i++)
         {
             var trimmed = lines[i].Trim();
-            if (trimmed.Length > 0 && !trimmed.StartsWith("//DIRECTIVE:"))
-                return true;
+            if (trimmed.Length > 0 && !trimmed.StartsWith("//DIRECTIVE:")){
+                return true;}
         }
         return false;
     }
@@ -594,14 +594,14 @@ public static class PreprocessorSourceTransformer
 
     private static bool ParsePrimary(List<string> tokens, ref int pos, HashSet<string> symbols)
     {
-        if (pos >= tokens.Count) return false;
+        if (pos >= tokens.Count){ return false;}
 
         if (tokens[pos] == "(")
         {
             pos++;
             bool result = ParseOr(tokens, ref pos, symbols);
-            if (pos < tokens.Count && tokens[pos] == ")")
-                pos++;
+            if (pos < tokens.Count && tokens[pos] == ")"){
+                pos++;}
             return result;
         }
 
@@ -653,8 +653,8 @@ public static class PreprocessorSourceTransformer
             else if (char.IsLetterOrDigit(c) || c == '_')
             {
                 int start = i;
-                while (i < condition.Length && (char.IsLetterOrDigit(condition[i]) || condition[i] == '_'))
-                    i++;
+                while (i < condition.Length && (char.IsLetterOrDigit(condition[i]) || condition[i] == '_')){
+                    i++;}
                 tokens.Add(condition[start..i]);
             }
             else
@@ -672,20 +672,20 @@ public static class PreprocessorSourceTransformer
     private static string ExtractConditionFromDirectiveText(string directiveText)
     {
         var trimmed = directiveText.TrimStart();
-        if (!trimmed.StartsWith('#')) return "";
+        if (!trimmed.StartsWith('#')){ return "";}
         var afterHash = trimmed[1..].TrimStart();
 
         string raw;
-        if (afterHash.StartsWith("if("))
-            raw = afterHash[2..];
-        else if (afterHash.StartsWith("if "))
-            raw = afterHash[3..];
-        else if (afterHash.StartsWith("elif("))
-            raw = afterHash[4..];
-        else if (afterHash.StartsWith("elif "))
-            raw = afterHash[5..];
-        else
-            return "";
+        if (afterHash.StartsWith("if(")){
+            raw = afterHash[2..];}
+        else if (afterHash.StartsWith("if ")){
+            raw = afterHash[3..];}
+        else if (afterHash.StartsWith("elif(")){
+            raw = afterHash[4..];}
+        else if (afterHash.StartsWith("elif ")){
+            raw = afterHash[5..];}
+        else{
+            return "";}
 
         return StripLineComment(raw);
     }
@@ -698,11 +698,11 @@ public static class PreprocessorSourceTransformer
             if (char.IsLetter(condition[i]) || condition[i] == '_')
             {
                 int start = i;
-                while (i < condition.Length && (char.IsLetterOrDigit(condition[i]) || condition[i] == '_'))
-                    i++;
+                while (i < condition.Length && (char.IsLetterOrDigit(condition[i]) || condition[i] == '_')){
+                    i++;}
                 var id = condition[start..i];
-                if (id != "true" && id != "false")
-                    symbols.Add(id);
+                if (id != "true" && id != "false"){
+                    symbols.Add(id);}
             }
             else
             {
@@ -720,8 +720,8 @@ public static class PreprocessorSourceTransformer
         // Find // that's not inside an identifier
         for (int i = 0; i < condition.Length - 1; i++)
         {
-            if (condition[i] == '/' && condition[i + 1] == '/')
-                return condition[..i].TrimEnd();
+            if (condition[i] == '/' && condition[i + 1] == '/'){
+                return condition[..i].TrimEnd();}
         }
         return condition.TrimEnd('\r', ' ');
     }
@@ -738,11 +738,11 @@ public static class PreprocessorSourceTransformer
 
     private static bool IsIdentifier(string s)
     {
-        if (s.Length == 0) return false;
-        if (!char.IsLetter(s[0]) && s[0] != '_') return false;
+        if (s.Length == 0){ return false;}
+        if (!char.IsLetter(s[0]) && s[0] != '_'){ return false;}
         for (int i = 1; i < s.Length; i++)
         {
-            if (!char.IsLetterOrDigit(s[i]) && s[i] != '_') return false;
+            if (!char.IsLetterOrDigit(s[i]) && s[i] != '_'){ return false;}
         }
         return true;
     }
@@ -758,8 +758,8 @@ public static class PreprocessorSourceTransformer
                 start = i + 1;
             }
         }
-        if (start <= source.Length)
-            yield return source[start..].TrimEnd('\r');
+        if (start <= source.Length){
+            yield return source[start..].TrimEnd('\r');}
     }
 
     private static string[] SplitLines(string source)

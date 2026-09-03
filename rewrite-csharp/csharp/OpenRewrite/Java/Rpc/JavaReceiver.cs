@@ -38,7 +38,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J? Visit(Tree? tree, RpcReceiveQueue q)
     {
-        if (tree == null) return null;
+        if (tree == null){ return null;}
 
         Cursor = new Cursor(Cursor, tree);
 
@@ -674,12 +674,12 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var before = q.Receive(left.Before, space => VisitSpace(space, q));
         T element;
-        if (left.Element is J)
-            element = q.Receive(left.Element!, el => (T)(object)VisitNonNull((J)(object)el!, q))!;
-        else if (left.Element is Space)
-            element = (T)(object)q.Receive((Space)(object)left.Element!, space => VisitSpace(space, q))!;
-        else
-            element = q.Receive(left.Element)!;
+        if (left.Element is J){
+            element = q.Receive(left.Element!, el => (T)(object)VisitNonNull((J)(object)el!, q))!;}
+        else if (left.Element is Space){
+            element = (T)(object)q.Receive((Space)(object)left.Element!, space => VisitSpace(space, q))!;}
+        else{
+            element = q.Receive(left.Element)!;}
         // C# JLeftPadded doesn't have Markers; consume and discard
         q.Receive<Markers>(Markers.Empty);
         return left.WithBefore(before!).WithElement(element);
@@ -688,12 +688,12 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     public virtual JRightPadded<T> VisitRightPadded<T>(JRightPadded<T> right, RpcReceiveQueue q)
     {
         T element;
-        if (right.Element is J)
-            element = q.Receive(right.Element!, el => (T)(object)VisitNonNull((J)(object)el!, q))!;
-        else if (right.Element is Space)
-            element = (T)(object)q.Receive((Space)(object)right.Element!, space => VisitSpace(space, q))!;
-        else
-            element = q.Receive(right.Element)!;
+        if (right.Element is J){
+            element = q.Receive(right.Element!, el => (T)(object)VisitNonNull((J)(object)el!, q))!;}
+        else if (right.Element is Space){
+            element = (T)(object)q.Receive((Space)(object)right.Element!, space => VisitSpace(space, q))!;}
+        else{
+            element = q.Receive(right.Element)!;}
         var after = q.Receive(right.After, space => VisitSpace(space, q));
         var markers = q.Receive(right.Markers);
         return right.WithElement(element).WithAfter(after!).WithMarkers(markers!);
@@ -724,7 +724,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public virtual JavaType? VisitType(JavaType? javaType, RpcReceiveQueue q)
     {
-        if (javaType == null) return null;
+        if (javaType == null){ return null;}
 
         switch (javaType)
         {

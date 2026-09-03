@@ -17,13 +17,12 @@ package org.openrewrite.golang.internal.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.java.internal.rpc.JavaSender;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
-import org.openrewrite.rpc.RpcSendQueue;
-
+import org.openrewrite.java.internal.rpc.JavaSender;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.Reference;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 

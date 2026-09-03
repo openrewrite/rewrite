@@ -93,7 +93,9 @@ val datedSnapshotVersion = when {
 fun extractVersionFromJar(): String? {
     val jarTask = tasks.named("jar", Jar::class).get()
     val jarFile = jarTask.archiveFile.get().asFile
-    if (!jarFile.exists()) return null
+    if (!jarFile.exists()) {
+        return null
+    }
 
     return zipTree(jarFile).matching {
         include("META-INF/rewrite-javascript-version.txt")

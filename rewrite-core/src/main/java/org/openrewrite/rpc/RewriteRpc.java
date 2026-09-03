@@ -15,11 +15,7 @@
  */
 package org.openrewrite.rpc;
 
-import io.moderne.jsonrpc.JsonRpc;
-import io.moderne.jsonrpc.JsonRpcMethod;
-import io.moderne.jsonrpc.JsonRpcRequest;
-import io.moderne.jsonrpc.JsonRpcSuccess;
-import io.moderne.jsonrpc.RawJson;
+import io.moderne.jsonrpc.*;
 import io.moderne.jsonrpc.internal.SnowflakeId;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.NonNull;
@@ -612,7 +608,7 @@ public class RewriteRpc {
         parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputList.size()));
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
-            private int index = 0;
+            private int index;
             private @Nullable List<String> ids;
 
             @Override

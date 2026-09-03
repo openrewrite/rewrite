@@ -15,14 +15,15 @@
  */
 // Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.misc.*;
 import org.antlr.v4.runtime.tree.*;
-import java.util.List;
-import java.util.Iterator;
+
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class TemplateParameterParser extends Parser {
@@ -31,15 +32,35 @@ public class TemplateParameterParser extends Parser {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8, 
-		LSBRACK=9, RSBRACK=10, AND=11, Extends=12, Super=13, FullyQualifiedName=14, 
-		Number=15, Identifier=16, S=17;
-	public static final int
-		RULE_matcherPattern = 0, RULE_genericPattern = 1, RULE_typedPattern = 2, 
-		RULE_patternType = 3, RULE_type = 4, RULE_typeParameter = 5, RULE_variance = 6, 
-		RULE_typeArray = 7, RULE_parameterName = 8, RULE_genericName = 9, RULE_typeName = 10, 
-		RULE_matcherName = 11;
+    public static final int LPAREN = 1;
+    public static final int RPAREN = 2;
+    public static final int DOT = 3;
+    public static final int COLON = 4;
+    public static final int COMMA = 5;
+    public static final int LBRACK = 6;
+    public static final int RBRACK = 7;
+    public static final int WILDCARD = 8;
+    public static final int LSBRACK = 9;
+    public static final int RSBRACK = 10;
+    public static final int AND = 11;
+    public static final int Extends = 12;
+    public static final int Super = 13;
+    public static final int FullyQualifiedName = 14;
+    public static final int Number = 15;
+    public static final int Identifier = 16;
+    public static final int S = 17;
+    public static final int RULE_matcherPattern = 0;
+    public static final int RULE_genericPattern = 1;
+    public static final int RULE_typedPattern = 2;
+    public static final int RULE_patternType = 3;
+    public static final int RULE_type = 4;
+    public static final int RULE_typeParameter = 5;
+    public static final int RULE_variance = 6;
+    public static final int RULE_typeArray = 7;
+    public static final int RULE_parameterName = 8;
+    public static final int RULE_genericName = 9;
+    public static final int RULE_typeName = 10;
+    public static final int RULE_matcherName = 11;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"matcherPattern", "genericPattern", "typedPattern", "patternType", "type", 
@@ -128,16 +149,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_matcherPattern; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterMatcherPattern(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterMatcherPattern(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitMatcherPattern(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitMatcherPattern(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitMatcherPattern(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitMatcherPattern(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -147,22 +175,15 @@ public class TemplateParameterParser extends Parser {
 		try {
 			setState(26);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,0,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(24);
-				typedPattern();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(25);
-				parameterName();
-				}
-				break;
-			}
+            if (getInterpreter().adaptivePredict(_input, 0, _ctx) == 1) {
+                enterOuterAlt(_localctx, 1);
+                setState(24);
+                typedPattern();
+            } else if (getInterpreter().adaptivePredict(_input, 0, _ctx) == 2) {
+                enterOuterAlt(_localctx, 2);
+                setState(25);
+                parameterName();
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -197,16 +218,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_genericPattern; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterGenericPattern(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterGenericPattern(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitGenericPattern(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitGenericPattern(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitGenericPattern(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitGenericPattern(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -278,16 +306,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_typedPattern; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterTypedPattern(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterTypedPattern(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitTypedPattern(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitTypedPattern(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypedPattern(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypedPattern(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -299,16 +334,12 @@ public class TemplateParameterParser extends Parser {
 			{
 			setState(44);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,3,_ctx) ) {
-			case 1:
-				{
-				setState(41);
-				parameterName();
-				setState(42);
-				match(COLON);
-				}
-				break;
-			}
+                if (getInterpreter().adaptivePredict(_input, 3, _ctx) == 1) {
+                    setState(41);
+                    parameterName();
+                    setState(42);
+                    match(COLON);
+                }
 			setState(46);
 			patternType();
 			}
@@ -340,16 +371,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_patternType; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterPatternType(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterPatternType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitPatternType(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitPatternType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitPatternType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitPatternType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -418,16 +456,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_type; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterType(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterType(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitType(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitType(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitType(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitType(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -515,16 +560,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_typeParameter; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterTypeParameter(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterTypeParameter(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitTypeParameter(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitTypeParameter(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypeParameter(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypeParameter(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -535,32 +587,25 @@ public class TemplateParameterParser extends Parser {
 		try {
 			setState(81);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,9,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(77);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==WILDCARD) {
-					{
-					setState(76);
-					variance();
-					}
-				}
+            if (getInterpreter().adaptivePredict(_input, 9, _ctx) == 1) {
+                enterOuterAlt(_localctx, 1);
+                setState(77);
+                _errHandler.sync(this);
+                _la = _input.LA(1);
+                if (_la == WILDCARD) {
+                    {
+                        setState(76);
+                        variance();
+                    }
+                }
 
-				setState(79);
-				type();
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(80);
-				match(WILDCARD);
-				}
-				break;
-			}
+                setState(79);
+                type();
+            } else if (getInterpreter().adaptivePredict(_input, 9, _ctx) == 2) {
+                enterOuterAlt(_localctx, 2);
+                setState(80);
+                match(WILDCARD);
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -584,16 +629,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_variance; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterVariance(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterVariance(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitVariance(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitVariance(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitVariance(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitVariance(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -603,26 +655,19 @@ public class TemplateParameterParser extends Parser {
 		try {
 			setState(87);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,10,_ctx) ) {
-			case 1:
-				enterOuterAlt(_localctx, 1);
-				{
-				setState(83);
-				match(WILDCARD);
-				setState(84);
-				match(Extends);
-				}
-				break;
-			case 2:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(85);
-				match(WILDCARD);
-				setState(86);
-				match(Super);
-				}
-				break;
-			}
+            if (getInterpreter().adaptivePredict(_input, 10, _ctx) == 1) {
+                enterOuterAlt(_localctx, 1);
+                setState(83);
+                match(WILDCARD);
+                setState(84);
+                match(Extends);
+            } else if (getInterpreter().adaptivePredict(_input, 10, _ctx) == 2) {
+                enterOuterAlt(_localctx, 2);
+                setState(85);
+                match(WILDCARD);
+                setState(86);
+                match(Super);
+            }
 		}
 		catch (RecognitionException re) {
 			_localctx.exception = re;
@@ -645,16 +690,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_typeArray; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterTypeArray(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterTypeArray(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitTypeArray(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitTypeArray(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypeArray(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypeArray(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -690,16 +742,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_parameterName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterParameterName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterParameterName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitParameterName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitParameterName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitParameterName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitParameterName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -733,16 +792,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_genericName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterGenericName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterGenericName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitGenericName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitGenericName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitGenericName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitGenericName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -777,16 +843,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_typeName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterTypeName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterTypeName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitTypeName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitTypeName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypeName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypeName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 
@@ -803,7 +876,9 @@ public class TemplateParameterParser extends Parser {
 			_errHandler.recoverInline(this);
 			}
 			else {
-				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+                if (_input.LA(1) == Token.EOF) {
+                    matchedEOF = true;
+                }
 				_errHandler.reportMatch(this);
 				consume();
 			}
@@ -829,16 +904,23 @@ public class TemplateParameterParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_matcherName; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).enterMatcherName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).enterMatcherName(this);
+            }
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof TemplateParameterParserListener ) ((TemplateParameterParserListener)listener).exitMatcherName(this);
+            if (listener instanceof TemplateParameterParserListener) {
+                ((TemplateParameterParserListener) listener).exitMatcherName(this);
+            }
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitMatcherName(this);
-			else return visitor.visitChildren(this);
+            if (visitor instanceof TemplateParameterParserVisitor) {
+                return ((TemplateParameterParserVisitor<? extends T>) visitor).visitMatcherName(this);
+            } else {
+                return visitor.visitChildren(this);
+            }
 		}
 	}
 

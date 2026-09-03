@@ -132,8 +132,8 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
 
     @Getter
     private static class PhaseTimer {
-        private long totalNs = 0;
-        private long maxNs = 0;
+        private long totalNs;
+        private long maxNs;
 
         <T> T recordTimed(Callable<T> callable) throws Exception {
             long startNs = System.nanoTime();

@@ -137,10 +137,14 @@ public class JavaTypeVisitor<P> {
             JavaType referenceValue = sev.getReferenceValue();
             if (referenceValue != null) {
                 JavaType visited = visit(referenceValue, p);
-                if (visited == referenceValue && element == sev.getElement()) return sev;
+                if (visited == referenceValue && element == sev.getElement()) {
+                    return sev;
+                }
                 return new JavaType.Annotation.SingleElementValue(element, null, visited);
             }
-            if (element == sev.getElement()) return sev;
+            if (element == sev.getElement()) {
+                return sev;
+            }
             return new JavaType.Annotation.SingleElementValue(element, sev.getConstantValue(), null);
         }
         if (ev instanceof JavaType.Annotation.ArrayElementValue) {
@@ -151,15 +155,21 @@ public class JavaTypeVisitor<P> {
                 for (int i = 0; i < referenceValues.length; i++) {
                     JavaType v = visit(referenceValues[i], p);
                     if (v != referenceValues[i]) {
-                        if (visited == null) visited = referenceValues.clone();
+                        if (visited == null) {
+                            visited = referenceValues.clone();
+                        }
                         visited[i] = v;
                     }
                 }
-                if (visited == null && element == aev.getElement()) return aev;
+                if (visited == null && element == aev.getElement()) {
+                    return aev;
+                }
                 return new JavaType.Annotation.ArrayElementValue(element, null,
                         visited != null ? visited : referenceValues);
             }
-            if (element == aev.getElement()) return aev;
+            if (element == aev.getElement()) {
+                return aev;
+            }
             return new JavaType.Annotation.ArrayElementValue(element, aev.getConstantValues(), null);
         }
         return ev;

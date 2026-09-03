@@ -103,7 +103,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         return c.withBody(c.getBody().withStatements(ListUtils.map(c.getBody().getStatements(),
-                (i, st) -> (i != 0) ? st.withPrefix(addNewline(st.getPrefix())) : st)));
+                (i, st) -> i != 0 ? st.withPrefix(addNewline(st.getPrefix())) : st)));
     }
 
     private Space addNewline(Space prefix) {

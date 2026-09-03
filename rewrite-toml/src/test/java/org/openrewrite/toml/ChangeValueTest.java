@@ -20,7 +20,6 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
-
 import org.openrewrite.toml.tree.Toml;
 
 import static org.assertj.core.api.Assertions.assertThat;

@@ -206,7 +206,7 @@ public class WhitespaceReconcilerTests
 
         public override J VisitPrimitive(Primitive primitive, int p)
         {
-            if (_replaced || !replaceFirst) return primitive;
+            if (_replaced || !replaceFirst){ return primitive;}
             _replaced = true;
             // Replace Primitive with Identifier — structurally different types
             return new Identifier(

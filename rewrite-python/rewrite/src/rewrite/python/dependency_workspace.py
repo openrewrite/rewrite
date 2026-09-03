@@ -104,10 +104,7 @@ class PythonDependencyWorkspace:
 
         # Check for site-packages
         site_packages = venv / 'lib'
-        if not site_packages.exists():
-            return False
-
-        return True
+        return site_packages.exists()
 
     @classmethod
     def _create_workspace(cls, content_hash: str, pyproject_content: str) -> Path:

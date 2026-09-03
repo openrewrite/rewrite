@@ -63,8 +63,8 @@ public class AttributeMatcher
         if (type != null)
         {
             var fqn = NormalizeAttributeName(type.FullyQualifiedName);
-            if (_fullyQualifiedName != null)
-                return string.Equals(fqn, _fullyQualifiedName, StringComparison.Ordinal);
+            if (_fullyQualifiedName != null){
+                return string.Equals(fqn, _fullyQualifiedName, StringComparison.Ordinal);}
 
             // Pattern is simple name only — extract simple name from FQN
             var lastDot = fqn.LastIndexOf('.');
@@ -74,8 +74,8 @@ public class AttributeMatcher
 
         // Fall back to syntactic matching
         var name = Cs.GetSimpleName(annotation.AnnotationType);
-        if (name == null)
-            return false;
+        if (name == null){
+            return false;}
 
         // When matching by simple name only, ignore any FQN constraint since
         // we don't have type attribution to verify it
@@ -91,8 +91,8 @@ public class AttributeMatcher
         {
             foreach (var attr in attrList.Attributes)
             {
-                if (Matches(attr.Element))
-                    return true;
+                if (Matches(attr.Element)){
+                    return true;}
             }
         }
 
@@ -114,8 +114,8 @@ public class AttributeMatcher
     internal static string NormalizeAttributeName(string name)
     {
         const string suffix = "Attribute";
-        if (!name.EndsWith(suffix, StringComparison.Ordinal))
-            return name;
+        if (!name.EndsWith(suffix, StringComparison.Ordinal)){
+            return name;}
 
         // For FQNs, only strip the suffix from the last segment
         var lastDot = name.LastIndexOf('.');

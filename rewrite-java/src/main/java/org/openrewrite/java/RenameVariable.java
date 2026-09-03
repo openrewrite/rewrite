@@ -176,7 +176,9 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             } else if (value instanceof J.ControlParentheses) {
                 // ControlParentheses wraps the type in a J.TypeCast (e.g. `(Foo) x`); elsewhere (if/while/switch) it wraps a value expression.
                 return !(getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.TypeCast);
-            } else return !(value instanceof J.ParameterizedType);
+            } else {
+                return !(value instanceof J.ParameterizedType);
+            }
         }
 
         /**

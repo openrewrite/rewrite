@@ -105,12 +105,12 @@ public sealed class MatchResult
     /// </summary>
     public IReadOnlyList<T> GetList<T>(string name) where T : class, J
     {
-        if (!_captures.TryGetValue(name, out var value))
-            return [];
-        if (value is IReadOnlyList<T> typedList)
-            return typedList;
-        if (value is IReadOnlyList<object> objectList)
-            return objectList.Cast<T>().ToList();
+        if (!_captures.TryGetValue(name, out var value)){
+            return [];}
+        if (value is IReadOnlyList<T> typedList){
+            return typedList;}
+        if (value is IReadOnlyList<object> objectList){
+            return objectList.Cast<T>().ToList();}
         return [];
     }
 

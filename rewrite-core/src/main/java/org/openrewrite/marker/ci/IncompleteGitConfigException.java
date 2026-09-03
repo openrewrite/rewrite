@@ -18,7 +18,6 @@ package org.openrewrite.marker.ci;
 public class IncompleteGitConfigException extends Exception {
 
     public IncompleteGitConfigException() {
-        super();
     }
 
     public IncompleteGitConfigException(String format) {

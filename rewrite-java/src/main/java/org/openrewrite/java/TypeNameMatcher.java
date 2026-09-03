@@ -54,7 +54,7 @@ class ExactTypeNameMatcher implements TypeNameMatcher {
     }
 }
 
-class PatternTypeNameMatcher implements TypeNameMatcher {
+final class PatternTypeNameMatcher implements TypeNameMatcher {
     private enum PatternType {
         FullWildcard,
         Exact,
@@ -172,7 +172,9 @@ class PatternTypeNameMatcher implements TypeNameMatcher {
                 pIdx++;
                 if (pIdx >= pLength) {
                     while (tIdx < tLength) {
-                        if (text.charAt(tIdx) == '.') return false;
+                        if (text.charAt(tIdx) == '.') {
+                            return false;
+                        }
                         tIdx++;
                     }
                     return true;

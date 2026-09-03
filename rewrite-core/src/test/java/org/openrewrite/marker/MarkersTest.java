@@ -56,7 +56,7 @@ class MarkersTest {
         assertThat(markers.findAll(TextMarker.class)).hasSize(2);
     }
 
-    private static class TextMarker implements Marker {
+    private static final class TextMarker implements Marker {
         private final UUID id;
         private final String text;
 
@@ -67,8 +67,12 @@ class MarkersTest {
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
             TextMarker that = (TextMarker) o;
             return text.equals(that.text);
         }

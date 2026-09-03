@@ -40,7 +40,7 @@ class FormatPreservingReader extends Reader {
     private ArrayList<Character> buffer = new ArrayList<>();
 
     @Getter
-    private int bufferIndex = 0;
+    private int bufferIndex;
 
     FormatPreservingReader(String source) {
         this.delegate = new StringReader(source);

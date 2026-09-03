@@ -50,10 +50,14 @@ class NoInlineAnnotationTransformationResolveVisitor extends ResolveVisitor {
     @Override
     public void visitAnnotations(final AnnotatedNode node) {
         List<AnnotationNode> annotations = node.getAnnotations();
-        if (annotations.isEmpty()) return;
+        if (annotations.isEmpty()) {
+            return;
+        }
         Map<String, AnnotationNode> tmpAnnotations = new HashMap<>();
         for (AnnotationNode an : annotations) {
-            if (an.isBuiltIn()) continue;
+            if (an.isBuiltIn()) {
+                continue;
+            }
             ClassNode annType = an.getClassNode();
             resolveOrFail(annType, " for annotation", an);
             for (Map.Entry<String, Expression> member : an.getMembers().entrySet()) {

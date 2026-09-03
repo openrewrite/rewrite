@@ -28,7 +28,7 @@ import static org.openrewrite.internal.StringUtils.isNotEmpty;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class MergeDuplicateSectionsVisitor<P> extends YamlIsoVisitor<P> {
-    private final static String NEW_ROOT_COMMENTS = "NEW_ROOT_COMMENTS";
+    private static final String NEW_ROOT_COMMENTS = "NEW_ROOT_COMMENTS";
 
     Yaml scope;
 

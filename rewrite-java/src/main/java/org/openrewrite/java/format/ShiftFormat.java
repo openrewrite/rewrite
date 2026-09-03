@@ -32,7 +32,7 @@ import java.util.Objects;
  * moved definitively a certain number of indentation levels left or right, such as when unwrapping
  * a block or conditional statement.
  */
-public class ShiftFormat {
+public final class ShiftFormat {
     private ShiftFormat() {
     }
 

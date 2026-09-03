@@ -73,7 +73,7 @@ public abstract class Recipe
         foreach (var prop in GetType().GetProperties())
         {
             var attr = prop.GetCustomAttribute<OptionAttribute>();
-            if (attr == null) continue;
+            if (attr == null){ continue;}
 
             object? value = null;
             try { value = prop.GetValue(this); }

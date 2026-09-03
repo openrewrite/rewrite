@@ -71,7 +71,7 @@ class ScalaParserErrorHandlingTest {
         // A source whose first read fails (e.g. a transient I/O error) makes batch
         // compilation fail as a whole; parseInputs must degrade to per-file parsing
         // instead of throwing.
-        Supplier<InputStream> flakySource = new Supplier<InputStream>() {
+        Supplier<InputStream> flakySource = new Supplier<>() {
             private boolean first = true;
 
             @Override

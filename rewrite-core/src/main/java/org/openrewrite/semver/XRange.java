@@ -164,7 +164,9 @@ public class XRange extends LatestRelease {
             return token;
         }
         String gtlt = m.group(1);
-        String mj = m.group(2), mn = m.group(3), p = m.group(4);
+        String mj = m.group(2);
+        String mn = m.group(3);
+        String p = m.group(4);
         boolean xM = isX(mj);
         boolean xm = xM || isX(mn);
         boolean xp = xm || isX(p);
@@ -176,7 +178,7 @@ public class XRange extends LatestRelease {
         String pr = incPre ? "-0" : "";
 
         if (xM) {
-            return (">".equals(gtlt) || "<".equals(gtlt)) ? "<0.0.0-0" : "*";
+            return ">".equals(gtlt) || "<".equals(gtlt) ? "<0.0.0-0" : "*";
         }
         if (!gtlt.isEmpty() && anyX) {
             if (xm) {

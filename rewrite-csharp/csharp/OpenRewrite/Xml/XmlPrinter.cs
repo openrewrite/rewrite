@@ -28,9 +28,9 @@ public class XmlPrinter<P> : XmlVisitor<PrintOutputCapture<P>>
 
     public override Xml VisitDocument(Document document, PrintOutputCapture<P> p)
     {
-        if (document.CharsetBomMarked) p.Append('\uFEFF');
+        if (document.CharsetBomMarked){ p.Append('\uFEFF');}
         BeforeSyntax(document, p);
-        if (document.Prolog != null) Visit(document.Prolog, p);
+        if (document.Prolog != null){ Visit(document.Prolog, p);}
         Visit(document.Root, p);
         AfterSyntax(document, p);
         p.Append(document.Eof);
@@ -40,9 +40,9 @@ public class XmlPrinter<P> : XmlVisitor<PrintOutputCapture<P>>
     public override Xml VisitProlog(Prolog prolog, PrintOutputCapture<P> p)
     {
         BeforeSyntax(prolog, p);
-        if (prolog.XmlDecl != null) Visit(prolog.XmlDecl, p);
-        foreach (var misc in prolog.MiscList) Visit(misc, p);
-        foreach (var jsp in prolog.JspDirectives) Visit(jsp, p);
+        if (prolog.XmlDecl != null){ Visit(prolog.XmlDecl, p);}
+        foreach (var misc in prolog.MiscList){ Visit(misc, p);}
+        foreach (var jsp in prolog.JspDirectives){ Visit(jsp, p);}
         AfterSyntax(prolog, p);
         return prolog;
     }
@@ -51,7 +51,7 @@ public class XmlPrinter<P> : XmlVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(xmlDecl, p);
         p.Append("<?").Append(xmlDecl.Name);
-        foreach (var attr in xmlDecl.Attributes) Visit(attr, p);
+        foreach (var attr in xmlDecl.Attributes){ Visit(attr, p);}
         p.Append(xmlDecl.BeforeTagDelimiterPrefix).Append("?>");
         AfterSyntax(xmlDecl, p);
         return xmlDecl;
@@ -61,7 +61,7 @@ public class XmlPrinter<P> : XmlVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(tag, p);
         p.Append('<').Append(tag.Name);
-        foreach (var attr in tag.Attributes) Visit(attr, p);
+        foreach (var attr in tag.Attributes){ Visit(attr, p);}
         p.Append(tag.BeforeTagDelimiterPrefix);
         if (tag.ClosingTag == null)
         {
@@ -72,7 +72,7 @@ public class XmlPrinter<P> : XmlVisitor<PrintOutputCapture<P>>
             p.Append('>');
             if (tag.ContentList != null)
             {
-                foreach (var content in tag.ContentList) Visit(content, p);
+                foreach (var content in tag.ContentList){ Visit(content, p);}
             }
             Visit(tag.ClosingTag, p);
         }
@@ -146,9 +146,9 @@ public class XmlPrinter<P> : XmlVisitor<PrintOutputCapture<P>>
         BeforeSyntax(docTypeDecl, p);
         p.Append("<!").Append(docTypeDecl.DocumentDeclaration);
         Visit(docTypeDecl.Name, p);
-        if (docTypeDecl.ExternalId != null) Visit(docTypeDecl.ExternalId, p);
-        foreach (var ident in docTypeDecl.InternalSubset) Visit(ident, p);
-        if (docTypeDecl.ExternalSubsetsNode != null) Visit(docTypeDecl.ExternalSubsetsNode, p);
+        if (docTypeDecl.ExternalId != null){ Visit(docTypeDecl.ExternalId, p);}
+        foreach (var ident in docTypeDecl.InternalSubset){ Visit(ident, p);}
+        if (docTypeDecl.ExternalSubsetsNode != null){ Visit(docTypeDecl.ExternalSubsetsNode, p);}
         p.Append(docTypeDecl.BeforeTagDelimiterPrefix).Append('>');
         AfterSyntax(docTypeDecl, p);
         return docTypeDecl;
@@ -158,7 +158,7 @@ public class XmlPrinter<P> : XmlVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(externalSubsets, p);
         p.Append('[');
-        foreach (var elem in externalSubsets.Elements) Visit(elem, p);
+        foreach (var elem in externalSubsets.Elements){ Visit(elem, p);}
         p.Append(']');
         AfterSyntax(externalSubsets, p);
         return externalSubsets;
@@ -167,7 +167,7 @@ public class XmlPrinter<P> : XmlVisitor<PrintOutputCapture<P>>
     public override Xml VisitElement(Element element, PrintOutputCapture<P> p)
     {
         BeforeSyntax(element, p);
-        foreach (var ident in element.Subset) Visit(ident, p);
+        foreach (var ident in element.Subset){ Visit(ident, p);}
         p.Append(element.BeforeTagDelimiterPrefix);
         AfterSyntax(element, p);
         return element;
@@ -185,7 +185,7 @@ public class XmlPrinter<P> : XmlVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(jspDirective, p);
         p.Append("<%@").Append(jspDirective.BeforeTypePrefix).Append(jspDirective.Type);
-        foreach (var attr in jspDirective.Attributes) Visit(attr, p);
+        foreach (var attr in jspDirective.Attributes){ Visit(attr, p);}
         p.Append(jspDirective.BeforeDirectiveEndPrefix).Append("%>");
         AfterSyntax(jspDirective, p);
         return jspDirective;

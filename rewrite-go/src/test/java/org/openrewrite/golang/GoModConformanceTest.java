@@ -16,16 +16,16 @@
 package org.openrewrite.golang;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
-import org.openrewrite.golang.marker.GoResolutionResult;
-import org.openrewrite.text.PlainText;
-import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.golang.marker.GoResolutionResult;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextParser;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -123,7 +123,9 @@ class GoModConformanceTest {
 
     private static List<ObjectNode> toRequires(List<GoResolutionResult.Require> reqs) {
         List<ObjectNode> out = new ArrayList<>();
-        if (reqs == null) return out;
+        if (reqs == null) {
+            return out;
+        }
         for (GoResolutionResult.Require r : reqs) {
             ObjectNode n = MAPPER.createObjectNode();
             n.put("modulePath", r.getModulePath());
@@ -136,7 +138,9 @@ class GoModConformanceTest {
 
     private static List<ObjectNode> toReplaces(List<GoResolutionResult.Replace> reps) {
         List<ObjectNode> out = new ArrayList<>();
-        if (reps == null) return out;
+        if (reps == null) {
+            return out;
+        }
         for (GoResolutionResult.Replace r : reps) {
             ObjectNode n = MAPPER.createObjectNode();
             n.put("oldPath", r.getOldPath());
@@ -150,7 +154,9 @@ class GoModConformanceTest {
 
     private static List<ObjectNode> toExcludes(List<GoResolutionResult.Exclude> excs) {
         List<ObjectNode> out = new ArrayList<>();
-        if (excs == null) return out;
+        if (excs == null) {
+            return out;
+        }
         for (GoResolutionResult.Exclude e : excs) {
             ObjectNode n = MAPPER.createObjectNode();
             n.put("modulePath", e.getModulePath());
@@ -162,7 +168,9 @@ class GoModConformanceTest {
 
     private static List<ObjectNode> toRetracts(List<GoResolutionResult.Retract> rets) {
         List<ObjectNode> out = new ArrayList<>();
-        if (rets == null) return out;
+        if (rets == null) {
+            return out;
+        }
         for (GoResolutionResult.Retract r : rets) {
             ObjectNode n = MAPPER.createObjectNode();
             n.put("versionRange", r.getVersionRange());
@@ -174,7 +182,9 @@ class GoModConformanceTest {
 
     private static List<ObjectNode> toResolved(List<GoResolutionResult.ResolvedDependency> deps) {
         List<ObjectNode> out = new ArrayList<>();
-        if (deps == null) return out;
+        if (deps == null) {
+            return out;
+        }
         for (GoResolutionResult.ResolvedDependency d : deps) {
             ObjectNode n = MAPPER.createObjectNode();
             n.put("modulePath", d.getModulePath());

@@ -38,8 +38,8 @@ public class ChangeTagValueVisitor<P>(Tag? scope, string? value) : XmlVisitor<P>
             var afterText = "";
             if (t.ContentList is { Count: 1 } && t.ContentList[0] is CharData existingValue)
             {
-                if (existingValue.Text == value)
-                    return tag;
+                if (existingValue.Text == value){
+                    return tag;}
 
                 prefix = existingValue.Prefix;
                 afterText = existingValue.AfterText;

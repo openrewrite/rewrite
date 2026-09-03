@@ -29,10 +29,10 @@ internal static class PathUtil
         var full = Path.GetFullPath(path);
         if (OperatingSystem.IsMacOS())
         {
-            if (full.StartsWith("/var/", StringComparison.Ordinal))
-                full = "/private" + full;
-            else if (full.StartsWith("/tmp/", StringComparison.Ordinal))
-                full = "/private" + full;
+            if (full.StartsWith("/var/", StringComparison.Ordinal)){
+                full = "/private" + full;}
+            else if (full.StartsWith("/tmp/", StringComparison.Ordinal)){
+                full = "/private" + full;}
         }
         return full;
     }

@@ -99,7 +99,7 @@ export namespace MarkerPrinter {
 }
 
 export class PrintOutputCapture {
-    private _out: string = "";
+    private const _out: string = "";
 
     constructor(public readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT) {
     }
@@ -129,7 +129,7 @@ interface TreePrinter {
 }
 
 export class TreePrinters {
-    private static _registry =
+    private static const _registry =
         new Map<string, TreePrinter>();
 
     static register(kind: string, printer: () => TreeVisitor<any, PrintOutputCapture>): void {

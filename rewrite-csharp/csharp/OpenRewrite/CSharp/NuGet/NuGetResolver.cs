@@ -66,8 +66,8 @@ public static class NuGetResolver
 
     private static void SetEnvIfAbsent(string name, string value)
     {
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name)))
-            Environment.SetEnvironmentVariable(name, value);
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name))){
+            Environment.SetEnvironmentVariable(name, value);}
     }
 
     /// <summary>NuGet.Common logger bridging to Serilog at Debug level.</summary>
@@ -113,15 +113,15 @@ public static class NuGetResolver
         foreach (var projectPath in projects)
         {
             var dgSpec = GenerateRestoreGraph(projectPath, extraGlobalProperties);
-            if (dgSpec == null)
-                continue;
+            if (dgSpec == null){
+                continue;}
             foreach (var project in dgSpec.Projects)
             {
-                if (merged.GetProjectSpec(project.RestoreMetadata?.ProjectUniqueName) == null)
-                    merged.AddProject(project);
+                if (merged.GetProjectSpec(project.RestoreMetadata?.ProjectUniqueName) == null){
+                    merged.AddProject(project);}
             }
-            foreach (var restore in dgSpec.Restore)
-                merged.AddRestore(restore);
+            foreach (var restore in dgSpec.Restore){
+                merged.AddRestore(restore);}
             any = true;
         }
 
@@ -148,8 +148,8 @@ public static class NuGetResolver
             }
             foreach (var p in solution.ProjectsInOrder)
             {
-                if (p.ProjectType == SolutionProjectType.KnownToBeMSBuildFormat && File.Exists(p.AbsolutePath))
-                    yield return Path.GetFullPath(p.AbsolutePath);
+                if (p.ProjectType == SolutionProjectType.KnownToBeMSBuildFormat && File.Exists(p.AbsolutePath)){
+                    yield return Path.GetFullPath(p.AbsolutePath);}
             }
         }
         else if (path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
@@ -168,11 +168,11 @@ public static class NuGetResolver
             foreach (var project in doc.Descendants("Project"))
             {
                 var rel = project.Attribute("Path")?.Value;
-                if (rel == null)
-                    continue;
+                if (rel == null){
+                    continue;}
                 var abs = Path.GetFullPath(Path.Combine(dir, rel.Replace('\\', Path.DirectorySeparatorChar)));
-                if (File.Exists(abs))
-                    yield return abs;
+                if (File.Exists(abs)){
+                    yield return abs;}
             }
         }
         else
@@ -319,8 +319,8 @@ public static class NuGetResolver
             }
         }
 
-        if (!anyRestorable)
-            return lockFiles;
+        if (!anyRestorable){
+            return lockFiles;}
 
         var settingsRoot = restorable.Projects
             .Select(p => Path.GetDirectoryName(p.RestoreMetadata?.ProjectPath ?? p.FilePath))
@@ -360,8 +360,8 @@ public static class NuGetResolver
                     Log.Debug("NuGetResolver: commit failed for {Project}: {Error}", projectPath, ex.Message);
                 }
             }
-            if (projectPath != null && pair.Result.LockFile != null)
-                lockFiles[Path.GetFullPath(projectPath)] = pair.Result.LockFile;
+            if (projectPath != null && pair.Result.LockFile != null){
+                lockFiles[Path.GetFullPath(projectPath)] = pair.Result.LockFile;}
         }
 
         return lockFiles;
@@ -386,8 +386,8 @@ public static class NuGetResolver
         try
         {
             var entries = ReadPackagesConfig(packagesConfigPath);
-            if (entries.Count == 0)
-                return null;
+            if (entries.Count == 0){
+                return null;}
 
             framework ??= entries
                 .Select(e => e.TargetFramework)
@@ -473,8 +473,8 @@ public static class NuGetResolver
     {
         var settings = LoadSettings(solutionOrProjectDir);
         var repositoryPath = SettingsUtility.GetRepositoryPath(settings);
-        if (string.IsNullOrEmpty(repositoryPath))
-            repositoryPath = Path.Combine(solutionOrProjectDir, "packages");
+        if (string.IsNullOrEmpty(repositoryPath)){
+            repositoryPath = Path.Combine(solutionOrProjectDir, "packages");}
         repositoryPath = Path.GetFullPath(repositoryPath);
 
         var identities = new HashSet<PackageIdentity>();
@@ -482,8 +482,8 @@ public static class NuGetResolver
         {
             try
             {
-                foreach (var entry in ReadPackagesConfig(configPath))
-                    identities.Add(entry.PackageIdentity);
+                foreach (var entry in ReadPackagesConfig(configPath)){
+                    identities.Add(entry.PackageIdentity);}
             }
             catch (Exception ex)
             {
@@ -491,8 +491,8 @@ public static class NuGetResolver
             }
         }
 
-        if (identities.Count == 0)
-            return;
+        if (identities.Count == 0){
+            return;}
 
         var pathResolver = new PackagePathResolver(repositoryPath);
         await InstallPackagesAsync(identities, pathResolver, settings, ct);
@@ -548,8 +548,8 @@ public static class NuGetResolver
         foreach (var identity in identities)
         {
             ct.ThrowIfCancellationRequested();
-            if (pathResolver.GetInstalledPath(identity) != null)
-                continue;
+            if (pathResolver.GetInstalledPath(identity) != null){
+                continue;}
 
             var installed = false;
             foreach (var repository in repositories)
@@ -557,12 +557,12 @@ public static class NuGetResolver
                 try
                 {
                     var downloadResource = await repository.GetResourceAsync<DownloadResource>(ct);
-                    if (downloadResource == null)
-                        continue;
+                    if (downloadResource == null){
+                        continue;}
                     using var result = await downloadResource.GetDownloadResourceResultAsync(
                         identity, downloadContext, globalPackagesFolder, Logger, ct);
-                    if (result.Status != DownloadResourceResultStatus.Available)
-                        continue;
+                    if (result.Status != DownloadResourceResultStatus.Available){
+                        continue;}
 
                     result.PackageStream.Seek(0, SeekOrigin.Begin);
                     await PackageExtractor.ExtractPackageAsync(
@@ -577,8 +577,8 @@ public static class NuGetResolver
                 }
             }
 
-            if (!installed)
-                Log.Debug("NuGetResolver: failed to install {Package} from any source", identity);
+            if (!installed){
+                Log.Debug("NuGetResolver: failed to install {Package} from any source", identity);}
         }
     }
 
@@ -605,8 +605,8 @@ public static class NuGetResolver
         }
 
         var dgSpec = CreateDependencyGraphSpec(projectPath, extraGlobalProperties);
-        if (dgSpec == null)
-            return null;
+        if (dgSpec == null){
+            return null;}
         var lockFiles = await RestoreAsync(dgSpec, commit: false, ct);
         return lockFiles.TryGetValue(Path.GetFullPath(projectPath), out var lockFile) ? lockFile : null;
     }
@@ -623,18 +623,18 @@ public static class NuGetResolver
             var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
 
             var tfv = doc.Descendants(ns + "TargetFrameworkVersion").FirstOrDefault()?.Value?.Trim();
-            if (!string.IsNullOrEmpty(tfv))
-                return NuGetFramework.Parse($".NETFramework,Version={tfv}");
+            if (!string.IsNullOrEmpty(tfv)){
+                return NuGetFramework.Parse($".NETFramework,Version={tfv}");}
 
             var tf = doc.Descendants(ns + "TargetFramework").FirstOrDefault()?.Value?.Trim();
-            if (!string.IsNullOrEmpty(tf))
-                return NuGetFramework.Parse(tf);
+            if (!string.IsNullOrEmpty(tf)){
+                return NuGetFramework.Parse(tf);}
 
             var tfs = doc.Descendants(ns + "TargetFrameworks").FirstOrDefault()?.Value;
             var first = tfs?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .FirstOrDefault();
-            if (!string.IsNullOrEmpty(first))
-                return NuGetFramework.Parse(first);
+            if (!string.IsNullOrEmpty(first)){
+                return NuGetFramework.Parse(first);}
         }
         catch (Exception ex)
         {

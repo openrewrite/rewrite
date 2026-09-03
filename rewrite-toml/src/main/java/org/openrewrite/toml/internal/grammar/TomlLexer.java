@@ -30,15 +30,41 @@ public class TomlLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		WS=1, NL=2, COMMENT=3, L_BRACKET=4, DOUBLE_L_BRACKET=5, R_BRACKET=6, DOUBLE_R_BRACKET=7,
-		EQUALS=8, DOT=9, COMMA=10, BASIC_STRING=11, LITERAL_STRING=12, UNQUOTED_KEY=13,
-		VALUE_WS=14, L_BRACE=15, BOOLEAN=16, ML_BASIC_STRING=17, ML_LITERAL_STRING=18,
-		FLOAT=19, INF=20, NAN=21, DEC_INT=22, HEX_INT=23, OCT_INT=24, BIN_INT=25,
-		OFFSET_DATE_TIME=26, LOCAL_DATE_TIME=27, LOCAL_DATE=28, LOCAL_TIME=29,
-		INLINE_TABLE_WS=30, R_BRACE=31, ARRAY_WS=32;
-	public static final int
-		SIMPLE_VALUE_MODE=1, INLINE_TABLE_MODE=2, ARRAY_MODE=3;
+    public static final int WS = 1;
+    public static final int NL = 2;
+    public static final int COMMENT = 3;
+    public static final int L_BRACKET = 4;
+    public static final int DOUBLE_L_BRACKET = 5;
+    public static final int R_BRACKET = 6;
+    public static final int DOUBLE_R_BRACKET = 7;
+    public static final int EQUALS = 8;
+    public static final int DOT = 9;
+    public static final int COMMA = 10;
+    public static final int BASIC_STRING = 11;
+    public static final int LITERAL_STRING = 12;
+    public static final int UNQUOTED_KEY = 13;
+    public static final int VALUE_WS = 14;
+    public static final int L_BRACE = 15;
+    public static final int BOOLEAN = 16;
+    public static final int ML_BASIC_STRING = 17;
+    public static final int ML_LITERAL_STRING = 18;
+    public static final int FLOAT = 19;
+    public static final int INF = 20;
+    public static final int NAN = 21;
+    public static final int DEC_INT = 22;
+    public static final int HEX_INT = 23;
+    public static final int OCT_INT = 24;
+    public static final int BIN_INT = 25;
+    public static final int OFFSET_DATE_TIME = 26;
+    public static final int LOCAL_DATE_TIME = 27;
+    public static final int LOCAL_DATE = 28;
+    public static final int LOCAL_TIME = 29;
+    public static final int INLINE_TABLE_WS = 30;
+    public static final int R_BRACE = 31;
+    public static final int ARRAY_WS = 32;
+    public static final int SIMPLE_VALUE_MODE = 1;
+    public static final int INLINE_TABLE_MODE = 2;
+    public static final int ARRAY_MODE = 3;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};

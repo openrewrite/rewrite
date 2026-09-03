@@ -110,7 +110,7 @@ public class Environment {
         List<RecipeDescriptor> result = new ArrayList<>();
         for (ResourceLoader r : resourceLoaders) {
             if (r instanceof YamlResourceLoader) {
-                result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToExamples)));
+                result.addAll(((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToExamples));
             } else {
                 Collection<RecipeDescriptor> descriptors = r.listRecipeDescriptors();
                 for (RecipeDescriptor descriptor : descriptors) {
@@ -155,7 +155,7 @@ public class Environment {
                             .min(comparingInt(a -> LevenshteinDistance.getDefaultInstance().apply(a, r)))
                             .orElse(r))
                     .collect(toList());
-            String message = String.format("Recipe(s) not found: %s\nDid you mean: %s",
+            String message = String.format("Recipe(s) not found: %s%nDid you mean: %s",
                     String.join(", ", recipesNotFound),
                     String.join(", ", suggestions));
             throw new RecipeException(message);

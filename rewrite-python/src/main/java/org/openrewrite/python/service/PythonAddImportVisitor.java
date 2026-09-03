@@ -33,9 +33,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.python.internal.PythonImportNames.aliasName;
-import static org.openrewrite.python.internal.PythonImportNames.canonicalFqn;
-import static org.openrewrite.python.internal.PythonImportNames.nameString;
+import static org.openrewrite.python.internal.PythonImportNames.*;
 
 /**
  * Dispatches to {@code rewrite.python.add_import.AddImport}.

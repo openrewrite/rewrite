@@ -57,8 +57,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitJsCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
-        return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
-                .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
+        return cu.withSourcePath(q.receiveAndGet(cu.getSourcePath(), Paths::get))
+                .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<JS.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))

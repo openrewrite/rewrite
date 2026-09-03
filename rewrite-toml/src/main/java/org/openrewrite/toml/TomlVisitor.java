@@ -110,6 +110,6 @@ public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
         }
 
         Space after = visitSpace(right.getAfter(), p);
-        return (after == right.getAfter() && t == right.getElement()) ? right : new TomlRightPadded<>(t, after, right.getMarkers());
+        return after == right.getAfter() && t == right.getElement() ? right : new TomlRightPadded<>(t, after, right.getMarkers());
     }
 }

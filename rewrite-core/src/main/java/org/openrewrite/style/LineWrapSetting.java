@@ -16,6 +16,6 @@
 package org.openrewrite.style;
 
 public enum LineWrapSetting {
-    DoNotWrap, WrapAlways, ChopIfTooLong;
+    DoNotWrap, WrapAlways, ChopIfTooLong
     // Eventually we would add values like WrapIfTooLong
 }

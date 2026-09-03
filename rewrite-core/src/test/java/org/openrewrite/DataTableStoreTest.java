@@ -18,6 +18,9 @@ package org.openrewrite;
 import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextVisitor;
 
 import java.io.FileInputStream;
 import java.io.FilterInputStream;
@@ -35,10 +38,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Stream;
-
-import org.openrewrite.internal.InMemoryLargeSourceSet;
-import org.openrewrite.text.PlainText;
-import org.openrewrite.text.PlainTextVisitor;
 
 import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
@@ -375,13 +374,13 @@ class DataTableStoreTest {
         suffix.put("org", "my-org");
 
         try (CsvDataTableStore store = new CsvDataTableStore(
-                tempDir, (path) -> {
+                tempDir, path -> {
             try {
                 return Files.newOutputStream(path);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-        }, (path) -> {
+        }, path -> {
             try {
                 return Files.newInputStream(path);
             } catch (IOException e) {

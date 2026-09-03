@@ -39,8 +39,8 @@ public class RpcVisitor : TreeVisitor<Tree, ExecutionContext>
     {
         StopAfterPreVisit();
 
-        if (tree is not SourceFile sf)
-            return tree;
+        if (tree is not SourceFile sf){
+            return tree;}
 
         var treeId = sf.Id.ToString();
         _rpc.StoreLocalObject(treeId, sf);

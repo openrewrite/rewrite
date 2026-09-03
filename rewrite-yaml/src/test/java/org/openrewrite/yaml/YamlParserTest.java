@@ -118,7 +118,7 @@ class YamlParserTest implements RewriteTest {
       "你好🛠世界"
     })
     void parseYamlWithUnicode(String input) {
-        Stream<SourceFile> yamlSources = YamlParser.builder().build().parse("a: %s\n".formatted(input));
+        Stream<SourceFile> yamlSources = YamlParser.builder().build().parse("a: %s%n".formatted(input));
         SourceFile sourceFile = yamlSources.findFirst().get();
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
 

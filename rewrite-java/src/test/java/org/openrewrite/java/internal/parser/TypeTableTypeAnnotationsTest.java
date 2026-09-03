@@ -464,7 +464,9 @@ class TypeTableTypeAnnotationsTest {
         List<TypeTable.TsvRow> rows = new java.util.ArrayList<>(lines.length);
         for (int i = 1; i < lines.length; i++) {
             String line = lines[i];
-            if (line.isEmpty()) continue;
+            if (line.isEmpty()) {
+                continue;
+            }
             rows.add(TypeTable.TsvRow.parse(line));
         }
         return rows;

@@ -24,7 +24,6 @@ import org.openrewrite.golang.tree.Go;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
-import static org.assertj.core.api.Assertions.assertThat;
 import org.openrewrite.test.TypeValidation;
 
 import java.nio.file.Path;
@@ -32,6 +31,7 @@ import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.golang.Assertions.expectMethodType;
 import static org.openrewrite.golang.Assertions.expectType;
 import static org.openrewrite.golang.Assertions.go;

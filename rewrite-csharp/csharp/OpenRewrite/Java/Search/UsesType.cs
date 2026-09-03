@@ -85,7 +85,7 @@ public class UsesType : JavaVisitor<ExecutionContext>
 
     private void CheckType(JavaType? type)
     {
-        if (_found || type == null) return;
+        if (_found || type == null){ return;}
         var fqn = FullyQualifiedName(type);
         if (fqn != null && MatchTypeGlob(_pattern, fqn))
         {
@@ -112,16 +112,16 @@ public class UsesType : JavaVisitor<ExecutionContext>
 
     private static bool MatchTypeGlob(string pattern, string fqn)
     {
-        if (pattern == fqn) return true;
-        if (pattern == "*..*") return true;
+        if (pattern == fqn){ return true;}
+        if (pattern == "*..*"){ return true;}
 
         var patternParts = pattern.Split('.');
         var fqnParts = fqn.Split('.');
-        if (patternParts.Length != fqnParts.Length) return false;
+        if (patternParts.Length != fqnParts.Length){ return false;}
         for (var i = 0; i < patternParts.Length; i++)
         {
-            if (patternParts[i] == "*") continue;
-            if (patternParts[i] != fqnParts[i]) return false;
+            if (patternParts[i] == "*"){ continue;}
+            if (patternParts[i] != fqnParts[i]){ return false;}
         }
         return true;
     }

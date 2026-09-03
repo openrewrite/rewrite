@@ -37,7 +37,7 @@ import static java.util.Collections.synchronizedMap;
  */
 @EqualsAndHashCode
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public class Space {
+public final class Space {
     public static final Space EMPTY = new Space("", emptyList());
     public static final Space SINGLE_SPACE = new Space(" ", emptyList());
 

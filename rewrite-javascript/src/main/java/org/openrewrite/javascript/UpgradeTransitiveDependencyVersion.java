@@ -19,11 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.javascript.internal.DependencyPathSegment;
-import org.openrewrite.javascript.internal.LockFileRegeneration;
-import org.openrewrite.javascript.internal.NodeDependencyScan;
-import org.openrewrite.javascript.internal.PackageJsonHelper;
-import org.openrewrite.javascript.internal.PackageJsonOverrides;
+import org.openrewrite.javascript.internal.*;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
@@ -76,7 +72,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
@@ -92,7 +90,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                    if (marker == null) return tree;
+                    if (marker == null) {
+                        return tree;
+                    }
                     NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                 }
@@ -112,7 +112,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
@@ -134,16 +136,24 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 }
 
                 Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
+                if (packagePath == null) {
+                    return tree;
+                }
                 NodeDependencyScan.ProjectState rootPs = acc.projects.get(packagePath);
-                if (rootPs == null) return tree;
+                if (rootPs == null) {
+                    return tree;
+                }
 
                 for (Path importer : NodeDependencyScan.lockImporters(acc, packagePath, rootPs)) {
                     NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
-                    if (ips == null) continue;
+                    if (ips == null) {
+                        continue;
+                    }
                     if (ips.modifiedPackageJson == null) {
                         SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
-                        if (pkg == null) pkg = ips.capturedPackageJson;
+                        if (pkg == null) {
+                            pkg = ips.capturedPackageJson;
+                        }
                         if (pkg != null && canApply(pkg)) {
                             ensureComputed(ips, pkg, ctx);
                             if (ips.modifiedPackageJson != null) {
@@ -164,9 +174,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             }
 
             private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
-                if (ps.modifiedPackageJson != null) return;
+                if (ps.modifiedPackageJson != null) {
+                    return;
+                }
                 NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                if (marker == null || marker.getPackageManager() == null) return;
+                if (marker == null || marker.getPackageManager() == null) {
+                    return;
+                }
                 NodeResolutionResult.PackageManager pm = marker.getPackageManager();
                 List<DependencyPathSegment> parsedPath = dependencyPath == null
                         ? null

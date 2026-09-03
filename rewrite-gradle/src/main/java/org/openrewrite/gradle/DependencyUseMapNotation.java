@@ -17,8 +17,6 @@ package org.openrewrite.gradle;
 
 import lombok.Getter;
 import org.openrewrite.*;
-import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
@@ -27,6 +25,8 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -185,7 +185,7 @@ public class DependencyUseMapNotation extends Recipe {
                                                                                                      BiFunction<R, Space, R> firstItemPrefixer,
                                                                                                      Function<J.MethodInvocation, J.MethodInvocation> typeAddition) {
         Expression e = m.getArguments().get(0);
-        if (!(type.isInstance(e))) {
+        if (!type.isInstance(e)) {
             return m;
         }
         T template = type.cast(e);
@@ -193,7 +193,7 @@ public class DependencyUseMapNotation extends Recipe {
         // Supporting all probable interpolations is difficult
         // This focuses on the most common case: When only the version number is interpolated
         List<J> parts = partsExtractor.apply(template);
-        if (parts.size() != 2 || !(parts.get(0) instanceof J.Literal) || !(partsType.isInstance(parts.get(1)))) {
+        if (parts.size() != 2 || !(parts.get(0) instanceof J.Literal) || !partsType.isInstance(parts.get(1))) {
             return m;
         }
         J.Literal arg1 = (J.Literal) parts.get(0);

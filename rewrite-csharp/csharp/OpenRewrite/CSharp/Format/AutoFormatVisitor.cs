@@ -42,12 +42,12 @@ public class AutoFormatVisitor<P> : CSharpVisitor<P>
     /// </summary>
     public J Format(J tree, Cursor cursor)
     {
-        if (tree is CompilationUnit treeCu)
-            return RoslynFormatter.Format(treeCu, targetSubtree: null, stopAfter: _stopAfter);
+        if (tree is CompilationUnit treeCu){
+            return RoslynFormatter.Format(treeCu, targetSubtree: null, stopAfter: _stopAfter);}
 
         var cu = cursor.FirstEnclosing<CompilationUnit>();
-        if (cu == null)
-            return tree;
+        if (cu == null){
+            return tree;}
 
         return RoslynFormatter.FormatSubtree(cu, tree.Id, tree, _stopAfter);
     }

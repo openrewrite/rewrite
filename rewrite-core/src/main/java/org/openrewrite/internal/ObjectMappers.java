@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
 
 import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 
-public class ObjectMappers {
+public final class ObjectMappers {
     private ObjectMappers() {
     }
 

@@ -29,7 +29,7 @@ public class RubyWhitespaceValidationService implements WhitespaceValidationServ
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RubyIsoVisitor<ExecutionContext>() {
+        return new RubyIsoVisitor<>() {
             @Override
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
                 space = super.visitSpace(space, loc, ctx);

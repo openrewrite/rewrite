@@ -28,13 +28,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
-import org.openrewrite.javascript.internal.registry.AbbreviatedPackument;
-import org.openrewrite.javascript.internal.registry.Environment;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
-import org.openrewrite.javascript.internal.registry.NodeRegistryException;
-import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
-import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
-import org.openrewrite.javascript.internal.registry.VersionManifest;
+import org.openrewrite.javascript.internal.registry.*;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.semver.Semver;
@@ -42,18 +36,7 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Deque;
-import java.util.EnumSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 import static java.util.Collections.*;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
@@ -1499,8 +1482,8 @@ public final class NativeLockEngine {
                                         String existingLock, NodeRegistries registries, NpmRegistryClient client) {
         boolean bun = pm == PackageManager.Bun;
         if (req.parent == null || !placed.containsKey(req.parent) ||
-                !(bun ? topLevelPinnedBun(existingLock, req.name, existingVersion) :
-                        topLevelPinnedNpm(existingLock, req.name, existingVersion))) {
+                (bun ? !topLevelPinnedBun(existingLock, req.name, existingVersion) :
+                        !topLevelPinnedNpm(existingLock, req.name, existingVersion))) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is already placed at " +
                     existingVersion + " which does not satisfy " + req.constraint +
                     " (" + (bun ? "bun" : "npm") + " would nest/move it; deferred)");
@@ -1932,12 +1915,24 @@ public final class NativeLockEngine {
     }
 
     private static @Nullable String unsupportedBunMetadata(VersionManifest m) {
-        if (m.getBin() != null) return "bin";
-        if (notEmpty(m.getOs())) return "os";
-        if (notEmpty(m.getCpu())) return "cpu";
-        if (notEmpty(m.getLibc())) return "libc";
-        if (notEmpty(m.getBundleDependencies())) return "bundleDependencies";
-        if (bool(m.getHasInstallScript())) return "hasInstallScript";
+        if (m.getBin() != null) {
+            return "bin";
+        }
+        if (notEmpty(m.getOs())) {
+            return "os";
+        }
+        if (notEmpty(m.getCpu())) {
+            return "cpu";
+        }
+        if (notEmpty(m.getLibc())) {
+            return "libc";
+        }
+        if (notEmpty(m.getBundleDependencies())) {
+            return "bundleDependencies";
+        }
+        if (bool(m.getHasInstallScript())) {
+            return "hasInstallScript";
+        }
         return null;
     }
 
@@ -1964,13 +1959,27 @@ public final class NativeLockEngine {
     }
 
     private static @Nullable String unsupportedPnpmMetadata(VersionManifest m) {
-        if (notEmpty(m.getOs())) return "os";
-        if (notEmpty(m.getCpu())) return "cpu";
-        if (notEmpty(m.getLibc())) return "libc";
-        if (m.getDeprecated() != null) return "deprecated";
-        if (m.getBin() != null) return "bin";
-        if (bool(m.getHasInstallScript())) return "hasInstallScript";
-        if (notEmpty(m.getBundleDependencies())) return "bundleDependencies";
+        if (notEmpty(m.getOs())) {
+            return "os";
+        }
+        if (notEmpty(m.getCpu())) {
+            return "cpu";
+        }
+        if (notEmpty(m.getLibc())) {
+            return "libc";
+        }
+        if (m.getDeprecated() != null) {
+            return "deprecated";
+        }
+        if (m.getBin() != null) {
+            return "bin";
+        }
+        if (bool(m.getHasInstallScript())) {
+            return "hasInstallScript";
+        }
+        if (notEmpty(m.getBundleDependencies())) {
+            return "bundleDependencies";
+        }
         return null;
     }
 
@@ -2151,12 +2160,24 @@ public final class NativeLockEngine {
 
     /** The metadata surfaces whose byte-exact npm serialization is not yet verified; each defers the add. */
     private static @Nullable String unserializableMetadata(VersionManifest m) {
-        if (m.getBin() != null && !m.getBin().isObject()) return "non-object bin";
-        if (m.getFunding() != null && !m.getFunding().isTextual()) return "non-string funding";
-        if (notEmpty(m.getBundleDependencies())) return "bundleDependencies";
-        if (bool(m.getHasShrinkwrap())) return "hasShrinkwrap";
-        if (notEmpty(m.getAcceptDependencies())) return "acceptDependencies";
-        if (m.getWorkspaces() != null) return "workspaces";
+        if (m.getBin() != null && !m.getBin().isObject()) {
+            return "non-object bin";
+        }
+        if (m.getFunding() != null && !m.getFunding().isTextual()) {
+            return "non-string funding";
+        }
+        if (notEmpty(m.getBundleDependencies())) {
+            return "bundleDependencies";
+        }
+        if (bool(m.getHasShrinkwrap())) {
+            return "hasShrinkwrap";
+        }
+        if (notEmpty(m.getAcceptDependencies())) {
+            return "acceptDependencies";
+        }
+        if (m.getWorkspaces() != null) {
+            return "workspaces";
+        }
         return null;
     }
 

@@ -17,8 +17,8 @@ package org.openrewrite.golang.tree;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 

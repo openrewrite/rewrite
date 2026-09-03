@@ -353,7 +353,7 @@ class ReloadableJava8Parser implements JavaParser {
         }
     }
 
-    private static class PackageAwareJavaFileObject extends SimpleJavaFileObject {
+    private static final class PackageAwareJavaFileObject extends SimpleJavaFileObject {
         private final String pkg;
         @Getter
         private final String className;

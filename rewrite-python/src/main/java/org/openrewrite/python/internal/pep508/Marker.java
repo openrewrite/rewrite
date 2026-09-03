@@ -19,12 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.internal.pep440.PythonVersion;
 import org.openrewrite.python.internal.pep440.PythonVersionSpecifier;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 
 import static org.openrewrite.python.internal.pep508.Pep508Parser.Comparison;
 import static org.openrewrite.python.internal.pep508.Pep508Parser.Operand;

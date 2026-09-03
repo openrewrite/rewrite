@@ -1624,7 +1624,7 @@ class PythonJavaPrinter:
         else:
             # Visit select with appropriate separator
             if method.padding.select:
-                suffix = "" if not method.name.simple_name else "."
+                suffix =  "." if method.name.simple_name else""
                 self._visit_right_padded(method.padding.select, p, suffix)
 
             # Visit type parameters

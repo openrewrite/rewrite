@@ -97,15 +97,15 @@ public class PreconditionsCheckTest(RpcFixture fixture) : RpcRewriteTest(fixture
     {
         public override J VisitIdentifier(Identifier id, ExecutionContext ctx)
         {
-            if (id.Type is JavaType.Class cls)
-                types.Add($"{id.SimpleName}: FQN={cls.FullyQualifiedName}");
+            if (id.Type is JavaType.Class cls){
+                types.Add($"{id.SimpleName}: FQN={cls.FullyQualifiedName}");}
             return id;
         }
 
         public override J VisitFieldAccess(FieldAccess fa, ExecutionContext ctx)
         {
-            if (fa.Type != null)
-                types.Add($"{fa}: {fa.Type}");
+            if (fa.Type != null){
+                types.Add($"{fa}: {fa.Type}");}
             return base.VisitFieldAccess(fa, ctx);
         }
     }

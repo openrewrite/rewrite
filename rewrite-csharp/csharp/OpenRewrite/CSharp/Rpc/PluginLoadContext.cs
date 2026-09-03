@@ -44,8 +44,8 @@ public class PluginLoadContext : AssemblyLoadContext
         var existing = Default.Assemblies
             .FirstOrDefault(a => string.Equals(a.GetName().Name, assemblyName.Name,
                 StringComparison.OrdinalIgnoreCase));
-        if (existing != null)
-            return existing;
+        if (existing != null){
+            return existing;}
 
         // Resolve from plugin's dependency graph via .deps.json
         var path = _resolver.ResolveAssemblyToPath(assemblyName);

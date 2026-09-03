@@ -173,7 +173,9 @@ final class XPathCompiler {
             // Set nextIsBacktrack flag and compute step characteristics
             for (int i = 0; i < compiledSteps.length; i++) {
                 CompiledStep s = compiledSteps[i];
-                if (s.isDescendant) flags |= FLAG_HAS_DESCENDANT;
+                if (s.isDescendant) {
+                    flags |= FLAG_HAS_DESCENDANT;
+                }
 
                 switch (s.type) {
                     case ABBREVIATED_DOT:
@@ -356,7 +358,9 @@ final class XPathCompiler {
         int flags = originalFlags & (FLAG_ABSOLUTE_PATH | FLAG_DESCENDANT_OR_SELF);
 
         for (CompiledStep s : steps) {
-            if (s.isDescendant) flags |= FLAG_HAS_DESCENDANT;
+            if (s.isDescendant) {
+                flags |= FLAG_HAS_DESCENDANT;
+            }
 
             switch (s.type) {
                 case ABBREVIATED_DOT:
@@ -508,7 +512,7 @@ final class XPathCompiler {
             // In the grammar: relationalExpr ((EQUALS | NOT_EQUALS) relationalExpr)*
             // We need to look at the i-1 operator token
             Token opToken = getEqualityOperator(eqExpr, i - 1);
-            ComparisonOp op = (opToken != null && opToken.getType() == XPathParser.NOT_EQUALS)
+            ComparisonOp op = opToken != null && opToken.getType() == XPathParser.NOT_EQUALS
                     ? ComparisonOp.NE : ComparisonOp.EQ;
 
             CompiledExpr right = compileRelationalExpr(relExprs.get(i));
@@ -868,7 +872,9 @@ final class XPathCompiler {
      * Strip quotes from string literal.
      */
     static String stripQuotes(String s) {
-        if (s.length() < 2) return s;
+        if (s.length() < 2) {
+            return s;
+        }
         char first = s.charAt(0);
         if ((first == '\'' || first == '"') && s.charAt(s.length() - 1) == first) {
             return s.substring(1, s.length() - 1);

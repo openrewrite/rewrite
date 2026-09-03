@@ -39,7 +39,7 @@ public class CharacterLiteralToString extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RubyIsoVisitor<ExecutionContext>() {
+        return new RubyIsoVisitor<>() {
             @Override
             public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
                 if (!literal.getMarkers().findFirst(CharacterLiteral.class).isPresent() ||

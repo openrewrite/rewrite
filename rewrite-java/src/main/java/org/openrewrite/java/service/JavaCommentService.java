@@ -17,8 +17,8 @@ package org.openrewrite.java.service;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.CommentService;

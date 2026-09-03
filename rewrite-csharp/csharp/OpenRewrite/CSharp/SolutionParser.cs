@@ -84,8 +84,8 @@ internal static class SolutionRestore
         {
             lock (Restored)
             {
-                if (Restored.TryGetValue(key, out var cached))
-                    return cached;
+                if (Restored.TryGetValue(key, out var cached)){
+                    return cached;}
             }
 
             var lockFiles = new Dictionary<string, LockFile>(StringComparer.OrdinalIgnoreCase);
@@ -109,8 +109,8 @@ internal static class SolutionRestore
                     {
                         var lockFile = await NuGetResolver.RestorePackagesConfigGraphAsync(
                             projectFile, packagesConfig, NuGetResolver.ReadLegacyFramework(projectFile), ct);
-                        if (lockFile != null)
-                            lockFiles[Path.GetFullPath(projectFile)] = lockFile;
+                        if (lockFile != null){
+                            lockFiles[Path.GetFullPath(projectFile)] = lockFile;}
                     }
                 }
             }
@@ -157,25 +157,25 @@ internal static class SolutionRestore
     /// </summary>
     public static async Task<NetFrameworkBuildAssets> RestoreNetFrameworkBuildAssetsAsync(CancellationToken ct)
     {
-        if (_buildAssets != null)
-            return _buildAssets;
+        if (_buildAssets != null){
+            return _buildAssets;}
 
         await Gate.WaitAsync(ct);
         try
         {
-            if (_buildAssets != null)
-                return _buildAssets;
+            if (_buildAssets != null){
+                return _buildAssets;}
 
             var cacheDir = Path.Combine(Path.GetTempPath(), "openrewrite-netfx-build-assets");
             var vsToolsPath = Path.Combine(cacheDir, WebTargetsPackage, "tools", "VSToolsPath");
             var targetFrameworkRootPath = Path.Combine(cacheDir, ReferenceAssembliesPackage, "build");
 
-            if (!Directory.Exists(vsToolsPath))
+            if (!Directory.Exists(vsToolsPath)){
                 await NuGetResolver.InstallPackageAsync(
-                    WebTargetsPackage, WebTargetsVersion, cacheDir, excludeVersion: true, ct);
-            if (!Directory.Exists(targetFrameworkRootPath))
+                    WebTargetsPackage, WebTargetsVersion, cacheDir, excludeVersion: true, ct);}
+            if (!Directory.Exists(targetFrameworkRootPath)){
                 await NuGetResolver.InstallPackageAsync(
-                    ReferenceAssembliesPackage, ReferenceAssembliesVersion, cacheDir, excludeVersion: true, ct);
+                    ReferenceAssembliesPackage, ReferenceAssembliesVersion, cacheDir, excludeVersion: true, ct);}
 
             _buildAssets = new NetFrameworkBuildAssets(
                 Directory.Exists(vsToolsPath) ? vsToolsPath : null,
@@ -236,10 +236,10 @@ public class SolutionParser
         if (hasPackagesConfig || HasNonSdkProject(path))
         {
             var buildAssets = await SolutionRestore.RestoreNetFrameworkBuildAssetsAsync(ct);
-            if (buildAssets.VSToolsPath != null)
-                msbuildProperties["VSToolsPath"] = buildAssets.VSToolsPath;
-            if (buildAssets.TargetFrameworkRootPath != null)
-                msbuildProperties["TargetFrameworkRootPath"] = buildAssets.TargetFrameworkRootPath;
+            if (buildAssets.VSToolsPath != null){
+                msbuildProperties["VSToolsPath"] = buildAssets.VSToolsPath;}
+            if (buildAssets.TargetFrameworkRootPath != null){
+                msbuildProperties["TargetFrameworkRootPath"] = buildAssets.TargetFrameworkRootPath;}
         }
 
         _restoredLockFiles = await SolutionRestore.RunAsync(path, hasPackagesConfig, msbuildProperties, ct);
@@ -257,10 +257,10 @@ public class SolutionParser
         Solution solution;
         Log.Debug(">> MSBuildWorkspace.Open ({FileName})", Path.GetFileName(path));
         if (path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
-            solution = await workspace.OpenSolutionAsync(path, progress, cancellationToken: ct);
-        else
-            solution = (await workspace.OpenProjectAsync(path, progress, cancellationToken: ct)).Solution;
+            path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase)){
+            solution = await workspace.OpenSolutionAsync(path, progress, cancellationToken: ct);}
+        else{
+            solution = (await workspace.OpenProjectAsync(path, progress, cancellationToken: ct)).Solution;}
         Log.Debug("<< MSBuildWorkspace.Open ({FileName}) ({Elapsed})", Path.GetFileName(path), sw.Elapsed);
 
         // Report any workspace diagnostics
@@ -268,10 +268,10 @@ public class SolutionParser
         if (diags.Count > 0)
         {
             Log.Debug("MSBuildWorkspace: {DiagCount} diagnostics", diags.Count);
-            foreach (var d in diags.Take(10))
-                Log.Debug("  MSBuild diagnostic {Kind}: {Message}", d.Kind, d.Message);
-            if (diags.Count > 10)
-                Log.Debug("  ... and {Remaining} more diagnostics", diags.Count - 10);
+            foreach (var d in diags.Take(10)){
+                Log.Debug("  MSBuild diagnostic {Kind}: {Message}", d.Kind, d.Message);}
+            if (diags.Count > 10){
+                Log.Debug("  ... and {Remaining} more diagnostics", diags.Count - 10);}
         }
 
         var projectCount = solution.Projects.Count();
@@ -309,8 +309,8 @@ public class SolutionParser
         var project = solution.Projects.FirstOrDefault(p =>
             string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase));
 
-        if (project == null)
-            throw new ArgumentException($"Project not found in solution: {projectPath}");
+        if (project == null){
+            throw new ArgumentException($"Project not found in solution: {projectPath}");}
 
         Compilation? compilation;
         var compileSw = Stopwatch.StartNew();
@@ -368,7 +368,7 @@ public class SolutionParser
             }
 
             var source = doc.GetTextAsync().Result?.ToString();
-            if (source == null) continue;
+            if (source == null){ continue;}
 
             var relativePath = Path.GetRelativePath(rootDir, doc.FilePath!);
             // Normalize path separators to forward slashes for cross-platform consistency
@@ -385,8 +385,8 @@ public class SolutionParser
                 if (compilation != null)
                 {
                     var syntaxTree = doc.GetSyntaxTreeAsync().Result;
-                    if (syntaxTree != null)
-                        semanticModel = compilation.GetSemanticModel(syntaxTree);
+                    if (syntaxTree != null){
+                        semanticModel = compilation.GetSemanticModel(syntaxTree);}
                 }
 
                 CompilationUnit cu;
@@ -504,12 +504,13 @@ public class SolutionParser
     {
         var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var paths = candidatePaths.ToList();
-        if (paths.Count == 0) return ignored;
+        if (paths.Count == 0){ return ignored;}
 
         try
         {
             var workDir = GitCli.DiscoverWorkTree(rootDir);
-            if (workDir == null) return ignored; // Not inside a git repository.
+            if (workDir == null){ return ignored; // Not inside a git repository.
+            } // Not inside a git repository.
             workDir = PathUtil.Canonicalize(workDir);
 
             // Evaluate ignore rules against repo-relative paths (forward slashes, as git
@@ -520,18 +521,19 @@ public class SolutionParser
             foreach (var path in paths)
             {
                 var rel = Path.GetRelativePath(workDir, PathUtil.Canonicalize(path));
-                if (rel.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(rel))
+                if (rel.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(rel)){
                     continue; // Outside the working tree — not subject to its ignore rules.
+                } // Outside the working tree — not subject to its ignore rules.
                 rel = rel.Replace('\\', '/');
                 relToOriginal[rel] = path;
             }
 
-            if (relToOriginal.Count == 0) return ignored;
+            if (relToOriginal.Count == 0){ return ignored;}
 
             foreach (var rel in GitCli.CheckIgnored(workDir, relToOriginal.Keys))
             {
-                if (relToOriginal.TryGetValue(rel, out var original))
-                    ignored.Add(original);
+                if (relToOriginal.TryGetValue(rel, out var original)){
+                    ignored.Add(original);}
             }
         }
         catch (Exception ex)
@@ -549,32 +551,29 @@ public class SolutionParser
     /// </summary>
     private static bool IsUserSource(Document doc, Project project)
     {
-        if (doc.FilePath == null) return false;
+        if (doc.FilePath == null){ return false;}
 
         var projectDir = Path.GetDirectoryName(project.FilePath);
-        if (projectDir == null) return true;
+        if (projectDir == null){ return true;}
 
         var relativePath = Path.GetRelativePath(projectDir, doc.FilePath);
 
         // Skip bin/ directory
         if (relativePath.StartsWith("bin" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
-            relativePath.StartsWith("bin/", StringComparison.OrdinalIgnoreCase))
-            return false;
+            relativePath.StartsWith("bin/", StringComparison.OrdinalIgnoreCase)){
+            return false;}
 
         // Skip obj/ directory entirely — generated files are not included in LST
         if (relativePath.StartsWith("obj" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
-            relativePath.StartsWith("obj/", StringComparison.OrdinalIgnoreCase))
-            return false;
+            relativePath.StartsWith("obj/", StringComparison.OrdinalIgnoreCase)){
+            return false;}
 
         // Skip source files supplied by NuGet packages. Source-only packages (e.g. *.sources,
         // and any package shipping contentFiles/cs/**) inject .cs files from the global package
         // cache into the compilation. That is third-party code living outside the repository, so
         // it must not be parsed into the LST, transformed by recipes, or emitted into fix patches
         // (which would otherwise target unwritable cache paths and fail to apply).
-        if (IsUnderNuGetCache(doc.FilePath))
-            return false;
-
-        return true;
+        return !(IsUnderNuGetCache(doc.FilePath));
     }
 
     private static readonly string[] NuGetCacheRoots = BuildNuGetCacheRoots();
@@ -589,8 +588,8 @@ public class SolutionParser
             catch { /* ignore malformed NUGET_PACKAGES */ }
         }
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (!string.IsNullOrEmpty(home))
-            roots.Add(Path.Combine(home, ".nuget", "packages"));
+        if (!string.IsNullOrEmpty(home)){
+            roots.Add(Path.Combine(home, ".nuget", "packages"));}
         return roots.ToArray();
     }
 
@@ -609,8 +608,8 @@ public class SolutionParser
 
         foreach (var root in NuGetCacheRoots)
         {
-            if (full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                return true;
+            if (full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)){
+                return true;}
         }
 
         return false;
@@ -633,15 +632,15 @@ public class SolutionParser
                 sdk = root.Attribute("Sdk")?.Value;
 
                 var tfm = root.Elements("PropertyGroup").Elements("TargetFramework").FirstOrDefault()?.Value;
-                if (tfm != null)
-                    tfms.Add(tfm);
+                if (tfm != null){
+                    tfms.Add(tfm);}
 
                 var tfmList = root.Elements("PropertyGroup").Elements("TargetFrameworks").FirstOrDefault()?.Value;
                 if (tfmList != null)
                 {
-                    foreach (var t in tfmList.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                        if (!tfms.Contains(t))
-                            tfms.Add(t);
+                    foreach (var t in tfmList.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)){
+                        if (!tfms.Contains(t)){
+                            tfms.Add(t);}}
                 }
             }
         }
@@ -664,15 +663,15 @@ public class SolutionParser
         try
         {
             var dir = Path.GetDirectoryName(Path.GetFullPath(path));
-            if (dir == null)
-                return false;
+            if (dir == null){
+                return false;}
             foreach (var projectFile in Directory.EnumerateFiles(dir, "*.csproj", SearchOption.AllDirectories))
             {
                 try
                 {
                     var root = XDocument.Load(projectFile).Root;
-                    if (root != null && root.Attribute("Sdk") == null)
-                        return true;
+                    if (root != null && root.Attribute("Sdk") == null){
+                        return true;}
                 }
                 catch
                 {
@@ -698,8 +697,8 @@ public class SolutionParser
         try
         {
             var dir = Path.GetDirectoryName(Path.GetFullPath(path));
-            if (dir == null)
-                return false;
+            if (dir == null){
+                return false;}
             return Directory.EnumerateFiles(dir, "packages.config", SearchOption.AllDirectories).Any();
         }
         catch (Exception ex)

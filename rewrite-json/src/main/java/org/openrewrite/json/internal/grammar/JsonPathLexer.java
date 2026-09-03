@@ -15,11 +15,11 @@
  */
 // Generated from rewrite-json/src/main/antlr/JsonPathLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.json.internal.grammar;
-import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.misc.*;
@@ -31,14 +31,45 @@ public class JsonPathLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		WS=1, UTF_8_BOM=2, MATCHES_REGEX_OPEN=3, LBRACE=4, RBRACE=5, LBRACK=6,
-		RBRACK=7, LPAREN=8, RPAREN=9, AT=10, DOT=11, DOT_DOT=12, ROOT=13, WILDCARD=14,
-		COLON=15, QUESTION=16, CONTAINS=17, TRUE=18, FALSE=19, NULL=20, Identifier=21,
-		StringLiteral=22, PositiveNumber=23, NegativeNumber=24, NumericLiteral=25,
-		COMMA=26, TICK=27, QUOTE=28, MATCHES=29, LOGICAL_OPERATOR=30, AND=31,
-		OR=32, NOT=33, EQUALITY_OPERATOR=34, EQ=35, NE=36, MATCHES_REGEX_CLOSE=37,
-		S=38, REGEX=39;
+    public static final int WS = 1;
+    public static final int UTF_8_BOM = 2;
+    public static final int MATCHES_REGEX_OPEN = 3;
+    public static final int LBRACE = 4;
+    public static final int RBRACE = 5;
+    public static final int LBRACK = 6;
+    public static final int RBRACK = 7;
+    public static final int LPAREN = 8;
+    public static final int RPAREN = 9;
+    public static final int AT = 10;
+    public static final int DOT = 11;
+    public static final int DOT_DOT = 12;
+    public static final int ROOT = 13;
+    public static final int WILDCARD = 14;
+    public static final int COLON = 15;
+    public static final int QUESTION = 16;
+    public static final int CONTAINS = 17;
+    public static final int TRUE = 18;
+    public static final int FALSE = 19;
+    public static final int NULL = 20;
+    public static final int Identifier = 21;
+    public static final int StringLiteral = 22;
+    public static final int PositiveNumber = 23;
+    public static final int NegativeNumber = 24;
+    public static final int NumericLiteral = 25;
+    public static final int COMMA = 26;
+    public static final int TICK = 27;
+    public static final int QUOTE = 28;
+    public static final int MATCHES = 29;
+    public static final int LOGICAL_OPERATOR = 30;
+    public static final int AND = 31;
+    public static final int OR = 32;
+    public static final int NOT = 33;
+    public static final int EQUALITY_OPERATOR = 34;
+    public static final int EQ = 35;
+    public static final int NE = 36;
+    public static final int MATCHES_REGEX_CLOSE = 37;
+    public static final int S = 38;
+    public static final int REGEX = 39;
 	public static final int
 		MATCHES_REGEX=1;
 	public static String[] channelNames = {

@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
  * Utility class for parsing and formatting Gradle-style dependency notation strings.
  * This class is separate from {@link Dependency} to avoid classloading issues in parent-loaded contexts.
  */
-public class DependencyNotation {
+public final class DependencyNotation {
 
     private DependencyNotation() {
         // Utility class

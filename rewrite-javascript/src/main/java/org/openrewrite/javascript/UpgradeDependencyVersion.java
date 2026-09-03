@@ -92,7 +92,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
@@ -108,7 +110,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                    if (marker == null) return tree;
+                    if (marker == null) {
+                        return tree;
+                    }
                     NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                     ps.matchedDeps = findMatches(sf);
@@ -120,7 +124,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
 
     private List<MatchedDependency> findMatches(SourceFile pkg) {
         NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return emptyList();
+        if (marker == null) {
+            return emptyList();
+        }
         Predicate<String> nameMatcher = buildNameMatcher();
         List<MatchedDependency> result = new ArrayList<>();
         collectMatches(result, "dependencies", marker.getDependencies(), nameMatcher);
@@ -141,7 +147,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
 
     private void collectMatches(List<MatchedDependency> out, String scopeName,
                                 @Nullable List<Dependency> deps, Predicate<String> nameMatcher) {
-        if (deps == null) return;
+        if (deps == null) {
+            return;
+        }
         for (Dependency d : deps) {
             if (nameMatcher.test(d.getName())) {
                 // TODO: add semver.gt check (matches TS shouldUpgrade); for v1 we always set the new version.
@@ -159,7 +167,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
@@ -194,16 +204,24 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 }
 
                 Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
+                if (packagePath == null) {
+                    return tree;
+                }
                 NodeDependencyScan.ProjectState rootPs = acc.projects.get(packagePath);
-                if (rootPs == null) return tree;
+                if (rootPs == null) {
+                    return tree;
+                }
 
                 for (Path importer : NodeDependencyScan.lockImporters(acc, packagePath, rootPs)) {
                     NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
-                    if (ips == null) continue;
+                    if (ips == null) {
+                        continue;
+                    }
                     if (ips.modifiedPackageJson == null) {
                         SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
-                        if (pkg == null) pkg = ips.capturedPackageJson;
+                        if (pkg == null) {
+                            pkg = ips.capturedPackageJson;
+                        }
                         // If the scanner found no matches on the original tree, recompute from the live tree.
                         if (ips.matchedDeps != null && ips.matchedDeps.isEmpty() && pkg != null) {
                             ips.matchedDeps = findMatches(pkg);
@@ -228,8 +246,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
             }
 
             private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
-                if (ps.modifiedPackageJson != null) return;
-                if (ps.matchedDeps == null || ps.matchedDeps.isEmpty()) return;
+                if (ps.modifiedPackageJson != null) {
+                    return;
+                }
+                if (ps.matchedDeps == null || ps.matchedDeps.isEmpty()) {
+                    return;
+                }
                 List<MatchedDependency> matches = ps.matchedDeps;
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg,

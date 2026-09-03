@@ -127,7 +127,7 @@ class CSharpRecipeArtifactIsolationTest {
         Recipe prepared = upgrade.prepare(List.of(resolver), Map.of());
         assertThat(prepared.getRecipeList())
           .as("UpgradeToDotNet10 must resolve ChangeDotNetTargetFramework as a child recipe")
-          .anyMatch(r -> r.getName().equals("OpenRewrite.CSharp.Recipes.ChangeDotNetTargetFramework"));
+          .anyMatch(r -> "OpenRewrite.CSharp.Recipes.ChangeDotNetTargetFramework".equals(r.getName()));
     }
 
     /**

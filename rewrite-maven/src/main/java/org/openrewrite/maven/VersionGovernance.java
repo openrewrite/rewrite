@@ -17,11 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.ManagedDependency;
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
-import org.openrewrite.maven.tree.ResolvedManagedDependency;
+import org.openrewrite.maven.tree.*;
 
 /**
  * Editable governance over a managed coordinate's resolved version: a {@code <dependencyManagement>} entry or an

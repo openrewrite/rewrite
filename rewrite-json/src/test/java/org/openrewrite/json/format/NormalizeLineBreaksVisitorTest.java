@@ -55,8 +55,8 @@ class NormalizeLineBreaksVisitorTest implements RewriteTest {
       "  \"age\": 30,\n" +
       "  \"car\": null}";
 
-    private TreeVisitor<?, ExecutionContext> LINUX_VISITOR = new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(false), null);
-    private TreeVisitor<?, ExecutionContext> WINDOWS_VISITOR = new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(true), null);
+    private final TreeVisitor<?, ExecutionContext> LINUX_VISITOR = new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(false), null);
+    private final TreeVisitor<?, ExecutionContext> WINDOWS_VISITOR = new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(true), null);
 
     @Test
     void windowsToLinux() {

@@ -135,13 +135,11 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitUnary(G.Unary unary, PrintOutputCapture<P> p) {
         beforeSyntax(unary, Space.Location.UNARY_PREFIX, p);
-        switch (unary.getOperator()) {
-            case Spread:
-                p.append("*");
-                visit(unary.getExpression(), p);
-                break;
-            default:
-                throw new UnsupportedOperationException("Unknown unary operator.");
+        if (unary.getOperator() == G.Unary.Type.Spread) {
+            p.append("*");
+            visit(unary.getExpression(), p);
+        } else {
+            throw new UnsupportedOperationException("Unknown unary operator.");
         }
         afterSyntax(unary, p);
         return unary;

@@ -98,7 +98,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
     public virtual JLeftPadded<T>? VisitLeftPadded<T>(JLeftPadded<T>? left, P p)
     {
-        if (left == null) return null;
+        if (left == null){ return null;}
 
         Cursor = new Cursor(Cursor, left);
 
@@ -114,14 +114,14 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         Cursor = Cursor.Parent!;
 
-        if (ReferenceEquals(before, left.Before) && !elementChanged)
-            return left;
+        if (ReferenceEquals(before, left.Before) && !elementChanged){
+            return left;}
         return new JLeftPadded<T>(before, t);
     }
 
     public virtual JRightPadded<T>? VisitRightPadded<T>(JRightPadded<T>? right, P p)
     {
-        if (right == null) return null;
+        if (right == null){ return null;}
 
         Cursor = new Cursor(Cursor, right);
 
@@ -139,14 +139,14 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         Cursor = Cursor.Parent!;
 
-        if (ReferenceEquals(after, right.After) && !elementChanged && ReferenceEquals(markers, right.Markers))
-            return right;
+        if (ReferenceEquals(after, right.After) && !elementChanged && ReferenceEquals(markers, right.Markers)){
+            return right;}
         return new JRightPadded<T>(t, after, markers);
     }
 
     public virtual JContainer<T>? VisitContainer<T>(JContainer<T>? container, P p) where T : J
     {
-        if (container == null) return null;
+        if (container == null){ return null;}
 
         Cursor = new Cursor(Cursor, container);
 
@@ -159,16 +159,16 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             var visited = VisitRightPadded(elem, p);
             if (visited != null)
             {
-                if (!ReferenceEquals(visited, elem)) changed = true;
+                if (!ReferenceEquals(visited, elem)){ changed = true;}
                 newElements.Add(visited);
             }
-            else changed = true;
+            else{ changed = true;}
         }
 
         Cursor = Cursor.Parent!;
 
-        if (!changed && ReferenceEquals(before, container.Before))
-            return container;
+        if (!changed && ReferenceEquals(before, container.Before)){
+            return container;}
         return new JContainer<T>(before, newElements, container.Markers);
     }
 
@@ -186,7 +186,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         {
             var visited = VisitMarker(marker, p);
             newList.Add(visited);
-            if (!ReferenceEquals(visited, marker)) changed = true;
+            if (!ReferenceEquals(visited, marker)){ changed = true;}
         }
 
         return changed ? markers.WithMarkerList(newList) : markers;
@@ -222,7 +222,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(annotation.Markers, p));
 
         var exprResult = VisitExpression(annotation, p);
-        if (exprResult is not Annotation node) return exprResult;
+        if (exprResult is not Annotation node){ return exprResult;}
 
         return node
             .WithAnnotationType((NameTree)Visit(node.AnnotationType, p)!)
@@ -252,7 +252,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(block.Markers, p));
 
         var stmtResult = VisitStatement(block, p);
-        if (stmtResult is not Block node) return stmtResult;
+        if (stmtResult is not Block node){ return stmtResult;}
 
         return node
             .WithStatic(VisitRightPadded(node.Static, p)!)
@@ -270,7 +270,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(classDecl.Markers, p));
 
         var stmtResult = VisitStatement(classDecl, p);
-        if (stmtResult is not ClassDeclaration node) return stmtResult;
+        if (stmtResult is not ClassDeclaration node){ return stmtResult;}
 
         var newKindAnnotations = ListUtils.Map(node.ClassKind.Annotations, ann => Visit(ann, p) as Annotation);
 
@@ -300,7 +300,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(enumValueSet.Markers, p));
 
         var stmtResult = VisitStatement(enumValueSet, p);
-        if (stmtResult is not EnumValueSet node) return stmtResult;
+        if (stmtResult is not EnumValueSet node){ return stmtResult;}
 
         return node
             .WithEnums(ListUtils.Map(node.Enums, e => VisitRightPadded(e, p)));
@@ -329,7 +329,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(method.Markers, p));
 
         var stmtResult = VisitStatement(method, p);
-        if (stmtResult is not MethodDeclaration node) return stmtResult;
+        if (stmtResult is not MethodDeclaration node){ return stmtResult;}
 
         return node
             .WithLeadingAnnotations(ListUtils.Map(node.LeadingAnnotations, ann => Visit(ann, p) as Annotation))
@@ -354,7 +354,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(ret.Markers, p));
 
         var stmtResult = VisitStatement(ret, p);
-        if (stmtResult is not Return node) return stmtResult;
+        if (stmtResult is not Return node){ return stmtResult;}
 
         return node
             .WithExpression((Expression?)Visit(node.Expression, p));
@@ -370,7 +370,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(iff.Markers, p));
 
         var stmtResult = VisitStatement(iff, p);
-        if (stmtResult is not If node) return stmtResult;
+        if (stmtResult is not If node){ return stmtResult;}
 
         return node
             .WithCondition((ControlParentheses<Expression>)Visit(node.Condition, p)!)
@@ -399,7 +399,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(whl.Markers, p));
 
         var stmtResult = VisitStatement(whl, p);
-        if (stmtResult is not WhileLoop node) return stmtResult;
+        if (stmtResult is not WhileLoop node){ return stmtResult;}
 
         return node
             .WithCondition((ControlParentheses<Expression>)Visit(node.Condition, p)!)
@@ -416,7 +416,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(dwl.Markers, p));
 
         var stmtResult = VisitStatement(dwl, p);
-        if (stmtResult is not DoWhileLoop node) return stmtResult;
+        if (stmtResult is not DoWhileLoop node){ return stmtResult;}
 
         return node
             .WithBody(VisitRightPadded(node.Body, p)!)
@@ -433,7 +433,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(fl.Markers, p));
 
         var stmtResult = VisitStatement(fl, p);
-        if (stmtResult is not ForLoop node) return stmtResult;
+        if (stmtResult is not ForLoop node){ return stmtResult;}
 
         return node
             .WithLoopControl((ForLoop.Control)Visit(node.LoopControl, p)!)
@@ -463,7 +463,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(fel.Markers, p));
 
         var stmtResult = VisitStatement(fel, p);
-        if (stmtResult is not ForEachLoop node) return stmtResult;
+        if (stmtResult is not ForEachLoop node){ return stmtResult;}
 
         return node
             .WithLoopControl((ForEachLoop.Control)Visit(node.LoopControl, p)!)
@@ -492,7 +492,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(tr.Markers, p));
 
         var stmtResult = VisitStatement(tr, p);
-        if (stmtResult is not Try node) return stmtResult;
+        if (stmtResult is not Try node){ return stmtResult;}
 
         return node
             .WithResources(VisitContainer(node.Resources, p))
@@ -523,7 +523,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(thr.Markers, p));
 
         var stmtResult = VisitStatement(thr, p);
-        if (stmtResult is not Throw node) return stmtResult;
+        if (stmtResult is not Throw node){ return stmtResult;}
 
         return node
             .WithException((Expression)Visit(node.Exception, p)!);
@@ -539,7 +539,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(brk.Markers, p));
 
         var stmtResult = VisitStatement(brk, p);
-        if (stmtResult is not Break node) return stmtResult;
+        if (stmtResult is not Break node){ return stmtResult;}
 
         return node
             .WithLabel((Identifier?)Visit(node.Label, p));
@@ -555,7 +555,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(cont.Markers, p));
 
         var stmtResult = VisitStatement(cont, p);
-        if (stmtResult is not Continue node) return stmtResult;
+        if (stmtResult is not Continue node){ return stmtResult;}
 
         return node
             .WithLabel((Identifier?)Visit(node.Label, p));
@@ -571,10 +571,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(emp.Markers, p));
 
         var stmtResult = VisitStatement(emp, p);
-        if (stmtResult is not Empty s1) return stmtResult;
+        if (stmtResult is not Empty s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not Empty node) return exprResult;
+        if (exprResult is not Empty node){ return exprResult;}
 
         return node;
     }
@@ -589,7 +589,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(cp.Markers, p));
 
         var exprResult = VisitExpression(cp, p);
-        if (exprResult is not ControlParentheses<Expression> node) return exprResult;
+        if (exprResult is not ControlParentheses<Expression> node){ return exprResult;}
 
         return node
             .WithTree(VisitRightPadded(node.Tree, p)!);
@@ -605,7 +605,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(cp.Markers, p));
 
         var exprResult = VisitExpression(cp, p);
-        if (exprResult is not ControlParentheses<TypeTree> node) return exprResult;
+        if (exprResult is not ControlParentheses<TypeTree> node){ return exprResult;}
 
         return node
             .WithTree(VisitRightPadded(node.Tree, p)!);
@@ -621,7 +621,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(cp.Markers, p));
 
         var exprResult = VisitExpression(cp, p);
-        if (exprResult is not ControlParentheses<VariableDeclarations> node) return exprResult;
+        if (exprResult is not ControlParentheses<VariableDeclarations> node){ return exprResult;}
 
         return node
             .WithTree(VisitRightPadded(node.Tree, p)!);
@@ -637,7 +637,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(literal.Markers, p));
 
         var exprResult = VisitExpression(literal, p);
-        if (exprResult is not Literal node) return exprResult;
+        if (exprResult is not Literal node){ return exprResult;}
 
         return node;
     }
@@ -652,7 +652,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(identifier.Markers, p));
 
         var exprResult = VisitExpression(identifier, p);
-        if (exprResult is not Identifier node) return exprResult;
+        if (exprResult is not Identifier node){ return exprResult;}
 
         return node
             .WithAnnotations(ListUtils.Map(node.Annotations, ann => Visit(ann, p) as Annotation))
@@ -670,10 +670,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(fieldAccess.Markers, p));
 
         var exprResult = VisitExpression(fieldAccess, p);
-        if (exprResult is not FieldAccess e1) return exprResult;
+        if (exprResult is not FieldAccess e1){ return exprResult;}
 
         var stmtResult = VisitStatement(e1, p);
-        if (stmtResult is not FieldAccess node) return stmtResult;
+        if (stmtResult is not FieldAccess node){ return stmtResult;}
 
         return node
             .WithTarget((Expression)Visit(node.Target, p)!)
@@ -691,7 +691,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(memberRef.Markers, p));
 
         var exprResult = VisitExpression(memberRef, p);
-        if (exprResult is not MemberReference node) return exprResult;
+        if (exprResult is not MemberReference node){ return exprResult;}
 
         return node
             .WithContaining(VisitRightPadded(node.Containing, p)!)
@@ -712,7 +712,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(binary.Markers, p));
 
         var exprResult = VisitExpression(binary, p);
-        if (exprResult is not Binary node) return exprResult;
+        if (exprResult is not Binary node){ return exprResult;}
 
         return node
             .WithLeft((Expression)Visit(node.Left, p)!)
@@ -731,10 +731,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(ternary.Markers, p));
 
         var exprResult = VisitExpression(ternary, p);
-        if (exprResult is not Ternary e1) return exprResult;
+        if (exprResult is not Ternary e1){ return exprResult;}
 
         var stmtResult = VisitStatement(e1, p);
-        if (stmtResult is not Ternary node) return stmtResult;
+        if (stmtResult is not Ternary node){ return stmtResult;}
 
         return node
             .WithCondition((Expression)Visit(node.Condition, p)!)
@@ -753,10 +753,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(assignment.Markers, p));
 
         var stmtResult = VisitStatement(assignment, p);
-        if (stmtResult is not Assignment s1) return stmtResult;
+        if (stmtResult is not Assignment s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not Assignment node) return exprResult;
+        if (exprResult is not Assignment node){ return exprResult;}
 
         return node
             .WithVariable((Expression)Visit(node.Variable, p)!)
@@ -774,10 +774,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(assignment.Markers, p));
 
         var stmtResult = VisitStatement(assignment, p);
-        if (stmtResult is not AssignmentOperation s1) return stmtResult;
+        if (stmtResult is not AssignmentOperation s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not AssignmentOperation node) return exprResult;
+        if (exprResult is not AssignmentOperation node){ return exprResult;}
 
         return node
             .WithVariable((Expression)Visit(node.Variable, p)!)
@@ -796,10 +796,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(unary.Markers, p));
 
         var stmtResult = VisitStatement(unary, p);
-        if (stmtResult is not Unary s1) return stmtResult;
+        if (stmtResult is not Unary s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not Unary node) return exprResult;
+        if (exprResult is not Unary node){ return exprResult;}
 
         return node
             .WithOperator(VisitLeftPadded(node.Operator, p)!)
@@ -817,7 +817,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(parens.Markers, p));
 
         var exprResult = VisitExpression(parens, p);
-        if (exprResult is not Parentheses<Expression> node) return exprResult;
+        if (exprResult is not Parentheses<Expression> node){ return exprResult;}
 
         return node
             .WithTree(VisitRightPadded(node.Tree, p)!);
@@ -829,7 +829,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     public virtual J VisitExpressionStatement(ExpressionStatement expressionStatement, P p)
     {
         var stmtResult = VisitStatement(expressionStatement, p);
-        if (stmtResult is not ExpressionStatement node) return stmtResult;
+        if (stmtResult is not ExpressionStatement node){ return stmtResult;}
 
         // ExpressionStatement delegates Prefix/Markers to its inner Expression,
         // so they are visited when the Expression itself is visited.
@@ -847,7 +847,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(varDecl.Markers, p));
 
         var stmtResult = VisitStatement(varDecl, p);
-        if (stmtResult is not VariableDeclarations node) return stmtResult;
+        if (stmtResult is not VariableDeclarations node){ return stmtResult;}
 
         return node
             .WithLeadingAnnotations(ListUtils.Map(node.LeadingAnnotations, ann => Visit(ann, p) as Annotation))
@@ -880,7 +880,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(primitive.Markers, p));
 
         var exprResult = VisitExpression(primitive, p);
-        if (exprResult is not Primitive node) return exprResult;
+        if (exprResult is not Primitive node){ return exprResult;}
 
         return node;
     }
@@ -895,10 +895,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(mi.Markers, p));
 
         var stmtResult = VisitStatement(mi, p);
-        if (stmtResult is not MethodInvocation s1) return stmtResult;
+        if (stmtResult is not MethodInvocation s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not MethodInvocation node) return exprResult;
+        if (exprResult is not MethodInvocation node){ return exprResult;}
 
         return node
             .WithSelect(VisitRightPadded(node.Select, p))
@@ -918,10 +918,10 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(nc.Markers, p));
 
         var stmtResult = VisitStatement(nc, p);
-        if (stmtResult is not NewClass s1) return stmtResult;
+        if (stmtResult is not NewClass s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not NewClass node) return exprResult;
+        if (exprResult is not NewClass node){ return exprResult;}
 
         return node
             .WithNew(VisitSpace(node.New, p))
@@ -942,7 +942,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(na.Markers, p));
 
         var exprResult = VisitExpression(na, p);
-        if (exprResult is not NewArray node) return exprResult;
+        if (exprResult is not NewArray node){ return exprResult;}
 
         return node
             .WithTypeExpression((TypeTree?)Visit(node.TypeExpression, p))
@@ -961,7 +961,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(instanceOf.Markers, p));
 
         var exprResult = VisitExpression(instanceOf, p);
-        if (exprResult is not InstanceOf node) return exprResult;
+        if (exprResult is not InstanceOf node){ return exprResult;}
 
         return node
             .WithExpression(VisitRightPadded(node.Expression, p)!)
@@ -980,7 +980,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(nullableType.Markers, p));
 
         var exprResult = VisitExpression(nullableType, p);
-        if (exprResult is not NullableType node) return exprResult;
+        if (exprResult is not NullableType node){ return exprResult;}
 
         return node
             .WithAnnotations(ListUtils.Map(node.Annotations, ann => Visit(ann, p) as Annotation))
@@ -998,7 +998,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(pt.Markers, p));
 
         var exprResult = VisitExpression(pt, p);
-        if (exprResult is not ParameterizedType node) return exprResult;
+        if (exprResult is not ParameterizedType node){ return exprResult;}
 
         return node
             .WithClazz((NameTree)Visit(node.Clazz, p)!)
@@ -1016,7 +1016,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(at.Markers, p));
 
         var exprResult = VisitExpression(at, p);
-        if (exprResult is not ArrayType node) return exprResult;
+        if (exprResult is not ArrayType node){ return exprResult;}
 
         node = node
             .WithElementType((TypeTree)Visit(node.ElementType, p)!)
@@ -1042,7 +1042,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(arrayAccess.Markers, p));
 
         var exprResult = VisitExpression(arrayAccess, p);
-        if (exprResult is not ArrayAccess node) return exprResult;
+        if (exprResult is not ArrayAccess node){ return exprResult;}
 
         return node
             .WithIndexed((Expression)Visit(node.Indexed, p)!)
@@ -1071,7 +1071,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(lambda.Markers, p));
 
         var exprResult = VisitExpression(lambda, p);
-        if (exprResult is not Lambda node) return exprResult;
+        if (exprResult is not Lambda node){ return exprResult;}
 
         return node
             .WithParams((Lambda.Parameters)Visit(node.Params, p)!)
@@ -1101,7 +1101,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(@switch.Markers, p));
 
         var stmtResult = VisitStatement(@switch, p);
-        if (stmtResult is not Switch node) return stmtResult;
+        if (stmtResult is not Switch node){ return stmtResult;}
 
         return node
             .WithSelector((ControlParentheses<Expression>)Visit(node.Selector, p)!)
@@ -1118,7 +1118,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(se.Markers, p));
 
         var exprResult = VisitExpression(se, p);
-        if (exprResult is not SwitchExpression node) return exprResult;
+        if (exprResult is not SwitchExpression node){ return exprResult;}
 
         return node
             .WithSelector((ControlParentheses<Expression>)Visit(node.Selector, p)!)
@@ -1135,7 +1135,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(@case.Markers, p));
 
         var stmtResult = VisitStatement(@case, p);
-        if (stmtResult is not Case node) return stmtResult;
+        if (stmtResult is not Case node){ return stmtResult;}
 
         return node
             .WithCaseLabels(VisitContainer(node.CaseLabels, p)!)
@@ -1154,7 +1154,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(dp.Markers, p));
 
         var exprResult = VisitExpression(dp, p);
-        if (exprResult is not DeconstructionPattern node) return exprResult;
+        if (exprResult is not DeconstructionPattern node){ return exprResult;}
 
         return node
             .WithDeconstructor((Expression)Visit(node.Deconstructor, p)!)
@@ -1172,7 +1172,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(label.Markers, p));
 
         var stmtResult = VisitStatement(label, p);
-        if (stmtResult is not Label node) return stmtResult;
+        if (stmtResult is not Label node){ return stmtResult;}
 
         return node
             .WithLabelName(VisitRightPadded(node.LabelName, p)!)
@@ -1189,7 +1189,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(sync.Markers, p));
 
         var stmtResult = VisitStatement(sync, p);
-        if (stmtResult is not Synchronized node) return stmtResult;
+        if (stmtResult is not Synchronized node){ return stmtResult;}
 
         return node
             .WithLock((ControlParentheses<Expression>)Visit(node.Lock, p)!)
@@ -1206,7 +1206,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(cast.Markers, p));
 
         var exprResult = VisitExpression(cast, p);
-        if (exprResult is not TypeCast node) return exprResult;
+        if (exprResult is not TypeCast node){ return exprResult;}
 
         return node
             .WithClazz((ControlParentheses<TypeTree>)Visit(node.Clazz, p)!)
@@ -1237,7 +1237,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(pkg.Markers, p));
 
         var stmtResult = VisitStatement(pkg, p);
-        if (stmtResult is not Package node) return stmtResult;
+        if (stmtResult is not Package node){ return stmtResult;}
 
         return node
             .WithExpression((Expression)Visit(node.Expression, p)!)

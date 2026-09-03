@@ -29,7 +29,7 @@ import java.util.Map;
  * a group when some clause names the same major.minor.patch tuple with a prerelease of its own,
  * unless {@code includePrerelease}.
  */
-class UnionRange implements VersionComparator {
+final class UnionRange implements VersionComparator {
 
     private static final int MAX_CACHE_SIZE = 4_096;
     private static final Map<String, UnionRange> CACHE = LruCache.bounded(MAX_CACHE_SIZE);

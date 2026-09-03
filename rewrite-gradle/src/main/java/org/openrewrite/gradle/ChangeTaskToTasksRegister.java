@@ -207,7 +207,7 @@ public class ChangeTaskToTasksRegister extends Recipe {
 
             return m.withSelect(taskRegistration.getSelect())
                     .withName(taskRegistration.getName())
-                    .withArguments(ListUtils.concat((taskRegistration).getArguments(), taskLambda));
+                    .withArguments(ListUtils.concat(taskRegistration.getArguments(), taskLambda));
         }
 
         private boolean isTaskDeclaration(J.MethodInvocation method) {

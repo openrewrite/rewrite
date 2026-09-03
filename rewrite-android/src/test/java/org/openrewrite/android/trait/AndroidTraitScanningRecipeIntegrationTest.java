@@ -58,7 +58,7 @@ class AndroidTraitScanningRecipeIntegrationTest implements RewriteTest {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getScanner(Set<String> known) {
-            return new XmlIsoVisitor<ExecutionContext>() {
+            return new XmlIsoVisitor<>() {
                 @Override
                 public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                     if ("string".equals(tag.getName())) {

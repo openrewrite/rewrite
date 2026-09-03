@@ -35,7 +35,7 @@ public class ClassIdResolver implements ObjectIdResolver {
 
     @Override
     public @Nullable Object resolveId(ObjectIdGenerator.IdKey id) {
-        return (items == null) ? null : items.get(id);
+        return items == null ? null : items.get(id);
     }
 
     @Override

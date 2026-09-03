@@ -15,10 +15,10 @@
  */
 package org.openrewrite;
 
-import org.junit.jupiter.api.Test;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.test.RewriteTest;

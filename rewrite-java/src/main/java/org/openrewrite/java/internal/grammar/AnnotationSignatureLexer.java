@@ -15,11 +15,11 @@
  */
 // Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
-import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.misc.*;
@@ -31,11 +31,29 @@ public class AnnotationSignatureLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4, 
-		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11, 
-		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19, 
-		DOTDOT=20, COLONCOLON=21, WS=22, Identifier=23;
+    public static final int IntegerLiteral = 1;
+    public static final int FloatingPointLiteral = 2;
+    public static final int BooleanLiteral = 3;
+    public static final int CharacterLiteral = 4;
+    public static final int StringLiteral = 5;
+    public static final int LPAREN = 6;
+    public static final int RPAREN = 7;
+    public static final int LBRACK = 8;
+    public static final int RBRACK = 9;
+    public static final int COMMA = 10;
+    public static final int DOT = 11;
+    public static final int ASSIGN = 12;
+    public static final int COLON = 13;
+    public static final int ADD = 14;
+    public static final int SUB = 15;
+    public static final int AND = 16;
+    public static final int OR = 17;
+    public static final int AT = 18;
+    public static final int ELLIPSIS = 19;
+    public static final int DOTDOT = 20;
+    public static final int COLONCOLON = 21;
+    public static final int WS = 22;
+    public static final int Identifier = 23;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};
@@ -140,30 +158,27 @@ public class AnnotationSignatureLexer extends Lexer {
 
 	@Override
 	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
-		switch (ruleIndex) {
-		case 63:
-			return JavaLetter_sempred((RuleContext)_localctx, predIndex);
-		case 64:
-			return JavaLetterOrDigit_sempred((RuleContext)_localctx, predIndex);
-		}
+        if (ruleIndex == 63) {
+            return javaLetterSempred((RuleContext) _localctx, predIndex);
+        } else if (ruleIndex == 64) {
+            return javaLetterOrDigitSempred((RuleContext) _localctx, predIndex);
+        }
 		return true;
 	}
-	private boolean JavaLetter_sempred(RuleContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 0:
-			return Character.isJavaIdentifierStart(_input.LA(-1));
-		case 1:
-			return Character.isJavaIdentifierStart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)));
-		}
+	private boolean javaLetterSempred(RuleContext _localctx, int predIndex) {
+        if (predIndex == 0) {
+            return Character.isJavaIdentifierStart(_input.LA(-1));
+        } else if (predIndex == 1) {
+            return Character.isJavaIdentifierStart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1)));
+        }
 		return true;
 	}
-	private boolean JavaLetterOrDigit_sempred(RuleContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 2:
-			return Character.isJavaIdentifierPart(_input.LA(-1));
-		case 3:
-			return Character.isJavaIdentifierPart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)));
-		}
+	private boolean javaLetterOrDigitSempred(RuleContext _localctx, int predIndex) {
+        if (predIndex == 2) {
+            return Character.isJavaIdentifierPart(_input.LA(-1));
+        } else if (predIndex == 3) {
+            return Character.isJavaIdentifierPart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1)));
+        }
 		return true;
 	}
 

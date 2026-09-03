@@ -25,7 +25,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 {
     public override J? Visit(Tree? tree, RpcSendQueue q)
     {
-        if (tree == null) return null;
+        if (tree == null){ return null;}
 
         Cursor = new Cursor(Cursor, tree);
 
@@ -650,9 +650,9 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         q.GetAndSend(container, c => c.Before, space => VisitSpace(GetValueNonNull<Space>(space), q));
         q.GetAndSendList(container, c => c.Elements, e =>
         {
-            if (e.Element == null)
+            if (e.Element == null){
                 throw new NullReferenceException(
-                    $"Null element in JContainer<{typeof(TJ).Name}>, cursor path: {BuildCursorPath()}");
+                    $"Null element in JContainer<{typeof(TJ).Name}>, cursor path: {BuildCursorPath()}");}
             return e.Element.Id;
         }, e => VisitRightPadded(e, q));
         q.GetAndSend(container, c => c.Markers);
@@ -688,7 +688,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public virtual JavaType? VisitType(JavaType? javaType, RpcSendQueue q)
     {
-        if (javaType == null) return null;
+        if (javaType == null){ return null;}
 
         switch (javaType)
         {
@@ -830,8 +830,8 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     private static object TypeSignature(JavaType type)
     {
         _typeSignatureStack ??= new HashSet<JavaType>(ReferenceEqualityComparer.Instance);
-        if (!_typeSignatureStack.Add(type))
-            return "{circular}";
+        if (!_typeSignatureStack.Add(type)){
+            return "{circular}";}
         try
         {
             return type switch
@@ -882,7 +882,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             s.Append('(');
             for (int i = 0; i < values.Count; i++)
             {
-                if (i > 0) s.Append(',');
+                if (i > 0){ s.Append(',');}
                 var value = values[i];
                 s.Append(value.Element != null ? TypeSignature(value.Element) : "{undefined}")
                     .Append('=')

@@ -43,9 +43,9 @@ public class WhitespaceValidator : CSharpVisitor<List<WhitespaceViolation>>
         // Walk all properties looking for Space, JRightPadded, JLeftPadded, JContainer fields
         foreach (var prop in nodeType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
-            if (prop.Name == "Prefix") continue; // Already checked above
+            if (prop.Name == "Prefix"){ continue; // Already checked above
 
-            var propType = prop.PropertyType;
+            }var propType = prop.PropertyType;
             object? value;
             try
             {
@@ -56,7 +56,7 @@ public class WhitespaceValidator : CSharpVisitor<List<WhitespaceViolation>>
                 continue;
             }
 
-            if (value == null) continue;
+            if (value == null){ continue;}
 
             if (propType == typeof(Space))
             {
@@ -101,11 +101,11 @@ public class WhitespaceValidator : CSharpVisitor<List<WhitespaceViolation>>
 
     private static bool IsWhitespaceOnly(string value)
     {
-        if (string.IsNullOrEmpty(value)) return true;
+        if (string.IsNullOrEmpty(value)){ return true;}
         foreach (var c in value)
         {
-            if (c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '\f' && c != '\v')
-                return false;
+            if (c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '\f' && c != '\v'){
+                return false;}
         }
         return true;
     }
@@ -121,9 +121,9 @@ public class WhitespaceValidator : CSharpVisitor<List<WhitespaceViolation>>
 
     private static bool IsListOfJRightPadded(Type type)
     {
-        if (!type.IsGenericType) return false;
+        if (!type.IsGenericType){ return false;}
         var genDef = type.GetGenericTypeDefinition();
-        if (genDef != typeof(IList<>) && genDef != typeof(List<>)) return false;
+        if (genDef != typeof(IList<>) && genDef != typeof(List<>)){ return false;}
         var elemType = type.GetGenericArguments()[0];
         return IsJRightPaddedType(elemType);
     }

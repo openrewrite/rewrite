@@ -38,8 +38,8 @@ internal static class GitCli
     public static string? DiscoverWorkTree(string startDir)
     {
         var (exit, stdout, _) = Run(startDir, new[] { "rev-parse", "--show-toplevel" });
-        if (exit != 0)
-            return null;
+        if (exit != 0){
+            return null;}
         var top = stdout.Trim();
         return string.IsNullOrEmpty(top) ? null : top;
     }
@@ -62,13 +62,13 @@ internal static class GitCli
     {
         // -z: NUL-separated, so paths with spaces/newlines survive intact and no quoting is applied.
         var (exit, stdout, _) = Run(workDir, new[] { "ls-files", "-z" });
-        if (exit != 0)
-            return Array.Empty<string>();
+        if (exit != 0){
+            return Array.Empty<string>();}
         var result = new List<string>();
         foreach (var rel in stdout.Split('\0', StringSplitOptions.RemoveEmptyEntries))
         {
-            if (string.Equals(PosixBaseName(rel), fileName, StringComparison.OrdinalIgnoreCase))
-                result.Add(rel);
+            if (string.Equals(PosixBaseName(rel), fileName, StringComparison.OrdinalIgnoreCase)){
+                result.Add(rel);}
         }
         return result;
     }
@@ -82,8 +82,8 @@ internal static class GitCli
     public static HashSet<string> CheckIgnored(string workDir, IReadOnlyCollection<string> relPaths)
     {
         var ignored = new HashSet<string>(StringComparer.Ordinal);
-        if (relPaths.Count == 0)
-            return ignored;
+        if (relPaths.Count == 0){
+            return ignored;}
 
         // Feed paths on stdin (NUL-delimited) to avoid command-line length limits and quoting.
         var stdin = string.Join('\0', relPaths) + '\0';
@@ -91,11 +91,11 @@ internal static class GitCli
 
         // git check-ignore exit codes: 0 = one or more paths ignored, 1 = none ignored,
         // 128 = fatal error. Treat anything other than 0 as "nothing ignored".
-        if (exit != 0)
-            return ignored;
+        if (exit != 0){
+            return ignored;}
 
-        foreach (var rel in stdout.Split('\0', StringSplitOptions.RemoveEmptyEntries))
-            ignored.Add(rel);
+        foreach (var rel in stdout.Split('\0', StringSplitOptions.RemoveEmptyEntries)){
+            ignored.Add(rel);}
         return ignored;
     }
 
@@ -128,12 +128,12 @@ internal static class GitCli
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            foreach (var a in args)
-                psi.ArgumentList.Add(a);
+            foreach (var a in args){
+                psi.ArgumentList.Add(a);}
 
             using var process = Process.Start(psi);
-            if (process == null)
-                return (-1, "", "");
+            if (process == null){
+                return (-1, "", "");}
 
             // Read stdout/stderr concurrently with the write below to avoid pipe-buffer deadlock.
             var stdoutTask = process.StandardOutput.ReadToEndAsync();

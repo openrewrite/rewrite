@@ -66,8 +66,8 @@ public class PythonReceiver extends PythonVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitCompilationUnit(Py.CompilationUnit cu, RpcReceiveQueue q) {
-        return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
-                .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
+        return cu.withSourcePath(q.receiveAndGet(cu.getSourcePath(), Paths::get))
+                .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<Py.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))

@@ -214,7 +214,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                                 new GradleDependency.Matcher().get(getCursor()).ifPresent(it -> {
                                                     if (it.getResolvedDependency().getRequested().getVersion() != null) {
                                                         requestedToDeclaration.put(it.getResolvedDependency().getRequested().getGav(), m1);
-                                                        gaToRequested.computeIfAbsent(it.getResolvedDependency().getGav().asGroupArtifact(), (groupArtifact -> new ArrayList<>()))
+                                                        gaToRequested.computeIfAbsent(it.getResolvedDependency().getGav().asGroupArtifact(), groupArtifact -> new ArrayList<>())
                                                                 .add(it.getResolvedDependency().getRequested().getVersion());
                                                     }
                                                 });

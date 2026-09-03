@@ -17,10 +17,10 @@ package org.openrewrite.golang.internal.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.java.internal.rpc.JavaReceiver;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
@@ -52,8 +52,8 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitGoCompilationUnit(Go.CompilationUnit cu, RpcReceiveQueue q) {
-        return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
-                .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
+        return cu.withSourcePath(q.receiveAndGet(cu.getSourcePath(), Paths::get))
+                .withCharset(q.receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<Go.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))

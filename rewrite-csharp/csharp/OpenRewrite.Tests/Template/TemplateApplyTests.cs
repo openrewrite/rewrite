@@ -733,8 +733,8 @@ file class RemoveEmptyStatementRecipe : OpenRewrite.Core.Recipe
     {
         public override J VisitEmpty(Empty empty, ExecutionContext ctx)
         {
-            if (Cursor.ParentTree.Value is Block)
-                return null!;
+            if (Cursor.ParentTree.Value is Block){
+                return null!;}
             return empty;
         }
     }
@@ -786,13 +786,13 @@ file class ReplaceOutermostOrWithAndRecipe : OpenRewrite.Core.Recipe
         public override J VisitBinary(Binary binary, ExecutionContext ctx)
         {
             binary = (Binary)base.VisitBinary(binary, ctx);
-            if (binary.Operator.Element != Binary.OperatorType.Or)
-                return binary;
+            if (binary.Operator.Element != Binary.OperatorType.Or){
+                return binary;}
 
             // Only match the outermost ||
             if (Cursor.ParentTree.Value is Binary parentBin &&
-                parentBin.Operator.Element == Binary.OperatorType.Or)
-                return binary;
+                parentBin.Operator.Element == Binary.OperatorType.Or){
+                return binary;}
 
             var left = Capture.Of<Expression>("left");
             var right = Capture.Of<Expression>("right");
@@ -821,8 +821,8 @@ file class UseRethrowRecipe : OpenRewrite.Core.Recipe
         {
             throwStmt = (Throw)base.VisitThrow(throwStmt, ctx);
 
-            if (throwStmt.Exception is not Identifier thrownId)
-                return throwStmt;
+            if (throwStmt.Exception is not Identifier thrownId){
+                return throwStmt;}
 
             var cursor = Cursor;
             while (cursor.Parent != null)

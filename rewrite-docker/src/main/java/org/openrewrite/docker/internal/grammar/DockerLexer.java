@@ -15,16 +15,17 @@
  */
 // Generated from rewrite-docker/src/main/antlr/DockerLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
-import java.util.LinkedList;
-import java.util.Queue;
-import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.misc.*;
+
+import java.util.LinkedList;
+import java.util.Queue;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class DockerLexer extends Lexer {
@@ -33,17 +34,54 @@ public class DockerLexer extends Lexer {
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
-	public static final int
-		PARSER_DIRECTIVE=1, COMMENT=2, FROM=3, RUN=4, CMD=5, NONE=6, LABEL=7,
-		EXPOSE=8, ENV=9, ADD=10, COPY=11, ENTRYPOINT=12, VOLUME=13, USER=14, WORKDIR=15,
-		ARG=16, ONBUILD=17, STOPSIGNAL=18, HEALTHCHECK=19, SHELL=20, MAINTAINER=21,
-		AS=22, HEREDOC_START=23, LINE_CONTINUATION=24, LBRACKET=25, RBRACKET=26,
-		COMMA=27, EQUALS=28, FLAG=29, DASH_DASH=30, DOUBLE_QUOTED_STRING=31, SINGLE_QUOTED_STRING=32,
-		ENV_VAR=33, SPECIAL_VAR=34, COMMAND_SUBST=35, BACKTICK_SUBST=36, DOLLAR=37,
-		UNQUOTED_TEXT=38, WS=39, NEWLINE=40, HP_LINE_CONTINUATION=41, HP_WS=42,
-		HP_COMMENT=43, HP_LINE_COMMENT=44, HEREDOC_CONTENT=45, H_NEWLINE=46;
-	public static final int
-		HEREDOC_PREAMBLE=1, HEREDOC=2;
+    public static final int PARSER_DIRECTIVE = 1;
+    public static final int COMMENT = 2;
+    public static final int FROM = 3;
+    public static final int RUN = 4;
+    public static final int CMD = 5;
+    public static final int NONE = 6;
+    public static final int LABEL = 7;
+    public static final int EXPOSE = 8;
+    public static final int ENV = 9;
+    public static final int ADD = 10;
+    public static final int COPY = 11;
+    public static final int ENTRYPOINT = 12;
+    public static final int VOLUME = 13;
+    public static final int USER = 14;
+    public static final int WORKDIR = 15;
+    public static final int ARG = 16;
+    public static final int ONBUILD = 17;
+    public static final int STOPSIGNAL = 18;
+    public static final int HEALTHCHECK = 19;
+    public static final int SHELL = 20;
+    public static final int MAINTAINER = 21;
+    public static final int AS = 22;
+    public static final int HEREDOC_START = 23;
+    public static final int LINE_CONTINUATION = 24;
+    public static final int LBRACKET = 25;
+    public static final int RBRACKET = 26;
+    public static final int COMMA = 27;
+    public static final int EQUALS = 28;
+    public static final int FLAG = 29;
+    public static final int DASH_DASH = 30;
+    public static final int DOUBLE_QUOTED_STRING = 31;
+    public static final int SINGLE_QUOTED_STRING = 32;
+    public static final int ENV_VAR = 33;
+    public static final int SPECIAL_VAR = 34;
+    public static final int COMMAND_SUBST = 35;
+    public static final int BACKTICK_SUBST = 36;
+    public static final int DOLLAR = 37;
+    public static final int UNQUOTED_TEXT = 38;
+    public static final int WS = 39;
+    public static final int NEWLINE = 40;
+    public static final int HP_LINE_CONTINUATION = 41;
+    public static final int HP_WS = 42;
+    public static final int HP_COMMENT = 43;
+    public static final int HP_LINE_COMMENT = 44;
+    public static final int HEREDOC_CONTENT = 45;
+    public static final int H_NEWLINE = 46;
+    public static final int HEREDOC_PREAMBLE = 1;
+    public static final int HEREDOC = 2;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};
@@ -128,14 +166,14 @@ public class DockerLexer extends Lexer {
 
 
 	    // Use a queue (FIFO) for heredoc markers so they are matched in order of declaration
-	    private Queue<String> heredocIdentifiers = new LinkedList<String>();
-	    private boolean heredocIdentifierCaptured = false;
+	    private Queue<String> heredocIdentifiers = new LinkedList<>();
+	    private boolean heredocIdentifierCaptured;
 	    // Track if we're at the start of a logical line (where instructions can appear)
 	    private boolean atLineStart = true;
 	    // Track if we're after FROM to recognize AS as a keyword (for stage aliasing)
-	    private boolean afterFrom = false;
+	    private boolean afterFrom;
 	    // Track if we're after HEALTHCHECK to recognize CMD/NONE as keywords
-	    private boolean afterHealthcheck = false;
+	    private boolean afterHealthcheck;
 
 
 	public DockerLexer(CharStream input) {
@@ -165,420 +203,420 @@ public class DockerLexer extends Lexer {
 	public void action(RuleContext _localctx, int ruleIndex, int actionIndex) {
 		switch (ruleIndex) {
 		case 0:
-			PARSER_DIRECTIVE_action((RuleContext)_localctx, actionIndex);
+			parser_directiveAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 2:
-			FROM_action((RuleContext)_localctx, actionIndex);
+			fromAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 3:
-			RUN_action((RuleContext)_localctx, actionIndex);
+			runAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 4:
-			CMD_action((RuleContext)_localctx, actionIndex);
+			cmdAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 5:
-			NONE_action((RuleContext)_localctx, actionIndex);
+			noneAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 6:
-			LABEL_action((RuleContext)_localctx, actionIndex);
+			labelAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 7:
-			EXPOSE_action((RuleContext)_localctx, actionIndex);
+			exposeAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 8:
-			ENV_action((RuleContext)_localctx, actionIndex);
+			envAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 9:
-			ADD_action((RuleContext)_localctx, actionIndex);
+			addAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 10:
-			COPY_action((RuleContext)_localctx, actionIndex);
+			copyAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 11:
-			ENTRYPOINT_action((RuleContext)_localctx, actionIndex);
+			entrypointAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 12:
-			VOLUME_action((RuleContext)_localctx, actionIndex);
+			volumeAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 13:
-			USER_action((RuleContext)_localctx, actionIndex);
+			userAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 14:
-			WORKDIR_action((RuleContext)_localctx, actionIndex);
+			workdirAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 15:
-			ARG_action((RuleContext)_localctx, actionIndex);
+			argAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 16:
-			ONBUILD_action((RuleContext)_localctx, actionIndex);
+			onbuildAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 17:
-			STOPSIGNAL_action((RuleContext)_localctx, actionIndex);
+			stopsignalAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 18:
-			HEALTHCHECK_action((RuleContext)_localctx, actionIndex);
+			healthcheckAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 19:
-			SHELL_action((RuleContext)_localctx, actionIndex);
+			shellAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 20:
-			MAINTAINER_action((RuleContext)_localctx, actionIndex);
+			maintainerAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 21:
-			AS_action((RuleContext)_localctx, actionIndex);
+			aSAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 22:
-			HEREDOC_START_action((RuleContext)_localctx, actionIndex);
+			heredoc_startAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 24:
-			LBRACKET_action((RuleContext)_localctx, actionIndex);
+			lbracketAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 25:
-			RBRACKET_action((RuleContext)_localctx, actionIndex);
+			rbracketAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 26:
-			COMMA_action((RuleContext)_localctx, actionIndex);
+			commaAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 27:
-			EQUALS_action((RuleContext)_localctx, actionIndex);
+			equalsAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 28:
-			FLAG_action((RuleContext)_localctx, actionIndex);
+			flagAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 30:
-			DASH_DASH_action((RuleContext)_localctx, actionIndex);
+			dash_dashAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 33:
-			DOUBLE_QUOTED_STRING_action((RuleContext)_localctx, actionIndex);
+			double_quoted_stringAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 34:
-			SINGLE_QUOTED_STRING_action((RuleContext)_localctx, actionIndex);
+			single_quoted_stringAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 38:
-			ENV_VAR_action((RuleContext)_localctx, actionIndex);
+			env_varAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 39:
-			SPECIAL_VAR_action((RuleContext)_localctx, actionIndex);
+			special_varAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 40:
-			COMMAND_SUBST_action((RuleContext)_localctx, actionIndex);
+			command_substAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 42:
-			BACKTICK_SUBST_action((RuleContext)_localctx, actionIndex);
+			backtick_substAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 43:
-			DOLLAR_action((RuleContext)_localctx, actionIndex);
+			dollarAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 44:
-			UNQUOTED_TEXT_action((RuleContext)_localctx, actionIndex);
+			unquoted_textAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 47:
-			NEWLINE_action((RuleContext)_localctx, actionIndex);
+			newlineAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 54:
-			HP_HEREDOC_START_action((RuleContext)_localctx, actionIndex);
+			hp_heredoc_startAction((RuleContext)_localctx, actionIndex);
 			break;
 		case 57:
-			HEREDOC_CONTENT_action((RuleContext)_localctx, actionIndex);
+			heredoc_contentAction((RuleContext)_localctx, actionIndex);
 			break;
 		}
 	}
-	private void PARSER_DIRECTIVE_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 0:
-			 atLineStart = true;
-			break;
-		}
+	private void parser_directiveAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 0) {
+            atLineStart = true;
+        }
 	}
-	private void FROM_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 1:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); else afterFrom = true; atLineStart = false;
-			break;
-		}
+	private void fromAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 1) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            } else {
+                afterFrom = true;
+            }
+            atLineStart = false;
+        }
 	}
-	private void RUN_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 2:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void runAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 2) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void CMD_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 3:
-			 if (!atLineStart && !afterHealthcheck) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false;
-			break;
-		}
+	private void cmdAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 3) {
+            if (!atLineStart && !afterHealthcheck) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+            afterHealthcheck = false;
+        }
 	}
-	private void NONE_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 4:
-			 if (!afterHealthcheck) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false;
-			break;
-		}
+	private void noneAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 4) {
+            if (!afterHealthcheck) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+            afterHealthcheck = false;
+        }
 	}
-	private void LABEL_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 5:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void labelAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 5) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void EXPOSE_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 6:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void exposeAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 6) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void ENV_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 7:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void envAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 7) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void ADD_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 8:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void addAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 8) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void COPY_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 9:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void copyAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 9) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void ENTRYPOINT_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 10:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void entrypointAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 10) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void VOLUME_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 11:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void volumeAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 11) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void USER_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 12:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void userAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 12) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void WORKDIR_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 13:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void workdirAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 13) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void ARG_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 14:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void argAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 14) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void ONBUILD_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 15:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); /* atLineStart stays true */
-			break;
-		}
+	private void onbuildAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 15) {
+            /* atLineStart stays true */
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+        }
 	}
-	private void STOPSIGNAL_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 16:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void stopsignalAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 16) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void HEALTHCHECK_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 17:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); else afterHealthcheck = true; /* atLineStart stays true */
-			break;
-		}
+	private void healthcheckAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 17) {
+            /* atLineStart stays true */
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            } else {
+                afterHealthcheck = true;
+            }
+        }
 	}
-	private void SHELL_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 18:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void shellAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 18) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void MAINTAINER_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 19:
-			 if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false;
-			break;
-		}
+	private void maintainerAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 19) {
+            if (!atLineStart) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+        }
 	}
-	private void AS_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 20:
-			 if (!afterFrom) setType(UNQUOTED_TEXT); atLineStart = false; afterFrom = false;
-			break;
-		}
+	private void aSAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 20) {
+            if (!afterFrom) {
+                setType(UNQUOTED_TEXT);
+            }
+            atLineStart = false;
+            afterFrom = false;
+        }
 	}
-	private void HEREDOC_START_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 21:
+	private void heredoc_startAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 21) {
 
-			    // Extract and store the heredoc marker identifier in FIFO order
-			    String text = getText();
-			    int prefixLen = text.charAt(2) == '-' ? 3 : 2;
-			    String marker = text.substring(prefixLen);
-			    heredocIdentifiers.add(marker);
-			    heredocIdentifierCaptured = true;
-			    atLineStart = false;
+            // Extract and store the heredoc marker identifier in FIFO order
+            String text = getText();
+            int prefixLen = text.charAt(2) == '-' ? 3 : 2;
+            String marker = text.substring(prefixLen);
+            heredocIdentifiers.add(marker);
+            heredocIdentifierCaptured = true;
+            atLineStart = false;
+        }
+	}
+	private void lbracketAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 22) {
+            atLineStart = false;
+        }
+	}
+	private void rbracketAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 23) {
+            atLineStart = false;
+        }
+	}
+	private void commaAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 24) {
+            atLineStart = false;
+        }
+	}
+	private void equalsAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 25) {
+            if (!afterHealthcheck) {
+                atLineStart = false;
+            }
+        }
+	}
+	private void flagAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 26) {
+            if (!afterHealthcheck) {
+                atLineStart = false;
+            }
+        }
+	}
+	private void dash_dashAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 27) {
+            if (!afterHealthcheck) {
+                atLineStart = false;
+            }
+        }
+	}
+	private void double_quoted_stringAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 28) {
+            if (!afterHealthcheck) {
+                atLineStart = false;
+            }
+        }
+	}
+	private void single_quoted_stringAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 29) {
+            if (!afterHealthcheck) {
+                atLineStart = false;
+            }
+        }
+	}
+	private void env_varAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 30) {
+            atLineStart = false;
+        }
+	}
+	private void special_varAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 31) {
+            atLineStart = false;
+        }
+	}
+	private void command_substAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 32) {
+            atLineStart = false;
+        }
+	}
+	private void backtick_substAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 33) {
+            atLineStart = false;
+        }
+	}
+	private void dollarAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 34) {
+            atLineStart = false;
+        }
+	}
+	private void unquoted_textAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 35) {
+            if (!afterHealthcheck) {
+                atLineStart = false;
+            }
+        }
+	}
+	private void newlineAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 36) {
+            atLineStart = true;
+            afterFrom = false;
+            afterHealthcheck = false;
+        }
+	}
+	private void hp_heredoc_startAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 37) {
 
-			break;
-		}
+            // Extract and store the heredoc marker identifier in FIFO order
+            String text = getText();
+            int prefixLen = text.charAt(2) == '-' ? 3 : 2;
+            String marker = text.substring(prefixLen);
+            heredocIdentifiers.add(marker);
+        }
 	}
-	private void LBRACKET_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 22:
-			 atLineStart = false;
-			break;
-		}
-	}
-	private void RBRACKET_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 23:
-			 atLineStart = false;
-			break;
-		}
-	}
-	private void COMMA_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 24:
-			 atLineStart = false;
-			break;
-		}
-	}
-	private void EQUALS_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 25:
-			 if (!afterHealthcheck) atLineStart = false;
-			break;
-		}
-	}
-	private void FLAG_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 26:
-			 if (!afterHealthcheck) atLineStart = false;
-			break;
-		}
-	}
-	private void DASH_DASH_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 27:
-			 if (!afterHealthcheck) atLineStart = false;
-			break;
-		}
-	}
-	private void DOUBLE_QUOTED_STRING_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 28:
-			 if (!afterHealthcheck) atLineStart = false;
-			break;
-		}
-	}
-	private void SINGLE_QUOTED_STRING_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 29:
-			 if (!afterHealthcheck) atLineStart = false;
-			break;
-		}
-	}
-	private void ENV_VAR_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 30:
-			 atLineStart = false;
-			break;
-		}
-	}
-	private void SPECIAL_VAR_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 31:
-			 atLineStart = false;
-			break;
-		}
-	}
-	private void COMMAND_SUBST_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 32:
-			 atLineStart = false;
-			break;
-		}
-	}
-	private void BACKTICK_SUBST_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 33:
-			 atLineStart = false;
-			break;
-		}
-	}
-	private void DOLLAR_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 34:
-			 atLineStart = false;
-			break;
-		}
-	}
-	private void UNQUOTED_TEXT_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 35:
-			 if (!afterHealthcheck) atLineStart = false;
-			break;
-		}
-	}
-	private void NEWLINE_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 36:
-			 atLineStart = true; afterFrom = false; afterHealthcheck = false;
-			break;
-		}
-	}
-	private void HP_HEREDOC_START_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 37:
+	private void heredoc_contentAction(RuleContext _localctx, int actionIndex) {
+        if (actionIndex == 38) {
 
-			    // Extract and store the heredoc marker identifier in FIFO order
-			    String text = getText();
-			    int prefixLen = text.charAt(2) == '-' ? 3 : 2;
-			    String marker = text.substring(prefixLen);
-			    heredocIdentifiers.add(marker);
-
-			break;
-		}
-	}
-	private void HEREDOC_CONTENT_action(RuleContext _localctx, int actionIndex) {
-		switch (actionIndex) {
-		case 38:
-
-			  if(!heredocIdentifiers.isEmpty() && getText().equals(heredocIdentifiers.peek())) {
-			      setType(UNQUOTED_TEXT);
-			      heredocIdentifiers.poll();  // Remove from front of queue (FIFO)
-			      // Only pop mode when all heredoc markers have been matched
-			      if(heredocIdentifiers.isEmpty()) {
-			          popMode();
-			          atLineStart = true;  // After heredoc ends, next line is at line start
-			      }
-			  }
-
-			break;
-		}
+            if (!heredocIdentifiers.isEmpty() && getText().equals(heredocIdentifiers.peek())) {
+                setType(UNQUOTED_TEXT);
+                heredocIdentifiers.poll();  // Remove from front of queue (FIFO)
+                // Only pop mode when all heredoc markers have been matched
+                if (heredocIdentifiers.isEmpty()) {
+                    popMode();
+                    atLineStart = true;  // After heredoc ends, next line is at line start
+                }
+            }
+        }
 	}
 
 	public static final String _serializedATN =

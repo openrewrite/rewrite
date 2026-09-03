@@ -98,7 +98,7 @@ class InMemoryLargeSourceSet(LargeSourceSet):
             else:
                 deleted.append(source)
                 changed = True
-        return self if not changed else InMemoryLargeSourceSet(mapped, deleted, self._initial_state or self)
+        return  InMemoryLargeSourceSet(mapped, deleted, self._initial_state or self) if changed elseself
 
     def generate(self, ls: List[SourceFile]) -> LargeSourceSet:
         if not ls:

@@ -23,17 +23,9 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.json.tree.Comment;
-import org.openrewrite.json.tree.Json;
-import org.openrewrite.json.tree.JsonRightPadded;
-import org.openrewrite.json.tree.JsonValue;
-import org.openrewrite.json.tree.Space;
+import org.openrewrite.json.tree.*;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)

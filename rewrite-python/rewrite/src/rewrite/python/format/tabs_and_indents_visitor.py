@@ -575,7 +575,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     if tree is target:
                         p.found = True
                         return tree
-                    return orig_visit(tree, p) if not p.found else tree
+                    return  tree if p.found elseorig_visit(tree, p)
                 self._delegate.visit = _check  # ty: ignore[invalid-assignment]  # monkey-patching delegate visitor
 
             def visit(self, tree, p, parent=None):
@@ -636,7 +636,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     if tree is target:
                         p.found = True
                         return tree
-                    return orig_visit(tree, p) if not p.found else tree
+                    return  tree if p.found elseorig_visit(tree, p)
                 self._delegate.visit = _check  # ty: ignore[invalid-assignment]  # monkey-patching delegate visitor
 
             def visit(self, tree, p, parent=None):

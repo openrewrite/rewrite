@@ -60,13 +60,12 @@ internal static class TreeHelper
     private static bool IsSkippedType(Type type)
     {
         // Skip exact type matches
-        if (SkipPropertyTypes.Contains(type)) return true;
+        if (SkipPropertyTypes.Contains(type)){ return true;}
         // Skip nullable versions of skipped types
         var underlying = Nullable.GetUnderlyingType(type);
-        if (underlying != null && SkipPropertyTypes.Contains(underlying)) return true;
+        if (underlying != null && SkipPropertyTypes.Contains(underlying)){ return true;}
         // Skip JavaType and all its subtypes (JavaType.Method, JavaType.FullyQualified, etc.)
-        if (typeof(JavaType).IsAssignableFrom(type)) return true;
-        return false;
+        return typeof(JavaType).IsAssignableFrom(type);
     }
 
     /// <summary>
@@ -79,9 +78,9 @@ internal static class TreeHelper
     /// </summary>
     internal static bool IsPaddedWrapper(object? value)
     {
-        if (value == null) return false;
+        if (value == null){ return false;}
         var type = value.GetType();
-        if (!type.IsGenericType) return false;
+        if (!type.IsGenericType){ return false;}
         var generic = type.GetGenericTypeDefinition();
         return generic == typeof(JRightPadded<>) ||
                generic == typeof(JLeftPadded<>) ||
@@ -108,17 +107,17 @@ internal static class TreeHelper
     internal static IList<object>? GetContainerElements(object value)
     {
         var type = value.GetType();
-        if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(JContainer<>))
-            return null;
+        if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(JContainer<>)){
+            return null;}
 
         var elementsProp = ContainerElementsPropertyCache.GetOrAdd(type, t => t.GetProperty("Elements"));
-        if (elementsProp?.GetValue(value) is not System.Collections.IList list)
-            return null;
+        if (elementsProp?.GetValue(value) is not System.Collections.IList list){
+            return null;}
 
         var result = new List<object>(list.Count);
         foreach (var item in list)
         {
-            if (item != null) result.Add(item);
+            if (item != null){ result.Add(item);}
         }
         return result;
     }

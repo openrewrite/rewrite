@@ -64,17 +64,17 @@ internal static class CSharpPrecedences
     {
         int childPrec = GetPrecedence(child);
         int parentPrec = GetPrecedence(parent);
-        if (childPrec > parentPrec) return false;
-        if (childPrec < parentPrec) return true;
-        if (isRightOperand && IsRightAssociative(child) && IsRightAssociative(parent)) return false;
-        if (IsSameOperator(child, parent) && IsAssociative(child)) return false;
-        if (IsInSameMathGroup(child, parent)) return isRightOperand;
+        if (childPrec > parentPrec){ return false;}
+        if (childPrec < parentPrec){ return true;}
+        if (isRightOperand && IsRightAssociative(child) && IsRightAssociative(parent)){ return false;}
+        if (IsSameOperator(child, parent) && IsAssociative(child)){ return false;}
+        if (IsInSameMathGroup(child, parent)){ return isRightOperand;}
         return !IsSameOperator(child, parent);
     }
 
     public static Parentheses<Expression> Parenthesize(Expression expr)
     {
-        if (expr is Parentheses<Expression> p) return p;
+        if (expr is Parentheses<Expression> p){ return p;}
         return new Parentheses<Expression>(
             Guid.NewGuid(), expr.Prefix, Markers.Empty,
             new JRightPadded<Expression>(J.SetPrefix(expr, Space.Empty), Space.Empty, Markers.Empty));
@@ -131,7 +131,7 @@ internal static class CSharpPrecedences
 
     private static bool IsInSameMathGroup(Expression a, Expression b)
     {
-        if (a is not Binary ba || b is not Binary bb) return false;
+        if (a is not Binary ba || b is not Binary bb){ return false;}
         return (IsAddSub(ba.Operator.Element) && IsAddSub(bb.Operator.Element)) ||
                (IsMulDivMod(ba.Operator.Element) && IsMulDivMod(bb.Operator.Element));
     }

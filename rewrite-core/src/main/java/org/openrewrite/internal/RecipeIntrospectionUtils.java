@@ -282,9 +282,9 @@ public class RecipeIntrospectionUtils {
         } else if (t.equals(long.class)) {
             return 0L;
         } else if (t.equals(float.class)) {
-            return 0.0f;
+            return 0.0F;
         } else if (t.equals(double.class)) {
-            return 0.0d;
+            return 0.0D;
         } else if (t.equals(char.class)) {
             return '\u0000';
         } else if (t.equals(boolean.class)) {

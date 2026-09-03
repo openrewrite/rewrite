@@ -39,7 +39,7 @@ public class AdaptiveRadixTree<V> {
         this.keyTable = keyTable;
     }
 
-    private static abstract class Node<V> {
+    private abstract static class Node<V> {
         protected int keyOffset;
         protected int keyLength;
 
@@ -84,16 +84,17 @@ public class AdaptiveRadixTree<V> {
         @Nullable
         V search(byte[] key, int depth, KeyTable keyTable) {
             // Fast path for empty and single-byte partial key
-            switch (keyLength) {
-                case 0:
-                    return depth == key.length ? value : null;
-                case 1:
-                    return depth < key.length && key[depth] == keyTable.get(keyOffset) &&
-                           depth + 1 == key.length ? value : null;
+            if (keyLength == 0) {
+                return depth == key.length ? value : null;
+            } else if (keyLength == 1) {
+                return depth < key.length && key[depth] == keyTable.get(keyOffset) &&
+                        depth + 1 == key.length ? value : null;
             }
 
             // Standard implementation for longer keys
-            if (!matchesPartialKey(key, depth, keyTable)) return null;
+            if (!matchesPartialKey(key, depth, keyTable)) {
+                return null;
+            }
             return depth + keyLength == key.length ? value : null;
         }
 
@@ -160,7 +161,7 @@ public class AdaptiveRadixTree<V> {
     }
 
     // Base class for all internal nodes
-    private static abstract class InternalNode<V> extends Node<V> {
+    private abstract static class InternalNode<V> extends Node<V> {
         protected @Nullable V value; // Value stored at this node (if any)
 
         protected InternalNode(int keyOffset, int keyLength) {
@@ -201,7 +202,9 @@ public class AdaptiveRadixTree<V> {
             InternalNode<V> node = this;
             while (true) {
                 if (node.keyLength != 0) {
-                    if (!node.matchesPartialKey(key, depth, keyTable)) return null;
+                    if (!node.matchesPartialKey(key, depth, keyTable)) {
+                        return null;
+                    }
                     depth += node.keyLength;
                 }
 
@@ -210,7 +213,9 @@ public class AdaptiveRadixTree<V> {
                 }
 
                 Node<V> child = node.getChild(key[depth]);
-                if (child == null) return null;
+                if (child == null) {
+                    return null;
+                }
                 depth++;
 
                 if (child instanceof InternalNode) {
@@ -325,8 +330,14 @@ public class AdaptiveRadixTree<V> {
 
     private static class Node4<V> extends InternalNode<V> {
         // Keys and children inline to avoid array overhead
-        private byte k0, k1, k2, k3;
-        private @Nullable Node<V> c0, c1, c2, c3;
+        private byte k0;
+        private byte k1;
+        private byte k2;
+        private byte k3;
+        private @Nullable Node<V> c0;
+        private @Nullable Node<V> c1;
+        private @Nullable Node<V> c2;
+        private @Nullable Node<V> c3;
         private byte size;
 
         Node4(int keyOffset, int keyLength) {
@@ -338,10 +349,10 @@ public class AdaptiveRadixTree<V> {
         @Nullable
         Node<V> getChild(byte key) {
             int mask = (1 << size) - 1; // Creates mask like 0001, 0011, 0111, 1111
-            return ((mask & 1) != 0 && k0 == key) ? c0 :
-                    ((mask & 2) != 0 && k1 == key) ? c1 :
-                            ((mask & 4) != 0 && k2 == key) ? c2 :
-                                    ((mask & 8) != 0 && k3 == key) ? c3 : null;
+            return (mask & 1) != 0 && k0 == key ? c0 :
+                    (mask & 2) != 0 && k1 == key ? c1 :
+                            (mask & 4) != 0 && k2 == key ? c2 :
+                                    (mask & 8) != 0 && k3 == key ? c3 : null;
         }
 
         @SuppressWarnings("DataFlowIssue")
@@ -465,10 +476,18 @@ public class AdaptiveRadixTree<V> {
         @SuppressWarnings("DataFlowIssue")
         @Override
         void cloneChildrenInto(Deque<InternalNode<V>> work) {
-            if (size > 0) c0 = pushClone(c0, work);
-            if (size > 1) c1 = pushClone(c1, work);
-            if (size > 2) c2 = pushClone(c2, work);
-            if (size > 3) c3 = pushClone(c3, work);
+            if (size > 0) {
+                c0 = pushClone(c0, work);
+            }
+            if (size > 1) {
+                c1 = pushClone(c1, work);
+            }
+            if (size > 2) {
+                c2 = pushClone(c2, work);
+            }
+            if (size > 3) {
+                c3 = pushClone(c3, work);
+            }
         }
     }
 
@@ -492,7 +511,9 @@ public class AdaptiveRadixTree<V> {
             // Use linear search for small sizes
             if (size <= LINEAR_SEARCH_THRESHOLD) {
                 for (int i = 0; i < size; i++) {
-                    if (keys[i] == key) return children[i];
+                    if (keys[i] == key) {
+                        return children[i];
+                    }
                 }
                 return null;
             }
@@ -510,12 +531,13 @@ public class AdaptiveRadixTree<V> {
                 int mid = (low + high) >>> 1;
                 int midVal = array[mid] & 0xFF;
 
-                if (midVal < key)
-                    low = mid + 1;
-                else if (midVal > key)
-                    high = mid - 1;
-                else
+                if (midVal < key) {
+                    low = mid + 1; // key found
+                } else if (midVal > key) {
+                    high = mid - 1; // key found
+                } else {
                     return mid; // key found
+                }
             }
             return -(low + 1);  // key not found
         }
@@ -545,7 +567,9 @@ public class AdaptiveRadixTree<V> {
 
             // Find insertion point while maintaining sorted order
             int pos = 0;
-            while (pos < size && (keys[pos] & 0xFF) < (key & 0xFF)) pos++;
+            while (pos < size && (keys[pos] & 0xFF) < (key & 0xFF)) {
+                pos++;
+            }
 
             if (pos < size) {
                 System.arraycopy(keys, pos, keys, pos + 1, size - pos);
@@ -630,9 +654,15 @@ public class AdaptiveRadixTree<V> {
             // Count bits set before this position
             int pos = 0;
             // Add bits from previous longs
-            if (longIndex > 0) pos += Long.bitCount(bitmap0);
-            if (longIndex > 1) pos += Long.bitCount(bitmap1);
-            if (longIndex > 2) pos += Long.bitCount(bitmap2);
+            if (longIndex > 0) {
+                pos += Long.bitCount(bitmap0);
+            }
+            if (longIndex > 1) {
+                pos += Long.bitCount(bitmap1);
+            }
+            if (longIndex > 2) {
+                pos += Long.bitCount(bitmap2);
+            }
 
             // Add bits from current long
             pos += Long.bitCount(bitmap & (mask - 1));
@@ -670,9 +700,15 @@ public class AdaptiveRadixTree<V> {
             if (exists) {
                 // Calculate position as in getChild
                 int pos = 0;
-                if (longIndex > 0) pos += Long.bitCount(bitmap0);
-                if (longIndex > 1) pos += Long.bitCount(bitmap1);
-                if (longIndex > 2) pos += Long.bitCount(bitmap2);
+                if (longIndex > 0) {
+                    pos += Long.bitCount(bitmap0);
+                }
+                if (longIndex > 1) {
+                    pos += Long.bitCount(bitmap1);
+                }
+                if (longIndex > 2) {
+                    pos += Long.bitCount(bitmap2);
+                }
 
                 switch (longIndex) {
                     case 0:
@@ -714,9 +750,15 @@ public class AdaptiveRadixTree<V> {
 
             // Calculate position for new child
             int pos = 0;
-            if (longIndex > 0) pos += Long.bitCount(bitmap0);
-            if (longIndex > 1) pos += Long.bitCount(bitmap1);
-            if (longIndex > 2) pos += Long.bitCount(bitmap2);
+            if (longIndex > 0) {
+                pos += Long.bitCount(bitmap0);
+            }
+            if (longIndex > 1) {
+                pos += Long.bitCount(bitmap1);
+            }
+            if (longIndex > 2) {
+                pos += Long.bitCount(bitmap2);
+            }
 
             switch (longIndex) {
                 case 0:
@@ -835,12 +877,16 @@ public class AdaptiveRadixTree<V> {
     }
 
     public @Nullable V search(String key) {
-        if (root == null) return null;
+        if (root == null) {
+            return null;
+        }
         return search(key.getBytes(StandardCharsets.UTF_8));
     }
 
     public @Nullable V search(byte[] bytes) {
-        if (root == null) return null;
+        if (root == null) {
+            return null;
+        }
         return root.search(bytes, 0, keyTable);
     }
 
@@ -898,8 +944,12 @@ public class AdaptiveRadixTree<V> {
         }
 
         boolean matches(byte[] key, int keyOffset, int storedOffset, int length) {
-            if (length <= 0) return true;
-            if (keyOffset + length > key.length) return false;
+            if (length <= 0) {
+                return true;
+            }
+            if (keyOffset + length > key.length) {
+                return false;
+            }
 
             assert storage != null;
             for (int i = 0; i < length; i++) {

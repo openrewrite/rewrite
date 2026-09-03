@@ -29,12 +29,12 @@ import java.util.function.Consumer;
 import static org.openrewrite.java.Assertions.sourceSet;
 import static org.openrewrite.test.SourceSpecs.dir;
 
-public class Assertions {
+public final class Assertions {
 
     private Assertions() {
     }
 
-    private static GroovyParser.Builder groovyParser = GroovyParser.builder()
+    private static final GroovyParser.Builder groovyParser = GroovyParser.builder()
             .classpath(JavaParser.runtimeClasspath())
             .logCompilationWarningsAndErrors(true);
 

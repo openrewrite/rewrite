@@ -170,12 +170,12 @@ internal class CSharpTypeMapping
     /// </summary>
     public JavaType? MapType(ITypeSymbol? symbol)
     {
-        if (symbol == null) return null;
-        if (symbol is IErrorTypeSymbol) return JavaType.Unknown.Instance;
+        if (symbol == null){ return null;}
+        if (symbol is IErrorTypeSymbol){ return JavaType.Unknown.Instance;}
 
         // Check cache first
-        if (_typeCache.TryGetValue(symbol, out var cached))
-            return cached;
+        if (_typeCache.TryGetValue(symbol, out var cached)){
+            return cached;}
 
         return symbol switch
         {
@@ -190,11 +190,11 @@ internal class CSharpTypeMapping
     {
         // Check for primitive types
         var primitive = MapPrimitive(symbol);
-        if (primitive != null) return primitive;
+        if (primitive != null){ return primitive;}
 
         // Check cache
-        if (_typeCache.TryGetValue(symbol, out var cached))
-            return cached;
+        if (_typeCache.TryGetValue(symbol, out var cached)){
+            return cached;}
 
         // Handle generic instantiations as Parameterized
         if (symbol.IsGenericType && !symbol.IsDefinition)
@@ -260,7 +260,7 @@ internal class CSharpTypeMapping
 
     private void DrainMemberQueue()
     {
-        if (_draining) return;
+        if (_draining){ return;}
         _draining = true;
         try
         {
@@ -291,7 +291,7 @@ internal class CSharpTypeMapping
 
         foreach (var member in symbol.GetMembers())
         {
-            if (IsCompilerGenerated(member)) continue;
+            if (IsCompilerGenerated(member)){ continue;}
 
             switch (member)
             {
@@ -316,7 +316,7 @@ internal class CSharpTypeMapping
 
     private static bool IsCompilerGenerated(ISymbol member)
     {
-        if (member.Name.Length == 0 || member.Name[0] == '<') return true;
+        if (member.Name.Length == 0 || member.Name[0] == '<'){ return true;}
 
         return member switch
         {
@@ -358,8 +358,8 @@ internal class CSharpTypeMapping
 
     private JavaType.Method MapMethod(IMethodSymbol symbol)
     {
-        if (_typeCache.TryGetValue(symbol, out var cached) && cached is JavaType.Method m)
-            return m;
+        if (_typeCache.TryGetValue(symbol, out var cached) && cached is JavaType.Method m){
+            return m;}
 
         var method = new JavaType.Method();
         _typeCache[symbol] = method;
@@ -401,8 +401,8 @@ internal class CSharpTypeMapping
 
     private JavaType.Variable MapVariable(ISymbol symbol, string name, JavaType? owner, JavaType? type)
     {
-        if (_typeCache.TryGetValue(symbol, out var cached) && cached is JavaType.Variable v)
-            return v;
+        if (_typeCache.TryGetValue(symbol, out var cached) && cached is JavaType.Variable v){
+            return v;}
 
         var variable = new JavaType.Variable(name, owner, type, null)
         {
@@ -454,11 +454,11 @@ internal class CSharpTypeMapping
             Accessibility.Protected => 4,    // Flag.Protected
             _ => 0
         });
-        if (symbol.IsStatic) flags |= 8;     // Flag.Static
-        if (symbol.IsAbstract) flags |= 1024; // Flag.Abstract
-        if (symbol.IsSealed) flags |= 16;     // Flag.Final (sealed ~ final)
+        if (symbol.IsStatic){ flags |= 8;     // Flag.Static
+        }if (symbol.IsAbstract){ flags |= 1024; // Flag.Abstract
+        }if (symbol.IsSealed){ flags |= 16;     // Flag.Final (sealed ~ final)
         // C#-specific: mark extension methods (bit 20, not used by Java Flag enum)
-        if (symbol is IMethodSymbol { IsExtensionMethod: true }) flags |= 1L << 20;
+        }if (symbol is IMethodSymbol { IsExtensionMethod: true }){ flags |= 1L << 20;}
         return flags;
     }
 

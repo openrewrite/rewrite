@@ -37,7 +37,7 @@ public class RpcReceiveQueue
     public RpcReceiveQueue(List<RpcObjectData> data, IDictionary<int, object> refs,
                            string? sourceFileType, IRpcCodec? treeCodec = null)
     {
-        foreach (var item in data) _batch.Enqueue(item);
+        foreach (var item in data){ _batch.Enqueue(item);}
         _refs = refs;
         _sourceFileType = sourceFileType;
         _treeCodec = treeCodec;
@@ -56,7 +56,7 @@ public class RpcReceiveQueue
     {
         if (_batch.Count == 0 && _pull != null)
         {
-            foreach (var item in _pull()) _batch.Enqueue(item);
+            foreach (var item in _pull()){ _batch.Enqueue(item);}
         }
         return _batch.Dequeue();
     }
@@ -106,8 +106,8 @@ public class RpcReceiveQueue
                 if (@ref != null && message.ValueType == null && message.Value == null)
                 {
                     // Pure reference to an existing object
-                    if (_refs.TryGetValue(@ref.Value, out var existing))
-                        return (T)existing;
+                    if (_refs.TryGetValue(@ref.Value, out var existing)){
+                        return (T)existing;}
                     throw new InvalidOperationException(
                         $"Received reference to unknown object: {@ref}");
                 }
@@ -126,10 +126,10 @@ public class RpcReceiveQueue
                 {
                     before = ExtractValue<T>(message.Value);
                 }
-                if (@ref != null && before != null)
-                    _refs[@ref.Value] = before;
-                goto case CHANGE; // Intentional fall-through
-            case CHANGE:
+                if (@ref != null && before != null){
+                    _refs[@ref.Value] = before; // Intentional fall-through
+            }
+                goto case CHANGE;case CHANGE:
                 T? after;
                 if (onChange != null)
                 {
@@ -163,8 +163,8 @@ public class RpcReceiveQueue
                 {
                     after = before;
                 }
-                if (@ref != null && after != null)
-                    _refs[@ref.Value] = after;
+                if (@ref != null && after != null){
+                    _refs[@ref.Value] = after;}
                 return after;
             default:
                 throw new InvalidOperationException($"Unknown state: {message.State}");
@@ -188,9 +188,9 @@ public class RpcReceiveQueue
                 goto case CHANGE;
             case CHANGE:
                 var posMsg = Take();
-                if (posMsg.State != CHANGE)
+                if (posMsg.State != CHANGE){
                     throw new InvalidOperationException(
-                        $"Expected CHANGE with positions in receiveList, got {posMsg.State}");
+                        $"Expected CHANGE with positions in receiveList, got {posMsg.State}");}
                 var positions = ExtractPositions(posMsg.Value!);
                 var after = new List<T>(positions.Count);
                 foreach (var beforeIdx in positions)
@@ -220,8 +220,8 @@ public class RpcReceiveQueue
 
     private static T ExtractValue<T>(object? value)
     {
-        if (value == null) return default!;
-        if (value is T t) return t;
+        if (value == null){ return default!;}
+        if (value is T t){ return t;}
 
         if (value is JsonElement je)
         {
@@ -229,16 +229,16 @@ public class RpcReceiveQueue
         }
 
         // Try numeric conversions for mismatched numeric types
-        if (typeof(T) == typeof(int) && value is IConvertible ic)
-            return (T)(object)ic.ToInt32(null);
-        if (typeof(T) == typeof(long) && value is IConvertible lc)
-            return (T)(object)lc.ToInt64(null);
-        if (typeof(T) == typeof(bool) && value is IConvertible bc)
-            return (T)(object)bc.ToBoolean(null);
+        if (typeof(T) == typeof(int) && value is IConvertible ic){
+            return (T)(object)ic.ToInt32(null);}
+        if (typeof(T) == typeof(long) && value is IConvertible lc){
+            return (T)(object)lc.ToInt64(null);}
+        if (typeof(T) == typeof(bool) && value is IConvertible bc){
+            return (T)(object)bc.ToBoolean(null);}
 
         // Enum values arrive as strings from Java (via StringEnumConverter)
-        if (typeof(T).IsEnum && value is string enumStr)
-            return (T)Enum.Parse(typeof(T), enumStr, ignoreCase: true);
+        if (typeof(T).IsEnum && value is string enumStr){
+            return (T)Enum.Parse(typeof(T), enumStr, ignoreCase: true);}
 
         return (T)value;
     }
@@ -250,26 +250,26 @@ public class RpcReceiveQueue
         // Handle nullable types
         var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
 
-        if (underlyingType == typeof(string))
-            return (T)(object)je.GetString()!;
-        if (underlyingType == typeof(Guid))
-            return (T)(object)Guid.Parse(je.GetString()!);
-        if (underlyingType == typeof(bool))
-            return (T)(object)je.GetBoolean();
-        if (underlyingType == typeof(int))
-            return (T)(object)je.GetInt32();
-        if (underlyingType == typeof(long))
-            return (T)(object)je.GetInt64();
-        if (underlyingType == typeof(double))
-            return (T)(object)je.GetDouble();
+        if (underlyingType == typeof(string)){
+            return (T)(object)je.GetString()!;}
+        if (underlyingType == typeof(Guid)){
+            return (T)(object)Guid.Parse(je.GetString()!);}
+        if (underlyingType == typeof(bool)){
+            return (T)(object)je.GetBoolean();}
+        if (underlyingType == typeof(int)){
+            return (T)(object)je.GetInt32();}
+        if (underlyingType == typeof(long)){
+            return (T)(object)je.GetInt64();}
+        if (underlyingType == typeof(double)){
+            return (T)(object)je.GetDouble();}
 
-        if (underlyingType.IsEnum && je.ValueKind == JsonValueKind.String)
-            return (T)Enum.Parse(underlyingType, je.GetString()!, ignoreCase: true);
+        if (underlyingType.IsEnum && je.ValueKind == JsonValueKind.String){
+            return (T)Enum.Parse(underlyingType, je.GetString()!, ignoreCase: true);}
 
-        if (je.ValueKind == JsonValueKind.String)
-            return (T)(object)je.GetString()!;
-        if (je.ValueKind == JsonValueKind.Null)
-            return default!;
+        if (je.ValueKind == JsonValueKind.String){
+            return (T)(object)je.GetString()!;}
+        if (je.ValueKind == JsonValueKind.Null){
+            return default!;}
 
         // For object values, return as-is and let caller handle
         return (T)(object)je;
@@ -280,18 +280,18 @@ public class RpcReceiveQueue
         if (value is JsonElement je && je.ValueKind == JsonValueKind.Array)
         {
             var result = new List<int>();
-            foreach (var elem in je.EnumerateArray())
-                result.Add(elem.GetInt32());
+            foreach (var elem in je.EnumerateArray()){
+                result.Add(elem.GetInt32());}
             return result;
         }
 
-        if (value is IList<int> intList) return new List<int>(intList);
+        if (value is IList<int> intList){ return new List<int>(intList);}
 
         if (value is System.Collections.IEnumerable enumerable)
         {
             var result = new List<int>();
-            foreach (var item in enumerable)
-                result.Add(Convert.ToInt32(item));
+            foreach (var item in enumerable){
+                result.Add(Convert.ToInt32(item));}
             return result;
         }
 
@@ -345,8 +345,8 @@ public class RpcReceiveQueue
         }
         if (type.IsInterface || type.IsAbstract)
         {
-            if (typeof(Marker).IsAssignableFrom(type))
-                return (T)(object)new UnknownMarker(Guid.NewGuid());
+            if (typeof(Marker).IsAssignableFrom(type)){
+                return (T)(object)new UnknownMarker(Guid.NewGuid());}
             throw new InvalidOperationException(
                 $"Cannot instantiate interface/abstract type: {type.FullName} (from {javaTypeName})");
         }
@@ -367,16 +367,16 @@ public class RpcReceiveQueue
         {
             foreach (var field in t.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly))
             {
-                if (field.GetValue(obj) != null) continue;
+                if (field.GetValue(obj) != null){ continue;}
                 var ft = field.FieldType;
-                if (ft == typeof(Space))
-                    field.SetValue(obj, Space.Empty);
-                else if (ft == typeof(Markers))
+                if (ft == typeof(Space)){
+                    field.SetValue(obj, Space.Empty);}
+                else if (ft == typeof(Markers)){
                     field.SetValue(obj, Markers.Empty);
                 // Note: do NOT initialize string fields to "" here.
                 // Nullable strings (like SearchResult.Description) must stay null
                 // so that NO_CHANGE messages preserve the null value correctly.
-                else if (ft.IsGenericType)
+                }else if (ft.IsGenericType)
                 {
                     var gtd = ft.GetGenericTypeDefinition();
                     if (gtd == typeof(IList<>) || gtd == typeof(List<>)
@@ -421,11 +421,11 @@ public class RpcReceiveQueue
             return (T)(object)new UnknownMarker(Guid.NewGuid());
         }
 
-        if (value is JsonElement jeNormal)
-            return (T)jeNormal.Deserialize(type, RpcJson.Options)!;
+        if (value is JsonElement jeNormal){
+            return (T)jeNormal.Deserialize(type, RpcJson.Options)!;}
 
-        if (value is T t)
-            return t;
+        if (value is T t){
+            return t;}
 
         return ExtractValue<T>(value);
     }
@@ -652,7 +652,7 @@ public class RpcReceiveQueue
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 var type = assembly.GetType(genericName);
-                if (type != null) return type;
+                if (type != null){ return type;}
             }
         }
         return nonGenericMatch;

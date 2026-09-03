@@ -109,7 +109,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                 if (target instanceof J.Identifier) {
                     target = ((J.Identifier) target).withType(newOwningType).withSimpleName(realName);
                 } else {
-                    target = (((J.FieldAccess) target).getName()).withType(newOwningType).withSimpleName(realName);
+                    target = ((J.FieldAccess) target).getName().withType(newOwningType).withSimpleName(realName);
                 }
                 JavaType nameType = name.getType();
                 name = name

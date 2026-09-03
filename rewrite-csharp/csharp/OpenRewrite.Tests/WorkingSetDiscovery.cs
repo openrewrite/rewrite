@@ -52,8 +52,8 @@ public static class WorkingSetDiscovery
         if (dir != rootDir)
         {
             var dirName = Path.GetFileName(dir);
-            if (ExcludedDirNames.Contains(dirName))
-                return;
+            if (ExcludedDirNames.Contains(dirName)){
+                return;}
         }
         // If this directory is a .NET project, add it and prune subtree
         if (IsDotNetProject(dir))
@@ -106,8 +106,8 @@ public static class WorkingSetDiscovery
     public static List<string> FindProjectFiles(string projectDir)
     {
         var slnFiles = FindFiles(projectDir, ".sln", ".slnx");
-        if (slnFiles.Count > 0)
-            return slnFiles;
+        if (slnFiles.Count > 0){
+            return slnFiles;}
 
         return FindFiles(projectDir, ".csproj");
     }
@@ -136,8 +136,8 @@ public static class WorkingSetDiscovery
     public static List<(string DisplayName, string ProjectDir, string ProjectFile)> DiscoverAll(string? rootDir = null)
     {
         rootDir ??= WorkingSetRoot;
-        if (rootDir == null)
-            return [];
+        if (rootDir == null){
+            return [];}
 
         var results = new List<(string DisplayName, string ProjectDir, string ProjectFile)>();
 

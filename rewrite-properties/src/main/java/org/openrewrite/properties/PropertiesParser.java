@@ -177,6 +177,7 @@ public class PropertiesParser implements Parser {
                         break;
                     }
                     state++;
+                    break;
                 case 1:
                     if ((c == '#' || c == '!') && !inComment) {
                         inComment = true;
@@ -186,6 +187,7 @@ public class PropertiesParser implements Parser {
                         break;
                     }
                     state++;
+                    break;
                 case 2:
                     if (!Character.isWhitespace(c)) {
                         // multi-word comment
@@ -207,7 +209,7 @@ public class PropertiesParser implements Parser {
         );
     }
 
-    static enum State {
+    enum State {
         WHITESPACE_BEFORE_KEY,
         KEY,
         KEY_OR_WHITESPACE,
@@ -218,11 +220,11 @@ public class PropertiesParser implements Parser {
     }
 
     private Properties.Entry entryFromLine(String line, String prefix, StringBuilder trailingWhitespaceBuffer) {
-        StringBuilder prefixBuilder = new StringBuilder(prefix),
-                key = new StringBuilder(),
-                equalsPrefix = new StringBuilder(),
-                valuePrefix = new StringBuilder(),
-                value = new StringBuilder();
+        StringBuilder prefixBuilder = new StringBuilder(prefix);
+        StringBuilder key = new StringBuilder();
+        StringBuilder equalsPrefix = new StringBuilder();
+        StringBuilder valuePrefix = new StringBuilder();
+        StringBuilder value = new StringBuilder();
 
         Properties.Entry.Delimiter delimiter = Properties.Entry.Delimiter.NONE;
         State state = State.WHITESPACE_BEFORE_KEY;
@@ -235,6 +237,7 @@ public class PropertiesParser implements Parser {
                         break;
                     }
                     state = State.KEY;
+                    break;
                 case KEY:
                     if (c == '=' || c == ':') {
                         if (endsWithEscape(key)) {
@@ -294,6 +297,7 @@ public class PropertiesParser implements Parser {
                         break;
                     }
                     state = State.VALUE_OR_TRAILING;
+                    break;
                 case VALUE_OR_TRAILING:
                     if (Character.isWhitespace(c)) {
                         trailingWhitespaceBuffer.append(c);

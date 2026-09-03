@@ -109,7 +109,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
             return emptyList();
         }
 
-        String maybeNewline = !Boolean.FALSE.equals(appendNewline) ? "\n" : "";
+        String maybeNewline = Boolean.FALSE.equals(appendNewline) ? "" : "\n";
         String content = this.content + maybeNewline;
         String preamble = this.preamble != null ? this.preamble + maybeNewline : "";
 
@@ -139,7 +139,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (sourceFile instanceof PlainText && matchesTarget(sourceFile.getSourcePath())) {
-                    String maybeNewline = !Boolean.FALSE.equals(appendNewline) ? "\n" : "";
+                    String maybeNewline = Boolean.FALSE.equals(appendNewline) ? "" : "\n";
                     String content = AppendToTextFile.this.content + maybeNewline;
                     String preamble = AppendToTextFile.this.preamble != null ? AppendToTextFile.this.preamble + maybeNewline : "";
 

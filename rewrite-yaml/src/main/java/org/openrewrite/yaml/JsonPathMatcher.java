@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
-import org.openrewrite.yaml.internal.ThrowingErrorListener;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -27,6 +26,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
+import org.openrewrite.yaml.internal.ThrowingErrorListener;
 import org.openrewrite.yaml.internal.grammar.JsonPathLexer;
 import org.openrewrite.yaml.internal.grammar.JsonPathParser;
 import org.openrewrite.yaml.internal.grammar.JsonPathParserBaseVisitor;
@@ -203,7 +203,7 @@ public class JsonPathMatcher {
 
         @Override
         protected Object aggregateResult(Object aggregate, Object nextResult) {
-            return (scope = nextResult);
+            return scope = nextResult;
         }
 
         @Override
@@ -402,7 +402,7 @@ public class JsonPathMatcher {
                         }
                     }
                     return getResultFromList(matches);
-                } else if (((member.getValue() instanceof Yaml.Scalar))) {
+                } else if (member.getValue() instanceof Yaml.Scalar) {
                     return key.equals(name) ? member : null;
                 }
 
@@ -429,7 +429,7 @@ public class JsonPathMatcher {
                     Object result = visitProperty(ctx);
                     if (result instanceof List) {
                         // Unwrap lists of results from visitProperty to match the position of the cursor.
-                        matches.addAll(((List<Object>) result));
+                        matches.addAll((List<Object>) result);
                     } else if (result != null) {
                         matches.add(result);
                     }
@@ -489,7 +489,7 @@ public class JsonPathMatcher {
                     // Unwrap lists of results from visitProperty to match the position of the cursor.
                     for (Object result : results) {
                         if (result instanceof List) {
-                            matches.addAll(((List<Object>) result));
+                            matches.addAll((List<Object>) result);
                         } else if (result != null) {
                             matches.add(result);
                         }
@@ -559,7 +559,7 @@ public class JsonPathMatcher {
                         Object result = visitUnaryExpression(ctx);
                         if (result instanceof List) {
                             // Unwrap lists of results from visitUnaryExpression to match the position of the cursor.
-                            matches.addAll(((List<Object>) result));
+                            matches.addAll((List<Object>) result);
                         } else if (result != null) {
                             matches.add(result);
                         }
@@ -704,10 +704,10 @@ public class JsonPathMatcher {
             if (ctx.LOGICAL_OPERATOR() != null) {
                 String operator;
                 switch (ctx.LOGICAL_OPERATOR().getText()) {
-                    case ("&&"):
+                    case "&&":
                         operator = "&&";
                         break;
-                    case ("||"):
+                    case "||":
                         operator = "||";
                         break;
                     default:
@@ -746,10 +746,10 @@ public class JsonPathMatcher {
                 rhs = getBinaryExpressionResult(rhs);
                 String operator;
                 switch (ctx.EQUALITY_OPERATOR().getText()) {
-                    case ("=="):
+                    case "==":
                         operator = "==";
                         break;
-                    case ("!="):
+                    case "!=":
                         operator = "!=";
                         break;
                     default:

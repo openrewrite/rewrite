@@ -91,8 +91,8 @@ public sealed class MSBuildProject : Marker, IRpcCodec<MSBuildProject>, IEquatab
         var props = new Dictionary<string, PropertyValue>();
         if (keys != null && values != null)
         {
-            for (int i = 0; i < keys.Count; i++)
-                props[keys[i]] = values[i];
+            for (int i = 0; i < keys.Count; i++){
+                props[keys[i]] = values[i];}
         }
         return before
             .WithId(id)

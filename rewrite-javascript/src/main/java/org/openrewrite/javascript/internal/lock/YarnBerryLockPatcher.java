@@ -24,16 +24,7 @@ import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Deque;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptySet;
@@ -582,7 +573,7 @@ public final class YarnBerryLockPatcher implements LockPatcher {
                 return e;
             }
         }
-        return (importerDir == null && count == 1) ? only : null;
+        return importerDir == null && count == 1 ? only : null;
     }
 
     /** The path after {@code @workspace:} in an importer descriptor key. */

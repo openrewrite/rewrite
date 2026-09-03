@@ -501,8 +501,8 @@ public class AutoFormatTests : RewriteTest
             var fl = (ForLoop)base.VisitForLoop(forLoop, p);
 
             // Only wrap if body is not already a block
-            if (fl.Body.Element is Block)
-                return fl;
+            if (fl.Body.Element is Block){
+                return fl;}
 
             var stmt = fl.Body.Element;
             var stmtPadded = new JRightPadded<Statement>(stmt, Space.Empty, Markers.Empty);
@@ -656,11 +656,11 @@ public class AutoFormatTests : RewriteTest
         {
             var v = (VariableDeclarations)base.VisitVariableDeclarations(varDecl, p);
 
-            if (Cursor.FirstEnclosing<ClassDeclaration>() == null)
-                return v;
+            if (Cursor.FirstEnclosing<ClassDeclaration>() == null){
+                return v;}
 
-            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly))
-                return v;
+            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly)){
+                return v;}
 
             var newModifiers = new List<Modifier>(v.Modifiers);
             newModifiers.Add(new Modifier(
@@ -945,13 +945,13 @@ file class AddConstructorWithMaybeAutoFormatRecipe : OpenRewrite.Core.Recipe
         {
             var before = classDecl;
             classDecl = (ClassDeclaration)base.VisitClassDeclaration(classDecl, ctx);
-            if (classDecl.Body == null) return classDecl;
+            if (classDecl.Body == null){ return classDecl;}
 
             // Check if parameterless constructor already exists
-            foreach (var stmt in classDecl.Body.Statements)
+            foreach (var stmt in classDecl.Body.Statements){
                 if (stmt.Element is MethodDeclaration md && md.Parameters.Elements.Count == 0 &&
-                    md.Name.SimpleName == classDecl.Name.SimpleName)
-                    return classDecl;
+                    md.Name.SimpleName == classDecl.Name.SimpleName){
+                    return classDecl;}}
 
             var className = classDecl.Name.SimpleName;
 
@@ -1012,8 +1012,8 @@ file class ReplaceWithMultiStatementTemplateRecipe : OpenRewrite.Core.Recipe
         public override J VisitReturn(Return ret, ExecutionContext ctx)
         {
             ret = (Return)base.VisitReturn(ret, ctx);
-            if (ret.Expression is not Ternary)
-                return ret;
+            if (ret.Expression is not Ternary){
+                return ret;}
 
             // Multi-statement compressed template — produces a SyntheticBlock
             var tmpl = CSharpTemplate.Statement(
@@ -1073,10 +1073,10 @@ file class ManualIfElseAtBlockLevelRecipe : OpenRewrite.Core.Recipe
             List<(Expression condition, Expression value)> branches, out Expression elseValue)
         {
             branches.Add((ternary.Condition, ternary.TruePart.Element));
-            if (ternary.FalsePart.Element is Ternary nested)
-                FlattenTernary(nested, branches, out elseValue);
-            else
-                elseValue = ternary.FalsePart.Element;
+            if (ternary.FalsePart.Element is Ternary nested){
+                FlattenTernary(nested, branches, out elseValue);}
+            else{
+                elseValue = ternary.FalsePart.Element;}
         }
 
         private static If BuildIfElseReturn(
@@ -1145,7 +1145,7 @@ file class MismatchingTypeRecipe : OpenRewrite.Core.Recipe
         {
             var before = classDecl;
             classDecl = (ClassDeclaration)base.VisitClassDeclaration(classDecl, ctx);
-            if (classDecl.Body == null || classDecl.Body.Statements.Count > 0) return classDecl;
+            if (classDecl.Body == null || classDecl.Body.Statements.Count > 0){ return classDecl;}
 
             // Deliberately use Identifier("string") — the parser produces Primitive(String)
             var typeExpr = new Identifier(

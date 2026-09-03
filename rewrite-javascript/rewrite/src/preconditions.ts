@@ -209,12 +209,16 @@ async function evaluateComposite(
     switch (composite.op) {
         case "or":
             for (const operand of operands) {
-                if (await operandMatches(operand, tree, ctx, parent)) return true;
+              if (await operandMatches(operand, tree, ctx, parent)) {
+                return true
+              };
             }
             return false;
         case "and":
             for (const operand of operands) {
-                if (!(await operandMatches(operand, tree, ctx, parent))) return false;
+              if (!(await operandMatches(operand, tree, ctx, parent))) {
+                return false
+              };
             }
             return true;
         case "not":

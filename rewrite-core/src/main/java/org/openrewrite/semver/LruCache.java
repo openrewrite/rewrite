@@ -36,7 +36,7 @@ final class LruCache {
     }
 
     static <K, V> Map<K, V> bounded(int maxSize) {
-        return synchronizedMap(new LinkedHashMap<K, V>(256, 0.75f, true) {
+        return synchronizedMap(new LinkedHashMap<K, V>(256, 0.75F, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
                 return size() > maxSize;

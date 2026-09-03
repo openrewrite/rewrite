@@ -270,7 +270,7 @@ public class GoRewriteRpc extends RewriteRpc {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
-            private int index = 0;
+            private int index;
             private @Nullable ParseProjectResponse response;
 
             @Override

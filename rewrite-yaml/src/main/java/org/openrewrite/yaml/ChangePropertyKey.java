@@ -99,9 +99,9 @@ public class ChangePropertyKey extends Recipe {
         private final List<NameCaseConvention.Compiled> exceptWildcardMatchers;
 
         ChangePropertyKeyVisitor() {
-            NameCaseConvention convention = !Boolean.FALSE.equals(relaxedBinding) ?
-                    NameCaseConvention.LOWER_CAMEL :
-                    NameCaseConvention.EXACT;
+            NameCaseConvention convention = Boolean.FALSE.equals(relaxedBinding) ?
+                    NameCaseConvention.EXACT :
+                    NameCaseConvention.LOWER_CAMEL;
             this.oldKeyMatcher = convention.compile(oldPropertyKey);
             this.oldKeyWildcardMatcher = convention.compile(oldPropertyKey + ".*");
             this.newKeyMatcher = convention.compile(newPropertyKey);
@@ -247,7 +247,7 @@ public class ChangePropertyKey extends Recipe {
         return except != null ? except : emptyList();
     }
 
-    private class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
+    private final class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
         private final Yaml.Mapping.Entry scope;
         private final String subproperty;
         private final Yaml.Mapping.Entry entryToReplace;
@@ -354,9 +354,9 @@ public class ChangePropertyKey extends Recipe {
             if (start < 0 || start + keyParts.length > segments.length) {
                 return false;
             }
-            NameCaseConvention convention = !Boolean.FALSE.equals(relaxedBinding) ?
-                    NameCaseConvention.LOWER_CAMEL :
-                    NameCaseConvention.EXACT;
+            NameCaseConvention convention = Boolean.FALSE.equals(relaxedBinding) ?
+                    NameCaseConvention.EXACT :
+                    NameCaseConvention.LOWER_CAMEL;
             for (int i = 0; i < keyParts.length; i++) {
                 if (!convention.format(segments[start + i]).equals(convention.format(keyParts[i]))) {
                     return false;
@@ -400,7 +400,7 @@ public class ChangePropertyKey extends Recipe {
         }
     }
 
-    private static class DeletePropertyVisitor<P> extends YamlIsoVisitor<P> {
+    private static final class DeletePropertyVisitor<P> extends YamlIsoVisitor<P> {
         private final Yaml.Mapping.Entry scope;
 
         private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {

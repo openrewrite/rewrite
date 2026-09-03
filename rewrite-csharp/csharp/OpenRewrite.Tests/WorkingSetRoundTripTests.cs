@@ -40,8 +40,8 @@ public class WorkingSetRoundTripTests
     public static IEnumerable<object[]> AllProjects()
     {
         if (WorkingSetDiscovery.WorkingSetRoot == null ||
-            !Directory.Exists(WorkingSetDiscovery.WorkingSetRoot))
-            yield break;
+            !Directory.Exists(WorkingSetDiscovery.WorkingSetRoot)){
+            yield break;}
 
         foreach (var (displayName, projectDir, projectFile) in WorkingSetDiscovery.DiscoverAll())
         {
@@ -54,9 +54,9 @@ public class WorkingSetRoundTripTests
     public async Task ParseAndPrintRoundTrip()
     {
         var projects = AllProjects().ToList();
-        if (projects.Count == 0) return; // No WORKING_SET_ROOT configured
+        if (projects.Count == 0){ return; // No WORKING_SET_ROOT configured
 
-        foreach (var data in projects)
+        }foreach (var data in projects)
         {
             await RunRoundTrip((string)data[0], (string)data[1], (string)data[2]);
         }
@@ -185,12 +185,12 @@ public class WorkingSetRoundTripTests
 
         var directiveLines = PreprocessorSourceTransformer.GetDirectivePositions(source);
         Console.WriteLine($"Directive lines: {directiveLines.Count}");
-        foreach (var d in directiveLines)
-            Console.WriteLine($"  Line {d.LineNumber}: {d.Kind} group={d.GroupId} text=\"{d.Text.Replace("\r", "\\r")}\"");
+        foreach (var d in directiveLines){
+            Console.WriteLine($"  Line {d.LineNumber}: {d.Kind} group={d.GroupId} text=\"{d.Text.Replace("\r", "\\r")}\"");}
 
         var directiveLineToIndex = new Dictionary<int, int>();
-        for (int idx = 0; idx < directiveLines.Count; idx++)
-            directiveLineToIndex[directiveLines[idx].LineNumber] = idx;
+        for (int idx = 0; idx < directiveLines.Count; idx++){
+            directiveLineToIndex[directiveLines[idx].LineNumber] = idx;}
 
         var permutations = PreprocessorSourceTransformer.GenerateUniquePermutations(
             source, symbols, directiveLineToIndex);
@@ -204,8 +204,8 @@ public class WorkingSetRoundTripTests
 
         PreprocessorSourceTransformer.ComputeActiveBranchIndices(directiveLines, permutations);
         Console.WriteLine("\nActive branch indices:");
-        foreach (var d in directiveLines)
-            Console.WriteLine($"  Line {d.LineNumber}: {d.Kind} ActiveBranch={d.ActiveBranchIndex}");
+        foreach (var d in directiveLines){
+            Console.WriteLine($"  Line {d.LineNumber}: {d.Kind} ActiveBranch={d.ActiveBranchIndex}");}
 
         var parser = new CSharpParser();
         var cu = parser.Parse(source, "Test.cs");
@@ -404,8 +404,8 @@ public class WorkingSetRoundTripTests
                 var lines = cleanSource.Split('\n');
                 for (int ln = 0; ln < lines.Length; ln++)
                 {
-                    if (lines[ln].Contains("//DIRECTIVE:"))
-                        Console.WriteLine($"    L{ln}: {lines[ln].TrimEnd()}");
+                    if (lines[ln].Contains("//DIRECTIVE:")){
+                        Console.WriteLine($"    L{ln}: {lines[ln].TrimEnd()}");}
                 }
             }
         }

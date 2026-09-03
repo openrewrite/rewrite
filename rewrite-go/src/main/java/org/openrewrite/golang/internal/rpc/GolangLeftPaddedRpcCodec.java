@@ -16,8 +16,8 @@
 package org.openrewrite.golang.internal.rpc;
 
 import lombok.Getter;
-import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;

@@ -403,7 +403,9 @@ class TsvEscapeUtils {
      */
     @VisibleForTesting
     static String[] splitAnnotationList(String input, char delimiter) {
-        if (input.isEmpty()) return new String[0];
+        if (input.isEmpty()) {
+            return new String[0];
+        }
 
         List<String> result = new ArrayList<>();
         StringBuilder current = null; // Lazy allocation
@@ -762,7 +764,7 @@ class TypeAnnotationSupport {
         String typeRefHex = String.format("%08x", typeRef);
 
         // Use TypePath.toString() if present, empty string otherwise
-        String pathString = (typePath != null) ? typePath.toString() : "";
+        String pathString = typePath != null ? typePath.toString() : "";
 
         return typeRefHex + ":" + pathString + ":" + annotation;
     }
@@ -770,7 +772,7 @@ class TypeAnnotationSupport {
     /**
      * Parse and reconstruct a type annotation from TSV format.
      */
-    public static class TypeAnnotationInfo {
+    public static final class TypeAnnotationInfo {
         public final int typeRef;
         public final @Nullable TypePath typePath;
         public final String annotation;

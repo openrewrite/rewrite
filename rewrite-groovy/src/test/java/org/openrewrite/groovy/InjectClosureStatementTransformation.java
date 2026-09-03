@@ -44,7 +44,7 @@ import java.util.List;
 public class InjectClosureStatementTransformation implements ASTTransformation {
 
     /** Set whenever this transformation actually runs, so tests can assert whether it was suppressed. */
-    public static volatile boolean executed = false;
+    public static volatile boolean executed;
 
     @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {

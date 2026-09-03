@@ -29,9 +29,9 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     {
         // DeconstructionPattern is a J type that implements Cs.Pattern
         // but must be visited via JavaVisitor which has the actual visit method
-        if (tree is DeconstructionPattern) return base.Accept(tree, p);
+        if (tree is DeconstructionPattern){ return base.Accept(tree, p);}
 
-        if (tree is not Cs) return base.Accept(tree, p);
+        if (tree is not Cs){ return base.Accept(tree, p);}
 
         return tree switch
         {
@@ -187,7 +187,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(usingDirective.Markers, p));
 
         var stmtResult = VisitStatement(usingDirective, p);
-        if (stmtResult is not UsingDirective node) return stmtResult;
+        if (stmtResult is not UsingDirective node){ return stmtResult;}
 
         return node
             .WithGlobal(VisitRightPadded(node.Global, p)!)
@@ -204,7 +204,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(prop.Markers, p));
 
         var stmtResult = VisitStatement(prop, p);
-        if (stmtResult is not PropertyDeclaration node) return stmtResult;
+        if (stmtResult is not PropertyDeclaration node){ return stmtResult;}
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
@@ -224,7 +224,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(accessor.Markers, p));
 
         var stmtResult = VisitStatement(accessor, p);
-        if (stmtResult is not AccessorDeclaration node) return stmtResult;
+        if (stmtResult is not AccessorDeclaration node){ return stmtResult;}
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
@@ -252,7 +252,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(ne.Markers, p));
 
         var exprResult = VisitExpression(ne, p);
-        if (exprResult is not NamedExpression node) return exprResult;
+        if (exprResult is not NamedExpression node){ return exprResult;}
 
         return node
             .WithName(VisitRightPadded(node.Name, p)!)
@@ -266,7 +266,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(re.Markers, p));
 
         var exprResult = VisitExpression(re, p);
-        if (exprResult is not RefExpression node) return exprResult;
+        if (exprResult is not RefExpression node){ return exprResult;}
 
         return node
             .WithExpression((Expression)Visit(node.Expression, p)!);
@@ -279,7 +279,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(de.Markers, p));
 
         var exprResult = VisitExpression(de, p);
-        if (exprResult is not DeclarationExpression node) return exprResult;
+        if (exprResult is not DeclarationExpression node){ return exprResult;}
 
         return node
             .WithTypeExpression((TypeTree?)Visit(node.TypeExpression, p))
@@ -293,7 +293,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(isPattern.Markers, p));
 
         var exprResult = VisitExpression(isPattern, p);
-        if (exprResult is not IsPattern node) return exprResult;
+        if (exprResult is not IsPattern node){ return exprResult;}
 
         return node
             .WithExpression((Expression)Visit(node.Expression, p)!)
@@ -308,7 +308,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(se.Markers, p));
 
         var exprResult = VisitExpression(se, p);
-        if (exprResult is not StatementExpression node) return exprResult;
+        if (exprResult is not StatementExpression node){ return exprResult;}
 
         return node
             .WithStatement((Statement)Visit(node.Statement, p)!);
@@ -321,7 +321,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(sizeOf.Markers, p));
 
         var exprResult = VisitExpression(sizeOf, p);
-        if (exprResult is not SizeOf node) return exprResult;
+        if (exprResult is not SizeOf node){ return exprResult;}
 
         return node
             .WithExpression((Expression)Visit(node.Expression, p)!)
@@ -335,7 +335,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(unsafeStatement.Markers, p));
 
         var stmtResult = VisitStatement(unsafeStatement, p);
-        if (stmtResult is not UnsafeStatement node) return stmtResult;
+        if (stmtResult is not UnsafeStatement node){ return stmtResult;}
 
         return node
             .WithBlock((Block)Visit(node.Block, p)!);
@@ -348,7 +348,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(pointerType.Markers, p));
 
         var exprResult = VisitExpression(pointerType, p);
-        if (exprResult is not PointerType node) return exprResult;
+        if (exprResult is not PointerType node){ return exprResult;}
 
         return node
             .WithElementType(VisitRightPadded(node.ElementType, p)!);
@@ -361,7 +361,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(fixedStatement.Markers, p));
 
         var stmtResult = VisitStatement(fixedStatement, p);
-        if (stmtResult is not FixedStatement node) return stmtResult;
+        if (stmtResult is not FixedStatement node){ return stmtResult;}
 
         return node
             .WithDeclarations((ControlParentheses<VariableDeclarations>)Visit(node.Declarations, p)!)
@@ -375,7 +375,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(externAlias.Markers, p));
 
         var stmtResult = VisitStatement(externAlias, p);
-        if (stmtResult is not ExternAlias node) return stmtResult;
+        if (stmtResult is not ExternAlias node){ return stmtResult;}
 
         return node
             .WithIdentifier(VisitLeftPadded(node.Identifier, p)!);
@@ -388,7 +388,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(initializerExpression.Markers, p));
 
         var exprResult = VisitExpression(initializerExpression, p);
-        if (exprResult is not InitializerExpression node) return exprResult;
+        if (exprResult is not InitializerExpression node){ return exprResult;}
 
         return node
             .WithExpressions(VisitContainer(node.Expressions, p)!);
@@ -401,7 +401,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(nullSafeExpression.Markers, p));
 
         var exprResult = VisitExpression(nullSafeExpression, p);
-        if (exprResult is not NullSafeExpression node) return exprResult;
+        if (exprResult is not NullSafeExpression node){ return exprResult;}
 
         return node
             .WithExpressionPadded(VisitRightPadded(node.ExpressionPadded, p)!);
@@ -414,7 +414,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(defaultExpression.Markers, p));
 
         var exprResult = VisitExpression(defaultExpression, p);
-        if (exprResult is not DefaultExpression node) return exprResult;
+        if (exprResult is not DefaultExpression node){ return exprResult;}
 
         return node
             .WithTypeOperator(VisitContainer(node.TypeOperator, p));
@@ -427,10 +427,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(csLambda.Markers, p));
 
         var stmtResult = VisitStatement(csLambda, p);
-        if (stmtResult is not CsLambda s1) return stmtResult;
+        if (stmtResult is not CsLambda s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not CsLambda node) return exprResult;
+        if (exprResult is not CsLambda node){ return exprResult;}
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
@@ -446,7 +446,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(rp.Markers, p));
 
         var exprResult = VisitExpression(rp, p);
-        if (exprResult is not RelationalPattern node) return exprResult;
+        if (exprResult is not RelationalPattern node){ return exprResult;}
 
         return node
             .WithOperator(VisitLeftPadded(node.Operator, p)!)
@@ -460,7 +460,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(pp.Markers, p));
 
         var exprResult = VisitExpression(pp, p);
-        if (exprResult is not PropertyPattern node) return exprResult;
+        if (exprResult is not PropertyPattern node){ return exprResult;}
 
         return node
             .WithTypeQualifier((TypeTree?)Visit(node.TypeQualifier, p))
@@ -488,10 +488,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(istr.Markers, p));
 
         var stmtResult = VisitStatement(istr, p);
-        if (stmtResult is not InterpolatedString s1) return stmtResult;
+        if (stmtResult is not InterpolatedString s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not InterpolatedString node) return exprResult;
+        if (exprResult is not InterpolatedString node){ return exprResult;}
 
         return node
             .WithParts(ListUtils.Map(node.Parts, part => Visit(part, p)));
@@ -515,10 +515,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(ae.Markers, p));
 
         var stmtResult = VisitStatement(ae, p);
-        if (stmtResult is not AwaitExpression s1) return stmtResult;
+        if (stmtResult is not AwaitExpression s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not AwaitExpression node) return exprResult;
+        if (exprResult is not AwaitExpression node){ return exprResult;}
 
         return node
             .WithExpression((Expression)Visit(node.Expression, p)!)
@@ -532,7 +532,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(yield.Markers, p));
 
         var stmtResult = VisitStatement(yield, p);
-        if (stmtResult is not Yield node) return stmtResult;
+        if (stmtResult is not Yield node){ return stmtResult;}
 
         return node
             .WithReturnOrBreakKeyword((Keyword)Visit(node.ReturnOrBreakKeyword, p)!)
@@ -546,7 +546,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(ns.Markers, p));
 
         var stmtResult = VisitStatement(ns, p);
-        if (stmtResult is not NamespaceDeclaration node) return stmtResult;
+        if (stmtResult is not NamespaceDeclaration node){ return stmtResult;}
 
         return node
             .WithName(VisitRightPadded(node.Name, p)!)
@@ -563,7 +563,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(tupleType.Markers, p));
 
         var exprResult = VisitExpression(tupleType, p);
-        if (exprResult is not TupleType node) return exprResult;
+        if (exprResult is not TupleType node){ return exprResult;}
 
         return node
             .WithElements(VisitContainer(node.Elements, p)!)
@@ -577,7 +577,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(tupleExpr.Markers, p));
 
         var exprResult = VisitExpression(tupleExpr, p);
-        if (exprResult is not TupleExpression node) return exprResult;
+        if (exprResult is not TupleExpression node){ return exprResult;}
 
         return node
             .WithArguments(VisitContainer(node.Arguments, p)!);
@@ -590,7 +590,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(conditionalDirective.Markers, p));
 
         var stmtResult = VisitStatement(conditionalDirective, p);
-        if (stmtResult is not ConditionalDirective node) return stmtResult;
+        if (stmtResult is not ConditionalDirective node){ return stmtResult;}
 
         return node
             .WithBranches(ListUtils.Map(node.Branches, b => VisitRightPadded(b, p)));
@@ -603,7 +603,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(pragmaWarningDirective.Markers, p));
 
         var stmtResult = VisitStatement(pragmaWarningDirective, p);
-        if (stmtResult is not PragmaWarningDirective node) return stmtResult;
+        if (stmtResult is not PragmaWarningDirective node){ return stmtResult;}
 
         return node
             .WithKeywordSpacing(VisitSpace(node.KeywordSpacing, p))
@@ -618,7 +618,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(pragmaChecksumDirective.Markers, p));
 
         var stmtResult = VisitStatement(pragmaChecksumDirective, p);
-        if (stmtResult is not PragmaChecksumDirective node) return stmtResult;
+        if (stmtResult is not PragmaChecksumDirective node){ return stmtResult;}
 
         return node.WithKeywordSpacing(VisitSpace(node.KeywordSpacing, p));
     }
@@ -630,7 +630,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(nullableDirective.Markers, p));
 
         var stmtResult = VisitStatement(nullableDirective, p);
-        if (stmtResult is not NullableDirective node) return stmtResult;
+        if (stmtResult is not NullableDirective node){ return stmtResult;}
 
         return node;
     }
@@ -642,7 +642,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(regionDirective.Markers, p));
 
         var stmtResult = VisitStatement(regionDirective, p);
-        if (stmtResult is not RegionDirective node) return stmtResult;
+        if (stmtResult is not RegionDirective node){ return stmtResult;}
 
         return node;
     }
@@ -654,7 +654,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(endRegionDirective.Markers, p));
 
         var stmtResult = VisitStatement(endRegionDirective, p);
-        if (stmtResult is not EndRegionDirective node) return stmtResult;
+        if (stmtResult is not EndRegionDirective node){ return stmtResult;}
 
         return node;
     }
@@ -666,7 +666,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(defineDirective.Markers, p));
 
         var stmtResult = VisitStatement(defineDirective, p);
-        if (stmtResult is not DefineDirective node) return stmtResult;
+        if (stmtResult is not DefineDirective node){ return stmtResult;}
 
         return node
             .WithSymbol((Identifier)Visit(node.Symbol, p)!);
@@ -679,7 +679,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(undefDirective.Markers, p));
 
         var stmtResult = VisitStatement(undefDirective, p);
-        if (stmtResult is not UndefDirective node) return stmtResult;
+        if (stmtResult is not UndefDirective node){ return stmtResult;}
 
         return node
             .WithSymbol((Identifier)Visit(node.Symbol, p)!);
@@ -692,7 +692,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(errorDirective.Markers, p));
 
         var stmtResult = VisitStatement(errorDirective, p);
-        if (stmtResult is not ErrorDirective node) return stmtResult;
+        if (stmtResult is not ErrorDirective node){ return stmtResult;}
 
         return node;
     }
@@ -704,7 +704,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(warningDirective.Markers, p));
 
         var stmtResult = VisitStatement(warningDirective, p);
-        if (stmtResult is not WarningDirective node) return stmtResult;
+        if (stmtResult is not WarningDirective node){ return stmtResult;}
 
         return node;
     }
@@ -716,7 +716,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(lineDirective.Markers, p));
 
         var stmtResult = VisitStatement(lineDirective, p);
-        if (stmtResult is not LineDirective node) return stmtResult;
+        if (stmtResult is not LineDirective node){ return stmtResult;}
 
         return node
             .WithLine((Expression?)Visit(node.Line, p))
@@ -747,7 +747,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(annotatedStatement.Markers, p));
 
         var stmtResult = VisitStatement(annotatedStatement, p);
-        if (stmtResult is not AnnotatedStatement node) return stmtResult;
+        if (stmtResult is not AnnotatedStatement node){ return stmtResult;}
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
@@ -761,7 +761,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(arrayRankSpecifier.Markers, p));
 
         var exprResult = VisitExpression(arrayRankSpecifier, p);
-        if (exprResult is not ArrayRankSpecifier node) return exprResult;
+        if (exprResult is not ArrayRankSpecifier node){ return exprResult;}
 
         return node
             .WithSizes(VisitContainer(node.Sizes, p)!);
@@ -774,10 +774,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(assignmentOperation.Markers, p));
 
         var stmtResult = VisitStatement(assignmentOperation, p);
-        if (stmtResult is not AssignmentOperation s1) return stmtResult;
+        if (stmtResult is not AssignmentOperation s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not AssignmentOperation node) return exprResult;
+        if (exprResult is not AssignmentOperation node){ return exprResult;}
 
         return node
             .WithVariable((Expression)Visit(node.Variable, p)!)
@@ -792,7 +792,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(stackAllocExpression.Markers, p));
 
         var exprResult = VisitExpression(stackAllocExpression, p);
-        if (exprResult is not StackAllocExpression node) return exprResult;
+        if (exprResult is not StackAllocExpression node){ return exprResult;}
 
         return node
             .WithExpression((NewArray)Visit(node.Expression, p)!);
@@ -805,7 +805,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(gotoStatement.Markers, p));
 
         var stmtResult = VisitStatement(gotoStatement, p);
-        if (stmtResult is not GotoStatement node) return stmtResult;
+        if (stmtResult is not GotoStatement node){ return stmtResult;}
 
         return node
             .WithCaseOrDefaultKeyword((Keyword?)Visit(node.CaseOrDefaultKeyword, p))
@@ -819,7 +819,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(eventDeclaration.Markers, p));
 
         var stmtResult = VisitStatement(eventDeclaration, p);
-        if (stmtResult is not EventDeclaration node) return stmtResult;
+        if (stmtResult is not EventDeclaration node){ return stmtResult;}
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
@@ -837,7 +837,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(csBinary.Markers, p));
 
         var exprResult = VisitExpression(csBinary, p);
-        if (exprResult is not CsBinary node) return exprResult;
+        if (exprResult is not CsBinary node){ return exprResult;}
 
         return node
             .WithLeft((Expression)Visit(node.Left, p)!)
@@ -853,7 +853,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(collectionExpression.Markers, p));
 
         var exprResult = VisitExpression(collectionExpression, p);
-        if (exprResult is not CollectionExpression node) return exprResult;
+        if (exprResult is not CollectionExpression node){ return exprResult;}
 
         return node
             .WithElements(ListUtils.Map(node.Elements, e => VisitRightPadded(e, p)))
@@ -867,7 +867,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(forEachVariableLoop.Markers, p));
 
         var stmtResult = VisitStatement(forEachVariableLoop, p);
-        if (stmtResult is not ForEachVariableLoop node) return stmtResult;
+        if (stmtResult is not ForEachVariableLoop node){ return stmtResult;}
 
         return node
             .WithControlElement((ForEachVariableLoopControl)Visit(node.ControlElement, p)!)
@@ -890,7 +890,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(usingStatement.Markers, p));
 
         var stmtResult = VisitStatement(usingStatement, p);
-        if (stmtResult is not UsingStatement node) return stmtResult;
+        if (stmtResult is not UsingStatement node){ return stmtResult;}
 
         return node
             .WithExpressionPadded(VisitLeftPadded(node.ExpressionPadded, p)!)
@@ -904,7 +904,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(clause.Markers, p));
 
         var exprResult = VisitExpression(clause, p);
-        if (exprResult is not AllowsConstraintClause node) return exprResult;
+        if (exprResult is not AllowsConstraintClause node){ return exprResult;}
 
         return node
             .WithExpressions(VisitContainer(node.Expressions, p)!);
@@ -917,7 +917,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(constraint.Markers, p));
 
         var exprResult = VisitExpression(constraint, p);
-        if (exprResult is not RefStructConstraint node) return exprResult;
+        if (exprResult is not RefStructConstraint node){ return exprResult;}
 
         return node;
     }
@@ -929,7 +929,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(constraint.Markers, p));
 
         var exprResult = VisitExpression(constraint, p);
-        if (exprResult is not ClassOrStructConstraint node) return exprResult;
+        if (exprResult is not ClassOrStructConstraint node){ return exprResult;}
 
         return node;
     }
@@ -941,7 +941,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(constraint.Markers, p));
 
         var exprResult = VisitExpression(constraint, p);
-        if (exprResult is not ConstructorConstraint node) return exprResult;
+        if (exprResult is not ConstructorConstraint node){ return exprResult;}
 
         return node;
     }
@@ -953,7 +953,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(constraint.Markers, p));
 
         var exprResult = VisitExpression(constraint, p);
-        if (exprResult is not DefaultConstraint node) return exprResult;
+        if (exprResult is not DefaultConstraint node){ return exprResult;}
 
         return node;
     }
@@ -965,7 +965,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(designation.Markers, p));
 
         var exprResult = VisitExpression(designation, p);
-        if (exprResult is not SingleVariableDesignation node) return exprResult;
+        if (exprResult is not SingleVariableDesignation node){ return exprResult;}
 
         return node
             .WithName((Identifier)Visit(node.Name, p)!);
@@ -978,7 +978,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(designation.Markers, p));
 
         var exprResult = VisitExpression(designation, p);
-        if (exprResult is not ParenthesizedVariableDesignation node) return exprResult;
+        if (exprResult is not ParenthesizedVariableDesignation node){ return exprResult;}
 
         return node
             .WithVariables(VisitContainer(node.Variables, p)!)
@@ -992,7 +992,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(designation.Markers, p));
 
         var exprResult = VisitExpression(designation, p);
-        if (exprResult is not DiscardVariableDesignation node) return exprResult;
+        if (exprResult is not DiscardVariableDesignation node){ return exprResult;}
 
         return node
             .WithDiscard((Identifier)Visit(node.Discard, p)!);
@@ -1005,10 +1005,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(csUnary.Markers, p));
 
         var stmtResult = VisitStatement(csUnary, p);
-        if (stmtResult is not CsUnary s1) return stmtResult;
+        if (stmtResult is not CsUnary s1){ return stmtResult;}
 
         var exprResult = VisitExpression(s1, p);
-        if (exprResult is not CsUnary node) return exprResult;
+        if (exprResult is not CsUnary node){ return exprResult;}
 
         return node
             .WithOperator(VisitLeftPadded(node.Operator, p)!)
@@ -1032,7 +1032,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(constantPattern.Markers, p));
 
         var exprResult = VisitExpression(constantPattern, p);
-        if (exprResult is not ConstantPattern node) return exprResult;
+        if (exprResult is not ConstantPattern node){ return exprResult;}
 
         return node
             .WithValue((Expression)Visit(node.Value, p)!);
@@ -1045,7 +1045,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(discardPattern.Markers, p));
 
         var exprResult = VisitExpression(discardPattern, p);
-        if (exprResult is not DiscardPattern node) return exprResult;
+        if (exprResult is not DiscardPattern node){ return exprResult;}
 
         return node
             .WithType((JavaType?)VisitType(node.Type, p));
@@ -1058,7 +1058,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(implicitElementAccess.Markers, p));
 
         var exprResult = VisitExpression(implicitElementAccess, p);
-        if (exprResult is not ImplicitElementAccess node) return exprResult;
+        if (exprResult is not ImplicitElementAccess node){ return exprResult;}
 
         return node
             .WithArgumentList(VisitContainer(node.ArgumentList, p)!);
@@ -1071,7 +1071,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(slicePattern.Markers, p));
 
         var exprResult = VisitExpression(slicePattern, p);
-        if (exprResult is not SlicePattern node) return exprResult;
+        if (exprResult is not SlicePattern node){ return exprResult;}
 
         return node;
     }
@@ -1083,7 +1083,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(listPattern.Markers, p));
 
         var exprResult = VisitExpression(listPattern, p);
-        if (exprResult is not ListPattern node) return exprResult;
+        if (exprResult is not ListPattern node){ return exprResult;}
 
         return node
             .WithPatterns(VisitContainer(node.Patterns, p)!)
@@ -1097,7 +1097,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(switchExpression.Markers, p));
 
         var exprResult = VisitExpression(switchExpression, p);
-        if (exprResult is not SwitchExpression node) return exprResult;
+        if (exprResult is not SwitchExpression node){ return exprResult;}
 
         return node
             .WithExpressionPadded(VisitRightPadded(node.ExpressionPadded, p)!)
@@ -1121,7 +1121,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(checkedExpression.Markers, p));
 
         var exprResult = VisitExpression(checkedExpression, p);
-        if (exprResult is not CheckedExpression node) return exprResult;
+        if (exprResult is not CheckedExpression node){ return exprResult;}
 
         return node
             .WithCheckedOrUncheckedKeyword((Keyword)Visit(node.CheckedOrUncheckedKeyword, p)!)
@@ -1135,7 +1135,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(checkedStatement.Markers, p));
 
         var stmtResult = VisitStatement(checkedStatement, p);
-        if (stmtResult is not CheckedStatement node) return stmtResult;
+        if (stmtResult is not CheckedStatement node){ return stmtResult;}
 
         return node
             .WithKeywordValue((Keyword)Visit(node.KeywordValue, p)!)
@@ -1149,7 +1149,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(rangeExpression.Markers, p));
 
         var exprResult = VisitExpression(rangeExpression, p);
-        if (exprResult is not RangeExpression node) return exprResult;
+        if (exprResult is not RangeExpression node){ return exprResult;}
 
         return node
             .WithStart(VisitRightPadded(node.Start, p))
@@ -1163,7 +1163,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(indexerDeclaration.Markers, p));
 
         var stmtResult = VisitStatement(indexerDeclaration, p);
-        if (stmtResult is not IndexerDeclaration node) return stmtResult;
+        if (stmtResult is not IndexerDeclaration node){ return stmtResult;}
 
         return node
             .WithModifiers(VisitModifiers(node.Modifiers, p))
@@ -1182,7 +1182,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(delegateDeclaration.Markers, p));
 
         var stmtResult = VisitStatement(delegateDeclaration, p);
-        if (stmtResult is not DelegateDeclaration node) return stmtResult;
+        if (stmtResult is not DelegateDeclaration node){ return stmtResult;}
 
         return node
             .WithAttributes(ListUtils.Map(node.Attributes, al => Visit(al, p) as AttributeList))
@@ -1200,7 +1200,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(conversion.Markers, p));
 
         var stmtResult = VisitStatement(conversion, p);
-        if (stmtResult is not ConversionOperatorDeclaration node) return stmtResult;
+        if (stmtResult is not ConversionOperatorDeclaration node){ return stmtResult;}
 
         return node
             .WithModifiers(VisitModifiers(node.Modifiers, p))
@@ -1219,7 +1219,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(operatorDeclaration.Markers, p));
 
         var stmtResult = VisitStatement(operatorDeclaration, p);
-        if (stmtResult is not OperatorDeclaration node) return stmtResult;
+        if (stmtResult is not OperatorDeclaration node){ return stmtResult;}
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
@@ -1241,7 +1241,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(enumDeclaration.Markers, p));
 
         var stmtResult = VisitStatement(enumDeclaration, p);
-        if (stmtResult is not EnumDeclaration node) return stmtResult;
+        if (stmtResult is not EnumDeclaration node){ return stmtResult;}
 
         return node
             .WithAttributeLists(node.AttributeLists != null
@@ -1260,7 +1260,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(enumMember.Markers, p));
 
         var exprResult = VisitExpression(enumMember, p);
-        if (exprResult is not EnumMemberDeclaration node) return exprResult;
+        if (exprResult is not EnumMemberDeclaration node){ return exprResult;}
 
         return node
             .WithAttributeLists(ListUtils.Map(node.AttributeLists, al => Visit(al, p) as AttributeList))
@@ -1275,7 +1275,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(aliasQualifiedName.Markers, p));
 
         var exprResult = VisitExpression(aliasQualifiedName, p);
-        if (exprResult is not AliasQualifiedName node) return exprResult;
+        if (exprResult is not AliasQualifiedName node){ return exprResult;}
 
         return node
             .WithAlias(VisitRightPadded(node.Alias, p)!)
@@ -1289,7 +1289,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(pointerDereference.Markers, p));
 
         var exprResult = VisitExpression(pointerDereference, p);
-        if (exprResult is not PointerDereference node) return exprResult;
+        if (exprResult is not PointerDereference node){ return exprResult;}
 
         return node
             .WithExpression((Expression)Visit(node.Expression, p)!)
@@ -1303,10 +1303,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(pointerFieldAccess.Markers, p));
 
         var exprResult = VisitExpression(pointerFieldAccess, p);
-        if (exprResult is not PointerFieldAccess e1) return exprResult;
+        if (exprResult is not PointerFieldAccess e1){ return exprResult;}
 
         var stmtResult = VisitStatement(e1, p);
-        if (stmtResult is not PointerFieldAccess node) return stmtResult;
+        if (stmtResult is not PointerFieldAccess node){ return stmtResult;}
 
         return node
             .WithTarget((Expression)Visit(node.Target, p)!)
@@ -1321,7 +1321,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(refType.Markers, p));
 
         var exprResult = VisitExpression(refType, p);
-        if (exprResult is not RefType node) return exprResult;
+        if (exprResult is not RefType node){ return exprResult;}
 
         return node
             .WithTypeIdentifier((TypeTree)Visit(node.TypeIdentifier, p)!)
@@ -1337,7 +1337,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(queryExpression.Markers, p));
 
         var exprResult = VisitExpression(queryExpression, p);
-        if (exprResult is not QueryExpression node) return exprResult;
+        if (exprResult is not QueryExpression node){ return exprResult;}
 
         return node
             .WithFromClause((FromClause)Visit(node.FromClause, p)!)
@@ -1361,7 +1361,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(fromClause.Markers, p));
 
         var exprResult = VisitExpression(fromClause, p);
-        if (exprResult is not FromClause node) return exprResult;
+        if (exprResult is not FromClause node){ return exprResult;}
 
         return node
             .WithTypeIdentifier((TypeTree?)Visit(node.TypeIdentifier, p))
@@ -1455,7 +1455,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(anonymousObject.Markers, p));
 
         var exprResult = VisitExpression(anonymousObject, p);
-        if (exprResult is not AnonymousObjectCreationExpression node) return exprResult;
+        if (exprResult is not AnonymousObjectCreationExpression node){ return exprResult;}
 
         return node
             .WithInitializers(VisitContainer(node.Initializers, p)!)
@@ -1469,7 +1469,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(withExpression.Markers, p));
 
         var exprResult = VisitExpression(withExpression, p);
-        if (exprResult is not WithExpression node) return exprResult;
+        if (exprResult is not WithExpression node){ return exprResult;}
 
         return node
             .WithTarget((Expression)Visit(node.Target, p)!)
@@ -1484,7 +1484,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(spreadExpression.Markers, p));
 
         var exprResult = VisitExpression(spreadExpression, p);
-        if (exprResult is not SpreadExpression node) return exprResult;
+        if (exprResult is not SpreadExpression node){ return exprResult;}
 
         return node
             .WithExpression((Expression)Visit(node.Expression, p)!)
@@ -1498,7 +1498,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(functionPointerType.Markers, p));
 
         var exprResult = VisitExpression(functionPointerType, p);
-        if (exprResult is not FunctionPointerType node) return exprResult;
+        if (exprResult is not FunctionPointerType node){ return exprResult;}
 
         return node
             .WithCallingConvention(VisitLeftPadded(node.CallingConvention, p))
@@ -1514,7 +1514,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(twa.Markers, p));
 
         var exprResult = VisitExpression(twa, p);
-        if (exprResult is not TypeWithArguments node) return exprResult;
+        if (exprResult is not TypeWithArguments node){ return exprResult;}
 
         return node
             .WithTypeExpression((TypeTree)Visit(node.TypeExpression, p)!)
@@ -1528,7 +1528,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(whenClause.Markers, p));
 
         var exprResult = VisitExpression(whenClause, p);
-        if (exprResult is not WhenClause node) return exprResult;
+        if (exprResult is not WhenClause node){ return exprResult;}
 
         node = node
             .WithCondition((ControlParentheses<Expression>)Visit(node.Condition, p)!);
@@ -1543,7 +1543,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithMarkers(VisitMarkers(eim.Markers, p));
 
         var stmtResult = VisitStatement(eim, p);
-        if (stmtResult is not ExplicitInterfaceMember node) return stmtResult;
+        if (stmtResult is not ExplicitInterfaceMember node){ return stmtResult;}
 
         return node
             .WithInterfaceSpecifier(VisitRightPadded(node.InterfaceSpecifier, p)!)
@@ -1559,8 +1559,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     protected T AutoFormat<T>(T tree, P p, Cursor cursor) where T : class, J
     {
         // Full CU formatting — do it immediately, no benefit to deferring
-        if (tree is CompilationUnit cu)
-            return (T)(J)RoslynFormatter.Format(cu);
+        if (tree is CompilationUnit cu){
+            return (T)(J)RoslynFormatter.Format(cu);}
 
         _deferredFormat ??= new RoslynFormatter.DeferredFormatVisitor<P>();
         _deferredFormat.Add(tree);
@@ -1584,7 +1584,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     /// </summary>
     protected T MaybeAutoFormat<T>(T before, T after, J? stopAfter, P p, Cursor cursor) where T : class, J
     {
-        if (ReferenceEquals(before, after)) return after;
+        if (ReferenceEquals(before, after)){ return after;}
         var visitor = new AutoFormatVisitor<int>(stopAfter);
         return visitor.Format(after, cursor) as T ?? after;
     }

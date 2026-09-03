@@ -145,10 +145,10 @@ public class CsvDataTableStore : IDataTableStore
 
     internal static string EscapeCsv(object? value)
     {
-        if (value is null) return "\"\"";
+        if (value is null){ return "\"\"";}
         var s = value.ToString() ?? "";
-        if (s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r'))
-            return "\"" + s.Replace("\"", "\"\"") + "\"";
+        if (s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r')){
+            return "\"" + s.Replace("\"", "\"\"") + "\"";}
         return s;
     }
 
@@ -169,15 +169,15 @@ public class CsvDataTableStore : IDataTableStore
     {
         var s = value.ToLower();
         var sb = new StringBuilder(s.Length);
-        foreach (var c in s)
-            sb.Append(char.IsLetterOrDigit(c) ? c : '-');
+        foreach (var c in s){
+            sb.Append(char.IsLetterOrDigit(c) ? c : '-');}
         var collapsed = new StringBuilder();
         var lastWasDash = true;
         foreach (var c in sb.ToString())
         {
             if (c == '-')
             {
-                if (!lastWasDash) collapsed.Append('-');
+                if (!lastWasDash){ collapsed.Append('-');}
                 lastWasDash = true;
             }
             else
@@ -191,7 +191,7 @@ public class CsvDataTableStore : IDataTableStore
         {
             prefix = prefix[..30];
             var lastDash = prefix.LastIndexOf('-');
-            if (lastDash > 0) prefix = prefix[..lastDash];
+            if (lastDash > 0){ prefix = prefix[..lastDash];}
         }
         var hash = Sha256Prefix(value, 4);
         return $"{prefix}-{hash}";

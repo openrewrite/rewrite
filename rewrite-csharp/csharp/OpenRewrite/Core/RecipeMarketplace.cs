@@ -84,12 +84,12 @@ public class RecipeMarketplace
 
         foreach (var type in types)
         {
-            if (type.IsAbstract || type.IsInterface || !typeof(Recipe).IsAssignableFrom(type))
-                continue;
+            if (type.IsAbstract || type.IsInterface || !typeof(Recipe).IsAssignableFrom(type)){
+                continue;}
 
             var paths = ReadCategoryPaths(type);
-            if (paths.Count == 0)
-                continue;
+            if (paths.Count == 0){
+                continue;}
 
             if (type.GetConstructor(Type.EmptyTypes) == null)
             {
@@ -139,8 +139,8 @@ public class RecipeMarketplace
 
     private static CategoryDescriptor ResolveDescriptor(Type attrType)
     {
-        if (_descriptorCache.TryGetValue(attrType, out var cached))
-            return cached;
+        if (_descriptorCache.TryGetValue(attrType, out var cached)){
+            return cached;}
 
         if (attrType.GetConstructor(Type.EmptyTypes) == null)
         {
@@ -219,8 +219,8 @@ public class RecipeMarketplace
         {
             foreach (var category in _categories)
             {
-                if (category.Descriptor.DisplayName == descriptor.DisplayName)
-                    return category;
+                if (category.Descriptor.DisplayName == descriptor.DisplayName){
+                    return category;}
             }
 
             var newCategory = new Category(descriptor);
@@ -232,15 +232,15 @@ public class RecipeMarketplace
         {
             foreach (var (descriptor, recipe) in _recipes)
             {
-                if (descriptor.Name == name)
-                    return (descriptor, recipe);
+                if (descriptor.Name == name){
+                    return (descriptor, recipe);}
             }
 
             foreach (var category in _categories)
             {
                 var found = category.FindRecipe(name);
-                if (found != null)
-                    return found;
+                if (found != null){
+                    return found;}
             }
 
             return null;

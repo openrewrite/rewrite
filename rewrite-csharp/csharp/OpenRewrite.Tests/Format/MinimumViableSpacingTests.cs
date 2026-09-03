@@ -448,12 +448,12 @@ public class MinimumViableSpacingTests
             var v = (VariableDeclarations)base.VisitVariableDeclarations(varDecl, p);
 
             // Only add to fields (inside a class body)
-            if (Cursor.FirstEnclosing<ClassDeclaration>() == null)
-                return v;
+            if (Cursor.FirstEnclosing<ClassDeclaration>() == null){
+                return v;}
 
             // Don't add if already has readonly
-            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly))
-                return v;
+            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly)){
+                return v;}
 
             var newModifiers = new List<Modifier>(v.Modifiers);
             newModifiers.Add(new Modifier(
@@ -496,15 +496,15 @@ public class MinimumViableSpacingTests
         {
             var v = (VariableDeclarations)base.VisitVariableDeclarations(varDecl, p);
 
-            if (Cursor.FirstEnclosing<ClassDeclaration>() == null)
-                return v;
+            if (Cursor.FirstEnclosing<ClassDeclaration>() == null){
+                return v;}
 
-            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly))
-                return v;
+            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly)){
+                return v;}
 
             // Skip properties (has accessors)
-            if (Cursor.FirstEnclosing<PropertyDeclaration>() != null)
-                return v;
+            if (Cursor.FirstEnclosing<PropertyDeclaration>() != null){
+                return v;}
 
             // Test with keyword string but using Add
             var newModifiers = new List<Modifier>(v.Modifiers);

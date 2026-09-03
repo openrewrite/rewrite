@@ -75,7 +75,7 @@ public class GradleWrapperScriptDownloader {
             writer.write("version,gradlew,gradlewBat\n");
             for (String sortedVersion : sortedVersions) {
                 Version version = allVersions.get(sortedVersion);
-                writer.write("%s,%s,%s\n".formatted(
+                writer.write("%s,%s,%s%n".formatted(
                   sortedVersion,
                   version.getGradlewChecksum(),
                   version.getGradlewBatChecksum()));

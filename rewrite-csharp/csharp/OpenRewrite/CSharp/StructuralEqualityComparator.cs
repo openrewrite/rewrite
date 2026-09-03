@@ -32,19 +32,19 @@ public static class StructuralEqualityComparator
     /// </summary>
     public static bool AreStructurallyEqual(J a, J b)
     {
-        if (ReferenceEquals(a, b))
-            return true;
+        if (ReferenceEquals(a, b)){
+            return true;}
         return CompareNodes(a, b);
     }
 
     private static bool CompareNodes(J a, J b)
     {
-        if (a.GetType() != b.GetType())
-            return false;
+        if (a.GetType() != b.GetType()){
+            return false;}
 
         // NullSafe marker distinguishes ?. from . — this is semantic, not formatting
-        if (TreeHelper.HasNullSafe(a) != TreeHelper.HasNullSafe(b))
-            return false;
+        if (TreeHelper.HasNullSafe(a) != TreeHelper.HasNullSafe(b)){
+            return false;}
 
         var properties = TreeHelper.GetStructuralProperties(a.GetType());
         foreach (var prop in properties)
@@ -52,8 +52,8 @@ public static class StructuralEqualityComparator
             var valA = prop.GetValue(a);
             var valB = prop.GetValue(b);
 
-            if (!CompareValues(valA, valB))
-                return false;
+            if (!CompareValues(valA, valB)){
+                return false;}
         }
 
         return true;
@@ -61,14 +61,14 @@ public static class StructuralEqualityComparator
 
     private static bool CompareValues(object? a, object? b)
     {
-        if (ReferenceEquals(a, b))
-            return true;
-        if (a == null || b == null)
-            return false;
+        if (ReferenceEquals(a, b)){
+            return true;}
+        if (a == null || b == null){
+            return false;}
 
         // J tree nodes — recursive structural comparison
-        if (a is J ja && b is J jb)
-            return CompareNodes(ja, jb);
+        if (a is J ja && b is J jb){
+            return CompareNodes(ja, jb);}
 
         // Generic wrappers — get type info once and dispatch
         var typeA = a.GetType();
@@ -80,21 +80,21 @@ public static class StructuralEqualityComparator
             if (defA == defB)
             {
                 // JRightPadded<T> / JLeftPadded<T> — unwrap and recurse
-                if (defA == typeof(JRightPadded<>) || defA == typeof(JLeftPadded<>))
-                    return CompareValues(TreeHelper.UnwrapPadded(a), TreeHelper.UnwrapPadded(b));
+                if (defA == typeof(JRightPadded<>) || defA == typeof(JLeftPadded<>)){
+                    return CompareValues(TreeHelper.UnwrapPadded(a), TreeHelper.UnwrapPadded(b));}
 
                 // JContainer<T> — extract elements (returns JRightPadded<T> wrappers) and compare
                 if (defA == typeof(JContainer<>))
                 {
                     var elemsA = TreeHelper.GetContainerElements(a);
                     var elemsB = TreeHelper.GetContainerElements(b);
-                    if (elemsA == null && elemsB == null) return true;
-                    if (elemsA == null || elemsB == null) return false;
-                    if (elemsA.Count != elemsB.Count) return false;
+                    if (elemsA == null && elemsB == null){ return true;}
+                    if (elemsA == null || elemsB == null){ return false;}
+                    if (elemsA.Count != elemsB.Count){ return false;}
                     for (int i = 0; i < elemsA.Count; i++)
                     {
-                        if (!CompareValues(elemsA[i], elemsB[i]))
-                            return false;
+                        if (!CompareValues(elemsA[i], elemsB[i])){
+                            return false;}
                     }
                     return true;
                 }
@@ -102,8 +102,8 @@ public static class StructuralEqualityComparator
         }
 
         // IList — lock-step element comparison
-        if (a is IList listA && b is IList listB)
-            return CompareList(listA, listB);
+        if (a is IList listA && b is IList listB){
+            return CompareList(listA, listB);}
 
         // Primitives and enums
         return Equals(a, b);
@@ -111,13 +111,13 @@ public static class StructuralEqualityComparator
 
     private static bool CompareList(IList a, IList b)
     {
-        if (a.Count != b.Count)
-            return false;
+        if (a.Count != b.Count){
+            return false;}
 
         for (int i = 0; i < a.Count; i++)
         {
-            if (!CompareValues(a[i], b[i]))
-                return false;
+            if (!CompareValues(a[i], b[i])){
+                return false;}
         }
         return true;
     }

@@ -760,7 +760,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             if (group != null && (artifact != null || !StringUtils.isBlank(artifactName))) {
                 return new GroupArtifactVersion(
                         group.getValue(),
-                        !StringUtils.isBlank(artifactName) ? artifactName : requireNonNull(artifact).getValue(),
+                        StringUtils.isBlank(artifactName) ? requireNonNull(artifact).getValue() : artifactName,
                         version == null ? null : version.getValue()
                 );
             }

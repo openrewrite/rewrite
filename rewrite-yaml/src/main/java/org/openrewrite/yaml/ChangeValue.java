@@ -76,8 +76,8 @@ public class ChangeValue extends Recipe {
                         e = e.withValue(block.withBody(value));
                     }
                 } else if (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value)) {
-                    Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
-                    Yaml.Tag tag = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getTag() : null;
+                    Yaml.Anchor anchor = e.getValue() instanceof Yaml.Scalar ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
+                    Yaml.Tag tag = e.getValue() instanceof Yaml.Scalar ? ((Yaml.Scalar) e.getValue()).getTag() : null;
                     String prefix = e.getValue() instanceof Yaml.Sequence ? ((Yaml.Sequence) e.getValue()).getOpeningBracketPrefix() : e.getValue().getPrefix();
                     e = e.withValue(
                             new Yaml.Scalar(randomId(), prefix, Markers.EMPTY,

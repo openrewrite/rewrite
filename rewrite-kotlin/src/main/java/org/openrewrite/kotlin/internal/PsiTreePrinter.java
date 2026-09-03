@@ -29,8 +29,8 @@ import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirProperty;
 import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
-import org.jetbrains.kotlin.fir.types.ConeClassLikeLookupTag;
 import org.jetbrains.kotlin.fir.types.*;
+import org.jetbrains.kotlin.fir.types.ConeClassLikeLookupTag;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.ir.IrElement;
 import org.jetbrains.kotlin.ir.declarations.IrFile;
@@ -69,7 +69,7 @@ public class PsiTreePrinter {
     private static final KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new DefaultJavaTypeFactory(new JavaTypeCache()));
 
     // Set to true to print types and verify, otherwise just verify the parse to print idempotent.
-    private final static boolean printTypes = true;
+    private static final boolean printTypes = true;
 
     private final List<StringBuilder> outputLines;
 

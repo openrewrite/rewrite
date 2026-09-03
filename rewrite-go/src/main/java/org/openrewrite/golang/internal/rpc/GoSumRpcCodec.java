@@ -85,8 +85,8 @@ public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSum> {
         t = t.withId(q.receiveAndGet(t.getId(), UUID::fromString));
         t = t.withPrefix(q.receive(t.getPrefix(), space -> receiver.visitSpace(space, q)));
         t = t.withMarkers(q.receive(t.getMarkers()));
-        t = t.withSourcePath(q.<Path, String>receiveAndGet(t.getSourcePath(), Paths::get));
-        t = (GoSum) t.withCharset(q.<Charset, String>receiveAndGet(t.getCharset(), Charset::forName));
+        t = t.withSourcePath(q.receiveAndGet(t.getSourcePath(), Paths::get));
+        t = (GoSum) t.withCharset(q.receiveAndGet(t.getCharset(), Charset::forName));
         t = t.withCharsetBomMarked(q.receive(t.isCharsetBomMarked()));
         t = t.withChecksum(q.receive(t.getChecksum()));
         t = t.withFileAttributes(q.receive(t.getFileAttributes()));

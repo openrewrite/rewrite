@@ -669,7 +669,7 @@ public class MavenPomDownloader {
                             }
                         } else {
                             // Record the absense of the pom file
-                            ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
+                            ctx.getResolutionListener().downloadError(gav, uris, containingPom == null ? null : containingPom.getRequested());
                         }
                     } catch (IOException | UncheckedIOException e) {
                         // unable to read the pom from a file-based repository.
@@ -739,7 +739,7 @@ public class MavenPomDownloader {
                             }
 
                             // Record the absense of the pom file
-                            ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
+                            ctx.getResolutionListener().downloadError(gav, uris, containingPom == null ? null : containingPom.getRequested());
 
                         }
                     } catch (HttpSenderResponseException e) {
@@ -773,7 +773,7 @@ public class MavenPomDownloader {
             sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
             return pom;
         } else {
-            ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
+            ctx.getResolutionListener().downloadError(gav, uris, containingPom == null ? null : containingPom.getRequested());
             sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
             throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
                     .setRepositoryResponses(repositoryResponses);

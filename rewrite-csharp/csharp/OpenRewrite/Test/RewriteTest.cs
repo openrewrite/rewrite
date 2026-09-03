@@ -259,7 +259,7 @@ public abstract class RewriteTest
 
         public override J? Visit(Tree? tree, int p)
         {
-            if (Found != null) return tree as J;
+            if (Found != null){ return tree as J;}
             if (tree is TNode match)
             {
                 Found = match;
@@ -301,15 +301,15 @@ public abstract class RewriteTest
         var docs = CsprojParserInstance.ParseAll(files);
 
         var result = new Dictionary<string, SourceFile>();
-        for (var i = 0; i < specs.Count; i++)
-            result[specs[i].SourcePath!] = docs[i];
+        for (var i = 0; i < specs.Count; i++){
+            result[specs[i].SourcePath!] = docs[i];}
         return result;
     }
 
     private static void AssertContentEquals(string expected, string actual, string sourcePath,
         string errorMessagePrefix)
     {
-        if (expected == actual) return;
+        if (expected == actual){ return;}
         var diff = DiffUtils.UnifiedDiff(expected, actual, sourcePath);
         Assert.Fail($"{errorMessagePrefix} \"{sourcePath}\":\n{diff}");
     }

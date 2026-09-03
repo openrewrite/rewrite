@@ -452,8 +452,7 @@ export function isValidSurrogateRange(unicodeString: string): boolean {
 
     const codes = matches.map(m => {
         const codePointStr = m.slice(2);
-        const codePoint = parseInt(codePointStr, 16);
-        return codePoint;
+        return parseInt(codePointStr, 16);
     });
 
     const isHighSurrogate = (charCode: number): boolean => charCode >= 0xD800 && charCode <= 0xDBFF;

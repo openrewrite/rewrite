@@ -21,11 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.EngineFailure;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;

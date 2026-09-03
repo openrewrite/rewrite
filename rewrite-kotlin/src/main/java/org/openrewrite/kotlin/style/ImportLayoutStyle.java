@@ -401,7 +401,7 @@ public class ImportLayoutStyle implements KotlinStyle {
         private final List<Block> packagesToFold = new ArrayList<>();
         private int topLevelSymbolsToUseStarImport = 5;
         private int javaStaticsAndEnumsToUseStarImport = 3;
-        private boolean importAliasesSeparately = false;
+        private boolean importAliasesSeparately;
 
         public Builder importAllOthers() {
             blocks.add(new Block.AllOthers(!importAliasesSeparately));
@@ -500,7 +500,7 @@ public class ImportLayoutStyle implements KotlinStyle {
         private final Collection<JavaType.FullyQualified> classpath;
         private final List<JRightPadded<J.Import>> originalImports;
         private final Set<String> jvmClasspathNames = new HashSet<>();
-        private @Nullable Set<String> containsClassNameConflict = null;
+        private @Nullable Set<String> containsClassNameConflict;
 
         ImportLayoutConflictDetection(Collection<JavaType.FullyQualified> classpath, List<JRightPadded<J.Import>> originalImports) {
             this.classpath = classpath;

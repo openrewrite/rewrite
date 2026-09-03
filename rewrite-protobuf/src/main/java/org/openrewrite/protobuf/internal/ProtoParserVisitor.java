@@ -48,11 +48,11 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     /**
      * Track position within the file by character (UTF-16 code units)
      */
-    private int cursor = 0;
+    private int cursor;
     /**
      * Track parsing position within the file by Unicode code point
      */
-    private int codePointCursor = 0;
+    private int codePointCursor;
 
     public ProtoParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
@@ -68,7 +68,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         for (int i = 1; i < statementTrees.size() - 1; i++) {
             Proto s = visit(statementTrees.get(i));
             statements.add(ProtoRightPadded.build(s).withAfter(
-                    (s instanceof Proto.Empty ||
+                    s instanceof Proto.Empty ||
                             s instanceof Proto.Field ||
                             s instanceof Proto.EnumField ||
                             s instanceof Proto.Import ||
@@ -77,8 +77,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
                             s instanceof Proto.Package ||
                             s instanceof Proto.Reserved ||
                             (s instanceof Proto.Rpc && ((Proto.Rpc) s).getBody() == null) ||
-                            s instanceof Proto.Syntax
-                    ) ? sourceBefore(";") : Space.EMPTY
+                            s instanceof Proto.Syntax ? sourceBefore(";") : Space.EMPTY
             ));
         }
         return new Proto.Block(randomId(), bodyPrefix, Markers.EMPTY, statements, sourceBefore("}"));
@@ -352,13 +351,12 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         for (int i = startIndex; i < ctx.children.size() - 1; i++) {
             Proto s = visit(ctx.children.get(i));
             ProtoRightPadded<Proto> protoProtoRightPadded = ProtoRightPadded.build(s).withAfter(
-                    (s instanceof Proto.Empty ||
+                    s instanceof Proto.Empty ||
                             s instanceof Proto.Import ||
                             s instanceof Proto.MapField ||
                             s instanceof Proto.OptionDeclaration ||
                             s instanceof Proto.Package ||
-                            s instanceof Proto.Syntax
-                    ) ? sourceBefore(";") : Space.EMPTY
+                            s instanceof Proto.Syntax ? sourceBefore(";") : Space.EMPTY
             );
             list.add(protoProtoRightPadded);
         }

@@ -19,7 +19,7 @@ package org.openrewrite.maven.trait;
  * @deprecated Use specific matchers like {@link MavenDependency.Matcher} or {@link MavenPlugin.Matcher} instead.
  */
 @Deprecated
-public class Traits {
+public final class Traits {
     private Traits() {
     }
 

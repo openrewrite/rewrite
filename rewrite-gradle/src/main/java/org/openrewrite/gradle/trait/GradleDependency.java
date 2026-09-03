@@ -1610,7 +1610,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             } else if (argument instanceof G.MapLiteral) {
                 List<Expression> mapEntryExpressions = ((G.MapLiteral) argument).getElements()
                         .stream()
-                        .map(e -> (Expression) e)
+                        .map(Expression.class::cast)
                         .collect(toList());
                 return getMapEntriesDependency(mapEntryExpressions);
             } else if (argument instanceof G.MapEntry) {

@@ -129,7 +129,7 @@ public class CsvDataTableStoreTests
         }
         finally
         {
-            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+            if (Directory.Exists(outputDir)){ Directory.Delete(outputDir, true);}
         }
     }
 
@@ -159,7 +159,7 @@ public class CsvDataTableStoreTests
         }
         finally
         {
-            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+            if (Directory.Exists(outputDir)){ Directory.Delete(outputDir, true);}
         }
     }
 
@@ -183,7 +183,7 @@ public class CsvDataTableStoreTests
         }
         finally
         {
-            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+            if (Directory.Exists(outputDir)){ Directory.Delete(outputDir, true);}
         }
     }
 
@@ -208,7 +208,7 @@ public class CsvDataTableStoreTests
         }
         finally
         {
-            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+            if (Directory.Exists(outputDir)){ Directory.Delete(outputDir, true);}
         }
     }
 
@@ -234,7 +234,7 @@ public class CsvDataTableStoreTests
         }
         finally
         {
-            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+            if (Directory.Exists(outputDir)){ Directory.Delete(outputDir, true);}
         }
     }
 
@@ -264,7 +264,7 @@ public class CsvDataTableStoreTests
         }
         finally
         {
-            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+            if (Directory.Exists(outputDir)){ Directory.Delete(outputDir, true);}
         }
     }
 }
@@ -300,7 +300,7 @@ public class SetDataTableStoreTests
         }
         finally
         {
-            if (Directory.Exists(outputDir)) Directory.Delete(outputDir, true);
+            if (Directory.Exists(outputDir)){ Directory.Delete(outputDir, true);}
         }
     }
 

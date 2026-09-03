@@ -29,16 +29,16 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NamingService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.JavaTypeVisitor;
+import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.rpc.request.Print;
-import org.openrewrite.java.internal.TypesInUse;
-import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -3194,6 +3194,7 @@ public interface Cs extends J {
             }
         }
     }
+
     //endregion
 
     // TypeParameterConstraintClause, TypeParameterConstraint, TypeConstraint, AllowsConstraint DELETED
@@ -3767,6 +3768,7 @@ public interface Cs extends J {
             return new CoordinateBuilder.Expression(this);
         }
     }
+
     //endregion
 
     /**
@@ -3954,10 +3956,7 @@ public interface Cs extends J {
             Not;
 
             public boolean isModifying() {
-                switch (this) {
-                    default:
-                        return false;
-                }
+                return false;
             }
         }
 

@@ -19,11 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /** Shared per-project scan-state for the Node dependency {@code ScanningRecipe}s. */
 public final class NodeDependencyScan {

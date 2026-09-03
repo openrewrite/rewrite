@@ -19,22 +19,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 
 import static java.util.Collections.emptySet;
-import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.ADD;
-import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.FORCED_MOVE;
-import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.PROMOTION;
-import static org.openrewrite.javascript.internal.lock.YarnLock.maybeWrap;
-import static org.openrewrite.javascript.internal.lock.YarnLock.sortAlpha;
-import static org.openrewrite.javascript.internal.lock.YarnLock.unwrap;
+import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
+import static org.openrewrite.javascript.internal.lock.YarnLock.*;
 
 /**
  * Patches a classic {@code yarn.lock} (v1). Not valid YAML, so this is a targeted text edit over the raw

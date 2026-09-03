@@ -15,7 +15,7 @@
  */
 package org.openrewrite.yaml.internal;
 
-public class StringUtils {
+public final class StringUtils {
 
     private StringUtils() {
     }

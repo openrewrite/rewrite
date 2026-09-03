@@ -46,8 +46,8 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
         // If the tree is a SourceFile that doesn't match this visitor's type parameter T,
         // pass it through unchanged. Returning null from Visit() for incompatible types
         // would be interpreted as "delete this file" by the recipe scheduler.
-        if (tree is SourceFile && tree is not T)
-            return tree;
+        if (tree is SourceFile && tree is not T){
+            return tree;}
         return Visit(tree, p);
     }
     public virtual Cursor Cursor { get; set; } = new();
@@ -86,10 +86,10 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
         for (int i = 0; i < factories.Count; i++)
         {
             var factory = factories[i];
-            if (!factory.TreeType.IsInstanceOfType(tree)) continue;
+            if (!factory.TreeType.IsInstanceOfType(tree)){ continue;}
 
             var closedLangType = factory.OpenLangVisitorType.MakeGenericType(typeof(P));
-            if (closedLangType.IsInstanceOfType(this)) return this;
+            if (closedLangType.IsInstanceOfType(this)){ return this;}
 
             _adapterCache ??= new Dictionary<Type, TreeVisitor<T, P>>(2);
             if (!_adapterCache.TryGetValue(closedLangType, out var cached))
@@ -105,8 +105,8 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
 
     public virtual T? Visit(Tree? tree, P p)
     {
-        if (tree == null) return DefaultValue(null, p);
-        if (tree is not T typed) return DefaultValue(tree, p);
+        if (tree == null){ return DefaultValue(null, p);}
+        if (tree is not T typed){ return DefaultValue(tree, p);}
 
         bool topLevel = _visitCount == 0;
         _visitCount++;
@@ -115,8 +115,8 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
         T? t = PreVisit(typed, p);
         if (!_stopAfterPreVisit)
         {
-            if (t != null) t = Adapt(t).Accept(t, p);
-            if (t != null) t = PostVisit(t, p);
+            if (t != null){ t = Adapt(t).Accept(t, p);}
+            if (t != null){ t = PostVisit(t, p);}
         }
         _stopAfterPreVisit = false;
 
@@ -176,8 +176,8 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
     /// </summary>
     protected void MaybeDoAfterVisit(TreeVisitor<T, P> visitor)
     {
-        if (_afterVisit == null || !_afterVisit.Contains(visitor))
-            DoAfterVisit(visitor);
+        if (_afterVisit == null || !_afterVisit.Contains(visitor)){
+            DoAfterVisit(visitor);}
     }
 
     public static TreeVisitor<T, P> Noop() => new NoopVisitor();
@@ -211,17 +211,17 @@ public static class TreeVisitorAdapterRegistry
             // Deduplicate in case a module initializer somehow runs twice.
             for (int i = 0; i < _factories.Count; i++)
             {
-                if (_factories[i].TreeType == treeType && _factories[i].OpenLangVisitorType == openLangVisitorType)
-                    return;
+                if (_factories[i].TreeType == treeType && _factories[i].OpenLangVisitorType == openLangVisitorType){
+                    return;}
             }
 
             _factories.Add(new AdapterFactory(treeType, openLangVisitorType, openAdapterType));
             _factories.Sort((a, b) =>
             {
-                if (a.TreeType == b.TreeType) return 0;
+                if (a.TreeType == b.TreeType){ return 0;}
                 // Most specific first: if a is a base of b, b wins → a after b.
-                if (a.TreeType.IsAssignableFrom(b.TreeType)) return 1;
-                if (b.TreeType.IsAssignableFrom(a.TreeType)) return -1;
+                if (a.TreeType.IsAssignableFrom(b.TreeType)){ return 1;}
+                if (b.TreeType.IsAssignableFrom(a.TreeType)){ return -1;}
                 return 0;
             });
         }

@@ -623,7 +623,7 @@ public abstract class Recipe implements Cloneable {
                         option.put("value", value);
                         objectMapper.updateValue(optionDescriptor, option);
 
-                        if (value instanceof String && optionDescriptor.getType().equals("List")) {
+                        if (value instanceof String && "List".equals(optionDescriptor.getType())) {
                             m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
                         }
                     }

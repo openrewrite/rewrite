@@ -116,7 +116,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
                 throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
             }
             if (!newPrefixString.equals(prefix.getWhitespace()) && elem.getAfter().getComments().isEmpty()) {
-                return elem.withElement(elem.getElement().withPrefix(prefix.withWhitespace((newPrefixString))));
+                return elem.withElement(elem.getElement().withPrefix(prefix.withWhitespace(newPrefixString)));
             } else {
                 return elem;
             }

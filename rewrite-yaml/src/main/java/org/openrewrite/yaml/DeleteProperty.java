@@ -72,9 +72,9 @@ public class DeleteProperty extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
-                NameCaseConvention.LOWER_CAMEL :
-                NameCaseConvention.EXACT).compile(propertyKey);
+        Compiled keyMatcher = (Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.EXACT :
+                NameCaseConvention.LOWER_CAMEL).compile(propertyKey);
 
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
 
@@ -112,7 +112,7 @@ public class DeleteProperty extends Recipe {
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
                 Yaml.Sequence s = super.visitSequence(sequence, ctx);
-                boolean childModified = (s != sequence);
+                boolean childModified = s != sequence;
                 List<Yaml.Sequence.Entry> entries = s.getEntries();
                 if (entries.isEmpty()) {
                     return s;
@@ -159,7 +159,7 @@ public class DeleteProperty extends Recipe {
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
                 Yaml.Mapping m = super.visitMapping(mapping, ctx);
-                boolean childModified = (m != mapping);
+                boolean childModified = m != mapping;
 
                 boolean changed = false;
                 List<Yaml.Mapping.Entry> entries = new ArrayList<>();

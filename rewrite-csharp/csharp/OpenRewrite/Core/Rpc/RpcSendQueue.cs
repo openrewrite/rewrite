@@ -68,9 +68,9 @@ public class RpcSendQueue
     /// </summary>
     private IRpcCodec? GetCodecFor(object val)
     {
-        if (val is IRpcCodec selfCodec) return selfCodec;
-        if (val is Marker) return null; // Markers without IRpcCodec are serialized as plain values
-        if (_treeCodec != null && GetValueType(val) != null) return _treeCodec;
+        if (val is IRpcCodec selfCodec){ return selfCodec;}
+        if (val is Marker){ return null; // Markers without IRpcCodec are serialized as plain values
+        }if (_treeCodec != null && GetValueType(val) != null){ return _treeCodec;}
         return null;
     }
 
@@ -85,7 +85,7 @@ public class RpcSendQueue
 
     public void Flush()
     {
-        if (_batch.Count == 0) return;
+        if (_batch.Count == 0){ return;}
         _drain(new List<RpcObjectData>(_batch));
         _batch.Clear();
     }
@@ -199,8 +199,8 @@ public class RpcSendQueue
     {
         Send(after, before, () =>
         {
-            if (after == null)
-                throw new InvalidOperationException("A DELETE event should have been sent.");
+            if (after == null){
+                throw new InvalidOperationException("A DELETE event should have been sent.");}
 
             var beforeIdx = PutListPositions(after, before, id);
 
@@ -317,7 +317,7 @@ public class RpcSendQueue
 
     private static string? GetValueType(object? after)
     {
-        if (after == null) return null;
+        if (after == null){ return null;}
 
         var type = after.GetType();
         if (type.IsPrimitive || type.IsArray ||
@@ -343,14 +343,14 @@ public class RpcSendQueue
     internal static string? ToJavaTypeName(Type type)
     {
         // Check explicit overrides first
-        if (JavaTypeNameOverrides.TryGetValue(type, out var overrideName))
-            return overrideName;
+        if (JavaTypeNameOverrides.TryGetValue(type, out var overrideName)){
+            return overrideName;}
 
         var name = type.Name;
 
         // Strip generic arity suffix (e.g., JRightPadded`1 → JRightPadded)
         var backtick = name.IndexOf('`');
-        if (backtick >= 0) name = name[..backtick];
+        if (backtick >= 0){ name = name[..backtick];}
 
         // Handle nested types: Outer+Inner → Outer$Inner
         if (type.IsNested && type.DeclaringType != null)

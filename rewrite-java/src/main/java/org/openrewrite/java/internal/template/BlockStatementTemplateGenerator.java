@@ -92,7 +92,7 @@ public class BlockStatementTemplateGenerator {
         List<J2> js = new ArrayList<>();
 
         new JavaIsoVisitor<Integer>() {
-            boolean done = false;
+            boolean done;
 
             J.@Nullable Block blockEnclosingTemplateComment;
 
@@ -232,20 +232,20 @@ public class BlockStatementTemplateGenerator {
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
                     "specify the type by calling JavaTemplate.Builder#bindType()");
         } else if (j instanceof J.MethodInvocation) {
-            before.insert(0, String.format("class %s {{\n", classDeclaration));
+            before.insert(0, String.format("class %s {{%n", classDeclaration));
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
             if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
                 before.append(bindType).append(" o = ");
             }
             after.append(";\n}}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
-            before.insert(0, String.format("class %s {\n", classDeclaration));
+            before.insert(0, String.format("class %s {%n", classDeclaration));
             before.append(bindType).append(" o = ");
             after.append(";\n}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
                    cursor.getValue() instanceof J.Block &&
                    (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
-            before.insert(0, String.format("class %s {\n", classDeclaration));
+            before.insert(0, String.format("class %s {%n", classDeclaration));
             after.append("\n}");
         } else if (j instanceof J.ClassDeclaration) {
             // While not impossible to handle, reaching this point is likely to be a mistake.
@@ -257,7 +257,7 @@ public class BlockStatementTemplateGenerator {
                     "Templating a class declaration requires context from which package declaration and imports may be reached. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
         } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
-            before.insert(0, String.format("class %s {{\n", classDeclaration));
+            before.insert(0, String.format("class %s {{%n", classDeclaration));
             after.append("\n}}");
         }
 
@@ -409,7 +409,7 @@ public class BlockStatementTemplateGenerator {
                         }
                         beforeSegments.append(valueOfType(arg.getType())).append(",");
                     } else {
-                        afterSegments.append(",/*" + STOP_COMMENT + "*/").append(valueOfType(arg.getType()));
+                        afterSegments.append(",/*").append(STOP_COMMENT).append("*/").append(valueOfType(arg.getType()));
                     }
                 }
                 afterSegments.append(")");
@@ -417,7 +417,7 @@ public class BlockStatementTemplateGenerator {
                     if (isEnum) {
                         afterSegments.append(";");
                     }
-                    afterSegments.append("/*" + STOP_COMMENT + "*/");
+                    afterSegments.append("/*").append(STOP_COMMENT).append("*/");
                 }
                 before.insert(0, beforeSegments);
                 after.append(afterSegments);
@@ -448,7 +448,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
             if (referToSameElement(prior, c.getVariable())) {
-                after.append(" = /*" + STOP_COMMENT + "*/").append(c.getIterable().printTrimmed(cursor));
+                after.append(" = /*").append(STOP_COMMENT).append("*/").append(c.getIterable().printTrimmed(cursor));
             } else if (referToSameElement(prior, c.getIterable())) {
                 before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");

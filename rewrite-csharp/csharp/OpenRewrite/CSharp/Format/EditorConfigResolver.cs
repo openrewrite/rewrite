@@ -40,8 +40,8 @@ public class EditorConfigResolver
     {
         var dir = Path.GetDirectoryName(Path.GetFullPath(absoluteFilePath))!;
 
-        if (_cache.TryGetValue(dir, out var cached))
-            return cached;
+        if (_cache.TryGetValue(dir, out var cached)){
+            return cached;}
 
         var style = ResolveForDirectory(dir);
         _cache[dir] = style;
@@ -82,11 +82,12 @@ public class EditorConfigResolver
             {
                 var (settings, isRoot) = ParseEditorConfig(editorConfigPath);
                 configs.Add((current, settings, isRoot));
-                if (isRoot) break;
+                if (isRoot){ break;}
             }
 
             var parent = Path.GetDirectoryName(current);
-            if (parent == current) break; // filesystem root
+            if (parent == current){ break; // filesystem root
+            } // filesystem root
             current = parent;
         }
 
@@ -120,8 +121,8 @@ public class EditorConfigResolver
             var line = rawLine.Trim();
 
             // Skip empty lines and comments
-            if (line.Length == 0 || line[0] == '#' || line[0] == ';')
-                continue;
+            if (line.Length == 0 || line[0] == '#' || line[0] == ';'){
+                continue;}
 
             // Section header
             if (line[0] == '[' && line[^1] == ']')
@@ -134,7 +135,7 @@ public class EditorConfigResolver
 
             // Key = value
             var eqIndex = line.IndexOf('=');
-            if (eqIndex < 0) continue;
+            if (eqIndex < 0){ continue;}
 
             var key = line[..eqIndex].Trim();
             var rawValue = line[(eqIndex + 1)..].Trim();
@@ -166,12 +167,12 @@ public class EditorConfigResolver
     private static bool IsApplicableToCSharp(string pattern)
     {
         // Universal wildcard
-        if (pattern == "*")
-            return true;
+        if (pattern == "*"){
+            return true;}
 
         // Exact extension match
-        if (pattern.Equals("*.cs", StringComparison.OrdinalIgnoreCase))
-            return true;
+        if (pattern.Equals("*.cs", StringComparison.OrdinalIgnoreCase)){
+            return true;}
 
         // Brace expansion: *.{cs,vb} or {*.cs,*.vb}
         if (pattern.Contains('{') && pattern.Contains('}'))
@@ -187,8 +188,8 @@ public class EditorConfigResolver
                 foreach (var alt in alternatives)
                 {
                     var expanded = prefix + alt.Trim() + suffix;
-                    if (expanded.Equals("*.cs", StringComparison.OrdinalIgnoreCase))
-                        return true;
+                    if (expanded.Equals("*.cs", StringComparison.OrdinalIgnoreCase)){
+                        return true;}
                 }
             }
         }
@@ -206,8 +207,8 @@ public class EditorConfigResolver
             ? tabSize
             : GetIntSetting(settings, "indent_size", 4);
         // If tab_width was not explicitly set, default it to indent_size
-        if (!settings.ContainsKey("tab_width"))
-            tabSize = indentSize;
+        if (!settings.ContainsKey("tab_width")){
+            tabSize = indentSize;}
         var newLine = GetNewLineSetting(settings);
 
         // Brace placement — parse csharp_new_line_before_open_brace
@@ -226,40 +227,40 @@ public class EditorConfigResolver
         if (settings.TryGetValue("csharp_new_line_before_open_brace", out var braceValue))
         {
             braceValue = braceValue.Trim().ToLowerInvariant();
-            if (braceValue == "all")
+            if (braceValue != "all")
             {
-                // All true — already defaults
-            }
-            else if (braceValue == "none")
-            {
-                bracesInTypes = false;
-                bracesInMethods = false;
-                bracesInProperties = false;
-                bracesInAccessors = false;
-                bracesInAnonymousMethods = false;
-                bracesInAnonymousTypes = false;
-                bracesInControlBlocks = false;
-                bracesInLambdas = false;
-                bracesInObjectCollectionArray = false;
-                bracesInLocalFunctions = false;
-            }
-            else
-            {
-                // Comma-separated list: only listed items are true
-                var items = new HashSet<string>(
-                    braceValue.Split(',').Select(s => s.Trim()),
-                    StringComparer.OrdinalIgnoreCase);
+                if (braceValue == "none")
+                {
+                    bracesInTypes = false;
+                    bracesInMethods = false;
+                    bracesInProperties = false;
+                    bracesInAccessors = false;
+                    bracesInAnonymousMethods = false;
+                    bracesInAnonymousTypes = false;
+                    bracesInControlBlocks = false;
+                    bracesInLambdas = false;
+                    bracesInObjectCollectionArray = false;
+                    bracesInLocalFunctions = false;
+                }
+                else
+                {
+                    // Comma-separated list: only listed items are true
+                    var items = new HashSet<string>(
+                        braceValue.Split(',').Select(s => s.Trim()),
+                        StringComparer.OrdinalIgnoreCase);
 
-                bracesInTypes = items.Contains("types");
-                bracesInMethods = items.Contains("methods");
-                bracesInProperties = items.Contains("properties");
-                bracesInAccessors = items.Contains("accessors");
-                bracesInAnonymousMethods = items.Contains("anonymous_methods");
-                bracesInAnonymousTypes = items.Contains("anonymous_types");
-                bracesInControlBlocks = items.Contains("control_blocks");
-                bracesInLambdas = items.Contains("lambdas");
-                bracesInObjectCollectionArray = items.Contains("object_collection_array_initializers");
-                bracesInLocalFunctions = items.Contains("local_functions");
+                    bracesInTypes = items.Contains("types");
+                    bracesInMethods = items.Contains("methods");
+                    bracesInProperties = items.Contains("properties");
+                    bracesInAccessors = items.Contains("accessors");
+                    bracesInAnonymousMethods = items.Contains("anonymous_methods");
+                    bracesInAnonymousTypes = items.Contains("anonymous_types");
+                    bracesInControlBlocks = items.Contains("control_blocks");
+                    bracesInLambdas = items.Contains("lambdas");
+                    bracesInObjectCollectionArray = items.Contains("object_collection_array_initializers");
+                    bracesInLocalFunctions = items.Contains("local_functions");
+                }
+                // All true — already defaults
             }
         }
 
@@ -337,22 +338,22 @@ public class EditorConfigResolver
 
     private static bool GetBoolSetting(Dictionary<string, string> settings, string key, string trueValue, bool defaultValue)
     {
-        if (!settings.TryGetValue(key, out var value))
-            return defaultValue;
+        if (!settings.TryGetValue(key, out var value)){
+            return defaultValue;}
         return value.Trim().Equals(trueValue, StringComparison.OrdinalIgnoreCase);
     }
 
     private static int GetIntSetting(Dictionary<string, string> settings, string key, int defaultValue)
     {
-        if (!settings.TryGetValue(key, out var value))
-            return defaultValue;
+        if (!settings.TryGetValue(key, out var value)){
+            return defaultValue;}
         return int.TryParse(value.Trim(), out var result) ? result : defaultValue;
     }
 
     private static string GetNewLineSetting(Dictionary<string, string> settings)
     {
-        if (!settings.TryGetValue("end_of_line", out var value))
-            return "\n";
+        if (!settings.TryGetValue("end_of_line", out var value)){
+            return "\n";}
         return value.Trim().ToLowerInvariant() switch
         {
             "crlf" => "\r\n",
@@ -366,9 +367,9 @@ public class EditorConfigResolver
     /// </summary>
     private static int GetLabelPositioning(Dictionary<string, string> settings)
     {
-        if (!settings.TryGetValue("csharp_indent_labels", out var value))
+        if (!settings.TryGetValue("csharp_indent_labels", out var value)){
             return 1; // OneLess (default)
-        return value.Trim().ToLowerInvariant() switch
+        }return value.Trim().ToLowerInvariant() switch
         {
             "flush_left" => 0,         // LeftMost
             "one_less_than_current" => 1, // OneLess
@@ -382,9 +383,9 @@ public class EditorConfigResolver
     /// </summary>
     private static int GetBinaryOperatorSpacing(Dictionary<string, string> settings)
     {
-        if (!settings.TryGetValue("csharp_space_around_binary_operators", out var value))
+        if (!settings.TryGetValue("csharp_space_around_binary_operators", out var value)){
             return 0; // Single (default)
-        return value.Trim().ToLowerInvariant() switch
+        }return value.Trim().ToLowerInvariant() switch
         {
             "before_and_after" => 0, // Single
             "ignore" => 1,          // Ignore

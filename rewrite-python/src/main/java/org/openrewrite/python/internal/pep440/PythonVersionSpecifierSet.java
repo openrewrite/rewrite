@@ -17,11 +17,7 @@ package org.openrewrite.python.internal.pep440;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -32,7 +28,7 @@ import static java.util.stream.Collectors.toList;
  * pre-release policy: pre-releases are excluded by default unless some clause itself
  * references a pre-release version, or {@code includePrereleases} is passed explicitly.
  */
-public class PythonVersionSpecifierSet {
+public final class PythonVersionSpecifierSet {
     private final List<PythonVersionSpecifier> specifiers;
 
     private PythonVersionSpecifierSet(List<PythonVersionSpecifier> specifiers) {

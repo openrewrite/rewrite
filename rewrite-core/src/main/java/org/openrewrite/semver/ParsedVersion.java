@@ -311,7 +311,7 @@ final class ParsedVersion {
         ParsedVersion a = parse(v1);
         ParsedVersion b = parse(v2);
         if (!a.isStrictSemver() || !b.isStrictSemver()) {
-            throw new IllegalArgumentException("Invalid version: " + (!a.isStrictSemver() ? v1 : v2));
+            throw new IllegalArgumentException("Invalid version: " + (a.isStrictSemver() ? v2 : v1));
         }
         return a.comparePrecedence(b);
     }

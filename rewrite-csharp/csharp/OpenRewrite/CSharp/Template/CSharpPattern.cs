@@ -176,12 +176,12 @@ public sealed class CSharpPattern
         // This avoids allocating a PatternMatchingComparator for the common non-matching case.
         if (unwrappedPattern.GetType() != unwrappedTree.GetType()
             && !IsCapturePlaceholder(unwrappedPattern)
-            && !PatternMatchingComparator.HasCrossTypeEquivalence(unwrappedPattern, unwrappedTree))
-            return null;
+            && !PatternMatchingComparator.HasCrossTypeEquivalence(unwrappedPattern, unwrappedTree)){
+            return null;}
 
         var comparator = new PatternMatchingComparator(_captures);
         var captured = comparator.Match(patternTree, tree, cursor);
-        if (captured == null) return null;
+        if (captured == null){ return null;}
         var nullSafe = comparator.NullSafeBindings;
         return new MatchResult(captured, nullSafe.Count > 0 ? nullSafe : null);
     }
@@ -316,8 +316,8 @@ public sealed class CSharpPattern
             foreach (var (pattern, annotator) in rules)
             {
                 var match = pattern.Match(tree, Cursor);
-                if (match != null)
-                    return annotator(tree, Cursor, match);
+                if (match != null){
+                    return annotator(tree, Cursor, match);}
             }
             return tree;
         }

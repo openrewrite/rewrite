@@ -72,7 +72,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     private String firstPrefix = "";
 
     private String source;
-    private int cursor = 0;
+    private int cursor;
 
     public ReloadableJava21JavadocVisitor(Context context, TreePath scope, ReloadableJava21TypeMapping typeMapping, String source, JCTree tree) {
         this.attr = Attr.instance(context);
@@ -132,8 +132,8 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     inFirstPrefix = false;
                 } else {
                     // Handle consecutive new lines.
-                    if ((prev == '\n' ||
-                            prev == '\r' && source.charAt(i - 2) == '\n')) {
+                    if (prev == '\n' ||
+                            prev == '\r' && source.charAt(i - 2) == '\n') {
                         String prevLineLine = prev == '\n' ? "\n" : "\r\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
                     } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.
@@ -714,7 +714,9 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             JavaType.Class classType = (JavaType.Class) type;
 
             JavaType.@Nullable Method method = methodReferenceType(ref, classType.getMethods());
-            if (method != null) return method;
+            if (method != null) {
+                return method;
+            }
 
             // Superclass fields takes presence over interface fields
             method = methodReferenceType(ref, classType.getSupertype());
@@ -722,7 +724,9 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             if (method == null) {
                 for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
                     method = methodReferenceType(ref, interface_.getMethods());
-                    if (method != null) return method;
+                    if (method != null) {
+                        return method;
+                    }
                 }
             }
 

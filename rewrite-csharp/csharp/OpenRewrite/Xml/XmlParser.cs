@@ -88,15 +88,13 @@ public class XmlParser
         parser.RemoveErrorListeners();
         parser.AddErrorListener(new ForwardingErrorListener(sourcePath));
 
-        var document = (Document)new XmlParserVisitor(
+        return (Document)new XmlParserVisitor(
             sourcePath,
             null,
             sourceStr,
             charsetName,
             charsetBomMarked
         ).VisitDocument(parser.document());
-
-        return document;
     }
 
     /// <summary>

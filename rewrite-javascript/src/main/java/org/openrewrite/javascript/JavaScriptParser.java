@@ -86,13 +86,13 @@ public class JavaScriptParser implements Parser {
         return Stream.concat(largeFileStream, smallFileStream);
     }
 
-    private final static List<String> EXTENSIONS = unmodifiableList(Arrays.asList(
+    private static final List<String> EXTENSIONS = unmodifiableList(Arrays.asList(
             ".js", ".jsx", ".mjs", ".cjs",
             ".ts", ".tsx", ".mts", ".cts"
     ));
 
     // Exclude Yarn's Plug'n'Play loader files (https://yarnpkg.com/features/pnp)
-    private final static List<String> EXCLUSIONS = unmodifiableList(Arrays.asList(
+    private static final List<String> EXCLUSIONS = unmodifiableList(Arrays.asList(
             ".pnp.cjs", ".pnp.loader.mjs"
     ));
 

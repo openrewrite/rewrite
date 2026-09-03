@@ -128,11 +128,15 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
     override fun check(declaration: FirProperty) {
         val initializer = declaration.initializer as? FirFunctionCall ?: return
         val calleeId = initializer.calleeReference.toResolvedCallableSymbol()?.callableId
-        if (calleeId != RECIPE_FQN && calleeId != RECIPES_FQN) return
+        if (calleeId != RECIPE_FQN && calleeId != RECIPES_FQN) {
+            return
+        }
 
         checkConstantMetadata(initializer, declaration)
-        if (calleeId != RECIPE_FQN) return // remaining rules are specific to the trailing-lambda form
+        if (calleeId != RECIPE_FQN) {
+            return // remaining rules are specific to the trailing-lambda form
 
+        }
         val body = initializer.findTrailingLambdaBody() ?: return
 
         val classified: List<Pair<FirStatement, StatementKind>> = body.statements.map { it to classify(it) }
@@ -161,7 +165,9 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
                     phaseLambdaBody(stmt)
                 else -> emptyList()
             }
-            if (phaseLambda.isEmpty()) continue
+            if (phaseLambda.isEmpty()) {
+                continue
+            }
             checkOrphanRewriteInsidePhase(phaseLambda, declaration)
         }
 
@@ -228,7 +234,9 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
 
     context(@Suppress("unused") context: CheckerContext, reporter: DiagnosticReporter)
     private fun reportError(source: KtSourceElement, message: String) {
-        if (source.kind is KtFakeSourceElementKind) return
+        if (source.kind is KtFakeSourceElementKind) {
+            return
+        }
         reporter.reportOn(source, FirErrors.OTHER_ERROR_WITH_REASON, message)
     }
 
@@ -241,7 +249,9 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
     private fun checkConstantMetadata(call: FirFunctionCall, declaration: FirProperty) {
         val mapping = (call.argumentList as? FirResolvedArgumentList)?.mapping ?: return
         for ((argExpr, param) in mapping) {
-            if (param.name != NAME_DISPLAY_NAME && param.name != NAME_DESCRIPTION) continue
+            if (param.name != NAME_DISPLAY_NAME && param.name != NAME_DESCRIPTION) {
+                continue
+            }
             if (!isConstantString(argExpr)) {
                 reportError(
                     argExpr.source ?: declaration.source ?: return,
@@ -296,8 +306,11 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
             chain.head?.callableSimpleName() == NAME_SCAN -> {
                 val hasEdit = chain.tailNames.contains(NAME_EDIT)
                 val hasGenerate = chain.tailNames.contains(NAME_GENERATE)
-                if (!hasEdit && !hasGenerate) StatementKind.OrphanScan
-                else StatementKind.ScanChain(hasEdit, hasGenerate)
+                if (!hasEdit && !hasGenerate) {
+                    StatementKind.OrphanScan
+                } else {
+                    StatementKind.ScanChain(hasEdit, hasGenerate)
+                }
             }
             // Bare-edit / bare-generate / bare-rewrite-with-to. We only treat
             // the call as "bare" when it has NO dispatch-receiver call (i.e.

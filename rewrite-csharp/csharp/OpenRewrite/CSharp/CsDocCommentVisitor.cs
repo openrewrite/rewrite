@@ -37,7 +37,7 @@ public class CsDocCommentVisitor<P>
 
     protected J? CsharpVisitorVisit(Tree? tree, P p)
     {
-        if (tree == null) return null;
+        if (tree == null){ return null;}
         var previous = _csharpVisitor.Cursor;
         var j = _csharpVisitor.Visit(tree, p, Cursor);
         _csharpVisitor.Cursor = previous;
@@ -71,9 +71,9 @@ public class CsDocCommentVisitor<P>
             if (result == null && !ReferenceEquals(visited, original))
             {
                 result = new List<CsDocComment>(nodes.Count);
-                for (int j = 0; j < i; j++) result.Add(nodes[j]);
+                for (int j = 0; j < i; j++){ result.Add(nodes[j]);}
             }
-            if (result != null && visited != null) result.Add(visited);
+            if (result != null && visited != null){ result.Add(visited);}
         }
         return result ?? nodes;
     }

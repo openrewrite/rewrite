@@ -50,7 +50,7 @@ class DependencyWorkspace {
     );
     private static final int MAX_CACHE_SIZE = 100;
     private static final Map<String, Path> cache = synchronizedMap(
-            new LinkedHashMap<String, Path>(16, 0.75f, true) {
+            new LinkedHashMap<String, Path>(16, 0.75F, true) {
                 @Override
                 protected boolean removeEldestEntry(Map.Entry<String, Path> eldest) {
                     if (size() > MAX_CACHE_SIZE) {

@@ -145,12 +145,12 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
         j = firstStatement ?
                 (hasImports ? minimumLines(j, minimumBlankLines_AfterImports) : j) :
                 // Apply `style.getMinimum().getAroundClass()` to classes declared in the SourceFile.
-                (topLevelStatements.contains(j)) ? minimumLines(j, minimumBlankLines_AroundClass) : j;
+                topLevelStatements.contains(j) ? minimumLines(j, minimumBlankLines_AroundClass) : j;
 
         // style.getKeepMaximum().getInDeclarations() also sets the maximum new lines of class declaration prefixes.
         j = firstStatement ?
                 (hasImports ? keepMaximumLines(j, Math.max(style.getKeepMaximum().getInDeclarations(), minimumBlankLines_AfterImports)) : j) :
-                (topLevelStatements.contains(j)) ? keepMaximumLines(j, style.getKeepMaximum().getInDeclarations()) : j;
+                topLevelStatements.contains(j) ? keepMaximumLines(j, style.getKeepMaximum().getInDeclarations()) : j;
 
         if (!hasImports && firstStatement) {
             if (cu.getPackageDeclaration() == null) {

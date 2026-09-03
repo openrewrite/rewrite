@@ -323,15 +323,22 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val sourceText: String? = run {
             val path = file.fileEntry.name
             val onDisk = File(path)
-            if (onDisk.isFile) onDisk.readText() else null
+            if (onDisk.isFile) {
+                onDisk.readText()
+            } else { null
+            }
         }
-        if (sourceText == null) return  // no source = no template extraction possible
+        if (sourceText == null) {
+            return  // no source = no template extraction possible
 
-        // Iterate over a snapshot — `addChild` mutates `file.declarations` while
-        // we add synthetic Recipe subclasses, which would otherwise trip a
-        // ConcurrentModificationException on the underlying list iterator.
+            // Iterate over a snapshot — `addChild` mutates `file.declarations` while
+            // we add synthetic Recipe subclasses, which would otherwise trip a
+            // ConcurrentModificationException on the underlying list iterator.
+        }
         for (declaration in file.declarations.toList()) {
-            if (declaration !is IrProperty) continue
+            if (declaration !is IrProperty) {
+                continue
+            }
             val initializerExpr = declaration.backingField?.initializer?.expression as? IrCall ?: continue
             // `IrUtilsKt.hasTopLevelEqualFqName` returns false for callees whose
             // parent is an `IrExternalPackageFragmentImpl` (functions resolved
@@ -376,7 +383,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 }
                 RECIPES_FQN -> {
                     val compositeMetadata = readCompositeMetadata(initializerExpr) ?: continue
-                    if (ctx.getRecipeList == null || ctx.listOfVarargSymbol == null) continue
+                    if (ctx.getRecipeList == null || ctx.listOfVarargSymbol == null) {
+                        continue
+                    }
                     buildCompositeRecipeClass(
                         ctx = ctx,
                         parentFile = file,
@@ -404,7 +413,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             )
         }
 
-        if (replacements.isEmpty()) return
+        if (replacements.isEmpty()) {
+            return
+        }
 
         file.transformChildrenVoid(object : IrElementTransformerVoid() {
             override fun visitCall(expression: IrCall): IrExpression {
@@ -430,7 +441,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val params = callee.valueParameters
         val displayNameIdx = params.indexOfFirst { it.name == Name.identifier("displayName") }
         val descriptionIdx = params.indexOfFirst { it.name == Name.identifier("description") }
-        if (displayNameIdx < 0 || descriptionIdx < 0) return null
+        if (displayNameIdx < 0 || descriptionIdx < 0) {
+            return null
+        }
         val displayName = evalConstString(call.arguments[displayNameIdx]) ?: return null
         val description = evalConstString(call.arguments[descriptionIdx]) ?: return null
 
@@ -455,7 +468,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val displayNameIdx = params.indexOfFirst { it.name == Name.identifier("displayName") }
         val descriptionIdx = params.indexOfFirst { it.name == Name.identifier("description") }
         val recipesIdx = params.indexOfFirst { it.name == Name.identifier("recipes") }
-        if (displayNameIdx < 0 || descriptionIdx < 0 || recipesIdx < 0) return null
+        if (displayNameIdx < 0 || descriptionIdx < 0 || recipesIdx < 0) {
+            return null
+        }
         val displayName = evalConstString(call.arguments[displayNameIdx]) ?: return null
         val description = evalConstString(call.arguments[descriptionIdx]) ?: return null
         val recipesVararg = call.arguments[recipesIdx] as? org.jetbrains.kotlin.ir.expressions.IrVararg ?: return null
@@ -463,19 +478,29 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     private fun nonNullArgOrNull(arg: IrExpression?): IrExpression? {
-        if (arg == null) return null
-        if (arg is IrConst && arg.value == null) return null
+        if (arg == null) {
+            return null
+        }
+        if (arg is IrConst && arg.value == null) {
+            return null
+        }
         return arg
     }
 
     private fun substantiveArgOrNull(arg: IrExpression?): IrExpression? {
-        if (arg == null) return null
+        if (arg == null) {
+            return null
+        }
         if (arg is IrCall) {
             val fqn = arg.symbol.owner.kotlinFqName.asString()
-            if (fqn == "kotlin.collections.emptySet") return null
+            if (fqn == "kotlin.collections.emptySet") {
+                return null
+            }
             if (fqn == "kotlin.collections.setOf") {
                 val singleArg = arg.arguments.singleOrNull() ?: return arg
-                if (singleArg is org.jetbrains.kotlin.ir.expressions.IrVararg && singleArg.elements.isEmpty()) return null
+                if (singleArg is org.jetbrains.kotlin.ir.expressions.IrVararg && singleArg.elements.isEmpty()) {
+                    return null
+                }
             }
         }
         return arg
@@ -492,7 +517,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             null -> null
             is IrConst -> expr.value?.toString()
             is IrStringConcatenation -> buildString {
-                for (part in expr.arguments) append(evalConstString(part) ?: return null)
+                for (part in expr.arguments) {
+                    append(evalConstString(part) ?: return null)
+                }
             }
             is IrCall -> when (expr.symbol.owner.kotlinFqName.asString()) {
                 "kotlin.String.plus" -> {
@@ -504,8 +531,11 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 "kotlin.text.trimMargin" -> {
                     val receiver = evalConstString(expr.arguments.getOrNull(0)) ?: return null
                     val marginArg = expr.arguments.getOrNull(1)
-                    if (marginArg == null) receiver.trimMargin()
-                    else receiver.trimMargin(evalConstString(marginArg) ?: return null)
+                    if (marginArg == null) {
+                        receiver.trimMargin()
+                    } else {
+                        receiver.trimMargin(evalConstString(marginArg) ?: return null)
+                    }
                 }
                 else -> null
             }
@@ -617,8 +647,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val editCall = (firstStmt as? IrReturn)?.value as? IrCall
             ?: firstStmt as? IrCall
             ?: return null
-        if (editCall.symbol.owner.kotlinFqName.asString() != RECIPE_BUILDER_EDIT_FQN) return null
-        if (editCall.valueArgumentsCount != 1) return null
+        if (editCall.symbol.owner.kotlinFqName.asString() != RECIPE_BUILDER_EDIT_FQN) {
+            return null
+        }
+        if (editCall.valueArgumentsCount != 1) {
+            return null
+        }
         val editBlockArg = editCall.getValueArgument(0) as? IrFunctionExpression ?: return null
         val editStmts = (editBlockArg.function.body as? IrBlockBody)?.statements ?: return null
 
@@ -644,9 +678,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             outermostCall
         }
         val toCallFqn = toCall.symbol.owner.kotlinFqName.asString()
-        if (toCallFqn !in REWRITE_ADVICE_TO_FQNS) return null
+        if (toCallFqn !in REWRITE_ADVICE_TO_FQNS) {
+            return null
+        }
         val rewriteCall = toCall.dispatchReceiver as? IrCall ?: return null
-        if (rewriteCall.symbol.owner.kotlinFqName.asString() != EDIT_SCOPE_REWRITE_FQN) return null
+        if (rewriteCall.symbol.owner.kotlinFqName.asString() != EDIT_SCOPE_REWRITE_FQN) {
+            return null
+        }
 
         // Two accepted call shapes on `rewrite`:
         //   1) rewrite(before)              — valueArgumentsCount == 1.
@@ -675,24 +713,34 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             // fixed param list and each before must supply the same set of
             // bindings. Canonical signatures, however, may differ — they
             // just produce per-before substitution-source CSVs (see below).
-            if (beforeLambdas[i].params.size != beforeLambdas[0].params.size) return null
+            if (beforeLambdas[i].params.size != beforeLambdas[0].params.size) {
+                return null
+            }
             // Multi-before recipes must agree on the not-null-assertion shape.
             // Mixing `someCall()` and `someCall()!!` befores would require two
             // different visitor entry points; reject and let the runtime DSL
             // builder surface the limitation.
-            if (beforeLambdas[i].wrappedInNotNull != notNullForAll) return null
+            if (beforeLambdas[i].wrappedInNotNull != notNullForAll) {
+                return null
+            }
             // Same restriction for property-access vs method-invocation shape:
             // the two routes use different LST visitors, so a multi-before
             // recipe must pick one or the other.
-            if (beforeLambdas[i].propertyAccess != propertyAccessForAll) return null
+            if (beforeLambdas[i].propertyAccess != propertyAccessForAll) {
+                return null
+            }
         }
         // Variadic groups only flow through the plain method-invocation helpers;
         // not-null / chain shapes use visitor entries without run support.
-        if (beforeLambdas.any { it.varargGroup != null && (it.wrappedInNotNull || it.inner != null) }) return null
+        if (beforeLambdas.any { it.varargGroup != null && (it.wrappedInNotNull || it.inner != null) }) {
+            return null
+        }
         // `.strictArity()` is incompatible with the spread form (a spread has no
         // fixed count to pin). Compute the exact arg count for the runtime guard
         // — only meaningful for varargs callees; -1 disables it.
-        if (strict && beforeLambdas.any { it.varargGroup?.isSpread == true }) return null
+        if (strict && beforeLambdas.any { it.varargGroup?.isSpread }) {
+            return null
+        }
         val strictArgCount = if (strict) {
             val counts = beforeLambdas.filter { it.varargGroup != null }.map { it.argSignatures.size }.toSet()
             when {
@@ -721,13 +769,17 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val csvs = mutableListOf(firstTemplate.second)
         for (i in 1 until beforeLambdas.size) {
             val nextTemplate = buildAfterTemplate(afterArg, sourceText, beforeLambdas[i], strict, javaTemplate) ?: return null
-            if (nextTemplate.first != firstTemplate.first) return null
+            if (nextTemplate.first != firstTemplate.first) {
+                return null
+            }
             csvs += nextTemplate.second
         }
         // Reject multi-before chains in v1 (mixing chain shapes with single-call
         // would require per-before matcher dispatch in the runtime helper; the
         // 5 starter chain recipes are all single-before).
-        if (beforeLambdas.any { it.inner != null } && beforeLambdas.size > 1) return null
+        if (beforeLambdas.any { it.inner != null } && beforeLambdas.size > 1) {
+            return null
+        }
         val matcherSpecs = beforeLambdas.map { bl ->
             bl.inlinedConstantMatcherSpec ?: run {
                 val outerSpec = computeMatcherSpec(bl.rootCall!!, bl.propertyAccess)
@@ -736,7 +788,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 // distinguishes a single chained spec from the \n-separated
                 // multi-before shape. Runtime helpers detect the tab and
                 // switch to chain-matching mode.
-                if (innerSpec != null) "$outerSpec\t$innerSpec" else outerSpec
+                if (innerSpec != null) { "$outerSpec\t$innerSpec"
+                } else { outerSpec
+                }
             }
         }
         // Single-before recipes pass the CSV through as a plain string for
@@ -759,7 +813,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     private fun findTrailingLambda(call: IrCall): IrFunctionExpression? {
         val callee = call.symbol.owner
         val blockIdx = callee.valueParameters.indexOfFirst { it.name == Name.identifier("block") }
-        if (blockIdx < 0) return null
+        if (blockIdx < 0) {
+            return null
+        }
         return call.arguments[blockIdx] as? IrFunctionExpression
     }
 
@@ -785,12 +841,16 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         var found = false
         val visitor = object : IrVisitorVoid() {
             override fun visitElement(element: IrElement) {
-                if (found) return
+                if (found) {
+                    return
+                }
                 element.acceptChildrenVoid(this)
             }
 
             override fun visitFunctionExpression(expression: IrFunctionExpression) {
-                if (found) return
+                if (found) {
+                    return
+                }
                 // Inspect each value parameter's type for K.* references.
                 for (p in expression.function.valueParameters) {
                     if (typeIsKotlinSpecific(p.type)) {
@@ -802,7 +862,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             }
 
             override fun visitCall(expression: IrCall) {
-                if (found) return
+                if (found) {
+                    return
+                }
                 // Callee FQN in the `kotlin.*` namespace promotes to Kotlin:
                 // JavaTemplate can't parse Kotlin-extension call syntax in
                 // the after-template (`s.lowercase()`, `sb.appendLine("x")`,
@@ -816,7 +878,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 expression.acceptChildrenVoid(this)
             }
         }
-        for (lambda in lambdas) lambda.acceptChildrenVoid(visitor)
+        for (lambda in lambdas) {
+            lambda.acceptChildrenVoid(visitor)
+        }
         return found
     }
 
@@ -963,9 +1027,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // If it's `(`, the author wrote method-call syntax. Otherwise
         // (newline, whitespace, EOF, operator, `}`), it's property access.
         val propertyAccess = run {
-            if (rootCall.symbol.owner.correspondingPropertySymbol == null) return@run false
+            if (rootCall.symbol.owner.correspondingPropertySymbol == null) {
+                return@run false
+            }
             val eo = rootCall.endOffset
-            if (eo < 0 || eo > sourceText.length) return@run false
+            if (eo < 0 || eo > sourceText.length) {
+                return@run false
+            }
             // Skip horizontal whitespace; a literal '(' on the same expression
             // line means the author wrote a method-style call.
             var i = eo
@@ -978,8 +1046,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }
 
         if (params.isEmpty()) {
-            if (rootCall.dispatchReceiver != null || rootCall.extensionReceiver != null) return null
-            if (rootCall.valueArgumentsCount > 0) return null
+            if (rootCall.dispatchReceiver != null || rootCall.extensionReceiver != null) {
+                return null
+            }
+            if (rootCall.valueArgumentsCount > 0) {
+                return null
+            }
             return BeforeLambda(params, rootCall, emptyList(), receiverParamSymbol = null,
                 wrappedInNotNull = wrappedInNotNull, propertyAccess = propertyAccess)
         }
@@ -1013,7 +1085,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             val innerReceiverSym: IrValueSymbol? = when (innerRawRecv) {
                 null -> null
                 is IrGetValue -> {
-                    if (innerRawRecv.symbol !in paramSyms) return null
+                    if (innerRawRecv.symbol !in paramSyms) {
+                        return null
+                    }
                     innerRawRecv.symbol
                 }
                 else -> return null
@@ -1023,7 +1097,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 val arg = unwrapImplicitCasts(innerCall.getValueArgument(i)) ?: continue
                 when (arg) {
                     is IrGetValue -> {
-                        if (arg.symbol !in paramSyms) return null
+                        if (arg.symbol !in paramSyms) {
+                            return null
+                        }
                         innerSigs += ArgSig.ParamRef(arg.symbol)
                     }
                     is IrConst -> innerSigs += ArgSig.LiteralConst(arg.kind, arg.value)
@@ -1052,7 +1128,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val receiverParamSymbol: IrValueSymbol? = when (rawReceiver) {
             null -> null
             is IrGetValue -> {
-                if (rawReceiver.symbol !in paramSyms) return null
+                if (rawReceiver.symbol !in paramSyms) {
+                    return null
+                }
                 rawReceiver.symbol
             }
             else -> return null
@@ -1076,16 +1154,22 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                     if (element is IrSpreadElement) {
                         // `*args` — one lone spread of an array param. v1 rejects
                         // mixing a spread with other elements in the same slot.
-                        if (rawArg.elements.size != 1) return null
+                        if (rawArg.elements.size != 1) {
+                            return null
+                        }
                         val spreadExpr = unwrapImplicitCasts(element.expression)
-                        if (spreadExpr !is IrGetValue || spreadExpr.symbol !in paramSyms) return null
+                        if (spreadExpr !is IrGetValue || spreadExpr.symbol !in paramSyms) {
+                            return null
+                        }
                         sigs += ArgSig.VarargSpread(spreadExpr.symbol)
                         members += spreadExpr.symbol
                         sawSpread = true
                     } else {
                         when (val elemExpr = unwrapImplicitCasts(element as? IrExpression)) {
                             is IrGetValue -> {
-                                if (elemExpr.symbol !in paramSyms) return null
+                                if (elemExpr.symbol !in paramSyms) {
+                                    return null
+                                }
                                 sigs += ArgSig.ParamRef(elemExpr.symbol)
                                 members += elemExpr.symbol
                             }
@@ -1105,7 +1189,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             val arg = unwrapImplicitCasts(rawArg) ?: continue
             when (arg) {
                 is IrGetValue -> {
-                    if (arg.symbol !in paramSyms) return null
+                    if (arg.symbol !in paramSyms) {
+                        return null
+                    }
                     sigs += ArgSig.ParamRef(arg.symbol)
                 }
                 is IrConst -> sigs += ArgSig.LiteralConst(arg.kind, arg.value)
@@ -1140,17 +1226,23 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     ): BeforeLambda? {
         val so = constExpr.startOffset
         val eo = constExpr.endOffset
-        if (so < 0 || eo <= so || eo > sourceText.length) return null
+        if (so < 0 || eo <= so || eo > sourceText.length) {
+            return null
+        }
         // The IR-emitted offsets may cover just `PI` (the package qualifier
         // has no IR node); reuse the FQN-extension walk so the parsed slice
         // is the recipe author's full `Foo.BAR` spelling.
         val sliceStart = extendBackwardForQualifierChain(sourceText, so)
         val rawSlice = sourceText.substring(sliceStart, eo).trim()
         val dotIdx = rawSlice.lastIndexOf('.')
-        if (dotIdx <= 0 || dotIdx == rawSlice.length - 1) return null
+        if (dotIdx <= 0 || dotIdx == rawSlice.length - 1) {
+            return null
+        }
         val qualifier = rawSlice.substring(0, dotIdx)
         val name = rawSlice.substring(dotIdx + 1)
-        if (!isValidJavaIdentifier(qualifier.replace(".", "")) || !isValidJavaIdentifier(name)) return null
+        if (!isValidJavaIdentifier(qualifier.replace(".", "")) || !isValidJavaIdentifier(name)) {
+            return null
+        }
         val resolvedFqn = resolveQualifierAsClass(ctx.pluginContext, qualifier) ?: return null
         return BeforeLambda(
             params = params,
@@ -1164,10 +1256,16 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     private fun isValidJavaIdentifier(s: String): Boolean {
-        if (s.isEmpty()) return false
-        if (!Character.isJavaIdentifierStart(s[0])) return false
+        if (s.isEmpty()) {
+            return false
+        }
+        if (!Character.isJavaIdentifierStart(s[0])) {
+            return false
+        }
         for (i in 1 until s.length) {
-            if (!Character.isJavaIdentifierPart(s[i])) return false
+            if (!Character.isJavaIdentifierPart(s[i])) {
+                return false
+            }
         }
         return true
     }
@@ -1197,8 +1295,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         candidates += "kotlin.$qualifier"
         for (cand in candidates) {
             val fq = FqName(cand)
-            if (fq.isRoot) continue
-            if (pluginContext.referenceClass(ClassId.topLevel(fq)) != null) return cand
+            if (fq.isRoot) {
+                continue
+            }
+            if (pluginContext.referenceClass(ClassId.topLevel(fq)) != null) {
+                return cand
+            }
         }
         return null
     }
@@ -1345,7 +1447,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             return tokens.joinToString(",")
         }
         val jvmArgCount = params.size + extReceiverArg
-        if (jvmArgCount == 0) return ""
+        if (jvmArgCount == 0) {
+            return ""
+        }
         return List(jvmArgCount) { "*" }.joinToString(",")
     }
 
@@ -1376,9 +1480,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
     private fun defaultFacadeBaseName(filePath: String): String? {
         val nameOnly = filePath.substringAfterLast('/').substringAfterLast('\\')
-        if (!nameOnly.endsWith(".kt")) return null
+        if (!nameOnly.endsWith(".kt")) {
+            return null
+        }
         val stem = nameOnly.removeSuffix(".kt")
-        if (stem.isEmpty()) return null
+        if (stem.isEmpty()) {
+            return null
+        }
         return stem.replaceFirstChar { it.uppercaseChar() } + "Kt"
     }
 
@@ -1395,15 +1503,23 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         var i = start
         while (i > 0) {
             val dotIdx = i - 1
-            if (sourceText[dotIdx] != '.') break
+            if (sourceText[dotIdx] != '.') {
+                break
+            }
             // Walk back through identifier chars preceding the '.'.
             var j = dotIdx - 1
-            while (j >= 0 && (sourceText[j].isLetterOrDigit() || sourceText[j] == '_')) j--
+            while (j >= 0 && (sourceText[j].isLetterOrDigit() || sourceText[j] == '_')) {
+                j--
+            }
             val identStart = j + 1
             // Identifier must be at least one char and start with a non-digit.
-            if (identStart >= dotIdx) break
+            if (identStart >= dotIdx) {
+                break
+            }
             val first = sourceText[identStart]
-            if (!(first.isLetter() || first == '_')) break
+            if (!(first.isLetter() || first == '_')) {
+                break
+            }
             i = identStart
         }
         return i
@@ -1422,7 +1538,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     ): Pair<String, String>? {
         val fn = fnExpr.function
         val afterParams = fn.valueParameters
-        if (afterParams.size != before.params.size) return null
+        if (afterParams.size != before.params.size) {
+            return null
+        }
         val body = fn.body as? IrBlockBody ?: return null
         val singleStmt = body.statements.singleOrNull() ?: return null
         val expr: IrExpression = when (singleStmt) {
@@ -1463,7 +1581,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val paramSymToSource = HashMap<IrValueSymbol, String>(afterParams.size)
         for (i in 0 until afterParams.size) {
             val afterSym = afterParams[i].symbol
-            if (afterSym in groupAfterSyms) continue  // emitted as the variadic run below
+            if (afterSym in groupAfterSyms) {
+                continue  // emitted as the variadic run below
+            }
             val beforeParamSym = before.params[i].symbol
             val source: String = when {
                 beforeParamSym == before.receiverParamSymbol -> outerSrc(-1)
@@ -1471,18 +1591,24 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                     val outerArgIdx = before.argSignatures.indexOfFirst { sig ->
                         sig is ArgSig.ParamRef && sig.symbol == beforeParamSym
                     }
-                    if (outerArgIdx >= 0) outerSrc(outerArgIdx)
-                    else if (isChain) {
+                    if (outerArgIdx >= 0) {
+                        outerSrc(outerArgIdx)
+                    } else if (isChain) {
                         val inner = before.inner!!
-                        if (beforeParamSym == inner.receiverParamSymbol) innerSrc(-1)
-                        else {
+                        if (beforeParamSym == inner.receiverParamSymbol) {
+                            innerSrc(-1)
+                        } else {
                             val innerArgIdx = inner.argSignatures.indexOfFirst { sig ->
                                 sig is ArgSig.ParamRef && sig.symbol == beforeParamSym
                             }
-                            if (innerArgIdx < 0) return null
+                            if (innerArgIdx < 0) {
+                                return null
+                            }
                             innerSrc(innerArgIdx)
                         }
-                    } else return null
+                    } else {
+                        return null
+                    }
                 }
             }
             paramSymToSource[afterSym] = source
@@ -1491,11 +1617,15 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         data class LiteralSlot(val src: String, val sig: ArgSig.LiteralConst, var consumed: Boolean = false)
         val literalSlots = mutableListOf<LiteralSlot>()
         before.argSignatures.forEachIndexed { idx, sig ->
-            if (sig is ArgSig.LiteralConst) literalSlots += LiteralSlot(outerSrc(idx), sig)
+            if (sig is ArgSig.LiteralConst) {
+                literalSlots += LiteralSlot(outerSrc(idx), sig)
+            }
         }
         if (isChain) {
             before.inner!!.argSignatures.forEachIndexed { idx, sig ->
-                if (sig is ArgSig.LiteralConst) literalSlots += LiteralSlot(innerSrc(idx), sig)
+                if (sig is ArgSig.LiteralConst) {
+                    literalSlots += LiteralSlot(innerSrc(idx), sig)
+                }
             }
         }
 
@@ -1507,8 +1637,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 val so = element.startOffset
                 val eo = element.endOffset
                 if (so >= 0 && eo > so) {
-                    if (so < minStart) minStart = so
-                    if (eo > maxEnd) maxEnd = eo
+                    if (so < minStart) {
+                        minStart = so
+                    }
+                    if (eo > maxEnd) {
+                        maxEnd = eo
+                    }
                 }
                 element.acceptChildrenVoid(this)
             }
@@ -1517,11 +1651,17 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             val so = expr.startOffset
             val eo = expr.endOffset
             if (so >= 0 && eo > so) {
-                if (so < minStart) minStart = so
-                if (eo > maxEnd) maxEnd = eo
+                if (so < minStart) {
+                    minStart = so
+                }
+                if (eo > maxEnd) {
+                    maxEnd = eo
+                }
             }
         }
-        if (minStart == Int.MAX_VALUE || maxEnd > sourceText.length) return null
+        if (minStart == Int.MAX_VALUE || maxEnd > sourceText.length) {
+            return null
+        }
         // Source-text-slice gives the IR-visible span, which excludes any
         // syntactic FQN qualifier preceding a top-level call (K2 IR resolves
         // `kotlin.math.abs(x)` to a single `IrCall(abs)` whose offsets cover
@@ -1587,10 +1727,16 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // expands the sentinel to one `#{any()}` per matched arg and splices
         // `getArguments()[k..end]` at this ordinal (source `V<k>`).
         if (group != null) {
-            if (groupRefs.isEmpty()) return null                       // after must reference the run
+            if (groupRefs.isEmpty()) {
+                return null                       // after must reference the run
+            }
             val seen = groupRefs.map { it.symbol }.toSet()
-            if (seen.size != groupRefs.size) return null               // a member used twice
-            if (seen != groupAfterSyms) return null                    // missing / extra members
+            if (seen.size != groupRefs.size) {
+                return null               // a member used twice
+            }
+            if (seen != groupAfterSyms) {
+                return null                    // missing / extra members
+            }
             val runStartRaw = groupRefs.minOf { it.startOffset }
             val runEnd = groupRefs.maxOf { it.endOffset }
             // Spread form (`*args`): swallow the leading `*` (and any horizontal
@@ -1603,7 +1749,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 runStartRaw
             }
             // Contiguity: no normal capture may sit inside the run span.
-            if (spots.any { it.startOffset < runEnd && it.endOffset > runStart }) return null
+            if (spots.any { it.startOffset < runEnd && it.endOffset > runStart }) {
+                return null
+            }
             spots += Spot(runStart, runEnd, "V${group.startArgIndex}", VARARGS_SENTINEL)
         }
 
@@ -1626,7 +1774,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 return null
             }
         }
-        if (prependSpots.size > 1) return null
+        if (prependSpots.size > 1) {
+            return null
+        }
 
         val templateBuilder = StringBuilder(slice)
         for (spot in inSliceSpots.sortedByDescending { it.startOffset }) {
@@ -1643,7 +1793,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }
 
         val orderedSources = mutableListOf<String>()
-        if (prependSpots.isNotEmpty()) orderedSources += prependSpots.single().source
+        if (prependSpots.isNotEmpty()) {
+            orderedSources += prependSpots.single().source
+        }
         orderedSources += inSliceSpots.sortedBy { it.startOffset }.map { it.source }
         val csv = orderedSources.joinToString(",")
 
@@ -1666,13 +1818,17 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // selector's return type). Anything but an invariant, concrete argument
         // (star projection, use-site variance, type parameter) falls back to raw.
         val args = (type as? IrSimpleType)?.arguments
-        if (args.isNullOrEmpty()) return fqn
+        if (args.isNullOrEmpty()) {
+            return fqn
+        }
         val rendered = args.map { renderTypeArgument(it) ?: return fqn }
         return "$fqn<${rendered.joinToString(", ")}>"
     }
 
     private fun renderTypeArgument(arg: IrTypeArgument): String? {
-        if (arg !is IrTypeProjection || arg.variance != Variance.INVARIANT) return null
+        if (arg !is IrTypeProjection || arg.variance != Variance.INVARIANT) {
+            return null
+        }
         return renderPlaceholderType(arg.type, javaTemplate = false)
     }
 

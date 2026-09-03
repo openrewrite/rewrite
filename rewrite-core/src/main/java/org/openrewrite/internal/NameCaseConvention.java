@@ -223,7 +223,7 @@ public enum NameCaseConvention {
      * @see NameCaseConvention#compile(String)
      */
     @Incubating(since = "8.73.0")
-    public static class Compiled {
+    public static final class Compiled {
         private final NameCaseConvention convention;
         private final String formattedPattern;
         private volatile @Nullable Pattern compiledRegex;

@@ -85,9 +85,9 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Override
     public String getInstanceNameSuffix() {
         return String.format("%s`%s` to %s`%s`",
-                (oldFilePath == null) ? "" : oldFilePath + ":",
+                oldFilePath == null ? "" : oldFilePath + ":",
                 oldPropertyKey,
-                (newFilePath == null) ? "" : newFilePath + ":",
+                newFilePath == null ? "" : newFilePath + ":",
                 newPropertyKey);
     }
 
@@ -103,9 +103,9 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
-        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
-                NameCaseConvention.LOWER_CAMEL :
-                NameCaseConvention.EXACT).compile(oldPropertyKey);
+        NameCaseConvention.Compiled keyMatcher = (Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.EXACT :
+                NameCaseConvention.LOWER_CAMEL).compile(oldPropertyKey);
 
         TreeVisitor<?, ExecutionContext> visitor = new PropertiesIsoVisitor<ExecutionContext>() {
             @Override

@@ -758,7 +758,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             var typeParam = typeParameters.Elements[i];
             bool isSynthetic = typeParam.Element.Bounds?.Markers.FindFirst<ImplicitTypeParameters>() != null;
-            if (isSynthetic) continue;
+            if (isSynthetic){ continue;}
 
             if (needsComma)
             {
@@ -786,7 +786,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     /// </summary>
     private void PrintTypeParameterConstraintsInSourceOrder(JContainer<TypeParameter>? typeParameters, PrintOutputCapture<P> p)
     {
-        if (typeParameters == null) return;
+        if (typeParameters == null){ return;}
 
         // Collect all type parameters that have where clauses
         var ctpsWithWhere = new List<ConstrainedTypeParameter>();
@@ -820,7 +820,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     /// </summary>
     private void PrintConstrainedTypeParameterConstraints(ConstrainedTypeParameter ctp, PrintOutputCapture<P> p)
     {
-        if (ctp.WhereConstraint == null) return;
+        if (ctp.WhereConstraint == null){ return;}
 
         VisitSpace(ctp.WhereConstraint.Before, p);
         p.Append("where");
@@ -1270,20 +1270,20 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(block, p);
         var omitBraces = block.Markers.FindFirst<OmitBraces>() != null;
-        if (!omitBraces)
-            p.Append('{');
+        if (!omitBraces){
+            p.Append('{');}
 
         foreach (var stmt in block.Statements)
         {
             // Skip primary constructor MethodDeclaration — already printed by VisitClassDeclaration
-            if (stmt.Element is MethodDeclaration md && md.Markers.FindFirst<PrimaryConstructor>() != null)
-                continue;
+            if (stmt.Element is MethodDeclaration md && md.Markers.FindFirst<PrimaryConstructor>() != null){
+                continue;}
             VisitStatement(stmt, p);
         }
 
         VisitSpace(block.End, p);
-        if (!omitBraces)
-            p.Append('}');
+        if (!omitBraces){
+            p.Append('}');}
         AfterSyntax(block, p);
         return block;
     }
@@ -1852,10 +1852,10 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(cp, p);
         var omitParens = cp.Markers.FindFirst<OmitParentheses>() != null;
-        if (!omitParens) p.Append('(');
+        if (!omitParens){ p.Append('(');}
         Visit(cp.Tree.Element, p);
         VisitSpace(cp.Tree.After, p);
-        if (!omitParens) p.Append(')');
+        if (!omitParens){ p.Append(')');}
         AfterSyntax(cp, p);
         return cp;
     }
@@ -1898,9 +1898,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             int dollarCount = 0;
             foreach (var c in istr.Delimiter)
             {
-                if (c == '$') dollarCount++;
+                if (c == '$'){ dollarCount++;}
             }
-            if (dollarCount > 1) braceCount = dollarCount;
+            if (dollarCount > 1){ braceCount = dollarCount;}
         }
 
         // Opening brace(s)
@@ -1981,13 +1981,13 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
     private bool IsInPatternContext()
     {
-        if (_patternDepth > 0)
-            return true;
+        if (_patternDepth > 0){
+            return true;}
         var c = Cursor;
         while (c != null)
         {
-            if (c.Value is IsPattern)
-                return true;
+            if (c.Value is IsPattern){
+                return true;}
             c = c.Parent;
         }
         return false;
@@ -2759,7 +2759,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     /// </summary>
     private void PrintParameterList<T>(string open, JContainer<T>? container, string close, PrintOutputCapture<P> p) where T : J
     {
-        if (container == null) return;
+        if (container == null){ return;}
         VisitSpace(container.Before, p);
         p.Append(open);
         for (int i = 0; i < container.Elements.Count; i++)
@@ -2981,8 +2981,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             p.Append(directive.Text);
 
             // Restore the newline that the ghost comment occupied
-            if (branchTrailingNewlines[0][d])
-                p.Append('\n');
+            if (branchTrailingNewlines[0][d]){
+                p.Append('\n');}
 
             // Update the active branch stack.
             // Guard against empty stack: recipe visitors can remove nodes whose
@@ -2995,18 +2995,18 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                     break;
                 case PreprocessorDirectiveKind.Elif:
                 case PreprocessorDirectiveKind.Else:
-                    if (stack.Count > 0) stack.Pop();
+                    if (stack.Count > 0){ stack.Pop();}
                     stack.Push(directive.ActiveBranchIndex);
                     break;
                 case PreprocessorDirectiveKind.Endif:
-                    if (stack.Count > 0) stack.Pop();
+                    if (stack.Count > 0){ stack.Pop();}
                     break;
             }
 
             // Emit next section from the active branch
             int activeBranch = stack.Count > 0 ? stack.Peek() : 0;
             // Fall back to primary branch when no branch activates this directive
-            if (activeBranch < 0) activeBranch = 0;
+            if (activeBranch < 0){ activeBranch = 0;}
             int sectionIndex = d + 1;
             if (activeBranch < branchSections.Length &&
                 sectionIndex < branchSections[activeBranch].Count)
@@ -3903,8 +3903,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitPointerDereference(PointerDereference pd, PrintOutputCapture<P> p)
     {
         BeforeSyntax(pd, p);
-        if (pd.Markers.FindFirst<PointerMemberAccess>() == null)
-            p.Append('*');
+        if (pd.Markers.FindFirst<PointerMemberAccess>() == null){
+            p.Append('*');}
         Visit(pd.Expression, p);
         AfterSyntax(pd, p);
         return pd;

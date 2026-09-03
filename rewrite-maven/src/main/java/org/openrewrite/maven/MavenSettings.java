@@ -275,12 +275,16 @@ public class MavenSettings {
         }
 
         private @Nullable ActiveProfiles interpolate(@Nullable ActiveProfiles activeProfiles) {
-            if (activeProfiles == null) return null;
+            if (activeProfiles == null) {
+                return null;
+            }
             return new ActiveProfiles(ListUtils.map(activeProfiles.getActiveProfiles(), this::interpolate));
         }
 
         private @Nullable Mirrors interpolate(@Nullable Mirrors mirrors) {
-            if (mirrors == null) return null;
+            if (mirrors == null) {
+                return null;
+            }
             return new Mirrors(ListUtils.map(mirrors.getMirrors(), this::interpolate));
         }
 
@@ -289,7 +293,9 @@ public class MavenSettings {
         }
 
         private @Nullable Servers interpolate(@Nullable Servers servers) {
-            if (servers == null) return null;
+            if (servers == null) {
+                return null;
+            }
             return new Servers(ListUtils.map(servers.getServers(), this::interpolate));
         }
 
@@ -313,7 +319,9 @@ public class MavenSettings {
         }
 
         private @Nullable Proxies interpolate(@Nullable Proxies proxies) {
-            if (proxies == null) return null;
+            if (proxies == null) {
+                return null;
+            }
             return new Proxies(ListUtils.map(proxies.getProxies(), this::interpolate));
         }
 

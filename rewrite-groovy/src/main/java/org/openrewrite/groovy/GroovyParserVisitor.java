@@ -92,7 +92,7 @@ public class GroovyParserVisitor {
     private final boolean charsetBomMarked;
     private final GroovyTypeMapping typeMapping;
 
-    private int cursor = 0;
+    private int cursor;
 
     /** Maps a trait class name to its synthetic Groovy-generated {@code $Trait$Helper} class. */
     private final Map<String, ClassNode> traitHelpers = new HashMap<>();
@@ -1919,7 +1919,7 @@ public class GroovyParserVisitor {
             queue.add(new J.Break(randomId(),
                     sourceBefore("break"),
                     Markers.EMPTY,
-                    (statement.getLabel() == null) ?
+                    statement.getLabel() == null ?
                             null :
                             new J.Identifier(randomId(),
                                     sourceBefore(statement.getLabel()),
@@ -2242,7 +2242,7 @@ public class GroovyParserVisitor {
             queue.add(new J.Continue(randomId(),
                     sourceBefore("continue"),
                     Markers.EMPTY,
-                    (statement.getLabel() == null) ?
+                    statement.getLabel() == null ?
                             null :
                             new J.Identifier(randomId(),
                                     sourceBefore(statement.getLabel()),
@@ -2290,7 +2290,7 @@ public class GroovyParserVisitor {
                 TypeTree typeExpr = visitVariableExpressionType(firstVar);
 
                 List<VariableExpression> tupleVarExprs = tupleExpressions.stream()
-                        .map(e -> (VariableExpression) e)
+                        .map(VariableExpression.class::cast)
                         .collect(toList());
                 G.TupleExpression tupleDeclarator = parseTupleExpression(tupleVarExprs);
 
@@ -2730,10 +2730,9 @@ public class GroovyParserVisitor {
                 }
 
                 Space prefix = whitespace();
-                boolean implicitCall = (methodName != null && cursor < source.length() &&
+                boolean implicitCall = methodName != null && cursor < source.length() &&
                         source.charAt(cursor) == '(' && (cursor + methodName.length() > source.length() ||
-                        !methodName.equals(source.substring(cursor, cursor + methodName.length())))
-                );
+                        !methodName.equals(source.substring(cursor, cursor + methodName.length())));
                 Space spaceBeforeArgs = null;
                 if (implicitCall) {
                     // This is an implicit call() method - create identifier but it doesn't get printed
@@ -2980,7 +2979,7 @@ public class GroovyParserVisitor {
                 int saveCursor = cursor;
                 J name = doVisit(prop.getProperty());
                 if (name instanceof J.Literal) {
-                    J.Literal nameLiteral = ((J.Literal) name);
+                    J.Literal nameLiteral = (J.Literal) name;
                     name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameLiteral.getValueSource(), nameLiteral.getType(), null);
                 } else if (name instanceof G.GString) {
                     name = gStringAsIdentifier((G.GString) name, saveCursor);
@@ -3093,10 +3092,10 @@ public class GroovyParserVisitor {
                     .filter(GroovyParserVisitor.this::appearsInSource)
                     .collect(toList());
             boolean isDestructuringLhs = !visibleExpressions.isEmpty() &&
-                    visibleExpressions.stream().allMatch(e -> e instanceof VariableExpression);
+                    visibleExpressions.stream().allMatch(VariableExpression.class::isInstance);
             if (isDestructuringLhs) {
                 List<VariableExpression> varExprs = visibleExpressions.stream()
-                        .map(e -> (VariableExpression) e)
+                        .map(VariableExpression.class::cast)
                         .collect(toList());
                 queue.add(parseTupleExpression(varExprs));
                 return;
@@ -3271,8 +3270,8 @@ public class GroovyParserVisitor {
 
             // Strangely, groovy parses the finally's block as a BlockStatement which contains another BlockStatement
             // The true contents of the block are within the first statement of this apparently pointless enclosing BlockStatement
-            JLeftPadded<J.Block> finally_ = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
-                    padLeft(sourceBefore("finally"), doVisit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0)));
+            JLeftPadded<J.Block> finally_ = node.getFinallyStatement() instanceof BlockStatement ?
+                    padLeft(sourceBefore("finally"), doVisit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0))) : null;
 
             //noinspection ConstantConditions
             queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finally_));
@@ -3288,13 +3287,10 @@ public class GroovyParserVisitor {
             cursor += typeToken.length();
 
             J.Unary.Type operator = null;
-            switch (typeToken) {
-                case "++":
-                    operator = J.Unary.Type.PostIncrement;
-                    break;
-                case "--":
-                    operator = J.Unary.Type.PostDecrement;
-                    break;
+            if ("++".equals(typeToken)) {
+                operator = J.Unary.Type.PostIncrement;
+            } else if ("--".equals(typeToken)) {
+                operator = J.Unary.Type.PostDecrement;
             }
             assert operator != null;
 
@@ -3344,7 +3340,7 @@ public class GroovyParserVisitor {
                 return visitTypeTree(expression.getOriginType());
             }
 
-            JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
+            JavaType type = typeMapping.type(staticType((org.codehaus.groovy.ast.expr.Expression) expression));
             Space prefix = whitespace();
             String typeName = "";
 
@@ -3711,9 +3707,13 @@ public class GroovyParserVisitor {
      * BlockStatement -> BlockStatement -> [resourceDecl, sentinel, innerTryCatchStatement]
      */
     private static boolean isDesugaredResourceBlock(org.codehaus.groovy.ast.stmt.Statement stmt) {
-        if (!(stmt instanceof BlockStatement)) return false;
+        if (!(stmt instanceof BlockStatement)) {
+            return false;
+        }
         List<org.codehaus.groovy.ast.stmt.Statement> stmts = ((BlockStatement) stmt).getStatements();
-        if (stmts.isEmpty() || !(stmts.get(0) instanceof BlockStatement)) return false;
+        if (stmts.isEmpty() || !(stmts.get(0) instanceof BlockStatement)) {
+            return false;
+        }
         List<org.codehaus.groovy.ast.stmt.Statement> inner = ((BlockStatement) stmts.get(0)).getStatements();
         return inner.size() >= 3 && inner.get(inner.size() - 1) instanceof TryCatchStatement;
     }
@@ -4306,7 +4306,9 @@ public class GroovyParserVisitor {
             if (!pkg.isEmpty()) {
                 packageSegmentCount = 1;
                 for (int i = 0; i < pkg.length(); i++) {
-                    if (pkg.charAt(i) == '.') packageSegmentCount++;
+                    if (pkg.charAt(i) == '.') {
+                        packageSegmentCount++;
+                    }
                 }
             }
         }
@@ -4529,7 +4531,9 @@ public class GroovyParserVisitor {
             int lineNo = 1;
             while (offset < importSource.length()) {
                 int importIndex = importSource.indexOf("import", offset);
-                if (importIndex == -1) break;
+                if (importIndex == -1) {
+                    break;
+                }
                 lineNo += StringUtils.countOccurrences(importSource.substring(offset, importIndex), "\n");
 
                 int maybeStaticIndex = indexOfNextNonWhitespace(importIndex + 6, importSource);

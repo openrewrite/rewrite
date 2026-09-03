@@ -63,8 +63,8 @@ public class TreeRandomIdBenchmark {
     @Threads(1)
     public void inlineThreadLocalRandom_singleThread(Blackhole bh) {
         ThreadLocalRandom r = ThreadLocalRandom.current();
-        long msb = (r.nextLong() & 0xffffffffffff0fffL) | 0x0000000000004000L;
-        long lsb = (r.nextLong() & 0x3fffffffffffffffL) | 0x8000000000000000L;
+        long msb = (r.nextLong() & 0xFFFFFFFFFFFF0FFFL) | 0x0000000000004000L;
+        long lsb = (r.nextLong() & 0x3FFFFFFFFFFFFFFFL) | 0x8000000000000000L;
         bh.consume(new UUID(msb, lsb));
     }
 
@@ -72,8 +72,8 @@ public class TreeRandomIdBenchmark {
     @Threads(8)
     public void inlineThreadLocalRandom_multiThread(Blackhole bh) {
         ThreadLocalRandom r = ThreadLocalRandom.current();
-        long msb = (r.nextLong() & 0xffffffffffff0fffL) | 0x0000000000004000L;
-        long lsb = (r.nextLong() & 0x3fffffffffffffffL) | 0x8000000000000000L;
+        long msb = (r.nextLong() & 0xFFFFFFFFFFFF0FFFL) | 0x0000000000004000L;
+        long lsb = (r.nextLong() & 0x3FFFFFFFFFFFFFFFL) | 0x8000000000000000L;
         bh.consume(new UUID(msb, lsb));
     }
 

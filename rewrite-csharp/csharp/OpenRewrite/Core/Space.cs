@@ -43,10 +43,10 @@ public sealed class Space(string whitespace, IList<Comment> comments)
     {
         if (comments.Count == 0)
         {
-            if (string.IsNullOrEmpty(whitespace))
-                return Empty;
-            if (whitespace.Length <= MaxFlyweightLength)
-                return Flyweights.GetOrAdd(whitespace, static ws => new Space(ws, []));
+            if (string.IsNullOrEmpty(whitespace)){
+                return Empty;}
+            if (whitespace.Length <= MaxFlyweightLength){
+                return Flyweights.GetOrAdd(whitespace, static ws => new Space(ws, []));}
         }
         return new Space(whitespace, comments);
     }
@@ -62,8 +62,8 @@ public sealed class Space(string whitespace, IList<Comment> comments)
     /// </summary>
     public static Space FormatWithComments(string formatting)
     {
-        if (string.IsNullOrEmpty(formatting))
-            return Empty;
+        if (string.IsNullOrEmpty(formatting)){
+            return Empty;}
 
         var prefix = new System.Text.StringBuilder();
         var comment = new System.Text.StringBuilder();

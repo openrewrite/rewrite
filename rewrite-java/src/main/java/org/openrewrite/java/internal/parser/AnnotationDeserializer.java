@@ -33,7 +33,7 @@ public class AnnotationDeserializer {
      */
     private static class Parser {
         private final String input;
-        private int pos = 0;
+        private int pos;
 
         Parser(String input) {
             this.input = input;
@@ -81,9 +81,13 @@ public class AnnotationDeserializer {
             int contextEnd = Math.min(input.length(), errorPos + 20);
             if (contextStart > 0 || contextEnd < input.length()) {
                 errorMsg.append("\nContext: ");
-                if (contextStart > 0) errorMsg.append("...");
+                if (contextStart > 0) {
+                    errorMsg.append("...");
+                }
                 errorMsg.append(input, contextStart, contextEnd);
-                if (contextEnd < input.length()) errorMsg.append("...");
+                if (contextEnd < input.length()) {
+                    errorMsg.append("...");
+                }
             }
             return errorMsg.toString();
         }
@@ -95,7 +99,9 @@ public class AnnotationDeserializer {
 
                 // Parse attribute name (identifier)
                 String attributeName = parseIdentifier();
-                if (attributeName.isEmpty()) break;
+                if (attributeName.isEmpty()) {
+                    break;
+                }
 
                 // Check for '=' - if not found, this is a value-only attribute
                 expect('=');

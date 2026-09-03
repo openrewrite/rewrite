@@ -42,7 +42,9 @@ const SYNC_ARRAY_METHODS = new Set([
  * Looks for types like Promise<T>, PromiseLike<T>, or the Promise class itself.
  */
 function isPromiseType(type?: Type): boolean {
-    if (!type) return false;
+  if (!type) {
+    return false
+  };
 
     // Check for Class type with Promise name
     if (Type.isClass(type)) {
@@ -81,7 +83,9 @@ function hasAsyncModifier(arrowFunc: JS.ArrowFunction): boolean {
  * Check if a function type returns a Promise.
  */
 function functionTypeReturnsPromise(funcType: Type): boolean {
-    if (!Type.isFunctionType(funcType)) return false;
+  if (!Type.isFunctionType(funcType)) {
+    return false
+  };
 
     const clazz = funcType as Type.Class;
     if (clazz.typeParameters && clazz.typeParameters.length > 0) {
@@ -116,7 +120,9 @@ function callbackReturnsPromise(arg: any): boolean {
     // Handle RightPadded wrapper
     const element = arg?.element ?? arg;
 
-    if (!element) return false;
+  if (!element) {
+    return false
+  };
 
     // Check if it's an arrow function
     if (element.kind === JS.Kind.ArrowFunction) {

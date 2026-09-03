@@ -35,11 +35,11 @@ public static class CSharpParenthesizeVisitor
         // Fast exit: simple expression types never need parenthesization
         if (newTree is not (Binary or Unary or Ternary or Assignment or AssignmentOperation
             or TypeCast or CsBinary or CsUnary or IsPattern or RangeExpression
-            or SwitchExpression or WithExpression or Lambda))
-            return newTree;
+            or SwitchExpression or WithExpression or Lambda)){
+            return newTree;}
 
         var originalTree = cursor.Value;
-        if (originalTree is not Tree original) return newTree;
+        if (originalTree is not Tree original){ return newTree;}
 
         // Give newTree the original's ID so the non-recursive visitor can locate it
         var newTreeWithOriginalId = (Expression)((Tree)newTree).WithId(original.Id);
@@ -48,8 +48,8 @@ public static class CSharpParenthesizeVisitor
         var result = new CSharpParenthesizeVisitor<int>(false)
             .Visit(newTreeWithOriginalId, 0, cursor.Parent!);
 
-        if (result is Parentheses<Expression>)
-            return CSharpPrecedences.Parenthesize(newTree);
+        if (result is Parentheses<Expression>){
+            return CSharpPrecedences.Parenthesize(newTree);}
 
         return newTree;
     }
@@ -178,8 +178,8 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
 
     private J MaybeWrapBinaryLike(Expression expr)
     {
-        if (NeedsParenthesesInContext(expr))
-            return CSharpPrecedences.Parenthesize(expr);
+        if (NeedsParenthesesInContext(expr)){
+            return CSharpPrecedences.Parenthesize(expr);}
         return expr;
     }
 
@@ -191,12 +191,12 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         // All prefix unary operators are at the same precedence level (13),
         // so a unary inside another unary is always unambiguous — no parens needed.
         // This covers !!x, -(-x), -(~x), ~(!x), etc.
-        if (parent is Unary or CsUnary)
-            return expr;
+        if (parent is Unary or CsUnary){
+            return expr;}
 
         // Unary inside binary/other contexts follows normal precedence rules
-        if (NeedsParenthesesInContext(expr))
-            return CSharpPrecedences.Parenthesize(expr);
+        if (NeedsParenthesesInContext(expr)){
+            return CSharpPrecedences.Parenthesize(expr);}
 
         return expr;
     }
@@ -209,8 +209,8 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         // Ternary (prec -1) needs parens inside most expression contexts.
         // Ternary-inside-ternary: C# parses `a ? b : c ? d : e` right-to-left,
         // so a ternary used as the condition of another ternary needs parens.
-        if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern or Ternary)
-            return CSharpPrecedences.Parenthesize(expr);
+        if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern or Ternary){
+            return CSharpPrecedences.Parenthesize(expr);}
 
         return expr;
     }
@@ -221,8 +221,8 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parent = parentCursor.Value;
 
         // Assignment/AssignmentOperation/Lambda need parens inside Binary, Unary, Ternary, CsBinary, CsUnary, IsPattern
-        if (parent is Binary or Unary or Ternary or CsBinary or CsUnary or IsPattern)
-            return CSharpPrecedences.Parenthesize(expr);
+        if (parent is Binary or Unary or Ternary or CsBinary or CsUnary or IsPattern){
+            return CSharpPrecedences.Parenthesize(expr);}
 
         return expr;
     }
@@ -232,8 +232,8 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parentCursor = Cursor.ParentTree;
         var parent = parentCursor.Value;
 
-        if (parent is Unary or CsUnary)
-            return true;
+        if (parent is Unary or CsUnary){
+            return true;}
 
         if (parent is Binary parentBinary)
         {
@@ -251,8 +251,8 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         {
             // CsBinary with Or/And inside IsPattern is a pattern combinator, not a
             // boolean expression — it must NOT be wrapped in parentheses.
-            if (expr is CsBinary csb && csb.Operator.Element is CsBinary.OperatorType.Or or CsBinary.OperatorType.And)
-                return false;
+            if (expr is CsBinary csb && csb.Operator.Element is CsBinary.OperatorType.Or or CsBinary.OperatorType.And){
+                return false;}
 
             return expr is Binary or CsBinary or Ternary or Assignment or AssignmentOperation or Lambda;
         }

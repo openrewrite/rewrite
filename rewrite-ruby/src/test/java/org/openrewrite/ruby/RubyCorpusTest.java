@@ -106,7 +106,7 @@ public class RubyCorpusTest {
         StringBuilder report = new StringBuilder();
         report.append("Ruby corpus: ").append(root).append('\n');
         report.append(String.format("files=%d parsed=%d (%.1f%%) failed=%d%n",
-                paths.size(), parsed, paths.isEmpty() ? 0d : 100d * parsed / paths.size(), failed));
+                paths.size(), parsed, paths.isEmpty() ? 0D : 100D * parsed / paths.size(), failed));
         report.append("top failure causes:\n");
         causes.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue(Comparator.reverseOrder()))

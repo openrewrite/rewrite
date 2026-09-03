@@ -337,8 +337,8 @@ public class MinimumViableSpacingVisitor : CSharpVisitor<int>
     /// </summary>
     private static J EnsureSpace(J element)
     {
-        if (!element.Prefix.IsEmpty)
-            return element;
+        if (!element.Prefix.IsEmpty){
+            return element;}
         return (J)((dynamic)element).WithPrefix(element.Prefix.WithWhitespace(" "));
     }
 

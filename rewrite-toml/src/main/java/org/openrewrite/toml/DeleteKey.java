@@ -75,7 +75,9 @@ public class DeleteKey extends Recipe {
                         prevDeleted = false;
                     }
                     TomlRightPadded<Toml> newRp = visited == rp.getElement() ? rp : rp.withElement(visited);
-                    if (newRp != rp) changed = true;
+                    if (newRp != rp) {
+                        changed = true;
+                    }
                     result.add(newRp);
                 }
                 return changed ? t.getPadding().withValues(result) : t;

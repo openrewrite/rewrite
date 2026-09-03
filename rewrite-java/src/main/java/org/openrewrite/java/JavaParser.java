@@ -45,10 +45,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
-import static java.util.Collections.synchronizedMap;
-import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
@@ -243,10 +240,10 @@ public interface JavaParser extends Parser {
         protected Collection<Input> dependsOn;
 
         protected Charset charset = Charset.defaultCharset();
-        protected boolean logCompilationWarningsAndErrors = false;
+        protected boolean logCompilationWarningsAndErrors;
         protected final List<NamedStyles> styles = new ArrayList<>();
 
-        public Builder() {
+        protected Builder() {
             super(J.CompilationUnit.class);
         }
 
@@ -489,7 +486,7 @@ class RuntimeClasspathCache {
 @UtilityClass
 class JdkParserBuilderCache {
     // Cached supplier for the parser builder - initialized on first access
-    private static volatile @Nullable Supplier<JavaParser.Builder<? extends JavaParser, ?>> cachedBuilderSupplier = null;
+    private static volatile @Nullable Supplier<JavaParser.Builder<? extends JavaParser, ?>> cachedBuilderSupplier;
 
     static JavaParser.Builder<? extends JavaParser, ?> getBuilder() {
         Supplier<JavaParser.Builder<? extends JavaParser, ?>> supplier = cachedBuilderSupplier;

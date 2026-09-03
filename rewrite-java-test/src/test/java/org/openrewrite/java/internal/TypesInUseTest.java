@@ -88,7 +88,7 @@ class TypesInUseTest implements RewriteTest {
 
                 // Fully qualified Javadoc references stay out of the import-retention set (#5738)...
                 assertThat(tiu.getTypesInUse().stream()
-                  .filter(t -> t instanceof JavaType.FullyQualified)
+                  .filter(JavaType.FullyQualified.class::isInstance)
                   .map(t -> ((JavaType.FullyQualified) t).getFullyQualifiedName()))
                   .doesNotContain("org.openrewrite.other.Target");
 

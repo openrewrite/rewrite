@@ -259,9 +259,9 @@ public class PipfileFile implements PythonDependencyFile {
                         value);
 
                 List<Toml> values = t.getValues();
-                Space entryPrefix = !values.isEmpty()
-                        ? values.get(values.size() - 1).getPrefix()
-                        : Space.format("\n");
+                Space entryPrefix = values.isEmpty()
+                        ? Space.format("\n")
+                        : values.get(values.size() - 1).getPrefix();
                 newKv = newKv.withPrefix(entryPrefix);
 
                 return t.withValues(concat(values, newKv));

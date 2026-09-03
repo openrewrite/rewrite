@@ -270,7 +270,7 @@ public final class Assertions {
     public static ThrowingConsumer<K.CompilationUnit> spaceConscious(SourceSpec<K.CompilationUnit> spec) {
         return cu -> {
             K.CompilationUnit visited = (K.CompilationUnit) new KotlinIsoVisitor<Integer>() {
-                int id = 0;
+                int id;
 
                 @Override
                 public Space visitSpace(Space space, KSpace.Location loc, Integer integer) {
@@ -598,7 +598,7 @@ public final class Assertions {
         }
 
         private boolean isValidated(J.Identifier i) {
-            J j = getCursor().dropParentUntil(it -> it instanceof J).getValue();
+            J j = getCursor().dropParentUntil(J.class::isInstance).getValue();
             // TODO: replace with AnnotationUseSite tree.
             return !(j instanceof K.Return);
         }

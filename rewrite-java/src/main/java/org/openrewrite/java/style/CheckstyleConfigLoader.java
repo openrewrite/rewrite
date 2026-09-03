@@ -38,7 +38,7 @@ import static java.util.stream.Collectors.*;
 import static org.openrewrite.java.style.Checkstyle.defaultBlockPolicy;
 import static org.openrewrite.java.style.Checkstyle.defaultOperatorWrapStyleOption;
 
-public class CheckstyleConfigLoader {
+public final class CheckstyleConfigLoader {
     private CheckstyleConfigLoader() {
     }
 
@@ -797,7 +797,7 @@ public class CheckstyleConfigLoader {
                             null, null,
                             affectsDoWhile ? new WrappingAndBracesStyle.DoWhileStatement(null, alone) : null,
                             null, null,
-                            (affectsTry || affectsCatch || affectsFinally) ?
+                            affectsTry || affectsCatch || affectsFinally ?
                                     new WrappingAndBracesStyle.TryStatement(
                                             affectsCatch ? alone : null,
                                             affectsFinally ? alone : null,

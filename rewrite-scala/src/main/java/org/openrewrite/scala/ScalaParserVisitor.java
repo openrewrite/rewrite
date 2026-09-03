@@ -95,7 +95,7 @@ public class ScalaParserVisitor {
         // Don't include empty package declarations
         if (packageDecl != null && packageDecl.getExpression() instanceof J.Identifier) {
             J.Identifier id = (J.Identifier) packageDecl.getExpression();
-            if (id.getSimpleName().isEmpty() || id.getSimpleName().equals("<empty>")) {
+            if (id.getSimpleName().isEmpty() || "<empty>".equals(id.getSimpleName())) {
                 packageDecl = null;
             }
         }

@@ -23,11 +23,7 @@ import org.openrewrite.javascript.NodeRegistryCredentials;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Resolves the npm registries (and their credentials) a project locks against: host-supplied

@@ -61,7 +61,7 @@ public class Cursor {
     /**
      * @return true if this cursor is the root of the tree, false otherwise
      */
-    final public boolean isRoot() {
+    public final boolean isRoot() {
         return ROOT_VALUE.equals(value);
     }
 
@@ -90,7 +90,7 @@ public class Cursor {
                 Spliterator.IMMUTABLE), false);
     }
 
-    private static class CursorPathIterator implements Iterator<Cursor> {
+    private static final class CursorPathIterator implements Iterator<Cursor> {
 
         private Predicate<Cursor> filter = c -> true;
         private Cursor cursor;
@@ -127,7 +127,7 @@ public class Cursor {
         }
     }
 
-    private static class CursorIterator implements Iterator<Object> {
+    private static final class CursorIterator implements Iterator<Object> {
         private Cursor cursor;
 
         private Predicate<Object> filter = v -> true;

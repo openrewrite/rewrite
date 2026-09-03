@@ -35,9 +35,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
-import static java.util.Collections.newSetFromMap;
+import static java.util.Collections.*;
 import static org.openrewrite.java.tree.JavaType.ShallowClass.build;
 
 /**

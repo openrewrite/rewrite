@@ -40,9 +40,9 @@ public partial interface J
         var method = WithPrefixCache.GetOrAdd(node.GetType(), type =>
             type.GetMethod("WithPrefix", [typeof(Space)]));
 
-        if (method == null)
+        if (method == null){
             throw new InvalidOperationException(
-                $"{node.GetType().FullName} does not expose WithPrefix(Space), so its prefix cannot be set.");
+                $"{node.GetType().FullName} does not expose WithPrefix(Space), so its prefix cannot be set.");}
 
         return (T)method.Invoke(node, [prefix])!;
     }
@@ -59,9 +59,9 @@ public partial interface J
         var method = WithMarkersCache.GetOrAdd(node.GetType(), type =>
             type.GetMethod("WithMarkers", [typeof(Markers)]));
 
-        if (method == null)
+        if (method == null){
             throw new InvalidOperationException(
-                $"{node.GetType().FullName} does not expose WithMarkers(Markers), so markers cannot be attached to it.");
+                $"{node.GetType().FullName} does not expose WithMarkers(Markers), so markers cannot be attached to it.");}
 
         return (T)method.Invoke(node, [markers])!;
     }
@@ -75,8 +75,8 @@ public partial interface J
         var method = WithIdCache.GetOrAdd(node.GetType(), type =>
             type.GetMethod("WithId", [typeof(Guid)]));
 
-        if (method != null)
-            return (T)method.Invoke(node, [id])!;
+        if (method != null){
+            return (T)method.Invoke(node, [id])!;}
 
         return node;
     }

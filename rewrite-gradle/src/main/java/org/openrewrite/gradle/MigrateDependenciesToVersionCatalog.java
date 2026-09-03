@@ -80,7 +80,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
         final Set<String> configurations = new LinkedHashSet<>();
         final Set<String> propertyNamesToRemove = new LinkedHashSet<>();
         final Map<String, String> propertyValues = new LinkedHashMap<>();
-        boolean catalogExists = false;
+        boolean catalogExists;
     }
 
     static class DependencyCoordinates {
@@ -289,7 +289,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
         TomlParser parser = TomlParser.builder().build();
         Toml.Document versionCatalog = parser.parse(ctx, tomlContent)
                 .findFirst()
-                .map(sourceFile -> (Toml.Document) sourceFile)
+                .map(Toml.Document.class::cast)
                 .map(doc -> doc.withSourcePath(Paths.get(CATALOG_PATH)))
                 .orElseThrow(() -> new IllegalStateException("Failed to create version catalog file"));
 
@@ -610,7 +610,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
     private class KotlinGradleFileVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final DependencyAccumulator acc;
-        private boolean removedPropertyDelegations = false;
+        private boolean removedPropertyDelegations;
 
         KotlinGradleFileVisitor(DependencyAccumulator acc) {
             this.acc = acc;

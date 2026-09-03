@@ -133,7 +133,7 @@ public class CsDocCommentPrinter<P> : CsDocCommentVisitor<PrintOutputCapture<P>>
 
     private void VisitAll(IList<CsDocComment>? nodes, PrintOutputCapture<P> p)
     {
-        if (nodes == null) return;
+        if (nodes == null){ return;}
         foreach (var node in nodes)
         {
             Visit(node, p);

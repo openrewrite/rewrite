@@ -21,8 +21,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
-import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
+import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.json.internal.JsonPrinter;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -30,15 +30,7 @@ import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.ArrayDeque;
-import java.util.Arrays;
-import java.util.Deque;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
@@ -936,7 +928,7 @@ public final class NpmLockPatcher implements LockPatcher {
         }
         if (wt.isPeerDependenciesChanged()) {
             Map<String, String> peers = wt.getPeerDependencies();
-            JsonNode value = (peers == null || peers.isEmpty()) ? null : JSON.valueToTree(peers);
+            JsonNode value = peers == null || peers.isEmpty() ? null : JSON.valueToTree(peers);
             entry = writeObjectMember(name, packages, entry, "peerDependencies", value);
         }
         if (wt.isPeerDependenciesMetaChanged()) {
@@ -969,7 +961,7 @@ public final class NpmLockPatcher implements LockPatcher {
     /** Add, replace, or remove the entry's {@code engines} object at npm's field position (byte-exact). */
     private Json.JsonObject writeEngines(String name, Json.JsonObject packages, Json.JsonObject entry,
                                                 @Nullable Map<String, String> engines) {
-        JsonNode value = (engines == null || engines.isEmpty()) ? null : JSON.valueToTree(engines);
+        JsonNode value = engines == null || engines.isEmpty() ? null : JSON.valueToTree(engines);
         return writeObjectMember(name, packages, entry, "engines", value);
     }
 

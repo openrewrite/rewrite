@@ -15,11 +15,11 @@
  */
 package org.openrewrite.ruby.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitBraces;
@@ -121,13 +121,10 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitAssignmentOperation(Rb.AssignmentOperation assignOp, PrintOutputCapture<P> p) {
         String keyword = "";
-        switch (assignOp.getOperator()) {
-            case And:
-                keyword = "&&=";
-                break;
-            case Or:
-                keyword = "||=";
-                break;
+        if (assignOp.getOperator() == Rb.AssignmentOperation.Type.And) {
+            keyword = "&&=";
+        } else if (assignOp.getOperator() == Rb.AssignmentOperation.Type.Or) {
+            keyword = "||=";
         }
         beforeSyntax(assignOp, Space.Location.ASSIGNMENT_OPERATION_PREFIX, p);
         visit(assignOp.getVariable(), p);

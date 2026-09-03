@@ -60,6 +60,6 @@ public class AutodetectGeneralFormatStyle extends XmlVisitor<LineEndingsCount> {
 }
 
 class LineEndingsCount {
-    public int crlf = 0;
-    public int lf = 0;
+    public int crlf;
+    public int lf;
 }

@@ -72,8 +72,8 @@ public class Cursor
         var c = this;
         while (c != null)
         {
-            if (c.Value is T value)
-                return value;
+            if (c.Value is T value){
+                return value;}
             c = c.Parent;
         }
         return default;

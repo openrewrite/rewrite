@@ -71,7 +71,9 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
@@ -87,7 +89,9 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                    if (marker == null) return tree;
+                    if (marker == null) {
+                        return tree;
+                    }
                     NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                 }
@@ -98,19 +102,30 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
 
     private @Nullable Set<String> findContainingScopes(SourceFile pkg) {
         NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return null;
+        if (marker == null) {
+            return null;
+        }
         Set<String> result = new LinkedHashSet<>();
         addIfPresent(result, "dependencies", marker.getDependencies());
         addIfPresent(result, "devDependencies", marker.getDevDependencies());
         addIfPresent(result, "peerDependencies", marker.getPeerDependencies());
         addIfPresent(result, "optionalDependencies", marker.getOptionalDependencies());
         addIfPresent(result, "bundledDependencies", marker.getBundledDependencies());
-        if (scope != null) result.retainAll(singleton(scope));
+        if (scope != null) {
+            result.retainAll(singleton(scope));
+        }
         return result.isEmpty() ? null : result;
     }
 
     private void addIfPresent(Set<String> out, String name, @Nullable List<Dependency> deps) {
-        if (deps != null) for (Dependency d : deps) if (packageName.equals(d.getName())) { out.add(name); return; }
+        if (deps != null) {
+            for (Dependency d : deps) {
+                if (packageName.equals(d.getName())) {
+                    out.add(name);
+                    return;
+                }
+            }
+        }
     }
 
     @Override
@@ -119,7 +134,9 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
@@ -141,16 +158,24 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 }
 
                 Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
+                if (packagePath == null) {
+                    return tree;
+                }
                 NodeDependencyScan.ProjectState rootPs = acc.projects.get(packagePath);
-                if (rootPs == null) return tree;
+                if (rootPs == null) {
+                    return tree;
+                }
 
                 for (Path importer : NodeDependencyScan.lockImporters(acc, packagePath, rootPs)) {
                     NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
-                    if (ips == null) continue;
+                    if (ips == null) {
+                        continue;
+                    }
                     if (ips.modifiedPackageJson == null) {
                         SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
-                        if (pkg == null) pkg = ips.capturedPackageJson;
+                        if (pkg == null) {
+                            pkg = ips.capturedPackageJson;
+                        }
                         if (pkg != null && (ips.scopesContainingPackage = findContainingScopes(pkg)) != null) {
                             ensureComputed(ips, pkg, ctx);
                             if (ips.modifiedPackageJson != null) {
@@ -171,8 +196,12 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
             }
 
             private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
-                if (ps.modifiedPackageJson != null) return;
-                if (ps.scopesContainingPackage == null) return;
+                if (ps.modifiedPackageJson != null) {
+                    return;
+                }
+                if (ps.scopesContainingPackage == null) {
+                    return;
+                }
                 Set<String> scopes = ps.scopesContainingPackage;
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg,

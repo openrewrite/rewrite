@@ -19,8 +19,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
-import org.junit.jupiter.api.Test;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.ClasspathScanningLoader;
 import org.openrewrite.config.OptionDescriptor;
@@ -54,7 +54,7 @@ class RecipesThatMadeChangesTest {
 
         // The codec decomposes the marker, so no message may carry a Recipe instance inline.
         assertThat(sent).extracting(RpcObjectData::getValue)
-          .noneMatch(v -> v instanceof Recipe);
+          .noneMatch(Recipe.class::isInstance);
         assertThat(sent).extracting(RpcObjectData::getValueType)
           .filteredOn(Objects::nonNull)
           .containsOnly(RecipesThatMadeChanges.class.getName(), RecipeThatMadeChanges.class.getName());

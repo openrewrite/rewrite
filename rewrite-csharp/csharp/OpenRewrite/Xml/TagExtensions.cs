@@ -39,11 +39,11 @@ public static class TagExtensions
     /// </summary>
     public static Tag? GetChild(this Tag tag, string name)
     {
-        if (tag.ContentList == null) return null;
+        if (tag.ContentList == null){ return null;}
         foreach (var content in tag.ContentList)
         {
-            if (content is Tag child && child.Name == name)
-                return child;
+            if (content is Tag child && child.Name == name){
+                return child;}
         }
         return null;
     }
@@ -54,11 +54,11 @@ public static class TagExtensions
     /// </summary>
     public static string? GetValue(this Tag tag)
     {
-        if (tag.ContentList == null) return null;
+        if (tag.ContentList == null){ return null;}
         foreach (var content in tag.ContentList)
         {
-            if (content is CharData charData)
-                return charData.Text;
+            if (content is CharData charData){
+                return charData.Text;}
         }
         return null;
     }
@@ -70,8 +70,8 @@ public static class TagExtensions
     {
         foreach (var attr in tag.Attributes)
         {
-            if (string.Equals(attr.Key.Name, attrName, StringComparison.OrdinalIgnoreCase))
-                return attr.Val.Val;
+            if (string.Equals(attr.Key.Name, attrName, StringComparison.OrdinalIgnoreCase)){
+                return attr.Val.Val;}
         }
         return null;
     }
@@ -98,11 +98,11 @@ public static class TagExtensions
     /// </summary>
     public static IEnumerable<Tag> GetChildren(this Tag tag)
     {
-        if (tag.ContentList == null) yield break;
+        if (tag.ContentList == null){ yield break;}
         foreach (var content in tag.ContentList)
         {
-            if (content is Tag child)
-                yield return child;
+            if (content is Tag child){
+                yield return child;}
         }
     }
 }

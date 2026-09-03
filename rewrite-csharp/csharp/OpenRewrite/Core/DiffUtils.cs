@@ -31,8 +31,8 @@ public static class DiffUtils
     /// </summary>
     public static string UnifiedDiff(string before, string after, string path)
     {
-        if (before == after)
-            return "";
+        if (before == after){
+            return "";}
 
         var aLines = SplitLines(before);
         var bLines = SplitLines(after);
@@ -44,20 +44,20 @@ public static class DiffUtils
         sb.AppendLine($"--- a/{path}");
         sb.AppendLine($"+++ b/{path}");
 
-        foreach (var hunk in hunks)
-            FormatHunk(sb, edits, hunk, aLines, bLines);
+        foreach (var hunk in hunks){
+            FormatHunk(sb, edits, hunk, aLines, bLines);}
 
         return sb.ToString();
     }
 
     private static string[] SplitLines(string text)
     {
-        if (text.Length == 0)
-            return [];
+        if (text.Length == 0){
+            return [];}
 
         var lines = text.Split('\n');
-        if (lines.Length > 0 && lines[^1] == "")
-            return lines[..^1];
+        if (lines.Length > 0 && lines[^1] == ""){
+            return lines[..^1];}
         return lines;
     }
 
@@ -110,11 +110,11 @@ public static class DiffUtils
         var n = b.Length;
         var dp = new int[m + 1, n + 1];
 
-        for (var i = m - 1; i >= 0; i--)
-        for (var j = n - 1; j >= 0; j--)
+        for (var i = m - 1; i >= 0; i--){
+        for (var j = n - 1; j >= 0; j--){
             dp[i, j] = a[i] == b[j]
                 ? dp[i + 1, j + 1] + 1
-                : Math.Max(dp[i + 1, j], dp[i, j + 1]);
+                : Math.Max(dp[i + 1, j], dp[i, j + 1]);}}
 
         return dp;
     }
@@ -140,11 +140,11 @@ public static class DiffUtils
             }
         }
 
-        if (rangeStart.HasValue)
-            changeRanges.Add((rangeStart.Value, edits.Count - 1));
+        if (rangeStart.HasValue){
+            changeRanges.Add((rangeStart.Value, edits.Count - 1));}
 
-        if (changeRanges.Count == 0)
-            return [];
+        if (changeRanges.Count == 0){
+            return [];}
 
         // Expand each range by context lines and merge overlapping ranges
         var hunks = new List<HunkRange>();
@@ -185,24 +185,24 @@ public static class DiffUtils
             switch (edit.Kind)
             {
                 case EditKind.Equal:
-                    if (aStart < 0) aStart = edit.AIndex;
-                    if (bStart < 0) bStart = edit.BIndex;
+                    if (aStart < 0){ aStart = edit.AIndex;}
+                    if (bStart < 0){ bStart = edit.BIndex;}
                     aCount++;
                     bCount++;
                     break;
                 case EditKind.Delete:
-                    if (aStart < 0) aStart = edit.AIndex;
+                    if (aStart < 0){ aStart = edit.AIndex;}
                     aCount++;
                     break;
                 case EditKind.Insert:
-                    if (bStart < 0) bStart = edit.BIndex;
+                    if (bStart < 0){ bStart = edit.BIndex;}
                     bCount++;
                     break;
             }
         }
 
-        if (aStart < 0) aStart = 0;
-        if (bStart < 0) bStart = 0;
+        if (aStart < 0){ aStart = 0;}
+        if (bStart < 0){ bStart = 0;}
 
         sb.AppendLine($"@@ -{aStart + 1},{aCount} +{bStart + 1},{bCount} @@");
 

@@ -30,8 +30,8 @@ public interface Tree {
 
     static UUID randomId() {
         ThreadLocalRandom r = ThreadLocalRandom.current();
-        long msb = (r.nextLong() & 0xffffffffffff0fffL) | 0x0000000000004000L; // version 4
-        long lsb = (r.nextLong() & 0x3fffffffffffffffL) | 0x8000000000000000L; // variant IETF
+        long msb = (r.nextLong() & 0xFFFFFFFFFFFF0FFFL) | 0x0000000000004000L; // version 4
+        long lsb = (r.nextLong() & 0x3FFFFFFFFFFFFFFFL) | 0x8000000000000000L; // variant IETF
         return new UUID(msb, lsb);
     }
 

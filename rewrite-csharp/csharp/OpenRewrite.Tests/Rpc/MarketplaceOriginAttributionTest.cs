@@ -120,7 +120,7 @@ public class MarketplaceOriginAttributionTest : IDisposable
         var stdout = process.StandardOutput.ReadToEnd();
         var stderr = process.StandardError.ReadToEnd();
         process.WaitForExit();
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException($"dotnet {arguments} failed ({process.ExitCode}):\n{stderr}\n{stdout}");
+        if (process.ExitCode != 0){
+            throw new InvalidOperationException($"dotnet {arguments} failed ({process.ExitCode}):\n{stderr}\n{stdout}");}
     }
 }

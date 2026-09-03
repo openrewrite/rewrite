@@ -630,7 +630,7 @@ public class GitProvenance extends Reference implements Marker {
      */
     @Value
     @Incubating(since = "8.85.0")
-    public static class CommitHistory {
+    public static final class CommitHistory {
         Scope scope;
         Detail detail;
 

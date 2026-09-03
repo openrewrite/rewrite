@@ -51,12 +51,15 @@ class KotlinSource(
         stack.addFirst(ktFile)
         while (stack.isNotEmpty()) {
             val curr = stack.removeFirst()
-            if (curr is KtElement)
+            if (curr is KtElement) {
                 result[curr.textRange.startOffset] = curr.node
-            if (curr.firstChild != null)
+            }
+            if (curr.firstChild != null) {
                 stack.addFirst(curr.firstChild)
-            if (curr.nextSibling != null)
+            }
+            if (curr.nextSibling != null) {
                 stack.addFirst(curr.nextSibling)
+            }
         }
         return result
     }

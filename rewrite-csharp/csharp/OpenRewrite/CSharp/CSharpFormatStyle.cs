@@ -35,7 +35,7 @@ public sealed class CSharpFormatStyle : Marker, IRpcCodec<CSharpFormatStyle>, IE
     internal const long DefaultFlags = 0x0000600033BFFFFAL;
 
     // ── Bit positions for boolean flags (append-only — do not reorder) ──
-    private const int BitUseTabs = 0;
+    private const int BitUseTabs;
     private const int BitIndentBlock = 1;
     private const int BitIndentBraces = 2;
     private const int BitIndentSwitchCaseSection = 3;
@@ -248,8 +248,8 @@ public sealed class CSharpFormatStyle : Marker, IRpcCodec<CSharpFormatStyle>, IE
     private static long PackFlags(params bool[] bits)
     {
         long flags = 0;
-        for (var i = 0; i < bits.Length; i++)
-            if (bits[i]) flags |= 1L << i;
+        for (var i = 0; i < bits.Length; i++){
+            if (bits[i]){ flags |= 1L << i;}}
         return flags;
     }
 

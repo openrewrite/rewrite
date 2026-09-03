@@ -790,8 +790,8 @@ class SwapBinaryOperandsRecipe : OpenRewrite.Core.Recipe
         {
             binary = (Binary)base.VisitBinary(binary, ctx);
             var match = pat.Match(binary, Cursor);
-            if (match != null)
-                return (J)tmpl.Apply(Cursor, values: match)!;
+            if (match != null){
+                return (J)tmpl.Apply(Cursor, values: match)!;}
             return binary;
         }
     }
@@ -819,8 +819,8 @@ class NormalizeConsoleOutputRecipe : OpenRewrite.Core.Recipe
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
             var match = pat1.Match(mi, Cursor) ?? pat2.Match(mi, Cursor);
-            if (match != null)
-                return (J)tmpl.Apply(Cursor, values: match)!;
+            if (match != null){
+                return (J)tmpl.Apply(Cursor, values: match)!;}
             return mi;
         }
     }
@@ -857,8 +857,8 @@ class MigrateAndRedirectRecipe : OpenRewrite.Core.Recipe
             {
                 var result = (J)migrateTmpl.Apply(Cursor, values: match)!;
                 var redirectMatch = redirectPat.Match(result, Cursor);
-                if (redirectMatch != null)
-                    result = (J)redirectTmpl.Apply(Cursor, values: redirectMatch)!;
+                if (redirectMatch != null){
+                    result = (J)redirectTmpl.Apply(Cursor, values: redirectMatch)!;}
                 return result;
             }
             return mi;
@@ -893,11 +893,11 @@ class MigrateWithFallbackRecipe : OpenRewrite.Core.Recipe
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
             var match = primaryPat.Match(mi, Cursor);
-            if (match != null)
-                return (MethodInvocation)primaryTmpl.Apply(Cursor, values: match)!;
+            if (match != null){
+                return (MethodInvocation)primaryTmpl.Apply(Cursor, values: match)!;}
             match = fallbackPat.Match(mi, Cursor);
-            if (match != null)
-                return (MethodInvocation)fallbackTmpl.Apply(Cursor, values: match)!;
+            if (match != null){
+                return (MethodInvocation)fallbackTmpl.Apply(Cursor, values: match)!;}
             return mi;
         }
     }
@@ -922,11 +922,11 @@ class PreMatchFilteredRecipe : OpenRewrite.Core.Recipe
         public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
-            if (Cursor.FirstEnclosing<MethodDeclaration>()?.Name.SimpleName != "Target")
-                return mi;
+            if (Cursor.FirstEnclosing<MethodDeclaration>()?.Name.SimpleName != "Target"){
+                return mi;}
             var match = pat.Match(mi, Cursor);
-            if (match != null)
-                return (MethodInvocation)tmpl.Apply(Cursor, values: match)!;
+            if (match != null){
+                return (MethodInvocation)tmpl.Apply(Cursor, values: match)!;}
             return mi;
         }
     }
@@ -954,8 +954,8 @@ class CaptureConstraintFilteredRecipe : OpenRewrite.Core.Recipe
         {
             binary = (Binary)base.VisitBinary(binary, ctx);
             var match = pat.Match(binary, Cursor);
-            if (match != null)
-                return (J)tmpl.Apply(Cursor, values: match)!;
+            if (match != null){
+                return (J)tmpl.Apply(Cursor, values: match)!;}
             return binary;
         }
     }
@@ -981,8 +981,8 @@ class CaptureFlowRecipe : OpenRewrite.Core.Recipe
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
             var match = pat.Match(mi, Cursor);
-            if (match != null)
-                return (MethodInvocation)tmpl.Apply(Cursor, values: match)!;
+            if (match != null){
+                return (MethodInvocation)tmpl.Apply(Cursor, values: match)!;}
             return mi;
         }
     }

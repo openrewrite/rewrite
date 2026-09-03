@@ -71,7 +71,7 @@ public static class MSBuildProjectHelper
     public static bool IsAttestationStale(ExecutionContext ctx, string sourcePath)
     {
         var set = ctx.GetMessage<HashSet<string>>(StaleAttestationsKey);
-        if (set == null) return false;
+        if (set == null){ return false;}
         lock (set)
         {
             return set.Contains(sourcePath);
@@ -85,7 +85,7 @@ public static class MSBuildProjectHelper
     private static bool TryConsumeStaleAttestation(ExecutionContext ctx, string sourcePath)
     {
         var set = ctx.GetMessage<HashSet<string>>(StaleAttestationsKey);
-        if (set == null) return false;
+        if (set == null){ return false;}
         lock (set)
         {
             return set.Remove(sourcePath);
@@ -106,20 +106,20 @@ public static class MSBuildProjectHelper
     {
         var sdk = doc.Root.GetAttributeValue("Sdk");
 
-        if (rootDir == null)
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+        if (rootDir == null){
+            return new MSBuildProject(Guid.NewGuid(), sdk);}
 
         var projectPath = Path.GetFullPath(Path.Combine(rootDir, doc.SourcePath));
-        if (!File.Exists(projectPath))
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+        if (!File.Exists(projectPath)){
+            return new MSBuildProject(Guid.NewGuid(), sdk);}
 
         try
         {
             var lockFile = NuGetResolver
                 .ResolveProjectLockFileAsync(projectPath, null, CancellationToken.None)
                 .GetAwaiter().GetResult();
-            if (lockFile == null)
-                return new MSBuildProject(Guid.NewGuid(), sdk);
+            if (lockFile == null){
+                return new MSBuildProject(Guid.NewGuid(), sdk);}
 
             var projectDir = Path.GetDirectoryName(projectPath)!;
             return CreateFromLockFile(sdk, lockFile, projectDir,
@@ -180,8 +180,8 @@ public static class MSBuildProjectHelper
             {
                 var tfm = ShortTfm(tfi.FrameworkName, tfi.TargetAlias);
                 var refs = new List<PackageReference>();
-                foreach (var dep in tfi.Dependencies)
-                    refs.Add(new PackageReference(dep.Name, dep.LibraryRange?.VersionRange?.MinVersion?.ToNormalizedString()));
+                foreach (var dep in tfi.Dependencies){
+                    refs.Add(new PackageReference(dep.Name, dep.LibraryRange?.VersionRange?.MinVersion?.ToNormalizedString()));}
                 declaredByTfm[tfm] = refs;
             }
         }
@@ -192,17 +192,17 @@ public static class MSBuildProjectHelper
         foreach (var library in lockFile.Libraries)
         {
             var key = library.Name + "/" + library.Version;
-            if (string.Equals(library.Type, "project", StringComparison.OrdinalIgnoreCase))
-                projectLibraries[key] = library.MSBuildProject;
-            else if (library.Files != null)
-                libraryFiles[key] = library.Files;
+            if (string.Equals(library.Type, "project", StringComparison.OrdinalIgnoreCase)){
+                projectLibraries[key] = library.MSBuildProject;}
+            else if (library.Files != null){
+                libraryFiles[key] = library.Files;}
         }
 
         var projectRefs = new List<ProjectReference>();
         foreach (var msbuildProject in projectLibraries.Values)
         {
-            if (msbuildProject == null)
-                continue;
+            if (msbuildProject == null){
+                continue;}
             try
             {
                 var absolutePath = Path.GetFullPath(Path.Combine(projectDir, msbuildProject));
@@ -219,8 +219,8 @@ public static class MSBuildProjectHelper
         {
             // RID-specific targets duplicate the RID-less graph; the marker captures the
             // RID-agnostic view.
-            if (!string.IsNullOrEmpty(target.RuntimeIdentifier))
-                continue;
+            if (!string.IsNullOrEmpty(target.RuntimeIdentifier)){
+                continue;}
 
             var tfm = ShortTfm(target.TargetFramework, null);
             declaredByTfm.TryGetValue(tfm, out var declared);
@@ -231,8 +231,8 @@ public static class MSBuildProjectHelper
             var dependencyNames = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var library in target.Libraries)
             {
-                if (library.Name == null || library.Version == null)
-                    continue;
+                if (library.Name == null || library.Version == null){
+                    continue;}
                 var isProject = string.Equals(library.Type, "project", StringComparison.OrdinalIgnoreCase);
                 var fileKey = library.Name + "/" + library.Version;
                 libraryFiles.TryGetValue(fileKey, out var files);
@@ -247,17 +247,17 @@ public static class MSBuildProjectHelper
                     {
                         var normalized = file.Replace('\\', '/');
                         if (normalized.StartsWith("analyzers/", StringComparison.OrdinalIgnoreCase) &&
-                            normalized.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-                            analyzers.Add(normalized);
+                            normalized.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)){
+                            analyzers.Add(normalized);}
                         else if (normalized.StartsWith("tools/", StringComparison.OrdinalIgnoreCase) &&
                                  (normalized.EndsWith("install.ps1", StringComparison.OrdinalIgnoreCase) ||
-                                  normalized.EndsWith("init.ps1", StringComparison.OrdinalIgnoreCase)))
-                            hasInstallScripts = true;
+                                  normalized.EndsWith("init.ps1", StringComparison.OrdinalIgnoreCase))){
+                            hasInstallScripts = true;}
                         else if (normalized.EndsWith(".xdt", StringComparison.OrdinalIgnoreCase) ||
-                                 normalized.EndsWith(".transform", StringComparison.OrdinalIgnoreCase))
-                            hasXdt = true;
-                        else if (normalized.StartsWith("content/", StringComparison.OrdinalIgnoreCase))
-                            hasLegacyContent = true;
+                                 normalized.EndsWith(".transform", StringComparison.OrdinalIgnoreCase)){
+                            hasXdt = true;}
+                        else if (normalized.StartsWith("content/", StringComparison.OrdinalIgnoreCase)){
+                            hasLegacyContent = true;}
                     }
                 }
 
@@ -293,8 +293,8 @@ public static class MSBuildProjectHelper
                 var list = (List<ResolvedPackage>)nodes[name].Dependencies;
                 foreach (var depName in deps)
                 {
-                    if (nodes.TryGetValue(depName, out var depNode))
-                        list.Add(depNode);
+                    if (nodes.TryGetValue(depName, out var depNode)){
+                        list.Add(depNode);}
                 }
             }
 
@@ -309,8 +309,8 @@ public static class MSBuildProjectHelper
                 var list = (List<ResolvedPackage>)node.Dependencies;
                 for (var i = 0; i < list.Count; i++)
                 {
-                    if (finalNodes.TryGetValue(list[i].Name, out var final))
-                        list[i] = final;
+                    if (finalNodes.TryGetValue(list[i].Name, out var final)){
+                        list[i] = final;}
                 }
             }
 
@@ -343,8 +343,8 @@ public static class MSBuildProjectHelper
     /// <summary>Strips the special <c>_._</c> placeholder entries from an asset list.</summary>
     private static IList<string> RealItems(IEnumerable<string?>? paths)
     {
-        if (paths == null)
-            return [];
+        if (paths == null){
+            return [];}
         return paths
             .Where(p => p != null && !Path.GetFileName(p).Equals("_._", StringComparison.Ordinal))
             .Select(p => p!.Replace('\\', '/'))
@@ -363,19 +363,19 @@ public static class MSBuildProjectHelper
         var queue = new Queue<(string Name, int Depth)>();
         foreach (var root in roots)
         {
-            if (nodes.ContainsKey(root) && depths.TryAdd(root, 0))
-                queue.Enqueue((root, 0));
+            if (nodes.ContainsKey(root) && depths.TryAdd(root, 0)){
+                queue.Enqueue((root, 0));}
         }
 
         while (queue.Count > 0)
         {
             var (name, depth) = queue.Dequeue();
-            if (!edges.TryGetValue(name, out var deps))
-                continue;
+            if (!edges.TryGetValue(name, out var deps)){
+                continue;}
             foreach (var dep in deps)
             {
-                if (nodes.ContainsKey(dep) && depths.TryAdd(dep, depth + 1))
-                    queue.Enqueue((dep, depth + 1));
+                if (nodes.ContainsKey(dep) && depths.TryAdd(dep, depth + 1)){
+                    queue.Enqueue((dep, depth + 1));}
             }
         }
 
@@ -384,10 +384,10 @@ public static class MSBuildProjectHelper
 
     private static string ShortTfm(global::NuGet.Frameworks.NuGetFramework? framework, string? alias)
     {
-        if (!string.IsNullOrEmpty(alias))
-            return alias;
-        if (framework == null)
-            return "";
+        if (!string.IsNullOrEmpty(alias)){
+            return alias;}
+        if (framework == null){
+            return "";}
         try
         {
             return framework.GetShortFolderName();
@@ -411,11 +411,12 @@ public static class MSBuildProjectHelper
         while (dir != null)
         {
             var configPath = FindNuGetConfig(dir);
-            if (configPath != null)
-                configFiles.Add(configPath);
+            if (configPath != null){
+                configFiles.Add(configPath);}
 
             var parent = Path.GetDirectoryName(dir);
-            if (parent == dir) break; // root
+            if (parent == dir){ break; // root
+            } // root
             dir = parent;
         }
 
@@ -424,7 +425,7 @@ public static class MSBuildProjectHelper
         configFiles.Reverse();
 
         var sources = new List<PackageSource>();
-        foreach (var configFile in configFiles)
+        foreach (var configFile in configFiles){
             try
             {
                 ApplyPackageSources(configFile, sources);
@@ -432,7 +433,7 @@ public static class MSBuildProjectHelper
             catch (Exception ex)
             {
                 Log.Debug("Failed to read nuget.config at {Path}: {Error}", configFile, ex.Message);
-            }
+            }}
 
         return sources;
     }
@@ -444,9 +445,9 @@ public static class MSBuildProjectHelper
     {
         try
         {
-            foreach (var file in Directory.EnumerateFiles(directory))
-                if (Path.GetFileName(file).Equals("nuget.config", StringComparison.OrdinalIgnoreCase))
-                    return file;
+            foreach (var file in Directory.EnumerateFiles(directory)){
+                if (Path.GetFileName(file).Equals("nuget.config", StringComparison.OrdinalIgnoreCase)){
+                    return file;}}
         }
         catch
         {
@@ -464,9 +465,9 @@ public static class MSBuildProjectHelper
     {
         var xmlDoc = XDocument.Load(configPath);
         var packageSources = xmlDoc.Root?.Element("packageSources");
-        if (packageSources == null) return;
+        if (packageSources == null){ return;}
 
-        foreach (var element in packageSources.Elements())
+        foreach (var element in packageSources.Elements()){
             if (element.Name.LocalName.Equals("clear", StringComparison.OrdinalIgnoreCase))
             {
                 sources.Clear();
@@ -485,8 +486,8 @@ public static class MSBuildProjectHelper
             else if (element.Name.LocalName.Equals("remove", StringComparison.OrdinalIgnoreCase))
             {
                 var key = element.Attribute("key")?.Value;
-                if (key != null) sources.RemoveAll(s => s.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
-            }
+                if (key != null){ sources.RemoveAll(s => s.Key.Equals(key, StringComparison.OrdinalIgnoreCase));}
+            }}
     }
 
     #endregion
@@ -504,8 +505,8 @@ public static class MSBuildProjectHelper
     public static Document RegenerateAndRefreshMarker(Document updated, ExecutionContext ctx)
     {
         var existingMarker = updated.Markers.FindFirst<MSBuildProject>();
-        if (existingMarker == null)
-            return updated;
+        if (existingMarker == null){
+            return updated;}
 
         // Print the updated .csproj content
         var content = XmlParser.Print(updated);
@@ -518,13 +519,13 @@ public static class MSBuildProjectHelper
 
             // Materialize all captured build files from the repository context
             var buildContext = DotNetBuildContext.Get(ctx);
-            if (buildContext != null) buildContext.MaterializeAll(tempDir, updated.SourcePath);
+            if (buildContext != null){ buildContext.MaterializeAll(tempDir, updated.SourcePath);}
 
             // Write the modified .csproj file (overwrites any version from build context)
             var csprojPath = Path.Combine(tempDir, updated.SourcePath);
             var csprojDir = Path.GetDirectoryName(csprojPath);
-            if (csprojDir != null)
-                Directory.CreateDirectory(csprojDir);
+            if (csprojDir != null){
+                Directory.CreateDirectory(csprojDir);}
             File.WriteAllText(csprojPath, content);
 
             // In-process restore + marker rebuild from the in-memory lock file
@@ -546,7 +547,7 @@ public static class MSBuildProjectHelper
         }
         finally
         {
-            if (tempDir != null)
+            if (tempDir != null){
                 try
                 {
                     Directory.Delete(tempDir, true);
@@ -554,7 +555,7 @@ public static class MSBuildProjectHelper
                 catch
                 {
                     /* best effort cleanup */
-                }
+                }}
         }
     }
 
@@ -572,14 +573,14 @@ public static class MSBuildProjectHelper
     {
         public override Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
         {
-            if (document.Markers.FindFirst<MSBuildProject>() == null)
-                return document;
+            if (document.Markers.FindFirst<MSBuildProject>() == null){
+                return document;}
             // Gate on the stale flag so files no mutating recipe touched don't
             // trigger a restore. Consuming clears the flag so a second
             // reattestation pass (e.g., immediate + trailing
             // EnsureCsprojAttestation) doesn't run restore twice.
-            if (!TryConsumeStaleAttestation(ctx, document.SourcePath))
-                return document;
+            if (!TryConsumeStaleAttestation(ctx, document.SourcePath)){
+                return document;}
             return RegenerateAndRefreshMarker(document, ctx);
         }
     }
@@ -643,7 +644,7 @@ public static class MSBuildProjectHelper
                 $"{packageName} is not a direct dependency of {projectDescription}");
         }
 
-        foreach (var target in lockFile.Targets)
+        foreach (var target in lockFile.Targets){
         foreach (var library in target.Libraries)
         {
             if (string.Equals(library.Type, "package", StringComparison.OrdinalIgnoreCase) &&
@@ -652,7 +653,7 @@ public static class MSBuildProjectHelper
             {
                 return library.Version.ToNormalizedString();
             }
-        }
+        }}
 
         throw new InvalidOperationException(
             $"Could not find resolved version for {packageName} in restore result of {projectDescription}");
@@ -661,8 +662,8 @@ public static class MSBuildProjectHelper
     private static bool IsDirectDependency(LockFile lockFile, string packageName)
     {
         var spec = lockFile.PackageSpec;
-        if (spec == null)
-            return false;
+        if (spec == null){
+            return false;}
 
         return spec.TargetFrameworks.Any(tfi =>
             tfi.Dependencies.Any(d => string.Equals(d.Name, packageName, StringComparison.OrdinalIgnoreCase)));

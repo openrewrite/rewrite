@@ -40,14 +40,14 @@ internal static class AssemblyTypeEnumerator
         var allRefs = new List<MetadataReference>();
         foreach (var path in ownAssemblies)
         {
-            if (!seen.Add(Path.GetFullPath(path))) continue;
+            if (!seen.Add(Path.GetFullPath(path))){ continue;}
             var reference = MetadataReference.CreateFromFile(path);
             ownRefs.Add(reference);
             allRefs.Add(reference);
         }
         foreach (var path in referenceAssemblies)
         {
-            if (!seen.Add(Path.GetFullPath(path))) continue;
+            if (!seen.Add(Path.GetFullPath(path))){ continue;}
             allRefs.Add(MetadataReference.CreateFromFile(path));
         }
 
@@ -140,8 +140,8 @@ internal sealed class AssemblyTypeMapping
 
     private JavaType Map(ITypeSymbol? symbol)
     {
-        if (symbol == null) return JavaType.Unknown.Instance;
-        if (_cache.TryGetValue(symbol, out var cached)) return cached;
+        if (symbol == null){ return JavaType.Unknown.Instance;}
+        if (_cache.TryGetValue(symbol, out var cached)){ return cached;}
         return symbol switch
         {
             IArrayTypeSymbol array => MapArray(array),
@@ -159,9 +159,9 @@ internal sealed class AssemblyTypeMapping
     private JavaType MapNamed(INamedTypeSymbol symbol)
     {
         var primitive = CSharpTypeMapping.MapPrimitive(symbol);
-        if (primitive != null) return primitive;
+        if (primitive != null){ return primitive;}
 
-        if (_cache.TryGetValue(symbol, out var cached)) return cached;
+        if (_cache.TryGetValue(symbol, out var cached)){ return cached;}
 
         // Generic instantiation (List<int>) → Parameterized over the raw definition.
         if (symbol.IsGenericType && !symbol.IsDefinition)
@@ -230,7 +230,7 @@ internal sealed class AssemblyTypeMapping
         List<JavaType.Variable>? members = null;
         foreach (var member in symbol.GetMembers())
         {
-            if (!IsAccessible(member)) continue;
+            if (!IsAccessible(member)){ continue;}
             switch (member)
             {
                 case IFieldSymbol { IsImplicitlyDeclared: false } field:
@@ -249,8 +249,8 @@ internal sealed class AssemblyTypeMapping
         List<JavaType.Method>? methods = null;
         foreach (var method in symbol.GetMembers().OfType<IMethodSymbol>())
         {
-            if (!IsAccessible(method)) continue;
-            if (method.MethodKind != MethodKind.Ordinary && method.MethodKind != MethodKind.Constructor) continue;
+            if (!IsAccessible(method)){ continue;}
+            if (method.MethodKind != MethodKind.Ordinary && method.MethodKind != MethodKind.Constructor){ continue;}
             (methods ??= new()).Add(MapMethod(method, owner));
         }
         return methods;

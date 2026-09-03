@@ -100,14 +100,14 @@ public class WhitespaceReconciler
 
     private void ThrowIfMismatches()
     {
-        if (_mismatches is { Count: > 0 })
-            throw new WhitespaceReconcileMismatchException(_mismatches);
+        if (_mismatches is { Count: > 0 }){
+            throw new WhitespaceReconcileMismatchException(_mismatches);}
     }
 
     private bool ShouldReconcile() => _state == ReconcileState.Reconciling;
 
-    private void PushPath(string segment) { if (_throwOnMismatch) _path.Push(segment); }
-    private void PopPath() { if (_throwOnMismatch) _path.Pop(); }
+    private void PushPath(string segment) { if (_throwOnMismatch){ _path.Push(segment); } }
+    private void PopPath() { if (_throwOnMismatch){ _path.Pop(); } }
 
     private string CurrentPath()
     {
@@ -141,8 +141,8 @@ public class WhitespaceReconciler
         // is not a structural divergence — just keep the original value.
         if (original == null || formatted == null)
         {
-            if (ReferenceEquals(original, formatted))
-                return original;
+            if (ReferenceEquals(original, formatted)){
+                return original;}
 
             // A null mismatch on a structural type is a real incompatibility
             var nonNull = original ?? formatted;
@@ -162,40 +162,40 @@ public class WhitespaceReconciler
         // Space — copy from formatted when reconciling
         if (original is Space)
         {
-            if (!ShouldReconcile()) return original;
+            if (!ShouldReconcile()){ return original;}
             return formatted is Space ? formatted : StructureMismatch(original, formatted);
         }
 
         // Markers — copy from formatted when reconciling
         if (original is Markers)
         {
-            if (!ShouldReconcile()) return original;
+            if (!ShouldReconcile()){ return original;}
             return formatted is Markers ? formatted : StructureMismatch(original, formatted);
         }
 
         // J nodes — recurse
         if (original is J origJ)
         {
-            if (formatted is not J fmtJ)
-                return StructureMismatch(original, formatted);
+            if (formatted is not J fmtJ){
+                return StructureMismatch(original, formatted);}
             return VisitTree(origJ, fmtJ);
         }
 
         // Padded wrappers — recurse into their structure
-        if (IsGenericOf(original, typeof(JRightPadded<>)))
-            return VisitRightPadded(original, formatted);
+        if (IsGenericOf(original, typeof(JRightPadded<>))){
+            return VisitRightPadded(original, formatted);}
 
-        if (IsGenericOf(original, typeof(JLeftPadded<>)))
-            return VisitLeftPadded(original, formatted);
+        if (IsGenericOf(original, typeof(JLeftPadded<>))){
+            return VisitLeftPadded(original, formatted);}
 
-        if (IsGenericOf(original, typeof(JContainer<>)))
-            return VisitContainer(original, formatted);
+        if (IsGenericOf(original, typeof(JContainer<>))){
+            return VisitContainer(original, formatted);}
 
         // Lists (of padded elements, child nodes, etc.)
         if (original is IList origList)
         {
-            if (formatted is not IList fmtList)
-                return StructureMismatch(original, formatted);
+            if (formatted is not IList fmtList){
+                return StructureMismatch(original, formatted);}
             return VisitList(origList, fmtList);
         }
 
@@ -208,8 +208,8 @@ public class WhitespaceReconciler
 
 
         // Check structural type compatibility
-        if (original.GetType() != formatted.GetType())
-            return StructureMismatch(original, formatted);
+        if (original.GetType() != formatted.GetType()){
+            return StructureMismatch(original, formatted);}
 
         // Track target subtree (single-target mode)
         var isTarget = _targetSubtree != null && ReferenceEquals(original, _targetSubtree);
@@ -221,15 +221,15 @@ public class WhitespaceReconciler
 
         var previousState = _state;
 
-        if (isTarget && _state == ReconcileState.Searching)
-            _state = ReconcileState.Reconciling;
+        if (isTarget && _state == ReconcileState.Searching){
+            _state = ReconcileState.Reconciling;}
         if (isMultiTarget)
         {
             _state = ReconcileState.Reconciling;
             _multiTargetDepth = 0;
         }
-        if (_targetIds != null && _state == ReconcileState.Reconciling)
-            _multiTargetDepth++;
+        if (_targetIds != null && _state == ReconcileState.Reconciling){
+            _multiTargetDepth++;}
 
         PushPath(original.GetType().Name);
         try
@@ -251,7 +251,7 @@ public class WhitespaceReconciler
                 if (!ReferenceEquals(visited, origVal))
                 {
                     result = SetProperty(result, type, prop, visited);
-                    if (result == null) return original;
+                    if (result == null){ return original;}
                 }
             }
 
@@ -260,17 +260,17 @@ public class WhitespaceReconciler
         finally
         {
             PopPath();
-            if (isTarget && previousState == ReconcileState.Searching)
-                _state = ReconcileState.Done;
-            if (isStopAfter && previousState == ReconcileState.Reconciling)
-                _state = ReconcileState.Done;
+            if (isTarget && previousState == ReconcileState.Searching){
+                _state = ReconcileState.Done;}
+            if (isStopAfter && previousState == ReconcileState.Reconciling){
+                _state = ReconcileState.Done;}
 
             // Multi-target: return to Searching when leaving a target subtree
             if (_targetIds != null && _state == ReconcileState.Reconciling)
             {
                 _multiTargetDepth--;
-                if (_multiTargetDepth <= 0)
-                    _state = ReconcileState.Searching;
+                if (_multiTargetDepth <= 0){
+                    _state = ReconcileState.Searching;}
             }
         }
     }
@@ -281,7 +281,7 @@ public class WhitespaceReconciler
 
         var origType = original.GetType();
         var fmtType = formatted.GetType();
-        if (origType != fmtType) return StructureMismatch(original, formatted);
+        if (origType != fmtType){ return StructureMismatch(original, formatted);}
 
         var elementProp = origType.GetProperty("Element")!;
         var afterProp = origType.GetProperty("After")!;
@@ -308,20 +308,20 @@ public class WhitespaceReconciler
 
         if (ReferenceEquals(visitedElement, origElement) &&
             ReferenceEquals(visitedAfter, origAfter) &&
-            ReferenceEquals(visitedMarkers, origMarkers))
-            return original;
+            ReferenceEquals(visitedMarkers, origMarkers)){
+            return original;}
 
         var withElement = origType.GetMethod("WithElement")!;
         var withAfter = origType.GetMethod("WithAfter")!;
         var withMarkers = origType.GetMethod("WithMarkers")!;
 
         var result = original;
-        if (!ReferenceEquals(visitedElement, origElement))
-            result = withElement.Invoke(result, [visitedElement])!;
-        if (!ReferenceEquals(visitedAfter, origAfter))
-            result = withAfter.Invoke(result, [visitedAfter])!;
-        if (!ReferenceEquals(visitedMarkers, origMarkers))
-            result = withMarkers.Invoke(result, [visitedMarkers])!;
+        if (!ReferenceEquals(visitedElement, origElement)){
+            result = withElement.Invoke(result, [visitedElement])!;}
+        if (!ReferenceEquals(visitedAfter, origAfter)){
+            result = withAfter.Invoke(result, [visitedAfter])!;}
+        if (!ReferenceEquals(visitedMarkers, origMarkers)){
+            result = withMarkers.Invoke(result, [visitedMarkers])!;}
 
         return result;
     }
@@ -332,7 +332,7 @@ public class WhitespaceReconciler
 
         var origType = original.GetType();
         var fmtType = formatted.GetType();
-        if (origType != fmtType) return StructureMismatch(original, formatted);
+        if (origType != fmtType){ return StructureMismatch(original, formatted);}
 
         var beforeProp = origType.GetProperty("Before")!;
         var elementProp = origType.GetProperty("Element")!;
@@ -351,17 +351,17 @@ public class WhitespaceReconciler
 
 
         if (ReferenceEquals(visitedBefore, origBefore) &&
-            ReferenceEquals(visitedElement, origElement))
-            return original;
+            ReferenceEquals(visitedElement, origElement)){
+            return original;}
 
         var withBefore = origType.GetMethod("WithBefore")!;
         var withElement = origType.GetMethod("WithElement")!;
 
         var result = original;
-        if (!ReferenceEquals(visitedBefore, origBefore))
-            result = withBefore.Invoke(result, [visitedBefore])!;
-        if (!ReferenceEquals(visitedElement, origElement))
-            result = withElement.Invoke(result, [visitedElement])!;
+        if (!ReferenceEquals(visitedBefore, origBefore)){
+            result = withBefore.Invoke(result, [visitedBefore])!;}
+        if (!ReferenceEquals(visitedElement, origElement)){
+            result = withElement.Invoke(result, [visitedElement])!;}
 
         return result;
     }
@@ -372,7 +372,7 @@ public class WhitespaceReconciler
 
         var origType = original.GetType();
         var fmtType = formatted.GetType();
-        if (origType != fmtType) return StructureMismatch(original, formatted);
+        if (origType != fmtType){ return StructureMismatch(original, formatted);}
 
         var beforeProp = origType.GetProperty("Before")!;
         var elementsProp = origType.GetProperty("Elements")!;
@@ -399,28 +399,28 @@ public class WhitespaceReconciler
 
         if (ReferenceEquals(visitedBefore, origBefore) &&
             ReferenceEquals(visitedElements, origElements) &&
-            ReferenceEquals(visitedMarkers, origMarkers))
-            return original;
+            ReferenceEquals(visitedMarkers, origMarkers)){
+            return original;}
 
         var withBefore = origType.GetMethod("WithBefore")!;
         var withElements = origType.GetMethod("WithElements")!;
         var withMarkers = origType.GetMethod("WithMarkers")!;
 
         var result = original;
-        if (!ReferenceEquals(visitedBefore, origBefore))
-            result = withBefore.Invoke(result, [visitedBefore])!;
-        if (!ReferenceEquals(visitedElements, origElements))
-            result = withElements.Invoke(result, [visitedElements])!;
-        if (!ReferenceEquals(visitedMarkers, origMarkers))
-            result = withMarkers.Invoke(result, [visitedMarkers])!;
+        if (!ReferenceEquals(visitedBefore, origBefore)){
+            result = withBefore.Invoke(result, [visitedBefore])!;}
+        if (!ReferenceEquals(visitedElements, origElements)){
+            result = withElements.Invoke(result, [visitedElements])!;}
+        if (!ReferenceEquals(visitedMarkers, origMarkers)){
+            result = withMarkers.Invoke(result, [visitedMarkers])!;}
 
         return result;
     }
 
     private object? VisitList(IList original, IList formatted)
     {
-        if (original.Count != formatted.Count)
-            return StructureMismatch(original, formatted);
+        if (original.Count != formatted.Count){
+            return StructureMismatch(original, formatted);}
 
         var changed = false;
         var newList = new List<object?>(original.Count);
@@ -432,11 +432,11 @@ public class WhitespaceReconciler
             PopPath();
     
             newList.Add(visited);
-            if (!ReferenceEquals(visited, original[i]))
-                changed = true;
+            if (!ReferenceEquals(visited, original[i])){
+                changed = true;}
         }
 
-        if (!changed) return original;
+        if (!changed){ return original;}
 
         // Create a new typed list matching the original's element type
         var listType = original.GetType();
@@ -444,8 +444,8 @@ public class WhitespaceReconciler
         {
             var elementType = listType.GetGenericArguments()[0];
             var typedList = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType))!;
-            foreach (var item in newList)
-                typedList.Add(item);
+            foreach (var item in newList){
+                typedList.Add(item);}
             return typedList;
         }
 
@@ -505,8 +505,8 @@ public class WhitespaceReconciler
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"{mismatches.Count} structural mismatch(es) between original and formatted trees:");
-            for (var i = 0; i < mismatches.Count; i++)
-                sb.AppendLine($"  {i + 1}. {mismatches[i]}");
+            for (var i = 0; i < mismatches.Count; i++){
+                sb.AppendLine($"  {i + 1}. {mismatches[i]}");}
             return sb.ToString();
         }
     }

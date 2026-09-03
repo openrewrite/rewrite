@@ -109,12 +109,9 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
             indentType = IndentType.ALIGN;
         }
 
-        switch (indentType) {
-            case ALIGN:
-                break;
-            case INDENT:
-                indent += style.getIndentSize();
-                break;
+        if (indentType == org.openrewrite.hcl.format.TabsAndIndentsVisitor.IndentType.ALIGN) {
+        } else if (indentType == org.openrewrite.hcl.format.TabsAndIndentsVisitor.IndentType.INDENT) {
+            indent += style.getIndentSize();
         }
 
         Space s = indentTo(space, indent, loc);
@@ -139,8 +136,8 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (right.getElement() instanceof Hcl) {
             Hcl elem = (Hcl) right.getElement();
-            if ((right.getAfter().getLastWhitespace().contains("\n") ||
-                 elem.getPrefix().getLastWhitespace().contains("\n"))) {
+            if (right.getAfter().getLastWhitespace().contains("\n") ||
+                 elem.getPrefix().getLastWhitespace().contains("\n")) {
                 switch (loc) {
                     case FUNCTION_CALL_ARGUMENT:
                     case PARENTHESES:
@@ -195,7 +192,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         }
 
         setCursor(getCursor().getParent());
-        return (after == right.getAfter() && t == right.getElement()) ? right : new HclRightPadded<>(t, after, right.getMarkers());
+        return after == right.getAfter() && t == right.getElement() ? right : new HclRightPadded<>(t, after, right.getMarkers());
     }
 
     @Override
@@ -393,6 +390,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                         whitespace.append(c);
                         continue;
                     }
+                    break;
 
                 case '\n':
                     if (isFirstLine) {
@@ -433,6 +431,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                         }
                         currentText.append(' ');
                     }
+                    break;
 
                 default:
                     if (!isFirstLine && isWhitespace) {

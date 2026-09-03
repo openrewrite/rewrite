@@ -28,7 +28,7 @@ import java.util.function.Consumer;
 
 import static java.util.Collections.emptySet;
 
-public class KotlinTemplate extends JavaTemplate {
+public final class KotlinTemplate extends JavaTemplate {
     private KotlinTemplate(boolean contextSensitive,
                            KotlinParser.Builder parser,
                            String code,

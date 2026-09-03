@@ -29,7 +29,7 @@ import static org.openrewrite.semver.Semver.isVersion;
  * Allows patch-level changes if a minor version is specified on the comparator. Allows minor-level changes if not.
  * <a href="https://github.com/npm/node-semver#tilde-ranges-123-12-1">Tilde ranges</a>.
  */
-public class TildeRange extends LatestRelease {
+public final class TildeRange extends LatestRelease {
     private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?");
 
     // The npm tilde grammar; unlike TILDE_RANGE_PATTERN, no 4th component, wildcards allowed.
@@ -119,7 +119,10 @@ public class TildeRange extends LatestRelease {
         if (!m.matches()) {
             return token;
         }
-        String mj = m.group(1), mn = m.group(2), p = m.group(3), pr = m.group(4);
+        String mj = m.group(1);
+        String mn = m.group(2);
+        String p = m.group(3);
+        String pr = m.group(4);
         String z = incPre ? "-0" : "";
         if (XRange.isX(mj)) {
             return "";

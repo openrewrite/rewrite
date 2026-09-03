@@ -85,8 +85,8 @@ public static class RoslynFormatter
         // spaces between modifiers and types must not be discarded.
         if (string.Equals(source, formattedSource, StringComparison.Ordinal))
         {
-            if (ReferenceEquals(mvsCu, originalCu))
-                return originalCu;
+            if (ReferenceEquals(mvsCu, originalCu)){
+                return originalCu;}
 
             // MVS made changes — reconcile them within the target subtree
             var mvsReconciler = new WhitespaceReconciler();
@@ -152,8 +152,8 @@ public static class RoslynFormatter
         var formattedCu = Format(splicedCu, targetSubtree: replacement, stopAfter: stopAfter);
 
         // 3. If formatting didn't change anything, return as-is
-        if (ReferenceEquals(formattedCu, splicedCu))
-            return replacement;
+        if (ReferenceEquals(formattedCu, splicedCu)){
+            return replacement;}
 
         // 4. Extract the formatted subtree by ID
         return FindById(formattedCu, replacement.Id) ?? replacement;
@@ -166,8 +166,8 @@ public static class RoslynFormatter
     /// </summary>
     internal static (Guid id, Space prefix) PrintableIdAndPrefix(J node)
     {
-        if (node is ExpressionStatement es)
-            return (es.Expression.Id, es.Expression.Prefix);
+        if (node is ExpressionStatement es){
+            return (es.Expression.Id, es.Expression.Prefix);}
         return (node.Id, node.Prefix);
     }
 
@@ -188,8 +188,8 @@ public static class RoslynFormatter
 
         protected override J? Accept(J tree, int p)
         {
-            if (_found)
-                return tree;
+            if (_found){
+                return tree;}
             if (tree.Id == targetId)
             {
                 _found = true;
@@ -208,8 +208,8 @@ public static class RoslynFormatter
 
         protected override J? Accept(J tree, int p)
         {
-            if (Result != null)
-                return tree;
+            if (Result != null){
+                return tree;}
             if (tree.Id == targetId)
             {
                 Result = tree;
@@ -229,8 +229,8 @@ public static class RoslynFormatter
     public static CompilationUnit FormatSpans(CompilationUnit cu, HashSet<Guid> nodeIds,
         Dictionary<Guid, Space> preservedPrefixes)
     {
-        if (nodeIds.Count == 0)
-            return cu;
+        if (nodeIds.Count == 0){
+            return cu;}
 
         // 1. Ensure minimum spacing so printed output is parseable.
         // MVS may introduce spacing artifacts on nodes outside the target subtrees
@@ -245,8 +245,8 @@ public static class RoslynFormatter
         var source = trackingPrinter.Print(mvsCu);
         var spans = trackingPrinter.GetTrackedSpans();
 
-        if (spans.Count == 0)
-            return originalCu;
+        if (spans.Count == 0){
+            return originalCu;}
 
         // 3. Get style from marker (attached during parsing) or fall back to defaults
         var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? CSharpFormatStyle.Default;
@@ -259,8 +259,8 @@ public static class RoslynFormatter
         // spaces between modifiers and types must not be discarded.
         if (string.Equals(source, formattedSource, StringComparison.Ordinal))
         {
-            if (ReferenceEquals(mvsCu, originalCu))
-                return originalCu;
+            if (ReferenceEquals(mvsCu, originalCu)){
+                return originalCu;}
 
             // MVS made changes — reconcile them within the target subtrees
             var mvsReconciler = new WhitespaceReconciler();
@@ -321,16 +321,16 @@ public static class RoslynFormatter
 
         protected override void BeforeSyntax(J j, PrintOutputCapture<int> p)
         {
-            if (_start < 0 && j.Id == targetId)
-                _start = p.Length;
+            if (_start < 0 && j.Id == targetId){
+                _start = p.Length;}
             base.BeforeSyntax(j, p);
         }
 
         protected override void AfterSyntax(J j, PrintOutputCapture<int> p)
         {
             base.AfterSyntax(j, p);
-            if (_end < 0 && j.Id == targetId)
-                _end = p.Length;
+            if (_end < 0 && j.Id == targetId){
+                _end = p.Length;}
         }
     }
 
@@ -347,24 +347,24 @@ public static class RoslynFormatter
             var spans = new List<TextSpan>(_starts.Count);
             foreach (var (id, start) in _starts)
             {
-                if (_ends.TryGetValue(id, out var end) && end > start)
-                    spans.Add(TextSpan.FromBounds(start, end));
+                if (_ends.TryGetValue(id, out var end) && end > start){
+                    spans.Add(TextSpan.FromBounds(start, end));}
             }
             return spans;
         }
 
         protected override void BeforeSyntax(J j, PrintOutputCapture<int> p)
         {
-            if (targetIds.Contains(j.Id) && !_starts.ContainsKey(j.Id))
-                _starts[j.Id] = p.Length;
+            if (targetIds.Contains(j.Id) && !_starts.ContainsKey(j.Id)){
+                _starts[j.Id] = p.Length;}
             base.BeforeSyntax(j, p);
         }
 
         protected override void AfterSyntax(J j, PrintOutputCapture<int> p)
         {
             base.AfterSyntax(j, p);
-            if (targetIds.Contains(j.Id) && !_ends.ContainsKey(j.Id))
-                _ends[j.Id] = p.Length;
+            if (targetIds.Contains(j.Id) && !_ends.ContainsKey(j.Id)){
+                _ends[j.Id] = p.Length;}
         }
     }
 
@@ -377,8 +377,8 @@ public static class RoslynFormatter
 
         protected override J? Accept(J tree, int p)
         {
-            if (_remaining <= 0)
-                return tree;
+            if (_remaining <= 0){
+                return tree;}
             if (prefixes.TryGetValue(tree.Id, out var prefix))
             {
                 _remaining--;
@@ -409,8 +409,8 @@ public static class RoslynFormatter
 
         public override J VisitCompilationUnit(CompilationUnit cu, P ctx)
         {
-            if (_nodeIds.Count == 0)
-                return cu;
+            if (_nodeIds.Count == 0){
+                return cu;}
 
             // Flatten synthetic blocks and register their statements for formatting
             // in a single pass — ensures IDs match the actual tree
@@ -459,15 +459,15 @@ public static class RoslynFormatter
                     if (newStatements == null)
                     {
                         newStatements = new List<JRightPadded<Statement>>(statements.Count);
-                        for (var j = 0; j < i; j++)
-                            newStatements.Add(statements[j]);
+                        for (var j = 0; j < i; j++){
+                            newStatements.Add(statements[j]);}
                     }
 
                     // If this synthetic block was registered for formatting,
                     // register its individual statements instead
                     var registered = nodeIds.Remove(inner.Id);
-                    if (registered)
-                        preservedPrefixes.Remove(inner.Id);
+                    if (registered){
+                        preservedPrefixes.Remove(inner.Id);}
 
                     var innerStmts = inner.Statements;
                     for (var k = 0; k < innerStmts.Count; k++)

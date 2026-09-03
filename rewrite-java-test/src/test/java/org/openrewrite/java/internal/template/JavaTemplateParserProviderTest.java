@@ -28,9 +28,7 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.util.function.Consumer;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaTemplateParserProviderTest {

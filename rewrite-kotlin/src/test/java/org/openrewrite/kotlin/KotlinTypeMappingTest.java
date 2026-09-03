@@ -1980,13 +1980,10 @@ class KotlinTypeMappingTest {
                         @Override
                         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
                             String expected = null;
-                            switch (fieldAccess.toString()) {
-                                case "Alpha.Status":
-                                    expected = "p.Alpha$Status";
-                                    break;
-                                case "Beta.Status":
-                                    expected = "p.Beta$Status";
-                                    break;
+                            if ("Alpha.Status".equals(fieldAccess.toString())) {
+                                expected = "p.Alpha$Status";
+                            } else if ("Beta.Status".equals(fieldAccess.toString())) {
+                                expected = "p.Beta$Status";
                             }
                             if (expected != null) {
                                 JavaType.Class type = (JavaType.Class) fieldAccess.getType();
@@ -2034,13 +2031,10 @@ class KotlinTypeMappingTest {
                         @Override
                         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
                             String expected = null;
-                            switch (fieldAccess.toString()) {
-                                case "B.A.C":
-                                    expected = "foo.bar.A$B$A$C";
-                                    break;
-                                case "B.A":
-                                    expected = "foo.bar.A$B$A";
-                                    break;
+                            if ("B.A.C".equals(fieldAccess.toString())) {
+                                expected = "foo.bar.A$B$A$C";
+                            } else if ("B.A".equals(fieldAccess.toString())) {
+                                expected = "foo.bar.A$B$A";
                             }
                             if (expected != null) {
                                 assertThat(fieldAccess.getType()).isNotNull();

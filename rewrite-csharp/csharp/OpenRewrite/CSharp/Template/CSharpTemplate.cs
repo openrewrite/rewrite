@@ -232,7 +232,7 @@ public sealed class CSharpTemplate
     /// </summary>
     private static J? UnwrapCursorValue(object? value)
     {
-        if (value is J j) return j;
+        if (value is J j){ return j;}
 
         // JRightPadded<T> and JLeftPadded<T> are generic, so use reflection
         // to extract the Element property

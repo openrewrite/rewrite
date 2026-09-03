@@ -214,11 +214,8 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     private prefixContainsNewline(tree: J): boolean {
-        // Check if the element starts on a new line (only the last whitespace matters)
-        if (tree.prefix && lastWhitespace(tree.prefix).includes("\n")) {
-            return true;
-        }
-        return false;
+      // Check if the element starts on a new line (only the last whitespace matters)
+      return tree.prefix && lastWhitespace(tree.prefix).includes("\n")
     }
 
     private isJsxChildElement(tree: J): boolean {
@@ -665,12 +662,16 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        if (path.length === 0) return;
+      if (path.length === 0) {
+        return
+      };
         path.reverse();
 
         for (const c of path) {
             const v = c.value;
-            if (!this.isActualJNode(v)) continue;
+          if (!this.isActualJNode(v)) {
+            continue
+          };
 
             const savedCursor = this.cursor;
             this.cursor = c;

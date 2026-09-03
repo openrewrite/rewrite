@@ -38,7 +38,7 @@ import static java.util.Collections.emptyList;
  *
  * @param <T> The type of the inner list of elements.
  */
-public class JContainer<T> {
+public final class JContainer<T> {
 
     private transient @Nullable Padding<T> padding;
 

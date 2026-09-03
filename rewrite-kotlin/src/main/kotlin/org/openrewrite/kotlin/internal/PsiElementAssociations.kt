@@ -267,7 +267,10 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     }
 
                     else -> {
-                        if (psi is KtCallExpression) resolvedAwayCallType(psi) else null
+                        if (psi is KtCallExpression) {
+                            resolvedAwayCallType(psi)
+                        } else { null
+                        }
                     }
                 }
             }
@@ -398,8 +401,9 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             is FirResolvedQualifier -> ExpressionType.QUALIFIER
             is FirCollectionLiteral -> ExpressionType.METHOD_INVOCATION
             is FirFunctionCall -> {
-                if (fir.calleeReference is FirErrorNamedReference)
+                if (fir.calleeReference is FirErrorNamedReference) {
                     return null
+                }
 
                 val sym = fir.calleeReference.resolved?.resolvedSymbol
                 when {
@@ -423,8 +427,10 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             }
             else -> {
                 // `primary` walked up to an enclosing element, so the compiler resolved this call away
-                if (fir.source?.psi !== psi) null
-                else throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+                if (fir.source?.psi !== psi) { null
+                } else {
+                    throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+                }
             }
         }
     }
