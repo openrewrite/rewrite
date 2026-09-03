@@ -12,10 +12,13 @@ from rewrite.rpc.child_connection import ChildConnection, child_command
 
 
 class BundleChildren:
-    def __init__(self, python_executable, venvs_root, upstream, *, spawn=None, venv_ops=None):
+    def __init__(self, python_executable, venvs_root, upstream, *, spawn=None, venv_ops=None,
+                 on_child_replaced=None):
         self._python = python_executable
         self._venvs_root = Path(venvs_root)
         self._upstream = upstream
+        # A fresh child starts with empty ref maps, so whatever mirrors the old one has to go.
+        self._on_child_replaced = on_child_replaced or (lambda bundle_dist: None)
         self._spawn = spawn or ChildConnection.spawn
         self._venv_ops = venv_ops or venv_manager
         self._children = {}     # bundle_dist -> child connection
@@ -67,6 +70,7 @@ class BundleChildren:
             stale = self._children.pop(bundle_dist, None)
             if stale is not None:
                 stale.close()
+            self._on_child_replaced(bundle_dist)
             self._venv_ops.create_venv(self._python, venv_dir, clear=venv_dir.exists())
         self._venv_ops.install_into_venv(venv_dir, spec, force=force)
         self._versions[bundle_dist] = self._venv_ops.installed_version(venv_dir, bundle_dist)

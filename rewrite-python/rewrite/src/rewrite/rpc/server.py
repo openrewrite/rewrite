@@ -2436,7 +2436,9 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
         return [d for d in remaining.pop(0) if d.get('state') != 'END_OF_OBJECT']
 
     edited = RpcReceiveQueue(refs, source_file_type, pull).receive(served, None)
-    if edited is not None:
+    if edited is None:
+        _hub_forget(obj_id)
+    else:
         _hub_tree[obj_id] = edited
         _hub_served[(bundle, obj_id)] = edited
         local_objects[obj_id] = edited
@@ -2444,14 +2446,31 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
             local_objects[str(edited.id)] = edited
 
 
+def _hub_drop_bundle(bundle: str) -> None:
+    """Forget everything the hub holds on one bundle's behalf, for when its child is replaced."""
+    _hub_send_refs.pop(bundle, None)
+    _hub_recv_refs.pop(bundle, None)
+    for table in (_hub_served, _hub_send_checkpoint, _hub_recv_checkpoint):
+        for key in [k for k in table if k[0] == bundle]:
+            del table[key]
+
+
+def _hub_forget(obj_id: str) -> None:
+    """Let go of a file while leaving every child's ref numbering where it stands. This is the half
+    of _hub_release that is safe without an Evict: a child that has not been told to roll back still
+    holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
+    _hub_tree.pop(obj_id, None)
+    local_objects.pop(obj_id, None)
+    for key in [k for k in _hub_served if k[1] == obj_id]:
+        del _hub_served[key]
+
+
 def _hub_release(obj_id: str) -> None:
     """The rollback must be symmetric with the child's own Evict, in both directions: the child drops
     this file's refs from both of its maps, so a ref kept here would name an id the child no longer
     holds ("Received reference to unknown object").
     """
-    _hub_tree.pop(obj_id, None)
-    for key in [k for k in _hub_served if k[1] == obj_id]:
-        del _hub_served[key]
+    _hub_forget(obj_id)
     for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
         checkpoint = _hub_send_checkpoint.pop(key)
         refs = _hub_send_refs.get(key[0])
@@ -2495,7 +2514,7 @@ def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
             'searchResultIds': [],
         })
         if after is None:
-            _hub_release(tree_id)
+            _hub_forget(tree_id)
             tree = None
             break
         tree = after
@@ -2540,7 +2559,9 @@ def _get_facade():
         if removed:
             logger.info("Cleared %d pre-venv recipe artifact(s) from %s: %s",
                         len(removed), _recipe_install_dir, ", ".join(removed))
-        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir, upstream=_serve_child_object),
+        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir,
+                                        upstream=_serve_child_object,
+                                        on_child_replaced=_hub_drop_bundle),
                          hub_pull=_hub_pull_child_edit,
                          local_visit=_hub_local_visit,
                          is_local_visitor=_hub_is_builtin_visitor)
