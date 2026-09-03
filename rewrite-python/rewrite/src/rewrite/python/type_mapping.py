@@ -217,12 +217,14 @@ class PythonTypeMapping:
         self._module_ast_tree: Optional[ast.Module] = None
         self._import_binding_index: Optional[Dict[str, str]] = None
         self._from_import_member_index: Optional[Dict[str, Tuple[str, str]]] = None
+        self._shadowed_names: Optional[Set[str]] = None
 
         # ty-types data: populated by _build_index
         self._node_index: Dict[Tuple[int, int], Tuple[int, str]] = {}  # (start, end) -> (type_id, node_kind)
         self._node_index_by_start: Dict[int, List[Tuple[int, int, str]]] = {}  # start -> [(end, type_id, node_kind)]
         self._type_registry: Dict[int, Dict[str, Any]] = {}  # type_id -> TypeDescriptor
         self._call_signature_index: Dict[Tuple[int, int], Dict[str, Any]] = {}  # (start, end) -> callSignature
+        self._binding_index: Dict[Tuple[int, int], Dict[str, str]] = {}  # (start, end) -> BindingInfo
         session_java_types = getattr(ty_client, 'java_types', None) or SessionTypeCache()
         self._type_cache: Dict[str, JavaType] = session_java_types.by_fqn
         self._type_id_cache: Dict[int, JavaType] = session_java_types.by_type_id
@@ -267,7 +269,7 @@ class PythonTypeMapping:
             return
 
         # Fetch all types in one call
-        result = client.get_types(actual_file)
+        result = client.get_types(actual_file, include_bindings=True)
         if result:
             self._build_index(result)
 
@@ -338,6 +340,10 @@ class PythonTypeMapping:
             call_sig = node.get('callSignature')
             if call_sig is not None:
                 self._call_signature_index[(node['start'], node['end'])] = call_sig
+
+            binding = node.get('binding')
+            if binding is not None:
+                self._binding_index[(node['start'], node['end'])] = binding
 
         # Merge types into registry (keys are strings in JSON)
         for type_id_str, descriptor in result.get('types', {}).items():
@@ -965,7 +971,7 @@ class PythonTypeMapping:
         annotation: the decorating function or class itself, under the module defining
         it — not the type applying it returns.
 
-        An unshadowed import binding names a decorator ty cannot type at all.
+        A decorator no descriptor names is named by where it is bound.
         """
         type_id = self._lookup_type_id(node)
         descriptor = self._type_registry.get(type_id) if type_id is not None else None
@@ -979,10 +985,47 @@ class PythonTypeMapping:
                     and not descriptor.get('className'):
                 return self._create_class_type(
                     f"{_ALIASED_MODULES.get(module, module)}.{name}")
-        fqn = self._import_binding_fqn(node)
+        bound = self._binding_owner(node)
+        fqn = (f"{_ALIASED_MODULES.get(bound[0], bound[0])}.{bound[1]}" if bound
+               else self._import_binding_fqn(node))
         if fqn:
             return self._create_class_type(fqn)
         return self.type(node)
+
+    def _binding_owner(self, node: ast.expr) -> Optional[Tuple[str, str]]:
+        """The ``(module, symbol)`` ty binds a reference to, following re-export chains to
+        where the symbol is declared. ty reports a scope's first declaration, so a name
+        the file binds a second time is not read from one.
+        """
+        if self._writes_a_rebound_name(node):
+            return None
+        binding = self._lookup_binding(node)
+        if binding is None:
+            return None
+        module, qualified = binding.get('definedIn'), binding.get('qualifiedName')
+        if not module or not qualified or not qualified.startswith(f"{module}."):
+            return None
+        symbol = qualified[len(module) + 1:]
+        # Only what the module itself declares. A deeper path is a class member, owned by
+        # that class rather than the module — `"".join` binds `builtins.str.join` — or is
+        # under a scope `qualifiedName` spells as ty does (`<locals of function 'f'>`).
+        return (module, symbol) if '.' not in symbol else None
+
+    def _writes_a_rebound_name(self, node: ast.expr) -> bool:
+        """Whether the name ``node`` is written under is one the file binds a second time."""
+        while isinstance(node, ast.Attribute):
+            node = node.value
+        self._import_bindings()
+        return isinstance(node, ast.Name) and node.id in (self._shadowed_names or ())
+
+    def _lookup_binding(self, node: ast.expr) -> Optional[Dict[str, str]]:
+        """The BindingInfo ty attached to ``node``, by byte range."""
+        end_lineno = getattr(node, 'end_lineno', None)
+        end_col_offset = getattr(node, 'end_col_offset', None)
+        if getattr(node, 'lineno', None) is None or end_lineno is None or end_col_offset is None:
+            return None
+        return self._binding_index.get(
+            (self._decorated_start(node), self._pos_to_byte_offset(end_lineno, end_col_offset)))
 
     def _import_binding_fqn(self, node: ast.expr) -> Optional[str]:
         """The FQN an unshadowed module-level import gives ``node``'s written name."""
@@ -997,21 +1040,20 @@ class PythonTypeMapping:
 
     def _import_bindings(self) -> Dict[str, str]:
         """The FQN each of this file's absolute module-level imports names, keyed by the
-        name it binds, minus every name the file binds a second time. The same scan
+        name it binds, minus every name :meth:`_rebound_names` reports. The same scan
         yields the ``from M import f`` bindings that :meth:`_bound_from_import_member` reads.
 
         Python binds a name once per scope, so an import nothing else rebinds says what a
-        reference to that name means whether or not ty could type it. Anything that could
-        rebind — an assignment, a ``def``, a parameter, a second import — disqualifies the
-        name rather than being scoped precisely, since a decorator naming a shadowed
-        symbol is not worth a false attribution.
+        reference to that name means whether or not ty could type it.
         """
         if self._import_binding_index is None:
             tree = self._module_ast()
             bindings: Dict[str, str] = {}
             members: Dict[str, Tuple[str, str]] = {}
-            shadowed: Set[str] = set()
-            top_level = set()
+            top_level = {id(alias) for stmt in (tree.body if tree else ())
+                         if isinstance(stmt, (ast.Import, ast.ImportFrom))
+                         for alias in stmt.names}
+            shadowed = self._rebound_names(tree, top_level)
 
             def bind(name: str, fqn: Optional[str]) -> None:
                 # `import a.b` after `import a` re-binds the root to the same FQN
@@ -1022,7 +1064,6 @@ class PythonTypeMapping:
 
             for stmt in tree.body if tree else ():
                 if isinstance(stmt, (ast.Import, ast.ImportFrom)):
-                    top_level.update(id(alias) for alias in stmt.names)
                     # A relative import's written form is not a module path
                     relative = isinstance(stmt, ast.ImportFrom) and (stmt.level or not stmt.module)
                     for alias in stmt.names:
@@ -1041,26 +1082,35 @@ class PythonTypeMapping:
                             bind(alias.asname or alias.name, f"{stmt.module}.{alias.name}")
                             members[alias.asname or alias.name] = (stmt.module, alias.name)
 
-            for node in ast.walk(tree) if tree else ():
-                if isinstance(node, ast.Name):
-                    if isinstance(node.ctx, (ast.Store, ast.Del)):
-                        shadowed.add(node.id)
-                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                    shadowed.add(node.name)
-                elif isinstance(node, ast.arg):
-                    shadowed.add(node.arg)
-                elif isinstance(node, ast.ExceptHandler) and node.name:
-                    shadowed.add(node.name)
-                elif isinstance(node, (ast.Global, ast.Nonlocal)):
-                    shadowed.update(node.names)
-                elif isinstance(node, ast.alias) and id(node) not in top_level:
-                    shadowed.add(node.asname or node.name.split('.')[0])
-
             self._import_binding_index = {name: fqn for name, fqn in bindings.items()
                                           if name not in shadowed}
             self._from_import_member_index = {name: member for name, member in members.items()
                                               if name not in shadowed}
         return self._import_binding_index
+
+    def _rebound_names(self, tree: Optional[ast.Module], top_level: Set[int]) -> Set[str]:
+        """Every name this file binds somewhere other than one of its own top-level
+        imports. Coarse on purpose: a name bound twice is one whose references cannot be
+        read off an import, and declining to attribute costs less than attributing wrong.
+        """
+        if self._shadowed_names is None:
+            names: Set[str] = set()
+            for node in ast.walk(tree) if tree else ():
+                if isinstance(node, ast.Name):
+                    if isinstance(node.ctx, (ast.Store, ast.Del)):
+                        names.add(node.id)
+                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    names.add(node.name)
+                elif isinstance(node, ast.arg):
+                    names.add(node.arg)
+                elif isinstance(node, ast.ExceptHandler) and node.name:
+                    names.add(node.name)
+                elif isinstance(node, (ast.Global, ast.Nonlocal)):
+                    names.update(node.names)
+                elif isinstance(node, ast.alias) and id(node) not in top_level:
+                    names.add(node.asname or node.name.split('.')[0])
+            self._shadowed_names = names
+        return set(self._shadowed_names)
 
     def _bound_from_import_member(self, node: ast.expr) -> Optional[Tuple[str, str]]:
         """The ``(module, member)`` an unshadowed module-level ``from M import f`` binds
@@ -1328,7 +1378,8 @@ class PythonTypeMapping:
         callee = self._type_registry.get(callee_id) if callee_id is not None else None
         if callee is not None and callee.get('kind') in _FUNCTION_KINDS:
             return callee.get('name') or None
-        return None
+        bound = self._binding_owner(node.func)
+        return bound[1] if bound else None
 
     def _extract_method_name(self, node: ast.Call) -> Optional[str]:
         """The name a Call node spells."""
@@ -1487,6 +1538,10 @@ class PythonTypeMapping:
                 module_name = callee.get('moduleName')
                 if module_name:
                     return self._module_class(module_name)
+
+        bound = self._binding_owner(node.func)
+        if bound:
+            return self._module_class(bound[0])
 
         if isinstance(node.func, ast.Attribute):
             receiver = node.func.value

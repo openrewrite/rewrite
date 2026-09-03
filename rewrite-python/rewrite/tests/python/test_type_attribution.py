@@ -3745,12 +3745,20 @@ class TestSymbolIdentityAcrossImportForms:
     def test_a_platform_module_is_named_by_its_portable_alias(self):
         self._assert_names('from posixpath import join\njoin("a", "b")\n', 'os.path', 'join')
 
-    def test_an_attribute_of_a_reexporting_module_names_the_definition(self):
+    @pytest.mark.parametrize('member', [
+        'def bar():\n    return 1\n',
+        'def factory():\n    def d():\n        return 1\n    return d\n\n\nbar = factory()\n',
+    ], ids=['typed', 'untyped'])
+    @pytest.mark.parametrize('source', [
+        'import pkg.api\npkg.api.baz()\n',
+        'from pkg.api import baz\nbaz()\n',
+    ], ids=['as-attribute', 'through-facade'])
+    def test_a_reexported_module_member_names_the_definition(self, member, source):
         cu, tmpdir, client = _parse_with_types({
             'pkg/__init__.py': '',
-            'pkg/_impl.py': 'def bar():\n    return 1\n',
+            'pkg/_impl.py': member,
             'pkg/api.py': 'from pkg._impl import bar as baz\n',
-            'm.py': 'import pkg.api\npkg.api.baz()\n',
+            'm.py': source,
         })
         try:
             method_type = cu.statements[1].method_type
@@ -4351,9 +4359,11 @@ class TestDecoratorAttribution:
         self._assert_named_in_package(
             'from pkg.api import tag\n\n@tag\ndef f():\n    pass\n', 'pkg._impl.tag')
 
-    def test_a_package_and_its_submodule_bind_the_same_root(self):
-        """`import pkg` then `import pkg.api` binds `pkg` once, so the written path
-        still names a decorator ty cannot type."""
+    def test_an_untyped_decorator_names_the_module_defining_it(self):
         self._assert_named_in_package(
             'import pkg\nimport pkg.api\n\n@pkg.api.require\ndef f():\n    pass\n',
-            'pkg.api.require')
+            'pkg._impl.require')
+
+        # A star import spells no name at all, so only the binding can name what it binds.
+        self._assert_named_in_package(
+            'from pkg.api import *\n\n@require\ndef f():\n    pass\n', 'pkg._impl.require')
