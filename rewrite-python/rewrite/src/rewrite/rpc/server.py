@@ -1136,6 +1136,8 @@ def handle_reset(params: dict) -> bool:
     _hub_recv_refs.clear()
     _hub_send_checkpoint.clear()
     _hub_recv_checkpoint.clear()
+    # A half-drained page would resume mid-list for a host that expects to start over.
+    _dependency_types_pending.clear()
 
     logger.info("Reset: cleared all cached state")
     return True

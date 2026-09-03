@@ -668,3 +668,19 @@ def test_reset_reaches_the_children(monkeypatch, tmp_path):
     # The hub's per-bundle ref maps and the child's own are two ends of one table: dropping only
     # the hub's would leave the child citing ids the hub can no longer resolve.
     assert broadcast == [{}]
+
+
+def test_reset_drops_a_half_drained_dependency_types_page(monkeypatch):
+    import rewrite.rpc.server as server
+
+    monkeypatch.setattr(server, "_dependency_types_pending", {("attrs", "23.1", (3, 12)): [{"a": 1}]})
+    # In-flight call bookkeeping is owned by send_request's finally, and Reset is served from
+    # inside that machinery, so clearing it here would strand an outer frame's response.
+    monkeypatch.setattr(server, "_awaiting_ids", {7})
+    monkeypatch.setattr(server, "_pending_responses", {7: {"id": 7}})
+
+    server.handle_reset({})
+
+    assert not server._dependency_types_pending
+    assert server._awaiting_ids == {7}
+    assert server._pending_responses == {7: {"id": 7}}
