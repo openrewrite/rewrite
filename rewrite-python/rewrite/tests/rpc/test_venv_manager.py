@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from pathlib import Path
 
 from rewrite.rpc import venv_manager
@@ -65,12 +66,13 @@ def test_create_venv_can_clear_a_stale_directory(monkeypatch, tmp_path):
     assert calls == [["/usr/bin/python3.12", "-m", "venv", "--clear", str(venv_dir)]]
 
 
-def _fake_venv(venv_dir: Path, home: Path) -> None:
+def _fake_venv(venv_dir: Path, home: Path, version: str = None) -> None:
     interpreter = venv_manager.venv_python(venv_dir)
     interpreter.parent.mkdir(parents=True, exist_ok=True)
     interpreter.touch()
+    version = version or "%d.%d.0" % sys.version_info[:2]
     (venv_dir / "pyvenv.cfg").write_text(
-        f"home = {home}\ninclude-system-site-packages = false\nversion = 3.12.11\n")
+        f"home = {home}\ninclude-system-site-packages = false\nversion = {version}\n")
 
 
 def test_usable_venv_requires_an_interpreter_whose_base_still_exists(tmp_path):
@@ -85,6 +87,16 @@ def test_usable_venv_is_false_when_the_base_interpreter_was_upgraded_away(tmp_pa
     venv_dir = tmp_path / "b1"
     _fake_venv(venv_dir, tmp_path / "cpython-3.12.11-pruned")
     assert venv_manager.venv_python(venv_dir).exists()
+    assert not venv_manager.is_usable_venv(venv_dir)
+
+
+def test_usable_venv_is_false_for_a_venv_built_by_another_python(tmp_path):
+    """Its site-packages carries bytecode and extension modules for the version that built it, and
+    this process imports them, so a mismatch has to be rebuilt rather than reused."""
+    base = tmp_path / "other-python"
+    base.mkdir()
+    venv_dir = tmp_path / "b1"
+    _fake_venv(venv_dir, base, version="%d.%d.0" % (sys.version_info[0], sys.version_info[1] - 1))
     assert not venv_manager.is_usable_venv(venv_dir)
 
 

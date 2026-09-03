@@ -523,35 +523,3 @@ def test_prepare_recipe_same_type_children_preserve_distinct_options(monkeypatch
     def text_of(child):
         return next(o["value"] for o in child["descriptor"]["options"] if o["name"] == "text")
     assert [text_of(c) for c in children] == ["a", "b", "c"]
-
-
-def test_hub_release_rewinds_send_refs_in_lockstep_with_the_child():
-    """A child drops its receive refs for a file when the broadcast Evict reaches it, so the facade
-    must return its send-ref numbering to exactly the pre-file value. If the facade kept advancing,
-    it would emit a GET_REF for a ref the child no longer holds; if it rewound while the child did
-    not, it would reuse a number still bound to the old object and serve a wrong tree silently."""
-    import rewrite.rpc.server as server
-    from rewrite.rpc.reference import ReferenceMap
-
-    bundle, first, second = "pkg", "file-1", "file-2"
-    refs = server._hub_send_refs[bundle] = ReferenceMap()
-
-    # Serving the first file advances this child's numbering and records where it started.
-    server._hub_send_checkpoint.setdefault((bundle, first), refs.snapshot())
-    refs.create(object())
-    refs.create(object())
-    server._hub_served[(bundle, first)] = object()
-    server._hub_tree[first] = object()
-
-    server._hub_release(first)
-
-    # Everything that file introduced is gone, and the counter is back where it began.
-    assert refs.snapshot() == 0
-    assert len(refs) == 0
-    assert (bundle, first) not in server._hub_served
-    assert (bundle, first) not in server._hub_send_checkpoint
-    assert first not in server._hub_tree
-
-    # So the next file reuses the same ref numbers rather than continuing past them.
-    server._hub_send_checkpoint.setdefault((bundle, second), refs.snapshot())
-    assert server._hub_send_checkpoint[(bundle, second)] == 0

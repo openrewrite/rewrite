@@ -1,119 +1,16 @@
-"""Facade -> child transport.
+"""JSON-RPC over a child process's stdin/stdout.
 
-Spawns a single-bundle child server (``server.py --child-bundle <dist>`` on the bundle's venv
-interpreter) and exchanges JSON-RPC over its stdin/stdout using the same Content-Length framing
-as the Java<->Python link. stdio is point-to-point, so the facade owns the child's pipes and speaks
-to it directly here. A child's *outbound* callbacks toward Java (``GetObject`` etc.) are relayed
-by handling inbound requests inside ``request``'s read loop.
+Uses the same Content-Length framing as the Java<->Python link. stdio is point-to-point, so the
+owner of the process speaks to it directly here; the child's *outbound* callbacks are relayed by
+handling inbound requests inside ``request``'s read loop. :mod:`rewrite.rpc.java_rpc_client` drives
+a Java peer over this.
 """
 import json
-import os
-import re
 import subprocess
-import sysconfig
 import traceback
-from importlib import metadata
-from pathlib import Path
-
-from rewrite.rpc import venv_manager
-
-_ENGINE_ROOT = str(Path(__file__).resolve().parents[2])
-_ENGINE_DIST = "openrewrite"
-_REQUIREMENT_NAME = re.compile(r"[A-Za-z0-9._-]+")
-
-
-def _path_key(path: str) -> str:
-    return os.path.normcase(os.path.abspath(path))
-
-
-def _engine_roots() -> list:
-    """Directories supplying the engine *and its runtime dependencies*.
-
-    The platform a child needs is not just the ``rewrite`` package: a recipe may parse a Python
-    template, which reaches ``parso``. A bundle venv has neither, so both must travel on the
-    child's ``PYTHONPATH``.
-    """
-    roots: list = []
-    seen: set = set()
-
-    def add(path: str) -> None:
-        key = _path_key(path)
-        if key not in seen:
-            seen.add(key)
-            roots.append(path)
-
-    add(_ENGINE_ROOT)
-    try:
-        requires = metadata.distribution(_ENGINE_DIST).requires or []
-    except metadata.PackageNotFoundError:
-        return roots  # running straight from source with no installed metadata
-
-    for requirement in requires:
-        if "extra ==" in requirement:
-            continue  # dev/publish/profiling extras are not part of a child's platform
-        name = _REQUIREMENT_NAME.match(requirement.strip())
-        if name is None:
-            continue
-        try:
-            add(str(metadata.distribution(name.group(0)).locate_file("")))
-        except metadata.PackageNotFoundError:
-            continue  # declared but absent: contribute no path rather than fail the spawn
-    return roots
-
-
-def child_command(venv_dir: Path, bundle_dist: str, attribution_name=None) -> list:
-    cmd = [
-        str(venv_manager.venv_python(venv_dir)),
-        "-m", "rewrite.rpc.server",
-        "--child-bundle", bundle_dist,
-    ]
-    if attribution_name:
-        cmd += ["--attribution-name", attribution_name]
-    return cmd
-
-
-def _child_env(exclude_paths=()) -> dict:
-    """The child's environment, with the engine placed first on ``PYTHONPATH``.
-
-    The engine is *platform*, not a bundle dependency: one pinned copy is shared by the facade and
-    every child, the way Java delegates ``org.openrewrite.*`` to the parent classloader. A child
-    runs on its bundle's venv interpreter, which has no engine of its own and inherits only the
-    environment — so the engine can reach it by no route other than ``PYTHONPATH``.
-
-    Placing it first also makes it win over ``site-packages``, so a copy pip may have dragged into
-    the bundle's venv (as a recipe's transitive dependency) is shadowed rather than loaded.
-
-    ``exclude_paths`` drops inherited entries a child must not import from — notably the shared
-    recipe-install directory the Java host puts on the facade's ``PYTHONPATH``, whose flat contents
-    would otherwise be importable by *every* child, shadowing its own copy.
-
-    ``PATH`` gains the facade's scripts directory because ``PYTHONPATH`` carries importable code
-    but not console binaries (``ty-types`` needs both). Append rather than prepend: the bundle's own
-    ``python``/``pip`` must stay first for subprocesses a recipe's template workspace spawns.
-    """
-    env = dict(os.environ)
-
-    engine = _engine_roots()
-    excluded = {_path_key(p) for p in (*exclude_paths, *engine)}
-    inherited = [p for p in env.get("PYTHONPATH", "").split(os.pathsep)
-                 if p and _path_key(p) not in excluded]
-    env["PYTHONPATH"] = os.pathsep.join([*engine, *inherited])
-
-    scripts = sysconfig.get_path("scripts")
-    path = [p for p in env.get("PATH", "").split(os.pathsep) if p]
-    if scripts and _path_key(scripts) not in {_path_key(p) for p in path}:
-        path.append(scripts)
-    env["PATH"] = os.pathsep.join(path)
-    return env
 
 
 class ChildConnection:
-    @classmethod
-    def spawn(cls, cmd: list, upstream=None, exclude_paths=()) -> "ChildConnection":
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                env=_child_env(exclude_paths))
-        return cls(proc, upstream)
-
     def __init__(self, proc: subprocess.Popen, upstream=None):
         self._proc = proc
         self._upstream = upstream
@@ -144,14 +41,18 @@ class ChildConnection:
                         f"child issued a '{callback_method}' callback but no upstream is configured")
                 try:
                     result = self._upstream(callback_method, msg.get("params", {}))
-                    self._write({"jsonrpc": "2.0", "id": child_id, "result": result})
+                    response = {"jsonrpc": "2.0", "id": child_id, "result": result}
                 except Exception as e:
-                    # Carry the traceback in `data` — the same field the child's own
+                    # Carry the traceback in `data` — the same field the peer's own
                     # error responses use — so the failing side is diagnosable from
                     # the other end of the wire.
-                    self._write({"jsonrpc": "2.0", "id": child_id,
-                                 "error": {"code": -32603, "message": str(e),
-                                           "data": traceback.format_exc()}})
+                    response = {"jsonrpc": "2.0", "id": child_id,
+                                "error": {"code": -32603, "message": str(e),
+                                          "data": traceback.format_exc()}}
+                # Notifications (no id, e.g. Evict) get no reply — a null-id response
+                # would fail every in-flight request on the peer's reader.
+                if child_id is not None:
+                    self._write(response)
 
     def close(self) -> None:
         try:
