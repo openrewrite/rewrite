@@ -514,7 +514,7 @@ class TestWellFormedness:
 
         spec = RecipeSpec(recipe=from_visitor(AwaitEveryCall()))
         with pytest.raises(AssertionError, match=r"CompilationUnit\.statements\[0\] holds Await, expected Statement"):
-            spec.rewrite_run(python("foo()", "await foo()"))
+            spec.rewrite_run(python("foo()"))
 
     def test_expression_in_single_statement_slot(self):
         class AwaitEveryYield(PythonVisitor[ExecutionContext]):
@@ -522,16 +522,12 @@ class TestWellFormedness:
                 return _await(y)
 
         spec = RecipeSpec(recipe=from_visitor(AwaitEveryYield()))
-        with pytest.raises(AssertionError, match=r"StatementExpression\.statement holds Await, expected Statement"):
+        with pytest.raises(AssertionError, match=r"holds Await, expected Statement \(StatementExpression\.statement\)"):
             spec.rewrite_run(
                 python(
                     """
                     def f():
                         yield 1
-                    """,
                     """
-                    def f():
-                        await yield 1
-                    """,
                 )
             )
