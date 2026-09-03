@@ -499,8 +499,8 @@ class PythonTypeMapping:
         if qualified:
             return (qualified[len('builtins.'):]
                     if qualified.startswith('builtins.') else qualified)
-        # TODO drop this fallback once the floor is ty-types 0.0.72+, where every
-        # class-bearing descriptor carries `qualifiedName`.
+        # Not every descriptor kind carries `qualifiedName`: `function`, `boundMethod`
+        # and `knownInstance` never do, and a few instances and TypedDicts lack it too.
         name = descriptor.get(name_key) or ''
         if not name:
             return ''
@@ -1777,7 +1777,6 @@ class PythonTypeMapping:
         by its FQN. An unqualified name is scoped to this file so the same name in
         two modules stays apart; a ``qualifiedName`` is already unique, and scoping
         it would keep two files from sharing one interned type."""
-        # TODO drop with the `_class_fqn` fallback once the floor is ty-types 0.0.72+.
         return None if descriptor.get('qualifiedName') else f"{self._file_path}#{name}"
 
     def _create_class_type(self, fqn: str, shallow: bool = True,
