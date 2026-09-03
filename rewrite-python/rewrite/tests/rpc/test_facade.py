@@ -413,7 +413,8 @@ def _print_python(cu) -> str:
 def _isolated_hub(monkeypatch, server):
     """Fresh hub state so this test neither sees nor leaves module-global tables."""
     for name in ("_hub_tree", "_hub_served", "_hub_send_refs", "_hub_recv_refs",
-                 "_hub_send_checkpoint", "_hub_recv_checkpoint", "local_objects"):
+                 "_hub_send_checkpoint", "_hub_recv_checkpoint", "local_objects",
+                 "_ref_checkpoints", "_local_ref_checkpoints"):
         monkeypatch.setattr(server, name, {})
 
 
@@ -601,11 +602,9 @@ def test_facade_visit_checkpoints_its_own_ref_tables_so_evict_rolls_them_back(mo
     monkeypatch.setattr(server, "_child_bundle", None)
     monkeypatch.setattr(server, "_facade", _RefGrowingFacade())
 
+    _isolated_hub(monkeypatch, server)
     monkeypatch.setattr(server, "local_refs", ReferenceMap())
     monkeypatch.setattr(server, "remote_refs", {})
-    monkeypatch.setattr(server, "_ref_checkpoints", {})
-    monkeypatch.setattr(server, "_local_ref_checkpoints", {})
-    monkeypatch.setattr(server, "_hub_tree", {})
 
     # an earlier file's refs, which this file's eviction must leave alone
     kept = object()
