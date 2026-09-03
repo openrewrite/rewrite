@@ -3731,17 +3731,78 @@ class TestSymbolIdentityAcrossImportForms:
             _cleanup_parse(tmpdir, client)
 
     # `asyncio` re-exports the `sleep` that `asyncio.tasks` defines, written through
-    # the facade, through the defining module, and as an attribute of the package.
+    # the facade, through the defining module, as an attribute of the package, and
+    # under a name of the file's own choosing.
     @pytest.mark.parametrize('source', [
         'from asyncio import sleep\nsleep(1)\n',
         'from asyncio.tasks import sleep\nsleep(1)\n',
         'import asyncio\nasyncio.sleep(1)\n',
-    ], ids=['through-facade', 'through-definer', 'as-attribute'])
+        'from asyncio import sleep as nap\nnap(1)\n',
+    ], ids=['through-facade', 'through-definer', 'as-attribute', 'under-an-alias'])
     def test_a_reexported_function_has_one_identity(self, source):
         self._assert_names(source, 'asyncio.tasks', 'sleep')
 
     def test_a_platform_module_is_named_by_its_portable_alias(self):
         self._assert_names('from posixpath import join\njoin("a", "b")\n', 'os.path', 'join')
+
+    def test_an_attribute_of_a_reexporting_module_names_the_definition(self):
+        cu, tmpdir, client = _parse_with_types({
+            'pkg/__init__.py': '',
+            'pkg/_impl.py': 'def bar():\n    return 1\n',
+            'pkg/api.py': 'from pkg._impl import bar as baz\n',
+            'm.py': 'import pkg.api\npkg.api.baz()\n',
+        })
+        try:
+            method_type = cu.statements[1].method_type
+            assert (method_type.declaring_type.fully_qualified_name,
+                    method_type.name) == ('pkg._impl', 'bar')
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestSymbolTheStubsDoNotDeclare:
+    """A symbol no stub declares is named by the import that binds it — reached through
+    a from-import, or through a receiver whose own import names the module."""
+
+    LIB = 'def present():\n    return 1\n'
+
+    def _call_names(self, source, call_index=1):
+        cu, tmpdir, client = _parse_with_types({'lib.py': self.LIB, 'm.py': source})
+        try:
+            method_type = cu.statements[call_index].method_type
+            declaring_type = method_type.declaring_type
+            return (getattr(declaring_type, 'fully_qualified_name', None), method_type.name)
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    @pytest.mark.parametrize('source', [
+        'import lib\nlib.gone()\n',
+        'from lib import gone\ngone()\n',
+        'from lib import gone as g\ng()\n',
+    ], ids=['as-attribute', 'through-from-import', 'under-an-alias'])
+    def test_an_undeclared_symbol_has_one_identity(self, source):
+        assert self._call_names(source) == ('lib', 'gone')
+
+    def test_a_rebound_name_is_not_attributed_from_its_import(self):
+        owner, _ = self._call_names('from lib import gone\ngone = None\ngone()\n', 2)
+        assert owner is None, 'a name the file rebinds no longer names what it imported'
+
+    def test_an_import_in_a_function_does_not_bind_at_module_scope(self):
+        owner, _ = self._call_names('def g():\n    from lib import gone\ngone()\n')
+        assert owner is None, 'a function-scope import binds only inside that function'
+
+    def test_a_receiver_names_the_module_its_import_binds(self):
+        cu, tmpdir, client = _parse_with_types(
+            {'m.py': 'import nosuchmod\nimport nosuch.pkg as np\n'
+                     'nosuchmod.gone()\nnp.sub.gone()\n'})
+        try:
+            owners = [c.method_type.declaring_type.fully_qualified_name
+                      for c in _collect_method_invocations(cu)]
+            assert owners == ['nosuchmod', 'nosuch.pkg.sub'], \
+                'a receiver names the module its import binds, not the chain it spells'
+        finally:
+            _cleanup_parse(tmpdir, client)
 
 
 @requires_ty_types_cli

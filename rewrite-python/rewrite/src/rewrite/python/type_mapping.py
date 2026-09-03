@@ -216,6 +216,7 @@ class PythonTypeMapping:
         self._module_ast_parsed = False
         self._module_ast_tree: Optional[ast.Module] = None
         self._import_binding_index: Optional[Dict[str, str]] = None
+        self._from_import_member_index: Optional[Dict[str, Tuple[str, str]]] = None
 
         # ty-types data: populated by _build_index
         self._node_index: Dict[Tuple[int, int], Tuple[int, str]] = {}  # (start, end) -> (type_id, node_kind)
@@ -996,7 +997,8 @@ class PythonTypeMapping:
 
     def _import_bindings(self) -> Dict[str, str]:
         """The FQN each of this file's absolute module-level imports names, keyed by the
-        name it binds, minus every name the file binds a second time.
+        name it binds, minus every name the file binds a second time. The same scan
+        yields the ``from M import f`` bindings that :meth:`_bound_from_import_member` reads.
 
         Python binds a name once per scope, so an import nothing else rebinds says what a
         reference to that name means whether or not ty could type it. Anything that could
@@ -1007,6 +1009,7 @@ class PythonTypeMapping:
         if self._import_binding_index is None:
             tree = self._module_ast()
             bindings: Dict[str, str] = {}
+            members: Dict[str, Tuple[str, str]] = {}
             shadowed: Set[str] = set()
             top_level = set()
 
@@ -1030,11 +1033,13 @@ class PythonTypeMapping:
                         elif alias.name == '*':
                             # A star import can bind any name, so nothing here is decidable
                             self._import_binding_index = {}
+                            self._from_import_member_index = {}
                             return self._import_binding_index
                         elif relative:
                             bind(alias.asname or alias.name, None)
                         else:
                             bind(alias.asname or alias.name, f"{stmt.module}.{alias.name}")
+                            members[alias.asname or alias.name] = (stmt.module, alias.name)
 
             for node in ast.walk(tree) if tree else ():
                 if isinstance(node, ast.Name):
@@ -1053,7 +1058,19 @@ class PythonTypeMapping:
 
             self._import_binding_index = {name: fqn for name, fqn in bindings.items()
                                           if name not in shadowed}
+            self._from_import_member_index = {name: member for name, member in members.items()
+                                              if name not in shadowed}
         return self._import_binding_index
+
+    def _bound_from_import_member(self, node: ast.expr) -> Optional[Tuple[str, str]]:
+        """The ``(module, member)`` an unshadowed module-level ``from M import f`` binds
+        ``node``'s name to. A receiver-less call spells the binding's name, which an alias
+        makes different from the member's, so both halves come from the import.
+        """
+        if not isinstance(node, ast.Name):
+            return None
+        self._import_bindings()
+        return (self._from_import_member_index or {}).get(node.id)
 
     def import_alias_type(self, node: ast.alias) -> Optional[JavaType]:
         """The type of the symbol an import name binds, named under the module defining
@@ -1267,9 +1284,16 @@ class PythonTypeMapping:
             return None
         if self._constructed_class(node) is not None:
             method_name = '<constructor>'
+        else:
+            method_name = self._callee_declared_name(node) or method_name
 
         # Get declaring type
         declaring_type = self._get_declaring_type(node)
+        if isinstance(declaring_type, JavaType.Unknown):
+            # Nothing resolved the callee, so the import binding it is what names it.
+            bound = self._bound_from_import_member(node.func)
+            if bound:
+                declaring_type, method_name = self._module_class(bound[0]), bound[1]
 
         # Get parameter names and types from method signature
         param_names, param_types = self._get_method_signature(node)
@@ -1295,8 +1319,19 @@ class PythonTypeMapping:
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
 
+    def _callee_declared_name(self, node: ast.Call) -> Optional[str]:
+        """The name the callee carries where it is defined. Its owner is read off the
+        callee, so its name is too: a binding that renames a symbol renames neither
+        half — ``from platform import system as s`` calls ``platform system(..)``.
+        """
+        callee_id = self._lookup_func_type_id(node)
+        callee = self._type_registry.get(callee_id) if callee_id is not None else None
+        if callee is not None and callee.get('kind') in _FUNCTION_KINDS:
+            return callee.get('name') or None
+        return None
+
     def _extract_method_name(self, node: ast.Call) -> Optional[str]:
-        """Extract the method name from a Call node."""
+        """The name a Call node spells."""
         if isinstance(node.func, ast.Name):
             return node.func.id
         elif isinstance(node.func, ast.Attribute):
@@ -1468,6 +1503,13 @@ class PythonTypeMapping:
                 resolved = self._resolve_declaring_type(type_id)
                 if resolved is not None:
                     return resolved
+
+        if isinstance(node.func, ast.Attribute):
+            # A receiver whose root an unshadowed import binds is that module, spelled as
+            # the import names it. A written chain alone cannot tell a module from a value.
+            module = self._import_binding_fqn(node.func.value)
+            if module:
+                return self._module_class(module)
 
         inferred = self._infer_declaring_type_from_ast(node)
         return inferred if inferred is not None else _UNKNOWN
