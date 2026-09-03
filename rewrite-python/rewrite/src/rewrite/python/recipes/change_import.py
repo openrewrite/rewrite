@@ -149,7 +149,7 @@ class ChangeImport(Recipe):
             module_alias: Optional[str] = None
             rewrote_qualified_refs: bool = False
             new_module_type: Optional[JavaType.Class] = None
-            local_bindings: LocalBindings  # a fresh instance per compilation unit
+            local_bindings = LocalBindings()
             old_import_at_module_level: bool = False
             direct_module_import_at_module_level: bool = False
 
@@ -160,7 +160,6 @@ class ChangeImport(Recipe):
                 self.module_alias = None
                 self.rewrote_qualified_refs = False
                 self.new_module_type = None
-                self.local_bindings = LocalBindings()
 
                 for stmt in cu.statements:
                     self._detect(stmt)

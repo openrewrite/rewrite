@@ -90,6 +90,7 @@ from rewrite.python.format import (
 from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_import
 from rewrite.python.remove_import import RemoveImport, RemoveImportOptions, maybe_remove_import
 from rewrite.python.method_matcher import MethodMatcher
+from rewrite.python.scope_utils import Scope, scope_of
 
 # Type-comparison helpers
 from rewrite.python.type_utils import (
@@ -196,6 +197,9 @@ __all__ = [
     "maybe_remove_import",
     # Method matching
     "MethodMatcher",
+    # Scoping
+    "Scope",
+    "scope_of",
     # Type-comparison helpers
     "is_assignable_to",
     "is_of_type",
