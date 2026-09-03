@@ -528,7 +528,8 @@ public class RewriteRpc {
             return new RecipeLoader(null).load(name, options);
         } catch (RuntimeException e) {
             throw new IllegalStateException("Recipe " + name +
-                                            " is neither in the marketplace nor loadable from the classpath", e);
+                                            " is not in the marketplace and could not be loaded from the classpath: " +
+                                            e.getMessage(), e);
         }
     }
 

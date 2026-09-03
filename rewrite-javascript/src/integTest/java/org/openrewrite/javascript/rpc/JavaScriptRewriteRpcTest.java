@@ -661,7 +661,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
      * (the shape of Angular's {@code UpgradeToAngular19}). The host re-prepares each child by id while
      * building {@code RpcRecipe.getRecipeList()}; the Java-delegate child misses in the JS marketplace,
      * so the JS server must answer {@code delegatesTo} (rather than throwing "Could not find recipe
-     * with id ...") and the host resolves it from its own marketplace as a LOCAL Java recipe.
+     * with id ...") and the host instantiates it as a LOCAL Java recipe (marketplace, then classpath).
      * <p>
      * The host (this JVM) is configured with a runtime-classpath marketplace + resolver that owns its
      * bundled {@code org.openrewrite.javascript.*} recipes — mirroring the moderne-cli concession.

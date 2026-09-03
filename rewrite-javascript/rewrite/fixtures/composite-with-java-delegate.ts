@@ -30,7 +30,7 @@ export async function activate(marketplace: RecipeMarketplace) {
  * {@code RpcRecipe.getRecipeList()}. The Java-delegate child is an {@code RpcRecipe}
  * that {@code installSubRecipes} does not register in this server's marketplace, so the
  * re-prepare misses here and the server must answer with {@code delegatesTo} (rather than
- * throwing) so the host resolves it from its own marketplace as a local Java recipe.
+ * throwing) so the host instantiates it as a local Java recipe (marketplace, then classpath).
  */
 class CompositeWithJavaDelegate extends Recipe {
     name = "org.openrewrite.example.npm.composite-with-java-delegate";

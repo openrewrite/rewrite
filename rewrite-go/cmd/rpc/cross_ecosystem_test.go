@@ -29,8 +29,8 @@ import (
 )
 
 // goDelegatingRecipe delegates entirely to a Java host recipe. The Go server can't run it, so
-// PrepareRecipe answers with delegatesTo{recipeName, options} and the Java host resolves the
-// recipe from its own marketplace instead of wrapping the Go recipe in an RpcRecipe.
+// PrepareRecipe answers with delegatesTo{recipeName, options} and the Java host instantiates the
+// recipe locally (marketplace, then classpath) instead of wrapping the Go recipe in an RpcRecipe.
 type goDelegatingRecipe struct{ recipe.Base }
 
 func (*goDelegatingRecipe) Name() string           { return "org.openrewrite.go.test.Delegating" }

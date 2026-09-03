@@ -55,6 +55,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -319,6 +320,17 @@ class RewriteRpcTest implements RewriteTest {
           null);
 
         assertThat(client.recipeFromPrepareResponse(response)).isEqualTo(expected);
+    }
+
+    @Test
+    void delegatesToFailsWithLoaderCauseWhenNeitherMarketplaceNorClasspathHasIt() {
+        PrepareRecipeResponse response = new PrepareRecipeResponse("1", null, "", List.of(), null, List.of(),
+          new PrepareRecipeResponse.DelegatesTo("org.example.Missing", Map.of()), null);
+
+        assertThatThrownBy(() -> client.recipeFromPrepareResponse(response))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("org.example.Missing")
+          .hasCauseInstanceOf(RuntimeException.class);
     }
 
     @Test

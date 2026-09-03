@@ -64,10 +64,11 @@ import static org.openrewrite.test.SourceSpecs.text;
  * {@code existingFileStrategy}) and string-to-enum coercion ({@code "Continue"}).
  * <p>
  * The Python composite is supplied as a test-only fixture package installed into
- * the peer via the {@code InstallRecipes} RPC, and the delegated Java recipe is
- * made resolvable to the JVM's {@code delegatesTo} consumer by a marketplace
- * scanned from the runtime classpath (mirroring {@code RewriteRpcTest}). No
- * production code or shipped recipe is involved.
+ * the peer via the {@code InstallRecipes} RPC, and the JVM's {@code delegatesTo}
+ * consumer resolves the delegated Java recipe from a marketplace scanned from the
+ * runtime classpath (mirroring {@code RewriteRpcTest}), exercising the marketplace
+ * route rather than its classpath fallback. No production code or shipped recipe is
+ * involved.
  */
 class RecipeListReferencingJavaRecipeIntegTest implements RewriteTest {
 
@@ -188,9 +189,9 @@ class RecipeListReferencingJavaRecipeIntegTest implements RewriteTest {
 
     /**
      * Resolves recipes straight from the runtime-classpath marketplace, so the
-     * JVM's {@code delegatesTo} consumer (which does a marketplace lookup) can
-     * find and natively instantiate the delegated Java recipe. Mirrors the
-     * resolver in {@code RewriteRpcTest}.
+     * JVM's {@code delegatesTo} consumer (marketplace first, then classpath) finds
+     * the delegated Java recipe through the marketplace. Mirrors the resolver in
+     * {@code RewriteRpcTest}.
      */
     class TestRecipeBundleResolver implements RecipeBundleResolver {
         @Override
