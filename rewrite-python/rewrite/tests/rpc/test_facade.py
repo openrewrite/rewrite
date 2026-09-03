@@ -301,12 +301,15 @@ def test_hub_release_rolls_each_childs_ref_table_back_in_lockstep():
 
     server._hub_tree["T"] = object()
     server._hub_served[("A", "T")] = object()
-    # child A had 2 refs before this file, then the file introduced refs 3 and 4
+    # child A had 2 refs in each direction before this file, then the file introduced 3 and 4
     refs = server._hub_send_refs["A"] = ReferenceMap()
     survivors = [object(), object()]
     for obj in survivors + [object(), object()]:
         refs.create(obj)
     server._hub_send_checkpoint[("A", "T")] = 2
+    recv = server._hub_recv_refs["A"] = {i: object() for i in range(1, 5)}
+    kept = {i: recv[i] for i in (1, 2)}
+    server._hub_recv_checkpoint[("A", "T")] = 2
 
     server._hub_release("T")
 
@@ -314,9 +317,11 @@ def test_hub_release_rolls_each_childs_ref_table_back_in_lockstep():
     assert [refs.get(obj) for obj in survivors] == [1, 2]
     assert len(refs) == 2
     assert refs.snapshot() == 2                     # counter rewound so the next file re-ADDs
+    assert recv == kept
     assert "T" not in server._hub_tree
     assert ("A", "T") not in server._hub_served
     assert ("A", "T") not in server._hub_send_checkpoint
+    assert ("A", "T") not in server._hub_recv_checkpoint
 
 
 class _PreconditionChildren(_FakeChildren):
@@ -407,8 +412,8 @@ def _print_python(cu) -> str:
 
 def _isolated_hub(monkeypatch, server):
     """Fresh hub state so this test neither sees nor leaves module-global tables."""
-    for name in ("_hub_tree", "_hub_served", "_hub_send_refs",
-                 "_hub_send_checkpoint", "local_objects"):
+    for name in ("_hub_tree", "_hub_served", "_hub_send_refs", "_hub_recv_refs",
+                 "_hub_send_checkpoint", "_hub_recv_checkpoint", "local_objects"):
         monkeypatch.setattr(server, name, {})
 
 
@@ -528,3 +533,94 @@ def test_an_unknown_visitor_is_still_an_error():
         assert False, "expected a ValueError for a visitor no child owns"
     except ValueError as e:
         assert "No child owns visitor" in str(e)
+
+
+class _RefUsingChild:
+    """A child bundle as a real RPC peer: one persistent send ref map toward the hub, so the second
+    edit that reuses a type the first edit already sent cites it as a bare ref."""
+
+    def __init__(self, edits):
+        from rewrite.rpc.reference import ReferenceMap
+        self._edits = edits                 # obj_id -> the tree this child's visitors produced
+        self.refs = ReferenceMap()
+
+    def request(self, bundle, method, params):
+        import rewrite.rpc.server as server
+        from rewrite.rpc.send_queue import RpcSendQueue
+
+        obj_id = params["id"]
+        before = server._hub_served[(bundle, obj_id)]
+        return RpcSendQueue(params["sourceFileType"], self.refs).generate(self._edits[obj_id], before)
+
+
+def test_the_hub_resolves_a_back_reference_a_childs_earlier_edit_assigned(monkeypatch):
+    import rewrite.rpc.server as server
+
+    sft, bundle = "org.openrewrite.python.tree.Py$CompilationUnit", "pkg"
+    # Both edits add a statement whose literal carries the same primitive type, which is what the
+    # child sends once and cites thereafter.
+    files = {_parse_python("x = 1\n"): _parse_python("x = 1\ny = 2\n"),
+             _parse_python("q = 3\n"): _parse_python("q = 3\nr = 4\n")}
+    trees = {str(before.id): before for before in files}
+    edits = {str(before.id): after for before, after in files.items()}
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: trees.get(obj_id))
+
+    children = _RefUsingChild(edits)
+    for tree_id in trees:
+        server._hub_acquire(tree_id, sft)
+        server._hub_serve_child(bundle, tree_id, sft)
+        server._hub_pull_child_edit(children, bundle, tree_id, sft)
+
+    assert [_print_python(server._hub_tree[tree_id]) for tree_id in trees] == [
+        "x = 1\ny = 2\n", "q = 3\nr = 4\n"]
+
+
+def test_facade_visit_checkpoints_its_own_ref_tables_so_evict_rolls_them_back(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    class _RefGrowingFacade:
+        def get_marketplace(self, params): ...
+        def install_recipes(self, params): ...
+        def prepare_recipe(self, params): ...
+        def set_data_table_store(self, params): ...
+        def batch_visit(self, params): ...
+        def generate(self, params): ...
+
+        def evict(self, params):
+            return True
+
+        def visit(self, params):
+            server.local_refs.create(object())  # what handle_get_object's response assigns
+            return {"modified": True}
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _RefGrowingFacade())
+
+    monkeypatch.setattr(server, "local_refs", ReferenceMap())
+    monkeypatch.setattr(server, "remote_refs", {})
+    monkeypatch.setattr(server, "_ref_checkpoints", {})
+    monkeypatch.setattr(server, "_local_ref_checkpoints", {})
+    monkeypatch.setattr(server, "_hub_tree", {})
+
+    # an earlier file's refs, which this file's eviction must leave alone
+    kept = object()
+    server.local_refs.create(kept)
+    server.remote_refs[1] = object()
+
+    def _fake_get_object_from_java(obj_id, source_file_type):
+        server.remote_refs[2] = object()  # the tree Java sends for this file
+        return object()
+
+    monkeypatch.setattr(server, "get_object_from_java", _fake_get_object_from_java)
+
+    server.handle_request("Visit", {"treeId": "T", "sourceFileType": "py", "visitor": "edit:1"})
+    server.handle_request("Evict", {"id": "T"})
+
+    assert server.local_refs.get(kept) == 1
+    assert server.local_refs.snapshot() == 1
+    assert sorted(server.remote_refs) == [1]
