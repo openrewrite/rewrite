@@ -528,6 +528,7 @@ def handle_parse(params: dict) -> List[str]:
     # parse_python_source.
     from rewrite.python._version_detect import detect_from_project
     project_language_level = detect_from_project(relative_to) if relative_to else None
+    ty_python_version = _ty_python_version(language_level, project_language_level)
 
     # Create a ty-types client for this parse batch
     ty_client = None
@@ -536,7 +537,8 @@ def handle_parse(params: dict) -> List[str]:
         from rewrite.python.ty_client import TyTypesClient
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
-        ty_client = TyTypesClient(virtual_env=dependency_path)
+        ty_client = TyTypesClient(virtual_env=dependency_path,
+                                  python_version=ty_python_version)
         if relative_to:
             ty_client.initialize(relative_to)
         else:
@@ -637,6 +639,7 @@ def handle_parse_project(params: dict) -> List[dict]:
     # file may still override it via in-source signals inside parse_python_source.
     from rewrite.python._version_detect import detect_from_project
     project_language_level = detect_from_project(project_path)
+    ty_python_version = _ty_python_version(language_level, project_language_level)
 
     results = []
 
@@ -645,7 +648,8 @@ def handle_parse_project(params: dict) -> List[dict]:
         from rewrite.python.ty_client import TyTypesClient
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
-        ty_client = TyTypesClient(virtual_env=dependency_path)
+        ty_client = TyTypesClient(virtual_env=dependency_path,
+                                  python_version=ty_python_version)
         ty_client.initialize(project_path)
     except (ImportError, RuntimeError):
         pass
@@ -827,6 +831,19 @@ def _typeshed_stdlib_dir() -> Path:
 def _requested_python_version(value: Any) -> Optional[str]:
     """The value if it looks like a Python minor version ("3.12"), else None."""
     return value if isinstance(value, str) and re.fullmatch(r'\d+\.\d+', value) else None
+
+
+def _ty_python_version(*levels: Optional[str]) -> Optional[str]:
+    """The first language level precise enough to name a stdlib surface to ty.
+
+    One ty session serves a whole batch, so callers pass only levels holding
+    for all of it — never a per-file shebang or magic comment.
+    """
+    for level in levels:
+        version = _requested_python_version(level)
+        if version:
+            return version
+    return None
 
 
 def _write_stdlib_ty_config(stdlib: Path, python_version: Optional[str]) -> str:
