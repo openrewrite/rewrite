@@ -54,6 +54,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -198,6 +199,30 @@ class RewriteRpcTest implements RewriteTest {
         server.localObjects.put(id, fixed);
         PlainText result = client.getObject(id, sourceFileType);
         assertThat(result.getText()).isEqualTo("Fixed");
+    }
+
+    /**
+     * A NO_CHANGE answer for an object this side never received means the peers have drifted apart,
+     * not that the object was deleted: getObject() must fail rather than hand back null.
+     */
+    @Test
+    void getObjectRejectsNoChangeWithoutABaseline() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        server.localObjects.put(id, original);
+        client.getObject(id, sourceFileType);
+
+        // The client loses its copy (a failed receive drops it) while the server still believes it was delivered.
+        client.remoteObjects.remove(id);
+
+        assertThatThrownBy(() -> client.getObject(id, sourceFileType))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("no change to " + id);
     }
 
     /**

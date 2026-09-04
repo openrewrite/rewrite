@@ -58,6 +58,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
+import static org.openrewrite.rpc.RpcObjectData.State.NO_CHANGE;
 
 /**
  * Base class for RPC clients with thread-local context support.
@@ -736,6 +737,10 @@ public class RewriteRpc {
         );
         Object remoteObject;
         try {
+            if (before == null && q.peek().getState() == NO_CHANGE) {
+                // The remote believes this side already holds the object; a null here would read as a deletion.
+                throw new IllegalStateException("Remote reports no change to " + id + " but this side holds no copy of it");
+            }
             remoteObject = q.receive(before, null);
         } catch (Exception e) {
             // Reset our tracking of the remote state so the next interaction

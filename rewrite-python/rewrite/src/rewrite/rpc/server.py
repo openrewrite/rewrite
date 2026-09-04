@@ -2417,7 +2417,8 @@ def _hub_serve_child(bundle: str, obj_id: str, source_file_type: Optional[str]) 
     return data
 
 
-def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: Optional[str]) -> None:
+def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: Optional[str],
+                         may_delete: bool = False) -> None:
     """Pull a child's edit back as a diff against what it was served and apply it to the facade's
     tree, so the next bundle starts from this bundle's result."""
     from rewrite.rpc.receive_queue import RpcReceiveQueue
@@ -2437,6 +2438,8 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
 
     edited = RpcReceiveQueue(refs, source_file_type, pull).receive(served, None)
     if edited is None:
+        if not may_delete:
+            raise RuntimeError(f"{bundle} reported {obj_id} as modified but no longer holds it")
         _hub_forget(obj_id)
     else:
         _hub_tree[obj_id] = edited
@@ -2563,6 +2566,7 @@ def _get_facade():
                                         upstream=_serve_child_object,
                                         on_child_replaced=_hub_drop_bundle),
                          hub_pull=_hub_pull_child_edit,
+                         hub_drop=_hub_forget,
                          local_visit=_hub_local_visit,
                          is_local_visitor=_hub_is_builtin_visitor)
     return _facade
