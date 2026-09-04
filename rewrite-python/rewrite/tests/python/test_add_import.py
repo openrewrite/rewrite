@@ -148,6 +148,21 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_only_if_referenced_ignores_a_member_name_that_merely_matches(self, arm):
+        """``json`` occurs only in slots naming a member, never as a reference."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'json', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                def handle(resp, url, body, item):
+                    resp.json()
+                    post(url, json=body)
+                    return item.payload.json
+                """,
+            )
+        )
+
     def test_only_if_referenced_adds_when_referenced(self, arm):
         """The name is used, so the import is added."""
         spec = RecipeSpec(recipe=from_visitor(

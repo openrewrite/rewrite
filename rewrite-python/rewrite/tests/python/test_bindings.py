@@ -32,6 +32,11 @@ class _Census(PythonVisitor[Any]):
     def __init__(self) -> None:
         super().__init__()
         self.found: List[Reference] = []
+        self.bindings: List[Tuple[str, str, Optional[str], bool]] = []
+
+    def visit_compilation_unit(self, cu: CompilationUnit, p: Any) -> J:
+        self.bindings = [(b.name, b.module, b.member, b.guarded) for b in import_bindings(cu)]
+        return super().visit_compilation_unit(cu, p)
 
     def visit_identifier(self, ident: Identifier, p: Any) -> J:
         binding = import_bindings(self).reference(self.cursor, ident)
@@ -40,8 +45,8 @@ class _Census(PythonVisitor[Any]):
         return ident
 
 
-def _run(source: str, visitor: PythonVisitor[Any]) -> None:
-    RecipeSpec(type_attribution=False).rewrite_run(
+def _run(source: str, visitor: PythonVisitor[Any], attributed: bool = False) -> None:
+    RecipeSpec(type_attribution=attributed).rewrite_run(
         python(source, after_recipe=lambda sf: visitor.visit(sf, None)))
 
 
@@ -73,6 +78,33 @@ def test_a_name_in_member_position_is_not_a_reference():
         """) == [('json', 'json', None)]
 
 
+def test_a_global_statement_declares_a_binding_rather_than_reading_it():
+    assert _references("""
+        import json
+        def f():
+            global json
+            json = None
+        """) == []
+
+
+def test_attribution_changes_nothing_the_model_reports():
+    source = """
+        import json
+        from os.path import join as j
+        from . import sibling
+        resp.json()
+        json.dumps(j)
+        x: 'json.Foo' = None
+        """
+
+    def arm(attributed: bool):
+        census = _Census()
+        _run(source, census, attributed)
+        return census.found, census.bindings
+
+    assert arm(False) == arm(True)
+
+
 def test_a_local_binding_shadows_the_import_it_matches():
     assert _references("""
         import json
@@ -95,6 +127,41 @@ def test_an_import_statement_binds_its_names_rather_than_reading_them():
         from os.path import join
         os.path.join(a, b)
         """) == [('os', 'os.path', None)]
+
+
+def test_a_target_the_statement_binds_is_not_a_reference():
+    assert _references("""
+        import json
+        json = None
+        (a, json) = f()
+        for json in xs:
+            pass
+        del json
+        """) == []
+
+
+def test_a_dotted_target_reads_the_name_it_assigns_through():
+    assert _references("""
+        import json
+        json.cache = {}
+        json += 1
+        """) == [('json', 'json', None), ('json', 'json', None)]
+
+
+def test_the_last_import_of_a_name_in_source_order_is_the_one_in_force():
+    bindings = _bindings("""
+        from typing import TYPE_CHECKING
+        if TYPE_CHECKING:
+            from a import Bar
+        from b import Bar
+        """)
+    assert bindings.for_name('Bar').module == 'b'
+
+
+def test_a_wildcard_import_binds_no_name_of_its_own():
+    bindings = _bindings("from json import *\n")
+    assert [(b.name, b.member) for b in bindings] == [('*', '*')]
+    assert bindings.for_name('*') is None
 
 
 def test_bindings_record_the_local_name_module_and_member():

@@ -24,10 +24,17 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 
 from rewrite import Cursor
 from rewrite.java.support_types import J, Statement
-from rewrite.java.tree import FieldAccess, Identifier, Import, MethodInvocation
-from rewrite.python.import_utils import get_alias_name, module_scope_blocks
+from rewrite.java.tree import (Assignment, FieldAccess, ForEachLoop, Identifier, If, Import,
+                               MethodInvocation, Parentheses)
+from rewrite.python.import_utils import get_alias_name, unconditional_body
 from rewrite.python.scope_utils import scope_of
-from rewrite.python.tree import CompilationUnit, MultiImport, VariableScope
+from rewrite.python.tree import (ChainedAssignment, CollectionLiteral, ComprehensionExpression,
+                                 CompilationUnit, Del, ExpressionStatement, MultiImport, Star,
+                                 TypeHintedExpression, VariableScope)
+
+# The wrappers a target puts between a statement and the names it binds, as `scope_utils`
+# unwraps them to collect those names.
+_TARGET_WRAPPERS = (Parentheses, Star, CollectionLiteral, ExpressionStatement, TypeHintedExpression)
 from rewrite.visitor import TreeVisitor
 
 _IMPORT_BINDINGS = 'org.openrewrite.python.importBindings'
@@ -46,7 +53,8 @@ class Binding:
     sibling module and never the standard library's ``locale``."""
 
     member: Optional[str]
-    """The member of ``from <module> import <member>``, None for ``import <module>``."""
+    """The member of ``from <module> import <member>``, None for ``import <module>``, ``'*'``
+    for a wildcard."""
 
     imp: Import
     """The node binding this one name; a ``MultiImport`` holds several."""
@@ -64,7 +72,7 @@ class ImportBindings:
     def __init__(self, bindings: Sequence[Binding]) -> None:
         self._bindings = tuple(bindings)
         # A second import of a name replaces the first, as running the statements would.
-        self._by_name: Dict[str, Binding] = {b.name: b for b in self._bindings}
+        self._by_name: Dict[str, Binding] = {b.name: b for b in self._bindings if b.member != '*'}
 
     def __iter__(self) -> Iterator[Binding]:
         return iter(self._bindings)
@@ -73,7 +81,9 @@ class ImportBindings:
         return len(self._bindings)
 
     def for_name(self, name: str) -> Optional[Binding]:
-        """The binding ``name`` holds, or None where no import binds it."""
+        """The binding ``name`` holds, or None where no import binds it — which is weaker than
+        ``name`` being free, since a wildcard import and a ``try``/``except ImportError``
+        fallback both bind names no ``Binding`` records."""
         return self._by_name.get(name)
 
     def for_module(self, module: str, member: Optional[str] = None) -> Tuple[Binding, ...]:
@@ -85,7 +95,10 @@ class ImportBindings:
 
     def reference(self, cursor: Cursor, ident: Identifier) -> Optional[Binding]:
         """The binding ``ident`` reads, or None where it reads something else: a name in
-        member position, a name nothing imports, or one an enclosing scope rebinds."""
+        member position, a name nothing imports, or one an enclosing scope rebinds. A quoted
+        forward reference holds an expression rather than a name, so its names come from
+        :func:`referenced_names` instead. Check :attr:`Binding.guarded` before emitting a
+        reference that has to resolve at runtime."""
         binding = self._by_name.get(ident.simple_name)
         if binding is None or not is_reference(cursor, ident):
             return None
@@ -96,14 +109,13 @@ class ImportBindings:
 def import_bindings(source: Union[TreeVisitor[Any, Any], CompilationUnit,
                                   Iterable[Statement]]) -> ImportBindings:
     """The bindings the imports of ``source`` introduce: a visitor answers for the file it is
-    visiting and scans it once, a compilation unit for its module scope, a statement list for
-    the block it belongs to, which is how a function's own imports are reached.
+    visiting and scans it once, a compilation unit or statement list scans on every call.
 
-    Module scope is the top-level statements plus the ``if`` bodies :func:`module_scope_blocks`
-    yields, so a ``try``/``except ImportError`` fallback never has its shim taken for the module.
+    A scan descends into the body of an ``if`` that has no ``else``, so a ``try``/``except
+    ImportError`` fallback never has its shim taken for the module — see :attr:`Binding.guarded`.
     """
     if isinstance(source, CompilationUnit):
-        return ImportBindings(_module_scope_bindings(source))
+        return ImportBindings(_scan(source.statements, guarded=False))
     if isinstance(source, TreeVisitor):
         return _cached(source.cursor)
     return ImportBindings(_scan(source, guarded=False))
@@ -116,16 +128,19 @@ def is_reference(cursor: Cursor, ident: Identifier) -> bool:
     :meth:`ImportBindings.reference` composes the two. ``cursor`` stands on ``ident`` or on
     its parent, which lets a visitor ask about a node's own child from where it already is.
     """
-    path = _path_from(cursor, ident)
-    index = 1
-    # A dotted name reads through its root, so where the chain sits decides for the root too.
-    while index < len(path):
-        enclosing = path[index]
-        if not isinstance(enclosing, FieldAccess) or enclosing.target is not path[index - 1]:
+    node: J = ident
+    parent: Optional[J] = None
+    dotted = False
+    for enclosing in _enclosing_nodes(cursor, ident):
+        # A dotted name reads through its root, and a tuple or starred target spreads over the
+        # names under it, so in both the enclosing node decides for the one below.
+        if isinstance(enclosing, FieldAccess) and enclosing.target is node:
+            node, dotted = enclosing, True
+        elif isinstance(enclosing, _TARGET_WRAPPERS):
+            node = enclosing
+        else:
+            parent = enclosing
             break
-        index += 1
-    node = path[index - 1]
-    parent = path[index] if index < len(path) else None
 
     if isinstance(parent, (Import, MultiImport, VariableScope)):
         # An import names the module or member it binds; `global x` names a binding elsewhere.
@@ -133,21 +148,35 @@ def is_reference(cursor: Cursor, ident: Identifier) -> bool:
     if isinstance(parent, MethodInvocation):
         # A call selecting nothing calls a name it read; with a receiver the name is a member.
         return parent.name is not node or parent.select is None
+    if not dotted and _is_target(parent, node):
+        return False
     # Every other node that names rather than reads keeps the name on `name`: an attribute, a
     # keyword argument, a `def`, a `class`, a parameter, a type alias.
     return getattr(parent, 'name', None) is not node
 
 
-def _path_from(cursor: Cursor, ident: Identifier) -> List[J]:
-    """``ident`` and the nodes enclosing it, padding wrappers left out."""
-    path: List[J] = [ident]
+def _is_target(parent: Optional[J], node: J) -> bool:
+    """Whether ``node`` is a target ``parent`` binds. Only an undotted name asks: ``json.x = 1``
+    reads ``json`` to assign through it."""
+    if isinstance(parent, Assignment):
+        return parent.variable is node
+    if isinstance(parent, ChainedAssignment):
+        return any(variable is node for variable in parent.variables)
+    if isinstance(parent, ForEachLoop.Control):
+        return parent.variable is node
+    if isinstance(parent, ComprehensionExpression.Clause):
+        return parent.iterator_variable is node
+    return isinstance(parent, Del)
+
+
+def _enclosing_nodes(cursor: Cursor, ident: Identifier) -> Iterator[J]:
+    """The nodes enclosing ``ident``, innermost first, padding wrappers left out."""
     c: Optional[Cursor] = cursor
     while c is not None:
         value = c.value
         if isinstance(value, J) and value is not ident:
-            path.append(value)
+            yield value
         c = c.parent
-    return path
 
 
 def _cached(cursor: Cursor) -> ImportBindings:
@@ -156,20 +185,15 @@ def _cached(cursor: Cursor) -> ImportBindings:
         if isinstance(c.value, CompilationUnit):
             bindings = c.get_message(_IMPORT_BINDINGS, None)
             if bindings is None:
-                bindings = ImportBindings(_module_scope_bindings(c.value))
+                bindings = ImportBindings(_scan(c.value.statements, guarded=False))
                 c.put_message(_IMPORT_BINDINGS, bindings)
             return bindings
     return ImportBindings(())
 
 
-def _module_scope_bindings(cu: CompilationUnit) -> List[Binding]:
-    bindings = _scan(cu.statements, guarded=False)
-    for block in module_scope_blocks(cu.statements):
-        bindings.extend(_scan(block.statements, guarded=True))
-    return bindings
-
-
 def _scan(statements: Iterable[Statement], guarded: bool) -> List[Binding]:
+    """The bindings of ``statements`` in source order, which is the order that decides which
+    import of a name is the one in force."""
     bindings: List[Binding] = []
     for stmt in statements:
         if isinstance(stmt, MultiImport):
@@ -177,6 +201,10 @@ def _scan(statements: Iterable[Statement], guarded: bool) -> List[Binding]:
             bindings.extend(_binding(imp, module, guarded) for imp in stmt.names)
         elif isinstance(stmt, Import):
             bindings.append(_binding(stmt, None, guarded))
+        elif isinstance(stmt, If):
+            body = unconditional_body(stmt)
+            if body is not None:
+                bindings.extend(_scan(body.statements, guarded=True))
     return bindings
 
 
