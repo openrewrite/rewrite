@@ -46,4 +46,14 @@ describeJavaRpc("Java recipe via RPC", () => {
             },
         );
     });
+
+    testJavaRpc("prepareJavaRecipe exposes a Java composite's children for a run in this process", async ({javaRpc: _javaRpc}) => {
+        const recipe = await prepareJavaRecipe(
+            "org.openrewrite.maven.cleanup.AddProjectBuildOutputTimestamp",
+            {timestamp: "2024-01-01T00:00:00Z"},
+        );
+        expect((await recipe.descriptor()).recipeList).toEqual([]);
+        expect((await recipe.recipeList()).map(child => child.name))
+            .toEqual(["org.openrewrite.maven.AddProperty"]);
+    });
 });

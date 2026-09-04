@@ -33,7 +33,7 @@ export * from "./queue";
 export * from "../reference";
 export {RewriteRpc} from "./rewrite-rpc";
 export {RpcRecipe, RpcVisitor} from "./recipe";
-export {prepareJavaRecipe} from "./java-recipe";
+export {DelegatingRecipe, prepareJavaRecipe} from "./java-recipe";
 export {registerVisitor} from "./request/visitor-registry";
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
