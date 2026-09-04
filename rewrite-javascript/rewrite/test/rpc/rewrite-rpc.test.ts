@@ -23,6 +23,8 @@ import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
+import {activate as activateCompositeWithJavaDelegate} from "../../fixtures/composite-with-java-delegate";
+import {activate as activateJavaDelegatePrecondition} from "../../fixtures/java-delegate-precondition";
 import {
     findNodeResolutionResult,
     javascript,
@@ -40,6 +42,7 @@ describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
 
     let server: RewriteRpc;
+    let serverMarketplace: RecipeMarketplace;
     let client: RewriteRpc;
 
     beforeEach(async () => {
@@ -59,10 +62,10 @@ describe("Rewrite RPC", () => {
             new rpc.StreamMessageReader(clientToServer),
             new rpc.StreamMessageWriter(serverToClient)
         );
-        const marketplace = new RecipeMarketplace();
-        await activate(marketplace);
+        serverMarketplace = new RecipeMarketplace();
+        await activate(serverMarketplace);
         server = new RewriteRpc(serverConnection, {
-            marketplace: marketplace
+            marketplace: serverMarketplace
         });
     });
 
@@ -269,10 +272,10 @@ describe("Rewrite RPC", () => {
 
     test("prepareRecipeWithRpcSubRecipeInRecipeList", async () => {
         // A composite recipe whose recipeList() mixes a local recipe with an
-        // already-prepared remote (RpcRecipe) sub-recipe — the shape of e.g.
-        // Angular's UpgradeToAngular21, which lists upgradeDependencyVersion()
-        // (a Java recipe prepared over RPC). Preparing it must not try to
-        // re-install the RpcRecipe by its (no-arg-incompatible) constructor.
+        // already-prepared remote (RpcRecipe) sub-recipe — the shape of a
+        // framework-upgrade composite listing a Java recipe prepared over RPC.
+        // Preparing it must not try to re-install the RpcRecipe by its
+        // (no-arg-incompatible) constructor.
         const recipe = await client.prepareRecipe("org.openrewrite.example.text.with-rpc-sub-recipe");
         const descriptor = await recipe.descriptor();
         expect(descriptor.recipeList.map(r => r.name)).toContain(
@@ -300,13 +303,6 @@ describe("Rewrite RPC", () => {
     });
 
     test("preparing an unknown recipe id delegates to the host instead of failing", async () => {
-        // When the host builds RpcRecipe.getRecipeList() it re-prepares every child by
-        // id over RPC. A child that delegates to a Java recipe (e.g. Angular's
-        // upgradeDependencyVersion() -> org.openrewrite.javascript.UpgradeDependencyVersion)
-        // is an RpcRecipe that installSubRecipes intentionally does NOT register in this
-        // marketplace, so findRecipe misses. Rather than throwing "Could not find recipe
-        // with id ...", the server must tell the host to resolve it locally via delegatesTo
-        // (the Java recipe is on the host's classpath).
         const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
             new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
             new PrepareRecipe("org.openrewrite.javascript.UpgradeDependencyVersion", {newVersion: "19.x"})
@@ -315,6 +311,29 @@ describe("Rewrite RPC", () => {
             recipeName: "org.openrewrite.javascript.UpgradeDependencyVersion",
             options: {newVersion: "19.x"}
         });
+    });
+
+    test("a composite's Java-delegate children are emitted as delegatesTo with the options as passed", async () => {
+        await activateCompositeWithJavaDelegate(serverMarketplace);
+        const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe("org.openrewrite.example.npm.composite-with-java-delegate")
+        );
+        expect(response.recipeList!.map(child => child.delegatesTo)).toEqual([
+            {recipeName: "org.openrewrite.example.host.replace-hello", options: {}},
+            {recipeName: "org.openrewrite.text.FindAndReplace", options: {find: "goodbye", replace: "farewell"}}
+        ]);
+    });
+
+    test("a Java-delegate precondition is sent as a named visitor for the host to gate on", async () => {
+        await activateJavaDelegatePrecondition(serverMarketplace);
+        const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe("org.openrewrite.example.npm.find-identifier-gated-by-java-recipe")
+        );
+        expect(response.editPreconditions).toContainEqual(
+            {visitorName: "org.openrewrite.text.Find", visitorOptions: {find: "gate"}}
+        );
     });
 
     test("runRecipeWithCrossModuleRecipeList", async () => {
