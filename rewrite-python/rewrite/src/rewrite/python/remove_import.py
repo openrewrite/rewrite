@@ -20,6 +20,7 @@ from typing import List, Optional, Sequence, Set
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded, Statement
 from rewrite.java.tree import Identifier, If, Import, Space
+from rewrite.python.binding_utils import is_reference
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
                                          get_canonical_fqn, referenced_names,
                                          unconditional_body)
@@ -143,39 +144,20 @@ class RemoveImport(PythonVisitor):
         return from_name != self.module or qualid != self.name
 
     def _collect_used_identifiers(self, cu: CompilationUnit) -> Set[str]:
-        """Collect all identifiers used in the code (excluding imports)."""
+        """The names the code reads. An identifier filling a slot that names a member —
+        `resp.json()`, `post(url, json=body)`, `item.payload.json` — spells the import
+        without reading it."""
         used: Set[str] = set()
         bindings = LocalBindings()
 
         class UsageCollector(PythonVisitor):
-            def __init__(self):
-                super().__init__()
-                self.in_import = False
-
-            def visit_import(self, import_: Import, p) -> J:
-                # Don't collect identifiers from standalone import statements
-                self.in_import = True
-                try:
-                    return super().visit_import(import_, p)
-                finally:
-                    self.in_import = False
-
-            def visit_multi_import(self, multi: MultiImport, p) -> J:
-                # Don't collect identifiers from import statements
-                self.in_import = True
-                try:
-                    return super().visit_multi_import(multi, p)
-                finally:
-                    self.in_import = False
-
             def visit_identifier(self, ident: Identifier, p) -> J:
-                if not self.in_import:
+                if is_reference(self.cursor, ident):
                     used.update(name for name in referenced_names(ident)
                                 if not bindings.is_bound(self.cursor, name))
                 return ident
 
-        collector = UsageCollector()
-        collector.visit(cu, None)
+        UsageCollector().visit(cu, None)
         return used
 
     def _remove_import(self, cu: CompilationUnit) -> CompilationUnit:

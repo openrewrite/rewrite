@@ -471,12 +471,37 @@ class TestCanonicalRemoveImport:
 
 
 class TestRemoveImportUsageScoping:
-    """``only_if_unused`` counts every reference the enclosing scopes do not
-    rebind, including references that appear only in annotations."""
+    """``only_if_unused`` counts the references the code reads: not a name an enclosing
+    scope rebinds, nor one filling a slot that names a member, and including references
+    that appear only in annotations."""
 
     @staticmethod
     def _remove(arm, module, name):
         return from_visitor(_remove_import_visitor(arm, module, name))
+
+    def test_remove_import_a_member_name_merely_matches(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'json', None),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    import json
+
+
+                    def handle(resp, url, body, item):
+                        resp.json()
+                        post(url, json=body)
+                        return item.payload.json
+                    """,
+                    """\
+                    def handle(resp, url, body, item):
+                        resp.json()
+                        post(url, json=body)
+                        return item.payload.json
+                    """,
+                )
+            )
 
     def test_keep_import_referenced_in_function_annotations(self, arm):
         for type_attribution in (False, True):

@@ -90,6 +90,7 @@ from rewrite.python.format import (
 from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_import
 from rewrite.python.remove_import import RemoveImport, RemoveImportOptions, maybe_remove_import
 from rewrite.python.method_matcher import MethodMatcher
+from rewrite.python.binding_utils import Binding, ImportBindings, import_bindings, is_reference
 from rewrite.python.scope_utils import Scope, scope_of
 
 # Type-comparison helpers
@@ -200,6 +201,11 @@ __all__ = [
     # Scoping
     "Scope",
     "scope_of",
+    # Import bindings
+    "Binding",
+    "ImportBindings",
+    "import_bindings",
+    "is_reference",
     # Type-comparison helpers
     "is_assignable_to",
     "is_of_type",
