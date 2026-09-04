@@ -77,6 +77,14 @@ local_refs = ReferenceMap()
 _ref_checkpoints: Dict[str, int] = {}
 _local_ref_checkpoints: Dict[str, int] = {}
 
+
+def _checkpoint_refs(tree_id: str) -> None:
+    """Snapshot both directions' ref high-water before any of a file's data moves, so
+    handle_evict rolls back exactly what that file introduced (first sight of the file wins)."""
+    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
+    _local_ref_checkpoints.setdefault(tree_id, local_refs.snapshot())
+
+
 # Per-call metrics CSV (--metrics-csv), same schema as Go: cache-size ramp vs per-file-Evict sawtooth.
 _metrics_file = None
 _metrics_writer = None
@@ -1122,6 +1130,14 @@ def handle_reset(params: dict) -> bool:
     _ref_checkpoints.clear()
     _local_ref_checkpoints.clear()
     local_refs.clear()
+    _hub_tree.clear()
+    _hub_served.clear()
+    _hub_send_refs.clear()
+    _hub_recv_refs.clear()
+    _hub_send_checkpoint.clear()
+    _hub_recv_checkpoint.clear()
+    # A half-drained page would resume mid-list for a host that expects to start over.
+    _dependency_types_pending.clear()
 
     logger.info("Reset: cleared all cached state")
     return True
@@ -2079,10 +2095,7 @@ def handle_visit(params: dict) -> dict:
 
     ctx = _context_for(p_id)
 
-    # Snapshot both directions' ref high-water for this file before fetching its tree
-    # (first visit wins).
-    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
-    _local_ref_checkpoints.setdefault(tree_id, local_refs.snapshot())
+    _checkpoint_refs(tree_id)
 
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
@@ -2139,9 +2152,7 @@ def handle_batch_visit(params: dict) -> dict:
 
     ctx = _context_for(p_id)
 
-    # Snapshot both directions' ref high-water for this file before fetching its tree.
-    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
-    _local_ref_checkpoints.setdefault(tree_id, local_refs.snapshot())
+    _checkpoint_refs(tree_id)
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -2363,14 +2374,19 @@ def handle_generate(params: dict) -> dict:
 # child's stream directly to a sibling is unsafe.
 _hub_tree: Dict[str, Any] = {}              # obj_id -> the facade's authoritative tree
 _hub_send_refs: Dict[str, ReferenceMap] = {}  # bundle -> send ref map      (facade -> child)
+_hub_recv_refs: Dict[str, Dict[int, Any]] = {}  # bundle -> receive ref map (child -> facade)
 _hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that child was last served
 _hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
+_hub_recv_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> highest received ref before this file
 
 def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
     """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
     first time it is needed and owned by the facade from then on."""
     if obj_id is None:
         return None
+    # The facade routes Visit and BatchVisit past handle_visit, so this is the only place
+    # it sees a file early enough to checkpoint the facade<->Java tables.
+    _checkpoint_refs(obj_id)
     tree = _hub_tree.get(obj_id)
     if tree is None:
         tree = get_object_from_java(obj_id, source_file_type)
@@ -2407,6 +2423,10 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
     from rewrite.rpc.receive_queue import RpcReceiveQueue
 
     served = _hub_served.get((bundle, obj_id))
+    # The child's send map spans its connection, so a bundle pulled twice — a BatchVisit whose
+    # owners alternate, or a later file — cites on the second pull a ref it ADDed on the first.
+    refs = _hub_recv_refs.setdefault(bundle, {})
+    _hub_recv_checkpoint.setdefault((bundle, obj_id), max(refs, default=-1))
     remaining = [children.request(bundle, 'GetObject',
                                   {'id': obj_id, 'sourceFileType': source_file_type})]
 
@@ -2415,8 +2435,10 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
             return []
         return [d for d in remaining.pop(0) if d.get('state') != 'END_OF_OBJECT']
 
-    edited = RpcReceiveQueue({}, source_file_type, pull).receive(served, None)
-    if edited is not None:
+    edited = RpcReceiveQueue(refs, source_file_type, pull).receive(served, None)
+    if edited is None:
+        _hub_forget(obj_id)
+    else:
         _hub_tree[obj_id] = edited
         _hub_served[(bundle, obj_id)] = edited
         local_objects[obj_id] = edited
@@ -2424,19 +2446,42 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
             local_objects[str(edited.id)] = edited
 
 
-def _hub_release(obj_id: str) -> None:
-    """The rollback must be symmetric with the child's own Evict: the child drops the refs this file
-    introduced from its receive map, so if the facade kept them in its send map it would emit a
-    GET_REF for a ref the child no longer has ("Received reference to unknown object").
-    """
+def _hub_drop_bundle(bundle: str) -> None:
+    """Forget everything the hub holds on one bundle's behalf, for when its child is replaced."""
+    _hub_send_refs.pop(bundle, None)
+    _hub_recv_refs.pop(bundle, None)
+    for table in (_hub_served, _hub_send_checkpoint, _hub_recv_checkpoint):
+        for key in [k for k in table if k[0] == bundle]:
+            del table[key]
+
+
+def _hub_forget(obj_id: str) -> None:
+    """Let go of a file while leaving every child's ref numbering where it stands. This is the half
+    of _hub_release that is safe without an Evict: a child that has not been told to roll back still
+    holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
     _hub_tree.pop(obj_id, None)
+    local_objects.pop(obj_id, None)
     for key in [k for k in _hub_served if k[1] == obj_id]:
         del _hub_served[key]
+
+
+def _hub_release(obj_id: str) -> None:
+    """The rollback must be symmetric with the child's own Evict, in both directions: the child drops
+    this file's refs from both of its maps, so a ref kept here would name an id the child no longer
+    holds ("Received reference to unknown object").
+    """
+    _hub_forget(obj_id)
     for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
         checkpoint = _hub_send_checkpoint.pop(key)
         refs = _hub_send_refs.get(key[0])
         if refs is not None:
             refs.rollback_to(checkpoint)
+    for key in [k for k in _hub_recv_checkpoint if k[1] == obj_id]:
+        checkpoint = _hub_recv_checkpoint.pop(key)
+        refs = _hub_recv_refs.get(key[0])
+        if refs is not None:
+            for ref_id in [r for r in refs if r > checkpoint]:
+                del refs[ref_id]
 
 
 def _hub_is_builtin_visitor(visitor_name: Optional[str]) -> bool:
@@ -2469,7 +2514,7 @@ def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
             'searchResultIds': [],
         })
         if after is None:
-            _hub_release(tree_id)
+            _hub_forget(tree_id)
             tree = None
             break
         tree = after
@@ -2514,7 +2559,9 @@ def _get_facade():
         if removed:
             logger.info("Cleared %d pre-venv recipe artifact(s) from %s: %s",
                         len(removed), _recipe_install_dir, ", ".join(removed))
-        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir, upstream=_serve_child_object),
+        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir,
+                                        upstream=_serve_child_object,
+                                        on_child_replaced=_hub_drop_bundle),
                          hub_pull=_hub_pull_child_edit,
                          local_visit=_hub_local_visit,
                          is_local_visitor=_hub_is_builtin_visitor)
@@ -2530,6 +2577,9 @@ def handle_request(method: str, params: dict) -> Any:
             facade.evict(params)
             _hub_release(params.get('id'))
             return handle_evict(params)
+        if method == 'Reset':
+            facade.reset(params)
+            return handle_reset(params)
         facade_handlers = {
             'InstallRecipes': facade.install_recipes,
             'GetMarketplace': facade.get_marketplace,

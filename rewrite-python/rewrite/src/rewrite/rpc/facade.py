@@ -127,10 +127,16 @@ class Facade:
             if (self._hub_pull is not None and tree_id is not None and
                     any(r.get("modified") for r in sub_results)):
                 self._hub_pull(self._children, owner, tree_id, source_file_type)
+            if any(r.get("deleted") for r in sub_results):
+                break
         return {"results": results}
 
     def evict(self, params: dict) -> bool:
         self._children.broadcast_evict(params)
+        return True
+
+    def reset(self, params: dict) -> bool:
+        self._children.broadcast_reset(params)
         return True
 
     def set_data_table_store(self, params: dict) -> bool:
