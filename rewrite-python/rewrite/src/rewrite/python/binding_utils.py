@@ -31,13 +31,13 @@ from rewrite.python.scope_utils import scope_of
 from rewrite.python.tree import (ChainedAssignment, CollectionLiteral, ComprehensionExpression,
                                  CompilationUnit, Del, ExpressionStatement, MultiImport, Star,
                                  TypeHintedExpression, VariableScope)
+from rewrite.visitor import TreeVisitor
+
+_IMPORT_BINDINGS = 'org.openrewrite.python.importBindings'
 
 # The wrappers a target puts between a statement and the names it binds, as `scope_utils`
 # unwraps them to collect those names.
 _TARGET_WRAPPERS = (Parentheses, Star, CollectionLiteral, ExpressionStatement, TypeHintedExpression)
-from rewrite.visitor import TreeVisitor
-
-_IMPORT_BINDINGS = 'org.openrewrite.python.importBindings'
 
 
 @dataclass(frozen=True)
@@ -156,16 +156,16 @@ def is_reference(cursor: Cursor, ident: Identifier) -> bool:
 
 
 def _is_target(parent: Optional[J], node: J) -> bool:
-    """Whether ``node`` is a target ``parent`` binds. Only an undotted name asks: ``json.x = 1``
-    reads ``json`` to assign through it."""
+    """Whether ``node`` is a target ``parent`` binds rather than an expression it evaluates."""
     if isinstance(parent, Assignment):
         return parent.variable is node
     if isinstance(parent, ChainedAssignment):
         return any(variable is node for variable in parent.variables)
     if isinstance(parent, ForEachLoop.Control):
         return parent.variable is node
-    if isinstance(parent, ComprehensionExpression.Clause):
-        return parent.iterator_variable is node
+    if isinstance(parent, ComprehensionExpression):
+        # A clause holds its target directly, so the comprehension is the node above the name.
+        return any(clause.iterator_variable is node for clause in parent.clauses)
     return isinstance(parent, Del)
 
 

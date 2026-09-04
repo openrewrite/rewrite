@@ -17,7 +17,7 @@
 from typing import Any, List, Optional, Tuple
 
 from rewrite.java.tree import Identifier, J, MethodDeclaration
-from rewrite.python.binding_utils import ImportBindings, import_bindings
+from rewrite.python.binding_utils import ImportBindings, import_bindings, is_reference
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
@@ -54,6 +54,20 @@ def _references(source: str) -> List[Reference]:
     census = _Census()
     _run(source, census)
     return census.found
+
+
+def _positions(source: str) -> List[bool]:
+    """What :func:`is_reference` answers for each ``json`` identifier, in source order."""
+    answers: List[bool] = []
+
+    class Positions(PythonVisitor[Any]):
+        def visit_identifier(self, ident: Identifier, p: Any) -> J:
+            if ident.simple_name == 'json':
+                answers.append(is_reference(self.cursor, ident))
+            return ident
+
+    _run(source, Positions())
+    return answers
 
 
 def _bindings(source: str) -> ImportBindings:
@@ -138,6 +152,11 @@ def test_a_target_the_statement_binds_is_not_a_reference():
             pass
         del json
         """) == []
+
+
+def test_a_comprehension_target_is_not_a_reference():
+    # `reference()` filters this by scope, so `is_reference` is asked on its own.
+    assert _positions("y = [json for json in xs]\n") == [True, False]
 
 
 def test_a_dotted_target_reads_the_name_it_assigns_through():
