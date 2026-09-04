@@ -505,8 +505,10 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Supplies the path to the Python executable. The supplier is invoked at most
-         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * Supplies the path to the Python executable. The supplier is invoked once per
+         * thread that starts an RPC, since {@link RewriteRpcProcessManager} holds one RPC
+         * per thread; invocations are serialized across threads (see
+         * {@link #resolveUnderInstallLock}). Returning {@code null} uses the built-in
          * default (same as not configuring the path at all). Exceptions thrown by the
          * supplier propagate out of the RPC-start call.
          *
@@ -616,7 +618,8 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Supplies the engine install directory, resolved at most once when the RPC first starts.
+         * Supplies the engine install directory, resolved once per thread that starts an RPC and
+         * serialized across threads (see {@link #resolveUnderInstallLock}).
          * Returning {@code null} means "no pre-provisioned engine" (fall back to normal detection).
          * Because it runs at start, the supplier is the right place to do lazy, on-demand work such
          * as installing the engine before returning its directory.
@@ -657,7 +660,7 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         @Override
         public PythonRewriteRpc get() {
-            Path pythonPath = pythonPathSupplier.get();
+            Path pythonPath = resolveUnderInstallLock(pythonPathSupplier);
             if (pythonPath == null) {
                 pythonPath = findDefaultPythonPath();
             }
@@ -671,7 +674,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             // already provisioned out-of-band. Resolved lazily here so any such work only happens
             // when the RPC actually starts; when present, use it directly and skip all
             // bootstrap/detection — no network, no interpreter probes. Null → normal path.
-            Path engineInstallDir = engineInstallDirSupplier.get();
+            Path engineInstallDir = resolveUnderInstallLock(engineInstallDirSupplier);
             if (engineInstallDir != null) {
                 resolvedPipPackagesPath = engineInstallDir;
             } else if (!isDevBuild) {
@@ -788,6 +791,14 @@ public class PythonRewriteRpc extends RewriteRpc {
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
+            }
+        }
+
+        private static final Object INSTALL_LOCK = new Object();
+
+        static @Nullable Path resolveUnderInstallLock(Supplier<@Nullable Path> supplier) {
+            synchronized (INSTALL_LOCK) {
+                return supplier.get();
             }
         }
 
