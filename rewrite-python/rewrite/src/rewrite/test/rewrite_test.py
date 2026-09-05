@@ -178,6 +178,10 @@ class RecipeSpec:
         4. Runs the recipe
         5. Compares results with expected "after" states
 
+        Setting ``REWRITE_PYTHON_DUMP_TYPES`` prints each parsed file's type
+        attribution, and a recipe that produces no change names the nodes that
+        carry none. See the README section "Inspecting type attribution".
+
         Args:
             *source_specs: Variable number of source specifications
 
@@ -254,6 +258,11 @@ class RecipeSpec:
                 workspace.file_path(spec),
                 workspace.ty_client,
             )
+
+            # Reports the attribution this run produced, which is the one a
+            # pattern written for this test has to match.
+            from rewrite.python.type_report import dump_types_if_requested
+            dump_types_if_requested(parsed)
 
             result.append((spec, parsed))
 
@@ -416,8 +425,11 @@ class RecipeSpec:
             else:
                 # Change expected
                 if after_sf is None:
+                    from rewrite.python.type_report import attribution_hint
+                    before_sf = parsed_map.get(id(spec))
+                    hint = "" if before_sf is None else attribution_hint(before_sf)
                     raise AssertionError(
-                        f"Expected recipe to produce a change for:\n{dedent(spec.before)}"
+                        f"Expected recipe to produce a change for:\n{dedent(spec.before)}{hint}"
                     )
 
                 actual = after_sf.print_all()

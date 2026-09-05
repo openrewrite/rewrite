@@ -46,9 +46,10 @@ class MethodMatcher:
     Matches method invocations against an AspectJ-style pattern signature.
 
     Matching turns on the call's declaring type, which an import-resolved call
-    carries with no type check running. A pattern naming a concrete receiver
-    fails where that type is ``JavaType.Unknown``, though ``*..*`` still matches;
-    ``python -m rewrite.python <file>`` prints what each call actually got.
+    carries with no type check running; a pattern naming a concrete receiver
+    fails where that type is ``JavaType.Unknown``, though ``*..*`` still matches.
+    ``REWRITE_PYTHON_DUMP_TYPES=1`` during a test run, or ``rewrite-python-types
+    <file>``, prints what each call actually got.
     """
 
     _type_matcher: "TypeMatcher"

@@ -31,6 +31,10 @@ pytest tests/python/all/tree/import_test.py -v --timeout=60
 pytest tests/rpc/ --timeout=120
 ```
 
+`REWRITE_PYTHON_DUMP_TYPES=1 pytest ... -s` prints each parsed file's type
+attribution, which is what a `MethodMatcher` pattern written for that test has
+to match. `missing`, `all` and `supertypes` are the other accepted values.
+
 **RPC tests can hang indefinitely** if communication fails (deadlock, malformed response, printer bugs). Always use explicit `--timeout`.
 
 ## Directory Structure
@@ -53,7 +57,7 @@ rewrite-python/rewrite/
 │   │   ├── _py2_parser_visitor.py        # Python 2 parser visitor
 │   │   ├── add_import.py                 # Import addition logic
 │   │   ├── remove_import.py              # Import removal logic
-│   │   ├── type_report.py                # Type attribution listing (python -m rewrite.python)
+│   │   ├── type_report.py                # Type attribution listing (rewrite-python-types)
 │   │   ├── recipes/                      # Built-in recipes
 │   │   ├── format/                       # Formatting visitors (auto_format, blank_lines, etc.)
 │   │   └── template/                     # Template engine (coordinates, patterns, etc.)

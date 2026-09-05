@@ -21,9 +21,20 @@ from unittest.mock import patch
 
 import pytest
 
+from dataclasses import dataclass
+
+from rewrite import Recipe
+from rewrite.python.visitor import PythonVisitor
+from rewrite.test import RecipeSpec
+from rewrite.test.spec import python
+
 from rewrite.java import JavaType
-from rewrite.python.__main__ import main
+
 from rewrite.python.type_report import (
+    DUMP_TYPES_ENV,
+    attribution_hint,
+    dump_types_if_requested,
+    main,
     parse_for_types,
     print_types,
     render_type,
@@ -139,6 +150,64 @@ def test_a_failed_ty_initialization_raises_rather_than_reporting_an_untyped_file
     with patch("rewrite.python.ty_client.TyTypesClient.initialize", return_value=False):
         with pytest.raises(RuntimeError):
             parse_for_types(path, with_types=True, project_root=str(tmp_path))
+
+
+def test_the_dump_env_var_is_inert_unless_set(tmp_path, monkeypatch):
+    cu = parse_for_types(_write(tmp_path), with_types=False)
+
+    monkeypatch.delenv(DUMP_TYPES_ENV, raising=False)
+    quiet = io.StringIO()
+    assert dump_types_if_requested(cu, out=quiet) is False
+    assert quiet.getvalue() == ""
+
+    # "off" spellings have to stay off; a truthy value selects a row filter.
+    monkeypatch.setenv(DUMP_TYPES_ENV, "0")
+    assert dump_types_if_requested(cu, out=io.StringIO()) is False
+
+    monkeypatch.setenv(DUMP_TYPES_ENV, "missing")
+    loud = io.StringIO()
+    assert dump_types_if_requested(cu, out=loud) is True
+    assert "arr.tostring()" in loud.getvalue()
+
+
+def test_the_attribution_hint_never_displaces_the_assertion_it_annotates(tmp_path):
+    assert attribution_hint(object()) == ""
+
+
+def test_the_harness_reports_the_attribution_its_own_parse_produced(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv(DUMP_TYPES_ENV, "1")
+    RecipeSpec().rewrite_run(python(SAMPLE))
+    assert "type attribution:" in capsys.readouterr().out
+
+
+def test_a_recipe_that_produces_no_change_names_the_unattributed_nodes():
+    with pytest.raises(AssertionError) as failure:
+        RecipeSpec(recipe=_NoOp()).rewrite_run(
+            python("def f(arr):\n    return arr.tostring()\n",
+                   "def f(arr):\n    return arr.tobytes()\n"),
+        )
+    assert "cannot fire" in str(failure.value)
+    assert "arr.tostring()" in str(failure.value)
+
+
+@dataclass
+class _NoOp(Recipe):
+    """A recipe that changes nothing, as one gated on an unresolved type would."""
+
+    @property
+    def display_name(self) -> str:
+        return "No-op"
+
+    @property
+    def name(self) -> str:
+        return "test.NoOp"
+
+    @property
+    def description(self) -> str:
+        return "Stands in for a recipe whose gate never matches."
+
+    def editor(self) -> PythonVisitor:
+        return PythonVisitor()
 
 
 @requires_ty_types_cli

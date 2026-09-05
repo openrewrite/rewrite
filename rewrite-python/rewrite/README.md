@@ -103,42 +103,54 @@ recipes delete code.
 
 ## Inspecting type attribution
 
-`python -m rewrite.python <file.py>` prints the LST as a flat, source-ordered
-listing of the nodes a recipe gates on, so "what type did this expression get,
-and if none, where was it lost?" is one command rather than a throwaway visitor.
+Most recipe debugging is one question: what type did this expression get, and if none, where was it lost? Set `REWRITE_PYTHON_DUMP_TYPES` and any test prints the attribution its own parse produced — which is the attribution a `MethodMatcher` pattern written for that test has to match:
 
 ```
-$ python -m rewrite.python probe.py
+$ REWRITE_PYTHON_DUMP_TYPES=1 pytest tests/recipes/test_my_recipe.py -s
+
+--- type attribution: my_recipe.py ---
 line:col  kind                   source            type
-4:1       MethodDeclaration      def probe(arr)    ⚠ <none> probe(..) -> <none>
-4:11      NamedVariable          arr               ⚠ <none>
-5:5       MethodInvocation       socket.getfqdn()  socket getfqdn(..) -> <none>
-6:12      MethodInvocation       arr.tostring()    ⚠ <unknown> tostring(..) -> <none>
-6:12        └ select:Identifier  arr               <none>
+4:1       MethodDeclaration      def f(arr)        my_recipe f(..) -> <none>
+4:7       NamedVariable          arr               ⚠ <unknown>
+5:5       MethodInvocation       socket.getfqdn()  socket getfqdn(..) -> str
+6:12      MethodInvocation       arr.tostring()    ⚠ <unknown> tostring(..) -> <unknown>
+6:12        └ select:Identifier  arr               <unknown>
 ```
 
-`socket.getfqdn()` resolves from the file's own imports, so it carries a
-declaring type with no type check running at all: the text before `->` is a
-`MethodMatcher` pattern you can paste into `MethodMatcher.create(...)` or
-`uses_method(...)`. `arr.tostring()` does not, and the indented `select` line
-names the receiver that lost it. `<none>` is a slot the parser left empty and
-`<unknown>` is a `JavaType.Unknown` — a distinction worth keeping, since a
-`MethodInvocation` always carries *some* method type.
+The text before `->` is a pattern you can paste into `MethodMatcher.create(...)` or `uses_method(...)`. `socket.getfqdn()` resolves from the file's own imports, so it carries a declaring type; `arr.tostring()` does not, and the indented `select` line names the receiver that lost it. `<none>` is a slot the parser left empty and `<unknown>` is a `JavaType.Unknown` — worth keeping apart, since a `MethodInvocation` always carries *some* method type.
+
+The variable accepts comma-separated flags: `missing` lists only unattributed nodes, `all` widens beyond calls and declarations, and `supertypes` shows each declaring type's ancestry — which bounds how general a pattern can be, since a type recording no supertype can only be matched by its own name or a wildcard.
+
+A recipe gated on a type that never resolved is the usual reason a test sees no change, so that failure names the unattributed nodes without being asked:
+
+```
+Expected recipe to produce a change for:
+def f(arr):
+    return arr.tostring()
+
+Nodes with no type attribution (a recipe gated on one of these cannot fire):
+  1:7  NamedVariable  arr  -> <unknown>
+  2:12  MethodInvocation  arr.tostring()  -> <unknown> tostring(..) -> <unknown>
+```
+
+### Against a file on disk
+
+`rewrite-python-types <file.py>` runs the same report outside a test, for reading an existing project or sweeping a corpus. Note that it resolves types against the file's own directory, so a project laid out differently from your test workspace can attribute differently — prefer the test-harness output when writing a pattern for a test.
 
 | flag | |
 | --- | --- |
 | `--ty` | attribute types with a ty client (off by default, so the zero-config invocation still runs) |
 | `--only-missing` | list only the nodes whose type is missing |
 | `--all` | every type-bearing node, not just calls and declarations |
+| `--supertypes` | show each declaring type's ancestry |
 | `--tree` | the nested structure with prefixes, for structural rather than type questions |
 | `--json` | the listing as JSON, for a test or CI check that asserts a fixture gained attribution |
 | `--diff-ty` | parse twice, with and without ty, and report the nodes that differ |
 
-`--diff-ty` answers "does my recipe need type attribution to work?" — a recipe
-gated only on rows that read the same in both columns runs without a type check:
+`--diff-ty` answers "does my recipe need type attribution to work?" — a recipe gated only on rows that read the same in both columns runs without a type check:
 
 ```
-$ python -m rewrite.python --diff-ty probe.py
+$ rewrite-python-types --diff-ty probe.py
 line:col  kind               source            without ty                          with ty
 4:1       MethodDeclaration  def probe(arr)    ⚠ <none> probe(..) -> <none>        probe probe(..) -> <none>
 4:11      NamedVariable      arr               ⚠ <none>                            ⚠ <unknown>
@@ -150,9 +162,7 @@ line:col  kind               source            without ty                       
 
 An unannotated parameter leaves `arr.tostring()` unresolved even under ty.
 
-From a test or a REPL the same output comes from `print_types(source_file)`, and
-`build_type_report(source_file)` returns it as data. Both are read-only, and the
-in-process parse behind them is for diagnostics only.
+From a test or a REPL, `print_types(source_file)` writes the same listing and `build_type_report(source_file)` returns it as data. Both are read-only, and the in-process parse behind the command is for diagnostics only.
 
 ## Running recipes with the Moderne CLI
 

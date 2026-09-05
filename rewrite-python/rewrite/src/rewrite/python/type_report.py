@@ -21,8 +21,10 @@ format and the CLI.
 
 from __future__ import annotations
 
+import argparse
 import ast
 import json
+import os
 import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -45,6 +47,10 @@ __all__ = [
     "print_tree",
     "diff_ty",
     "parse_for_types",
+    "dump_types_if_requested",
+    "attribution_hint",
+    "DUMP_TYPES_ENV",
+    "main",
 ]
 
 # Rendered in place of a type so the two ways attribution can be absent stay
@@ -147,6 +153,7 @@ class TypeEntry:
     missing: bool
     note: Optional[str] = None
     cause: Optional[TypeEntry] = None
+    supertypes: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
@@ -161,6 +168,8 @@ class TypeEntry:
             out["note"] = self.note
         if self.cause is not None:
             out["cause"] = self.cause.to_dict()
+        if self.supertypes:
+            out["supertypes"] = self.supertypes
         return out
 
 
@@ -324,6 +333,35 @@ def _describe(node) -> Tuple[str, bool]:
     return rendered, rendered in _MISSING
 
 
+NO_SUPERTYPE = "(none recorded)"
+
+
+def _supertype_chain(node) -> Optional[str]:
+    """The declaring type's ancestry, which decides how general a pattern can be.
+
+    A pattern names one type, so a call whose declaring type records no
+    supertype can only be matched by that type's own name or a wildcard.
+    """
+    method = _method_type(node)
+    if method is None:
+        return None
+    declaring = method.declaring_type
+    if declaring is None or isinstance(declaring, JavaType.Unknown):
+        return None
+
+    chain, seen = [render_type(declaring)], {id(declaring)}
+    current = declaring
+    while True:
+        current = getattr(current, "supertype", None)
+        if current is None or id(current) in seen:
+            break
+        seen.add(id(current))
+        chain.append(render_type(current))
+    if len(chain) == 1:
+        chain.append(NO_SUPERTYPE)
+    return " <: ".join(chain)
+
+
 def _matcher_note(node) -> Optional[str]:
     """Report a resolved call whose own rendered pattern does not match it."""
     if not isinstance(node, j.MethodInvocation):
@@ -360,7 +398,7 @@ def _descendant(located: List[_Located], parent: int, child) -> Optional[int]:
 
 
 def build_type_report(source_file, *, only_missing: bool = False,
-                all_nodes: bool = False) -> TypeReport:
+                      all_nodes: bool = False, supertypes: bool = False) -> TypeReport:
     """Build a source-ordered report of the LST's type attribution."""
     located, printed = _locate(source_file)
     starts = _line_index(printed)
@@ -380,6 +418,7 @@ def build_type_report(source_file, *, only_missing: bool = False,
             type=rendered,
             missing=missing,
             note=_matcher_note(item.node),
+            supertypes=_supertype_chain(item.node) if supertypes else None,
         ))
 
     entries: List[TypeEntry] = []
@@ -413,10 +452,12 @@ def _glyphs(out: TextIO) -> Tuple[str, str]:
 
 
 def print_types(source_file, *, out: Optional[TextIO] = None, only_missing: bool = False,
-                all_nodes: bool = False, as_json: bool = False) -> TypeReport:
+                all_nodes: bool = False, as_json: bool = False,
+                supertypes: bool = False) -> TypeReport:
     """Print a flat, source-ordered listing of the LST's type attribution."""
     out = sys.stdout if out is None else out
-    report = build_type_report(source_file, only_missing=only_missing, all_nodes=all_nodes)
+    report = build_type_report(source_file, only_missing=only_missing,
+                               all_nodes=all_nodes, supertypes=supertypes)
     if as_json:
         json.dump(report.to_dict(), out, indent=2)
         out.write("\n")
@@ -426,6 +467,9 @@ def print_types(source_file, *, out: Optional[TextIO] = None, only_missing: bool
     rows: List[Tuple[str, str, str, str]] = []
     for entry in report.entries:
         rows.append(_row(entry, warning))
+        if entry.supertypes:
+            rows.append((f"{entry.line}:{entry.column}", f"  {branch} supertypes",
+                         "", entry.supertypes))
         if entry.cause is not None:
             cause = entry.cause
             rows.append((
@@ -503,6 +547,56 @@ def diff_ty(path: str, *, project_root: Optional[str] = None,
 
 
 
+DUMP_TYPES_ENV = "REWRITE_PYTHON_DUMP_TYPES"
+
+
+def _dump_options(value: str) -> Optional[Dict[str, bool]]:
+    """Parse the env var into ``print_types`` keywords, or None to stay silent."""
+    flags = {f.strip().lower() for f in value.split(",") if f.strip()}
+    if not flags or flags <= {"0", "false", "off", "no"}:
+        return None
+    return {
+        "only_missing": "missing" in flags,
+        "all_nodes": "all" in flags,
+        "supertypes": "supertypes" in flags,
+    }
+
+
+def dump_types_if_requested(source_file, *, out: Optional[TextIO] = None) -> bool:
+    """Print the report when ``REWRITE_PYTHON_DUMP_TYPES`` asks for it.
+
+    Runs inside every test run, so it stays silent unless asked and swallows its
+    own failures rather than turning a passing test red.
+    """
+    options = _dump_options(os.environ.get(DUMP_TYPES_ENV, ""))
+    if options is None:
+        return False
+    out = sys.stdout if out is None else out
+    try:
+        out.write(f"\n--- type attribution: {getattr(source_file, 'source_path', '?')} ---\n")
+        print_types(source_file, out=out, **options)
+    except Exception as exc:
+        out.write(f"(could not report type attribution: {exc})\n")
+    return True
+
+
+def attribution_hint(source_file, *, limit: int = 12) -> str:
+    """The unattributed rows, for appending to a failing assertion."""
+    try:
+        missing = build_type_report(source_file, only_missing=True).missing
+    except Exception:
+        return ""
+    if not missing:
+        return ""
+    shown = missing[:limit]
+    lines = "\n".join(
+        f"  {e.line}:{e.column}  {e.kind}  {e.source}  -> {e.type}" for e in shown
+    )
+    more = "" if len(missing) == len(shown) else f"\n  ... and {len(missing) - len(shown)} more"
+    return (f"\n\nNodes with no type attribution (a recipe gated on one of these "
+            f"cannot fire):\n{lines}{more}")
+
+
 def parse_for_types(path: str, *, with_types: bool = True,
                     project_root: Optional[str] = None) -> py.CompilationUnit:
     """Parse a file into a CompilationUnit for inspection.
@@ -539,3 +633,56 @@ def parse_for_types(path: str, *, with_types: bool = True,
         return cu.replace(source_path=resolved.relative_to(root))
     except ValueError:
         return cu
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="rewrite-python-types",
+        description="Print a parsed Python LST annotated with its type attribution.",
+    )
+    parser.add_argument("path", help="the Python file to parse")
+    parser.add_argument("--ty", action="store_true",
+                        help="attribute types with a ty client (off by default, so the "
+                             "zero-config invocation still runs)")
+    parser.add_argument("--project-root", metavar="DIR",
+                        help="workspace ty resolves imports against (default: the file's directory)")
+    parser.add_argument("--only-missing", action="store_true",
+                        help="list only the nodes whose type is missing")
+    parser.add_argument("--all", action="store_true", dest="all_nodes",
+                        help="list every type-bearing node, not just calls and declarations")
+    parser.add_argument("--tree", action="store_true",
+                        help="print the nested structure with prefixes instead of the listing")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="print the listing as JSON")
+    parser.add_argument("--supertypes", action="store_true",
+                        help="show each declaring type's ancestry, which bounds how "
+                             "general a MethodMatcher pattern can be")
+    parser.add_argument("--diff-ty", action="store_true", dest="diff",
+                        help="parse twice, with and without ty, and report the nodes that differ")
+    args = parser.parse_args(argv)
+
+    # Each mode reads its own subset of the flags, so one it does not read is a
+    # mistake worth naming rather than a table where the caller wants JSON.
+    mode = "--diff-ty" if args.diff else "--tree" if args.tree else None
+    unread = {
+        "--diff-ty": (("only_missing", "--only-missing"), ("as_json", "--json"),
+                      ("ty", "--ty"), ("supertypes", "--supertypes")),
+        "--tree": (("only_missing", "--only-missing"), ("all_nodes", "--all"),
+                   ("as_json", "--json"), ("supertypes", "--supertypes")),
+    }
+    for dest, flag in unread.get(mode, ()):
+        if getattr(args, dest):
+            parser.error(f"{mode} does not take {flag}")
+
+    if args.diff:
+        diff_ty(args.path, project_root=args.project_root, all_nodes=args.all_nodes)
+        return 0
+
+    cu = parse_for_types(args.path, with_types=args.ty, project_root=args.project_root)
+    if args.tree:
+        print_tree(cu)
+        return 0
+
+    print_types(cu, only_missing=args.only_missing, all_nodes=args.all_nodes,
+                as_json=args.as_json, supertypes=args.supertypes)
+    return 0
