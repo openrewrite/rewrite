@@ -262,10 +262,15 @@ public class RpcSendQueue {
                 return null;
             }
 
+            // A type that brings its own RpcCodec keeps its real class name: that
+            // name is the discriminator the remote has a codec and factory registered
+            // for, so flattening it to a base type would erase it.
+            boolean hasOwnCodec = RpcCodec.class.isAssignableFrom(afterType);
+
             // If the class is a subtype of JavaType but in a different package,
             // return the superclass name instead
             Class<?> jt = getJavaTypeClass(afterType);
-            if (jt != null && pkg != null && !JAVA_TYPE_PACKAGE.equals(pkg.getName()) && jt.isAssignableFrom(afterType)) {
+            if (!hasOwnCodec && jt != null && pkg != null && !JAVA_TYPE_PACKAGE.equals(pkg.getName()) && jt.isAssignableFrom(afterType)) {
                 Class<?> superclass = afterType.getSuperclass();
                 if (superclass != null && !Object.class.equals(superclass)) {
                     return superclass.getName();
@@ -275,7 +280,7 @@ public class RpcSendQueue {
             // Synthetic tree subclasses generated outside the org.openrewrite packages
             // -- must be reported to the remote as their real (super) type, not the proxy
             // class name, which the remote has no codec/factory for.
-            if (pkg != null && !pkg.getName().startsWith("org.openrewrite")) {
+            if (!hasOwnCodec && pkg != null && !pkg.getName().startsWith("org.openrewrite")) {
                 Class<?> superclass = afterType.getSuperclass();
                 Package superPkg = superclass == null ? null : superclass.getPackage();
                 if (superPkg != null && superPkg.getName().startsWith("org.openrewrite") && !Object.class.equals(superclass)) {

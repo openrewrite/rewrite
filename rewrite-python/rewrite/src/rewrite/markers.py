@@ -17,10 +17,12 @@ class Marker(ABC):
     __slots__ = ()
 
     # Like Tree, the id is stored as a 128-bit int in `_id` on concrete markers;
-    # `id` reconstructs a UUID lazily and eq/hash compare the raw int.
+    # `id` reconstructs a UUID lazily and eq/hash compare the raw int. An unset
+    # `_id` yields None, as on `Tree.id`.
     @property
-    def id(self) -> UUID:
-        return UUID(int=self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+    def id(self) -> Optional[UUID]:
+        _id = self._id  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+        return UUID(int=_id) if _id is not None else None
 
     # `_id` is on the public positional constructor surface, so callers may pass
     # a `uuid.UUID`; the dataclass `__init__` of every concrete marker calls this
@@ -55,8 +57,8 @@ class Markers:
     _id: UUID
 
     @property
-    def id(self) -> UUID:
-        return UUID(int=self._id)  # _id stored as int internally; public API stays UUID
+    def id(self) -> Optional[UUID]:
+        return UUID(int=self._id) if self._id is not None else None  # _id stored as int internally; public API stays UUID
 
     def __post_init__(self):
         # Normalise `uuid.UUID` ids from external callers to the internal int form.

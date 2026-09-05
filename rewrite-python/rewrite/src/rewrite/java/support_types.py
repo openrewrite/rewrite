@@ -230,9 +230,67 @@ class JavaType(ABC):
         _members: Optional[List[JavaType.Variable]]
         _methods: Optional[List[JavaType.Method]]
 
+        def __init__(self) -> None:
+            # Every field is set here so the accessors below can read `self._x`
+            # directly. Producers overwrite them as they populate the type; a
+            # body-less shell leaves the body fields None.
+            self._flags_bit_map = 0
+            self._fully_qualified_name = ""
+            self._kind = JavaType.FullyQualified.Kind.Class
+            self._type_parameters = None
+            self._supertype = None
+            self._owning_class = None
+            self._annotations = None
+            self._interfaces = None
+            self._members = None
+            self._methods = None
+
         @property
         def fully_qualified_name(self) -> str:
             return self._fully_qualified_name
+
+        # List-valued accessors return [] for an unpopulated field, matching the
+        # Java getters, so iterating a body-less shell never raises.
+        @property
+        def flags_bit_map(self) -> int:
+            return self._flags_bit_map
+
+        @property
+        def kind(self) -> JavaType.FullyQualified.Kind:
+            return self._kind
+
+        @property
+        def type_parameters(self) -> List[JavaType]:
+            tp = self._type_parameters
+            return tp if tp is not None else []
+
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]:
+            return self._supertype
+
+        @property
+        def owning_class(self) -> Optional[JavaType.FullyQualified]:
+            return self._owning_class
+
+        @property
+        def annotations(self) -> List[JavaType.FullyQualified]:
+            ann = self._annotations
+            return ann if ann is not None else []
+
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]:
+            ifaces = self._interfaces
+            return ifaces if ifaces is not None else []
+
+        @property
+        def members(self) -> List[JavaType.Variable]:
+            mem = self._members
+            return mem if mem is not None else []
+
+        @property
+        def methods(self) -> List[JavaType.Method]:
+            m = self._methods
+            return m if m is not None else []
 
     class ShallowClass(Class):
         pass
