@@ -18,6 +18,9 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -944,9 +947,458 @@ class UpgradePluginVersionTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/992")
+    @Issue("https://github.com/openrewrite/rewrite/issues/8775")
     @Test
-    void shouldNotAddVersionWhenManagedByParent() {
+    void shouldOverridePluginVersionManagedByExternalParent() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins", "maven-plugin-plugin", "3.15.2", null, null, true, true
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.apache</groupId>
+                  <artifactId>apache</artifactId>
+                  <version>30</version>
+                  <relativePath/>
+                </parent>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <maven.plugin.tools.version>3.6.1</maven.plugin.tools.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-plugin-plugin</artifactId>
+                      <inherited>true</inherited>
+                      <configuration>
+                        <goalPrefix>pojogen</goalPrefix>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.apache</groupId>
+                  <artifactId>apache</artifactId>
+                  <version>30</version>
+                  <relativePath/>
+                </parent>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <maven.plugin.tools.version>3.6.1</maven.plugin.tools.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-plugin-plugin</artifactId>
+                      <inherited>true</inherited>
+                      <version>3.15.2</version>
+                      <configuration>
+                        <goalPrefix>pojogen</goalPrefix>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8775")
+    @Test
+    void shouldNotDowngradeExplicitPluginVersionInProfileWhenOverridingManagedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins", "maven-plugin-plugin", "3.9.0", null, null, true, true
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.apache</groupId>
+                  <artifactId>apache</artifactId>
+                  <version>30</version>
+                  <relativePath/>
+                </parent>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <maven.plugin.tools.version>3.6.1</maven.plugin.tools.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-plugin-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+                <profiles>
+                  <profile>
+                    <id>other</id>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-plugin-plugin</artifactId>
+                          <version>3.15.2</version>
+                        </plugin>
+                      </plugins>
+                    </build>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.apache</groupId>
+                  <artifactId>apache</artifactId>
+                  <version>30</version>
+                  <relativePath/>
+                </parent>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <maven.plugin.tools.version>3.6.1</maven.plugin.tools.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-plugin-plugin</artifactId>
+                      <version>3.9.0</version>
+                    </plugin>
+                  </plugins>
+                </build>
+                <profiles>
+                  <profile>
+                    <id>other</id>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-plugin-plugin</artifactId>
+                          <version>3.15.2</version>
+                        </plugin>
+                      </plugins>
+                    </build>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8775")
+    @Test
+    void shouldNotOverrideNewerManagedVersionWhenUpgradingPluginInProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins", "maven-plugin-plugin", "3.9.0", null, null, true, true
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.apache</groupId>
+                  <artifactId>apache</artifactId>
+                  <version>30</version>
+                  <relativePath/>
+                </parent>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <maven.plugin.tools.version>3.15.2</maven.plugin.tools.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-plugin-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+                <profiles>
+                  <profile>
+                    <id>other</id>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-plugin-plugin</artifactId>
+                          <version>3.6.1</version>
+                        </plugin>
+                      </plugins>
+                    </build>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.apache</groupId>
+                  <artifactId>apache</artifactId>
+                  <version>30</version>
+                  <relativePath/>
+                </parent>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <maven.plugin.tools.version>3.15.2</maven.plugin.tools.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-plugin-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+                <profiles>
+                  <profile>
+                    <id>other</id>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-plugin-plugin</artifactId>
+                          <version>3.9.0</version>
+                        </plugin>
+                      </plugins>
+                    </build>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8775")
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(booleans = false)
+    void shouldNotOverridePluginVersionManagedByExternalParentByDefault(Boolean overrideManagedVersion) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins", "maven-plugin-plugin", "3.15.2", null, null, true, overrideManagedVersion
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.apache</groupId>
+                  <artifactId>apache</artifactId>
+                  <version>30</version>
+                  <relativePath/>
+                </parent>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <maven.plugin.tools.version>3.6.1</maven.plugin.tools.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-plugin-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8775")
+    @Test
+    void shouldOverridePluginVersionManagedByExternalAncestor() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins", "maven-plugin-plugin", "3.15.2", null, null, true, true
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.apache</groupId>
+                  <artifactId>apache</artifactId>
+                  <version>30</version>
+                  <relativePath/>
+                </parent>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-parent</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+                <properties>
+                  <maven.plugin.tools.version>3.6.1</maven.plugin.tools.version>
+                </properties>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <artifactId>my-app-child</artifactId>
+                  <build>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-plugin-plugin</artifactId>
+                        <configuration>
+                          <goalPrefix>pojogen</goalPrefix>
+                        </configuration>
+                      </plugin>
+                    </plugins>
+                  </build>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <artifactId>my-app-child</artifactId>
+                  <build>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-plugin-plugin</artifactId>
+                        <version>3.15.2</version>
+                        <configuration>
+                          <goalPrefix>pojogen</goalPrefix>
+                        </configuration>
+                      </plugin>
+                    </plugins>
+                  </build>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8775")
+    @ParameterizedTest
+    @ValueSource(strings = {"3.9.0", "3.15.2"})
+    void shouldNotDowngradePluginVersionManagedByExternalParent(String managedVersion) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins", "maven-plugin-plugin", "3.9.0", null, null, true, true
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.apache</groupId>
+                  <artifactId>apache</artifactId>
+                  <version>30</version>
+                  <relativePath/>
+                </parent>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <maven.plugin.tools.version>%s</maven.plugin.tools.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-plugin-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """.formatted(managedVersion)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8775")
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(booleans = false)
+    void shouldNotOverrideManagedPluginWithoutAddVersionIfMissing(Boolean addVersionIfMissing) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "org.apache.maven.plugins", "maven-plugin-plugin", "3.15.2", null, null, addVersionIfMissing, true
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.apache</groupId>
+                  <artifactId>apache</artifactId>
+                  <version>30</version>
+                  <relativePath/>
+                </parent>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <maven.plugin.tools.version>3.6.1</maven.plugin.tools.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-plugin-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/992")
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(booleans = {false, true})
+    void shouldNotAddVersionWhenManagedByParent(Boolean overrideManagedVersion) {
         rewriteRun(
           spec -> spec.recipe(new UpgradePluginVersion(
             "org.apache.maven.plugins",
@@ -954,7 +1406,8 @@ class UpgradePluginVersionTest implements RewriteTest {
             "3.11.0",
             null,
             null,
-            true
+            true,
+            overrideManagedVersion
           )),
           pomXml(
             """
@@ -1027,8 +1480,10 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/1173")
-    @Test
-    void shouldNotAddVersionWhenManagedInSamePomEvenWhenManagedVersionUpgraded() {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(booleans = {false, true})
+    void shouldNotAddVersionWhenManagedInSamePomEvenWhenManagedVersionUpgraded(Boolean overrideManagedVersion) {
         rewriteRun(
           spec -> spec.recipe(new UpgradePluginVersion(
             "org.apache.maven.plugins",
@@ -1036,7 +1491,8 @@ class UpgradePluginVersionTest implements RewriteTest {
             "3.11.0",
             null,
             null,
-            true
+            true,
+            overrideManagedVersion
           )),
           pomXml(
             """
