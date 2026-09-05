@@ -199,6 +199,7 @@ WORKER_SOURCE = (
     "\n"
     "w = Worker()\n"
     "w.getName()\n"
+    "w.run()\n"
 )
 
 
@@ -231,14 +232,14 @@ def worker_cu():
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-def _get_name_invocation(cu):
+def _worker_invocation(cu, name):
     from rewrite.python.visitor import PythonVisitor
 
     found = []
 
     class _Collector(PythonVisitor):
         def visit_method_invocation(self, mi, p):
-            if mi.name.simple_name == "getName":
+            if mi.name.simple_name == name:
                 found.append(mi)
             return super().visit_method_invocation(mi, p)
 
@@ -250,22 +251,22 @@ def _get_name_invocation(cu):
 class TestMatchOverrides:
     """Matching a method declared on a supertype of the call's declaring type."""
 
-    def test_base_type_pattern_matched_only_with_the_flag(self, worker_cu):
-        invocation = _get_name_invocation(worker_cu)
-
-        # The call is attributed to the subclass, so an exact base-type
-        # match cannot work.
-        assert invocation.method_type.declaring_type.fully_qualified_name == "m.Worker"
-
-        assert not MethodMatcher.create("threading.Thread getName(..)").matches(invocation)
+    def test_the_flag_is_needed_only_for_a_real_override(self, worker_cu):
+        overridden = _worker_invocation(worker_cu, "run")
+        assert overridden.method_type.declaring_type.fully_qualified_name == "m.Worker"
+        assert not MethodMatcher.create("threading.Thread run(..)").matches(overridden)
         assert MethodMatcher.create(
-            "threading.Thread getName(..)", match_overrides=True
-        ).matches(invocation)
+            "threading.Thread run(..)", match_overrides=True
+        ).matches(overridden)
+
+        # Inherited without an override, so the base type is already the declaring one.
+        inherited = _worker_invocation(worker_cu, "getName")
+        assert MethodMatcher.create("threading.Thread getName(..)").matches(inherited)
 
     def test_unrelated_supertype_still_rejected(self, worker_cu):
         assert not MethodMatcher.create(
-            "queue.Queue getName(..)", match_overrides=True
-        ).matches(_get_name_invocation(worker_cu))
+            "queue.Queue run(..)", match_overrides=True
+        ).matches(_worker_invocation(worker_cu, "run"))
 
     def test_preconditions_forward_the_flag(self, worker_cu):
         from rewrite import InMemoryExecutionContext
@@ -276,7 +277,7 @@ class TestMatchOverrides:
             visited = recipe_ref.local_visitor.visit(worker_cu, InMemoryExecutionContext())
             return visited.markers.find_first(SearchResult) is not None
 
-        pattern = "threading.Thread getName(..)"
+        pattern = "threading.Thread run(..)"
         assert not selects(uses_method(pattern))
         assert selects(uses_method(pattern, match_overrides=True))
         assert selects(find_methods(pattern, match_overrides=True))

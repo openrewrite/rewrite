@@ -211,18 +211,18 @@ class _NoOp(Recipe):
 
 
 @requires_ty_types_cli
-def test_supertypes_walks_past_the_receiver_class_to_the_builtin_base(tmp_path):
+def test_supertypes_reports_the_chain_above_the_declaring_class(tmp_path):
     path = _write(tmp_path, "class MyList(list):\n    pass\n\n\ndef f(items: MyList):\n    items.append(1)\n")
     cu = parse_for_types(path, with_types=True, project_root=str(tmp_path))
 
     call = next(e for e in build_type_report(cu, supertypes=True).entries
                 if e.kind == "MethodInvocation")
 
-    # The declaring type is the receiver's class, so `list append(..)` only
-    # matches via the chain — which is why the chain has to be reported.
-    assert call.type.startswith("sample.MyList append(..)")
+    # `append` is declared on `list`, so that is the pattern a MethodMatcher
+    # takes; the chain reports which broader patterns also match it.
+    assert call.type.startswith("list append(..)")
     assert call.supertypes is not None
-    assert call.supertypes.split(" <: ")[:2] == ["sample.MyList", "list"]
+    assert call.supertypes.split(" <: ")[0] == "list"
 
 
 @requires_ty_types_cli
