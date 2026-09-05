@@ -2710,6 +2710,66 @@ class TestSelfReceiverDeclaringType:
             _cleanup_parse(tmpdir, client)
 
 
+@requires_ty_types_cli
+class TestSuperReceiverDeclaringType:
+    """A `super()`-rooted call is owned by the class declaring what it resolves to.
+
+    Ordinary calls keep naming the receiver, which is a different class for any
+    inherited method.
+    """
+
+    SRC = '''
+        class A:
+            def f(self) -> int:
+                return 1
+
+            def inherited(self) -> int:
+                return 2
+
+        class B(A):
+            pass
+
+        class C(B):
+            def f(self) -> str:
+                return "s"
+
+            def go(self):
+                self.f()
+                self.inherited()
+                super().f()
+    '''
+
+    def test_super_takes_the_declaring_class_and_self_keeps_the_receiver(self):
+        mapping, tree, tmpdir, client = _make_mapping(self.SRC)
+        try:
+            registry = mapping._type_registry
+            class_ids = {d.get('qualifiedName'): i for i, d in registry.items()
+                         if d.get('kind') == 'classLiteral'}
+            go = tree.body[2].body[1]
+            self_f, self_inherited, super_f = (stmt.value for stmt in go.body)
+
+            # ty-types >= 0.0.79 (openrewrite/ty-types#27) surfaces these; synthesize
+            # them so the contract is pinned against the wire shape, not the binary.
+            registry[mapping._lookup_type_id(super_f.func.value)] = {
+                'kind': 'super',
+                'pivotClassId': class_ids['test.C'],
+                'receiverId': mapping._lookup_type_id(go.args.args[0]),
+            }
+            for call, declaring in ((super_f, 'test.A'), (self_f, 'test.C'),
+                                    (self_inherited, 'test.A')):
+                registry[mapping._lookup_type_id(call.func)]['declaringClassId'] = \
+                    class_ids[declaring]
+
+            assert _fqn(mapping._get_declaring_type(super_f)) == 'test.A', \
+                "super() must name the declaring class, not the pivot"
+
+            # `inherited` carries declaringClassId test.A, but a non-super receiver
+            # must keep naming the receiver.
+            assert _fqn(mapping._get_declaring_type(self_inherited)) == 'test.C'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
 class TestSubprocessEnvironment:
     """TyTypesClient must point ty-types at the running interpreter's
     environment so third-party imports (and their supertypes) resolve, rather

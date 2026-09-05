@@ -1533,6 +1533,13 @@ class PythonTypeMapping:
             # `module_type` leaves a class to its own FQN.
             return self._class_reference(constructed)
 
+        # A `super()` receiver names no class of its own: the attribute can resolve
+        # further up the MRO than the pivot, so only the callee's declaring class
+        # names the owner. Every other receiver keeps the receiver convention.
+        super_owner = self._super_call_declaring_type(node)
+        if super_owner is not None:
+            return super_owner
+
         # The callee names what is called; a receiver names only the module a call was
         # reached through, which differs for a re-exported function. A value receiver
         # owns its calls, so it is read below instead: `"x".upper()` is `str`'s.
@@ -1583,6 +1590,20 @@ class PythonTypeMapping:
 
         inferred = self._infer_declaring_type_from_ast(node)
         return inferred if inferred is not None else _UNKNOWN
+
+    def _super_call_declaring_type(self, node: ast.Call) -> Optional[JavaType.FullyQualified]:
+        """The declaring class of a call whose receiver is a ``super`` object."""
+        if not isinstance(node.func, ast.Attribute):
+            return None
+        if self._descriptor_of(node.func.value).get('kind') != 'super':
+            return None
+        declaring_id = self._descriptor_of(node.func).get('declaringClassId')
+        return None if declaring_id is None else self._resolve_declaring_type(declaring_id)
+
+    def _descriptor_of(self, node: ast.expr) -> Dict[str, Any]:
+        """The TypeDescriptor ty gave a node, empty when it typed the node as nothing."""
+        type_id = self._lookup_type_id(node)
+        return (self._type_registry.get(type_id) or {}) if type_id is not None else {}
 
     def _names_a_module(self, node: ast.expr) -> bool:
         type_id = self._lookup_type_id(node)
