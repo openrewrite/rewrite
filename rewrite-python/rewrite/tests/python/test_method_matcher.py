@@ -14,12 +14,11 @@
 
 """Tests for the MethodMatcher utility."""
 
+from typing import List
+
 import pytest
 
-from typing import List
 from rewrite.java.tree import MethodInvocation
-from rewrite.python.visitor import PythonVisitor
-from rewrite.test import RecipeSpec, python
 from rewrite.python import MethodMatcher
 from rewrite.python.method_matcher import (
     PatternTypeMatcher,
@@ -28,6 +27,8 @@ from rewrite.python.method_matcher import (
     PatternMethodNameMatcher,
     WildcardMethodNameMatcher,
 )
+from rewrite.python.visitor import PythonVisitor
+from rewrite.test import RecipeSpec, python
 
 
 class TestMethodMatcherPatternParsing:
@@ -281,8 +282,8 @@ class TestMatchOverrides:
         assert selects(find_methods(pattern, match_overrides=True))
 
 
-def _invocation(source: str, name: str) -> MethodInvocation:
-    """The single call named ``name`` in ``source``, parsed without type attribution."""
+def _invocation(source: str, name: str, type_attribution: bool = False) -> MethodInvocation:
+    """The single call named ``name`` in ``source``."""
     found: List[MethodInvocation] = []
 
     class Finder(PythonVisitor):
@@ -291,7 +292,7 @@ def _invocation(source: str, name: str) -> MethodInvocation:
                 found.append(method)
             return super().visit_method_invocation(method, p)
 
-    RecipeSpec(type_attribution=False).rewrite_run(
+    RecipeSpec(type_attribution=type_attribution).rewrite_run(
         python(source, after_recipe=lambda sf: Finder().visit(sf, None)))
     assert len(found) == 1
     return found[0]
@@ -348,3 +349,41 @@ class TestMatchUnknownTypes:
         mi = _invocation("Assert.assertTrue(foo.bar())", "assertTrue")
         assert MethodMatcher.create("org.junit.Assert assertTrue(bool)").matches(
             mi, match_unknown_types=True)
+
+    def test_a_known_argument_type_is_still_checked(self):
+        mi = _invocation("Assert.assertTrue(foo.bar(), 'message')", "assertTrue")
+        assert MethodMatcher.create("org.junit.Assert assertTrue(*, str)").matches(
+            mi, match_unknown_types=True)
+
+        assert not MethodMatcher.create("org.junit.Assert assertTrue(*, int)").matches(
+            mi, match_unknown_types=True)
+
+class TestArgumentTypeMatching:
+    """Argument matching against a parsed call."""
+
+    def test_a_zero_argument_call_matches_an_empty_argument_pattern(self):
+        mi = _invocation("import m\nm.g()\n", "g")
+        assert MethodMatcher.create("m g()").matches(mi)
+        assert not MethodMatcher.create("m g(*)").matches(mi)
+        # The Java host matches the same call through JavaType.Method, counting
+        # parameter types; both peers have to see zero for one pattern to serve both.
+        assert not mi.method_type.parameter_types
+
+    def test_a_primitive_argument_matches_its_python_spelling(self):
+        mi = _invocation("import m\nm.f('s', 1, 1.5, True, None)\n", "f")
+        assert MethodMatcher.create("m f(str, int, float, bool, None)").matches(mi)
+        assert not MethodMatcher.create("m f(str, int, float, bool, str)").matches(mi)
+
+    def test_a_wildcard_argument_accepts_an_argument_with_no_type(self):
+        mi = _invocation("import m\nm.f(g(), 'message')\n", "f")
+        assert MethodMatcher.create("m f(*, str)").matches(mi)
+
+    def test_a_typed_pattern_matches_a_keyword_argument(self):
+        mi = _invocation("import m\nm.f(x=1)\n", "f")
+        assert MethodMatcher.create("m f(int)").matches(mi)
+
+    def test_an_argument_type_pattern_may_contain_wildcards(self):
+        mi = _invocation("import datetime\nimport m\nm.f(datetime.datetime.now())\n",
+                         "f", type_attribution=True)
+        assert MethodMatcher.create("m f(datetime.*)").matches(mi)
+        assert not MethodMatcher.create("m f(json.*)").matches(mi)

@@ -853,7 +853,9 @@ class ParserVisitor(ast.NodeVisitor):
                 Markers.EMPTY,
                 self.__convert_name(node.arg),
                 self.__pad_left(self.__source_before('='), self.__convert(node.value)),
-                self._type_mapping.type(node)
+                # A keyword argument is an expression whose type is its value's;
+                # ty attributes the value, not the `ast.keyword` wrapping it.
+                self._type_mapping.type(node.value)
             )
         prefix = self.__whitespace()
         if self.__skip('**'):

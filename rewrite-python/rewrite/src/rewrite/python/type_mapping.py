@@ -91,7 +91,7 @@ _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
 }
 
 # Reverse mapping from JavaType.Primitive to Python type name
-_PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
+PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
     JavaType.Primitive.String: 'str',
     JavaType.Primitive.Int: 'int',
     JavaType.Primitive.Double: 'float',
@@ -1727,7 +1727,7 @@ class PythonTypeMapping:
                 return java_type._type if isinstance(java_type._type, JavaType.FullyQualified) else java_type
             if isinstance(java_type, JavaType.Primitive):
                 return self._create_class_type(
-                    _PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower())
+                    PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower())
                 )
         return None
 

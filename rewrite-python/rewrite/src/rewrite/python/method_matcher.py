@@ -38,7 +38,8 @@ from dataclasses import dataclass
 from typing import Optional, List
 
 from rewrite.java.support_types import JavaType
-from rewrite.java.tree import Identifier, MethodInvocation
+from rewrite.java.tree import Empty, Identifier, MethodInvocation
+from rewrite.python.type_mapping import PRIMITIVE_TO_PYTHON
 from rewrite.python.type_utils import is_of_type_with_name
 
 
@@ -167,6 +168,10 @@ class MethodMatcher:
     def _matches_arguments(self, method: MethodInvocation, allow_unknown: bool = False) -> bool:
         """Check if method arguments match the expected pattern."""
         args = method.arguments
+        if len(args) == 1 and isinstance(args[0], Empty):
+            # A call with no arguments holds one Empty placeholder, which
+            # no pattern names.
+            args = []
         arg_count = len(args)
 
         def accepts(matcher: "ArgumentMatcher", arg_type) -> bool:
@@ -478,20 +483,22 @@ class TypedArgumentMatcher(ArgumentMatcher):
     """Matches arguments of a specific type pattern."""
 
     _type_pattern: str
+    _type_matcher: "TypeMatcher"
+
+    @classmethod
+    def create(cls, type_pattern: str) -> "TypedArgumentMatcher":
+        return cls(_type_pattern=type_pattern,
+                   _type_matcher=_type_matcher_for(type_pattern))
 
     def matches(self, arg_type) -> bool:
-        if arg_type is None:
-            return False
-
         fqn = _get_fqn(arg_type)
         if fqn is None:
             return False
 
-        # Simple matching for now - could be enhanced
-        if self._type_pattern == "*":
-            return True
-
-        return fqn == self._type_pattern or fqn.endswith("." + self._type_pattern)
+        # An unqualified pattern also names the trailing component of a qualified
+        # type, so `datetime` reaches `datetime.datetime`.
+        return self._type_matcher.matches_name(fqn) or \
+            fqn.endswith("." + self._type_pattern)
 
     def matches_unknown(self, arg_type) -> bool:
         if arg_type is None or isinstance(arg_type, JavaType.Unknown):
@@ -500,14 +507,24 @@ class TypedArgumentMatcher(ArgumentMatcher):
 
 
 def _get_fqn(type_obj) -> Optional[str]:
-    """Extract the fully qualified name from a type object."""
+    """The name a pattern spells this type by."""
     if type_obj is None:
         return None
+
+    if isinstance(type_obj, JavaType.Primitive):
+        return PRIMITIVE_TO_PYTHON.get(type_obj)
 
     if hasattr(type_obj, "fully_qualified_name"):
         return type_obj.fully_qualified_name
 
     return None
+
+
+def _type_matcher_for(pattern: str) -> TypeMatcher:
+    # Universal wildcards that match everything
+    if pattern in ("*", "..*", "*..", "*..*", "*.."):
+        return WildcardTypeMatcher()
+    return PatternTypeMatcher.create(pattern)
 
 
 class _Parser:
@@ -556,7 +573,7 @@ class _Parser:
                 f"Invalid method pattern: '{self.pattern}'. "
                 f"Empty type pattern"
             )
-        self.type_matcher = self._parse_type_matcher(type_pattern)
+        self.type_matcher = _type_matcher_for(type_pattern)
 
         # Parse method name
         method_name = before_paren[separator + 1:].strip()
@@ -570,12 +587,6 @@ class _Parser:
         # Parse arguments
         args_str = pattern[open_paren + 1:close_paren].strip()
         self._parse_arguments(args_str)
-
-    def _parse_type_matcher(self, pattern: str) -> TypeMatcher:
-        # Universal wildcards that match everything
-        if pattern in ("*", "..*", "*..", "*..*", "*.."):
-            return WildcardTypeMatcher()
-        return PatternTypeMatcher.create(pattern)
 
     def _parse_method_matcher(self, name: str) -> MethodNameMatcher:
         if name == "*":
@@ -611,4 +622,4 @@ class _Parser:
             elif arg == "*":
                 self.argument_matchers.append(WildcardArgumentMatcher())
             else:
-                self.argument_matchers.append(TypedArgumentMatcher(arg))
+                self.argument_matchers.append(TypedArgumentMatcher.create(arg))
