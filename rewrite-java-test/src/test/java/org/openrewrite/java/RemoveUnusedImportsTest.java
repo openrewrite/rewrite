@@ -2577,4 +2577,40 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8654")
+    @Test
+    void unfoldStaticWildcardFromPackageWithCapitalizedSegment() {
+        rewriteRun(
+          java(
+            """
+              package com.example.api.Impl.utils;
+              public class Queries {
+                  public static final String GET_QUERY = "SELECT 1";
+                  public static final String UNUSED_QUERY = "SELECT 2";
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.consumer;
+
+              import static com.example.api.Impl.utils.Queries.*;
+
+              class Consumer {
+                  String query = GET_QUERY;
+              }
+              """,
+            """
+              package com.example.consumer;
+
+              import static com.example.api.Impl.utils.Queries.GET_QUERY;
+
+              class Consumer {
+                  String query = GET_QUERY;
+              }
+              """
+          )
+        );
+    }
 }
