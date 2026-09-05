@@ -1743,7 +1743,11 @@ type delegatesToResponse struct {
 // handlePrepareRecipe instantiates a recipe by name with options.
 func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 	var req prepareRecipeRequest
-	if err := json.Unmarshal(params, &req); err != nil {
+	// UseNumber keeps an integer option's literal digits, which float64 cannot
+	// hold past 2^53; recipe.coerceOption parses them against the field's type.
+	dec := json.NewDecoder(bytes.NewReader(params))
+	dec.UseNumber()
+	if err := dec.Decode(&req); err != nil {
 		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
 	}
 
@@ -1777,7 +1781,10 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 	// be described, so return the stored descriptor with no prepared child tree. Execution happens
 	// in the CLI-built binary, where the recipe module is linked and its constructor exists, so
 	// prepareInstance below runs and returns the whole tree.
-	instance := reg.Constructor(req.Options)
+	instance, err := reg.Constructor(req.Options)
+	if err != nil {
+		return nil, &rpcError{Code: -32602, Message: err.Error()}
+	}
 	if instance == nil {
 		recipeID := uuid.New().String()
 		// Store the nil instance keyed by id so a later Visit can fail loudly by recipe name
