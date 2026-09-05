@@ -2734,7 +2734,6 @@ class TestSuperReceiverDeclaringType:
                 return "s"
 
             def go(self):
-                self.f()
                 self.inherited()
                 super().f()
     '''
@@ -2742,24 +2741,7 @@ class TestSuperReceiverDeclaringType:
     def test_super_takes_the_declaring_class_and_self_keeps_the_receiver(self):
         mapping, tree, tmpdir, client = _make_mapping(self.SRC)
         try:
-            registry = mapping._type_registry
-            class_ids = {d.get('qualifiedName'): i for i, d in registry.items()
-                         if d.get('kind') == 'classLiteral'}
-            go = tree.body[2].body[1]
-            self_f, self_inherited, super_f = (stmt.value for stmt in go.body)
-
-            # Below the pinned ty-types floor these are absent, so stand them up to
-            # the shape openrewrite/ty-types#27 emits; a binary that sends them wins,
-            # which is what makes a change to the contract fail here.
-            receiver = registry[mapping._lookup_type_id(super_f.func.value)]
-            if receiver.get('kind') != 'super':
-                receiver.clear()
-                receiver.update(kind='super', pivotClassId=class_ids['test.C'],
-                                receiverId=mapping._lookup_type_id(go.args.args[0]))
-            for call, declaring in ((super_f, 'test.A'), (self_f, 'test.C'),
-                                    (self_inherited, 'test.A')):
-                registry[mapping._lookup_type_id(call.func)].setdefault(
-                    'declaringClassId', class_ids[declaring])
+            self_inherited, super_f = (stmt.value for stmt in tree.body[2].body[1].body)
 
             assert _fqn(mapping._get_declaring_type(super_f)) == 'test.A', \
                 "super() must name the declaring class, not the pivot"
