@@ -2256,6 +2256,28 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8731")
+    @Test
+    void javadocLinkOnPackageInfoUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", true)),
+          java(
+            """
+              /**
+               * See {@link org.openrewrite.Existing}
+               */
+              package com.example;
+              """,
+            """
+              /**
+               * See {@link org.openrewrite.test.Existing}
+               */
+              package com.example;
+              """
+          )
+        );
+    }
+
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2482")
     void changePackageInServiceProviderFile() {
