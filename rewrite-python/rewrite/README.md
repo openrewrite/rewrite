@@ -101,6 +101,59 @@ class RenameFunctionCall(Recipe):
 Returning `None` from a visit method removes the node entirely — which is how
 recipes delete code.
 
+## Inspecting type attribution
+
+`python -m rewrite.python <file.py>` prints the LST as a flat, source-ordered
+listing of the nodes a recipe gates on, so "what type did this expression get,
+and if none, where was it lost?" is one command rather than a throwaway visitor.
+
+```
+$ python -m rewrite.python probe.py
+line:col  kind                   source            type
+4:1       MethodDeclaration      def probe(arr)    ⚠ <none> probe(..) -> <none>
+4:11      NamedVariable          arr               ⚠ <none>
+5:5       MethodInvocation       socket.getfqdn()  socket getfqdn(..) -> <none>
+6:12      MethodInvocation       arr.tostring()    ⚠ <unknown> tostring(..) -> <none>
+6:12        └ select:Identifier  arr               <none>
+```
+
+`socket.getfqdn()` resolves from the file's own imports, so it carries a
+declaring type with no type check running at all: the text before `->` is a
+`MethodMatcher` pattern you can paste into `MethodMatcher.create(...)` or
+`uses_method(...)`. `arr.tostring()` does not, and the indented `select` line
+names the receiver that lost it. `<none>` is a slot the parser left empty and
+`<unknown>` is a `JavaType.Unknown` — a distinction worth keeping, since a
+`MethodInvocation` always carries *some* method type.
+
+| flag | |
+| --- | --- |
+| `--ty` | attribute types with a ty client (off by default, so the zero-config invocation still runs) |
+| `--only-missing` | list only the nodes whose type is missing |
+| `--all` | every type-bearing node, not just calls and declarations |
+| `--tree` | the nested structure with prefixes, for structural rather than type questions |
+| `--json` | the listing as JSON, for a test or CI check that asserts a fixture gained attribution |
+| `--diff-ty` | parse twice, with and without ty, and report the nodes that differ |
+
+`--diff-ty` answers "does my recipe need type attribution to work?" — a recipe
+gated only on rows that read the same in both columns runs without a type check:
+
+```
+$ python -m rewrite.python --diff-ty probe.py
+line:col  kind               source            without ty                          with ty
+4:1       MethodDeclaration  def probe(arr)    ⚠ <none> probe(..) -> <none>        probe probe(..) -> <none>
+4:11      NamedVariable      arr               ⚠ <none>                            ⚠ <unknown>
+5:5       MethodInvocation   socket.getfqdn()  socket getfqdn(..) -> <none>        socket getfqdn(..) -> str
+6:12      MethodInvocation   arr.tostring()    ⚠ <unknown> tostring(..) -> <none>  ⚠ <unknown> tostring(..) -> <unknown>
+
+4 of 4 nodes differ
+```
+
+An unannotated parameter leaves `arr.tostring()` unresolved even under ty.
+
+From a test or a REPL the same output comes from `print_types(source_file)`, and
+`build_type_report(source_file)` returns it as data. Both are read-only, and the
+in-process parse behind them is for diagnostics only.
+
 ## Running recipes with the Moderne CLI
 
 Expose an `activate()` function so the CLI can discover your recipe:

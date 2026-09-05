@@ -45,8 +45,10 @@ class MethodMatcher:
     """
     Matches method invocations against an AspectJ-style pattern signature.
 
-    Uses full type information from the AST to match method calls.
-    Requires type attribution from the type checker (ty) to function.
+    Matching turns on the call's declaring type, which an import-resolved call
+    carries with no type check running. A pattern naming a concrete receiver
+    fails where that type is ``JavaType.Unknown``, though ``*..*`` still matches;
+    ``python -m rewrite.python <file>`` prints what each call actually got.
     """
 
     _type_matcher: "TypeMatcher"

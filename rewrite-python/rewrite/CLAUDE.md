@@ -53,6 +53,7 @@ rewrite-python/rewrite/
 │   │   ├── _py2_parser_visitor.py        # Python 2 parser visitor
 │   │   ├── add_import.py                 # Import addition logic
 │   │   ├── remove_import.py              # Import removal logic
+│   │   ├── type_report.py                # Type attribution listing (python -m rewrite.python)
 │   │   ├── recipes/                      # Built-in recipes
 │   │   ├── format/                       # Formatting visitors (auto_format, blank_lines, etc.)
 │   │   └── template/                     # Template engine (coordinates, patterns, etc.)
