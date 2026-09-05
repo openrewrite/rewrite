@@ -87,8 +87,8 @@ class ImportBindings:
 
     def for_name(self, name: str) -> Optional[Binding]:
         """The binding ``name`` holds, or None where no import binds it — which is weaker than
-        ``name`` being free, since a wildcard import and a ``try``/``except ImportError``
-        fallback both bind names no ``Binding`` records."""
+        ``name`` being free, since a wildcard import and an import under any ``try`` both bind
+        names no ``Binding`` records."""
         return self._by_name.get(name)
 
     def for_module(self, module: str, member: Optional[str] = None) -> Tuple[Binding, ...]:
@@ -116,8 +116,8 @@ def import_bindings(source: Union[TreeVisitor[Any, Any], CompilationUnit,
     """The bindings the imports of ``source`` introduce: a visitor answers for the file it is
     visiting and scans it once, a compilation unit or statement list scans on every call.
 
-    A scan descends into the body of an ``if`` that has no ``else``, so a ``try``/``except
-    ImportError`` fallback never has its shim taken for the module — see :attr:`Binding.guarded`.
+    A scan descends into an ``if`` that has no ``else`` and into no ``try`` whatever it catches,
+    so a fallback import's shim is never taken for the module — see :attr:`Binding.guarded`.
     """
     if isinstance(source, CompilationUnit):
         return ImportBindings(_scan(source.statements, guarded=False))
