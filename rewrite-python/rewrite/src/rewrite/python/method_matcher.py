@@ -37,10 +37,36 @@ Wildcards:
 from dataclasses import dataclass
 from typing import Optional, List
 
+from rewrite import Cursor
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import Empty, Identifier, MethodInvocation
+from rewrite.python.binding_utils import Binding, import_bindings
+from rewrite.python.import_utils import get_alias_name
 from rewrite.python.type_mapping import PRIMITIVE_TO_PYTHON
 from rewrite.python.type_utils import is_of_type_with_name
+
+
+def _argument_count(method: MethodInvocation) -> int:
+    """How many arguments the call passes. A call with none holds one ``Empty`` placeholder,
+    which no pattern names."""
+    args = method.arguments
+    return 0 if len(args) == 1 and isinstance(args[0], Empty) else len(args)
+
+
+def _has_usable_declaring_type(method: MethodInvocation) -> bool:
+    """Whether the call carries a declaring type that says what its receiver is."""
+    declaring = method.method_type.declaring_type if method.method_type else None
+    return declaring is not None and not isinstance(declaring, JavaType.Unknown)
+
+
+def _receiver_type(binding: Binding) -> Optional[str]:
+    """The type a receiver spelling ``binding``'s name has, or None where the name does not
+    stand for one on its own."""
+    if binding.member is not None:
+        # `from datetime import datetime` makes the receiver the member, not the module.
+        return f"{binding.module}.{binding.member}"
+    # `import os.path` binds `os`, which names the root package; an alias binds the whole path.
+    return binding.module if get_alias_name(binding.imp) else binding.name
 
 
 @dataclass
@@ -49,9 +75,10 @@ class MethodMatcher:
     Matches method invocations against an AspectJ-style pattern signature.
 
     Matching turns on the call's declaring type, which an import-resolved call
-    carries with no type check running; a pattern naming a concrete receiver fails
-    where that type is ``JavaType.Unknown``, though ``*..*`` still matches and
-    ``matches(method, match_unknown_types=True)`` falls back to the call as written.
+    carries with no type check running. Where that type is ``JavaType.Unknown`` a
+    pattern naming a concrete receiver needs another route: ``*..*`` matches anyway,
+    a ``cursor`` resolves the receiver against the file's imports, and
+    ``match_unknown_types=True`` reads the call as written.
     ``REWRITE_PYTHON_DUMP_TYPES=1`` in a test run prints what each call got.
     """
 
@@ -95,29 +122,43 @@ class MethodMatcher:
             _match_overrides=match_overrides,
         )
 
-    def matches(self, method: MethodInvocation, match_unknown_types: bool = False) -> bool:
+    def matches(self, method: MethodInvocation, match_unknown_types: bool = False,
+                *, cursor: Optional[Cursor] = None) -> bool:
         """
         Check if a method invocation matches this pattern.
 
         Args:
             method: The method invocation to check
-            match_unknown_types: when the attributed types don't match,
-                also match structurally, on the call's written receiver,
-                name and arguments. Reaches calls whose declaring type is
-                ``JavaType.Unknown``, at the risk of false positives on
-                unrelated calls, so it is off by default.
+            match_unknown_types: where the call has no declaring type to match,
+                also match structurally, on its written receiver, name and
+                arguments, at the risk of false positives on unrelated calls, so
+                it is off by default. Java reads the spelling against a resolved
+                declaring type too; this stops at the guard below.
+            cursor: standing on ``method``, which resolves the receiver against
+                the file's imports where its declaring type is ``Unknown``. One
+                binding of a name in any scope leaves every call in the file with
+                that type, so a pattern naming a module needs this to reach them.
 
         Returns:
             True if the method matches the pattern
         """
         if self._matches_typed(method):
             return True
+        if _has_usable_declaring_type(method):
+            # A declaring type names the receiver at this call site, which the imports and
+            # the spelling can only guess at, so where there is one it settles the question.
+            return False
+        if self._matches_resolved_receiver(method, cursor):
+            return True
         return match_unknown_types and self._matches_allowing_unknown_types(method)
 
     def _matches_typed(self, method: MethodInvocation) -> bool:
         """Check the pattern against the call's type attribution."""
-        # Check method name first (fast path)
+        # Name and arity are string and integer comparisons; the declaring type may walk a
+        # hierarchy and the argument types compare one by one, so they come after.
         if not self._matches_method_name(method):
+            return False
+        if not self._matches_parameter_count(method):
             return False
 
         # A parsed call's declaring type is JavaType.Unknown, never None, so this
@@ -126,11 +167,9 @@ class MethodMatcher:
         if method.method_type is None or method.method_type.declaring_type is None:
             return False
 
-        # Check declaring type
         if not self._matches_target_type(method.method_type.declaring_type):
             return False
 
-        # Check arguments
         return self._matches_arguments(method)
 
     def _matches_target_type(self, type_obj) -> bool:
@@ -141,9 +180,56 @@ class MethodMatcher:
             type_obj, True, self._type_matcher.matches_name
         )
 
+    def _matches_resolved_receiver(self, method: MethodInvocation,
+                                   cursor: Optional[Cursor]) -> bool:
+        """Check the pattern against a call with no declaring type, reading the receiver's
+        module off the import that binds it.
+
+        The name and argument checks stay the typed ones; only the declaring type comes from
+        the import.
+        """
+        if cursor is None or not self._matches_parameter_count(method):
+            return False
+
+        select = method.select
+        if select is None:
+            binding = self._binding_for(cursor, method.name)
+            if binding is None or binding.member is None:
+                return False
+            # A bare call reads the member the import bound, under whatever local name:
+            # `from socket import gethostname as getfqdn` calls `socket.gethostname`.
+            if not self._method_matcher.matches(binding.member):
+                return False
+            owner = binding.module
+        elif isinstance(select, Identifier):
+            if not self._matches_method_name(method):
+                return False
+            binding = self._binding_for(cursor, select)
+            owner = _receiver_type(binding) if binding is not None else None
+            if owner is None:
+                return False
+        else:
+            # A dotted receiver's root binds a prefix of the path, and the binding
+            # alone does not say how to recombine them.
+            return False
+
+        # `module` keeps a relative import's leading dot, so `.socket` is never `socket`.
+        if not self._type_matcher.matches_name(owner):
+            return False
+        return self._matches_arguments(method)
+
+    @staticmethod
+    def _binding_for(cursor: Cursor, name: Identifier) -> "Optional[Binding]":
+        binding = import_bindings(cursor).reference(cursor, name)
+        # An `if` decides whether a guarded binding happens at all, so the name it holds
+        # at this call site is not settled: `if TYPE_CHECKING:` binds nothing at runtime.
+        return None if binding is None or binding.guarded else binding
+
     def _matches_allowing_unknown_types(self, method: MethodInvocation) -> bool:
         """Check the pattern against the call as written, ignoring absent types."""
         if not self._method_matcher.matches(method.name.simple_name):
+            return False
+        if not self._matches_parameter_count(method):
             return False
 
         # Only a bare identifier receiver is compared; a qualified or computed
@@ -165,12 +251,18 @@ class MethodMatcher:
         return method.method_type is not None and \
             self._method_matcher.matches(method.method_type.name)
 
+    def _matches_parameter_count(self, method: MethodInvocation) -> bool:
+        """Whether the call passes as many arguments as the pattern names. Cheap, and
+        selective enough to run before resolving a receiver or walking a type hierarchy."""
+        count = _argument_count(method)
+        if self._varargs_position == -1:
+            return count == len(self._argument_matchers)
+        return count >= len(self._argument_matchers) - 1
+
     def _matches_arguments(self, method: MethodInvocation, allow_unknown: bool = False) -> bool:
         """Check if method arguments match the expected pattern."""
         args = method.arguments
         if len(args) == 1 and isinstance(args[0], Empty):
-            # A call with no arguments holds one Empty placeholder, which
-            # no pattern names.
             args = []
         arg_count = len(args)
 

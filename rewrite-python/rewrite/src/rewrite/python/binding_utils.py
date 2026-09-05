@@ -111,10 +111,11 @@ class ImportBindings:
         return None if declaring is not None and not isinstance(declaring, CompilationUnit) else binding
 
 
-def import_bindings(source: Union[TreeVisitor[Any, Any], CompilationUnit,
+def import_bindings(source: Union[TreeVisitor[Any, Any], Cursor, CompilationUnit,
                                   Iterable[Statement]]) -> ImportBindings:
-    """The bindings the imports of ``source`` introduce: a visitor answers for the file it is
-    visiting and scans it once, a compilation unit or statement list scans on every call.
+    """The bindings the imports of ``source`` introduce: a visitor or a cursor answers for the
+    file being visited and scans it once, a compilation unit or statement list scans on every
+    call.
 
     A scan descends into an ``if`` that has no ``else`` and into no ``try`` whatever it catches,
     so a fallback import's shim is never taken for the module — see :attr:`Binding.guarded`.
@@ -123,6 +124,8 @@ def import_bindings(source: Union[TreeVisitor[Any, Any], CompilationUnit,
         return ImportBindings(_scan(source.statements, guarded=False))
     if isinstance(source, TreeVisitor):
         return _cached(source.cursor)
+    if isinstance(source, Cursor):
+        return _cached(source)
     return ImportBindings(_scan(source, guarded=False))
 
 
