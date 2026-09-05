@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.java.internal.PackageNameUtils;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -286,6 +287,7 @@ public class RemoveUnusedImports extends Recipe {
 
             // Do not use direct imports that are imported by a wildcard import
             Set<String> ambiguousStaticImportNames = getAmbiguousStaticImportNames(cu);
+            Set<String> sourcePackageTypeNames = null;
             for (ImportUsage anImport : importUsage) {
                 if (anImport.imports.isEmpty()) {
                     continue; // Skip import usages that have been completely removed
@@ -300,8 +302,15 @@ public class RemoveUnusedImports extends Recipe {
                         }
                     } else {
                         if (usedWildcardImports.size() == 1 && usedWildcardImports.contains(elem.getPackageName()) && !elem.getTypeName().contains("$") && !conflictsWithJavaLang(elem)) {
-                            anImport.used = false;
-                            changed = true;
+                            if (sourcePackageTypeNames == null) {
+                                sourcePackageTypeNames = typeNamesInPackage(cu, sourcePackage, ctx);
+                            }
+                            // A type in the compilation unit's own package takes precedence over an
+                            // import on demand, so the single-type import is not redundant.
+                            if (!sourcePackageTypeNames.contains(elem.getClassName())) {
+                                anImport.used = false;
+                                changed = true;
+                            }
                         }
                     }
                 }
@@ -474,6 +483,24 @@ public class RemoveUnusedImports extends Recipe {
 
         private static boolean conflictsWithJavaLang(J.Import elem) {
             return JAVA_LANG_CLASS_NAMES.contains(elem.getClassName());
+        }
+
+        /**
+         * @return the simple names of every classpath type declared in {@code packageName}, or an empty set when the
+         * classpath is unavailable or cannot be trusted.
+         */
+        private static Set<String> typeNamesInPackage(J.CompilationUnit cu, String packageName, ExecutionContext ctx) {
+            Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+            if (packageName.isEmpty() || !sourceSet.isPresent() || JavaSourceSet.isDirty(ctx, cu)) {
+                return emptySet();
+            }
+            Set<String> typeNames = new HashSet<>();
+            for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
+                if (packageName.equals(fq.getPackageName())) {
+                    typeNames.add(fq.getClassName());
+                }
+            }
+            return typeNames;
         }
 
         /**
