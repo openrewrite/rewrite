@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from typing import Optional, List
 
 from rewrite.java.tree import MethodInvocation
+from rewrite.python.type_utils import is_of_type_with_name
 
 
 @dataclass
@@ -57,9 +58,10 @@ class MethodMatcher:
     _argument_matchers: List["ArgumentMatcher"]
     _varargs_position: int  # -1 if no varargs
     _original_pattern: str
+    _match_overrides: bool = False
 
     @classmethod
-    def create(cls, pattern: str) -> "MethodMatcher":
+    def create(cls, pattern: str, match_overrides: bool = False) -> "MethodMatcher":
         """
         Create a MethodMatcher from a pattern string.
 
@@ -67,6 +69,8 @@ class MethodMatcher:
 
         Args:
             pattern: The method signature pattern
+            match_overrides: Also match calls whose declaring type is a subtype
+                of the pattern's type
 
         Returns:
             A configured MethodMatcher
@@ -75,6 +79,7 @@ class MethodMatcher:
             >>> m = MethodMatcher.create("datetime.datetime utcnow()")
             >>> m = MethodMatcher.create("datetime.datetime#now(..)")
             >>> m = MethodMatcher.create("datetime..* *(..)")
+            >>> m = MethodMatcher.create("threading.Thread getName()", match_overrides=True)
         """
         parser = _Parser(pattern)
         parser.parse()
@@ -85,6 +90,7 @@ class MethodMatcher:
             _argument_matchers=parser.argument_matchers,
             _varargs_position=parser.varargs_position,
             _original_pattern=pattern,
+            _match_overrides=match_overrides,
         )
 
     def matches(self, method: MethodInvocation) -> bool:
@@ -108,11 +114,19 @@ class MethodMatcher:
             return False
 
         # Check declaring type
-        if not self._type_matcher.matches(method.method_type.declaring_type):
+        if not self._matches_target_type(method.method_type.declaring_type):
             return False
 
         # Check arguments
         return self._matches_arguments(method)
+
+    def _matches_target_type(self, type_obj) -> bool:
+        """Check if the declaring type matches, optionally through supertypes."""
+        if self._type_matcher.matches(type_obj):
+            return True
+        return self._match_overrides and is_of_type_with_name(
+            type_obj, True, self._type_matcher.matches_name
+        )
 
     def _matches_method_name(self, method: MethodInvocation) -> bool:
         """Check if the method name matches.

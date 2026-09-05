@@ -109,6 +109,7 @@ from rewrite.python.type_report import (
 # Type-comparison helpers
 from rewrite.python.type_utils import (
     is_assignable_to,
+    is_of_type_with_name,
     is_of_type,
     is_of_class_type,
     is_string,
@@ -231,6 +232,7 @@ __all__ = [
     "is_reference",
     # Type-comparison helpers
     "is_assignable_to",
+    "is_of_type_with_name",
     "is_of_type",
     "is_of_class_type",
     "is_string",

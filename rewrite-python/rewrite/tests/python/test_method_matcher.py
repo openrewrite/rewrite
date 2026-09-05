@@ -181,3 +181,97 @@ class TestMethodMatcherRepr:
     def test_repr(self):
         m = MethodMatcher.create("datetime.datetime utcnow()")
         assert repr(m) == "MethodMatcher('datetime.datetime utcnow()')"
+
+
+WORKER_SOURCE = (
+    "import threading\n"
+    "\n"
+    "\n"
+    "class Worker(threading.Thread):\n"
+    "    def run(self):\n"
+    "        pass\n"
+    "\n"
+    "\n"
+    "w = Worker()\n"
+    "w.getName()\n"
+)
+
+
+@pytest.fixture(scope="module")
+def worker_cu():
+    """Parse a ``threading.Thread`` subclass with real type attribution."""
+    import ast
+    import os
+    import shutil
+    import tempfile
+
+    from rewrite.python._parser_visitor import ParserVisitor
+    from rewrite.python.ty_client import TyTypesClient
+
+    if shutil.which("ty-types") is None:
+        pytest.skip("ty-types CLI is not installed (ensure ty-types binary is on PATH)")
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        path = os.path.join(tmpdir, "m.py")
+        with open(path, "w") as f:
+            f.write(WORKER_SOURCE)
+        with TyTypesClient() as client:
+            if not client.initialize(tmpdir):
+                pytest.skip("ty-types did not initialize, so there is no attribution to match")
+            return ParserVisitor(WORKER_SOURCE, path, client).visit_Module(
+                ast.parse(WORKER_SOURCE)
+            )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _get_name_invocation(cu):
+    from rewrite.python.visitor import PythonVisitor
+
+    found = []
+
+    class _Collector(PythonVisitor):
+        def visit_method_invocation(self, mi, p):
+            if mi.name.simple_name == "getName":
+                found.append(mi)
+            return super().visit_method_invocation(mi, p)
+
+    _Collector().visit(cu, None)
+    assert len(found) == 1
+    return found[0]
+
+
+class TestMatchOverrides:
+    """Matching a method declared on a supertype of the call's declaring type."""
+
+    def test_base_type_pattern_matched_only_with_the_flag(self, worker_cu):
+        invocation = _get_name_invocation(worker_cu)
+
+        # The call is attributed to the subclass, so an exact base-type
+        # match cannot work.
+        assert invocation.method_type.declaring_type.fully_qualified_name == "m.Worker"
+
+        assert not MethodMatcher.create("threading.Thread getName(..)").matches(invocation)
+        assert MethodMatcher.create(
+            "threading.Thread getName(..)", match_overrides=True
+        ).matches(invocation)
+
+    def test_unrelated_supertype_still_rejected(self, worker_cu):
+        assert not MethodMatcher.create(
+            "queue.Queue getName(..)", match_overrides=True
+        ).matches(_get_name_invocation(worker_cu))
+
+    def test_preconditions_forward_the_flag(self, worker_cu):
+        from rewrite import InMemoryExecutionContext
+        from rewrite.markers import SearchResult
+        from rewrite.python.preconditions import find_methods, uses_method
+
+        def selects(recipe_ref) -> bool:
+            visited = recipe_ref.local_visitor.visit(worker_cu, InMemoryExecutionContext())
+            return visited.markers.find_first(SearchResult) is not None
+
+        pattern = "threading.Thread getName(..)"
+        assert not selects(uses_method(pattern))
+        assert selects(uses_method(pattern, match_overrides=True))
+        assert selects(find_methods(pattern, match_overrides=True))
