@@ -1708,6 +1708,13 @@ class PythonTypeMapping:
             if descriptor.get('className'):
                 return self._class_reference(descriptor)
 
+        elif kind == 'typeVar':
+            # `self` is a `Self` typevar bound to its class, `cls` a `type[Self]`
+            # arriving through `subclassOf`, so the bound is what owns the call.
+            upper_bound_id = descriptor.get('upperBound')
+            if upper_bound_id is not None:
+                return self._resolve_declaring_type(upper_bound_id)
+
         return None
 
     def _get_call_return_type(self, call_node: ast.Call) -> Optional[JavaType.FullyQualified]:
