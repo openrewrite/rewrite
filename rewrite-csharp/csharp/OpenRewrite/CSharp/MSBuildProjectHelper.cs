@@ -261,6 +261,16 @@ public static class MSBuildProjectHelper
                     }
                 }
 
+                var dependencyRanges = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (library.Dependencies != null)
+                {
+                    foreach (var dependency in library.Dependencies)
+                    {
+                        if (dependency.VersionRange != null)
+                            dependencyRanges[dependency.Id] = dependency.VersionRange.ToNormalizedString();
+                    }
+                }
+
                 var node = new ResolvedPackage(
                     library.Name,
                     library.Version.ToNormalizedString(),
@@ -278,7 +288,8 @@ public static class MSBuildProjectHelper
                     analyzerAssemblies: analyzers,
                     hasInstallScripts: hasInstallScripts,
                     hasXdtTransforms: hasXdt,
-                    hasLegacyContentFolder: hasLegacyContent);
+                    hasLegacyContentFolder: hasLegacyContent,
+                    dependencyRanges: dependencyRanges);
                 nodes[library.Name] = node;
                 dependencyNames[library.Name] =
                     library.Dependencies?.Select(d => d.Id).ToList() ?? new List<string>();
