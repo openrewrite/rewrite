@@ -129,10 +129,16 @@ class UsesMethod(TreeVisitor[Tree, Any]):
 
     With ``match_overrides``, a call whose declaring type is a subtype of the
     pattern's receiver matches too.
+
+    ``match_unknown_types`` widens a concrete receiver pattern to calls whose
+    declaring type is ``JavaType.Unknown``; see :meth:`MethodMatcher.matches`
+    for the false-positive trade-off.
     """
 
-    def __init__(self, method_pattern: str, match_overrides: bool = False) -> None:
+    def __init__(self, method_pattern: str, match_overrides: bool = False,
+                 match_unknown_types: bool = False) -> None:
         self._matcher = MethodMatcher.create(method_pattern, match_overrides)
+        self._match_unknown_types = match_unknown_types
 
     def visit(
         self,
@@ -142,7 +148,7 @@ class UsesMethod(TreeVisitor[Tree, Any]):
     ) -> Optional[Tree]:
         if not isinstance(tree, SourceFile):
             return tree
-        if _MethodSearch(self._matcher).search(tree, p):
+        if _MethodSearch(self._matcher, self._match_unknown_types).search(tree, p):
             return SearchResult.found(tree)
         return tree
 
@@ -279,12 +285,14 @@ class _TypeSearch(_FindFirst):
 
 
 class _MethodSearch(_FindFirst):
-    def __init__(self, matcher: MethodMatcher) -> None:
+    def __init__(self, matcher: MethodMatcher, match_unknown_types: bool = False) -> None:
         super().__init__()
         self._matcher = matcher
+        self._match_unknown_types = match_unknown_types
 
     def matches(self, tree: Tree) -> bool:
-        return isinstance(tree, MethodInvocation) and self._matcher.matches(tree)
+        return isinstance(tree, MethodInvocation) and self._matcher.matches(
+            tree, match_unknown_types=self._match_unknown_types)
 
 
 class _ImportSearch(_FindFirst):

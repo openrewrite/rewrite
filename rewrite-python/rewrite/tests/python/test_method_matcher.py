@@ -16,6 +16,10 @@
 
 import pytest
 
+from typing import List
+from rewrite.java.tree import MethodInvocation
+from rewrite.python.visitor import PythonVisitor
+from rewrite.test import RecipeSpec, python
 from rewrite.python import MethodMatcher
 from rewrite.python.method_matcher import (
     PatternTypeMatcher,
@@ -275,3 +279,72 @@ class TestMatchOverrides:
         assert not selects(uses_method(pattern))
         assert selects(uses_method(pattern, match_overrides=True))
         assert selects(find_methods(pattern, match_overrides=True))
+
+
+def _invocation(source: str, name: str) -> MethodInvocation:
+    """The single call named ``name`` in ``source``, parsed without type attribution."""
+    found: List[MethodInvocation] = []
+
+    class Finder(PythonVisitor):
+        def visit_method_invocation(self, method: MethodInvocation, p):
+            if method.name.simple_name == name:
+                found.append(method)
+            return super().visit_method_invocation(method, p)
+
+    RecipeSpec(type_attribution=False).rewrite_run(
+        python(source, after_recipe=lambda sf: Finder().visit(sf, None)))
+    assert len(found) == 1
+    return found[0]
+
+
+class TestMatchUnknownTypes:
+    """Structural fallback for calls whose declaring type is ``JavaType.Unknown``."""
+
+    def test_wildcard_receiver_matches_an_unknown_declaring_type_by_default(self):
+        mi = _invocation("Assert.assertTrue(foo.bar())", "assertTrue")
+        assert MethodMatcher.create("* *(..)").matches(mi)
+        assert MethodMatcher.create("*..* assertTrue(..)").matches(mi)
+
+    def test_concrete_receiver_needs_match_unknown_types(self):
+        mi = _invocation("Assert.assertTrue(foo.bar())", "assertTrue")
+        m = MethodMatcher.create("org.junit.Assert assertTrue(..)")
+        assert not m.matches(mi)
+        assert m.matches(mi, match_unknown_types=True)
+
+    def test_receiver_identifier_is_matched_against_the_pattern_tail(self):
+        mi = _invocation("MyHelper.do_something(True)", "do_something")
+
+        def matches(type_pattern: str) -> bool:
+            return MethodMatcher.create(f"{type_pattern} do_something(..)").matches(
+                mi, match_unknown_types=True)
+
+        assert matches("com.foo.MyHelper")
+        assert matches("com.foo.*")
+        assert matches("com..MyHelper")
+        assert matches("com.foo.My*Helper")
+        assert not matches("com.foo.OtherHelper")
+        assert not matches("com.foo.Your*Helper")
+
+    def test_a_receiver_that_is_not_an_identifier_is_not_checked(self):
+        mi = _invocation("array.array('b').tostring()", "tostring")
+        # Matching an unrelated receiver here is the false positive `matches`
+        # warns about; Java leaves a non-identifier receiver unchecked too.
+        assert MethodMatcher.create("nowhere.At.All tostring(..)").matches(
+            mi, match_unknown_types=True)
+
+    def test_a_mismatched_method_name_is_rejected(self):
+        mi = _invocation("Assert.assertTrue(foo.bar())", "assertTrue")
+        assert not MethodMatcher.create("org.junit.Assert assertFalse(..)").matches(
+            mi, match_unknown_types=True)
+
+    def test_argument_count_must_still_match(self):
+        mi = _invocation("Assert.assertTrue(foo.bar(), 'message')", "assertTrue")
+        assert not MethodMatcher.create("org.junit.Assert assertTrue(*)").matches(
+            mi, match_unknown_types=True)
+        assert not MethodMatcher.create("org.junit.Assert assertTrue(*, *, *)").matches(
+            mi, match_unknown_types=True)
+
+    def test_an_unattributed_argument_satisfies_a_typed_argument_matcher(self):
+        mi = _invocation("Assert.assertTrue(foo.bar())", "assertTrue")
+        assert MethodMatcher.create("org.junit.Assert assertTrue(bool)").matches(
+            mi, match_unknown_types=True)
