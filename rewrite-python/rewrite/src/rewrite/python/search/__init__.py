@@ -126,10 +126,13 @@ class UsesMethod(TreeVisitor[Tree, Any]):
     Mirrors ``org.openrewrite.java.search.HasMethod``. The ``method_pattern``
     follows the OpenRewrite method-pattern syntax
     (``<receiver-type> <method-name>(<args>)``) — e.g. ``"*..* tostring(..)"``.
+
+    With ``match_overrides``, a call whose declaring type is a subtype of the
+    pattern's receiver matches too.
     """
 
-    def __init__(self, method_pattern: str) -> None:
-        self._matcher = MethodMatcher.create(method_pattern)
+    def __init__(self, method_pattern: str, match_overrides: bool = False) -> None:
+        self._matcher = MethodMatcher.create(method_pattern, match_overrides)
 
     def visit(
         self,

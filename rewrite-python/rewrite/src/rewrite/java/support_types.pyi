@@ -60,7 +60,10 @@ class JavaType(ABC):
             Annotation: Kind
             Record: Kind
 
-
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]: ...
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]: ...
 
     class Unknown(FullyQualified):
         pass
@@ -93,6 +96,10 @@ class JavaType(ABC):
         def type_parameters(self) -> Optional[List[JavaType]]: ...
         @property
         def fully_qualified_name(self) -> str: ...
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]: ...
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]: ...
 
     class Annotation(FullyQualified):
         class ElementValue(ABC):
@@ -138,6 +145,10 @@ class JavaType(ABC):
         def values(self) -> List[JavaType.Annotation.ElementValue]: ...
         @property
         def fully_qualified_name(self) -> str: ...
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]: ...
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]: ...
 
     @dataclass(frozen=True)
     class GenericTypeVariable:
