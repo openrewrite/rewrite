@@ -1533,12 +1533,11 @@ class PythonTypeMapping:
             # `module_type` leaves a class to its own FQN.
             return self._class_reference(constructed)
 
-        # A `super()` receiver names no class of its own: the attribute can resolve
-        # further up the MRO than the pivot, so only the callee's declaring class
-        # names the owner. Every other receiver keeps the receiver convention.
-        super_owner = self._super_call_declaring_type(node)
-        if super_owner is not None:
-            return super_owner
+        # A method is owned by the class that declares it, so `match_overrides` walks
+        # up from an override. Mirrors Java, where this is `MethodSymbol.owner`.
+        declared_by = self._declaring_class_of_callee(node)
+        if declared_by is not None:
+            return declared_by
 
         # The callee names what is called; a receiver names only the module a call was
         # reached through, which differs for a re-exported function. A value receiver
@@ -1591,13 +1590,18 @@ class PythonTypeMapping:
         inferred = self._infer_declaring_type_from_ast(node)
         return inferred if inferred is not None else _UNKNOWN
 
-    def _super_call_declaring_type(self, node: ast.Call) -> Optional[JavaType.FullyQualified]:
-        """The declaring class of a call whose receiver is a ``super`` object."""
+    def _declaring_class_of_callee(self, node: ast.Call) -> Optional[JavaType.FullyQualified]:
+        """The class ty resolved the callee to through the MRO.
+
+        None for a module-level function or a builtin bound method; the
+        receiver's own type names those.
+        """
         if not isinstance(node.func, ast.Attribute):
             return None
-        if self._descriptor_of(node.func.value).get('kind') != 'super':
+        callee = self._descriptor_of(node.func)
+        if callee.get('kind') != 'boundMethod':
             return None
-        declaring_id = self._descriptor_of(node.func).get('declaringClassId')
+        declaring_id = callee.get('declaringClassId')
         return None if declaring_id is None else self._resolve_declaring_type(declaring_id)
 
     def _descriptor_of(self, node: ast.expr) -> Dict[str, Any]:

@@ -2428,7 +2428,8 @@ class TestDeclaringTypeUnification:
             mt = mapping.method_invocation_type(call)
             assert mt is not None
             assert mt._declaring_type is not None
-            assert mt._declaring_type.fully_qualified_name == 'os.PathLike'
+            # `register` is declared on the metaclass.
+            assert mt._declaring_type.fully_qualified_name == 'abc.ABCMeta'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -2670,12 +2671,40 @@ class TestSupertypeChainResolution:
 
 
 @requires_ty_types_cli
-class TestSelfReceiverDeclaringType:
-    """A call through ``self`` or ``cls`` is owned by the enclosing class.
+class TestInheritedCallDeclaringType:
+    """Attribution of a call to a method the receiver's class does not override."""
 
-    Anything else leaves ``MethodMatcher`` and ``UsesMethod`` blind to the
-    shape most calls inside a class body are written in.
-    """
+    SRC = '''
+        import threading
+
+        class Worker(threading.Thread):
+            def run(self):
+                pass
+
+        w = Worker()
+        w.getName()
+        w.run()
+    '''
+
+    def test_an_inherited_call_names_the_declaring_class(self):
+        cu, tmpdir, client = _parse_with_types({'m.py': self.SRC})
+        try:
+            declaring = {c.name.simple_name: c.method_type.declaring_type
+                         for c in _collect_method_invocations(cu)}
+
+            assert _fqn(declaring['getName']) == 'threading.Thread', \
+                f"inherited without override: got {declaring['getName']!r}"
+
+            assert _fqn(declaring['run']) == 'm.Worker', \
+                f"overridden, so the subclass declares it: got {declaring['run']!r}"
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestSelfReceiverDeclaringType:
+    """A call through ``self`` or ``cls`` resolves to a class, not to ``Unknown``,
+    which ``MethodMatcher`` and ``UsesMethod`` cannot gate on."""
 
     SRC = '''
         class Base:
@@ -2695,16 +2724,16 @@ class TestSelfReceiverDeclaringType:
                 return cls.build()
     '''
 
-    def test_self_and_cls_receivers_are_owned_by_the_enclosing_class(self):
+    def test_self_and_cls_receivers_resolve_to_the_declaring_class(self):
         cu, tmpdir, client = _parse_with_types({'m.py': self.SRC})
         try:
             declaring = {c.name.simple_name: c.method_type.declaring_type
                          for c in _collect_method_invocations(cu)}
 
-            assert _fqn(declaring['greet']) == 'm.Child', \
+            assert _fqn(declaring['greet']) == 'm.Base', \
                 f"self-rooted call: got {declaring['greet']!r}"
 
-            assert _fqn(declaring['build']) == 'm.Child', \
+            assert _fqn(declaring['build']) == 'm.Base', \
                 f"cls-rooted call: got {declaring['build']!r}"
         finally:
             _cleanup_parse(tmpdir, client)
