@@ -17,7 +17,8 @@
 from typing import Any, List, Optional, Tuple
 
 from rewrite.java.tree import Identifier, J, MethodDeclaration
-from rewrite.python.binding_utils import ImportBindings, import_bindings, is_reference
+from rewrite.python.binding_utils import (ImportBindings, import_bindings, is_reference,
+                                          resolves_in_scope)
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
@@ -56,14 +57,14 @@ def _references(source: str) -> List[Reference]:
     return census.found
 
 
-def _positions(source: str) -> List[bool]:
-    """What :func:`is_reference` answers for each ``json`` identifier, in source order."""
+def _positions(source: str, predicate: Any = is_reference) -> List[bool]:
+    """What ``predicate`` answers for each ``json`` identifier, in source order."""
     answers: List[bool] = []
 
     class Positions(PythonVisitor[Any]):
         def visit_identifier(self, ident: Identifier, p: Any) -> J:
             if ident.simple_name == 'json':
-                answers.append(is_reference(self.cursor, ident))
+                answers.append(predicate(self.cursor, ident))
             return ident
 
     _run(source, Positions())
@@ -169,6 +170,21 @@ def test_an_undotted_case_label_captures_rather_than_matches():
             case json.Loads():
                 pass
         """) == [True]
+
+
+def test_a_rename_follows_more_names_than_a_read_census():
+    # A write and a `global` declaration name the binding without reading it; member and
+    # keyword position name something else, which both predicates answer alike.
+    source = """
+        json = 1
+        def f(resp, url):
+            global json
+            resp.json()
+            post(url, json=1)
+            return json
+        """
+    assert _positions(source) == [False, False, False, False, True]
+    assert _positions(source, resolves_in_scope) == [True, True, False, False, True]
 
 
 def test_a_comprehension_target_is_not_a_reference():
