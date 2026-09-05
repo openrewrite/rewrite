@@ -345,7 +345,7 @@ public class GroovyParserVisitor {
                                 randomId(), compName.getPrefix(), Markers.EMPTY,
                                 compName.withPrefix(EMPTY), emptyList(), null, typeMapping.variableType(compName.getSimpleName(), rc.getType()));
                         J.VariableDeclarations varDecl = new J.VariableDeclarations(randomId(), compPrefix, Markers.EMPTY,
-                                emptyList(), emptyList(), typeExpr, null, emptyList(), singletonList(JRightPadded.build(namedVar)));
+                                emptyList(), emptyList(), typeExpr, null, singletonList(JRightPadded.build(namedVar)));
                         componentDecls.add(JRightPadded.build((Statement) varDecl)
                                 .withAfter(i == components.size() - 1 ? sourceBefore(")") : sourceBefore(",")));
                     }

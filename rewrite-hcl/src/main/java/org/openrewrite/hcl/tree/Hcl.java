@@ -26,7 +26,6 @@ import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.marker.Markers;
 
 import java.lang.ref.WeakReference;
@@ -1555,23 +1554,6 @@ public interface Hcl extends Tree {
         Markers markers;
 
         HclRightPadded<Expression> paddedExpression;
-
-        @JsonCreator
-        @ToBeRemoved(after = "2026-04-01", reason = "Temporary constructor to aid deserialization of older models")
-        TemplateInterpolation(UUID id,
-                              Space prefix,
-                              Markers markers,
-                              @Nullable Expression expression,
-                              @Nullable HclRightPadded<Expression> paddedExpression) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            if (expression != null) {
-                this.paddedExpression = HclRightPadded.withElement(null, expression);
-            } else {
-                this.paddedExpression = requireNonNull(paddedExpression);
-            }
-        }
 
         public Expression getExpression() {
             return paddedExpression.getElement();

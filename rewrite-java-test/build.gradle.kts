@@ -15,7 +15,6 @@ dependencies {
     implementation(project(":rewrite-java"))
     implementation(project(":rewrite-test"))
 
-    testImplementation("io.github.classgraph:classgraph:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.apache.hbase:hbase-shaded-client:2.4.11")
