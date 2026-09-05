@@ -19,8 +19,11 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaTypeGoat;
 import org.openrewrite.java.JavaTypeMappingTest;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -91,6 +94,17 @@ class JavaReflectionTypeMappingTest implements JavaTypeMappingTest {
         // synthetic slots and a different length than the types list.
         assertThat(constructor.getParameterNames()).doesNotContainNull();
         assertThat(constructor.getParameterNames()).hasSameSizeAs(constructor.getParameterTypes());
+    }
+
+    @Test
+    void varargsMethodHasVarargsFlag() throws Exception {
+        // Reflection exposes varargs as ACC_VARARGS (0x80) in getModifiers(), which collides
+        // with Flag.Transient. The mapping must translate it to Flag.Varargs rather than
+        // leaving a spurious Transient.
+        JavaType.Method asList = typeMapping.method(Arrays.class.getMethod("asList", Object[].class));
+        assertThat(asList.getFlags())
+          .contains(Flag.Varargs)
+          .doesNotContain(Flag.Transient);
     }
 
 }
