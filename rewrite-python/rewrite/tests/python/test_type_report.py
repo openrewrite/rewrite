@@ -211,6 +211,21 @@ class _NoOp(Recipe):
 
 
 @requires_ty_types_cli
+def test_supertypes_walks_past_the_receiver_class_to_the_builtin_base(tmp_path):
+    path = _write(tmp_path, "class MyList(list):\n    pass\n\n\ndef f(items: MyList):\n    items.append(1)\n")
+    cu = parse_for_types(path, with_types=True, project_root=str(tmp_path))
+
+    call = next(e for e in build_type_report(cu, supertypes=True).entries
+                if e.kind == "MethodInvocation")
+
+    # The declaring type is the receiver's class, so `list append(..)` only
+    # matches via the chain — which is why the chain has to be reported.
+    assert call.type.startswith("sample.MyList append(..)")
+    assert call.supertypes is not None
+    assert call.supertypes.split(" <: ")[:2] == ["sample.MyList", "list"]
+
+
+@requires_ty_types_cli
 def test_diff_ty_separates_the_import_resolved_call_from_the_instance_receiver(tmp_path):
     from rewrite.python.type_report import diff_ty
 

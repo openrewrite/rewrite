@@ -352,7 +352,8 @@ def _supertype_chain(node) -> Optional[str]:
     chain, seen = [render_type(declaring)], {id(declaring)}
     current = declaring
     while True:
-        current = getattr(current, "supertype", None)
+        # The model exposes no public accessor; type_utils reads the same field.
+        current = getattr(current, "_supertype", None)
         if current is None or id(current) in seen:
             break
         seen.add(id(current))
