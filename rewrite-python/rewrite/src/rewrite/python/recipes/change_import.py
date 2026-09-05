@@ -28,7 +28,7 @@ from rewrite.java.tree import FieldAccess, Identifier, If, Import, MethodInvocat
 from rewrite.markers import Markers
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
                                          module_scope_blocks, unconditional_body)
-from rewrite.python.binding_utils import resolves_in_scope
+from rewrite.python.binding_utils import is_reference, resolves_in_scope
 from rewrite.python.scope_utils import LocalBindings
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
@@ -296,9 +296,9 @@ class ChangeImport(Recipe):
                     return self._remove_module_from_import(multi, old_module)
 
             def visit_identifier(self, ident: Identifier, p: ExecutionContext) -> J:
-                # `resolves_in_scope` matches the cursor's nodes by identity, so it is asked
-                # of the identifier the cursor holds.
-                in_scope = resolves_in_scope(self.cursor, ident)
+                # The position predicates match the cursor's nodes by identity, so they are
+                # asked of the identifier the cursor holds.
+                at_cursor = ident
                 ident = super().visit_identifier(ident, p)  # ty: ignore[invalid-assignment]  # visitor covariance
                 if not isinstance(ident, Identifier):
                     return ident
@@ -310,9 +310,10 @@ class ChangeImport(Recipe):
                     return ident
                 if ident.simple_name != old_ref_name:
                     return ident
-                if not in_scope:
+                if not resolves_in_scope(self.cursor, at_cursor):
                     return ident
-                if self.local_bindings.is_bound(self.cursor, old_ref_name):
+                binding = not is_reference(self.cursor, at_cursor)
+                if self.local_bindings.is_bound(self.cursor, old_ref_name, binding=binding):
                     return ident
                 return ident.replace(_simple_name=new_ref_name)
 

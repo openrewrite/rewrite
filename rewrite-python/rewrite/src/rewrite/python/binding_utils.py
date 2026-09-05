@@ -27,9 +27,9 @@ from rewrite.java.support_types import J, Statement
 from rewrite.java.tree import (Assignment, Case, FieldAccess, ForEachLoop, Identifier, If,
                                Import, MethodInvocation, Parentheses)
 from rewrite.python.import_utils import get_alias_name, unconditional_body
-from rewrite.python.scope_utils import scope_of
+from rewrite.python.scope_utils import captures, scope_of
 from rewrite.python.tree import (ChainedAssignment, CollectionLiteral, ComprehensionExpression,
-                                 CompilationUnit, ExpressionStatement, MultiImport,
+                                 CompilationUnit, ExpressionStatement, MatchCase, MultiImport,
                                  NamedArgument, Star, TypeHintedExpression, VariableScope)
 from rewrite.visitor import TreeVisitor
 
@@ -177,6 +177,9 @@ def _resolves(node: J, parent: Optional[J]) -> bool:
     if isinstance(parent, (FieldAccess, NamedArgument)):
         # An attribute belongs to its target and a keyword argument to the callee's signature.
         return parent.name is not node
+    if isinstance(parent, MatchCase.Pattern) and parent.kind is MatchCase.Pattern.Kind.KEYWORD:
+        # A class pattern's `attr=p` names an attribute of the class it matches.
+        return parent.children[0] is not node
     return True
 
 
@@ -197,10 +200,11 @@ def _is_target(parent: Optional[J], node: J) -> bool:
     if isinstance(parent, ComprehensionExpression):
         # A clause holds its target directly, so the comprehension is the node above the name.
         return any(clause.iterator_variable is node for clause in parent.clauses)
-    # A bare `case json:` label captures, and so binds. Every structured pattern is a
-    # `Py.MatchCase` instead, whose captures are left as reads: safe for a census, and a
-    # rename has to guard them itself.
-    return isinstance(parent, Case) and any(label is node for label in parent.case_labels)
+    if isinstance(parent, Case):
+        return any(capture is node for label in parent.case_labels for capture in captures(label))
+    # A pattern nested in another holds its own cursor, so the case above it is out of reach.
+    return (isinstance(parent, (MatchCase, MatchCase.Pattern))
+            and any(capture is node for capture in captures(parent)))
 
 
 def _enclosing_nodes(cursor: Cursor, ident: Identifier) -> Iterator[J]:

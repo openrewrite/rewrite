@@ -159,17 +159,23 @@ def test_del_reads_the_name_it_unbinds():
     assert _references("import json\ndel json\n") == [('json', 'json', None)]
 
 
-def test_an_undotted_case_label_captures_rather_than_matches():
+def test_a_case_patterns_captures_bind_rather_than_read():
+    # Every capture position binds the name; a dotted value pattern reads it.
     assert _positions("""
         match x:
             case json:
                 pass
-        """) == [False]
-    assert _positions("""
-        match x:
+            case Point(json):
+                pass
+            case [json]:
+                pass
+            case {'k': json}:
+                pass
+            case Other() as json:
+                pass
             case json.Loads():
                 pass
-        """) == [True]
+        """) == [False, False, False, False, False, True]
 
 
 def test_a_rename_follows_more_names_than_a_read_census():
