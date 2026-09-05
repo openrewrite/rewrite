@@ -100,10 +100,10 @@ class ImportBindings:
 
     def reference(self, cursor: Cursor, ident: Identifier) -> Optional[Binding]:
         """The binding ``ident`` reads, or None where it reads something else: a name in
-        member position, a name nothing imports, or one an enclosing scope rebinds. A quoted
-        forward reference holds an expression rather than a name, so its names come from
-        :func:`referenced_names` instead. Check :attr:`Binding.guarded` before emitting a
-        reference that has to resolve at runtime."""
+        member position, a name nothing imports, or one an enclosing scope rebinds. None is not
+        "unused": a quoted forward reference holds an expression, so a use census composes
+        :func:`is_reference` with :func:`referenced_names` rather than calling this. Check
+        :attr:`Binding.guarded` before emitting a runtime reference."""
         binding = self._by_name.get(ident.simple_name)
         if binding is None or not is_reference(cursor, ident):
             return None
@@ -171,8 +171,9 @@ def _is_target(parent: Optional[J], node: J) -> bool:
     if isinstance(parent, ComprehensionExpression):
         # A clause holds its target directly, so the comprehension is the node above the name.
         return any(clause.iterator_variable is node for clause in parent.clauses)
-    # An undotted case label is a capture pattern, which binds; `case json.Loads:` matches a
-    # value and so reads. A name nested in a class pattern's arguments is left as a read.
+    # A bare `case json:` label captures, and so binds. Every structured pattern is a
+    # `Py.MatchCase` instead, whose captures are left as reads: safe for a census, and a
+    # rename has to guard them itself.
     return isinstance(parent, Case) and any(label is node for label in parent.case_labels)
 
 
