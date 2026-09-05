@@ -19,6 +19,7 @@ package org.openrewrite.java.isolated;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
+import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
@@ -27,6 +28,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Pair;
 import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
@@ -58,7 +60,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.lang.Math.max;
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
@@ -600,10 +604,61 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     private List<JCAnnotation> extractRecordComponentAnnotations(Symbol.RecordComponent rc) {
         List<JCAnnotation> annotations = rc.getOriginalAnnos();
-        for (int i = 0; i < rc.getAnnotationMirrors().size(); i++) {
-            annotations.get(i).getAnnotationType().setType((Type) rc.getAnnotationMirrors().get(i).getAnnotationType());
+        if (annotations.isEmpty()) {
+            return annotations;
+        }
+
+        // javac types each header annotation only where it landed (JLS 9.7.4), leaving these originals untyped
+        Map<Integer, JCAnnotation> onAccessor = rc.accessorMeth == null ? emptyMap() :
+                mapAnnotations(rc.accessorMeth.getModifiers().getAnnotations(), new HashMap<>());
+        for (JCAnnotation annotation : annotations) {
+            JCTree annotationType = annotation.getAnnotationType();
+            JCAnnotation accessorAnnotation = onAccessor.get(annotation.pos);
+            if (accessorAnnotation != null && accessorAnnotation.getAnnotationType().type != null) {
+                annotationType.setType(accessorAnnotation.getAnnotationType().type);
+                continue;
+            }
+            // by name, as the mirrors cover only the component-applicable annotations and so never line up by index
+            Type type = typeNamed(annotationType.toString(), rc.getAnnotationMirrors());
+            if (type != null) {
+                annotationType.setType(type);
+            }
         }
         return annotations;
+    }
+
+    private static @Nullable Type typeNamed(String writtenName, List<? extends Attribute> attributes) {
+        Type enclosingTypeOmitted = null;
+        for (Attribute attribute : attributes) {
+            Symbol.TypeSymbol tsym = attribute.type.tsym;
+            if (tsym != null) {
+                String qualifiedName = tsym.getQualifiedName().toString();
+                if (qualifiedName.equals(writtenName)) {
+                    return attribute.type;
+                }
+                if (enclosingTypeOmitted == null && qualifiedName.endsWith("." + writtenName)) {
+                    enclosingTypeOmitted = attribute.type;
+                }
+            }
+        }
+        return enclosingTypeOmitted != null ? enclosingTypeOmitted : repeatedTypeNamed(writtenName, attributes);
+    }
+
+    // repeated annotations are attributed as the one container annotation that holds them
+    private static @Nullable Type repeatedTypeNamed(String writtenName, List<? extends Attribute> attributes) {
+        for (Attribute attribute : attributes) {
+            if (attribute instanceof Attribute.Compound) {
+                for (Pair<Symbol.MethodSymbol, Attribute> value : ((Attribute.Compound) attribute).values) {
+                    if (value.snd instanceof Attribute.Array) {
+                        Type type = typeNamed(writtenName, asList(((Attribute.Array) value.snd).values));
+                        if (type != null) {
+                            return type;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     @Override
