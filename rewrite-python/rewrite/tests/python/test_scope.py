@@ -17,7 +17,7 @@
 from typing import List
 
 from rewrite import Cursor
-from rewrite.java.tree import Identifier, MethodDeclaration, MethodInvocation
+from rewrite.java.tree import ClassDeclaration, Identifier, MethodDeclaration, MethodInvocation
 from rewrite.python.scope_utils import LocalBindings, Scope, scope_of
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
@@ -130,6 +130,47 @@ def test_a_class_body_is_reachable_from_directly_within_it_and_nowhere_else():
             class B:
                 anchor()
         """).declares('a') is False
+
+
+def test_a_match_case_binds_the_names_its_pattern_captures():
+    # The class matched, a keyword attribute and a dotted value pattern name something else.
+    assert _names_at_anchor("""
+        def f(p):
+            match p:
+                case Point(a, x=b):
+                    pass
+                case [c, *d]:
+                    pass
+                case {'k': e, **rest}:
+                    pass
+                case Other() as g:
+                    pass
+                case Color.RED:
+                    pass
+                case None | _:
+                    pass
+                case h:
+                    anchor()
+        """)[0] == ['a', 'b', 'c', 'd', 'e', 'g', 'h', 'p', 'rest']
+
+
+def test_a_class_bodys_bindings_reach_only_the_statements_after_them():
+    # A class body compiles a read to `LOAD_NAME`, which falls back to the module until the
+    # class-local name exists.
+    rebinding = _scope_at_anchor("""
+        import json
+        class C:
+            json = anchor()
+        """)
+    assert isinstance(rebinding.declaring_scope('json'), CompilationUnit)
+
+    rebound = _scope_at_anchor("""
+        import json
+        class C:
+            json = 1
+            alias = anchor()
+        """)
+    assert isinstance(rebound.declaring_scope('json'), ClassDeclaration)
 
 
 def test_a_comprehensions_leading_iterable_is_evaluated_before_its_targets_exist():
