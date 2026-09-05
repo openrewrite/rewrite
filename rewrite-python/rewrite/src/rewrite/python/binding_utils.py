@@ -24,12 +24,12 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 
 from rewrite import Cursor
 from rewrite.java.support_types import J, Statement
-from rewrite.java.tree import (Assignment, FieldAccess, ForEachLoop, Identifier, If, Import,
-                               MethodInvocation, Parentheses)
+from rewrite.java.tree import (Assignment, Case, FieldAccess, ForEachLoop, Identifier, If,
+                               Import, MethodInvocation, Parentheses)
 from rewrite.python.import_utils import get_alias_name, unconditional_body
 from rewrite.python.scope_utils import scope_of
 from rewrite.python.tree import (ChainedAssignment, CollectionLiteral, ComprehensionExpression,
-                                 CompilationUnit, Del, ExpressionStatement, MultiImport, Star,
+                                 CompilationUnit, ExpressionStatement, MultiImport, Star,
                                  TypeHintedExpression, VariableScope)
 from rewrite.visitor import TreeVisitor
 
@@ -71,8 +71,13 @@ class ImportBindings:
 
     def __init__(self, bindings: Sequence[Binding]) -> None:
         self._bindings = tuple(bindings)
-        # A second import of a name replaces the first, as running the statements would.
-        self._by_name: Dict[str, Binding] = {b.name: b for b in self._bindings if b.member != '*'}
+        self._by_name: Dict[str, Binding] = {}
+        for binding in self._bindings:
+            held = self._by_name.get(binding.name)
+            # A later import of a name replaces an earlier one, as running the statements would,
+            # except that a guarded import binds nothing at runtime for an unguarded one to lose to.
+            if binding.member != '*' and (held is None or held.guarded or not binding.guarded):
+                self._by_name[binding.name] = binding
 
     def __iter__(self) -> Iterator[Binding]:
         return iter(self._bindings)
@@ -166,7 +171,9 @@ def _is_target(parent: Optional[J], node: J) -> bool:
     if isinstance(parent, ComprehensionExpression):
         # A clause holds its target directly, so the comprehension is the node above the name.
         return any(clause.iterator_variable is node for clause in parent.clauses)
-    return isinstance(parent, Del)
+    # An undotted case label is a capture pattern, which binds; `case json.Loads:` matches a
+    # value and so reads. A name nested in a class pattern's arguments is left as a read.
+    return isinstance(parent, Case) and any(label is node for label in parent.case_labels)
 
 
 def _enclosing_nodes(cursor: Cursor, ident: Identifier) -> Iterator[J]:

@@ -150,8 +150,25 @@ def test_a_target_the_statement_binds_is_not_a_reference():
         (a, json) = f()
         for json in xs:
             pass
-        del json
         """) == []
+
+
+def test_del_reads_the_name_it_unbinds():
+    # `del json` needs the name bound, so removing the import it names breaks the file.
+    assert _references("import json\ndel json\n") == [('json', 'json', None)]
+
+
+def test_an_undotted_case_label_captures_rather_than_matches():
+    assert _positions("""
+        match x:
+            case json:
+                pass
+        """) == [False]
+    assert _positions("""
+        match x:
+            case json.Loads():
+                pass
+        """) == [True]
 
 
 def test_a_comprehension_target_is_not_a_reference():
@@ -168,13 +185,20 @@ def test_a_dotted_target_reads_the_name_it_assigns_through():
 
 
 def test_the_last_import_of_a_name_in_source_order_is_the_one_in_force():
-    bindings = _bindings("""
+    assert _bindings("""
         from typing import TYPE_CHECKING
         if TYPE_CHECKING:
             from a import Bar
         from b import Bar
-        """)
-    assert bindings.for_name('Bar').module == 'b'
+        """).for_name('Bar').module == 'b'
+
+    # A guarded import binds no runtime name, so it does not displace one that does.
+    assert _bindings("""
+        from typing import TYPE_CHECKING
+        from a import Bar
+        if TYPE_CHECKING:
+            from b import Bar
+        """).for_name('Bar').module == 'a'
 
 
 def test_a_wildcard_import_binds_no_name_of_its_own():
