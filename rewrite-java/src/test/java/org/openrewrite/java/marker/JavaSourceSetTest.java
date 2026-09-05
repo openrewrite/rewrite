@@ -15,23 +15,95 @@
  */
 package org.openrewrite.java.marker;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.Tree;
 import org.openrewrite.java.tree.JavaType;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
+import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaSourceSetTest {
 
     @TempDir
     Path tempDir;
+
+    @Test
+    void typesInPackageReturnsTypesInThatPackage() {
+        JavaType.FullyQualified list = JavaType.ShallowClass.build("java.util.List");
+        JavaType.FullyQualified map = JavaType.ShallowClass.build("java.util.Map");
+        JavaType.FullyQualified pattern = JavaType.ShallowClass.build("java.util.regex.Pattern");
+        JavaSourceSet sourceSet = new JavaSourceSet(Tree.randomId(), "main",
+          List.of(list, map, pattern), emptyMap());
+
+        assertThat(sourceSet.typesInPackage("java.util")).containsExactlyInAnyOrder(list, map);
+        assertThat(sourceSet.typesInPackage("java.util.regex")).containsExactly(pattern);
+        assertThat(sourceSet.typesInPackage("does.not.exist")).isEmpty();
+    }
+
+    @Test
+    void typesInPackageWalksClasspathOnce() {
+        List<JavaType.FullyQualified> backing = List.of(
+          JavaType.ShallowClass.build("java.util.List"),
+          JavaType.ShallowClass.build("java.util.regex.Pattern"));
+        AtomicInteger iterations = new AtomicInteger();
+        JavaSourceSet sourceSet = new JavaSourceSet(Tree.randomId(), "main",
+          new CountingList<>(backing, iterations), emptyMap());
+
+        sourceSet.typesInPackage("java.util");
+        sourceSet.typesInPackage("java.util.regex");
+        sourceSet.typesInPackage("java.util");
+
+        assertThat(iterations).hasValue(1);
+    }
+
+    @Test
+    void lazyPackageIndexIsNotSerialized() throws Exception {
+        ObjectMapper mapper = new ObjectMapper()
+          .registerModule(new ParameterNamesModule())
+          .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        JavaSourceSet sourceSet = new JavaSourceSet(Tree.randomId(), "main", List.of(), emptyMap());
+        sourceSet.typesInPackage("java.util"); // force the lazy index to be built
+
+        String json = mapper.writeValueAsString(sourceSet);
+        assertThat(json).doesNotContain("typesByPackage");
+
+        JavaSourceSet roundTripped = mapper.readValue(json, JavaSourceSet.class);
+        assertThat(roundTripped.getId()).isEqualTo(sourceSet.getId());
+    }
+
+    /**
+     * A {@link List} that counts how many times it is iterated, to prove the package index is
+     * built from a single classpath walk and then cached.
+     */
+    private static class CountingList<E> extends ArrayList<E> {
+        private final transient AtomicInteger iterations;
+
+        CountingList(Collection<E> backing, AtomicInteger iterations) {
+            super(backing);
+            this.iterations = iterations;
+        }
+
+        @Override
+        public Iterator<E> iterator() {
+            iterations.incrementAndGet();
+            return super.iterator();
+        }
+    }
 
     @Test
     void skipsMetaInfEntriesInJar() throws Exception {
