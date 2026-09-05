@@ -29,8 +29,8 @@ from rewrite.java.tree import (Assignment, Case, FieldAccess, ForEachLoop, Ident
 from rewrite.python.import_utils import get_alias_name, unconditional_body
 from rewrite.python.scope_utils import scope_of
 from rewrite.python.tree import (ChainedAssignment, CollectionLiteral, ComprehensionExpression,
-                                 CompilationUnit, ExpressionStatement, MultiImport, Star,
-                                 TypeHintedExpression, VariableScope)
+                                 CompilationUnit, ExpressionStatement, MultiImport,
+                                 NamedArgument, Star, TypeHintedExpression, VariableScope)
 from rewrite.visitor import TreeVisitor
 
 _IMPORT_BINDINGS = 'org.openrewrite.python.importBindings'
@@ -126,15 +126,33 @@ def import_bindings(source: Union[TreeVisitor[Any, Any], CompilationUnit,
     return ImportBindings(_scan(source, guarded=False))
 
 
-def is_reference(cursor: Cursor, ident: Identifier) -> bool:
-    """Whether ``ident`` reads a name, rather than filling a slot that names something.
-
-    Position is all this reads, so a name an enclosing scope rebinds still answers True;
-    :meth:`ImportBindings.reference` composes the two. ``cursor`` stands on ``ident`` or on
-    its parent, which lets a visitor ask about a node's own child from where it already is.
+def resolves_in_scope(cursor: Cursor, ident: Identifier) -> bool:
+    """Whether ``ident`` names something the enclosing scopes bind, rather than a member of
+    another namespace: an attribute, a keyword argument, or a name an import spells out.
+    Declarations and writes of a binding answer True, which is what a rename follows, and
+    position is all it reads, so pair it with a scope lookup. ``cursor`` stands on ``ident``
+    or on its parent, letting a visitor ask about a node's own child from where it is.
     """
+    node, parent, _ = _position(cursor, ident)
+    return _resolves(node, parent)
+
+
+def is_reference(cursor: Cursor, ident: Identifier) -> bool:
+    """Whether ``ident`` reads a name: :func:`resolves_in_scope` less the declarations, the
+    targets a statement binds and the names a ``global`` or ``nonlocal`` declares.
+    """
+    node, parent, dotted = _position(cursor, ident)
+    if not _resolves(node, parent) or _declares(node, parent):
+        return False
+    if isinstance(parent, VariableScope):
+        return False
+    return dotted or not _is_target(parent, node)
+
+
+def _position(cursor: Cursor, ident: Identifier) -> Tuple[J, Optional[J], bool]:
+    """The node standing for ``ident`` where it sits, the node above that, and whether a
+    dotted name carried it there."""
     node: J = ident
-    parent: Optional[J] = None
     dotted = False
     for enclosing in _enclosing_nodes(cursor, ident):
         # A dotted name reads through its root, and a tuple or starred target spreads over the
@@ -144,20 +162,28 @@ def is_reference(cursor: Cursor, ident: Identifier) -> bool:
         elif isinstance(enclosing, _TARGET_WRAPPERS):
             node = enclosing
         else:
-            parent = enclosing
-            break
+            return node, enclosing, dotted
+    return node, None, dotted
 
-    if isinstance(parent, (Import, MultiImport, VariableScope)):
-        # An import names the module or member it binds; `global x` names a binding elsewhere.
+
+def _resolves(node: J, parent: Optional[J]) -> bool:
+    """Whether the scopes decide what ``node`` names, rather than the node above it."""
+    if isinstance(parent, (Import, MultiImport)):
+        # An import names the module or member it binds, and holds it on `qualid`, not `name`.
         return False
     if isinstance(parent, MethodInvocation):
-        # A call selecting nothing calls a name it read; with a receiver the name is a member.
+        # A call selecting nothing calls a name it resolved; with a receiver it is a member.
         return parent.name is not node or parent.select is None
-    if not dotted and _is_target(parent, node):
-        return False
-    # Every other node that names rather than reads keeps the name on `name`: an attribute, a
-    # keyword argument, a `def`, a `class`, a parameter, a type alias.
-    return getattr(parent, 'name', None) is not node
+    if isinstance(parent, (FieldAccess, NamedArgument)):
+        # An attribute belongs to its target and a keyword argument to the callee's signature.
+        return parent.name is not node
+    return True
+
+
+def _declares(node: J, parent: Optional[J]) -> bool:
+    """Whether ``parent`` introduces ``node`` as a name of its own: a ``def``, a ``class``, a
+    parameter, a type alias. A receiverless call holds on ``name`` a name it resolved."""
+    return not isinstance(parent, MethodInvocation) and getattr(parent, 'name', None) is node
 
 
 def _is_target(parent: Optional[J], node: J) -> bool:
@@ -239,4 +265,5 @@ def _dotted_path(name: Optional[J]) -> str:
     return '.'.join(parts)
 
 
-__all__ = ['Binding', 'ImportBindings', 'import_bindings', 'is_reference']
+__all__ = ['Binding', 'ImportBindings', 'import_bindings', 'is_reference',
+           'resolves_in_scope']
