@@ -1572,6 +1572,17 @@ class PythonTypeMapping:
                 resolved = self._get_call_return_type(receiver)
                 if resolved is not None:
                     return resolved
+                # ty types a call it matches to no overload `Unknown`, so a
+                # construction is known by the class it names. That is the receiver's
+                # own class, as for a `self` receiver, so an inherited member needs
+                # `match_overrides`.
+                constructed = self._constructed_class(receiver)
+                if constructed is not None:
+                    reference = self._class_reference(constructed)
+                    # `super()` builds a proxy, never the class declaring what is
+                    # called on it; `_declaring_class_of_callee` names that class.
+                    if reference.fully_qualified_name != 'super':
+                        return reference
 
             # Try to look up receiver type in ty-types index
             type_id = self._lookup_type_id(receiver)

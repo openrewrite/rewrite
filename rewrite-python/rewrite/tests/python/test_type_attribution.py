@@ -879,6 +879,29 @@ class TestDeclaringTypeWithTyTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    def test_construction_receiver_declaring_type_when_ty_untypes_the_call(self):
+        """A construction ty leaves untyped still yields a declaring type."""
+        source = """
+            import array
+
+            class Subclass(array.array):
+                pass
+
+            Subclass().tobytes()
+        """
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[2].value  # Subclass().tobytes()
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            # `array.array` has no zero-argument overload, so ty resolves no
+            # member on the construction.
+            declaring = result._declaring_type
+            assert declaring._fully_qualified_name == f'{_SOURCE_MODULE}.Subclass'
+            assert declaring._supertype._fully_qualified_name == 'array.array'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
     def test_user_defined_class_method(self):
         """Method call on a user-defined class instance."""
         source = '''
