@@ -16,8 +16,8 @@
 package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
@@ -2262,7 +2262,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
+    @DisabledIfEnvironmentVariable(named = "REWRITE_GRADLE_MIRROR_URL", matches = ".+",
+            disabledReason = "An injected mirror adds a repository, defeating the empty-repositories scenario.")
     void cannotDownloadMetaDataWhenNoRepositoriesAreDefined() {
         rewriteRun(
           buildGradle(
