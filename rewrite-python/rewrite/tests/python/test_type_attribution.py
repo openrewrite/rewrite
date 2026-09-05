@@ -2712,19 +2712,12 @@ class TestSelfReceiverDeclaringType:
 
 @requires_ty_types_cli
 class TestSuperReceiverDeclaringType:
-    """A `super()`-rooted call is owned by the class declaring what it resolves to.
-
-    Ordinary calls keep naming the receiver, which is a different class for any
-    inherited method.
-    """
+    """A `super()`-rooted call is owned by the class declaring what it resolves to."""
 
     SRC = '''
         class A:
             def f(self) -> int:
                 return 1
-
-            def inherited(self) -> int:
-                return 2
 
         class B(A):
             pass
@@ -2734,21 +2727,14 @@ class TestSuperReceiverDeclaringType:
                 return "s"
 
             def go(self):
-                self.inherited()
                 super().f()
     '''
 
-    def test_super_takes_the_declaring_class_and_self_keeps_the_receiver(self):
+    def test_super_takes_the_declaring_class_not_the_pivot(self):
         mapping, tree, tmpdir, client = _make_mapping(self.SRC)
         try:
-            self_inherited, super_f = (stmt.value for stmt in tree.body[2].body[1].body)
-
-            assert _fqn(mapping._get_declaring_type(super_f)) == 'test.A', \
-                "super() must name the declaring class, not the pivot"
-
-            # `inherited` carries declaringClassId test.A, but a non-super receiver
-            # must keep naming the receiver.
-            assert _fqn(mapping._get_declaring_type(self_inherited)) == 'test.C'
+            super_f = tree.body[2].body[1].body[0].value
+            assert _fqn(mapping._get_declaring_type(super_f)) == 'test.A'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
