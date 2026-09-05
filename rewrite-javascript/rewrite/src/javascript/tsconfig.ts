@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import ts from "typescript";
+import fs from "node:fs";
 import * as path from "path";
 
 /**
@@ -50,8 +50,14 @@ export interface ResolvedTsConfig {
      * config applied, in which case {@link options} are the parser's defaults.
      */
     readonly configFilePath?: string;
-    readonly options: ts.CompilerOptions;
+    readonly options: CompilerOptions;
 }
+
+/** Compiler options under the names a tsconfig states them with. */
+export type CompilerOptions = Record<string, unknown>;
+
+/** Reads the options a config file states, resolving its `extends` chain. */
+export type ConfigParser = (configFilePath: string) => CompilerOptions;
 
 /**
  * Finds the config file governing each file and merges its resolution options over a set of
@@ -59,15 +65,18 @@ export interface ResolvedTsConfig {
  */
 export class TsConfigResolver {
     private readonly configByDir = new Map<string, string | undefined>();
-    private readonly optionsByConfig = new Map<string, ts.CompilerOptions | undefined>();
+    private readonly optionsByConfig = new Map<string, CompilerOptions | undefined>();
     private readonly root?: string;
 
     /**
      * @param defaults Options to fall back on, and to merge a project config over.
+     * @param parse Reads a config file. The compiler owns config parsing, so this is supplied
+     *   rather than done here.
      * @param relativeTo Root of the project being parsed, bounding the search. Without one,
      *   walking up from the process working directory picks up whatever config sits above it.
      */
-    constructor(private readonly defaults: ts.CompilerOptions, relativeTo?: string) {
+    constructor(private readonly defaults: CompilerOptions, private readonly parse: ConfigParser,
+                relativeTo?: string) {
         this.root = relativeTo ? path.resolve(relativeTo) : undefined;
     }
 
@@ -99,7 +108,7 @@ export class TsConfigResolver {
 
             for (const configFileName of CONFIG_FILE_NAMES) {
                 const candidate = path.join(dir, configFileName);
-                if (ts.sys.fileExists(candidate)) {
+                if (fs.existsSync(candidate)) {
                     return memoize(candidate);
                 }
             }
@@ -109,7 +118,7 @@ export class TsConfigResolver {
         }
     }
 
-    private optionsFor(configFilePath: string): ts.CompilerOptions | undefined {
+    private optionsFor(configFilePath: string): CompilerOptions | undefined {
         if (!this.optionsByConfig.has(configFilePath)) {
             this.optionsByConfig.set(configFilePath, this.merge(configFilePath));
         }
@@ -117,57 +126,95 @@ export class TsConfigResolver {
     }
 
     /** Undefined where the config cannot be read, leaving the caller on its defaults. */
-    private merge(configFilePath: string): ts.CompilerOptions | undefined {
-        let projectOptions: ts.CompilerOptions;
+    private merge(configFilePath: string): CompilerOptions | undefined {
+        let projectOptions: CompilerOptions;
         try {
-            const {config, error} = ts.readConfigFile(configFilePath, ts.sys.readFile);
-            if (error || !config) {
-                return undefined;
-            }
-            // `readDirectory` answers empty because only `options` is read here; left to `ts.sys` it
-            // walks the whole tree under the config to build a file list, once per config found.
-            const parseConfigHost: ts.ParseConfigHost = {...ts.sys, readDirectory: () => []};
-            projectOptions = ts.parseJsonConfigFileContent(
-                config, parseConfigHost, path.dirname(configFilePath), undefined, configFilePath).options;
+            projectOptions = this.parse(configFilePath);
         } catch {
             return undefined;
         }
 
-        // A project's `baseUrl` stands alone, including where it states none: `baseUrl` takes
-        // precedence over `pathsBasePath`, so a default rooted at the repository would resolve a
-        // nested project's `paths` against the wrong directory.
-        const {baseUrl: _, ...defaults} = this.defaults;
+        // A project's own `paths` stand alone, including where it states none, so that a nested
+        // project resolves as its config says rather than against the repository root.
+        const {paths: _, ...defaults} = this.defaults;
 
-        const resolution: ts.CompilerOptions = {};
+        const resolution: CompilerOptions = {};
         for (const option of RESOLUTION_OPTIONS) {
             if (projectOptions[option] !== undefined) {
                 resolution[option] = projectOptions[option];
             }
         }
-        if (resolution.moduleResolution === undefined) {
-            const paired = pairedModuleResolution(projectOptions);
-            if (paired !== undefined) {
-                resolution.moduleResolution = paired;
-            }
-        }
-        return {...defaults, ...resolution};
+        rootPaths(resolution, path.dirname(configFilePath));
+
+        // Where the project states an option of its own that its resolution mode also implies,
+        // the project's is the more direct statement of the two.
+        const stated = resolution.moduleResolution as number | undefined;
+        delete resolution.moduleResolution;
+        const mode = stated === undefined ? pairedModuleResolution(projectOptions) : MODULE_RESOLUTION[stated];
+        return {...defaults, ...mode, ...resolution};
     }
 }
 
 /**
- * The resolution TypeScript infers for a project that states only its `module`. Only the
- * inference is adopted, since a module kind such as `node16` classifies files as CJS or ESM,
- * and an ESM-only import from a CJS file is then the error TS1479, costing the file its LST.
- * `Classic` is declined as well, searching no `node_modules`, so the default stands in.
+ * Rewrites `baseUrl` and `paths` into the absolute `paths` that stand for them. `baseUrl` names
+ * a directory every bare specifier is tried under, which is a `*` pattern rooted there; a relative
+ * `paths` entry resolves against the config stating it, which is not the config the parser writes.
  */
-function pairedModuleResolution(projectOptions: ts.CompilerOptions): ts.ModuleResolutionKind | undefined {
-    const infer = (ts as Partial<{ getEmitModuleResolutionKind(options: ts.CompilerOptions): ts.ModuleResolutionKind }>)
-        .getEmitModuleResolutionKind;
-    if (projectOptions.module === undefined || !infer) {
-        return undefined;
+function rootPaths(options: CompilerOptions, configDirectory: string): void {
+    const basePath = (options.pathsBasePath as string | undefined) ?? configDirectory;
+    const baseUrl = options.baseUrl as string | undefined;
+    const stated = options.paths as Record<string, string[]> | undefined;
+    delete options.pathsBasePath;
+    delete options.baseUrl;
+    if (!stated && !baseUrl) {
+        return;
     }
-    const inferred = infer(projectOptions);
-    return inferred === ts.ModuleResolutionKind.Classic ? undefined : inferred;
+    const paths: Record<string, string[]> = {};
+    for (const [pattern, targets] of Object.entries(stated ?? {})) {
+        paths[pattern] = targets.map(target => path.resolve(basePath, target));
+    }
+    // A pattern the project states for `*` is the more specific statement of the two.
+    if (baseUrl && !paths["*"]) {
+        paths["*"] = [path.join(baseUrl, "*")];
+    }
+    options.paths = paths;
+}
+
+/**
+ * What a `ModuleResolutionKind` states in a config, by value, the enum itself not being on the
+ * compiler's public surface. TypeScript 7 has dropped the two modes predating `exports`:
+ * `node10` reads neither an `exports` nor an `imports` map, which `bundler` states directly,
+ * while `classic` searches no `node_modules` at all and so has nothing to stand in for it.
+ */
+const MODULE_RESOLUTION: Record<number, CompilerOptions | undefined> = {
+    1: undefined,
+    2: {moduleResolution: "bundler", resolvePackageJsonExports: false, resolvePackageJsonImports: false},
+    3: {moduleResolution: "node16"},
+    99: {moduleResolution: "nodenext"},
+    100: {moduleResolution: "bundler"},
+};
+
+/** `ModuleKind` by value, for the module kinds that imply a resolution. */
+const MODULE_KIND = {CommonJS: 1, ESNext: 99, Node16: 100, NodeNext: 199, Preserve: 200};
+
+/**
+ * The resolution TypeScript pairs with a project that states only its `module`. Only the pairing
+ * is adopted, since a module kind such as `node16` classifies files as CJS or ESM, and an ESM-only
+ * import from a CJS file is then the error TS1479, costing the file its LST.
+ */
+function pairedModuleResolution(projectOptions: CompilerOptions): CompilerOptions | undefined {
+    switch (projectOptions.module) {
+        case MODULE_KIND.CommonJS:
+            return MODULE_RESOLUTION[2];
+        case MODULE_KIND.Node16:
+            return MODULE_RESOLUTION[3];
+        case MODULE_KIND.NodeNext:
+            return MODULE_RESOLUTION[99];
+        case MODULE_KIND.Preserve:
+            return MODULE_RESOLUTION[100];
+        default:
+            return undefined;
+    }
 }
 
 function isAtOrUnder(dir: string, root: string): boolean {

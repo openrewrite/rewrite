@@ -13,10 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import ts from "typescript";
+import * as ts from "./compiler";
 import * as path from "path";
 import {Type} from "../java";
 import {JavaScriptTypeMapping} from "./type-mapping";
+import fs from "node:fs";
+import {openSession} from "./ts7/program";
+import {ambientModulesIn, declarationsOf} from "./ts7/checker";
+
+function readFileOrUndefined(file: string): string | undefined {
+    try {
+        return fs.readFileSync(file, "utf8");
+    } catch {
+        return undefined;
+    }
+}
 
 const TYPESCRIPT_FILE = /\.[cm]?tsx?$/;
 
@@ -40,12 +51,12 @@ const TYPE_SYMBOL_FLAGS =
  * @param references node_modules roots / sibling packages used only for symbol resolution
  */
 export function exportedTypes(ownArtifacts: string[], references: string[]): Type.FullyQualified[] {
-    const compilerOptions: ts.CompilerOptions = {
-        target: ts.ScriptTarget.Latest,
+    const compilerOptions: Record<string, unknown> = {
+        target: "esnext",
         // Mirrors JavaScriptParser's module resolution, so a dependency's own imports resolve here
         // as they do when its consumers are parsed; the rationale for each option lives there.
-        module: ts.ModuleKind.Preserve,
-        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        module: "preserve",
+        moduleResolution: "bundler",
         customConditions: ["node"],
         noEmit: true,
         allowJs: true,
@@ -56,27 +67,9 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
         forceConsistentCasingInFileNames: false,
     };
 
-    const host = ts.createCompilerHost(compilerOptions);
-    // Default node resolution from each file's on-disk location, falling back to the
-    // explicit reference roots when a dependency isn't co-located with the own package.
-    host.resolveModuleNameLiterals = (moduleLiterals, containingFile) =>
-        moduleLiterals.map(literal => {
-            let resolved = ts.resolveModuleName(literal.text, containingFile, compilerOptions, host);
-            if (!resolved.resolvedModule) {
-                for (const ref of references) {
-                    const probe = ts.resolveModuleName(literal.text, path.join(ref, "__probe__.ts"), compilerOptions, host);
-                    if (probe.resolvedModule) {
-                        resolved = probe;
-                        break;
-                    }
-                }
-            }
-            return resolved;
-        });
-
     const entries: string[] = [];
     for (const artifact of ownArtifacts) {
-        const entry = declarationFileEntry(artifact) ?? resolvePackageEntry(artifact, compilerOptions, host);
+        const entry = declarationFileEntry(artifact) ?? resolvePackageEntry(artifact);
         if (entry) {
             entries.push(path.normalize(entry));
         }
@@ -85,8 +78,9 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
         return [];
     }
 
-    const program = ts.createProgram(entries, compilerOptions, host);
-    const checker = program.getTypeChecker();
+    const session = openSession(references[0] ?? path.dirname(entries[0]), new Map(), compilerOptions, entries);
+    const program = session.project.program;
+    const checker = session.project.checker;
     const typeMapping = new JavaScriptTypeMapping(checker);
 
     // Lowest arity wins for a given FQN, mirroring the C# byFqn dedup.
@@ -125,7 +119,7 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
                     }
                 }
             } catch (e) {
-                console.warn(`exportedTypes: skipping export '${symbol.getName()}': ${e}`);
+                console.warn(`exportedTypes: skipping export '${symbol.name}': ${e}`);
             }
         }
     };
@@ -145,9 +139,10 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
         // A global script (lib.*.d.ts / ambient .d.ts): globals live in global scope, not on a
         // module symbol. Enumerate top-level ambient declarations + `declare module` ambients.
         mapSymbols(globalTypeSymbols(checker, sourceFile));
-        for (const ambient of checker.getAmbientModules()) {
-            if (ambient.declarations?.some(d => d.getSourceFile() === sourceFile)) {
-                mapSymbols(enumerateTypeSymbols(checker, ambient));
+        for (const ambient of ambientModulesIn(sourceFile)) {
+            const ambientSymbol = checker.getSymbolAtLocation(ambient);
+            if (ambientSymbol) {
+                mapSymbols(enumerateTypeSymbols(checker, ambientSymbol));
             }
         }
     }
@@ -161,7 +156,7 @@ function arity(cls: Type.Class): number {
 
 /** A TypeScript declaration/source FILE (e.g. a `lib.*.d.ts` of ambient globals), used directly as a program entry. */
 function declarationFileEntry(artifact: string): string | undefined {
-    return ts.sys.fileExists(artifact) && TYPESCRIPT_FILE.test(artifact) ? artifact : undefined;
+    return fs.existsSync(artifact) && TYPESCRIPT_FILE.test(artifact) ? artifact : undefined;
 }
 
 /** Top-level ambient type declarations of a script (non-module) file — a `lib.*.d.ts`'s globals; namespaces descended for nested types. */
@@ -196,18 +191,65 @@ function globalTypeSymbols(checker: ts.TypeChecker, sourceFile: ts.SourceFile): 
  * file; else a top-level `index.d.ts` (then `index.ts`). Reaching none of them means the package
  * ships no types, which leaves the caller to fall back to its DefinitelyTyped package.
  */
-function resolvePackageEntry(dir: string, options: ts.CompilerOptions, host: ts.ModuleResolutionHost): string | undefined {
-    const manifest = packageManifest(dir);
-    if (typeof manifest?.name === "string") {
-        const conditions = options.customConditions ?? [];
-        // A package's declarations count under whichever condition carries them, since no
-        // consumer's import mode is choosing between `import` and `require` here.
-        for (const attempt of [conditions, [...conditions, "require"]]) {
-            const resolved = ts.resolveModuleName(manifest.name, path.join(dir, "__entry__.ts"),
-                {...options, customConditions: attempt}, host).resolvedModule?.resolvedFileName;
-            if (resolved && TYPESCRIPT_FILE.test(resolved) && containedIn(dir, resolved)) {
-                return resolved;
+/**
+ * The target an `exports` value selects under `conditions`. Keys are tried in the order the manifest
+ * lists them, which is what decides between `import` and `require` when a package offers both.
+ */
+function selectExportTarget(target: unknown, conditions: ReadonlySet<string>): string | undefined {
+    if (typeof target === "string") {
+        return target;
+    }
+    if (Array.isArray(target)) {
+        for (const alternative of target) {
+            const selected = selectExportTarget(alternative, conditions);
+            if (selected) {
+                return selected;
             }
+        }
+        return undefined;
+    }
+    if (target && typeof target === "object") {
+        for (const [condition, value] of Object.entries(target)) {
+            if (conditions.has(condition)) {
+                const selected = selectExportTarget(value, conditions);
+                if (selected) {
+                    return selected;
+                }
+            }
+        }
+    }
+    return undefined;
+}
+
+/** The declaration file a package's `exports` map names for the package itself. */
+function entryFromExports(dir: string, exportsField: unknown, conditions: ReadonlySet<string>): string | undefined {
+    let root = exportsField;
+    if (root && typeof root === "object" && !Array.isArray(root)) {
+        const keys = Object.keys(root);
+        if (keys.some(key => key.startsWith("."))) {
+            root = (root as Record<string, unknown>)["."];
+        }
+    }
+    const target = selectExportTarget(root, conditions);
+    if (!target || !target.startsWith(".")) {
+        return undefined;
+    }
+    const resolved = path.resolve(dir, target);
+    return TYPESCRIPT_FILE.test(resolved) && containedIn(dir, resolved) && fs.existsSync(resolved)
+        ? resolved
+        : undefined;
+}
+
+function resolvePackageEntry(dir: string, customConditions: readonly string[] = ["node"]): string | undefined {
+    const manifest = packageManifest(dir);
+    // There is no module resolver to ask, so the `exports` map is read here. A package's
+    // declarations count under whichever of `import` and `require` carries them, since no consumer's
+    // import mode is choosing between them.
+    for (const mode of ["import", "require"]) {
+        const conditions = new Set(["types", "default", mode, ...customConditions]);
+        const entry = entryFromExports(dir, manifest?.exports, conditions);
+        if (entry) {
+            return entry;
         }
     }
     // An `exports` map without a `types` condition takes resolution to the runtime entry and stops
@@ -216,14 +258,14 @@ function resolvePackageEntry(dir: string, options: ts.CompilerOptions, host: ts.
     if (typeof declared === "string") {
         const resolved = path.resolve(dir, declared);
         for (const candidate of [resolved, resolved + ".d.ts"]) {
-            if (ts.sys.fileExists(candidate)) {
+            if (fs.existsSync(candidate)) {
                 return candidate;
             }
         }
     }
     for (const candidate of ["index.d.ts", "index.ts", "index.tsx"]) {
         const resolved = path.join(dir, candidate);
-        if (ts.sys.fileExists(resolved)) {
+        if (fs.existsSync(resolved)) {
             return resolved;
         }
     }
@@ -239,13 +281,13 @@ function containedIn(dir: string, file: string): boolean {
     return path.resolve(file).startsWith(path.resolve(dir) + path.sep);
 }
 
-function packageManifest(dir: string): {name?: unknown, types?: unknown, typings?: unknown} | undefined {
+function packageManifest(dir: string): {name?: unknown, types?: unknown, typings?: unknown, exports?: unknown} | undefined {
     const packageJson = path.join(dir, "package.json");
-    if (!ts.sys.fileExists(packageJson)) {
+    if (!fs.existsSync(packageJson)) {
         return undefined;
     }
     try {
-        return JSON.parse(ts.sys.readFile(packageJson) || "{}");
+        return JSON.parse(readFileOrUndefined(packageJson) || "{}");
     } catch {
         // Malformed package.json; fall through to conventional entry points.
         return undefined;
@@ -283,10 +325,10 @@ function enumerateTypeSymbols(checker: ts.TypeChecker, moduleSymbol: ts.Symbol):
 
 function moduleExports(checker: ts.TypeChecker, symbol: ts.Symbol): ts.Symbol[] {
     try {
-        return checker.getExportsOfModule(symbol);
+        return [...checker.getExportsOfModule(symbol)];
     } catch {
         const members: ts.Symbol[] = [];
-        symbol.exports?.forEach(s => members.push(s));
+        symbol.getExports().forEach(s => members.push(s));
         return members;
     }
 }
@@ -297,7 +339,7 @@ function classLikeDeclarations(
     symbol: ts.Symbol
 ): Array<ts.ClassDeclaration | ts.InterfaceDeclaration | ts.EnumDeclaration> {
     const out: Array<ts.ClassDeclaration | ts.InterfaceDeclaration | ts.EnumDeclaration> = [];
-    for (const declaration of symbol.declarations ?? []) {
+    for (const declaration of declarationsOf(symbol)) {
         if (ts.isClassDeclaration(declaration) || ts.isInterfaceDeclaration(declaration) || ts.isEnumDeclaration(declaration)) {
             out.push(declaration);
         }

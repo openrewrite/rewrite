@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import ts from 'typescript';
+import * as ts from "./compiler";
 import * as path from 'path';
 import {
     Comment,
@@ -46,11 +46,14 @@ import {
     TextSpan
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
-import {TsConfigResolver} from "./tsconfig";
+import {CompilerOptions, TsConfigResolver} from "./tsconfig";
 import {create as produce} from "mutative";
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
+import {childAt, childCountOf, childrenOf, firstTokenOf, lastTokenOf} from "./token-navigation";
+import {Compiler} from "./ts7/program";
+import type {Project} from "typescript/unstable/sync";
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
@@ -93,7 +96,7 @@ export class JavaScriptParser extends Parser {
 
     private readonly tsConfig: TsConfigResolver;
     private readonly styles?: NamedStyles[];
-    private readonly oldPrograms = new Map<string, ts.Program>();
+    private compiler?: Compiler;
     private readonly sourceFileCache?: Map<string, ts.SourceFile>;
 
     constructor(
@@ -106,13 +109,13 @@ export class JavaScriptParser extends Parser {
         }: JavaScriptParserOptions = {},
     ) {
         super({ctx, relativeTo});
-        const defaultCompilerOptions: ts.CompilerOptions = {
-            target: ts.ScriptTarget.Latest,
+        const defaultCompilerOptions: CompilerOptions = {
+            target: "esnext",
             // Bundler matches `exports` conditions leniently, so packages that publish types only under
             // an `import` condition resolve; it pairs with `preserve`, which `commonjs` cannot (TS5095).
             // A `node16` module kind makes TS1479 reachable, and that error costs the whole LST.
-            module: ts.ModuleKind.Preserve,
-            moduleResolution: ts.ModuleResolutionKind.Bundler,
+            module: "preserve",
+            moduleResolution: "bundler",
             // Bundler's own condition set omits `node`, which takes the browser branch of packages
             // that publish one, typing them against an API surface the source does not use.
             customConditions: ["node"],
@@ -124,16 +127,19 @@ export class JavaScriptParser extends Parser {
             experimentalDecorators: true,
             emitDecoratorMetadata: true,
             forceConsistentCasingInFileNames: false,
-            jsx: ts.JsxEmit.Preserve,
+            jsx: "preserve",
             // Strictness is a property of the parsed project rather than of the compiler we pin: under
             // `strictNullChecks` every nullable type carries an extra `null` union constituent.
             strict: false,
             // `types` defaults to `[]`, which attributes ambient `@types/*` packages only when named;
             // `*` enumerates everything under `node_modules/@types`.
             types: types ?? ["*"],
-            baseUrl: relativeTo || process.cwd()
+            // Every bare specifier is tried under the parsed project's own root before
+            // `node_modules`; TypeScript 7 has no `baseUrl` to state that with.
+            paths: {"*": [path.join(relativeTo || process.cwd(), "*")]},
         };
-        this.tsConfig = new TsConfigResolver(defaultCompilerOptions, relativeTo);
+        this.tsConfig = new TsConfigResolver(defaultCompilerOptions,
+            configFilePath => this.sharedCompiler().parseConfigFile(configFilePath), relativeTo);
         this.styles = styles;
         this.sourceFileCache = sourceFileCache;
     }
@@ -158,36 +164,30 @@ export class JavaScriptParser extends Parser {
         const sourceText = parserInputRead(input);
         const scriptKind = getScriptKindFromFileName(sourcePath);
 
-        // Create source file directly without a Program
-        const sourceFileOptions: ts.CreateSourceFileOptions = {
-            languageVersion: ts.ScriptTarget.Latest,
-            jsDocParsingMode: ts.JSDocParsingMode.ParseNone
-        };
-
-        const tsSourceFile = ts.createSourceFile(
-            sourcePath,
-            sourceText,
-            sourceFileOptions,
-            true, // setParentNodes
-            scriptKind
-        );
-
-        // Check for parse-time syntax errors (accessible via internal parseDiagnostics)
-        // TypeScript stores parse errors directly on the source file
-        const parseDiagnostics = (tsSourceFile as any).parseDiagnostics as ts.Diagnostic[] | undefined;
-        if (parseDiagnostics && parseDiagnostics.length > 0) {
-            const errors = parseDiagnostics.filter(d => d.category === ts.DiagnosticCategory.Error);
+        // There is no parser outside the compiler process, so even a parse that wants no types
+        // goes through a session; it is opened for this file alone and released straight after.
+        const absolutePath = path.resolve(this.relativeTo ?? process.cwd(), sourcePath);
+        const {options} = this.tsConfig.forFile(absolutePath);
+        const session = this.sharedCompiler().open(new Map([[absolutePath, sourceText]]),
+            [{key: absolutePath, options, rootFiles: [absolutePath]}]);
+        const program = session.projectFor(absolutePath).program;
+        let tsSourceFile;
+        try {
+            tsSourceFile = program.getSourceFile(absolutePath);
+            if (!tsSourceFile) {
+                return this.error(input, new Error('Parser returned undefined'));
+            }
+            const errors = program.getSyntacticDiagnostics(absolutePath)
+                .filter(d => d.category === ts.DiagnosticCategory.Error);
             if (errors.length > 0) {
                 const errorMessages = errors.map(e => {
-                    if (e.file && e.start !== undefined) {
-                        const { line, character } = ts.getLineAndCharacterOfPosition(e.file, e.start);
-                        const message = ts.flattenDiagnosticMessageText(e.messageText, "\n");
-                        return `(${line + 1},${character + 1}): ${message} [${e.code}]`;
-                    }
-                    return `${ts.flattenDiagnosticMessageText(e.messageText, "\n")} [${e.code}]`;
+                    const {line, character} = tsSourceFile!.getLineAndCharacterOfPosition(e.pos);
+                    return `(${line + 1},${character + 1}): ${e.text} [${e.code}]`;
                 }).join('; ');
                 return this.error(input, new SyntaxError(`Compiler error(s): ${errorMessages}`));
             }
+        } finally {
+            session.close();
         }
 
         try {
@@ -210,14 +210,20 @@ export class JavaScriptParser extends Parser {
     // noinspection JSUnusedGlobalSymbols
     reset(): this {
         this.sourceFileCache && this.sourceFileCache.clear();
-        this.oldPrograms.clear();
+        this.compiler?.close();
+        this.compiler = undefined;
         return this;
+    }
+
+    /** The compiler process this parser reuses; starting one costs far more than a parse does. */
+    private sharedCompiler(): Compiler {
+        return this.compiler ??= new Compiler(this.relativeTo ?? process.cwd());
     }
 
     override async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
         const inputFiles = new Map<SourcePath, ParserInput>();
         const projectOf = new Map<SourcePath, string>();
-        const projects = new Map<string, { options: ts.CompilerOptions, rootNames: SourcePath[] }>();
+        const projects = new Map<string, { options: CompilerOptions, rootNames: SourcePath[] }>();
 
         // Populate inputFiles map and remove from cache if necessary
         for (const input of inputs) {
@@ -226,7 +232,7 @@ export class JavaScriptParser extends Parser {
             if (this.relativeTo && !path.isAbsolute(sourcePath)) {
                 sourcePath = path.join(this.relativeTo, sourcePath);
             }
-            const normalizedSourcePath = path.normalize(sourcePath);
+            const normalizedSourcePath = path.resolve(this.relativeTo ?? process.cwd(), sourcePath);
             inputFiles.set(normalizedSourcePath, input);
             // Remove from cache if previously cached
             this.sourceFileCache && this.sourceFileCache.delete(normalizedSourcePath);
@@ -244,208 +250,69 @@ export class JavaScriptParser extends Parser {
             project.rootNames.push(normalizedSourcePath);
         }
 
-        // Module resolution probes a directory before the files in it, so a directory holding
-        // nothing but in-memory inputs has to answer too, or those inputs are unreachable.
-        const inputDirectories = new Set<string>();
-        for (const sourcePath of inputFiles.keys()) {
-            for (let dir = path.dirname(sourcePath); !inputDirectories.has(dir); dir = path.dirname(dir)) {
-                inputDirectories.add(dir);
-            }
-        }
-
-        const compiled = new Map<string, { program: ts.Program, typeMapping: JavaScriptTypeMapping }>();
-        for (const [projectKey, {options, rootNames}] of projects) {
-            // TypeScript carries the previous program's bound files forward when the root paths match,
-            // so a parser held across parses of one path costs a fraction of a freshly built one.
-            const program = ts.createProgram(rootNames, options,
-                this.createCompilerHost(options, inputFiles, inputDirectories), this.oldPrograms.get(projectKey));
-            this.oldPrograms.set(projectKey, program);
-
-            // A JavaScriptTypeMapping deduplicates by `ts.Type.id`, which is only unique within
-            // the TypeChecker that issued it, so each program needs its own.
-            compiled.set(projectKey, {program, typeMapping: new JavaScriptTypeMapping(program.getTypeChecker(), this.relativeTo)});
-        }
-
+        // The compiler owns parsing and resolution, so the inputs are handed over as files it can
+        // read and it resolves everything else against the real filesystem itself.
+        const sources = new Map<string, string>();
         for (const [sourcePath, input] of inputFiles) {
-            const {program, typeMapping} = compiled.get(projectOf.get(sourcePath)!)!;
-            const filePath = parserInputFile(input);
-            const sourceFile = program.getSourceFile(filePath);
-            if (!sourceFile) {
-                yield this.error(input, new Error('Parser returned undefined'));
-                continue;
-            }
-
-            if (hasFlowAnnotation(sourceFile)) {
-                yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
-                continue;
-            }
-
-            const syntaxErrors = checkSyntaxErrors(program, sourceFile);
-            if (syntaxErrors.length > 0) {
-                let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
-                continue;
-            }
-
-            try {
-                yield await this.requirePrintEqualsInput(produce(
-                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
-                        .visit(sourceFile) as SourceFile,
-                    draft => {
-                        if (this.styles) {
-                            draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
-                        }
-                    }), input, escapeLoneSurrogates(sourceFile.getFullText()));
-            } catch (error) {
-                yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
-            }
+            sources.set(sourcePath, parserInputRead(input));
         }
-    }
+        const session = this.sharedCompiler().open(sources, [...projects].map(
+            ([key, {options, rootNames}]) => ({key, options, rootFiles: rootNames})));
 
-    private createCompilerHost(compilerOptions: ts.CompilerOptions, inputFiles: Map<SourcePath, ParserInput>,
-                               inputDirectories: Set<string>): ts.CompilerHost {
-        const host = ts.createCompilerHost(compilerOptions);
-
-        // Set the current directory for module resolution
-        if (this.relativeTo) {
-            const originalGetCurrentDirectory = host.getCurrentDirectory;
-            host.getCurrentDirectory = () => this.relativeTo || originalGetCurrentDirectory();
-        }
-
-        // Override getSourceFile
-        host.getSourceFile = (fileName, languageVersion, onError) => {
-            const normalizedFileName = path.normalize(fileName);
-            // A file's module format is baked in when it is created and follows from the requesting
-            // project's `moduleResolution`, so it belongs in the key of a cache several projects share.
-            const cacheKey = typeof languageVersion === 'number' ?
-                normalizedFileName :
-                `${languageVersion.impliedNodeFormat ?? ''}\0${normalizedFileName}`;
-            // Check if the SourceFile is in the cache
-            let sourceFile = this.sourceFileCache && this.sourceFileCache.get(cacheKey);
-            if (sourceFile) {
-                return sourceFile;
+        // A JavaScriptTypeMapping deduplicates by `Type.id`, which is only unique within the
+        // checker that issued it, so each project needs its own.
+        const typeMappings = new Map<string, JavaScriptTypeMapping>();
+        const typeMappingFor = (project: Project, projectKey: string) => {
+            let typeMapping = typeMappings.get(projectKey);
+            if (!typeMapping) {
+                typeMappings.set(projectKey, typeMapping =
+                    new JavaScriptTypeMapping(project.checker, this.relativeTo ?? process.cwd()));
             }
+            return typeMapping;
+        };
 
-            // Read the file content
-            let sourceText: string | undefined;
-
-            // For input files
-            const input = inputFiles.get(normalizedFileName);
-            if (input) {
-                sourceText = parserInputRead(input);
-            } else {
-                // For dependency files
-                sourceText = ts.sys.readFile(normalizedFileName);
-            }
-
-            if (sourceText !== undefined) {
-                // Determine script kind based on file extension
-                const scriptKind = getScriptKindFromFileName(normalizedFileName);
-
-                // Build CreateSourceFileOptions with jsDocParsingMode
-                const sourceFileOptions: ts.CreateSourceFileOptions = typeof languageVersion === 'number'
-                    ? {
-                        languageVersion: languageVersion,
-                        jsDocParsingMode: ts.JSDocParsingMode.ParseNone // We override this as otherwise invalid JSDoc causes parse errors
-                    }
-                    : {
-                        ...languageVersion,
-                        jsDocParsingMode: ts.JSDocParsingMode.ParseNone // We override this as otherwise invalid JSDoc causes parse errors
-                    };
-
-                sourceFile = ts.createSourceFile(normalizedFileName, sourceText, sourceFileOptions, true, scriptKind);
-                // Cache the SourceFile if it's a dependency
-                if (!input && this.sourceFileCache) {
-                    this.sourceFileCache.set(cacheKey, sourceFile);
+        try {
+            for (const [sourcePath, input] of inputFiles) {
+                const projectKey = projectOf.get(sourcePath)!;
+                const project = session.projectFor(projectKey);
+                const sourceFile = project.program.getSourceFile(sourcePath);
+                if (!sourceFile) {
+                    yield this.error(input, new Error('Parser returned undefined'));
+                    continue;
                 }
-                return sourceFile;
-            }
 
-            if (onError) onError(`File not found: ${normalizedFileName}`);
-            return undefined;
-        };
+                if (hasFlowAnnotation(sourceFile)) {
+                    yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
+                    continue;
+                }
 
-        // Override fileExists
-        host.fileExists = (fileName) => {
-            const normalizedFileName = path.normalize(fileName);
-            return inputFiles.has(normalizedFileName) || ts.sys.fileExists(normalizedFileName);
-        };
+                // One request for the file's names, so the type mapping's questions are answered locally.
+                (project.checker as unknown as {prefetch?: (sf: typeof sourceFile) => void})
+                    .prefetch?.(sourceFile);
 
-        host.directoryExists = (directoryName) => {
-            const normalizedDirectoryName = path.normalize(directoryName);
-            return inputDirectories.has(normalizedDirectoryName) || ts.sys.directoryExists(normalizedDirectoryName);
-        };
+                const syntaxErrors = checkSyntaxErrors(project.program, sourceFile);
+                if (syntaxErrors.length > 0) {
+                    let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
+                    yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
+                    continue;
+                }
 
-        // Override readFile
-        host.readFile = (fileName) => {
-            const normalizedFileName = path.normalize(fileName);
-            const input = inputFiles.get(normalizedFileName);
-            return input ? parserInputRead(input) : ts.sys.readFile(normalizedFileName);
-        };
-
-        // Custom module resolution to handle in-memory imports
-        // This is required because TypeScript's default module resolution looks for files on disk,
-        // but our source files only exist in memory (in the inputFiles map)
-        host.resolveModuleNameLiterals = (moduleLiterals, containingFile, _redirectedReference, _options, containingSourceFile) => {
-            const resolvedModules: ts.ResolvedModuleWithFailedLookupLocations[] = [];
-            const normalizedFileName = path.normalize(containingFile);
-            const containingDir = path.dirname(normalizedFileName);
-
-            for (const moduleLiteral of moduleLiterals) {
-                const moduleName = moduleLiteral.text;
-
-                // For relative imports, try to find in inputFiles first
-                if (moduleName.startsWith('.')) {
-                    const extensions = ['.tsx', '.ts', '.jsx', '.js', '.mts', '.cts'];
-                    let resolved: string | undefined;
-
-                    for (const ext of extensions) {
-                        // Try with extension
-                        const candidate = path.join(containingDir, moduleName + ext);
-                        if (inputFiles.has(candidate)) {
-                            resolved = candidate;
-                            break;
-                        }
-                        // Also try exact match (if moduleName already has extension)
-                        const exactCandidate = path.join(containingDir, moduleName);
-                        if (inputFiles.has(exactCandidate)) {
-                            resolved = exactCandidate;
-                            break;
-                        }
-                    }
-
-                    if (resolved) {
-                        resolvedModules.push({
-                            resolvedModule: {
-                                resolvedFileName: resolved,
-                                extension: path.extname(resolved) as ts.Extension,
-                                isExternalLibraryImport: false,
+                try {
+                    yield await this.requirePrintEqualsInput(produce(
+                        new JavaScriptParserVisitor(sourceFile, this.relativePath(input),
+                            typeMappingFor(project, projectKey)).visit(sourceFile) as SourceFile,
+                        draft => {
+                            if (this.styles) {
+                                draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
                             }
-                        });
-                        continue;
-                    }
+                        }), input, escapeLoneSurrogates(sourceFile.getFullText()));
+                } catch (error) {
+                    yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
                 }
-
-                // Fall back to TypeScript's default resolution for node_modules and absolute paths.
-                // Passing the usage location's mode keeps export conditions tied to the module kind
-                // pinned above, so every project reads the same branch of a dual package whatever
-                // `moduleResolution` it states.
-                const result = ts.resolveModuleName(
-                    moduleName,
-                    normalizedFileName,
-                    compilerOptions,
-                    host,
-                    undefined,
-                    undefined,
-                    ts.getModeForUsageLocation(containingSourceFile, moduleLiteral, compilerOptions)
-                );
-
-                resolvedModules.push(result);
             }
-            return resolvedModules;
-        };
-
-        return host;
+        } finally {
+            session.close();
+        }
     }
 }
 
@@ -588,9 +455,9 @@ export class JavaScriptParserVisitor {
                 // in case of `J.Unknown` its source will already contain any `;`
                 return this.rightPadded(j, emptySpace, emptyMarkers);
             }
-            let last: ts.Node | undefined = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile)
+            let last: ts.Node | undefined = childAt(n, childCountOf(n, this.sourceFile) - 1, this.sourceFile)
             if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement) && n.kind === ts.SyntaxKind.LabeledStatement) {
-                last = last.getLastToken(this.sourceFile);
+                last = lastTokenOf(last, this.sourceFile);
             }
             return this.rightPadded(j, this.semicolonPrefix(n), (_ => {
                 return last?.kind === ts.SyntaxKind.SemicolonToken ? markers({
@@ -764,9 +631,9 @@ export class JavaScriptParserVisitor {
     }
 
     private semicolonPrefix = (node: ts.Node) => {
-        let last: ts.Node | undefined = node.getChildren(this.sourceFile).slice(-1)[0];
+        let last: ts.Node | undefined = childrenOf(node, this.sourceFile).slice(-1)[0];
         if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement)) {
-            last = last.getLastToken(this.sourceFile);
+            last = lastTokenOf(last, this.sourceFile);
         }
         return last?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(last) : emptySpace;
     }
@@ -805,13 +672,13 @@ export class JavaScriptParserVisitor {
                 static: this.rightPadded(false, emptySpace, emptyMarkers),
                 statements: node.members.map((ce: ts.ClassElement) => this.rightPadded(
                     this.convert(ce),
-                    ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
-                    ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                    lastTokenOf(ce)?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(lastTokenOf(ce)!) : emptySpace,
+                    lastTokenOf(ce)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                         kind: J.Markers.Semicolon,
                         id: randomId()
                     }) : emptyMarkers
                 )),
-                end: this.prefix(node.getLastToken()!)
+                end: this.prefix(lastTokenOf(node)!)
             },
             type: this.mapDeclarationType(node)
         };
@@ -824,7 +691,7 @@ export class JavaScriptParserVisitor {
         for (let heritageClause of node.heritageClauses) {
             if (heritageClause.token == ts.SyntaxKind.ExtendsKeyword) {
                 return this.leftPadded<TypeTree>(
-                    this.prefix(heritageClause.getFirstToken()!),
+                    this.prefix(firstTokenOf(heritageClause)!),
                     this.mapTypeTree(heritageClause.types[0])
                 );
             }
@@ -848,7 +715,7 @@ export class JavaScriptParserVisitor {
                 }
                 return _extends.length > 0 ? {
                     kind: J.Kind.Container,
-                    before: this.prefix(heritageClause.getFirstToken()!),
+                    before: this.prefix(firstTokenOf(heritageClause)!),
                     elements: _extends,
                     markers: emptyMarkers
                 } : undefined;
@@ -873,7 +740,7 @@ export class JavaScriptParserVisitor {
                 }
                 return _implements.length > 0 ? {
                     kind: J.Kind.Container,
-                    before: this.prefix(heritageClause.getFirstToken()!),
+                    before: this.prefix(firstTokenOf(heritageClause)!),
                     elements: _implements,
                     markers: emptyMarkers
                 } : undefined;
@@ -1129,12 +996,12 @@ export class JavaScriptParserVisitor {
             annotations: [],
             modifiers: this.mapModifiers(node),
             name: this.visit(node.name),
-            bounds: (node.constraint || node.default) && {
+            bounds: (node.constraint || node.defaultType) && {
                 kind: J.Kind.Container,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExtendsKeyword) ?? this.findChildNode(node, ts.SyntaxKind.EqualsToken)!),
                 elements: [
                     node.constraint ? this.rightPadded(this.visit(node.constraint), this.suffix(node.constraint)) : this.rightPadded(this.newEmpty(), emptySpace),
-                    node.default ? this.rightPadded(this.visit(node.default), this.suffix(node.default)) : this.rightPadded(this.newEmpty(), emptySpace)
+                    node.defaultType ? this.rightPadded(this.visit(node.defaultType), this.suffix(node.defaultType)) : this.rightPadded(this.newEmpty(), emptySpace)
                 ],
                 markers: emptyMarkers
             }
@@ -1173,7 +1040,7 @@ export class JavaScriptParserVisitor {
                     markers: emptyMarkers,
                     name: name,
                     dimensionsAfterName: [],
-                    initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
+                    initializer: node.initializer && this.leftPadded(this.prefix(childAt(node, childrenOf(node).indexOf(node.initializer) - 1)), this.visit(node.initializer)),
                     variableType: this.mapVariableType(node)
                 },
                 this.suffix(node.name)
@@ -1198,10 +1065,10 @@ export class JavaScriptParserVisitor {
                 clazz: this.convert<J>(node.expression.expression) as Expression,
                 typeArguments: this.mapTypeArguments(this.suffix(node.expression.expression), node.expression.typeArguments)
             } satisfies JS.ExpressionWithTypeArguments as JS.ExpressionWithTypeArguments;
-            _arguments = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
+            _arguments = this.mapCommaSeparatedList(childrenOf(node.expression, this.sourceFile).slice(-3))
         } else if (ts.isCallExpression(node.expression)) {
             annotationType = this.convert<J>(node.expression.expression) as Expression;
-            _arguments = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
+            _arguments = this.mapCommaSeparatedList(childrenOf(node.expression, this.sourceFile).slice(-3))
         } else if (ts.isIdentifier(node.expression)) {
             annotationType = this.convert(node.expression);
         } else if (ts.isPropertyAccessExpression(node.expression)) {
@@ -1255,7 +1122,7 @@ export class JavaScriptParserVisitor {
                         draft.markers = this.maybeAddOptionalMarker(draft, node);
                     }) as VariableDeclarator,
                     dimensionsAfterName: [],
-                    initializer: initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(initializer) - 1)), this.visit(initializer)),
+                    initializer: initializer && this.leftPadded(this.prefix(childAt(node, childrenOf(node).indexOf(initializer) - 1)), this.visit(initializer)),
                     variableType: this.mapVariableType(node)
                 },
                 emptySpace
@@ -1282,7 +1149,7 @@ export class JavaScriptParserVisitor {
                         draft.markers = this.maybeAddOptionalMarker(draft, node);
 
                         // This will be mutually exclusive with the optional token
-                        if (node.exclamationToken) {
+                        if (ts.exclamationTokenOf(node)) {
                             draft.markers.markers.push({
                                 kind: JS.Markers.NonNullAssertion,
                                 id: randomId(),
@@ -1291,7 +1158,7 @@ export class JavaScriptParserVisitor {
                         }
                     }),
                     dimensionsAfterName: [],
-                    initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.initializer) - 1)), this.visit(node.initializer)),
+                    initializer: node.initializer && this.leftPadded(this.prefix(childAt(node, childrenOf(node).indexOf(node.initializer) - 1)), this.visit(node.initializer)),
                     variableType: this.mapVariableType(node)
                 },
                 emptySpace
@@ -1420,10 +1287,13 @@ export class JavaScriptParserVisitor {
         | ts.PropertySignature | ts.MethodSignature | ts.ArrowFunction | ts.CallSignatureDeclaration | ts.GetAccessorDeclaration
         | ts.FunctionDeclaration | ts.ConstructSignatureDeclaration | ts.FunctionExpression | ts.NamedTupleMember
         | ts.ConstructorDeclaration | ts.SetAccessorDeclaration): JS.TypeInfo | undefined {
-        return node.type && {
+        if (!node.type || ts.isReparsed(node.type)) {
+            return undefined;
+        }
+        return {
             kind: JS.Kind.TypeInfo,
             id: randomId(),
-            prefix: this.prefix(node.getChildAt(node.getChildren().indexOf(node.type) - 1)),
+            prefix: this.prefix(childAt(node, childrenOf(node).indexOf(node.type) - 1)),
             markers: emptyMarkers,
             typeIdentifier: this.visit(node.type)
         };
@@ -1438,19 +1308,19 @@ export class JavaScriptParserVisitor {
             static: this.rightPadded(true, this.prefix(this.findChildNode(node.body, ts.SyntaxKind.OpenBraceToken)!), emptyMarkers),
             statements: node.body.statements.map(ce => this.rightPadded(
                 this.convert(ce),
-                ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
-                ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                lastTokenOf(ce)?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(lastTokenOf(ce)!) : emptySpace,
+                lastTokenOf(ce)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
             )),
-            end: this.prefix(node.getLastToken()!)
+            end: this.prefix(lastTokenOf(node)!)
         };
     }
 
     visitConstructor(node: ts.ConstructorDeclaration): J.MethodDeclaration {
         // using string literal for the following case: class A { "constructor"() {} }
-        const constructorKeyword = node.getChildren()
+        const constructorKeyword = childrenOf(node)
             .find(n => (n.kind === ts.SyntaxKind.ConstructorKeyword) || ((n.kind === ts.SyntaxKind.StringLiteral) && (n.getText().includes("constructor"))))!;
         const methodType = this.mapMethodType(node);
         return {
@@ -1608,7 +1478,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             modifiers: this.mapModifiers(node),
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node, ts.SyntaxKind.OpenBracketToken)),
-            typeExpression: this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.type) - 1)), this.convert(node.type)),
+            typeExpression: this.leftPadded(this.prefix(childAt(node, childrenOf(node).indexOf(node.type) - 1)), this.convert(node.type)),
             type: this.mapType(node)
         };
     }
@@ -1650,8 +1520,8 @@ export class JavaScriptParserVisitor {
             modifiers: [],
             constructorType: this.leftPadded(emptySpace, false),
             typeParameters: this.mapTypeParametersAsObject(node),
-            parameters: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(node.typeParameters ? 3 : 0)),
-            returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type))
+            parameters: this.mapCommaSeparatedList(childrenOf(node, this.sourceFile).slice(node.typeParameters ? 3 : 0)),
+            returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type!))
         };
     }
 
@@ -1666,14 +1536,14 @@ export class JavaScriptParserVisitor {
             typeParameters: this.mapTypeParametersAsObject(node),
             parameters: {
                 kind: J.Kind.Container,
-                before: this.prefix(node.getChildAt(node.getChildren().findIndex(n => n.pos === node.parameters.pos) - 1)),
+                before: this.prefix(childAt(node, childrenOf(node).findIndex(n => n.pos === node.parameters.pos) - 1)),
                 elements: node.parameters.length == 0 ?
                     [this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))]
                     : node.parameters.map(p => this.rightPadded(this.visit(p), this.suffix(p)))
-                        .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []),
+                        .concat(ts.hasTrailingComma(node.parameters, this.sourceFile) ? this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []),
                 markers: emptyMarkers
             },
-            returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type))
+            returnType: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsGreaterThanToken)!), this.convert(node.type!))
         };
     }
 
@@ -1704,10 +1574,10 @@ export class JavaScriptParserVisitor {
                 statements: node.members.map(te => ({
                     kind: J.Kind.RightPadded,
                     element: this.convert(te),
-                    after: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(te.getLastToken()!) : emptySpace,
-                    markers: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(te.getLastToken())!) : emptyMarkers
+                    after: (lastTokenOf(te)?.kind === ts.SyntaxKind.SemicolonToken) || (lastTokenOf(te)?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(lastTokenOf(te)!) : emptySpace,
+                    markers: (lastTokenOf(te)?.kind === ts.SyntaxKind.SemicolonToken) || (lastTokenOf(te)?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(lastTokenOf(te))!) : emptyMarkers
                 })),
-                end: this.prefix(node.getLastToken()!)
+                end: this.prefix(lastTokenOf(node)!)
             },
             type: this.mapType(node)
         };
@@ -1731,7 +1601,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            elements: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
+            elements: this.mapCommaSeparatedList(childrenOf(node, this.sourceFile).slice(-3)),
             type: this.mapType(node)
         };
     }
@@ -1843,7 +1713,7 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: emptySpace,
                 markers: emptyMarkers,
-                tree: this.rightPadded(this.convert(node.type), this.prefix(node.getLastToken()!))
+                tree: this.rightPadded(this.convert(node.type), this.prefix(lastTokenOf(node)!))
             }
         };
     }
@@ -1958,8 +1828,8 @@ export class JavaScriptParserVisitor {
                         this.rightPadded(this.newEmpty(emptySpace, markers({
                             kind: J.Markers.Semicolon,
                             id: randomId()
-                        })), this.prefix(node.getLastToken()!))
-                        : this.rightPadded(this.newEmpty(), this.prefix(node.getLastToken()!))
+                        })), this.prefix(lastTokenOf(node)!))
+                        : this.rightPadded(this.newEmpty(), this.prefix(lastTokenOf(node)!))
                 ],
                 markers: emptyMarkers
             } : {
@@ -1969,8 +1839,8 @@ export class JavaScriptParserVisitor {
                     this.rightPadded(this.newEmpty(this.prefix(this.findChildNode(node, ts.SyntaxKind.SemicolonToken)!), markers({
                         kind: J.Markers.Semicolon,
                         id: randomId()
-                    })), this.prefix(node.getLastToken()!))
-                    : this.rightPadded(this.newEmpty(), this.prefix(node.getLastToken()!))
+                    })), this.prefix(lastTokenOf(node)!))
+                    : this.rightPadded(this.newEmpty(), this.prefix(lastTokenOf(node)!))
                 ],
                 markers: emptyMarkers
             },
@@ -2060,8 +1930,8 @@ export class JavaScriptParserVisitor {
     visitImportType(node: ts.ImportTypeNode): JS.ImportType {
         let importTypeAttributes = undefined;
         if (node.attributes) {
-            const openBraceIndex = node.attributes.getChildren().findIndex(n => n.kind === ts.SyntaxKind.OpenBraceToken);
-            const attributes = this.mapCommaSeparatedList<JS.ImportAttribute>(node.attributes.getChildren(this.sourceFile).slice(openBraceIndex, openBraceIndex + 3));
+            const openBraceIndex = childrenOf(node.attributes).findIndex(n => n.kind === ts.SyntaxKind.OpenBraceToken);
+            const attributes = this.mapCommaSeparatedList<JS.ImportAttribute>(childrenOf(node.attributes, this.sourceFile).slice(openBraceIndex, openBraceIndex + 3));
             importTypeAttributes = {
                 kind: JS.Kind.ImportTypeAttributes,
                 id: randomId(),
@@ -2102,7 +1972,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             leadingAnnotations: [],
             modifiers: [],
-            bindings: this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
+            bindings: this.mapCommaSeparatedList(childrenOf(node, this.sourceFile)),
             initializer: undefined
         };
     }
@@ -2113,12 +1983,17 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            elements: this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
+            elements: this.mapCommaSeparatedList(childrenOf(node, this.sourceFile)),
             type: this.mapType(node)
         };
     }
 
-    visitBindingElement(node: ts.BindingElement): JS.BindingElement {
+    visitBindingElement(node: ts.BindingElement): JS.BindingElement | J.Empty {
+        // An elision in a binding pattern (`const [a, , b] = ...`) is a binding element with
+        // nothing bound, so there is no name to map and the hole stands on its own.
+        if (!node.name) {
+            return this.newEmpty(this.prefix(node));
+        }
         // Capture prefix before converting name, as convert may consume whitespace
         const elementPrefix = this.prefix(node);
         let name: Expression = this.convert<Expression>(node.name);
@@ -2153,7 +2028,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             dimensions: [],
-            initializer: this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
+            initializer: this.mapCommaSeparatedList(childrenOf(node, this.sourceFile)),
             type: this.mapType(node)
         };
     }
@@ -2166,7 +2041,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             new: emptySpace,
             arguments: emptyContainer(),
-            body: this.convertPropertyAssignments(node.getChildren(this.sourceFile).slice(-3)),
+            body: this.convertPropertyAssignments(childrenOf(node, this.sourceFile).slice(-3)),
             constructorType: this.mapMethodType(node)
         };
     }
@@ -2178,7 +2053,7 @@ export class JavaScriptParserVisitor {
         let statementList = nodes[1] as ts.SyntaxList;
 
         const statements: J.RightPadded<Statement>[] = this.rightPaddedSeparatedList(
-            [...statementList.getChildren(this.sourceFile)],
+            [...childrenOf(statementList, this.sourceFile)],
             (nodes, i) => i == nodes.length - 2 && nodes[i + 1].kind === ts.SyntaxKind.CommaToken ? markers({
                 kind: J.Markers.TrailingComma,
                 id: randomId(),
@@ -2212,7 +2087,7 @@ export class JavaScriptParserVisitor {
                     } satisfies Optional as Optional);
                 }
             }),
-            name: this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), this.convert(node.name)),
+            name: this.leftPadded(this.prefix(childAt(node, 1, this.sourceFile)), this.convert(node.name)),
             type: this.mapType(node)
         };
     }
@@ -2303,7 +2178,7 @@ export class JavaScriptParserVisitor {
                     ...name,
                     type: methodType && methodType.name.startsWith('<') ? {...methodType} : undefined
                 },
-                arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
+                arguments: this.mapCommaSeparatedList(childrenOf(node, this.sourceFile).slice(-3)),
                 methodType: methodType
             }
         } else {
@@ -2314,7 +2189,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 function: select,
                 typeParameters: typeArguments,
-                arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
+                arguments: this.mapCommaSeparatedList(childrenOf(node, this.sourceFile).slice(-3)),
                 methodType: this.mapMethodType(node)
             }
         }
@@ -2385,9 +2260,9 @@ export class JavaScriptParserVisitor {
             class: {
                 kind: J.Kind.ControlParentheses,
                 id: randomId(),
-                prefix: this.prefix(node.getFirstToken()!),
+                prefix: this.prefix(firstTokenOf(node)!),
                 markers: emptyMarkers,
-                tree: this.rightPadded(this.convert(node.type), this.prefix(node.getChildAt(2, this.sourceFile)))
+                tree: this.rightPadded(this.convert(node.type), this.prefix(childAt(node, 2, this.sourceFile)))
             },
             expression: this.convert(node.expression),
         };
@@ -2399,7 +2274,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            tree: this.rightPadded(this.convert(node.expression), this.prefix(node.getLastToken()!))
+            tree: this.rightPadded(this.convert(node.expression), this.prefix(lastTokenOf(node)!))
         };
     }
 
@@ -2427,7 +2302,7 @@ export class JavaScriptParserVisitor {
                     parenthesized: isParenthesized,
                     parameters: node.parameters.length > 0 ?
                         node.parameters.map(p => this.rightPadded(this.convert(p), this.suffix(p)))
-                            .concat(node.parameters.hasTrailingComma ? this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []) :
+                            .concat(ts.hasTrailingComma(node.parameters, this.sourceFile) ? this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)) : []) :
                         isParenthesized ? [this.rightPadded(this.newEmpty(), this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!))] : [],
                 },
                 arrow: this.prefix(node.equalsGreaterThanToken),
@@ -2511,7 +2386,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            operator: this.leftPadded(this.prefix(node.getFirstToken()!), unaryOperator),
+            operator: this.leftPadded(this.prefix(firstTokenOf(node)!), unaryOperator),
             expression: this.convert(node.operand),
             type: this.mapType(node)
         };
@@ -2860,13 +2735,13 @@ export class JavaScriptParserVisitor {
                     statements: node.members.map(ce => ({
                         kind: J.Kind.RightPadded,
                         element: this.convert(ce),
-                        after: ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
-                        markers: ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                        after: lastTokenOf(ce)?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(lastTokenOf(ce)!) : emptySpace,
+                        markers: lastTokenOf(ce)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                             kind: J.Markers.Semicolon,
                             id: randomId()
                         }) : emptyMarkers
                     })),
-                    end: this.prefix(node.getLastToken()!)
+                    end: this.prefix(lastTokenOf(node)!)
                 },
                 type: this.mapDeclarationType(node)
             } satisfies J.ClassDeclaration as J.ClassDeclaration,
@@ -2898,7 +2773,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            left: this.rightPadded(this.convert(node.expression), this.prefix(node.getChildAt(1, this.sourceFile))),
+            left: this.rightPadded(this.convert(node.expression), this.prefix(childAt(node, 1, this.sourceFile))),
             right: this.convert(node.type),
             type: this.mapType(node),
         };
@@ -2921,7 +2796,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             target: node.keywordToken === ts.SyntaxKind.NewKeyword ? this.mapIdentifier(node, 'new') : this.mapIdentifier(node, 'import'),
-            name: this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), this.convert(node.name)),
+            name: this.leftPadded(this.prefix(childAt(node, 1, this.sourceFile)), this.convert(node.name)),
             type: this.mapType(node)
         };
     }
@@ -2966,7 +2841,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             static: this.rightPadded(false, emptySpace),
             statements: this.semicolonPaddedStatementList(node.statements),
-            end: this.prefix(node.getLastToken()!)
+            end: this.prefix(lastTokenOf(node)!)
         };
     }
 
@@ -3000,8 +2875,8 @@ export class JavaScriptParserVisitor {
     }
 
     visitIfStatement(node: ts.IfStatement): J.If {
-        const semicolonAfterThen = (node.thenStatement.getChildAt(node.thenStatement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken);
-        const semicolonAfterElse = (node.elseStatement?.getChildAt(node.elseStatement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken);
+        const semicolonAfterThen = (childAt(node.thenStatement, childCountOf(node.thenStatement) - 1)?.kind === ts.SyntaxKind.SemicolonToken);
+        const semicolonAfterElse = (!!node.elseStatement && childAt(node.elseStatement, childCountOf(node.elseStatement) - 1)?.kind === ts.SyntaxKind.SemicolonToken);
         return {
             kind: J.Kind.If,
             id: randomId(),
@@ -3016,7 +2891,7 @@ export class JavaScriptParserVisitor {
             },
             thenPart: this.rightPadded(
                 this.convert(node.thenStatement),
-                semicolonAfterThen ? this.prefix(node.thenStatement.getLastToken()!) : emptySpace,
+                semicolonAfterThen ? this.prefix(lastTokenOf(node.thenStatement)!) : emptySpace,
                 semicolonAfterThen ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers
             ),
             elsePart: node.elseStatement && {
@@ -3026,7 +2901,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 body: this.rightPadded(
                     this.convert(node.elseStatement),
-                    semicolonAfterElse ? this.prefix(node.elseStatement.getLastToken()!) : emptySpace,
+                    semicolonAfterElse ? this.prefix(lastTokenOf(node.elseStatement)!) : emptySpace,
                     semicolonAfterElse ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers
                 )
             }
@@ -3041,7 +2916,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             body: this.rightPadded(this.visit(node.statement),
                 this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                childAt(node.statement, childCountOf(node.statement) - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers),
@@ -3074,7 +2949,7 @@ export class JavaScriptParserVisitor {
             body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                childAt(node.statement, childCountOf(node.statement) - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
@@ -3117,7 +2992,7 @@ export class JavaScriptParserVisitor {
             body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                childAt(node.statement, childCountOf(node.statement) - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
@@ -3155,7 +3030,7 @@ export class JavaScriptParserVisitor {
             body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                childAt(node.statement, childCountOf(node.statement) - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
@@ -3235,7 +3110,7 @@ export class JavaScriptParserVisitor {
                 body: this.rightPadded(
                     this.convert(node.statement),
                     this.semicolonPrefix(node.statement),
-                    node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                    childAt(node.statement, childCountOf(node.statement) - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                         kind: J.Markers.Semicolon,
                         id: randomId()
                     }) : emptyMarkers
@@ -3290,7 +3165,7 @@ export class JavaScriptParserVisitor {
             body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                childAt(node.statement, childCountOf(node.statement) - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
@@ -3364,7 +3239,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: produce(emptyMarkers, draft => {
-                if (node.exclamationToken) {
+                if (ts.exclamationTokenOf(node)) {
                     draft.markers.push({
                         kind: JS.Markers.NonNullAssertion,
                         id: randomId(),
@@ -3374,13 +3249,13 @@ export class JavaScriptParserVisitor {
             }),
             name: this.visit(node.name),
             dimensionsAfterName: [],
-            initializer: node.initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildCount(this.sourceFile) - 2)), this.visit(node.initializer)),
+            initializer: node.initializer && this.leftPadded(this.prefix(childAt(node, childCountOf(node, this.sourceFile) - 2)), this.visit(node.initializer)),
             variableType: this.mapVariableType(node),
         };
     }
 
     visitVariableDeclarationList(node: ts.VariableDeclarationList): J.VariableDeclarations | JS.ScopedVariableDeclarations {
-        let kind = node.getFirstToken();
+        let kind = firstTokenOf(node);
 
         // to parse the declaration case: await using db = ...
         let modifiers: J.Modifier[] = [];
@@ -3394,7 +3269,7 @@ export class JavaScriptParserVisitor {
                 type: J.ModifierType.LanguageExtension,
                 annotations: []
             });
-            kind = node.getChildAt(1);
+            kind = childAt(node, 1);
         }
 
         if (kind?.kind === ts.SyntaxKind.VarKeyword ||
@@ -3428,7 +3303,7 @@ export class JavaScriptParserVisitor {
                     id: randomId(),
                     prefix: isMulti ? emptySpace : this.prefix(declaration),
                     markers: produce(emptyMarkers, draft => {
-                        if (declaration.exclamationToken) {
+                        if (ts.exclamationTokenOf(declaration)) {
                             draft.markers.push({
                                 kind: JS.Markers.NonNullAssertion,
                                 id: randomId(),
@@ -3440,7 +3315,7 @@ export class JavaScriptParserVisitor {
                     dimensionsAfterName: [],
                     initializer: (() => {
                         if (declaration.initializer) {
-                            const equalSign = declaration.getChildren().find(c => c.kind == ts.SyntaxKind.EqualsToken)
+                            const equalSign = childrenOf(declaration).find(c => c.kind == ts.SyntaxKind.EqualsToken)
                             const prefix = equalSign && this.prefix(equalSign);
                             return this.leftPadded(prefix ?? emptySpace, this.visit(declaration.initializer) as Expression)
                         } else {
@@ -3518,7 +3393,7 @@ export class JavaScriptParserVisitor {
     }
 
     private getParameterListNodes(node: ts.SignatureDeclarationBase | ts.NewExpression, openToken: ts.SyntaxKind = ts.SyntaxKind.OpenParenToken) {
-        const children = node.getChildren(this.sourceFile);
+        const children = childrenOf(node, this.sourceFile);
         for (let i = 0; i < children.length; i++) {
             if (children[i].kind === openToken) {
                 return children.slice(i, i + 3);
@@ -3555,10 +3430,10 @@ export class JavaScriptParserVisitor {
                 statements: node.members.map(te => ({
                     kind: J.Kind.RightPadded,
                     element: this.convert(te),
-                    after: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(te.getLastToken()!) : emptySpace,
-                    markers: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(te.getLastToken())!) : emptyMarkers
+                    after: (lastTokenOf(te)?.kind === ts.SyntaxKind.SemicolonToken) || (lastTokenOf(te)?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(lastTokenOf(te)!) : emptySpace,
+                    markers: (lastTokenOf(te)?.kind === ts.SyntaxKind.SemicolonToken) || (lastTokenOf(te)?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(lastTokenOf(te))!) : emptyMarkers
                 })),
-                end: this.prefix(node.getLastToken()!)
+                end: this.prefix(lastTokenOf(node)!)
             },
             type: this.mapDeclarationType(node)
         };
@@ -3609,17 +3484,17 @@ export class JavaScriptParserVisitor {
                         markers: emptyMarkers,
                         enums: node.members.map((em, i) => {
                             const isLast = i === node.members.length - 1;
-                            if (isLast && !node.members.hasTrailingComma) {
+                            if (isLast && !ts.hasTrailingComma(node.members, this.sourceFile)) {
                                 // No trailing comma - don't consume suffix, it belongs to block's end prefix
                                 return this.rightPadded(this.visit(em), emptySpace);
                             }
                             // For non-last members, or last member with trailing comma, consume the suffix
                             return this.rightPadded(this.visit(em), this.suffix(em));
                         }),
-                        terminatedWithSemicolon: node.members.hasTrailingComma
+                        terminatedWithSemicolon: ts.hasTrailingComma(node.members, this.sourceFile)
                     },
                     emptySpace)],
-                end: this.prefix(node.getLastToken()!)
+                end: this.prefix(lastTokenOf(node)!)
             },
             type: this.mapDeclarationType(node) as Type.Class
         };
@@ -3729,13 +3604,13 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             static: this.rightPadded(false, emptySpace),
             statements: this.semicolonPaddedStatementList(node.statements),
-            end: this.prefix(node.getLastToken()!)
+            end: this.prefix(lastTokenOf(node)!)
         };
     }
 
     visitCaseBlock(node: ts.CaseBlock): J.Block {
         // consume end space so it gets assigned to the block's `end`
-        const end = this.prefix(node.getLastToken()!);
+        const end = this.prefix(lastTokenOf(node)!);
         return {
             kind: J.Kind.Block,
             id: randomId(),
@@ -3806,7 +3681,7 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: (() => {
                     if (node.isTypeOnly) {
-                        const typeKeyword = node.getChildren().find(n => n.kind === ts.SyntaxKind.TypeKeyword);
+                        const typeKeyword = childrenOf(node).find(n => n.kind === ts.SyntaxKind.TypeKeyword);
                         return this.prefix(typeKeyword!);
                     } else {
                         return this.prefix(node.name);
@@ -3848,7 +3723,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            typeOnly: node.isTypeOnly,
+            typeOnly: node.phaseModifier === ts.SyntaxKind.TypeKeyword,
             name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
             namedBindings: node.namedBindings && this.visit(node.namedBindings)
         };
@@ -3866,7 +3741,7 @@ export class JavaScriptParserVisitor {
     }
 
     visitNamedImports(node: ts.NamedImports): JS.NamedImports {
-        const children = node.getChildren(this.sourceFile);
+        const children = childrenOf(node, this.sourceFile);
         let elements: J.Container<JS.ImportSpecifier>;
         if (node.elements.length === 0) {
             const openBrace = children[0];
@@ -3956,7 +3831,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            elements: this.mapCommaSeparatedList(node.getChildren()),
+            elements: this.mapCommaSeparatedList(childrenOf(node)),
             type: this.mapType(node)
         };
     }
@@ -4261,8 +4136,8 @@ export class JavaScriptParserVisitor {
     }
 
     visitImportAttributes(node: ts.ImportAttributes): JS.ImportAttributes {
-        const openBraceIndex = node.getChildren().findIndex(n => n.kind === ts.SyntaxKind.OpenBraceToken);
-        const elements = this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(openBraceIndex, openBraceIndex + 3));
+        const openBraceIndex = childrenOf(node).findIndex(n => n.kind === ts.SyntaxKind.OpenBraceToken);
+        const elements = this.mapCommaSeparatedList(childrenOf(node, this.sourceFile).slice(openBraceIndex, openBraceIndex + 3));
         return {
             kind: JS.Kind.ImportAttributes,
             id: randomId(),
@@ -4346,10 +4221,6 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    visitBundle(node: ts.Bundle) {
-        return this.visitUnknown(node);
-    }
-
     visitJSDocTypeExpression(node: ts.JSDocTypeExpression) {
         return this.visitUnknown(node);
     }
@@ -4358,15 +4229,7 @@ export class JavaScriptParserVisitor {
         return this.visitUnknown(node);
     }
 
-    visitJSDocMemberName(node: ts.JSDocMemberName) {
-        return this.visitUnknown(node);
-    }
-
     visitJSDocAllType(node: ts.JSDocAllType) {
-        return this.visitUnknown(node);
-    }
-
-    visitJSDocUnknownType(node: ts.JSDocUnknownType) {
         return this.visitUnknown(node);
     }
 
@@ -4382,23 +4245,11 @@ export class JavaScriptParserVisitor {
         return this.visitUnknown(node);
     }
 
-    visitJSDocFunctionType(node: ts.JSDocFunctionType) {
-        return this.visitUnknown(node);
-    }
-
     visitJSDocVariadicType(node: ts.JSDocVariadicType) {
         return this.visitUnknown(node);
     }
 
-    visitJSDocNamepathType(node: ts.JSDocNamepathType) {
-        return this.visitUnknown(node);
-    }
-
     visitJSDoc(node: ts.JSDoc) {
-        return this.visitUnknown(node);
-    }
-
-    visitJSDocType(node: ts.JSDocType) {
         return this.visitUnknown(node);
     }
 
@@ -4438,15 +4289,7 @@ export class JavaScriptParserVisitor {
         return this.visitUnknown(node);
     }
 
-    visitJSDocAuthorTag(node: ts.JSDocAuthorTag) {
-        return this.visitUnknown(node);
-    }
-
     visitJSDocDeprecatedTag(node: ts.JSDocDeprecatedTag) {
-        return this.visitUnknown(node);
-    }
-
-    visitJSDocClassTag(node: ts.JSDocClassTag) {
         return this.visitUnknown(node);
     }
 
@@ -4475,10 +4318,6 @@ export class JavaScriptParserVisitor {
     }
 
     visitJSDocOverloadTag(node: ts.JSDocOverloadTag) {
-        return this.visitUnknown(node);
-    }
-
-    visitJSDocEnumTag(node: ts.JSDocEnumTag) {
         return this.visitUnknown(node);
     }
 
@@ -4535,10 +4374,6 @@ export class JavaScriptParserVisitor {
     }
 
     visitPartiallyEmittedExpression(node: ts.PartiallyEmittedExpression) {
-        return this.visitUnknown(node);
-    }
-
-    visitCommaListExpression(node: ts.CommaListExpression) {
         return this.visitUnknown(node);
     }
 
@@ -4632,7 +4467,7 @@ export class JavaScriptParserVisitor {
             return emptyContainer();
         }
         const prefix = this.prefix(nodes[0]);
-        const args: J.RightPadded<T>[] = this.mapToRightPaddedList(nodes[1].getChildren(this.sourceFile), this.prefix(nodes[2]), markers);
+        const args: J.RightPadded<T>[] = this.mapToRightPaddedList(childrenOf(nodes[1], this.sourceFile), this.prefix(nodes[2]), markers);
         return {
             kind: J.Kind.Container,
             before: prefix,
@@ -4711,7 +4546,7 @@ export class JavaScriptParserVisitor {
                 kind: J.Kind.Container,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!),
                 elements: this.mapTypeParametersList(node.typeParameters)
-                    .concat(node.typeParameters.hasTrailingComma ? this.rightPadded<J.TypeParameter>(
+                    .concat(ts.hasTrailingComma(node.typeParameters, this.sourceFile) ? this.rightPadded<J.TypeParameter>(
                         {
                             kind: J.Kind.TypeParameter,
                             id: randomId(),
@@ -4749,7 +4584,7 @@ export class JavaScriptParserVisitor {
                     name: this.newEmpty(),
                 }, this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!))]
                 : typeParameters.map(tp => this.rightPadded(this.visit(tp), this.suffix(tp)))
-                    .concat(typeParameters.hasTrailingComma ? this.rightPadded(
+                    .concat(ts.hasTrailingComma(typeParameters, this.sourceFile) ? this.rightPadded(
                         {
                             kind: J.Kind.TypeParameter,
                             id: randomId(),
@@ -4768,18 +4603,18 @@ export class JavaScriptParserVisitor {
     }
 
     private findChildNode(node: ts.Node, kind: ts.SyntaxKind): ts.Node | undefined {
-        for (let i = 0; i < node.getChildCount(this.sourceFile); i++) {
-            if (node.getChildAt(i, this.sourceFile).kind === kind) {
-                return node.getChildAt(i, this.sourceFile);
+        for (let i = 0; i < childCountOf(node, this.sourceFile); i++) {
+            if (childAt(node, i, this.sourceFile).kind === kind) {
+                return childAt(node, i, this.sourceFile);
             }
         }
         return undefined;
     }
 
     private findLastChildNode(node: ts.Node, kind: ts.SyntaxKind): ts.Node | undefined {
-        for (let i = node.getChildCount(this.sourceFile) - 1; i >= 0; i--) {
-            if (node.getChildAt(i, this.sourceFile).kind === kind) {
-                return node.getChildAt(i, this.sourceFile);
+        for (let i = childCountOf(node, this.sourceFile) - 1; i >= 0; i--) {
+            if (childAt(node, i, this.sourceFile).kind === kind) {
+                return childAt(node, i, this.sourceFile);
             }
         }
         return undefined;
@@ -4805,7 +4640,7 @@ export class JavaScriptParserVisitor {
         markers: Markers
     }, node: ts.MethodSignature | ts.MethodDeclaration | ts.ParameterDeclaration | ts.PropertySignature | ts.PropertyDeclaration | ts.NamedTupleMember): Markers {
         return produce(t.markers, draft => {
-            if (node.questionToken) {
+            if (ts.questionTokenOf(node)) {
                 draft.markers.push({
                     kind: JS.Markers.Optional,
                     id: randomId(),
