@@ -37,7 +37,8 @@ Wildcards:
 from dataclasses import dataclass
 from typing import Optional, List
 
-from rewrite.java.tree import MethodInvocation
+from rewrite.java.support_types import JavaType
+from rewrite.java.tree import Identifier, MethodInvocation
 from rewrite.python.type_utils import is_of_type_with_name
 
 
@@ -47,10 +48,10 @@ class MethodMatcher:
     Matches method invocations against an AspectJ-style pattern signature.
 
     Matching turns on the call's declaring type, which an import-resolved call
-    carries with no type check running; a pattern naming a concrete receiver
-    fails where that type is ``JavaType.Unknown``, though ``*..*`` still matches.
-    ``REWRITE_PYTHON_DUMP_TYPES=1`` during a test run, or ``rewrite-python-types
-    <file>``, prints what each call actually got.
+    carries with no type check running; a pattern naming a concrete receiver fails
+    where that type is ``JavaType.Unknown``, though ``*..*`` still matches and
+    ``matches(method, match_unknown_types=True)`` falls back to the call as written.
+    ``REWRITE_PYTHON_DUMP_TYPES=1`` in a test run prints what each call got.
     """
 
     _type_matcher: "TypeMatcher"
@@ -93,23 +94,34 @@ class MethodMatcher:
             _match_overrides=match_overrides,
         )
 
-    def matches(self, method: MethodInvocation) -> bool:
+    def matches(self, method: MethodInvocation, match_unknown_types: bool = False) -> bool:
         """
         Check if a method invocation matches this pattern.
 
-        Requires type attribution to be present on the method invocation.
-
         Args:
             method: The method invocation to check
+            match_unknown_types: when the attributed types don't match,
+                also match structurally, on the call's written receiver,
+                name and arguments. Reaches calls whose declaring type is
+                ``JavaType.Unknown``, at the risk of false positives on
+                unrelated calls, so it is off by default.
 
         Returns:
             True if the method matches the pattern
         """
+        if self._matches_typed(method):
+            return True
+        return match_unknown_types and self._matches_allowing_unknown_types(method)
+
+    def _matches_typed(self, method: MethodInvocation) -> bool:
+        """Check the pattern against the call's type attribution."""
         # Check method name first (fast path)
         if not self._matches_method_name(method):
             return False
 
-        # Require type info
+        # A parsed call's declaring type is JavaType.Unknown, never None, so this
+        # guard leaves Unknown to the target-type check below, where a wildcard
+        # receiver still matches it. Rejecting it here would diverge from Java.
         if method.method_type is None or method.method_type.declaring_type is None:
             return False
 
@@ -128,6 +140,20 @@ class MethodMatcher:
             type_obj, True, self._type_matcher.matches_name
         )
 
+    def _matches_allowing_unknown_types(self, method: MethodInvocation) -> bool:
+        """Check the pattern against the call as written, ignoring absent types."""
+        if not self._method_matcher.matches(method.name.simple_name):
+            return False
+
+        # Only a bare identifier receiver is compared; a qualified or computed
+        # one is left unchecked, as in Java.
+        select = method.select
+        if isinstance(select, Identifier) and \
+                not self._type_matcher.matches_simple_name(select.simple_name):
+            return False
+
+        return self._matches_arguments(method, allow_unknown=True)
+
     def _matches_method_name(self, method: MethodInvocation) -> bool:
         """Check if the method name matches.
 
@@ -138,10 +164,13 @@ class MethodMatcher:
         return method.method_type is not None and \
             self._method_matcher.matches(method.method_type.name)
 
-    def _matches_arguments(self, method: MethodInvocation) -> bool:
+    def _matches_arguments(self, method: MethodInvocation, allow_unknown: bool = False) -> bool:
         """Check if method arguments match the expected pattern."""
         args = method.arguments
         arg_count = len(args)
+
+        def accepts(matcher: "ArgumentMatcher", arg_type) -> bool:
+            return matcher.matches_unknown(arg_type) if allow_unknown else matcher.matches(arg_type)
 
         if self._varargs_position == -1:
             # No varargs - exact count required
@@ -149,7 +178,7 @@ class MethodMatcher:
                 return False
             for i, matcher in enumerate(self._argument_matchers):
                 arg_type = args[i].type if hasattr(args[i], 'type') else None
-                if not matcher.matches(arg_type):
+                if not accepts(matcher, arg_type):
                     return False
             return True
         else:
@@ -163,7 +192,7 @@ class MethodMatcher:
             # Match before varargs
             for i in range(before_count):
                 arg_type = args[i].type if hasattr(args[i], 'type') else None
-                if not self._argument_matchers[i].matches(arg_type):
+                if not accepts(self._argument_matchers[i], arg_type):
                     return False
 
             # Match after varargs
@@ -171,7 +200,7 @@ class MethodMatcher:
                 arg_idx = arg_count - after_count + i
                 matcher_idx = self._varargs_position + 1 + i
                 arg_type = args[arg_idx].type if hasattr(args[arg_idx], 'type') else None
-                if not self._argument_matchers[matcher_idx].matches(arg_type):
+                if not accepts(self._argument_matchers[matcher_idx], arg_type):
                     return False
 
             return True
@@ -189,6 +218,10 @@ class TypeMatcher:
     def matches_name(self, fqn: str) -> bool:
         raise NotImplementedError
 
+    def matches_simple_name(self, simple_name: str) -> bool:
+        """Whether the pattern's trailing component matches an unqualified name."""
+        raise NotImplementedError
+
 
 class WildcardTypeMatcher(TypeMatcher):
     """Matches any type."""
@@ -199,11 +232,15 @@ class WildcardTypeMatcher(TypeMatcher):
     def matches_name(self, fqn: str) -> bool:
         return True
 
+    def matches_simple_name(self, simple_name: str) -> bool:
+        return True
+
 
 @dataclass
 class PatternTypeMatcher(TypeMatcher):
     """Matches types against a pattern with wildcards."""
 
+    _pattern: str
     _segments: List[str]  # Pattern segments split by '.'
     _has_double_wildcard: bool  # Whether pattern contains '..'
 
@@ -215,7 +252,7 @@ class PatternTypeMatcher(TypeMatcher):
         if not has_double:
             # Simple case - no double wildcards
             segments = pattern.split(".")
-            return cls(_segments=segments, _has_double_wildcard=False)
+            return cls(_pattern=pattern, _segments=segments, _has_double_wildcard=False)
 
         # Handle patterns with .. by splitting on ".." first
         # Examples: "datetime..*" -> ["datetime", "*"]
@@ -239,7 +276,7 @@ class PatternTypeMatcher(TypeMatcher):
                 if part:
                     segments.extend(part.split("."))
 
-        return cls(_segments=segments, _has_double_wildcard=True)
+        return cls(_pattern=pattern, _segments=segments, _has_double_wildcard=True)
 
     def matches(self, type_obj) -> bool:
         fqn = _get_fqn(type_obj)
@@ -250,6 +287,19 @@ class PatternTypeMatcher(TypeMatcher):
     def matches_name(self, fqn: str) -> bool:
         fqn_parts = fqn.split(".")
         return self._match_segments(self._segments, fqn_parts)
+
+    def matches_simple_name(self, simple_name: str) -> bool:
+        last_dot = self._pattern.rfind(".")
+        if last_dot < 0:
+            # Java accepts a dotless pattern as a receiver name only when literal.
+            return "*" not in self._pattern and self._pattern == simple_name
+
+        tail = self._pattern[last_dot + 1:]
+        if not tail:
+            return False
+        if "*" in tail:
+            return self._matches_glob(tail, simple_name)
+        return tail == simple_name
 
     def _match_segments(self, pattern: List[str], parts: List[str]) -> bool:
         """Match pattern segments against FQN parts."""
@@ -398,6 +448,10 @@ class ArgumentMatcher:
     def matches(self, arg_type) -> bool:
         raise NotImplementedError
 
+    def matches_unknown(self, arg_type) -> bool:
+        """Whether the argument matches once absent type information is excused."""
+        raise NotImplementedError
+
 
 class WildcardArgumentMatcher(ArgumentMatcher):
     """Matches any single argument."""
@@ -405,11 +459,17 @@ class WildcardArgumentMatcher(ArgumentMatcher):
     def matches(self, arg_type) -> bool:
         return True
 
+    def matches_unknown(self, arg_type) -> bool:
+        return True
+
 
 class WildcardVarargsArgumentMatcher(ArgumentMatcher):
     """Matches zero or more arguments of any type (..)."""
 
     def matches(self, arg_type) -> bool:
+        return True
+
+    def matches_unknown(self, arg_type) -> bool:
         return True
 
 
@@ -432,6 +492,11 @@ class TypedArgumentMatcher(ArgumentMatcher):
             return True
 
         return fqn == self._type_pattern or fqn.endswith("." + self._type_pattern)
+
+    def matches_unknown(self, arg_type) -> bool:
+        if arg_type is None or isinstance(arg_type, JavaType.Unknown):
+            return True
+        return self.matches(arg_type)
 
 
 def _get_fqn(type_obj) -> Optional[str]:
