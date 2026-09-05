@@ -64,6 +64,9 @@ def uses_method(method_pattern: str, match_overrides: bool = False) -> RecipeRef
         uses_method("*..* tostring(..)")
         uses_method("java.util.Collections emptyList()")
 
+    For a pattern that does not fire, ``REWRITE_PYTHON_DUMP_TYPES=1`` prints the
+    declaring type each call got during the test run.
+
     Bundles a native :class:`UsesMethod` visitor so unit tests without
     an active RPC connection still see real filtering behavior.
     """

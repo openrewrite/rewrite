@@ -55,6 +55,9 @@ Issues = "https://github.com/openrewrite/rewrite/issues"
 [project.entry-points."openrewrite.recipes"]
 openrewrite = "rewrite:activate"
 
+[project.scripts]
+rewrite-python-types = "rewrite.python.type_report:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["rewrite", "rewrite.*"]

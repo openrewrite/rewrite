@@ -93,6 +93,19 @@ from rewrite.python.method_matcher import MethodMatcher
 from rewrite.python.binding_utils import Binding, ImportBindings, import_bindings, is_reference
 from rewrite.python.scope_utils import Scope, scope_of
 
+# Type-attribution diagnostics
+from rewrite.python.type_report import (
+    TypeEntry,
+    TypeReport,
+    diff_ty,
+    parse_for_types,
+    print_tree,
+    print_types,
+    render_method,
+    render_type,
+    build_type_report,
+)
+
 # Type-comparison helpers
 from rewrite.python.type_utils import (
     is_assignable_to,
@@ -198,6 +211,16 @@ __all__ = [
     "maybe_remove_import",
     # Method matching
     "MethodMatcher",
+    # Type-attribution diagnostics
+    "TypeEntry",
+    "TypeReport",
+    "diff_ty",
+    "parse_for_types",
+    "print_tree",
+    "print_types",
+    "render_method",
+    "render_type",
+    "build_type_report",
     # Scoping
     "Scope",
     "scope_of",
