@@ -289,3 +289,25 @@ def test_a_file_binding_the_name_to_another_module_refuses():
             )
         )
     assert "other than 'subprocess'" in str(refusal.value.cause)
+
+
+def test_an_aliased_member_merges_into_the_file_s_import_of_that_module():
+    """The context's alias is the name imported, and the module's existing import carries it."""
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"r({arg})", context=["from subprocess import run as r"])
+
+    RecipeSpec(recipe=_recipe(pat, tmpl)).rewrite_run(
+        python(
+            """
+            import os
+            from subprocess import Popen
+            out = os.popen('ls')
+            """,
+            """
+            import os
+            from subprocess import Popen, run as r
+            out = r('ls')
+            """,
+        )
+    )
