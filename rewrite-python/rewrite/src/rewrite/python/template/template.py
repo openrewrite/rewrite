@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from rewrite.java import J
-from rewrite.python.visitor import PythonVisitor
+from rewrite.visitor import TreeVisitor
 from .capture import Capture
 from .coordinates import PythonCoordinates
 from .engine import TemplateEngine, TemplateOptions
@@ -110,16 +110,20 @@ class Template:
         return self._cached_tree
 
     def context_bindings(self) -> Tuple['ContextBinding', ...]:
-        """The modules this template's context binds, which the file it is spliced into has to
-        bind too for its code to run there."""
+        """The modules this template's code reads through its context, which the file it is
+        spliced into has to bind too for that code to run there. Context that only types a
+        capture is read by nothing the template splices, so it binds nothing here."""
         if self._context_bindings is None:
-            from .bindings import context_bindings
-            self._context_bindings = context_bindings(self._options.imports + self._options.context)
+            from .bindings import context_bindings, names_read
+            read = names_read(self.get_tree())
+            self._context_bindings = tuple(
+                b for b in context_bindings(self._options.imports + self._options.context)
+                if b.name in read)
         return self._context_bindings
 
     def apply(
         self,
-        cursor: Union['Cursor', PythonVisitor],
+        cursor: Union['Cursor', TreeVisitor],
         *,
         values: Optional[Union['MatchResult', Dict[str, Any]]] = None,
         coordinates: Optional[PythonCoordinates] = None,
@@ -150,8 +154,8 @@ class Template:
             # With explicit coordinates
             result = tmpl.apply(self, coordinates=PythonCoordinates.after(node))
         """
-        if isinstance(cursor, PythonVisitor):
-            visitor: Optional[PythonVisitor] = cursor
+        if isinstance(cursor, TreeVisitor):
+            visitor: Optional[TreeVisitor] = cursor
             at: Optional['Cursor'] = cursor.cursor
         else:
             visitor, at = None, cursor

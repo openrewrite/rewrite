@@ -80,6 +80,11 @@ final class PythonImports {
     }
 
     /** A dotted name as the parser models it outside an import qualid: no empty target. */
+    /** A statement reading {@code dotted}, as against an import binding it. */
+    static Statement use(String dotted) {
+        return new Py.ExpressionStatement(randomId(), name(dotted));
+    }
+
     private static Expression name(String dotted) {
         String[] parts = dotted.split("\\.");
         Expression result = identifier(parts[0]);

@@ -17,6 +17,7 @@
 import pytest
 
 from rewrite import ExecutionContext, Recipe
+from rewrite.execution import RecipeRunException
 from rewrite.python.template import capture, pattern, template
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
@@ -149,7 +150,8 @@ def test_conditional_import_does_not_bind_at_runtime():
 
 
 def test_context_the_template_does_not_reference_is_not_imported():
-    """Context typing a capture is not code the template splices, so it imports nothing."""
+    """Context typing a capture is not code the template splices, so it imports nothing —
+    not even into a file that spells the same name for its own purposes."""
     arg = capture('arg')
     pat = pattern(f"os.popen({arg})", context=["import os"])
     tmpl = template(f"subprocess.run({arg}, shell=True)",
@@ -159,11 +161,15 @@ def test_context_the_template_does_not_reference_is_not_imported():
         python(
             """
             import os
+            Any = 3
+            print(Any)
             out = os.popen('ls')
             """,
             """
             import os
             import subprocess
+            Any = 3
+            print(Any)
             out = subprocess.run('ls', shell=True)
             """,
         )
@@ -222,3 +228,64 @@ def test_dotted_module_binds_its_root():
             """,
         )
     )
+
+
+def test_a_name_the_template_binds_itself_is_not_a_context_reference():
+    """The comprehension's ``run`` is the template's own, whatever the context calls the same name."""
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"[run(i) for run in {arg}]", context=["from subprocess import run"])
+
+    RecipeSpec(recipe=_recipe(pat, tmpl)).rewrite_run(
+        python(
+            """
+            import os
+            from subprocess import run as r
+            out = os.popen('ls')
+            """,
+            """
+            import os
+            from subprocess import run as r
+            out = [run(i) for run in 'ls']
+            """,
+        )
+    )
+
+
+def test_a_scope_binding_the_name_to_something_else_refuses():
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"subprocess.run({arg}, shell=True)", context=["import subprocess"])
+
+    with pytest.raises(RecipeRunException) as refusal:
+        RecipeSpec(recipe=_recipe(pat, tmpl)).rewrite_run(
+            python(
+                """
+                import os
+                import subprocess
+
+                def listing(subprocess):
+                    return os.popen('ls')
+                """,
+            )
+        )
+    assert "binds 'subprocess' to something other than" in str(refusal.value.cause)
+
+
+def test_a_file_binding_the_name_to_another_module_refuses():
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"run({arg}, shell=True)", context=["from subprocess import run"])
+
+    with pytest.raises(RecipeRunException) as refusal:
+        RecipeSpec(recipe=_recipe(pat, tmpl)).rewrite_run(
+            python(
+                """
+                import os
+                from mylib import run
+                print(run)
+                out = os.popen('ls')
+                """,
+            )
+        )
+    assert "other than 'subprocess'" in str(refusal.value.cause)

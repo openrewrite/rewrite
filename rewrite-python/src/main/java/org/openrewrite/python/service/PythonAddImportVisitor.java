@@ -136,8 +136,9 @@ public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
     }
 
     private boolean isReferenced(Py.CompilationUnit cu) {
+        // `import a.b.c` binds only `a`, so that is the name a use of it reads through.
         String target = alias != null ? alias :
-                name != null ? name : module.substring(module.lastIndexOf('.') + 1);
+                name != null ? name : module.split("\\.", 2)[0];
         Pattern spelledIn = Pattern.compile("\\b" + Pattern.quote(target) + "\\b");
         AtomicBoolean found = new AtomicBoolean();
         new PythonVisitor<AtomicBoolean>() {
