@@ -40,12 +40,12 @@ class Template:
     Examples:
         # Simple template
         tmpl = template("x + 1")
-        result = tmpl.apply(self)
+        result = tmpl.apply(self.cursor)
 
         # Template with capture from pattern match
         expr = capture('expr')
         tmpl = template(f"print({expr})")
-        result = tmpl.apply(self, values=match_result)
+        result = tmpl.apply(self.cursor, values=match_result)
 
         # Template whose context types it and is imported into the file it lands in
         tmpl = template(
@@ -123,7 +123,7 @@ class Template:
 
     def apply(
         self,
-        cursor: Union['Cursor', TreeVisitor],
+        cursor: Optional['Cursor'],
         *,
         visitor: Optional[TreeVisitor] = None,
         values: Optional[Union['MatchResult', Dict[str, Any]]] = None,
@@ -134,11 +134,10 @@ class Template:
         Apply this template, returning the generated AST node.
 
         Args:
-            cursor: Where the result lands — a visitor stands for its own cursor, which is
-                where a recipe splices what it is visiting.
-            visitor: The visitor doing the edit, for a splice landing somewhere other than where
-                it stands. A template whose context imports a module needs one either way: the
-                module reaches the file through it.
+            cursor: Where the result lands, which for a recipe rewriting what it is visiting
+                is ``self.cursor``.
+            visitor: The visitor doing the edit. A template whose context imports a module needs
+                it: the module reaches the file through the visitor, not through the cursor.
             values: Captured values from a pattern match, or a dict of values.
             coordinates: Where/how to insert (default: replace current).
             format: Whether the result is fitted to where it lands. Pass False to assemble
@@ -150,29 +149,25 @@ class Template:
 
         Examples:
             # Simple application
-            result = tmpl.apply(self)
+            result = tmpl.apply(self.cursor)
 
             # With values from pattern match
-            result = tmpl.apply(self, values=match)
+            result = tmpl.apply(self.cursor, visitor=self, values=match)
 
             # With explicit coordinates
-            result = tmpl.apply(self, coordinates=PythonCoordinates.after(node))
+            result = tmpl.apply(self.cursor, coordinates=PythonCoordinates.after(node))
         """
-        at: Optional['Cursor'] = cursor.cursor if isinstance(cursor, TreeVisitor) else cursor
-        if visitor is None and isinstance(cursor, TreeVisitor):
-            visitor = cursor
-
         renames: Dict[str, str] = {}
         if self.context_bindings():
             if visitor is None:
                 raise ValueError(
                     f"Template imports {', '.join(sorted({b.module for b in self.context_bindings()}))} "
                     "in its context, so applying it has to bind those modules in the file it is "
-                    "spliced into. Pass the visitor — apply(self, ...) — rather than its cursor.")
+                    "spliced into. Name the visitor — apply(self.cursor, visitor=self, ...).")
             from .bindings import bind_context
-            # The splice site decides which names are in scope, and it is where the visitor
-            # stands only for a recipe rewriting what it is visiting.
-            renames = bind_context(visitor, at or visitor.cursor, self.context_bindings())
+            # The splice site decides which names are in scope, which is where the visitor stands
+            # only for a recipe rewriting what it is visiting.
+            renames = bind_context(visitor, cursor or visitor.cursor, self.context_bindings())
 
         # Get the template tree
         template_tree = self.get_tree()
@@ -204,21 +199,21 @@ class Template:
         # Phase 2: parenthesize the result for the slot it replaces, mirroring JavaTemplate.doApply().
         # This must happen before coordinates are applied, because
         # apply_coordinates may wrap the expression in ExpressionStatement.
-        if result is not None and at is not None:
+        if result is not None and cursor is not None:
             from .precedence import enclosing_tree, maybe_parenthesize
-            target = at.value
+            target = cursor.value
             if isinstance(target, J):
-                result = maybe_parenthesize(enclosing_tree(at.parent), target.id, result)
+                result = maybe_parenthesize(enclosing_tree(cursor.parent), target.id, result)
 
         # Phase 3: apply coordinates (prefix preservation, statement wrapping, auto-format)
         effective_coords = coordinates
-        if effective_coords is None and at is not None:
-            tree = at.value
+        if effective_coords is None and cursor is not None:
+            tree = cursor.value
             if tree is not None:
                 effective_coords = PythonCoordinates.replace(tree)
 
         if effective_coords is not None and result is not None:
-            result = TemplateEngine.apply_coordinates(result, at, effective_coords, format)
+            result = TemplateEngine.apply_coordinates(result, cursor, effective_coords, format)
 
         return result
 

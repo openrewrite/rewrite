@@ -46,7 +46,7 @@ def _recipe(pat, tmpl) -> Recipe:
                     method = super().visit_method_invocation(method, p)
                     match = pat.match(method, self.cursor)
                     if match:
-                        return tmpl.apply(self, values=match)
+                        return tmpl.apply(self.cursor, visitor=self, values=match)
                     return method
 
             return Visitor()
@@ -206,7 +206,7 @@ def test_import_lands_at_module_scope_for_a_splice_inside_a_function():
 def test_applying_to_a_cursor_cannot_bind_and_says_so():
     tmpl = template("subprocess.run('ls')", context=["import subprocess"])
 
-    with pytest.raises(ValueError, match="Pass the visitor"):
+    with pytest.raises(ValueError, match="Name the visitor"):
         tmpl.apply(cursor=None)
 
 
