@@ -94,13 +94,14 @@ def names_read(tree: J) -> FrozenSet[str]:
     return frozenset(names)
 
 
-def bind_context(visitor: TreeVisitor, bindings: Sequence[ContextBinding]) -> Dict[str, str]:
-    """Binds each of ``bindings`` in the file ``visitor`` is visiting, and returns the names to
-    rename the template's references to where the file already binds a module under another name.
+def bind_context(visitor: TreeVisitor, cursor: Cursor,
+                 bindings: Sequence[ContextBinding]) -> Dict[str, str]:
+    """Binds each of ``bindings`` in the file ``visitor`` is visiting, as read from ``cursor``,
+    and returns the names to rename the template's references to where the file already binds a
+    module under another name.
     A conditional import binds nothing a spliced reference reaches, so it counts as unbound, and
     a name held by something else raises, no import being able to make it read the module."""
     existing = import_bindings(visitor)
-    cursor = visitor.cursor
     renames: Dict[str, str] = {}
     for binding in bindings:
         if _imported_locally(cursor, binding):

@@ -125,6 +125,7 @@ class Template:
         self,
         cursor: Union['Cursor', TreeVisitor],
         *,
+        visitor: Optional[TreeVisitor] = None,
         values: Optional[Union['MatchResult', Dict[str, Any]]] = None,
         coordinates: Optional[PythonCoordinates] = None,
         format: bool = True,
@@ -133,8 +134,11 @@ class Template:
         Apply this template, returning the generated AST node.
 
         Args:
-            cursor: The visitor doing the edit, or its cursor. A template whose context imports
-                a module needs the visitor: the module reaches the file through it.
+            cursor: Where the result lands — a visitor stands for its own cursor, which is
+                where a recipe splices what it is visiting.
+            visitor: The visitor doing the edit, for a splice landing somewhere other than where
+                it stands. A template whose context imports a module needs one either way: the
+                module reaches the file through it.
             values: Captured values from a pattern match, or a dict of values.
             coordinates: Where/how to insert (default: replace current).
             format: Whether the result is fitted to where it lands. Pass False to assemble
@@ -154,11 +158,9 @@ class Template:
             # With explicit coordinates
             result = tmpl.apply(self, coordinates=PythonCoordinates.after(node))
         """
-        if isinstance(cursor, TreeVisitor):
-            visitor: Optional[TreeVisitor] = cursor
-            at: Optional['Cursor'] = cursor.cursor
-        else:
-            visitor, at = None, cursor
+        at: Optional['Cursor'] = cursor.cursor if isinstance(cursor, TreeVisitor) else cursor
+        if visitor is None and isinstance(cursor, TreeVisitor):
+            visitor = cursor
 
         renames: Dict[str, str] = {}
         if self.context_bindings():
@@ -168,7 +170,9 @@ class Template:
                     "in its context, so applying it has to bind those modules in the file it is "
                     "spliced into. Pass the visitor — apply(self, ...) — rather than its cursor.")
             from .bindings import bind_context
-            renames = bind_context(visitor, self.context_bindings())
+            # The splice site decides which names are in scope, and it is where the visitor
+            # stands only for a recipe rewriting what it is visiting.
+            renames = bind_context(visitor, at or visitor.cursor, self.context_bindings())
 
         # Get the template tree
         template_tree = self.get_tree()

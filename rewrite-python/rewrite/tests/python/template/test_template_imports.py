@@ -21,6 +21,7 @@ from rewrite.execution import RecipeRunException
 from rewrite.python.template import capture, pattern, template
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
+from rewrite.visitor import Cursor
 
 
 def _recipe(pat, tmpl) -> Recipe:
@@ -357,6 +358,62 @@ def test_a_relative_context_import_stays_relative():
             import os
             from . import util
             out = util.run('ls')
+            """,
+        )
+    )
+
+
+def test_a_splice_reads_the_scope_it_lands_in_not_the_one_the_visitor_stands_in():
+    """A recipe naming both splices where it is not standing, and the local import there — not
+    the file's module scope — is what decides the binding."""
+    tmpl = template("return subprocess.run('ls', shell=True)", context=["import subprocess"])
+
+    class Rewrite(Recipe):
+        @property
+        def name(self):
+            return "test.Rewrite"
+
+        @property
+        def display_name(self):
+            return "Rewrite"
+
+        @property
+        def description(self):
+            return "Rewrite."
+
+        def editor(self):
+            class Visitor(PythonVisitor[ExecutionContext]):
+                def visit_compilation_unit(self, cu, p):
+                    method = cu.statements[-1]
+                    body = method.body
+                    padded = list(body.padding.statements)
+                    last = padded[-1]
+                    at = Cursor(Cursor(Cursor(self.cursor, method), body), last.element)
+                    padded[-1] = last.replace(element=tmpl.apply(at, visitor=self))
+                    outer = list(cu.padding.statements)
+                    outer[-1] = outer[-1].replace(
+                        element=method.replace(body=body.padding.replace(_statements=padded)))
+                    return cu.padding.replace(_statements=outer)
+
+            return Visitor()
+
+    RecipeSpec(recipe=Rewrite()).rewrite_run(
+        python(
+            """
+            import os
+
+
+            def listing():
+                import subprocess
+                return os.popen('ls')
+            """,
+            """
+            import os
+
+
+            def listing():
+                import subprocess
+                return subprocess.run('ls', shell=True)
             """,
         )
     )
