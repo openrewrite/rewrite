@@ -36,7 +36,7 @@ Examples:
         def visit_method_invocation(self, method, ctx):
             match = pat.match(method, self.cursor)
             if match:
-                return tmpl.apply(self.cursor, values=match)
+                return tmpl.apply(self, values=match)
             return super().visit_method_invocation(method, ctx)
 """
 

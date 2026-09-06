@@ -202,7 +202,8 @@ class AddImport(PythonVisitor):
 
     def _is_referenced(self, cu: CompilationUnit) -> bool:
         """Check if the identifier we're importing is actually used."""
-        target_name = self.alias or self.name or self.module.split('.')[-1]
+        # `import a.b.c` binds only `a`, so that is the name a use of it reads through.
+        target_name = self.alias or self.name or self.module.split('.')[0]
 
         class ReferenceChecker(PythonVisitor):
             def __init__(self):

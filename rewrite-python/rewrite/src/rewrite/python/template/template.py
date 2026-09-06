@@ -16,15 +16,17 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from rewrite.java import J
+from rewrite.python.visitor import PythonVisitor
 from .capture import Capture
 from .coordinates import PythonCoordinates
 from .engine import TemplateEngine, TemplateOptions
 
 if TYPE_CHECKING:
     from rewrite.visitor import Cursor
+    from .bindings import ContextBinding
     from .pattern import MatchResult
 
 
@@ -38,17 +40,17 @@ class Template:
     Examples:
         # Simple template
         tmpl = template("x + 1")
-        result = tmpl.apply(cursor)
+        result = tmpl.apply(self)
 
         # Template with capture from pattern match
         expr = capture('expr')
         tmpl = template(f"print({expr})")
-        result = tmpl.apply(cursor, values=match_result)
+        result = tmpl.apply(self, values=match_result)
 
-        # Template with imports
+        # Template whose context types it and is imported into the file it lands in
         tmpl = template(
             "datetime.now()",
-            imports=["from datetime import datetime"]
+            context=["from datetime import datetime"]
         )
     """
 
@@ -80,6 +82,7 @@ class Template:
             dependencies=tuple(sorted(dependencies.items())) if dependencies else (),
         )
         self._cached_tree: Optional[J] = None
+        self._context_bindings: Optional[Tuple['ContextBinding', ...]] = None
 
     @property
     def code(self) -> str:
@@ -106,9 +109,17 @@ class Template:
             )
         return self._cached_tree
 
+    def context_bindings(self) -> Tuple['ContextBinding', ...]:
+        """The modules this template's context binds, which the file it is spliced into has to
+        bind too for its code to run there."""
+        if self._context_bindings is None:
+            from .bindings import context_bindings
+            self._context_bindings = context_bindings(self._options.imports + self._options.context)
+        return self._context_bindings
+
     def apply(
         self,
-        cursor: 'Cursor',
+        cursor: Union['Cursor', PythonVisitor],
         *,
         values: Optional[Union['MatchResult', Dict[str, Any]]] = None,
         coordinates: Optional[PythonCoordinates] = None,
@@ -118,7 +129,8 @@ class Template:
         Apply this template, returning the generated AST node.
 
         Args:
-            cursor: Current position in the AST.
+            cursor: The visitor doing the edit, or its cursor. A template whose context imports
+                a module needs the visitor: the module reaches the file through it.
             values: Captured values from a pattern match, or a dict of values.
             coordinates: Where/how to insert (default: replace current).
             format: Whether the result is fitted to where it lands. Pass False to assemble
@@ -130,16 +142,38 @@ class Template:
 
         Examples:
             # Simple application
-            result = tmpl.apply(cursor)
+            result = tmpl.apply(self)
 
             # With values from pattern match
-            result = tmpl.apply(cursor, values=match)
+            result = tmpl.apply(self, values=match)
 
             # With explicit coordinates
-            result = tmpl.apply(cursor, coordinates=PythonCoordinates.after(node))
+            result = tmpl.apply(self, coordinates=PythonCoordinates.after(node))
         """
+        if isinstance(cursor, PythonVisitor):
+            visitor: Optional[PythonVisitor] = cursor
+            at: Optional['Cursor'] = cursor.cursor
+        else:
+            visitor, at = None, cursor
+
+        renames: Dict[str, str] = {}
+        if self.context_bindings():
+            if visitor is None:
+                raise ValueError(
+                    f"Template imports {', '.join(sorted({b.module for b in self.context_bindings()}))} "
+                    "in its context, so applying it has to bind those modules in the file it is "
+                    "spliced into. Pass the visitor — apply(self, ...) — rather than its cursor.")
+            from .bindings import bind_context
+            renames = bind_context(visitor, self.context_bindings())
+
         # Get the template tree
         template_tree = self.get_tree()
+
+        # A name the file already binds is the one the spliced code has to use, and renaming ahead
+        # of substitution keeps the rename off the values, which are the target file's own code.
+        if renames:
+            from .bindings import RenameBindings
+            template_tree = RenameBindings(renames).visit(template_tree, None)
 
         # Convert MatchResult to dict if needed
         values_dict: Dict[str, Union[J, List[J]]] = {}
@@ -162,21 +196,21 @@ class Template:
         # Phase 2: parenthesize the result for the slot it replaces, mirroring JavaTemplate.doApply().
         # This must happen before coordinates are applied, because
         # apply_coordinates may wrap the expression in ExpressionStatement.
-        if result is not None and cursor is not None:
+        if result is not None and at is not None:
             from .precedence import enclosing_tree, maybe_parenthesize
-            target = cursor.value
+            target = at.value
             if isinstance(target, J):
-                result = maybe_parenthesize(enclosing_tree(cursor.parent), target.id, result)
+                result = maybe_parenthesize(enclosing_tree(at.parent), target.id, result)
 
         # Phase 3: apply coordinates (prefix preservation, statement wrapping, auto-format)
         effective_coords = coordinates
-        if effective_coords is None and cursor is not None:
-            tree = cursor.value
+        if effective_coords is None and at is not None:
+            tree = at.value
             if tree is not None:
                 effective_coords = PythonCoordinates.replace(tree)
 
         if effective_coords is not None and result is not None:
-            result = TemplateEngine.apply_coordinates(result, cursor, effective_coords, format)
+            result = TemplateEngine.apply_coordinates(result, at, effective_coords, format)
 
         return result
 
