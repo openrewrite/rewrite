@@ -269,7 +269,7 @@ def test_a_scope_binding_the_name_to_something_else_refuses():
                 """,
             )
         )
-    assert "binds 'subprocess' to something other than" in str(refusal.value.cause)
+    assert "rather than the module 'subprocess'" in str(refusal.value.cause)
 
 
 def test_a_file_binding_the_name_to_another_module_refuses():
@@ -288,7 +288,7 @@ def test_a_file_binding_the_name_to_another_module_refuses():
                 """,
             )
         )
-    assert "other than 'subprocess'" in str(refusal.value.cause)
+    assert "other than 'run' from 'subprocess'" in str(refusal.value.cause)
 
 
 def test_an_aliased_member_merges_into_the_file_s_import_of_that_module():
@@ -308,6 +308,55 @@ def test_an_aliased_member_merges_into_the_file_s_import_of_that_module():
             import os
             from subprocess import Popen, run as r
             out = r('ls')
+            """,
+        )
+    )
+
+
+def test_a_local_import_covering_the_context_is_left_to_do_the_binding():
+    """A function importing lazily binds the name where the splice lands."""
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"subprocess.run({arg}, shell=True)", context=["import subprocess"])
+
+    RecipeSpec(recipe=_recipe(pat, tmpl)).rewrite_run(
+        python(
+            """
+            import os
+
+
+            def listing():
+                import subprocess
+                return os.popen('ls')
+            """,
+            """
+            import os
+
+
+            def listing():
+                import subprocess
+                return subprocess.run('ls', shell=True)
+            """,
+        )
+    )
+
+
+def test_a_relative_context_import_stays_relative():
+    """``from . import util`` names a sibling module, never the standard library's."""
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"util.run({arg})", context=["from . import util"])
+
+    RecipeSpec(recipe=_recipe(pat, tmpl)).rewrite_run(
+        python(
+            """
+            import os
+            out = os.popen('ls')
+            """,
+            """
+            import os
+            from . import util
+            out = util.run('ls')
             """,
         )
     )

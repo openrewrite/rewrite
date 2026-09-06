@@ -21,10 +21,11 @@ from dataclasses import dataclass
 from typing import Dict, FrozenSet, Optional, Sequence, Set, Tuple
 
 from rewrite.java import J
-from rewrite.java.tree import Identifier
+from rewrite.java.tree import Block, Identifier
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
 from rewrite.python.binding_utils import Binding, ImportBindings, import_bindings, is_reference
-from rewrite.python.scope_utils import LocalBindings, scope_of
+from rewrite.python.scope_utils import scope_of
+from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.visitor import Cursor, TreeVisitor
 
@@ -76,7 +77,7 @@ def context_bindings(context: Sequence[str]) -> Tuple[ContextBinding, ...]:
 def reads_context_name(cursor: Cursor, ident: Identifier) -> bool:
     """Whether ``ident`` reads a name the context binds. A name the template binds for itself is
     its own, whatever the context calls the same spelling."""
-    return is_reference(cursor, ident) and not LocalBindings().is_bound(cursor, ident.simple_name)
+    return is_reference(cursor, ident) and _shadowing_scope(cursor, ident.simple_name) is None
 
 
 def names_read(tree: J) -> FrozenSet[str]:
@@ -102,25 +103,68 @@ def bind_context(visitor: TreeVisitor, bindings: Sequence[ContextBinding]) -> Di
     cursor = visitor.cursor
     renames: Dict[str, str] = {}
     for binding in bindings:
+        if _imported_locally(cursor, binding):
+            continue
+        _refuse_if_shadowed(cursor, binding.name, binding)
         bound = next((b.name for b in existing if b.module == binding.module
                       and b.member == binding.member and not b.guarded), None)
-        name = bound or binding.name
-        if LocalBindings().is_bound(cursor, name):
-            raise ValueError(
-                f"The scope at the splice site binds '{name}' to something other than "
-                f"'{binding.module}', so the spliced code would read that instead. No import "
-                f"reaches a shadowed name; apply the template where '{name}' is free.")
         if bound is None:
             if _taken(existing, cursor, binding):
                 raise ValueError(
-                    f"The file binds '{name}' to something other than '{binding.module}', so "
-                    f"importing the module under that name would rebind it. Import it under an "
-                    f"alias the file leaves free — context=[\"import {binding.module} as ...\"].")
+                    f"The file binds '{binding.name}' to something other than {_describe(binding)}, "
+                    f"so importing it under that name would rebind what the file already reads. "
+                    f"Import it under an alias the file leaves free — "
+                    f"context=[\"{_as_alias(binding)}\"].")
             maybe_add_import(visitor, AddImportOptions(
                 module=binding.module, name=binding.member, alias=binding.alias))
         elif bound != binding.name:
+            _refuse_if_shadowed(cursor, bound, binding)
             renames[binding.name] = bound
     return renames
+
+
+def _imported_locally(cursor: Cursor, binding: ContextBinding) -> bool:
+    """Whether a scope between the splice and the module already imports what ``binding`` names,
+    as a function importing lazily does. The name is bound where the splice lands, so the file's
+    module scope needs nothing."""
+    scope = _shadowing_scope(cursor, binding.name)
+    return scope is not None and _binds(_scope_imports(scope).for_name(binding.name), binding)
+
+
+def _refuse_if_shadowed(cursor: Cursor, name: str, binding: ContextBinding) -> None:
+    if _shadowing_scope(cursor, name) is not None:
+        raise ValueError(
+            f"A scope at the splice site binds '{name}', so the spliced code would read that "
+            f"rather than {_describe(binding)}. No import reaches a shadowed name; apply the "
+            f"template where '{name}' is free.")
+
+
+def _describe(binding: ContextBinding) -> str:
+    return (f"'{binding.member}' from '{binding.module}'" if binding.member is not None
+            else f"the module '{binding.module}'")
+
+
+def _as_alias(binding: ContextBinding) -> str:
+    return (f"from {binding.module} import {binding.member} as ..." if binding.member is not None
+            else f"import {binding.module} as ...")
+
+
+def _shadowing_scope(cursor: Cursor, name: str) -> Optional[J]:
+    """The innermost scope binding ``name`` between the splice and the module, None where the
+    module scope is what decides the name."""
+    scope = scope_of(cursor).declaring_scope(name)
+    return None if scope is None or isinstance(scope, CompilationUnit) else scope
+
+
+def _scope_imports(scope: J) -> ImportBindings:
+    """What the imports directly in ``scope``'s body bind. An import nested deeper — under a
+    ``with``, in a loop — is not reported, so the splice is refused rather than accepted."""
+    body = getattr(scope, 'body', None)
+    return import_bindings(body.statements if isinstance(body, Block) else ())
+
+
+def _binds(held: Optional[Binding], binding: ContextBinding) -> bool:
+    return held is not None and held.module == binding.module and held.member == binding.member
 
 
 def _taken(existing: ImportBindings, cursor: Cursor, binding: ContextBinding) -> bool:
