@@ -640,4 +640,32 @@ describe("change-import", () => {
         // Printing does not show a method type's module, so this is what pins the sibling's.
         expect(attribution).toEqual(["lodash-es.assign", "lodash.flatten"]);
     });
+
+    test("moving a reference typed by a large graph terminates", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new ChangeImport({
+            oldModule: "./token",
+            oldMember: "documentToken",
+            newModule: "./core-token"
+        });
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    {
+                        ...typescript(
+                            `import { documentToken } from './token';\n\nconst d = documentToken;\nconsole.log(d);\n`,
+                            `import { documentToken } from './core-token';\n\nconst d = documentToken;\nconsole.log(d);\n`),
+                        path: "main.ts"
+                    },
+                    {
+                        ...typescript(`export const documentToken: Document = document;`),
+                        path: "token.ts"
+                    },
+                    packageJson(`{"name": "test"}`)
+                )
+            );
+        }, { unsafeCleanup: true });
+    }, 30000);
 });
