@@ -17,10 +17,12 @@ package org.openrewrite.xml.internal;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
@@ -199,13 +201,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     List<Xml.Attribute> attributes = ctx.attribute().stream()
                             .map(this::visitAttribute)
                             .collect(toList());
+                    String beforeTagDelimiterPrefix = prefix(ctx.getStop());
+                    requireWellFormedAttribute(isXmlWhitespace(beforeTagDelimiterPrefix), c);
+
                     return new Xml.XmlDecl(
                             randomId(),
                             prefix,
                             Markers.EMPTY,
                             name,
                             attributes,
-                            prefix(ctx.getStop())
+                            beforeTagDelimiterPrefix
                     );
                 }
         );
@@ -249,6 +254,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             String beforeType = prefix(ctx.Name());
             String type = convert(ctx.Name(), (n, p) -> n.getText());
             List<Xml.Attribute> attributes = ctx.attribute().stream().map(this::visitAttribute).collect(toList());
+            String beforeDirectiveClose = prefix(ctx.DIRECTIVE_CLOSE());
+            requireWellFormedAttribute(isXmlWhitespace(beforeDirectiveClose), c);
 
             return new Xml.JspDirective(
                     randomId(),
@@ -257,7 +264,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     beforeType,
                     type,
                     attributes,
-                    prefix(ctx.DIRECTIVE_CLOSE())
+                    beforeDirectiveClose
             );
         });
     }
@@ -381,6 +388,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         }
                     }
 
+                    requireWellFormedAttribute(isXmlWhitespace(beforeTagDelimiterPrefix), c);
+
                     return new Xml.Tag(randomId(), prefix, markers, name, attributes,
                             content, closeTag, beforeTagDelimiterPrefix);
                 }
@@ -390,6 +399,9 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
         return convert(ctx, (c, prefix) -> {
+            requireWellFormedAttribute(isXmlWhitespace(prefix) && isSourceToken(c.Name()) &&
+                                       isSourceToken(c.EQUALS()) && isSourceToken(c.STRING()), c);
+
             Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
 
             String beforeEquals = convert(c.EQUALS(), (e, p) -> p);
@@ -403,8 +415,36 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     )
             );
 
+            requireWellFormedAttribute(isXmlWhitespace(beforeEquals) && isXmlWhitespace(value.getPrefix()), c);
+
             return new Xml.Attribute(randomId(), prefix, Markers.EMPTY, key, beforeEquals, value);
         });
+    }
+
+    /// Whether text is XML `S`, the only thing that may separate a tag's name, attributes and delimiter.
+    /// Stricter than `StringUtils.isBlank`, which accepts characters the `INSIDE`-mode lexer never skips.
+    private boolean isXmlWhitespace(String text) {
+        return StringUtils.indexOfNonWhitespace(text) == -1;
+    }
+
+    /// Whether a node is a token from the source, rather than one ANTLR error recovery
+    /// synthesized (an [ErrorNode]) or left out altogether.
+    private boolean isSourceToken(@Nullable TerminalNode node) {
+        return node != null && !(node instanceof ErrorNode);
+    }
+
+    /// Reject an attribute ANTLR only produced by recovering from malformed markup. Such a tree can still
+    /// reprint byte-for-byte — the dropped source survives in a prefix — so `requirePrintEqualsInput` misses it.
+    private void requireWellFormedAttribute(boolean wellFormed, ParserRuleContext ctx) {
+        if (!wellFormed) {
+            Token start = ctx.getStart();
+            throw new IllegalStateException(String.format(
+                    "Malformed attribute in %s at line %d, column %d. The markup here is not a well-formed " +
+                    "name=\"value\" attribute; common causes are a literal '\"' inside a double-quoted value, which " +
+                    "XML 1.0 section 2.3 does not permit (write it as &quot; or delimit the value with single " +
+                    "quotes), an unquoted value, or an HTML-style attribute written without a value.",
+                    path, start.getLine(), start.getCharPositionInLine() + 1));
+        }
     }
 
     @Override

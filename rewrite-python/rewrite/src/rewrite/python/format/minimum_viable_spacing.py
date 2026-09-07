@@ -4,7 +4,7 @@ from typing import cast, Optional
 
 from rewrite import Tree, P, Cursor, list_find
 from rewrite.java import Statement, Block, Semicolon, Unary
-from rewrite.python import PythonVisitor, ExpressionStatement
+from rewrite.python import PythonVisitor
 from rewrite.visitor import T
 
 
@@ -22,11 +22,7 @@ class MinimumViableSpacingVisitor(PythonVisitor):
             statement_index = list_find(owner.statements, tree)
             previous_statement = owner.padding.statements[statement_index - 1] if statement_index > 0 else None
             if not previous_statement or not previous_statement.markers.find_first(Semicolon):
-                new_prefix = tree.prefix.replace(whitespace='\n' + tree.prefix.whitespace)
-                if isinstance(tree, ExpressionStatement):
-                    tree = tree.replace(expression=tree.expression.replace(prefix=new_prefix))
-                else:
-                    tree = tree.replace(prefix=new_prefix)
+                tree = tree.replace(prefix=tree.prefix.replace(whitespace='\n' + tree.prefix.whitespace))
 
         return tree
 

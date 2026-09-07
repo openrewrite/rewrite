@@ -55,7 +55,11 @@ export class ParseProject {
          * If not specified, paths are relative to projectPath.
          * Use this when parsing a subdirectory but wanting paths relative to the repository root.
          */
-        private readonly relativeTo?: string
+        private readonly relativeTo?: string,
+        /**
+         * Parser options, as on the `Parse` request.
+         */
+        private readonly options?: { [key: string]: string }
     ) {}
 
     static handle(
@@ -85,7 +89,7 @@ export class ParseProject {
                     const prettierLoader = await projectParser.createPrettierLoader();
 
                     const resultItems: ParseProjectResponseItem[] = [];
-                    const ctx = new ExecutionContext();
+                    const ctx = new ExecutionContext({...request.options});
 
                     // Parse package.json files (these get NodeResolutionResult markers)
                     if (discovered.packageJsonFiles.length > 0) {

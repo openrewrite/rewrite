@@ -229,6 +229,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSendList(propertyAssignment, el => el.modifiers, el => el.id, el => this.visit(el, q));
         await q.getAndSend(propertyAssignment, el => el.name, el => this.visitRightPadded(el, q));
         await q.getAndSend(propertyAssignment, el => el.assigmentToken);
         await q.getAndSend(propertyAssignment, el => el.initializer, el => this.visit(el, q));
@@ -816,6 +817,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
+            modifiers: await q.receiveList(propertyAssignment.modifiers, el => this.visitDefined<J.Modifier>(el, q)),
             name: await q.receive(propertyAssignment.name, el => this.visitRightPadded(el, q)),
             assigmentToken: await q.receive(propertyAssignment.assigmentToken),
             initializer: await q.receive(propertyAssignment.initializer, el => this.visitDefined<Expression>(el, q))

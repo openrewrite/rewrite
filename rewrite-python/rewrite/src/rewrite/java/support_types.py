@@ -215,6 +215,14 @@ class JavaType(ABC):
             Annotation = 3
             Record = 4
 
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]:
+            return getattr(self, '_supertype', None)
+
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]:
+            return getattr(self, '_interfaces', None) or []
+
     class Unknown(FullyQualified):
         pass
 
@@ -256,6 +264,16 @@ class JavaType(ABC):
                 return t.fully_qualified_name
             return ''
 
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.supertype if t is not None else None
+
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.interfaces if t is not None else []
+
     class Annotation(FullyQualified):
         _type: JavaType.FullyQualified
         _values: Optional[List[JavaType.Annotation.ElementValue]]
@@ -274,6 +292,16 @@ class JavaType(ABC):
             if t is not None and hasattr(t, 'fully_qualified_name'):
                 return t.fully_qualified_name
             return ''
+
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.supertype if t is not None else None
+
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.interfaces if t is not None else []
 
         class ElementValue(ABC):
             """Base class for annotation element values."""
@@ -408,6 +436,12 @@ class JavaType(ABC):
         @property
         def name(self) -> str:
             return self._name
+
+        @property
+        def is_constructor(self) -> bool:
+            """The model names a construction ``<constructor>``; ``<init>`` is javac's
+            name for the same thing, which MethodMatcher accepts as an alias."""
+            return self._name in ('<constructor>', '<init>')
 
         @property
         def return_type(self) -> Optional[JavaType]:

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RecipeSpec;
@@ -761,6 +762,152 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
               class Foo {
                   void foo() {
                       List<String> one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8478")
+    @Test
+    void nestedNewReturnTypeInsideAnonymousClassArgument() {
+        // Both the anonymous class in argument position and the member following the enclosing
+        // method are load-bearing; without either one this templates cleanly.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("okhttp3.mockwebserver.MockResponse setResponseCode(int)", "mockwebserver3.MockResponse.Builder"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package okhttp3.mockwebserver;
+                  public class MockResponse {
+                      public MockResponse setResponseCode(int code) {
+                          return this;
+                      }
+                  }
+                  """,
+                """
+                  package okhttp3.mockwebserver;
+                  public class RecordedRequest {
+                  }
+                  """,
+                """
+                  package okhttp3.mockwebserver;
+                  public abstract class Dispatcher {
+                      public abstract MockResponse dispatch(RecordedRequest request);
+                  }
+                  """,
+                """
+                  package okhttp3.mockwebserver;
+                  public class MockWebServer {
+                      public void setDispatcher(Dispatcher dispatcher) {
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import okhttp3.mockwebserver.Dispatcher;
+              import okhttp3.mockwebserver.MockResponse;
+              import okhttp3.mockwebserver.MockWebServer;
+              import okhttp3.mockwebserver.RecordedRequest;
+
+              class Foo {
+                  void foo() {
+                      MockWebServer server = new MockWebServer();
+                      server.setDispatcher(new Dispatcher() {
+                          @Override
+                          public MockResponse dispatch(RecordedRequest request) {
+                              MockResponse response = new MockResponse().setResponseCode(200);
+                              return response;
+                          }
+                      });
+                  }
+
+                  void trailing() {
+                  }
+              }
+              """,
+            """
+              import okhttp3.mockwebserver.Dispatcher;
+              import okhttp3.mockwebserver.MockResponse;
+              import okhttp3.mockwebserver.MockWebServer;
+              import okhttp3.mockwebserver.RecordedRequest;
+
+              class Foo {
+                  void foo() {
+                      MockWebServer server = new MockWebServer();
+                      server.setDispatcher(new Dispatcher() {
+                          @Override
+                          public MockResponse dispatch(RecordedRequest request) {
+                              mockwebserver3.MockResponse.Builder response = new MockResponse().setResponseCode(200);
+                              return response;
+                          }
+                      });
+                  }
+
+                  void trailing() {
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("response".equals(variable.getSimpleName())) {
+                        assertThat(variable.getType()).satisfies(t ->
+                          assertThat(((JavaType.FullyQualified) t).getFullyQualifiedName())
+                            .isEqualTo("mockwebserver3.MockResponse$Builder"));
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void newReturnTypeOnATryWithResourcesVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar reader()", "java.io.LineNumberReader"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static java.io.BufferedReader reader() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+
+              import java.io.BufferedReader;
+
+              class Foo {
+                  void foo() throws Exception {
+                      try (BufferedReader one = Bar.reader()) {
+                      }
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.io.LineNumberReader;
+
+              class Foo {
+                  void foo() throws Exception {
+                      try (LineNumberReader one = Bar.reader()) {
+                      }
                   }
               }
               """

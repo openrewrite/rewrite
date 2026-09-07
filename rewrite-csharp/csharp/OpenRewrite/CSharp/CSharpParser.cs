@@ -2288,6 +2288,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            attributeLists.Add((AttributeList)Visit(attrList)!);
+        }
+
         // Parse modifiers (like 'private' for private set)
         var modifiers = new List<Modifier>();
         foreach (var mod in node.Modifiers)
@@ -2340,7 +2346,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
-            [],
+            attributeLists,
             modifiers,
             kind,
             body,
@@ -8876,6 +8882,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             while (contentEnd < targetPosition && _source[contentEnd] != '\r' && _source[contentEnd] != '\n')
                 contentEnd++;
 
+            if (!TakesPreprocessingMessage(keyword))
+            {
+                var commentStart = FindTrailingCommentStart(hashPos, contentEnd);
+                if (commentStart >= 0) contentEnd = commentStart;
+            }
+
             var directiveText = _source[hashPos..contentEnd];
             var directive = ParseDirectiveText(prefix, directiveText);
             if (directive != null)
@@ -8956,6 +8968,58 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var start = pos;
         while (pos < maxPos && char.IsLetter(_source[pos])) pos++;
         return pos > start ? _source[start..pos] : "";
+    }
+
+    private static bool TakesPreprocessingMessage(string keyword) =>
+        keyword is "region" or "error" or "warning";
+
+    private int FindTrailingCommentStart(int from, int to)
+    {
+        var comments = new List<(int Start, int End)>();
+        var i = from;
+        while (i < to)
+        {
+            var c = _source[i];
+            if (c == '"')
+            {
+                i++;
+                while (i < to && _source[i] != '"')
+                    i += _source[i] == '\\' ? 2 : 1;
+                i++;
+            }
+            else if (c == '/' && i + 1 < to && _source[i + 1] == '/')
+            {
+                comments.Add((i, to));
+                break;
+            }
+            else if (c == '/' && i + 1 < to && _source[i + 1] == '*')
+            {
+                var start = i;
+                i += 2;
+                while (i + 1 < to && !(_source[i] == '*' && _source[i + 1] == '/')) i++;
+                i = Math.Min(i + 2, to);
+                comments.Add((start, i));
+            }
+            else
+            {
+                i++;
+            }
+        }
+
+        var split = to;
+        while (true)
+        {
+            var scan = split;
+            while (scan > from && (_source[scan - 1] == ' ' || _source[scan - 1] == '\t')) scan--;
+            var index = comments.FindLastIndex(x => x.End == scan);
+            if (index < 0) break;
+            split = comments[index].Start;
+        }
+
+        if (split == to) return -1;
+
+        while (split > from && (_source[split - 1] == ' ' || _source[split - 1] == '\t')) split--;
+        return split;
     }
 
     /// <summary>

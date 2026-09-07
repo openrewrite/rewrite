@@ -29,7 +29,7 @@ from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
     StatementExpression, MultiImport, KeyValue, DictLiteral, CollectionLiteral,
-    FormattedString, Pass, TrailingElseWrapper, ComprehensionExpression,
+    FormattedString, Pass, Shebang, TrailingElseWrapper, ComprehensionExpression,
     TypeAlias, YieldFrom, UnionType, VariableScope, Del, SpecialParameter,
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
@@ -129,6 +129,8 @@ class PythonRpcReceiver:
             return self._visit_formatted_string(tree, q)
         elif isinstance(tree, Pass):
             return self._visit_pass(tree, q)
+        elif isinstance(tree, Shebang):
+            return self._visit_shebang(tree, q)
         elif isinstance(tree, TrailingElseWrapper):
             return self._visit_trailing_else_wrapper(tree, q)
         elif isinstance(tree, ComprehensionExpression.Condition):
@@ -297,6 +299,10 @@ class PythonRpcReceiver:
     def _visit_pass(self, pass_: Pass, q: RpcReceiveQueue) -> Pass:
         # No additional fields beyond id/prefix/markers
         return pass_
+
+    def _visit_shebang(self, shebang: Shebang, q: RpcReceiveQueue) -> Shebang:
+        text = q.receive(shebang.text)
+        return replace_if_changed(shebang, text=text)
 
     def _visit_trailing_else_wrapper(self, tew: TrailingElseWrapper, q: RpcReceiveQueue) -> TrailingElseWrapper:
         statement = q.receive(tew.statement)

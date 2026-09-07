@@ -18,7 +18,9 @@ package org.openrewrite.golang;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.golang.internal.ModuleCache;
 import org.openrewrite.golang.marker.GoProject;
+import org.openrewrite.golang.marker.GoResolutionResult;
 import org.openrewrite.golang.tree.Go;
 import org.openrewrite.golang.tree.GoMod;
 import org.openrewrite.golang.tree.GoSum;
@@ -28,7 +30,11 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.function.Consumer;
+
+import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 public final class Assertions {
     private Assertions() {
@@ -115,13 +121,50 @@ public final class Assertions {
      * not nested inside one another. Recipes that need module-level
      * dependency information look up the sibling go.mod's
      * {@link org.openrewrite.golang.marker.GoResolutionResult}.
+     * <p>
+     * A sibling {@code go.mod} also gives the {@code .go} sources their module
+     * context, so imports of the modules it requires carry real types.
      */
     public static SourceSpecs goProject(String project, SourceSpecs... sources) {
         return goProject(project, spec -> project(spec, project), sources);
     }
 
     public static SourceSpecs goProject(String project, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
+        moduleContext(sources);
         return SourceSpecs.dir(project, spec, sources);
+    }
+
+    /**
+     * The module path and go.mod content of the sibling go.mod, onto the parser of every {@code .go} spec.
+     */
+    private static void moduleContext(SourceSpecs... sources) {
+        String goModContent = null;
+        // Iterating a nested SourceSpecs is what applies its directory prefix, and that is not
+        // idempotent, so only direct children are examined.
+        for (SourceSpecs multiSpec : sources) {
+            if (multiSpec instanceof SourceSpec) {
+                Path sourcePath = ((SourceSpec<?>) multiSpec).getSourcePath();
+                if (sourcePath != null && "go.mod".equals(sourcePath.getFileName().toString())) {
+                    goModContent = trimIndentPreserveCRLF(((SourceSpec<?>) multiSpec).getBefore());
+                    break;
+                }
+            }
+        }
+        if (goModContent == null) {
+            return;
+        }
+        GoResolutionResult resolution = GoModParser.parseMarker(goModContent, Paths.get("go.mod"));
+        if (resolution == null) {
+            return;
+        }
+        ModuleCache.download(goModContent, resolution.getRequires());
+        for (SourceSpecs multiSpec : sources) {
+            if (multiSpec instanceof SourceSpec && ((SourceSpec<?>) multiSpec).getParser() instanceof GolangParser.Builder) {
+                ((GolangParser.Builder) ((SourceSpec<?>) multiSpec).getParser())
+                        .module(resolution.getModulePath())
+                        .goMod(goModContent);
+            }
+        }
     }
 
     /**

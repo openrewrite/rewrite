@@ -14,11 +14,36 @@
 
 """Shared utility functions for Python import handling."""
 
-from typing import Optional
+import ast
+from typing import Iterator, Optional, Sequence, Tuple
 
-from rewrite.java.support_types import JavaType, JRightPadded, Space
-from rewrite.java.tree import Empty, FieldAccess, Identifier, Import
+from rewrite.java.support_types import JavaType, JRightPadded, Space, Statement
+from rewrite.java.tree import Block, Empty, FieldAccess, Identifier, If, Import
 from rewrite.markers import Markers
+from rewrite.python.markers import Quoted
+
+
+def unconditional_body(if_: If) -> Optional[Block]:
+    """The body of an `if` that only adds bindings to the enclosing scope.
+
+    None once there is an `else`: the branches are then alternative bindings of
+    the same name, and honouring one would rewrite the other's binding too.
+    """
+    then_part = if_.then_part
+    return then_part if if_.else_part is None and isinstance(then_part, Block) else None
+
+
+def module_scope_blocks(statements: Sequence[Statement]) -> Iterator[Block]:
+    """The `if` bodies whose bindings land in the module scope.
+
+    `if TYPE_CHECKING:` is where files that defer their annotations keep their
+    typing imports.
+    """
+    for stmt in statements:
+        body = unconditional_body(stmt) if isinstance(stmt, If) else None
+        if body is not None:
+            yield body
+            yield from module_scope_blocks(body.statements)
 
 
 def get_qualid_name(qualid) -> str:
@@ -59,11 +84,8 @@ def get_alias_name(imp: Import) -> Optional[str]:
 
 
 def get_canonical_fqn(imp: Import) -> Optional[str]:
-    """The canonical fully qualified name of the symbol ``imp`` binds, read off
-    the type attributed to its qualid (see
-    ``PythonTypeMapping.import_alias_type``), or None when unattributed. Differs
-    from the written path for re-exports: ``from os.path import join`` yields
-    ``posixpath.join``."""
+    """The fully qualified name of the symbol ``imp`` binds, at the module defining it,
+    read off the qualid's own type, or None when unattributed."""
     t = getattr(imp.qualid, 'type', None)
     if isinstance(t, JavaType.Method):
         declaring = t.declaring_type
@@ -78,6 +100,19 @@ def get_canonical_fqn(imp: Import) -> Optional[str]:
     if isinstance(t, JavaType.FullyQualified) and not isinstance(t, JavaType.Unknown):
         return getattr(t, 'fully_qualified_name', None) or None
     return None
+
+
+def referenced_names(ident: Identifier) -> Tuple[str, ...]:
+    """The names ``ident`` looks up. A quoted identifier is a forward reference
+    holding a whole expression, so its names come from parsing it; a string that
+    is not an expression names nothing."""
+    if ident.markers.find_first(Quoted) is None:
+        return (ident.simple_name,)
+    try:
+        reference = ast.parse(ident.simple_name.strip(), mode='eval')
+    except (SyntaxError, ValueError):
+        return ()
+    return tuple(node.id for node in ast.walk(reference) if isinstance(node, ast.Name))
 
 
 def pad_right(elem) -> JRightPadded:

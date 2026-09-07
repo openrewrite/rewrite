@@ -397,8 +397,10 @@ public class GoRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Supplies the path to the Go RPC binary. The supplier is invoked at most
-         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * Supplies the path to the Go RPC binary. The supplier is invoked once per
+         * thread that starts an RPC, since {@link RewriteRpcProcessManager} holds one
+         * RPC per thread; invocations are serialized across threads (see
+         * {@link #resolveGoBinaryPath}). Returning {@code null} uses the built-in
          * fallback discovery (same as not configuring the path at all). Exceptions
          * thrown by the supplier propagate out of the RPC-start call.
          *
@@ -456,7 +458,7 @@ public class GoRewriteRpc extends RewriteRpc {
 
         @Override
         public GoRewriteRpc get() {
-            @Nullable Path goBinaryPath = goBinaryPathSupplier.get();
+            @Nullable Path goBinaryPath = resolveGoBinaryPath(goBinaryPathSupplier);
             String binaryPath;
             if (goBinaryPath != null) {
                 binaryPath = goBinaryPath.toString();
@@ -498,6 +500,14 @@ public class GoRewriteRpc extends RewriteRpc {
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
+            }
+        }
+
+        private static final Object BINARY_PATH_LOCK = new Object();
+
+        static @Nullable Path resolveGoBinaryPath(Supplier<@Nullable Path> goBinaryPathSupplier) {
+            synchronized (BINARY_PATH_LOCK) {
+                return goBinaryPathSupplier.get();
             }
         }
     }

@@ -180,6 +180,7 @@ func (r *GoReceiver) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p
 	a.Variable = receiveValue(q, a.Variable, func(e java.Expression) any { return r.Visit(e, q) })
 	a.Operator = receiveLeftPaddedEnum(r, q, a.Operator, golang.ParseAssignmentOperator)
 	a.Assignment = receiveValue(q, a.Assignment, func(e java.Expression) any { return r.Visit(e, q) })
+	a.Type = r.receiveType(a.Type, q)
 	return a
 }
 
@@ -190,6 +191,7 @@ func (r *GoReceiver) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
 	vr.Element = receiveValue(q, vr.Element, func(e java.Expression) any { return r.Visit(e, q) })
 	vr.Dots = receiveValue(q, vr.Dots, func(s java.Space) any { return receiveSpace(s, q) })
 	vr.Postfix = receiveScalar[bool](q, vr.Postfix)
+	vr.Type = r.receiveType(vr.Type, q)
 	return vr
 }
 
@@ -229,6 +231,7 @@ func (r *GoReceiver) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
 		at.Length = coerceToExpressionRP(result)
 	}
 	at.ElementType = receiveValue(q, at.ElementType, func(e java.Expression) any { return r.Visit(e, q) })
+	at.Type = r.receiveType(at.Type, q)
 	return at
 }
 
@@ -258,6 +261,7 @@ func (r *GoReceiver) VisitMapType(mt *golang.MapType, p any) java.J {
 		mt.Key = coerceToExpressionRP(result)
 	}
 	mt.Value = receiveValue(q, mt.Value, func(e java.Expression) any { return r.Visit(e, q) })
+	mt.Type = r.receiveType(mt.Type, q)
 	return mt
 }
 
@@ -294,6 +298,7 @@ func (r *GoReceiver) VisitPointerType(pt *golang.PointerType, p any) java.J {
 	c := *pt
 	pt = &c
 	pt.Elem = receiveValue(q, pt.Elem, func(e java.Expression) any { return r.Visit(e, q) })
+	pt.Type = r.receiveType(pt.Type, q)
 	return pt
 }
 
@@ -311,6 +316,7 @@ func (r *GoReceiver) VisitChannel(ch *golang.Channel, p any) java.J {
 		ch.Dir = golang.ChanRecvOnly
 	}
 	ch.Value = receiveValue(q, ch.Value, func(e java.Expression) any { return r.Visit(e, q) })
+	ch.Type = r.receiveType(ch.Type, q)
 	return ch
 }
 
@@ -320,6 +326,7 @@ func (r *GoReceiver) VisitFuncType(ft *golang.FuncType, p any) java.J {
 	ft = &c
 	ft.Parameters = receiveContainer[java.Statement](r, q, ft.Parameters)
 	ft.ReturnType = receiveValue(q, ft.ReturnType, func(e java.Expression) any { return r.Visit(e, q) })
+	ft.Type = r.receiveType(ft.Type, q)
 	return ft
 }
 
@@ -328,6 +335,7 @@ func (r *GoReceiver) VisitStructType(st *golang.StructType, p any) java.J {
 	c := *st // shallow copy to avoid mutating remoteObjects baseline
 	st = &c
 	st.Body = receiveValue(q, st.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	st.Type = r.receiveType(st.Type, q)
 	return st
 }
 
@@ -336,6 +344,7 @@ func (r *GoReceiver) VisitInterfaceType(it *golang.InterfaceType, p any) java.J 
 	c := *it // shallow copy to avoid mutating remoteObjects baseline
 	it = &c
 	it.Body = receiveValue(q, it.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	it.Type = r.receiveType(it.Type, q)
 	return it
 }
 
@@ -344,6 +353,7 @@ func (r *GoReceiver) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	c := *tl // shallow copy to avoid mutating remoteObjects baseline
 	tl = &c
 	tl.Types = receiveContainer[java.Statement](r, q, tl.Types)
+	tl.Type = r.receiveType(tl.Type, q)
 	return tl
 }
 
@@ -356,6 +366,7 @@ func (r *GoReceiver) VisitUnion(u *golang.Union, p any) java.J {
 		coerceToExpressionRP); after != nil {
 		u.Types = after
 	}
+	u.Type = r.receiveType(u.Type, q)
 	return u
 }
 
@@ -497,5 +508,6 @@ func (r *GoReceiver) VisitIndexList(il *golang.IndexList, p any) java.J {
 	il = &c
 	il.Target = receiveValue(q, il.Target, func(e java.Expression) any { return r.Visit(e, q) })
 	il.Indices = receiveContainer[java.Expression](r, q, il.Indices)
+	il.Type = r.receiveType(il.Type, q)
 	return il
 }

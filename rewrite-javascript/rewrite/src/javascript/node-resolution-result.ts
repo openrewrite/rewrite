@@ -60,13 +60,65 @@ export interface PackageLockEntry {
 }
 
 /**
- * Parsed package-lock.json content structure (npm lockfile v3 format).
+ * Entry in a legacy npm lockfileVersion 1 `dependencies` tree (npm 5/6), with its
+ * requirements under `requires` and nested conflicting versions under `dependencies`.
+ */
+export interface LockfileV1Entry {
+    readonly version?: string;
+    readonly resolved?: string;
+    readonly integrity?: string;
+    readonly license?: string | string[] | { type?: string; url?: string };
+    readonly engines?: Record<string, string> | string[];
+    readonly requires?: Record<string, string>;
+    readonly dependencies?: Record<string, LockfileV1Entry>;
+}
+
+/**
+ * Parsed package-lock.json content structure. The `packages` map is the modern
+ * (lockfileVersion 2/3) shape; `dependencies` is the legacy lockfileVersion 1 tree.
  */
 export interface PackageLockContent {
     readonly name?: string;
     readonly version?: string;
     readonly lockfileVersion?: number;
     readonly packages?: Record<string, PackageLockEntry>;
+    readonly dependencies?: Record<string, LockfileV1Entry>;
+}
+
+/**
+ * Converts a legacy npm lockfileVersion 1 `dependencies` tree into the modern
+ * `packages` map keyed by node_modules path, so the resolver can walk transitive
+ * dependencies the same way it does for lockfileVersion 2/3 files. Returns
+ * undefined when the tree is absent or empty.
+ */
+function convertV1DependencyTree(
+    tree: Record<string, LockfileV1Entry> | undefined
+): Record<string, PackageLockEntry> | undefined {
+    if (!tree || Object.keys(tree).length === 0) {
+        return undefined;
+    }
+    const packages: Record<string, PackageLockEntry> = {};
+
+    function walk(deps: Record<string, LockfileV1Entry>, pathPrefix: string): void {
+        for (const [name, entry] of Object.entries(deps)) {
+            const pkgPath = `${pathPrefix}node_modules/${name}`;
+            packages[pkgPath] = {
+                version: entry.version,
+                resolved: entry.resolved,
+                integrity: entry.integrity,
+                license: entry.license,
+                engines: entry.engines,
+                // v1 folds all declared deps into `requires`; the resolver reads `dependencies`.
+                dependencies: entry.requires,
+            };
+            if (entry.dependencies) {
+                walk(entry.dependencies, `${pkgPath}/`);
+            }
+        }
+    }
+
+    walk(tree, "");
+    return packages;
 }
 
 /**
@@ -524,9 +576,12 @@ export function createNodeResolutionResultMarker(
     function parseResolutions(
         lockContent: PackageLockContent
     ): ResolvedDependency[] {
-        if (!lockContent.packages) return [];
-
-        const packages = lockContent.packages;
+        // Prefer the modern `packages` map; fall back to converting a legacy
+        // lockfileVersion 1 `dependencies` tree when no `packages` map is present.
+        const packages = lockContent.packages && Object.keys(lockContent.packages).length > 0
+            ? lockContent.packages
+            : convertV1DependencyTree(lockContent.dependencies);
+        if (!packages) return [];
 
         // First pass: Create all ResolvedDependency placeholders and build path map
         const packageInfos: Array<{ path: string; name: string; version: string; entry: PackageLockEntry }> = [];

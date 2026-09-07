@@ -21,6 +21,7 @@ from dataclasses import dataclass, fields, is_dataclass
 from typing import (
     Any,
     Callable,
+    Dict,
     List,
     Optional,
     TYPE_CHECKING,
@@ -121,8 +122,21 @@ class RecipeDescriptor:
                     value = getattr(recipe, f.name)
                     options.append((f.name, value, descriptor))
 
-        # Extract data table descriptors
-        data_tables = [dt.descriptor() for dt in recipe.data_tables]
+        recipe_list = [cls.from_recipe(r) for r in recipe.recipe_list()]
+
+        # A recipe reports the union of the data tables it owns and every table its
+        # children produce, so consumers that read only the top-level descriptor --
+        # the marketplace listing and everything derived from it -- can resolve a
+        # composite's tables. Mirrors Java's Recipe#aggregateDataTableDescriptors.
+        # Sub-descriptors are built the same way, so the union is recursive; the
+        # recipe's own tables come first and the first descriptor for a given name
+        # wins.
+        data_tables: Dict[str, dict] = {}
+        for data_table in recipe.data_tables:
+            data_tables.setdefault(data_table.name, data_table.descriptor())
+        for sub_recipe in recipe_list:
+            for descriptor in sub_recipe.data_tables:
+                data_tables.setdefault(descriptor["name"], descriptor)
 
         return cls(
             name=recipe.name,
@@ -131,8 +145,8 @@ class RecipeDescriptor:
             tags=recipe.tags,
             estimated_effort_per_occurrence=recipe.estimated_effort_per_occurrence,
             options=options,
-            data_tables=data_tables,
-            recipe_list=[cls.from_recipe(r) for r in recipe.recipe_list()],
+            data_tables=list(data_tables.values()),
+            recipe_list=recipe_list,
         )
 
 

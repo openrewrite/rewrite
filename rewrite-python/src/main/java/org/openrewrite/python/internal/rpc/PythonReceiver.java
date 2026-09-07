@@ -83,6 +83,12 @@ public class PythonReceiver extends PythonVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitShebang(Py.Shebang shebang, RpcReceiveQueue q) {
+        return shebang
+                .withText(q.receive(shebang.getText()));
+    }
+
+    @Override
     public J visitAwait(Py.Await await, RpcReceiveQueue q) {
         return await
                 .withExpression(q.receive(await.getExpression(), expr -> (Expression) visitNonNull(expr, q)))

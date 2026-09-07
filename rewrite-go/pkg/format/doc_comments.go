@@ -136,13 +136,10 @@ func canonicalDocComment(run []java.Comment) ([]java.Comment, bool) {
 	var prose strings.Builder
 	var directives []java.Comment
 	for _, c := range run {
-		if c.Kind != java.LineComment {
+		if c.Multiline {
 			return nil, false
 		}
-		body, found := strings.CutPrefix(c.Text, "//")
-		if !found {
-			return nil, false
-		}
+		body := c.Text
 		if isDirective(body) {
 			directives = append(directives, c)
 			continue
@@ -164,16 +161,16 @@ func canonicalDocComment(run []java.Comment) ([]java.Comment, bool) {
 		line, text, _ = strings.Cut(text, "\n")
 		switch {
 		case line == "":
-			line = "//"
+			line = ""
 		case strings.HasPrefix(line, "\t"):
-			line = "//" + line
+			// code-indented line keeps its tab; the delimiter is added on print
 		default:
-			line = "// " + line
+			line = " " + line
 		}
 		out = append(out, docLine(run[0], line))
 	}
 	if len(directives) > 0 {
-		out = append(out, docLine(run[0], "//"))
+		out = append(out, docLine(run[0], ""))
 		out = append(out, directives...)
 	}
 	if len(out) == 0 {

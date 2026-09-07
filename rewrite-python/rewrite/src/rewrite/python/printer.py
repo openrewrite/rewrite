@@ -216,6 +216,8 @@ class PythonPrinter:
             return self.visit_named_argument(tree, p)
         elif isinstance(tree, py.Pass):
             return self.visit_pass(tree, p)
+        elif isinstance(tree, py.Shebang):
+            return self.visit_shebang(tree, p)
         elif isinstance(tree, py.Slice):
             return self.visit_slice(tree, p)
         elif isinstance(tree, py.SpecialParameter):
@@ -405,6 +407,13 @@ class PythonPrinter:
         p.append("async")
         self.visit(async_.statement, p)
         return async_
+
+    def visit_shebang(self, shebang: 'py.Shebang', p: PrintOutputCapture) -> J:
+        """Visit a shebang line."""
+        self._before_syntax(shebang, p)
+        p.append(shebang.text)
+        self._after_syntax(shebang, p)
+        return shebang
 
     def visit_await(self, await_: 'py.Await', p: PrintOutputCapture) -> J:
         """Visit an await expression."""

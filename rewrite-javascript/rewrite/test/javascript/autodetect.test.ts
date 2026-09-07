@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Autodetect, StyleKind, TabsAndIndentsStyle, SpacesStyle, WrappingAndBracesStyle, JavaScriptParser} from "../../src/javascript";
+import {Autodetect, StyleKind, TabsAndIndentsStyle, SpacesStyle, WrappingAndBracesStyle, JavaScriptParser, sourceFileCache} from "../../src/javascript";
 import {dedent} from "../../src/test";
 
 describe('Autodetect', () => {
-    const parser = new JavaScriptParser();
+    const parser = new JavaScriptParser({sourceFileCache});
 
     async function parseAndDetect(...sources: string[]): Promise<Autodetect> {
         const detector = Autodetect.detector();

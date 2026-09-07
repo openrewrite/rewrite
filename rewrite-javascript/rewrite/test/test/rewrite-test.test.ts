@@ -120,4 +120,23 @@ describe("rewrite test", () => {
             await sut.rewriteRun(text("hello"));
         });
     });
+
+    test("a spec returns to its suite configuration between tests", () => {
+        // Independent of whether the harness already switched tracking on
+        RecipeSpec.trackSuiteConfiguration();
+
+        const sut = new RecipeSpec();
+        const suiteRecipe = sut.recipe;
+        sut.allowEmptyDiff = true;
+        RecipeSpec.captureSuiteConfiguration();
+
+        sut.recipe = new ChangeText({text: "a test's own recipe"});
+        sut.allowEmptyDiff = false;
+        sut.checkParsePrintIdempotence = false;
+        RecipeSpec.restoreSuiteConfiguration();
+
+        expect(sut.recipe).toBe(suiteRecipe);
+        expect(sut.allowEmptyDiff).toBe(true);
+        expect(sut.checkParsePrintIdempotence).toBe(true);
+    });
 });

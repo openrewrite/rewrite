@@ -351,8 +351,9 @@ export function hasFlowAnnotation(sourceFile: ts.SourceFile) {
 }
 
 export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile) {
-    const diagnostics = ts.getPreEmitDiagnostics(program, sourceFile);
-    // checking Parsing and Syntax Errors
+    // Only parse diagnostics decide whether a file gets an LST, so the visitor has to map every slot the
+    // parser fills — including ones the checker would reject — or the file loses text on print.
+    const diagnostics = program.getSyntacticDiagnostics(sourceFile);
     let syntaxErrors : [errorMsg: string, errorCode: number][] = [];
     if (diagnostics.length > 0) {
         const errors = diagnostics.filter(d =>  (d.category === ts.DiagnosticCategory.Error) && isCriticalDiagnostic(d.code, sourceFile));
@@ -373,18 +374,11 @@ export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile
     return syntaxErrors;
 }
 
-const additionalCriticalCodes = new Set([
-    // Syntax errors
-    17019, // "'{0}' at the end of a type is not valid TypeScript syntax. Did you mean to write '{1}'?"
-    17020, // "'{0}' at the start of a type is not valid TypeScript syntax. Did you mean to write '{1}'?"
-
-    // Other critical errors
-]);
-
 // errors code description available at https://github.com/microsoft/TypeScript/blob/main/src/compiler/diagnosticMessages.json
 const excludedCodes = new Set([
     1039, // Initializers are not allowed in ambient contexts.
     1064, // The return type of an async function or method must be the global Promise<T> type. Did you mean to write 'Promise<{0}>'?
+    1101, // 'with' statements are not allowed in strict mode.
     1107, // Jump target cannot cross function boundary.
     1111, // Private field '{0}' must be declared in an enclosing class.
     1117, // An object literal cannot have multiple properties with the same name.
@@ -394,6 +388,7 @@ const excludedCodes = new Set([
     1183, // An implementation cannot be declared in ambient contexts.
     1203, // Export assignment cannot be used when targeting ECMAScript modules. Consider using 'export default' or another module format instead.
     1207, // Decorators cannot be applied to multiple get/set accessors of the same name.
+    1212, // Identifier expected. '{0}' is a reserved word in strict mode. The node is still parsed as an identifier.
     1215, // Invalid use of '{0}'. Modules are automatically in strict mode.
     1238, // Unable to resolve signature of class decorator when called as an expression.
     1239, // Unable to resolve signature of parameter decorator when called as an expression.
@@ -422,6 +417,7 @@ const excludedCodes = new Set([
     1375, // 'await' expressions are only allowed at the top level of a file when that file is a module, but this file has no imports or exports. Consider adding an empty 'export {}' to make this file a module.
     1378, // Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', 'nodenext', or 'preserve', and the 'target' option is set to 'es2017' or higher.
     1432, // Top-level 'for await' loops are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', 'node18', 'node20', 'nodenext', or 'preserve', and the 'target' option is set to 'es2017' or higher.
+    1540, // A 'namespace' declaration should not be declared using the 'module' keyword. The `module` spelling yields a ModuleDeclaration.
 ]);
 
 // Errors to exclude only for JavaScript files (.js, .jsx, .mjs, .cjs)
@@ -444,7 +440,7 @@ function isCriticalDiagnostic(code: number, sourceFile: ts.SourceFile): boolean 
         }
     }
 
-    return (code > 1000 && code < 2000 && !excludedCodes.has(code)) || additionalCriticalCodes.has(code);
+    return code > 1000 && code < 2000 && !excludedCodes.has(code);
 }
 
 export function isValidSurrogateRange(unicodeString: string): boolean {

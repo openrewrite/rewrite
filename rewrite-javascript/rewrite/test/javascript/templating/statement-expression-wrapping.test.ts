@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from '../../../src/javascript';
+import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
 import {fromVisitor, RecipeSpec} from '../../../src/test';
@@ -22,7 +22,7 @@ describe('Statement Expression Wrapping', () => {
     let parser: JavaScriptParser;
 
     beforeAll(() => {
-        parser = new JavaScriptParser();
+        parser = new JavaScriptParser({sourceFileCache});
     });
 
     it('should wrap function declaration in StatementExpression when replacing an expression', async () => {
