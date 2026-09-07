@@ -735,7 +735,35 @@ const x = 1;`
         await prettier.rewriteRun(typescript(before, after));
     });
 
+    test('autoFormat tolerates a property assignment whose modifiers list is absent', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new DropModifiersAndFormat());
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const x = new Foo({a: 1, b: 2});\nconst b = ! true;`,
+                `const x = new Foo({a: 1, b: 2});\nconst b = !true;`,
+            )
+            // @formatter:on
+        );
+    });
+
 });
+
+class DropModifiersAndFormat extends JavaScriptVisitor<ExecutionContext> {
+    protected override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
+        const edited = await super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
+        return autoFormat(edited, ctx);
+    }
+
+    protected override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, ctx: ExecutionContext): Promise<J | undefined> {
+        const visited = await super.visitPropertyAssignment(propertyAssignment, ctx) as JS.PropertyAssignment;
+        return produce(visited, draft => {
+            (draft as { modifiers?: J.Modifier[] }).modifiers = undefined;
+        });
+    }
+}
 
 /** The edit `eslint-plugin-import-x`'s `consistent-type-specifier-style` makes, plus a layout pass. */
 class HoistInlineTypeAndFormat extends JavaScriptVisitor<ExecutionContext> {

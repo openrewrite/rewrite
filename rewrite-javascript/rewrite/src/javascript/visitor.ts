@@ -551,7 +551,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         const updates: any = {
             prefix: await this.visitSpace(propertyAssignment.prefix, p),
             markers: await this.visitMarkers(propertyAssignment.markers, p),
-            modifiers: await mapAsync(propertyAssignment.modifiers, m => this.visitDefined<J.Modifier>(m, p)),
+            modifiers: await mapAsync(propertyAssignment.modifiers ?? [], m => this.visitDefined<J.Modifier>(m, p)),
             name: await this.visitRightPadded(propertyAssignment.name, p),
             initializer: propertyAssignment.initializer && await this.visitDefined<Expression>(propertyAssignment.initializer, p)
         };
