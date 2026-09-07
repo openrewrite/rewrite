@@ -35,7 +35,7 @@ export type {Scope} from "./scope";
 // `cursorOf` is deliberately absent: a visitor of one's own reaches `this.cursor` directly, and
 // the free functions that have no visitor to reach it through are already in this list.
 export {
-    scopeOf, namesDeclaredIn, namesDeclaredWithin, namesUsedIn, bindingNames, deconflict,
+    scopeOf, namesDeclaredIn, namesDeclaredWithin, namesUsedIn, namesReferencedWithin, bindingNames, deconflict,
     isValueReference, declarationsOf, compilationUnitOf, walk
 } from "./scope";
 export type {QuoteChar, AddImportOptions} from "./add-import";

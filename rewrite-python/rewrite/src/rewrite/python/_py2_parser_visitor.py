@@ -2763,7 +2763,7 @@ class Py2ParserVisitor:
                 random_id(), Space.EMPTY, Markers.EMPTY,
                 name_ident,
                 JLeftPadded(self._parse_space(children[1].prefix), value, Markers.EMPTY),
-                None,
+                getattr(value, 'type', None),
             )
         # Generator-expression argument: ``test (sync_)comp_for ...``.
         if (len(children) >= 2 and

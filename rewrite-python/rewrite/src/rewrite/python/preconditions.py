@@ -64,13 +64,23 @@ def uses_method(method_pattern: str, match_overrides: bool = False) -> RecipeRef
         uses_method("*..* tostring(..)")
         uses_method("java.util.Collections emptyList()")
 
+    ``match_overrides`` widens the receiver to its subtypes.
+
+    ``match_unknown_types`` is deliberately absent: ``HasMethod`` gates on the
+    file's used ``JavaType.Method`` set, with no call site to match structurally,
+    so the host would reject files the flag admits. Gate on it by passing
+    ``UsesMethod(pattern, match_unknown_types=True)`` to ``Preconditions.check``.
+
+    For a pattern that does not fire, ``REWRITE_PYTHON_DUMP_TYPES=1`` prints the
+    declaring type each call got during the test run.
+
     Bundles a native :class:`UsesMethod` visitor so unit tests without
     an active RPC connection still see real filtering behavior.
     """
     return RecipeRef(
         "org.openrewrite.java.search.HasMethod",
         {"methodPattern": method_pattern, "matchOverrides": match_overrides},
-        UsesMethod(method_pattern),
+        UsesMethod(method_pattern, match_overrides),
     )
 
 
@@ -125,7 +135,7 @@ def find_methods(
     return RecipeRef(
         "org.openrewrite.java.search.FindMethods",
         {"methodPattern": method_pattern, "matchOverrides": match_overrides},
-        UsesMethod(method_pattern),
+        UsesMethod(method_pattern, match_overrides),
     )
 
 

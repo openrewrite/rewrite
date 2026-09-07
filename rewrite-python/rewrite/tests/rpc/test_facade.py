@@ -301,12 +301,15 @@ def test_hub_release_rolls_each_childs_ref_table_back_in_lockstep():
 
     server._hub_tree["T"] = object()
     server._hub_served[("A", "T")] = object()
-    # child A had 2 refs before this file, then the file introduced refs 3 and 4
+    # child A had 2 refs in each direction before this file, then the file introduced 3 and 4
     refs = server._hub_send_refs["A"] = ReferenceMap()
     survivors = [object(), object()]
     for obj in survivors + [object(), object()]:
         refs.create(obj)
     server._hub_send_checkpoint[("A", "T")] = 2
+    recv = server._hub_recv_refs["A"] = {i: object() for i in range(1, 5)}
+    kept = {i: recv[i] for i in (1, 2)}
+    server._hub_recv_checkpoint[("A", "T")] = 2
 
     server._hub_release("T")
 
@@ -314,9 +317,11 @@ def test_hub_release_rolls_each_childs_ref_table_back_in_lockstep():
     assert [refs.get(obj) for obj in survivors] == [1, 2]
     assert len(refs) == 2
     assert refs.snapshot() == 2                     # counter rewound so the next file re-ADDs
+    assert recv == kept
     assert "T" not in server._hub_tree
     assert ("A", "T") not in server._hub_served
     assert ("A", "T") not in server._hub_send_checkpoint
+    assert ("A", "T") not in server._hub_recv_checkpoint
 
 
 class _PreconditionChildren(_FakeChildren):
@@ -407,8 +412,9 @@ def _print_python(cu) -> str:
 
 def _isolated_hub(monkeypatch, server):
     """Fresh hub state so this test neither sees nor leaves module-global tables."""
-    for name in ("_hub_tree", "_hub_served", "_hub_send_refs",
-                 "_hub_send_checkpoint", "local_objects"):
+    for name in ("_hub_tree", "_hub_served", "_hub_send_refs", "_hub_recv_refs",
+                 "_hub_send_checkpoint", "_hub_recv_checkpoint", "local_objects",
+                 "_ref_checkpoints", "_local_ref_checkpoints"):
         monkeypatch.setattr(server, name, {})
 
 
@@ -469,11 +475,11 @@ def test_local_visit_advances_the_hub_tree_and_the_next_serve_carries_it_to_the_
 
 
 def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monkeypatch):
-    """A built-in visitor may delete the file outright. The facade has to let go of it the same way
-    a broadcast Evict would: drop the tree, forget what each child was served, and rewind that
-    child's send-ref numbering — otherwise the next file reuses ref numbers the child no longer
-    holds. Nothing after the delete may run, and the child must be told DELETE, not served a
-    resurrected tree."""
+    """A built-in visitor may delete the file outright. The facade drops the tree and forgets what
+    each child was served, but leaves ref numbering alone: no Evict was broadcast, so each child
+    still holds this file's refs and rewinding ours would strand the ones it goes on to cite.
+    Nothing after the delete may run, and the child must be told DELETE, not served a resurrected
+    tree."""
     import rewrite.rpc.server as server
     from rewrite.python.visitor import PythonVisitor
 
@@ -509,12 +515,11 @@ def test_a_built_in_visitor_that_deletes_the_file_releases_it_from_the_hub(monke
                         "hasNewMessages": False, "searchResultIds": []}]
     assert ran_after == []
 
-    # The facade no longer owns the file, and every per-child table it seeded is rolled back.
+    # The facade no longer owns the file, while the child's ref numbering stands until its Evict.
     assert tree_id not in server._hub_tree
     assert (bundle, tree_id) not in server._hub_served
-    assert (bundle, tree_id) not in server._hub_send_checkpoint
-    assert len(server._hub_send_refs[bundle]) == 0
-    assert server._hub_send_refs[bundle].snapshot() == 0
+    assert (bundle, tree_id) in server._hub_send_checkpoint
+    assert server._hub_send_refs[bundle].snapshot() > 0
 
     # So a child asking for it again is told the file is gone rather than served a stale tree.
     assert server._hub_serve_child(bundle, tree_id, sft) == [
@@ -528,3 +533,251 @@ def test_an_unknown_visitor_is_still_an_error():
         assert False, "expected a ValueError for a visitor no child owns"
     except ValueError as e:
         assert "No child owns visitor" in str(e)
+
+
+class _RefUsingChild:
+    """A child bundle as a real RPC peer: one persistent send ref map toward the hub, so the second
+    edit that reuses a type the first edit already sent cites it as a bare ref."""
+
+    def __init__(self, edits):
+        from rewrite.rpc.reference import ReferenceMap
+        self._edits = edits                 # obj_id -> the tree this child's visitors produced
+        self.refs = ReferenceMap()
+
+    def request(self, bundle, method, params):
+        import rewrite.rpc.server as server
+        from rewrite.rpc.send_queue import RpcSendQueue
+
+        obj_id = params["id"]
+        before = server._hub_served[(bundle, obj_id)]
+        return RpcSendQueue(params["sourceFileType"], self.refs).generate(self._edits[obj_id], before)
+
+
+def test_the_hub_resolves_a_back_reference_a_childs_earlier_edit_assigned(monkeypatch):
+    import rewrite.rpc.server as server
+
+    sft, bundle = "org.openrewrite.python.tree.Py$CompilationUnit", "pkg"
+    # Both edits add a statement whose literal carries the same primitive type, which is what the
+    # child sends once and cites thereafter.
+    files = {_parse_python("x = 1\n"): _parse_python("x = 1\ny = 2\n"),
+             _parse_python("q = 3\n"): _parse_python("q = 3\nr = 4\n")}
+    trees = {str(before.id): before for before in files}
+    edits = {str(before.id): after for before, after in files.items()}
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: trees.get(obj_id))
+
+    children = _RefUsingChild(edits)
+    for tree_id in trees:
+        server._hub_acquire(tree_id, sft)
+        server._hub_serve_child(bundle, tree_id, sft)
+        server._hub_pull_child_edit(children, bundle, tree_id, sft)
+
+    assert [_print_python(server._hub_tree[tree_id]) for tree_id in trees] == [
+        "x = 1\ny = 2\n", "q = 3\nr = 4\n"]
+
+
+def test_facade_visit_checkpoints_its_own_ref_tables_so_evict_rolls_them_back(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    class _RefGrowingFacade:
+        def get_marketplace(self, params): ...
+        def install_recipes(self, params): ...
+        def prepare_recipe(self, params): ...
+        def set_data_table_store(self, params): ...
+        def batch_visit(self, params): ...
+        def generate(self, params): ...
+
+        def evict(self, params):
+            return True
+
+        def visit(self, params):
+            server.local_refs.create(object())  # what handle_get_object's response assigns
+            return {"modified": True}
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", _RefGrowingFacade())
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "local_refs", ReferenceMap())
+    monkeypatch.setattr(server, "remote_refs", {})
+
+    # an earlier file's refs, which this file's eviction must leave alone
+    kept = object()
+    server.local_refs.create(kept)
+    server.remote_refs[1] = object()
+
+    def _fake_get_object_from_java(obj_id, source_file_type):
+        server.remote_refs[2] = object()  # the tree Java sends for this file
+        return object()
+
+    monkeypatch.setattr(server, "get_object_from_java", _fake_get_object_from_java)
+
+    server.handle_request("Visit", {"treeId": "T", "sourceFileType": "py", "visitor": "edit:1"})
+    server.handle_request("Evict", {"id": "T"})
+
+    assert server.local_refs.get(kept) == 1
+    assert server.local_refs.snapshot() == 1
+    assert sorted(server.remote_refs) == [1]
+
+
+def test_reset_clears_the_hub_tables_too(monkeypatch):
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    _isolated_hub(monkeypatch, server)
+    tree = object()
+    server._hub_tree["T"] = tree
+    server._hub_served[("A", "T")] = tree
+    server._hub_send_refs["A"] = ReferenceMap()
+    server._hub_send_refs["A"].create(object())
+    server._hub_recv_refs["A"] = {1: object()}
+    server._hub_send_checkpoint[("A", "T")] = 0
+    server._hub_recv_checkpoint[("A", "T")] = -1
+
+    server.handle_reset({})
+
+    assert not server._hub_tree
+    assert not server._hub_served
+    assert not server._hub_send_refs
+    assert not server._hub_recv_refs
+    assert not server._hub_send_checkpoint
+    assert not server._hub_recv_checkpoint
+
+
+def test_reset_reaches_the_children(monkeypatch, tmp_path):
+    import rewrite.rpc.server as server
+
+    broadcast = []
+
+    class _FakeChildren(_EditingChildren):
+        def broadcast_reset(self, params):
+            broadcast.append(params)
+
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path)  # facade mode on
+    monkeypatch.setattr(server, "_child_bundle", None)
+    monkeypatch.setattr(server, "_facade", Facade(_FakeChildren()))
+    _isolated_hub(monkeypatch, server)
+
+    assert server.handle_request("Reset", {}) is True
+
+    # The hub's per-bundle ref maps and the child's own are two ends of one table: dropping only
+    # the hub's would leave the child citing ids the hub can no longer resolve.
+    assert broadcast == [{}]
+
+
+def test_reset_drops_a_half_drained_dependency_types_page(monkeypatch):
+    import rewrite.rpc.server as server
+
+    monkeypatch.setattr(server, "_dependency_types_pending", {("attrs", "23.1", (3, 12)): [{"a": 1}]})
+    # In-flight call bookkeeping is owned by send_request's finally, and Reset is served from
+    # inside that machinery, so clearing it here would strand an outer frame's response.
+    monkeypatch.setattr(server, "_awaiting_ids", {7})
+    monkeypatch.setattr(server, "_pending_responses", {7: {"id": 7}})
+
+    server.handle_reset({})
+
+    assert not server._dependency_types_pending
+    assert server._awaiting_ids == {7}
+    assert server._pending_responses == {7: {"id": 7}}
+
+
+def test_a_childs_delete_is_forgotten_without_disturbing_ref_numbering(monkeypatch):
+    """A child that deletes the file answers the pull with DELETE. The facade has to let go of the
+    tree — otherwise it serves the next bundle a file that no longer exists — but must leave both
+    ref maps alone: no Evict has been broadcast, so the child still holds this file's refs."""
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    class _DeletingChild:
+        def request(self, bundle, method, params):
+            return [{"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+
+    tree_id, sft, bundle = "T", "py", "pkg"
+    _isolated_hub(monkeypatch, server)
+    server._hub_tree[tree_id] = object()
+    server._hub_served[(bundle, tree_id)] = object()
+    server.local_objects[tree_id] = object()
+    refs = server._hub_send_refs[bundle] = ReferenceMap()
+    refs.create(object())
+    server._hub_recv_refs[bundle] = {1: object()}
+
+    server._hub_pull_child_edit(_DeletingChild(), bundle, tree_id, sft)
+
+    assert tree_id not in server._hub_tree
+    assert (bundle, tree_id) not in server._hub_served
+    assert tree_id not in server.local_objects          # so GetObject answers DELETE
+    # The child was told nothing, so its refs and ours still agree.
+    assert len(refs) == 1 and server._hub_recv_refs[bundle] == {1: server._hub_recv_refs[bundle][1]}
+
+
+def test_a_batch_stops_after_a_child_deletes_the_file():
+    """Once a bundle deletes the file there is nothing left for a later bundle to visit, and
+    _hub_serve_child would answer it DELETE anyway."""
+    ran = []
+
+    class _DeletingChildren(_FakeChildren):
+        def request(self, bundle, method, params):
+            if method == "BatchVisit":
+                vs = [v["visitor"] for v in params.get("visitors", [])]
+                ran.append((bundle, vs))
+                deleted = any(v.startswith("del:") for v in vs)
+                return {"results": [{"visitor": v, "modified": True, "deleted": deleted} for v in vs]}
+            return super().request(bundle, method, params)
+
+    children = _DeletingChildren()
+    f = Facade(children)
+    f._bundle_by_visitor.update({"del:a": "A", "edit:b": "B"})
+
+    resp = f.batch_visit({"treeId": "T", "sourceFileType": "py",
+                          "visitors": [{"visitor": "del:a"}, {"visitor": "edit:b"}]})
+
+    assert [r.get("visitor") for r in resp["results"]] == ["del:a"]
+    assert ran == [("A", ["del:a"])]
+
+
+def test_replacing_a_bundles_child_drops_the_ref_tables_that_mirrored_it():
+    """A respawned child starts with empty ref maps. The hub tables are keyed by bundle name, not by
+    child process, so they have to go with the child they were mirroring."""
+    import rewrite.rpc.server as server
+    from rewrite.rpc.bundle_children import BundleChildren
+    from rewrite.rpc.reference import ReferenceMap
+
+    class _Venvs:
+        def __init__(self): self.usable = False
+        def is_usable_venv(self, d): return self.usable
+        def create_venv(self, *a, **k): ...
+        def install_into_venv(self, *a, **k): ...
+        def installed_version(self, *a, **k): return "1.0"
+        def purge_non_venv_entries(self, *a, **k): return []
+
+    class _Child:
+        def close(self): ...
+        def request(self, method, params): return []
+
+    dropped = []
+    children = BundleChildren("python", "/tmp/venvs", upstream=lambda *a: None,
+                              spawn=lambda *a, **k: _Child(), venv_ops=_Venvs(),
+                              on_child_replaced=dropped.append)
+    children.install("pkg", "pkg==1.0")
+    children.install("pkg", "pkg==1.1")   # venv unusable again -> stale child closed, fresh one spawned
+
+    assert dropped == ["pkg", "pkg"]
+
+    # and the server's hook is what clears the tables
+    server._hub_send_refs["pkg"] = ReferenceMap()
+    server._hub_recv_refs["pkg"] = {1: object()}
+    server._hub_send_checkpoint[("pkg", "T")] = 0
+    server._hub_recv_checkpoint[("pkg", "T")] = -1
+    server._hub_served[("pkg", "T")] = object()
+
+    server._hub_drop_bundle("pkg")
+
+    assert "pkg" not in server._hub_send_refs
+    assert "pkg" not in server._hub_recv_refs
+    assert not [k for k in server._hub_send_checkpoint if k[0] == "pkg"]
+    assert not [k for k in server._hub_recv_checkpoint if k[0] == "pkg"]
+    assert not [k for k in server._hub_served if k[0] == "pkg"]
