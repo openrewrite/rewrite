@@ -37,20 +37,49 @@ export const sourceFileCache: Map<string, ts.SourceFile> = new Map();
 // Pooled so a spec reuses the program the previous spec left behind; see `JavaScriptParser.parse`.
 const parserPool: Map<string, JavaScriptParser> = new Map();
 
-function pooledParser(relativeTo?: string): JavaScriptParser {
-    const key = relativeTo ?? "";
+function pooledParser(relativeTo?: string, types?: string[]): JavaScriptParser {
+    // Two parsers over one directory differ by the declarations they load, so `types` keys the pool too.
+    const key = `${relativeTo ?? ""}\u0000${types?.join(",") ?? ""}`;
     let parser = parserPool.get(key);
     if (!parser) {
-        parser = new JavaScriptParser({sourceFileCache, relativeTo});
+        parser = new JavaScriptParser({sourceFileCache, relativeTo, types});
         parserPool.set(key, parser);
     }
     return parser;
+}
+
+/** Packages the manifest declares whose declarations are ambient, which the default `"*"` misses. */
+function declaredTypePackages(relativeTo: string, packageJsonContent: string): string[] {
+    let manifest: {dependencies?: Record<string, string>, devDependencies?: Record<string, string>};
+    try {
+        manifest = JSON.parse(packageJsonContent);
+    } catch {
+        return [];
+    }
+    return Object.keys({...manifest.dependencies, ...manifest.devDependencies})
+        .filter(name => !name.startsWith("@types/"))
+        .filter(name => {
+            // A directive naming a package without declarations is an error, not a no-op.
+            const manifestPath = path.join(relativeTo, "node_modules", name, "package.json");
+            if (!fs.existsSync(manifestPath)) {
+                return false;
+            }
+            try {
+                const installed = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+                return typeof (installed.types ?? installed.typings) === "string";
+            } catch {
+                return false;
+            }
+        });
 }
 
 // Automatically enable sourceFileCache for template parsing in tests
 setTemplateSourceFileCache(sourceFileCache);
 
 export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]): AsyncGenerator<SourceSpec<any>, void, unknown> {
+    // Set once the install has run; left unset otherwise, which keeps the parser's default.
+    let types: string[] | undefined;
+
     // Ensure the target directory exists
     if (!fs.existsSync(relativeTo)) {
         fs.mkdirSync(relativeTo, { recursive: true });
@@ -139,6 +168,12 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
             packageJsonSpec.before!
         );
 
+        // `"*"` keeps `node_modules/@types`, which naming anything at all would otherwise replace.
+        const declared = declaredTypePackages(relativeTo, packageJsonSpec.before!);
+        if (declared.length > 0) {
+            types = ["*", ...declared];
+        }
+
         // Use PackageJsonParser to parse and attach NodeResolutionResult marker
         yield {
             ...packageJsonSpec,
@@ -186,7 +221,7 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
         // Prettier is NOT available: auto-detect styles from the source files
         // Pre-parse all JS specs to sample them
         const detector = Autodetect.detector();
-        const tempParser = new JavaScriptParser({sourceFileCache, relativeTo});
+        const tempParser = new JavaScriptParser({sourceFileCache, relativeTo, types});
 
         for (const spec of jsSpecs) {
             if (spec.before) {
@@ -224,7 +259,7 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
 
                 yield {
                     ...spec,
-                    parser: () => pooledParser(relativeTo),
+                    parser: () => pooledParser(relativeTo, types),
                     // Add style marker before recipe runs if available
                     // Compose with existing beforeRecipe if present
                     beforeRecipe: styleMarker ? (sf: JS.CompilationUnit) => {

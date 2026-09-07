@@ -88,6 +88,43 @@ type WithInvalidSyntaxSlots<T> = T & {
     modifiers?: ts.NodeArray<ts.ModifierLike>;
 };
 
+/** Overloads pairing each AMD dependency with the parameter bound to it, which nothing else declares. */
+function amdFactoryOverloads(sourceFile: ts.SourceFile): string | undefined {
+    // Keyed by callee and tuple, so a file that repeats a dependency list declares one overload.
+    const overloads = new Map<string, string>();
+
+    const visit = (node: ts.Node): void => {
+        if (ts.isCallExpression(node) && node.arguments.length >= 2) {
+            const callee = ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text :
+                ts.isIdentifier(node.expression) ? node.expression.text : undefined;
+            // `require` is declared globally by `@types/node`, so an overload there would overreach.
+            if (callee === "define" && ts.isArrayLiteralExpression(node.arguments[0])) {
+                const dependencies = node.arguments[0].elements;
+                if (dependencies.length > 0 && dependencies.every(ts.isStringLiteralLike)) {
+                    const modules = dependencies.map(d => (d as ts.StringLiteralLike).text);
+                    const tuple = modules.map(m => JSON.stringify(m)).join(", ");
+                    const parameters = modules
+                        .map((m, i) => `p${i}: typeof import(${JSON.stringify(m)}).default`)
+                        .join(", ");
+                    const signature = `function define(dependencies: [${tuple}], factory: (${parameters}) => any): void;`;
+                    // A qualified callee declares into its namespace; a bare one is global.
+                    const namespaceOf = ts.isPropertyAccessExpression(node.expression)
+                        ? node.expression.expression.getText(sourceFile)
+                        : undefined;
+                    const declaration = namespaceOf !== undefined && /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(namespaceOf)
+                        ? `declare namespace ${namespaceOf} {\n    ${signature}\n}`
+                        : `declare ${signature}`;
+                    overloads.set(declaration, declaration);
+                }
+            }
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+
+    return overloads.size === 0 ? undefined : [...overloads.values()].join("\n");
+}
+
 export class JavaScriptParser extends Parser {
 
     private readonly compilerOptions: ts.CompilerOptions;
@@ -214,6 +251,8 @@ export class JavaScriptParser extends Parser {
 
     override async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
         const inputFiles = new Map<SourcePath, ParserInput>();
+        // Populated once the inputs are known, and read by the host overrides below.
+        const amdOverloadFiles = new Map<string, string>();
 
         // Populate inputFiles map and remove from cache if necessary
         for (const input of inputs) {
@@ -253,6 +292,8 @@ export class JavaScriptParser extends Parser {
             const input = inputFiles.get(normalizedFileName);
             if (input) {
                 sourceText = parserInputRead(input);
+            } else if (amdOverloadFiles.has(normalizedFileName)) {
+                sourceText = amdOverloadFiles.get(normalizedFileName);
             } else {
                 // For dependency files
                 sourceText = ts.sys.readFile(normalizedFileName);
@@ -275,7 +316,7 @@ export class JavaScriptParser extends Parser {
 
                 sourceFile = ts.createSourceFile(normalizedFileName, sourceText, sourceFileOptions, true, scriptKind);
                 // Cache the SourceFile if it's a dependency
-                if (!input && this.sourceFileCache) {
+                if (!input && !amdOverloadFiles.has(normalizedFileName) && this.sourceFileCache) {
                     this.sourceFileCache.set(normalizedFileName, sourceFile);
                 }
                 return sourceFile;
@@ -288,14 +329,16 @@ export class JavaScriptParser extends Parser {
         // Override fileExists
         host.fileExists = (fileName) => {
             const normalizedFileName = path.normalize(fileName);
-            return inputFiles.has(normalizedFileName) || ts.sys.fileExists(normalizedFileName);
+            return inputFiles.has(normalizedFileName) || amdOverloadFiles.has(normalizedFileName) ||
+                ts.sys.fileExists(normalizedFileName);
         };
 
         // Override readFile
         host.readFile = (fileName) => {
             const normalizedFileName = path.normalize(fileName);
             const input = inputFiles.get(normalizedFileName);
-            return input ? parserInputRead(input) : ts.sys.readFile(normalizedFileName);
+            return input ? parserInputRead(input) :
+                amdOverloadFiles.get(normalizedFileName) ?? ts.sys.readFile(normalizedFileName);
         };
 
         // Custom module resolution to handle in-memory imports
@@ -354,9 +397,25 @@ export class JavaScriptParser extends Parser {
             return resolvedModules;
         };
 
+        for (const input of inputFiles.values()) {
+            const filePath = parserInputFile(input);
+            const text = parserInputRead(input);
+            // Cheap enough to skip the parse for the files that cannot contain an AMD block.
+            if (!text.includes("define")) {
+                continue;
+            }
+            const overloads = amdFactoryOverloads(ts.createSourceFile(
+                filePath, text, ts.ScriptTarget.Latest, true, getScriptKindFromFileName(filePath)));
+            if (overloads !== undefined) {
+                // Beside the source, so a relative dependency resolves as it does for the source.
+                amdOverloadFiles.set(path.normalize(`${filePath}.__amd-types.d.ts`), overloads);
+            }
+        }
+
         // TypeScript carries the previous program's bound files forward when the root paths match,
         // so a parser held across parses of one path costs a fraction of a freshly built one.
-        const program = ts.createProgram([...inputFiles.keys()], this.compilerOptions, host, this.oldProgram);
+        const program = ts.createProgram(
+            [...inputFiles.keys(), ...amdOverloadFiles.keys()], this.compilerOptions, host, this.oldProgram);
 
         // Update the oldProgram reference
         this.oldProgram = program;
