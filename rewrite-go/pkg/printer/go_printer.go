@@ -607,9 +607,12 @@ func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 			out.Append(";")
 		}
 	}
-	if sw.Tag != nil {
-		p.Visit(sw.Tag.Element, out)
-		p.visitSpace(sw.Tag.After, out)
+	// The selector is a ControlParentheses (matching J.Switch), but Go has no
+	// parens, so emit only its inner element (an Empty for a tagless `switch {}`).
+	if sw.Selector != nil {
+		p.visitSpace(sw.Selector.Prefix, out)
+		p.Visit(sw.Selector.Tree.Element, out)
+		p.visitSpace(sw.Selector.Tree.After, out)
 	}
 	p.Visit(sw.Body, out)
 	p.afterSyntax(sw.Markers, out)
