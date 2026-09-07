@@ -648,6 +648,7 @@ describe("change-import", () => {
             oldMember: "documentToken",
             newModule: "./core-token"
         });
+        const referenced: { name?: string, members?: number } = {};
 
         await withDir(async (repo) => {
             await spec.rewriteRun(
@@ -657,8 +658,21 @@ describe("change-import", () => {
                         ...typescript(
                             `import { documentToken } from './token';\n\nconst d = documentToken;\nconsole.log(d);\n`,
                             `import { documentToken } from './core-token';\n\nconst d = documentToken;\nconsole.log(d);\n`),
-                        path: "main.ts"
-                    },
+                        path: "main.ts",
+                        afterRecipe: async (cu: any) => {
+                            await new class extends JavaScriptVisitor<any> {
+                                override async visitIdentifier(id: J.Identifier, p: any): Promise<J | undefined> {
+                                    const type = id.type;
+                                    if (id.simpleName === "documentToken" && referenced.name === undefined &&
+                                        type !== undefined && Type.isFullyQualified(type)) {
+                                        referenced.name = Type.FullyQualified.getFullyQualifiedName(type as any);
+                                        referenced.members = (type as Type.Class).members.length;
+                                    }
+                                    return id;
+                                }
+                            }().visit(cu, undefined);
+                        }
+                    } as any,
                     {
                         ...typescript(`export const documentToken: Document = document;`),
                         path: "token.ts"
@@ -667,5 +681,10 @@ describe("change-import", () => {
                 )
             );
         }, { unsafeCleanup: true });
+
+        // `Document` reaches some 50k types, which is the only reason this case is large enough to
+        // guard the walk; with a primitive here the recipe finishes instantly and pins nothing.
+        expect(referenced.name).toBe("Document");
+        expect(referenced.members).toBeGreaterThan(100);
     }, 30000);
 });
