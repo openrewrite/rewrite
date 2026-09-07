@@ -730,4 +730,61 @@ class JavaTemplateTest8Test implements RewriteTest {
           .hasMessageContaining("JavaTemplate coordinates were never matched")
           .hasMessageContaining(J.MethodInvocation.class.getName());
     }
+
+    @Test
+    void replaceMethodThatGeneratesSomethingElseFailsLoudly() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  String test(String s) {
+                      return s.trim();
+                  }
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                return JavaTemplate.apply("length", getCursor(), method.getCoordinates().replaceMethod());
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("but generated 1")
+          .hasMessageContaining(J.FieldAccess.class.getName())
+          .hasMessageContaining("s.trim()");
+    }
+
+    @Test
+    void replaceArgumentsThatGenerateNothingFailsLoudly() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  String test(String s) {
+                      return s.trim();
+                  }
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                return JavaTemplate.apply(")", getCursor(), method.getCoordinates().replaceArguments());
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("but generated 0")
+          .hasMessageContaining("s.trim()");
+    }
 }

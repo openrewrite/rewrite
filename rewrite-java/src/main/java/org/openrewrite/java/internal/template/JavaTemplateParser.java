@@ -205,8 +205,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(cursor, stub);
-        return (J.MethodInvocation) statementTemplateGenerator
-                .listTemplatedTrees(cu, Statement.class).get(0);
+        return onlyMethodInvocation(statementTemplateGenerator.listTemplatedTrees(cu, Statement.class), stub, method);
     }
 
     public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
@@ -219,8 +218,17 @@ public class JavaTemplateParser {
         @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(cursor, stub);
-        return (J.MethodInvocation) statementTemplateGenerator
-                .listTemplatedTrees(cu, Statement.class).get(0);
+        return onlyMethodInvocation(statementTemplateGenerator.listTemplatedTrees(cu, Statement.class), stub, method);
+    }
+
+    private static J.MethodInvocation onlyMethodInvocation(List<Statement> generated, String stub, J.MethodInvocation method) {
+        if (generated.size() != 1 || !(generated.get(0) instanceof J.MethodInvocation)) {
+            throw new IllegalArgumentException("Expected a template that would generate exactly one " +
+                                               "method invocation to replace one method invocation, but generated " + generated.size() +
+                                               " " + generated.stream().map(g -> g.getClass().getName()).collect(toList()) +
+                                               ". Stub:\n" + stub + "\nMethod invocation:\n" + method);
+        }
+        return (J.MethodInvocation) generated.get(0);
     }
 
     private boolean isStatement(Cursor cursor) {
