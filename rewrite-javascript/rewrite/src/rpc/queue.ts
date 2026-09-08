@@ -210,15 +210,16 @@ export class RpcSendQueue {
                 throw new Error("A DELETE event should have been sent.");
             }
 
-            const beforeIdx = this.putListPositions(after, before, id);
+            const positions = this.putListPositions(after, before, id);
 
-            for (const anAfter of after) {
-                const beforePos = beforeIdx.get(id(anAfter));
+            for (let i = 0; i < after.length; i++) {
+                const anAfter = after[i];
+                const beforePos = positions === undefined ? -1 : positions[i];
                 const onChangeRun = onChange ? () => onChange(anAfter) : undefined;
-                if (beforePos === undefined) {
+                if (beforePos === -1) {
                     await this.add(anAfter, onChangeRun);
                 } else {
-                    const aBefore = before?.[beforePos];
+                    const aBefore = before![beforePos];
                     if (aBefore === anAfter) {
                         this.put({state: RpcObjectState.NO_CHANGE});
                     } else if (anAfter !== undefined && (isRef(anAfter) || this.typesAreDifferent(anAfter, aBefore))) {
@@ -237,14 +238,22 @@ export class RpcSendQueue {
         });
     }
 
+    /**
+     * Emits the positions message and returns the same positions for the caller to walk,
+     * or undefined when every element is new.
+     */
     private putListPositions<T>(after: T[],
                                 before: T[] | undefined,
-                                id: (value: T) => any): Map<any, number> {
+                                id: (value: T) => any): number[] | undefined {
+        if (!before || before.length === 0) {
+            // Every element is an addition, so the positions are a constant that needs
+            // neither an index map nor a key computed per element.
+            this.put({state: RpcObjectState.CHANGE, value: new Array(after.length).fill(-1)});
+            return undefined;
+        }
         const beforeIdx = new Map<any, number>();
-        if (before) {
-            for (let i = 0; i < before.length; i++) {
-                beforeIdx.set(id(before[i]), i);
-            }
+        for (let i = 0; i < before.length; i++) {
+            beforeIdx.set(id(before[i]), i);
         }
         const positions: number[] = [];
         for (const t of after) {
@@ -252,7 +261,7 @@ export class RpcSendQueue {
             positions.push(beforePos === undefined ? -1 : beforePos);
         }
         this.put({state: RpcObjectState.CHANGE, value: positions});
-        return beforeIdx;
+        return positions;
     }
 
     private async add(after: any, onChange: (() => Promise<any>) | undefined): Promise<void> {
