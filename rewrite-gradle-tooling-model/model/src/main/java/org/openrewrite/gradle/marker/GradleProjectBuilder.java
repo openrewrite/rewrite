@@ -89,12 +89,8 @@ public final class GradleProjectBuilder {
                 springDependencyManagementPlugin(project));
     }
 
-    /**
-     * The state of the {@code io.spring.dependency-management} plugin, which cannot be read from the build script:
-     * the Spring Boot plugin imports {@code spring-boot-dependencies} programmatically. Reflective throughout, as
-     * OpenRewrite must not depend on either plugin, and null whenever anything is unavailable so that recipes fall
-     * back to what the scripts say.
-     */
+    // Reflective because OpenRewrite depends on neither plugin, and null when anything is unavailable so that
+    // recipes fall back to what the scripts say.
     private static @Nullable SpringDependencyManagementPlugin springDependencyManagementPlugin(Project project) {
         try {
             Object extension = project.getExtensions().findByName("dependencyManagement");

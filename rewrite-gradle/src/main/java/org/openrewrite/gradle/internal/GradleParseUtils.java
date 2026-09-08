@@ -41,8 +41,10 @@ public final class GradleParseUtils {
     }
 
     /**
-     * Parse a constant Gradle snippet as a build script, caching the result on the execution context. GradleParser
-     * isn't particularly fast, so a recipe run that generates the same snippet repeatedly parses it only once.
+     * Parse a constant Gradle snippet as a build script, so that a recipe adding code gets a tree the parser
+     * produced rather than one it assembled by hand, which is how printing and formatting stay correct.
+     * The result is cached on the execution context, as GradleParser is slow enough that reparsing the same
+     * snippet for every source file is noticeable.
      */
     public static Optional<JavaSourceFile> parseSnippet(String snippet, boolean isKotlinDsl, ExecutionContext ctx) {
         //noinspection unchecked

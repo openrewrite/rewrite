@@ -101,8 +101,7 @@ public class GradleProject implements ProjectIdentity, Serializable {
     GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
 
     /**
-     * State of the {@code io.spring.dependency-management} plugin, or null when it is not applied or when the LST
-     * predates this field.
+     * State of the {@code io.spring.dependency-management} plugin, or null when it is not applied.
      */
     @With
     @Nullable

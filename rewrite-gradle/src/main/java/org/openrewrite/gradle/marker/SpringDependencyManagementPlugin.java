@@ -29,10 +29,9 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
 /**
- * The effective state of the {@code io.spring.dependency-management} plugin, which is not a Gradle concept: it is
- * that plugin's own dependency management, layered on top of Gradle's. Recorded because a BOM can be imported
- * without appearing in any build script — the Spring Boot plugin imports {@code spring-boot-dependencies}
- * programmatically — and because the plugin honors a project property override of an imported BOM property.
+ * Dependency management that the {@code io.spring.dependency-management} plugin layers on top of Gradle's own.
+ * A BOM can be imported without appearing in any build script, as the Spring Boot plugin imports
+ * {@code spring-boot-dependencies} programmatically, so the plugin's own state is the only place to read it from.
  */
 @Value
 @With

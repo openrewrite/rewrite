@@ -546,11 +546,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         };
     }
 
-    /**
-     * A transitive dependency whose version a BOM derives from a property is upgraded by overriding that property
-     * rather than by a resolution rule, as long as every other artifact the property governs exists at the selected
-     * version. Which BOMs the build imports is only knowable once every script has been scanned.
-     */
+    // Which BOMs the build imports isn't known until every script has been scanned.
     private void resolveBomProperties(DependencyVersionState acc, DependencyMatcher dependencyMatcher, ExecutionContext ctx) {
         if (acc.bomPropertiesResolved) {
             return;
@@ -639,9 +635,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return super.visit(tree, ctx);
         }
 
-        /**
-         * Overrides each BOM property in the script, unless gradle.properties defines it and UpdateProperties updates it.
-         */
+        // Skips properties gradle.properties defines, which UpdateProperties handles instead.
         private JavaSourceFile overrideBomProperties(JavaSourceFile cu, Map<String, GroupArtifact> bomProperties, ExecutionContext ctx) {
             for (Map.Entry<String, GroupArtifact> bomProperty : bomProperties.entrySet()) {
                 String name = bomProperty.getKey();

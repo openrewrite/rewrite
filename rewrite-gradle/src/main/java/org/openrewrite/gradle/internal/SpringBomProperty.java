@@ -119,10 +119,7 @@ public class SpringBomProperty {
         return null;
     }
 
-    /**
-     * The plugin substitutes a project property for an imported BOM property only for properties it imported, so
-     * where the plugin's own view is available it decides.
-     */
+    // An empty view means the plugin's state wasn't captured, not that it imported nothing.
     private static boolean honorsOverrideOf(@Nullable SpringDependencyManagementPlugin plugin, String name) {
         return plugin == null || plugin.getImportedProperties().isEmpty() || plugin.getImportedProperties().containsKey(name);
     }

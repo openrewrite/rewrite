@@ -406,13 +406,9 @@ class GradleProjectTest {
         }
     }
 
-    /**
-     * The Spring Boot plugin imports its BOM programmatically, so nothing in the build script says which BOM manages
-     * these dependencies. The dependency management plugin's own state is the only place that is observable.
-     */
     @Nested
     @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
-    class springDependencyManagement {
+    class SpringDependencyManagement {
         @TempDir
         static Path dir;
 

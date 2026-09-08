@@ -352,11 +352,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
             }
 
-            /**
-             * A versionless dependency in a project using the Spring dependency management plugin may be governed by
-             * a BOM property. Which BOMs are imported is not known until every script has been scanned, so only note
-             * the candidate here.
-             */
+            // Which BOMs the build imports isn't known until every script has been scanned.
             private void recordBomCandidate(GradleDependency gradleDependency, GroupArtifact ga, String configName) {
                 if (gradleProject != null && SpringBomProperty.isPluginApplied(gradleProject) &&
                         gradleDependency.getDeclaredVersion() == null && !gradleDependency.isPlatform()) {
@@ -530,11 +526,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
     }
 
-    /**
-     * Matches each candidate against the BOMs the build imports, which is only knowable once every script has been
-     * scanned. A property that governs a candidate is recorded like a version variable, so the existing
-     * shared-variable guard vets every other artifact the property governs before anything is written.
-     */
+    // Recorded like a version variable so the shared-variable guard vets the other artifacts the property governs.
     private void resolveBomCandidates(DependencyVersionState acc, ExecutionContext ctx) {
         if (!acc.bomCandidatesResolved.compareAndSet(false, true)) {
             return;
