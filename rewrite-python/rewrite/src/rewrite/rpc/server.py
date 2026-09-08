@@ -256,9 +256,12 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     # Track whether we've received the complete object
     received_end = False
-    # Id of a page already asked for and not yet collected, so the peer serializes
-    # it while this side turns the previous one into a tree.
+    # Id of a page asked for and not yet collected, so the peer serializes it while
+    # this side turns the previous one into a tree. Only the stdio transport can
+    # hold one: a client that replaces send_request writes and waits in one call,
+    # with no seam to issue against, so there the pages are fetched on demand.
     pending_page = None
+    can_prefetch = getattr(send_request, '_java_rpc_original', None) is None
 
     def pull_batch() -> List[Dict[str, Any]]:
         """Pull the next batch of RpcObjectData from Java.
@@ -295,8 +298,7 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         if batch[-1].get('state') == 'END_OF_OBJECT':
             received_end = True
             batch = batch[:-1]  # Remove END_OF_OBJECT from the batch
-        else:
-            # Ask for the page after this one before handing this one to the queue.
+        elif can_prefetch:
             # A batch ending in END_OF_OBJECT has no successor: the peer drops its
             # transfer state on that marker, so asking again would restart it.
             pending_page = _issue_request('GetObject', {
