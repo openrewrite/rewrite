@@ -120,6 +120,17 @@ val pythonInstall by tasks.registering(Exec::class) {
     }
 }
 
+// The JUnit BOM is requested as a `6.+` range, and a range matches a snapshot the
+// repositories advertise but do not serve, which leaves integTest unresolvable.
+// `latest.release` would exclude it; a range cannot, so the candidate is filtered out.
+configurations.matching { it.name.startsWith("integTest") }.configureEach {
+    resolutionStrategy.componentSelection.all {
+        if (candidate.group.startsWith("org.junit") && candidate.version.endsWith("-SNAPSHOT")) {
+            reject("no JUnit snapshot is published to a repository this build can read")
+        }
+    }
+}
+
 testing {
     suites {
         register<JvmTestSuite>("integTest") {
