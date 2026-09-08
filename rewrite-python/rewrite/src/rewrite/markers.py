@@ -3,6 +3,7 @@ from __future__ import annotations
 import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from rewrite.utils import lst_dataclass
 from typing import List, ClassVar, cast, TYPE_CHECKING, Callable, TypeVar, Type, Optional, Dict, Any
 from uuid import UUID
 
@@ -50,7 +51,7 @@ class Marker(ABC):
 M = TypeVar('M', bound=Marker)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class Markers:
     _id: UUID
 
@@ -111,7 +112,7 @@ class Markers:
 Markers.EMPTY = Markers(random_id(), [])
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class SearchResult(Marker):
     _id: UUID
 
@@ -195,7 +196,7 @@ class Markup(Marker, ABC):
         return MarkupDebug(random_id(), message, detail)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class MarkupWarn(Markup):
     """Warning markup marker for deprecations and other warnings."""
     _id: UUID
@@ -211,7 +212,7 @@ class MarkupWarn(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class MarkupError(Markup):
     """Error markup marker for errors and issues."""
     _id: UUID
@@ -227,7 +228,7 @@ class MarkupError(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class MarkupInfo(Markup):
     """Info markup marker for informational messages."""
     _id: UUID
@@ -243,7 +244,7 @@ class MarkupInfo(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class MarkupDebug(Markup):
     """Debug markup marker for debugging information."""
     _id: UUID
@@ -297,7 +298,7 @@ class RecipeThatMadeChanges:
         return self._estimated_effort_per_occurrence_millis
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class RecipesThatMadeChanges(Marker):
     """Records which recipe stacks changed a source file. Python holds the stacks without
     interpreting them, so a marker served to this peer returns to the host intact.
@@ -312,7 +313,7 @@ class RecipesThatMadeChanges(Marker):
         return self._recipes
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class UnknownJavaMarker(Marker):
     _id: UUID
 
@@ -323,7 +324,7 @@ class UnknownJavaMarker(Marker):
         return self._data
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class ParseExceptionResult(Marker):
     @classmethod
     def build(cls, parser: 'Parser', exception: Exception) -> ParseExceptionResult:
