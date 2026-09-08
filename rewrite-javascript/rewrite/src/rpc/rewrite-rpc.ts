@@ -280,7 +280,8 @@ export class RewriteRpc {
             throw e;
         }
 
-        const eof = (await q.take());
+        const takenEof = q.take();
+        const eof = takenEof instanceof Promise ? await takenEof : takenEof;
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
             RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
             throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
