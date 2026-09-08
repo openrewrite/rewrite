@@ -328,7 +328,18 @@ export class RpcReceiveQueue {
                 private readonly trace: boolean) {
     }
 
-    async take(): Promise<RpcObjectData> {
+    // Returns a value rather than a promise for all but the message that refills the
+    // batch or yields, so the common path costs neither a promise nor an async frame.
+    take(): RpcObjectData | Promise<RpcObjectData> {
+        if (this.batchIndex < this.batch.length && ++this.sinceYield < 256) {
+            // An index keeps draining a batch linear; Array.shift() copies the remaining
+            // elements on every call, which is quadratic over the batch.
+            return this.batch[this.batchIndex++]!;
+        }
+        return this.takeSlow();
+    }
+
+    private async takeSlow(): Promise<RpcObjectData> {
         if (this.batchIndex >= this.batch.length) {
             this.batch = await this.pull();
             this.batchIndex = 0;
@@ -337,12 +348,10 @@ export class RpcReceiveQueue {
         // before it polls the socket, so without an occasional macrotask a page
         // requested ahead is never delivered. 256 is where delivery balances the
         // cost of scheduling.
-        if (++this.sinceYield >= 256) {
+        if (this.sinceYield >= 256) {
             this.sinceYield = 0;
             await new Promise(resolve => setImmediate(resolve));
         }
-        // An index keeps draining a batch linear; Array.shift() copies the remaining
-        // elements on every call, which is quadratic over the batch.
         return this.batch[this.batchIndex++]!;
     }
 
@@ -376,7 +385,8 @@ export class RpcReceiveQueue {
         before: T | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T> {
-        const message = await this.take();
+        const taken = this.take();
+        const message = taken instanceof Promise ? await taken : taken;
         RpcObjectData.logTrace(message, this.trace, this.logger);
         let ref: number | undefined;
         switch (message.state) {
@@ -460,7 +470,8 @@ export class RpcReceiveQueue {
         before: T[] | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T[] | undefined> {
-        const message = await this.take();
+        const taken = this.take();
+        const message = taken instanceof Promise ? await taken : taken;
         RpcObjectData.logTrace(message, this.trace, this.logger);
         switch (message.state) {
             case RpcObjectState.NO_CHANGE:
@@ -472,7 +483,8 @@ export class RpcReceiveQueue {
             // Intentional fall-through...
             case RpcObjectState.CHANGE:
                 // The next message should be a CHANGE with a list of positions
-                const d = await this.take();
+                const takenD = this.take();
+                const d = takenD instanceof Promise ? await takenD : takenD;
                 const positions = d.value as number[];
                 if (!positions) {
                     throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
