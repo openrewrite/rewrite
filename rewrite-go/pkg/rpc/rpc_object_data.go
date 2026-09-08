@@ -263,11 +263,30 @@ func decodeValue(v any, tbl map[string]string) any {
 // The remote's numbers arrive as text (see UseNumber above) and take the Go type
 // their JSON shape implies, so a value keeps both its kind and its full precision
 // across a round trip.
+// Converting an int64 to an interface allocates unless the runtime holds the value
+// statically, which it does only for 0..255. List positions are small and dominated
+// by ADDED_LIST_ITEM, so the range that covers them is pre-boxed once.
+var boxedInts = func() [1025]any {
+	var b [1025]any
+	for i := range b {
+		b[i] = int64(i - 1)
+	}
+	return b
+}()
+
+func boxInt(v int64) any {
+	// Bounded before the shift: v+1 overflows for MaxInt64 and would index negatively.
+	if v >= -1 && v < int64(len(boxedInts))-1 {
+		return boxedInts[v+1]
+	}
+	return v
+}
+
 func decodeNumber(n json.Number) any {
 	s := n.String()
 	if !strings.ContainsAny(s, ".eE") {
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return i
+			return boxInt(i)
 		}
 		if i, ok := new(big.Int).SetString(s, 10); ok {
 			return i
