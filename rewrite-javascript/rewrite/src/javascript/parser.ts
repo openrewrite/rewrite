@@ -125,6 +125,17 @@ function amdFactoryOverloads(sourceFile: ts.SourceFile): string | undefined {
     return overloads.size === 0 ? undefined : [...overloads].join("\n");
 }
 
+/**
+ * The declarations, preceded by a reference to each named type package. An AMD overload outranks
+ * the loader's own `define` only where the loader's declarations are reached this way.
+ */
+function withReferencesTo(types: string[] | undefined, declarations: string): string {
+    // `*` stands for the type roots rather than a package, so there is nothing to reference.
+    const references = (types ?? []).filter(name => name !== "*")
+        .map(name => `/// <reference types="${name}" />`);
+    return references.length === 0 ? declarations : `${references.join("\n")}\n${declarations}`;
+}
+
 export class JavaScriptParser extends Parser {
 
     private readonly tsConfig: TsConfigResolver;
@@ -282,7 +293,8 @@ export class JavaScriptParser extends Parser {
             if (overloads !== undefined) {
                 // Beside the source, so a relative dependency resolves as it does for the source.
                 const overloadPath = path.normalize(`${sourcePath}.__amd-types.d.ts`);
-                amdOverloadFiles.set(overloadPath, overloads);
+                amdOverloadFiles.set(overloadPath, withReferencesTo(
+                    this.tsConfig.forFile(sourcePath).options.types, overloads));
                 amdOverloadOf.set(sourcePath, overloadPath);
             }
         }

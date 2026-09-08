@@ -141,7 +141,7 @@ describe("AMD module bindings", () => {
                 npm(
                     repo.path,
                     //language=typescript
-                    typescript(`/// <reference types="@openui5/types" />
+                    typescript(`
                         sap.ui.define(["sap/m/Button"], function (Button) {
                             const button = new Button({text: "Go"});
                             button.attachPress(() => {});
