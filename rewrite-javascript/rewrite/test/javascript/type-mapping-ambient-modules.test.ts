@@ -20,6 +20,8 @@ import {JavaScriptVisitor, npm, packageJson, typescript} from "../../src/javascr
 import {J, Type} from "../../src/java";
 import {ExecutionContext, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
+import * as fs from "fs";
+import * as path from "path";
 
 /** UI5 declares its modules ambiently: `declare module "sap/m/Button"`, with no such path on disk. */
 function captureTypes(identifiers: string[], methods: string[]): {
@@ -99,6 +101,33 @@ describe("ambient module declarations from an external dependency", () => {
 
         expect(identifierTypes.get("button")).toBe("sap/m/Button.Button");
         expect(declaringTypes.get("attachPress")).toBe("sap/m/Button.Button");
+    }, 180000);
+
+    test("a fixture stating its own compiler options is not given its manifest's packages", async () => {
+        const {recipe, identifierTypes} = captureTypes(["button"], []);
+        const spec = new RecipeSpec();
+        spec.recipe = recipe;
+
+        await withDir(async (repo) => {
+            fs.mkdirSync(repo.path, {recursive: true});
+            fs.writeFileSync(path.join(repo.path, "tsconfig.json"), `{"compilerOptions": {}}`);
+
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    //language=typescript
+                    typescript(`
+                        import Button from "sap/m/Button";
+
+                        const button = new Button({text: "Go"});
+                    `),
+                    //language=json
+                    packageJson(UI5_PACKAGE_JSON)
+                )
+            );
+        }, {unsafeCleanup: true});
+
+        expect(identifierTypes.get("button")).toBe("<unknown>");
     }, 180000);
 
     // The same file reached through a directive instead, which no real UI5 source carries.

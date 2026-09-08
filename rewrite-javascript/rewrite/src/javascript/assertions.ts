@@ -168,8 +168,12 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
             packageJsonSpec.before!
         );
 
+        // Which ambient declarations are in scope is a project's own to state, so a fixture
+        // carrying a config decides for itself, and the manifest names them only where none is.
+        const statesConfig = fs.existsSync(path.join(relativeTo, "tsconfig.json")) ||
+            fs.existsSync(path.join(relativeTo, "jsconfig.json"));
         // `"*"` keeps `node_modules/@types`, which naming anything at all would otherwise replace.
-        const declared = declaredTypePackages(relativeTo, packageJsonSpec.before!);
+        const declared = statesConfig ? [] : declaredTypePackages(relativeTo, packageJsonSpec.before!);
         if (declared.length > 0) {
             types = ["*", ...declared];
         }
