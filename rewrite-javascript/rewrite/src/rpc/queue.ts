@@ -364,63 +364,73 @@ export class RpcReceiveQueue {
         before: T | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T> {
-        return saveTrace(this.trace, async () => {
-            const message = await this.take();
-            RpcObjectData.logTrace(message, this.trace, this.logger);
-            let ref: number | undefined;
-            switch (message.state) {
-                case RpcObjectState.NO_CHANGE:
-                    return before!;
-                case RpcObjectState.DELETE:
-                    return undefined as T;
-                case RpcObjectState.ADD:
-                    ref = message.ref;
-                    if (ref !== undefined && message.valueType === undefined && message.value === undefined) {
-                        // This is a pure reference to an existing object
-                        if (this.refs.has(ref)) {
-                            return this.refs.get(ref);
-                        } else {
-                            throw new Error(`Received a reference to an object that was not previously sent: ${ref}`);
-                        }
+        // Tracing is a debugging feature, and the closure is allocated on every
+        // call to decide not to use it; this runs once per field of every tree.
+        if (this.trace) {
+            return saveTrace(true, () => this.receiveImpl(before, onChange));
+        }
+        return this.receiveImpl(before, onChange);
+    }
+
+    private async receiveImpl<T extends any | undefined>(
+        before: T | undefined,
+        onChange?: (before: T) => T | Promise<T | undefined> | undefined
+    ): Promise<T> {
+        const message = await this.take();
+        RpcObjectData.logTrace(message, this.trace, this.logger);
+        let ref: number | undefined;
+        switch (message.state) {
+            case RpcObjectState.NO_CHANGE:
+                return before!;
+            case RpcObjectState.DELETE:
+                return undefined as T;
+            case RpcObjectState.ADD:
+                ref = message.ref;
+                if (ref !== undefined && message.valueType === undefined && message.value === undefined) {
+                    // This is a pure reference to an existing object
+                    if (this.refs.has(ref)) {
+                        return this.refs.get(ref);
                     } else {
-                        // This is either a new object or a forward declaration with ref
-                        before = message.valueType === undefined ?
-                            message.value :
-                            this.newObj(message.valueType);
-                        if (ref !== undefined) {
-                            // For an object like JavaType that we will mutate in place rather than using
-                            // immutable updates because of its cyclic nature, the before instance will ultimately
-                            // be the same as the after instance below.
-                            this.refs.set(ref, before);
-                        }
+                        throw new Error(`Received a reference to an object that was not previously sent: ${ref}`);
                     }
-                // Intentional fall-through...
-                case RpcObjectState.CHANGE:
-                    let after;
-                    let codec;
-                    if (onChange) {
-                        after = await onChange(before!);
-                    } else if ((codec = RpcCodecs.forInstance(before, this.sourceFileType))) {
-                        after = await codec.rpcReceive(before, this);
-                    } else if (message.value !== undefined) {
-                        after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
-                    } else if (message.state === RpcObjectState.ADD && message.valueType) {
-                        throw new Error(
-                            `No RPC codec registered on the TypeScript side for '${message.valueType}'. ` +
-                            `The Java side has a codec and sent property messages that will not be consumed, ` +
-                            `causing RPC queue desynchronization.`
-                        );
-                    } else {
-                        after = before;
-                    }
+                } else {
+                    // This is either a new object or a forward declaration with ref
+                    before = message.valueType === undefined ?
+                        message.value :
+                        this.newObj(message.valueType);
                     if (ref !== undefined) {
-                        this.refs.set(ref, after);
+                        // For an object like JavaType that we will mutate in place rather than using
+                        // immutable updates because of its cyclic nature, the before instance will ultimately
+                        // be the same as the after instance below.
+                        this.refs.set(ref, before);
                     }
-                    return after;
-                default:
-                    throw new Error(`Unknown state type ${message.state}`);
-            }
-        });
+                }
+            // Intentional fall-through...
+            case RpcObjectState.CHANGE:
+                let after;
+                let codec;
+                if (onChange) {
+                    after = await onChange(before!);
+                } else if ((codec = RpcCodecs.forInstance(before, this.sourceFileType))) {
+                    after = await codec.rpcReceive(before, this);
+                } else if (message.value !== undefined) {
+                    after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
+                } else if (message.state === RpcObjectState.ADD && message.valueType) {
+                    throw new Error(
+                        `No RPC codec registered on the TypeScript side for '${message.valueType}'. ` +
+                        `The Java side has a codec and sent property messages that will not be consumed, ` +
+                        `causing RPC queue desynchronization.`
+                    );
+                } else {
+                    after = before;
+                }
+                if (ref !== undefined) {
+                    this.refs.set(ref, after);
+                }
+                return after;
+            default:
+                throw new Error(`Unknown state type ${message.state}`);
+        }
     }
 
     /**
@@ -438,36 +448,46 @@ export class RpcReceiveQueue {
         before: T[] | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T[] | undefined> {
-        return saveTrace(this.trace, async () => {
-            const message = await this.take();
-            RpcObjectData.logTrace(message, this.trace, this.logger);
-            switch (message.state) {
-                case RpcObjectState.NO_CHANGE:
-                    return before;
-                case RpcObjectState.DELETE:
-                    return undefined;
-                case RpcObjectState.ADD:
-                    before = [];
-                // Intentional fall-through...
-                case RpcObjectState.CHANGE:
-                    // The next message should be a CHANGE with a list of positions
-                    const d = await this.take();
-                    const positions = d.value as number[];
-                    if (!positions) {
-                        throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
-                    }
-                    const after: T[] = new Array(positions.length);
-                    for (let i = 0; i < positions.length; i++) {
-                        const beforeIdx = positions[i];
-                        const b: T = await (beforeIdx >= 0 ? before![beforeIdx] as T : undefined) as T;
-                        let received: Promise<T> = this.receive<T>(b, onChange);
-                        after[i] = await received;
-                    }
-                    return after;
-                default:
-                    throw new Error(`${message.state} is not supported for lists.`);
-            }
-        });
+        // Tracing is a debugging feature, and the closure is allocated on every
+        // call to decide not to use it; this runs once per field of every tree.
+        if (this.trace) {
+            return saveTrace(true, () => this.receiveListImpl(before, onChange));
+        }
+        return this.receiveListImpl(before, onChange);
+    }
+
+    private async receiveListImpl<T>(
+        before: T[] | undefined,
+        onChange?: (before: T) => T | Promise<T | undefined> | undefined
+    ): Promise<T[] | undefined> {
+        const message = await this.take();
+        RpcObjectData.logTrace(message, this.trace, this.logger);
+        switch (message.state) {
+            case RpcObjectState.NO_CHANGE:
+                return before;
+            case RpcObjectState.DELETE:
+                return undefined;
+            case RpcObjectState.ADD:
+                before = [];
+            // Intentional fall-through...
+            case RpcObjectState.CHANGE:
+                // The next message should be a CHANGE with a list of positions
+                const d = await this.take();
+                const positions = d.value as number[];
+                if (!positions) {
+                    throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
+                }
+                const after: T[] = new Array(positions.length);
+                for (let i = 0; i < positions.length; i++) {
+                    const beforeIdx = positions[i];
+                    const b: T = await (beforeIdx >= 0 ? before![beforeIdx] as T : undefined) as T;
+                    let received: Promise<T> = this.receive<T>(b, onChange);
+                    after[i] = await received;
+                }
+                return after;
+            default:
+                throw new Error(`${message.state} is not supported for lists.`);
+        }
     }
 
     private newObj<T>(type: string): T {
