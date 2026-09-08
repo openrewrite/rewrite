@@ -1075,7 +1075,7 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 
 	strIntern := make(map[string]string)
 
-	fetchBatch := func() []rpc.RpcObjectData {
+	requestPage := func() error {
 		reqParams := getObjectRequest{ID: id, SourceFileType: sourceFileType}
 		paramsJSON, _ := json.Marshal(reqParams)
 		rpcReq := map[string]any{
@@ -1085,7 +1085,32 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			"params":  json.RawMessage(paramsJSON),
 		}
 		body, _ := json.Marshal(rpcReq)
-		_ = s.writeFramed(body)
+		return s.writeFramed(body)
+	}
+
+	// The request for the next page goes out before the current one is handed back,
+	// so Java serializes it while Go is still deserializing what it already has.
+	// At most one request is outstanding, and drainPage below consumes it before
+	// this call returns -- an unread response would otherwise be read as the reply
+	// to whatever request comes next.
+	outstanding := false
+	drainPage := func() {
+		if outstanding {
+			outstanding = false
+			if _, err := s.readMessage(); err != nil {
+				s.logger.Printf("Error draining prefetched page: %v", err)
+			}
+		}
+	}
+
+	fetchBatch := func() []rpc.RpcObjectData {
+		if !outstanding {
+			if err := requestPage(); err != nil {
+				s.logger.Printf("Error requesting object page: %v", err)
+				return nil
+			}
+		}
+		outstanding = false
 
 		resp, err := s.readMessage()
 		if err != nil {
@@ -1107,6 +1132,13 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			s.logger.Printf("Error parsing response result: %v", err)
 			return nil
 		}
+		// END_OF_OBJECT closes the transfer, so a page carrying it has no successor
+		// to ask for; asking anyway would restart the transfer on the Java side.
+		if len(batch) > 0 && batch[len(batch)-1].State != rpc.EndOfObject {
+			if err = requestPage(); err == nil {
+				outstanding = true
+			}
+		}
 		return batch
 	}
 
@@ -1116,6 +1148,8 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 
 	var obj any
 	func() {
+		// Registered first so it runs last, after the recover below re-panics.
+		defer drainPage()
 		// A panic mid-receive leaves Go's per-id baseline diverged from Java's:
 		// Java records remoteObjects[id] when it generates the diff, so its next
 		// send would be a CHANGE delta against a baseline Go never finished
