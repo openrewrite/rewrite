@@ -59,6 +59,11 @@ func (q *SendQueue) DiscardNewReferences() {
 }
 
 func (q *SendQueue) Put(data RpcObjectData) {
+	// Every message reaching the wire is shaped here, which is what lets RpcObjectData
+	// stay a plain tagged struct the encoder writes field by field. Construct sendable
+	// messages only through Put: a whole float marshaled without this reads as an
+	// integer on the far side (see wireNumber).
+	data.Value = wireNumber(data.Value)
 	q.batch = append(q.batch, data)
 	if len(q.batch) == q.batchSize {
 		q.Flush()
