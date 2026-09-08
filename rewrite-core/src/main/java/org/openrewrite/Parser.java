@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -236,6 +237,7 @@ public interface Parser {
 
     @Getter
     @RequiredArgsConstructor
+    @EqualsAndHashCode
     abstract class Builder implements Cloneable {
         private final Class<? extends SourceFile> sourceFileType;
 
