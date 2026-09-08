@@ -319,6 +319,7 @@ export class RpcSendQueue {
 export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
     private batchIndex = 0;
+    private sinceYield = 0;
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly sourceFileType: string | undefined,
@@ -331,6 +332,14 @@ export class RpcReceiveQueue {
         if (this.batchIndex >= this.batch.length) {
             this.batch = await this.pull();
             this.batchIndex = 0;
+        }
+        // Awaiting a resolved value only queues a microtask, and Node drains those
+        // before it polls the socket, so without an occasional macrotask a page
+        // requested ahead is never delivered. 256 is where delivery balances the
+        // cost of scheduling.
+        if (++this.sinceYield >= 256) {
+            this.sinceYield = 0;
+            await new Promise(resolve => setImmediate(resolve));
         }
         // An index keeps draining a batch linear; Array.shift() copies the remaining
         // elements on every call, which is quadratic over the batch.
