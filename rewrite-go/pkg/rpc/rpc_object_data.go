@@ -36,6 +36,12 @@ const (
 	EndOfObject
 )
 
+// Text, not JSON: the encoder quotes and escapes this directly, where a Marshaler's
+// JSON bytes would have to be reparsed and re-emitted to splice into the stream.
+func (s State) MarshalText() ([]byte, error) {
+	return []byte(s.String()), nil
+}
+
 func (s State) String() string {
 	switch s {
 	case NoChange:
@@ -62,21 +68,6 @@ type RpcObjectData struct {
 	ValueType *string `json:"valueType,omitempty"`
 	Value     any     `json:"value,omitempty"`
 	Ref       *int    `json:"ref,omitempty"`
-}
-
-func (d RpcObjectData) MarshalJSON() ([]byte, error) {
-	type Alias struct {
-		State     string  `json:"state"`
-		ValueType *string `json:"valueType,omitempty"`
-		Value     any     `json:"value,omitempty"`
-		Ref       *int    `json:"ref,omitempty"`
-	}
-	return json.Marshal(Alias{
-		State:     d.State.String(),
-		ValueType: d.ValueType,
-		Value:     wireNumber(d.Value),
-		Ref:       d.Ref,
-	})
 }
 
 // A value that carries no valueType is bound on the JVM side by its JSON shape,
