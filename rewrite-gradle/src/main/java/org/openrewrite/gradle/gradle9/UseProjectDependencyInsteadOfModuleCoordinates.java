@@ -24,9 +24,9 @@ import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.gradle.internal.GradleParseUtils;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -76,10 +76,11 @@ public class UseProjectDependencyInsteadOfModuleCoordinates extends Recipe {
                 }
 
                 // The `OmitParentheses` marker (Groovy command syntax, e.g. `implementation 'a:b:c'`) lives on
-                // the argument element itself, so carry the original coordinate's markers and prefix over to the
-                // replacement to preserve whether the enclosing call uses parentheses.
-                Expression projectNotation = GradleParseUtils.parseMethodInvocation(ctx, "project('" + projectPath(gp) + "')\n")
-                        .withPrefix(coordinate.getPrefix())
+                // the argument element itself, so carry the original coordinate's markers over to the replacement
+                // to preserve whether the enclosing call uses parentheses.
+                Expression projectNotation = GroovyTemplate.builder("project('" + projectPath(gp) + "')")
+                        .build()
+                        .<Expression>apply(new Cursor(getCursor(), coordinate), coordinate.getCoordinates().replace())
                         .withMarkers(coordinate.getMarkers());
                 return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> projectNotation));
             }

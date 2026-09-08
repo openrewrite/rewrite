@@ -54,7 +54,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+import static org.openrewrite.gradle.GradleParser.requireParsed;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH;
 
 @Value

@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.J;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+import static org.openrewrite.gradle.GradleParser.requireParsed;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
