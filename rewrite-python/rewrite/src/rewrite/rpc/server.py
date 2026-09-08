@@ -127,22 +127,12 @@ def _next_request_id() -> int:
         return _request_id_counter
 
 
-def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
-    """Send a JSON-RPC request to Java and wait for the response.
+def _issue_request(method: str, params: dict) -> Any:
+    """Write a request and register its id, without waiting for the reply.
 
-    This enables bidirectional communication - Python can request
-    objects from Java while processing an incoming request.
-
-    Args:
-        method: The RPC method name
-        params: The request parameters
-        timeout_seconds: Maximum time to wait for response (default 30s)
-
-    Returns:
-        The result from the RPC response
-
-    Raises:
-        RuntimeError: If request times out or fails
+    Separating the write from the wait lets a caller keep a request in flight
+    while it works; :func:`_await_response` collects it. A reply arriving for
+    another registered id is stashed by that function rather than discarded.
     """
     request_id = _next_request_id()
 
@@ -160,6 +150,11 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     write_message(request)
 
     _awaiting_ids.add(request_id)
+    return request_id
+
+
+def _await_response(request_id: Any, method: str, timeout_seconds: float = 30.0) -> Any:
+    """Wait for the reply to a request :func:`_issue_request` already wrote."""
     try:
         while True:
             response = _pending_responses.pop(request_id, None)
@@ -197,6 +192,26 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     finally:
         _awaiting_ids.discard(request_id)
         _pending_responses.pop(request_id, None)
+
+
+def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
+    """Send a JSON-RPC request to Java and wait for the response.
+
+    This enables bidirectional communication - Python can request
+    objects from Java while processing an incoming request.
+
+    Args:
+        method: The RPC method name
+        params: The request parameters
+        timeout_seconds: Maximum time to wait for response (default 30s)
+
+    Returns:
+        The result from the RPC response
+
+    Raises:
+        RuntimeError: If request times out or fails
+    """
+    return _await_response(_issue_request(method, params), method, timeout_seconds)
 
 
 def _require_tree(tree: Any, source_file_type: Optional[str]) -> Any:
@@ -241,6 +256,9 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     # Track whether we've received the complete object
     received_end = False
+    # Id of a page already asked for and not yet collected, so the peer serializes
+    # it while this side turns the previous one into a tree.
+    pending_page = None
 
     def pull_batch() -> List[Dict[str, Any]]:
         """Pull the next batch of RpcObjectData from Java.
@@ -254,16 +272,18 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
         after receive() completes (line 474), and we do the same by tracking received_end.
         """
-        nonlocal received_end
+        nonlocal received_end, pending_page
 
-        if received_end:
+        if pending_page is not None:
+            page_id, pending_page = pending_page, None
+            batch = _await_response(page_id, 'GetObject')
+        elif received_end:
             return []
-
-        # Request the next batch from Java
-        batch = send_request('GetObject', {
-            'id': obj_id,
-            'sourceFileType': source_file_type
-        })
+        else:
+            batch = send_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type
+            })
 
         if not batch:
             received_end = True
@@ -275,6 +295,14 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         if batch[-1].get('state') == 'END_OF_OBJECT':
             received_end = True
             batch = batch[:-1]  # Remove END_OF_OBJECT from the batch
+        else:
+            # Ask for the page after this one before handing this one to the queue.
+            # A batch ending in END_OF_OBJECT has no successor: the peer drops its
+            # transfer state on that marker, so asking again would restart it.
+            pending_page = _issue_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type
+            })
 
         return batch
 
@@ -301,6 +329,14 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         # Reset our tracking of the remote state so the next interaction
         # forces a full object sync (ADD) instead of a delta (CHANGE).
         remote_objects.pop(obj_id, None)
+        if pending_page is not None:
+            # The peer has advanced past this page; leaving it unread would hand
+            # it to whichever call reads next.
+            try:
+                _await_response(pending_page, 'GetObject')
+            except Exception:
+                pass
+            pending_page = None
         raise
 
     if obj is not None:
