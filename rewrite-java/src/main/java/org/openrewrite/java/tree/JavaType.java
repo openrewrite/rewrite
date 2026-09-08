@@ -833,8 +833,10 @@ public interface JavaType {
             }
 
             public List<?> getValues() {
-                //noinspection DataFlowIssue
-                return Arrays.asList(constantValues != null ? constantValues : referenceValues);
+                // Neither array is set when the argument was a null array literal, which C#
+                // allows (`[Foo(null)]`) and sends over RPC.
+                Object[] values = constantValues != null ? constantValues : referenceValues;
+                return values == null ? emptyList() : Arrays.asList(values);
             }
         }
 
