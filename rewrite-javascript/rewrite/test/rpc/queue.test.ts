@@ -4,6 +4,56 @@ import type {RpcObjectData} from "../../src/rpc";
 
 describe("RPC queues", () => {
 
+    async function sendList<T>(after: T[] | undefined, before: T[] | undefined): Promise<RpcObjectData[]> {
+        const queue = new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false);
+        await queue.sendList(after, before, t => t);
+        return queue.finish();
+    }
+
+    // The positions array is what lets a reorder cost one integer per element instead
+    // of re-sending the elements themselves.
+    test("reordered elements are repositioned, not resent", async () => {
+        const batch = await sendList(["C", "A", "B"], ["A", "B", "C"]);
+
+        expect(batch.map(d => d.state)).toEqual([
+            RpcObjectState.CHANGE, RpcObjectState.CHANGE,
+            RpcObjectState.NO_CHANGE, RpcObjectState.NO_CHANGE, RpcObjectState.NO_CHANGE,
+            RpcObjectState.END_OF_OBJECT,
+        ]);
+        expect(batch[1].value).toEqual([2, 0, 1]);
+    });
+
+    test("every element is added when the before list is empty", async () => {
+        const batch = await sendList(["A", "B"], []);
+
+        expect(batch.map(d => d.state)).toEqual([
+            RpcObjectState.CHANGE, RpcObjectState.CHANGE,
+            RpcObjectState.ADD, RpcObjectState.ADD,
+            RpcObjectState.END_OF_OBJECT,
+        ]);
+        expect(batch[1].value).toEqual([-1, -1]);
+    });
+
+    test("mixed adds and removals", async () => {
+        const batch = await sendList(["A", "E", "F", "C"], ["A", "B", "C", "D"]);
+
+        expect(batch.map(d => d.state)).toEqual([
+            RpcObjectState.CHANGE, RpcObjectState.CHANGE,
+            RpcObjectState.NO_CHANGE, RpcObjectState.ADD, RpcObjectState.ADD, RpcObjectState.NO_CHANGE,
+            RpcObjectState.END_OF_OBJECT,
+        ]);
+        expect(batch[1].value).toEqual([0, -1, -1, 2]);
+    });
+
+    test("an unchanged list is a single NO_CHANGE", async () => {
+        const before = ["A", "B"];
+        const batch = await sendList(before, before);
+
+        expect(batch.map(d => d.state)).toEqual([
+            RpcObjectState.NO_CHANGE, RpcObjectState.END_OF_OBJECT,
+        ]);
+    });
+
     test("asRef doesn't create a new instance", () => {
         const space = {kind: Json.Kind.Space, comments: [], whitespace: "\n"};
 
