@@ -18,18 +18,15 @@ package org.openrewrite.gradle.gradle9;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.groovy.tree.G;
+import org.openrewrite.groovy.GroovyTemplate;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 
-import java.nio.file.Paths;
 import java.util.List;
-
-import static java.util.Collections.singletonList;
-import static org.openrewrite.gradle.GradleParser.requireParsed;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -75,8 +72,7 @@ public class UseMainClassPropertyForApplication extends Recipe {
                 if (getCursor().firstEnclosing(J.Lambda.class) == null) {
                     Expression rhs = assignment.getAssignment();
                     if (rhs instanceof J.Literal && ((J.Literal) rhs).getValueSource() != null) {
-                        String valueSource = ((J.Literal) rhs).getValueSource();
-                        return parseApplicationBlock(ctx, valueSource, assignment.getPrefix());
+                        return applicationBlock(assignment, rhs);
                     }
                 }
                 return assignment;
@@ -100,35 +96,17 @@ public class UseMainClassPropertyForApplication extends Recipe {
                 if (!(initializer instanceof J.Literal) || ((J.Literal) initializer).getValueSource() == null) {
                     return super.visitVariableDeclarations(multiVariable, ctx);
                 }
-                String valueSource = ((J.Literal) initializer).getValueSource();
-                return parseApplicationBlock(ctx, valueSource, multiVariable.getPrefix());
+                return applicationBlock(multiVariable, initializer);
             }
 
-            // Parsed rather than templated: a template replacement of a Kotlin script statement comes back indented
-            // one level too far, since the block a script's statements sit in is not an indentation level
-            private J parseApplicationBlock(ExecutionContext ctx, String valueSource, Space prefix) {
-                String snippet = "application {\n    mainClass = " + valueSource + "\n}";
-                JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                boolean isKotlinDsl = sourceFile instanceof K.CompilationUnit;
-                if (isKotlinDsl) {
-                    Statement statement = GradleParser.builder().build()
-                            .parseInputs(singletonList(
-                                    Parser.Input.fromString(Paths.get("build.gradle.kts"), snippet)), null, ctx)
-                            .map(requireParsed(K.CompilationUnit.class))
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalStateException("Could not parse application block"))
-                            .getStatements()
-                            .get(0);
-                    return ((J) statement).withPrefix(prefix);
-                }
-                return ((J) GradleParser.builder().build()
-                        .parse(ctx, snippet)
-                        .map(requireParsed(G.CompilationUnit.class))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException("Could not parse application block"))
-                        .getStatements()
-                        .get(0))
-                        .withPrefix(prefix);
+            // The main class travels as a parameter rather than as text, so a `#{` inside the literal cannot be
+            // mistaken for a template placeholder
+            private J applicationBlock(Statement original, Expression mainClass) {
+                String snippet = "application {\n    mainClass = #{any()}\n}";
+                JavaTemplate template = getCursor().firstEnclosing(JavaSourceFile.class) instanceof K.CompilationUnit ?
+                        KotlinTemplate.builder(snippet).build() :
+                        GroovyTemplate.builder(snippet).build();
+                return template.apply(getCursor(), original.getCoordinates().replace(), mainClass);
             }
 
             private boolean isMainClassName(Tree variable) {
