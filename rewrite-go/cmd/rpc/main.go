@@ -61,6 +61,7 @@ type jsonRPCRequest struct {
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params"`
 	Result  json.RawMessage `json:"result"` // present in responses
+	Error   *rpcError       `json:"error"`  // present in error responses
 }
 
 type jsonRPCResponse struct {
@@ -1070,10 +1071,20 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
 		s.writer.Write(append([]byte(header), body...))
 
+		// Failures panic: the receive queue indexes whatever this returns, so an empty
+		// batch would surface as "index out of range" naming nothing. The recover in
+		// the caller turns a panic into one clear error.
 		resp, err := s.readMessage()
 		if err != nil {
-			s.logger.Printf("Error reading bidirectional response: %v", err)
-			return nil
+			panic(fmt.Errorf("GetObject %s: reading the reply failed: %w", id, err))
+		}
+
+		if resp.Error != nil {
+			if resp.Error.Data != "" {
+				// The peer's own frames go to the log; the message travels back to it.
+				s.logger.Printf("GetObject %s failed on the peer:\n%s", id, resp.Error.Data)
+			}
+			panic(fmt.Errorf("GetObject %s failed on the peer: %s", id, resp.Error.Message))
 		}
 
 		resultData := resp.Result
@@ -1081,14 +1092,12 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			resultData = resp.Params
 		}
 		if resultData == nil {
-			s.logger.Printf("No result data in bidirectional response")
-			return nil
+			panic(fmt.Errorf("GetObject %s: reply carried no result", id))
 		}
 
 		batch, err := rpc.DecodeBatch(resultData, strIntern)
 		if err != nil {
-			s.logger.Printf("Error parsing response result: %v", err)
-			return nil
+			panic(fmt.Errorf("GetObject %s: decoding the reply failed: %w", id, err))
 		}
 		return batch
 	}

@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"github.com/stretchr/testify/require"
@@ -38,6 +39,47 @@ func frameReverseGetObjectReply(t *testing.T, result any) []byte {
 	})
 	require.NoError(t, err, "marshal reply")
 	return append([]byte(fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))), body...)
+}
+
+// frameReverseGetObjectError is frameReverseGetObjectReply's error twin — the
+// shape Java sends when its own traversal fails partway through the reply.
+func frameReverseGetObjectError(t *testing.T, message, data string) []byte {
+	t.Helper()
+	body, err := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "go-GetObject",
+		"error":   map[string]any{"code": -32603, "message": message, "data": data},
+	})
+	require.NoError(t, err, "marshal error reply")
+	return append([]byte(fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))), body...)
+}
+
+// TestGetObjectFromJavaSurfacesRemoteError pins that an error response to a
+// reverse GetObject fails the receive with the peer's message, and puts the
+// peer's frames in the log.
+func TestGetObjectFromJavaSurfacesRemoteError(t *testing.T) {
+	dir := t.TempDir()
+	s := newServer(serverConfig{logFile: filepath.Join(dir, "server.log")})
+	t.Cleanup(s.closeMetrics)
+
+	const remoteMessage = "Internal error: Failed to send object tree-X " +
+		"(type: org.openrewrite.text.PlainText): java.lang.NullPointerException"
+	const remoteTrace = "\tat org.openrewrite.text.PlainTextRpcCodec.rpcSend(PlainTextRpcCodec.java:44)"
+	s.reader = bufio.NewReader(bytes.NewReader(frameReverseGetObjectError(t, remoteMessage, remoteTrace)))
+	s.writer = &bytes.Buffer{}
+
+	recovered := func() (r any) {
+		defer func() { r = recover() }()
+		s.getObjectFromJava("tree-X", "")
+		return nil
+	}()
+
+	require.NotNil(t, recovered, "expected the error response to fail the receive")
+	require.Contains(t, fmt.Sprint(recovered), remoteMessage)
+
+	logged, err := os.ReadFile(filepath.Join(dir, "server.log"))
+	require.NoError(t, err, "read server log")
+	require.Contains(t, string(logged), remoteTrace, "the peer's frames belong in the log")
 }
 
 // TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs reproduces the
