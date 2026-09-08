@@ -21,7 +21,9 @@ import org.openrewrite.Cursor;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.trait.Trait;
 
 /**
@@ -37,7 +39,7 @@ import org.openrewrite.trait.Trait;
  *   <li>ext block assignments: {@code ext { propertyName = 'value' }}</li>
  *   <li>ext field access: {@code ext.propertyName = 'value'}</li>
  *   <li>ext.set() method: {@code ext.set("propertyName", "value")}</li>
- *   <li>ext subscript access: {@code ext['propertyName'] = 'value'}</li>
+ *   <li>ext subscript access: {@code ext['propertyName'] = 'value'} or Kotlin {@code extra["propertyName"] = "value"}</li>
  *   <li>set() in ext block: {@code ext { set('propertyName', 'value') }}</li>
  * </ul>
  */
@@ -184,123 +186,111 @@ public class ExtraProperty implements Trait<J> {
         @Override
         protected @Nullable ExtraProperty test(Cursor cursor) {
             Object node = cursor.getValue();
-
-            // Check for variable declaration: def foo = "bar" or val foo = "bar"
-            if (matchVariableDeclarations && node instanceof J.VariableDeclarations.NamedVariable) {
-                J.VariableDeclarations.NamedVariable var = (J.VariableDeclarations.NamedVariable) node;
-                if (var.getInitializer() instanceof J.Literal) {
-                    J.Literal literal = (J.Literal) var.getInitializer();
-                    if (literal.getValue() instanceof String) {
-                        String name = var.getSimpleName();
-                        if (propertyName == null || propertyName.equals(name)) {
-                            return new ExtraProperty(
-                                    cursor,
-                                    name,
-                                    (String) literal.getValue(),
-                                    PropertySyntax.VARIABLE_DECLARATION
-                            );
-                        }
-                    }
+            String name;
+            Expression value;
+            PropertySyntax syntax;
+            if (node instanceof J.VariableDeclarations.NamedVariable) {
+                if (!matchVariableDeclarations) {
+                    return null;
                 }
+                J.VariableDeclarations.NamedVariable var = (J.VariableDeclarations.NamedVariable) node;
+                name = var.getSimpleName();
+                value = var.getInitializer();
+                syntax = PropertySyntax.VARIABLE_DECLARATION;
+            } else if (node instanceof J.Assignment) {
+                J.Assignment assignment = (J.Assignment) node;
+                syntax = assignmentSyntax(assignment.getVariable(), cursor);
+                name = assignedName(assignment.getVariable());
+                value = assignment.getAssignment();
+            } else if (node instanceof J.MethodInvocation) {
+                J.MethodInvocation method = (J.MethodInvocation) node;
+                syntax = setSyntax(method, cursor);
+                name = syntax == null ? null : stringLiteral(method.getArguments().get(0));
+                value = syntax == null ? null : method.getArguments().get(1);
+            } else {
+                return null;
             }
+            String literal = stringLiteral(value);
+            if (syntax == null || name == null || literal == null || (propertyName != null && !propertyName.equals(name))) {
+                return null;
+            }
+            return new ExtraProperty(cursor, name, literal, syntax);
+        }
 
-            // Check for assignment: ext { foo = "bar" } or ext.foo = "bar" or ext['foo'] = "bar"
+        /**
+         * The property assigned at the cursor through any {@code ext}/{@code extra} form, whatever the value's shape.
+         */
+        public static @Nullable String assignedProperty(Cursor cursor) {
+            Object node = cursor.getValue();
             if (node instanceof J.Assignment) {
                 J.Assignment assignment = (J.Assignment) node;
-                if (!(assignment.getAssignment() instanceof J.Literal)) {
-                    return null;
-                }
-                J.Literal literal = (J.Literal) assignment.getAssignment();
-                if (!(literal.getValue() instanceof String)) {
-                    return null;
-                }
-
-                String name = null;
-                PropertySyntax syntax = null;
-
-                // Check for ext { foo = "bar" }
-                if (assignment.getVariable() instanceof J.Identifier) {
-                    name = ((J.Identifier) assignment.getVariable()).getSimpleName();
-                    J.MethodInvocation enclosingMethod = cursor.firstEnclosing(J.MethodInvocation.class);
-                    if (enclosingMethod != null && "ext".equals(enclosingMethod.getSimpleName())) {
-                        syntax = PropertySyntax.EXT_BLOCK_ASSIGNMENT;
-                    }
-                }
-                // Check for ext.foo = "bar"
-                else if (assignment.getVariable() instanceof J.FieldAccess) {
-                    J.FieldAccess fieldAccess = (J.FieldAccess) assignment.getVariable();
-                    name = fieldAccess.getSimpleName();
-                    if ((fieldAccess.getTarget() instanceof J.Identifier &&
-                            "ext".equals(((J.Identifier) fieldAccess.getTarget()).getSimpleName())) ||
-                            (fieldAccess.getTarget() instanceof J.FieldAccess &&
-                                    "ext".equals(((J.FieldAccess) fieldAccess.getTarget()).getSimpleName()))) {
-                        syntax = PropertySyntax.EXT_FIELD_ACCESS;
-                    }
-                }
-                // Check for ext['foo'] = "bar" (subscript/indexed access)
-                else if (assignment.getVariable() instanceof G.Binary) {
-                    G.Binary binary = (G.Binary) assignment.getVariable();
-                    if (binary.getOperator() == G.Binary.Type.Access &&
-                            binary.getLeft() instanceof J.Identifier &&
-                            "ext".equals(((J.Identifier) binary.getLeft()).getSimpleName()) &&
-                            binary.getRight() instanceof J.Literal) {
-                        J.Literal keyLiteral = (J.Literal) binary.getRight();
-                        if (keyLiteral.getValue() instanceof String) {
-                            name = (String) keyLiteral.getValue();
-                            syntax = PropertySyntax.EXT_SUBSCRIPT_ACCESS;
-                        }
-                    }
-                }
-
-                if (name != null && syntax != null && (propertyName == null || propertyName.equals(name))) {
-                    return new ExtraProperty(cursor, name, (String) literal.getValue(), syntax);
-                }
+                return assignmentSyntax(assignment.getVariable(), cursor) == null ? null : assignedName(assignment.getVariable());
             }
-
-            // Check for ext.set("foo", "bar") or ext { set("foo", "bar") }
             if (node instanceof J.MethodInvocation) {
                 J.MethodInvocation method = (J.MethodInvocation) node;
-                if ("set".equals(method.getSimpleName()) && method.getArguments().size() == 2) {
-                    // Determine if this is ext.set() or set() inside ext block
-                    PropertySyntax setSyntax = null;
-                    if (method.getSelect() instanceof J.Identifier &&
-                            "ext".equals(((J.Identifier) method.getSelect()).getSimpleName())) {
-                        setSyntax = PropertySyntax.EXT_SET_METHOD;
-                    } else if (withinBlock(cursor, "ext")) {
-                        setSyntax = PropertySyntax.EXT_BLOCK_SET_METHOD;
-                    }
-
-                    if (setSyntax != null) {
-                        if (!(method.getArguments().get(0) instanceof J.Literal)) {
-                            return null;
-                        }
-                        J.Literal keyLiteral = (J.Literal) method.getArguments().get(0);
-                        if (!(keyLiteral.getValue() instanceof String)) {
-                            return null;
-                        }
-                        String name = (String) keyLiteral.getValue();
-
-                        if (!(method.getArguments().get(1) instanceof J.Literal)) {
-                            return null;
-                        }
-                        J.Literal valueLiteral = (J.Literal) method.getArguments().get(1);
-                        if (!(valueLiteral.getValue() instanceof String)) {
-                            return null;
-                        }
-
-                        if (propertyName == null || propertyName.equals(name)) {
-                            return new ExtraProperty(
-                                    cursor,
-                                    name,
-                                    (String) valueLiteral.getValue(),
-                                    setSyntax
-                            );
-                        }
-                    }
-                }
+                return setSyntax(method, cursor) == null ? null : stringLiteral(method.getArguments().get(0));
             }
-
             return null;
+        }
+
+        private static @Nullable PropertySyntax assignmentSyntax(Expression variable, Cursor cursor) {
+            if (variable instanceof J.Identifier) {
+                J.MethodInvocation enclosingMethod = cursor.firstEnclosing(J.MethodInvocation.class);
+                return enclosingMethod != null && "ext".equals(enclosingMethod.getSimpleName()) ? PropertySyntax.EXT_BLOCK_ASSIGNMENT : null;
+            }
+            if (variable instanceof J.FieldAccess) {
+                return isExt(((J.FieldAccess) variable).getTarget()) ? PropertySyntax.EXT_FIELD_ACCESS : null;
+            }
+            if (variable instanceof G.Binary) {
+                G.Binary binary = (G.Binary) variable;
+                return binary.getOperator() == G.Binary.Type.Access && isExt(binary.getLeft()) && stringLiteral(binary.getRight()) != null ?
+                        PropertySyntax.EXT_SUBSCRIPT_ACCESS : null;
+            }
+            if (variable instanceof J.MethodInvocation) {
+                // Kotlin extra["foo"] parses as an indexed <get> invocation
+                J.MethodInvocation get = (J.MethodInvocation) variable;
+                return get.getMarkers().findFirst(IndexedAccess.class).isPresent() && isExt(get.getSelect()) &&
+                        get.getArguments().size() == 1 && stringLiteral(get.getArguments().get(0)) != null ?
+                        PropertySyntax.EXT_SUBSCRIPT_ACCESS : null;
+            }
+            return null;
+        }
+
+        private static @Nullable String assignedName(Expression variable) {
+            if (variable instanceof J.Identifier) {
+                return ((J.Identifier) variable).getSimpleName();
+            }
+            if (variable instanceof J.FieldAccess) {
+                return ((J.FieldAccess) variable).getSimpleName();
+            }
+            if (variable instanceof G.Binary) {
+                return stringLiteral(((G.Binary) variable).getRight());
+            }
+            if (variable instanceof J.MethodInvocation) {
+                return stringLiteral(((J.MethodInvocation) variable).getArguments().get(0));
+            }
+            return null;
+        }
+
+        private static @Nullable PropertySyntax setSyntax(J.MethodInvocation method, Cursor cursor) {
+            if (!"set".equals(method.getSimpleName()) || method.getArguments().size() != 2) {
+                return null;
+            }
+            if (isExt(method.getSelect())) {
+                return PropertySyntax.EXT_SET_METHOD;
+            }
+            return withinBlock(cursor, "ext") ? PropertySyntax.EXT_BLOCK_SET_METHOD : null;
+        }
+
+        private static boolean isExt(@Nullable Expression expression) {
+            String name = expression instanceof J.Identifier ? ((J.Identifier) expression).getSimpleName() :
+                    expression instanceof J.FieldAccess ? ((J.FieldAccess) expression).getSimpleName() : null;
+            return "ext".equals(name) || "extra".equals(name);
+        }
+
+        private static @Nullable String stringLiteral(@Nullable Expression expression) {
+            return expression instanceof J.Literal && ((J.Literal) expression).getValue() instanceof String ?
+                    (String) ((J.Literal) expression).getValue() : null;
         }
     }
 }

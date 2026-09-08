@@ -100,6 +100,14 @@ public class GradleProject implements ProjectIdentity, Serializable {
     @With
     GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
 
+    /**
+     * State of the {@code io.spring.dependency-management} plugin, or null when it is not applied or when the LST
+     * predates this field.
+     */
+    @With
+    @Nullable
+    SpringDependencyManagementPlugin springDependencyManagementPlugin;
+
     public GradleBuildscript getBuildscript() {
         // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.
         //noinspection ConstantValue
@@ -214,7 +222,8 @@ public class GradleProject implements ProjectIdentity, Serializable {
                 mavenRepositories,
                 mavenPluginRepositories,
                 configurations,
-                buildscript
+                buildscript,
+                springDependencyManagementPlugin
         );
     }
 
@@ -319,7 +328,8 @@ public class GradleProject implements ProjectIdentity, Serializable {
                 mavenRepositories,
                 mavenPluginRepositories,
                 updateExtendsFrom(updatedConfigurations, untouchedConfigurations),
-                buildscript
+                buildscript,
+                springDependencyManagementPlugin
         );
 
         // All configurations extending from a mutated configuration must be marked as requiring re-resolution to propagate heritable changes
