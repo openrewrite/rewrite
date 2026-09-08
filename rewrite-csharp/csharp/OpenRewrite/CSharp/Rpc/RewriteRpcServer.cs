@@ -629,12 +629,30 @@ public class RewriteRpcServer
     {
         var localObject = _localObjects.GetValueOrDefault(id);
 
+        Task<List<RpcObjectData>> RequestPage() =>
+            _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
+                "GetObject",
+                new GetObjectRequest { Id = id, SourceFileType = sourceFileType });
+
+        // The following page is requested before this one is handed to the queue, so the
+        // remote serializes it while this side deserializes what it already has.
+        Task<List<RpcObjectData>>? nextPage = null;
         var q = new RpcReceiveQueue(
             _remoteRefs,
-            () => _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
-                "GetObject",
-                new GetObjectRequest { Id = id, SourceFileType = sourceFileType })
-                .GetAwaiter().GetResult(),
+            () =>
+            {
+                var pending = nextPage;
+                nextPage = null;
+                var page = (pending ?? RequestPage()).GetAwaiter().GetResult();
+                // A page ending in END_OF_OBJECT has no successor; the remote drops its
+                // transfer state when it sends that marker, so asking again would restart
+                // the transfer rather than return nothing.
+                if (page.Count > 0 && page[^1].State != END_OF_OBJECT)
+                {
+                    nextPage = RequestPage();
+                }
+                return page;
+            },
             sourceFileType,
             TreeCodec.Instance
         );
@@ -646,6 +664,19 @@ public class RewriteRpcServer
         }
         catch (Exception ex)
         {
+            if (nextPage != null)
+            {
+                // The remote has advanced past this page; leaving it unobserved would
+                // hand it to whichever request asks next.
+                try
+                {
+                    nextPage.GetAwaiter().GetResult();
+                }
+                catch
+                {
+                    // the original failure is the one worth reporting
+                }
+            }
             throw new InvalidOperationException(
                 $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
         }

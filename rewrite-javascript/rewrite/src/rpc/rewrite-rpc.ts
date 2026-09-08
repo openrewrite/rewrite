@@ -235,11 +235,33 @@ export class RewriteRpc {
         // (e.g., via a local recipe) since the remote doesn't know about those changes.
         const before = this.remoteObjects.get(id);
 
-        const q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, () => {
-            return this.connection.sendRequest(
+        const requestPage = () => {
+            const page = this.connection.sendRequest(
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
                 new GetObject(id, sourceFileType),
             );
+            // Marks the promise handled so a rejection on a page that is requested but
+            // never awaited is not reported as an unhandled rejection; awaiting it later
+            // still throws.
+            page.catch(() => {
+            });
+            return page;
+        };
+
+        // The following page is requested before this one is handed to the queue, so the
+        // remote serializes it while this side deserializes what it already has.
+        let nextPage: Promise<RpcObjectData[]> | undefined;
+        const q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, async () => {
+            const pending = nextPage;
+            nextPage = undefined;
+            const page = await (pending ?? requestPage());
+            // A page ending in END_OF_OBJECT has no successor; the remote drops its
+            // transfer state when it sends that marker, so asking again would restart
+            // the transfer rather than return nothing.
+            if (page.length > 0 && page[page.length - 1].state !== RpcObjectState.END_OF_OBJECT) {
+                nextPage = requestPage();
+            }
+            return page;
         }, this.logger, this.traceGetObject.receive);
 
         let remoteObject: P;
@@ -249,6 +271,12 @@ export class RewriteRpc {
             // Reset our tracking of the remote state so the next interaction
             // forces a full object sync (ADD) instead of a delta (CHANGE).
             this.remoteObjects.delete(id);
+            if (nextPage) {
+                // The remote has advanced past this page; leaving it would hand it to
+                // whichever request asks next.
+                await nextPage.catch(() => {
+                });
+            }
             throw e;
         }
 
