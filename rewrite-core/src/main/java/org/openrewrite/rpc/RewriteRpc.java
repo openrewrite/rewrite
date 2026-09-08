@@ -45,6 +45,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -767,13 +768,18 @@ public class RewriteRpc {
             CompletableFuture<JsonRpcSuccess> future = jsonRpc.send(JsonRpcRequest.newRequest(method, body));
 
             // future.get(timeout) from a FJP worker triggers ManagedBlocker compensation,
-            // which spawns helper threads that can leak per-thread RewriteRpc state.
-            long pollIntervalMs = 1;
+            // which spawns helper threads that can leak per-thread RewriteRpc state. So the
+            // completion unparks this thread instead: a response arrives in a few hundred
+            // microseconds, while Thread.sleep cannot wait for less than about a millisecond
+            // before Java 21 -- long enough to dominate a request that is otherwise idle.
+            Thread waiter = Thread.currentThread();
+            boolean unparkRegistered = false;
+
             long livenessIntervalNanos = TimeUnit.MILLISECONDS.toNanos(500);
             long startNanos = System.nanoTime();
             long deadlineNanos = startNanos + TimeUnit.MILLISECONDS.toNanos(timeout.toMillis());
             long lastLivenessNanos = startNanos;
-            while (System.nanoTime() < deadlineNanos) {
+            while (true) {
                 JsonRpcSuccess result = future.getNow(null);
                 if (result != null) {
                     return result.getResult(responseType);
@@ -781,7 +787,23 @@ public class RewriteRpc {
                 if (future.isCompletedExceptionally()) {
                     return future.get().getResult(responseType);
                 }
-                Thread.sleep(pollIntervalMs);
+                if (!unparkRegistered) {
+                    // Registered only once the response is known not to be here yet: on an
+                    // already-completed future this runs inline, and the permit it grants
+                    // would outlive this call and release someone else's park.
+                    future.whenComplete((r, t) -> LockSupport.unpark(waiter));
+                    unparkRegistered = true;
+                }
+                long parkUntilNanos = System.nanoTime();
+                if (parkUntilNanos >= deadlineNanos) {
+                    break;
+                }
+                // Bounded so liveness is still checked on its own cadence, and because a
+                // park may return spuriously; the loop re-reads the future either way.
+                LockSupport.parkNanos(Math.min(livenessIntervalNanos, deadlineNanos - parkUntilNanos));
+                if (Thread.interrupted()) {
+                    throw new InterruptedException();
+                }
                 long nowNanos = System.nanoTime();
                 if (nowNanos - lastLivenessNanos >= livenessIntervalNanos) {
                     checkLiveness();
