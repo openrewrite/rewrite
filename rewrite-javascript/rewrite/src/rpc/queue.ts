@@ -318,6 +318,7 @@ export class RpcSendQueue {
 
 export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
+    private batchIndex = 0;
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly sourceFileType: string | undefined,
@@ -327,10 +328,13 @@ export class RpcReceiveQueue {
     }
 
     async take(): Promise<RpcObjectData> {
-        if (this.batch.length === 0) {
+        if (this.batchIndex >= this.batch.length) {
             this.batch = await this.pull();
+            this.batchIndex = 0;
         }
-        return this.batch.shift()!;
+        // An index keeps draining a batch linear; Array.shift() copies the remaining
+        // elements on every call, which is quadratic over the batch.
+        return this.batch[this.batchIndex++]!;
     }
 
     receiveMarkers(markers?: Markers): Promise<Markers> {
