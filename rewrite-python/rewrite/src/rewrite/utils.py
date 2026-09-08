@@ -1,10 +1,22 @@
 import os
 from random import Random
-from dataclasses import fields as _dataclass_fields, is_dataclass as _is_dataclass, replace as dataclass_replace
-from typing import Any, Callable, Dict, TypeVar, List, Tuple, Union, cast
+from dataclasses import dataclass, fields as _dataclass_fields, is_dataclass as _is_dataclass, replace as dataclass_replace
+from typing import Any, Callable, Dict, TypeVar, List, Tuple, Union, cast, dataclass_transform
 from uuid import UUID
 
 T = TypeVar('T')
+
+
+@dataclass_transform(frozen_default=True, eq_default=False)
+def lst_dataclass(cls):
+    """An LST node: read-only to a type checker, ordinary to the interpreter.
+
+    `frozen=True` would put every field of every node through
+    `object.__setattr__`, which costs about five times a plain assignment. The
+    read-only contract is the type checker's to keep, as it is for the Java and
+    TypeScript models, neither of which enforces it at runtime either.
+    """
+    return dataclass(eq=False, slots=True)(cls)
 
 # Per-class cache of init-field names. `dataclasses.replace` re-walks
 # `__dataclass_fields__` on every call to fill in missing fields via getattr;

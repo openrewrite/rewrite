@@ -6,10 +6,10 @@ from typing import Optional, List, Dict
 from uuid import UUID
 
 from rewrite import Marker
-from rewrite.utils import replace_if_changed
+from rewrite.utils import lst_dataclass, replace_if_changed
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class KeywordArguments(Marker):
     _id: UUID
 
@@ -17,7 +17,7 @@ class KeywordArguments(Marker):
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class KeywordOnlyArguments(Marker):
     _id: UUID
 
@@ -25,7 +25,7 @@ class KeywordOnlyArguments(Marker):
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class Quoted(Marker):
     _id: UUID
 
@@ -64,7 +64,7 @@ class Quoted(Marker):
             return ""
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class SuppressNewline(Marker):
     """Marker to suppress trailing newline in compilation units."""
     _id: UUID
@@ -73,7 +73,7 @@ class SuppressNewline(Marker):
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class LegacyNotEqual(Marker):
     """Marker for the Python 2 ``<>`` not-equal operator on a :class:`j.Binary`.
 
@@ -86,7 +86,7 @@ class LegacyNotEqual(Marker):
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class RaiseTuple(Marker):
     """Marker for the Python 2 three-argument ``raise E, v, tb`` form on a :class:`j.Throw`.
 
@@ -100,7 +100,7 @@ class RaiseTuple(Marker):
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class TupleExceptClause(Marker):
     """Marker for the Python 2 ``except E, e:`` (comma) form on a J.Try.Catch.
 
@@ -113,7 +113,7 @@ class TupleExceptClause(Marker):
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class PrintSyntax(Marker):
     """Marker indicating a J.MethodInvocation represents a Python 2 print statement.
 
@@ -144,7 +144,7 @@ class PrintSyntax(Marker):
         return self if trailing_comma is self._trailing_comma else replace(self, _trailing_comma=trailing_comma)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class ExecSyntax(Marker):
     """Marker indicating a J.MethodInvocation represents a Python 2 exec statement.
 
@@ -159,7 +159,7 @@ class ExecSyntax(Marker):
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class PythonResolutionResult(Marker):
     """Contains metadata about a Python project, parsed from pyproject.toml and uv.lock."""
 
@@ -170,7 +170,7 @@ class PythonResolutionResult(Marker):
         Poetry = auto()
         Pdm = auto()
 
-    @dataclass(frozen=True, eq=False, slots=True)
+    @lst_dataclass
     class SourceIndex:
         _name: str
         _url: str
@@ -197,7 +197,7 @@ class PythonResolutionResult(Marker):
         def with_default_index(self, default_index: bool) -> PythonResolutionResult.SourceIndex:
             return self if default_index is self._default_index else replace(self, _default_index=default_index)
 
-    @dataclass(frozen=True, eq=False, slots=True)
+    @lst_dataclass
     class ResolvedDependency:
         _name: str
         _version: str
@@ -232,7 +232,7 @@ class PythonResolutionResult(Marker):
         def with_dependencies(self, dependencies: Optional[List[PythonResolutionResult.ResolvedDependency]]) -> PythonResolutionResult.ResolvedDependency:
             return self if dependencies is self._dependencies else replace(self, _dependencies=dependencies)
 
-    @dataclass(frozen=True, eq=False, slots=True)
+    @lst_dataclass
     class Dependency:
         _name: str
         _version_constraint: Optional[str]
