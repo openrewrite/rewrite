@@ -9,7 +9,7 @@ from uuid import UUID
 
 from rewrite import Markers
 from rewrite import Tree, SourceFile, TreeVisitor
-from rewrite.utils import replace_if_changed
+from rewrite.utils import lst_dataclass, lst_value_dataclass, replace_if_changed
 
 if TYPE_CHECKING:
     from .visitor import JavaVisitor
@@ -49,7 +49,7 @@ class J(Tree):
         ...
 
 
-@dataclass(frozen=True, slots=True)
+@lst_value_dataclass
 class Comment(ABC):
     @property
     @abstractmethod
@@ -79,7 +79,7 @@ class Comment(ABC):
         return replace_if_changed(self, **kwargs)
 
 
-@dataclass(frozen=True, slots=True)
+@lst_value_dataclass
 class TextComment(Comment):
     _multiline: bool
 
@@ -89,13 +89,13 @@ class TextComment(Comment):
 
     # IMPORTANT: This explicit constructor aligns the parameter order with the Java side
     def __init__(self, _multiline: bool, _text: str, _suffix: str, _markers: Markers) -> None:
-        object.__setattr__(self, '_multiline', _multiline)
-        object.__setattr__(self, '_text', _text)
-        object.__setattr__(self, '_suffix', _suffix)
-        object.__setattr__(self, '_markers', _markers)
+        self._multiline = _multiline
+        self._text = _text
+        self._suffix = _suffix
+        self._markers = _markers
 
 
-@dataclass(frozen=True, slots=True)
+@lst_value_dataclass
 class Space:
     _comments: List[Comment]
 
@@ -115,6 +115,17 @@ class Space:
 
     def is_empty(self) -> bool:
         return len(self._comments) == 0 and (self._whitespace is None or self._whitespace == '')
+
+    @classmethod
+    def build(cls, comments: List[Comment], whitespace: Optional[str]) -> Space:
+        """The two comment-free whitespace values that dominate a tree are shared
+        instances; every other Space is built fresh."""
+        if not comments:
+            if not whitespace:
+                return cls.EMPTY
+            if whitespace == ' ':
+                return cls.SINGLE_SPACE
+        return cls(comments, whitespace)
 
     @classmethod
     def first_prefix(cls, trees: Optional[Iterable[J]]) -> Space:
@@ -518,7 +529,7 @@ J2 = TypeVar('J2', bound=J)
 J3 = TypeVar('J3', bound=J)
 
 
-@dataclass(frozen=True, slots=True)
+@lst_dataclass
 class JRightPadded(Generic[T]):
     _element: T
 
@@ -592,7 +603,7 @@ class JRightPadded(Generic[T]):
 
 
 
-@dataclass(frozen=True, slots=True)
+@lst_dataclass
 class JLeftPadded(Generic[T]):
     _before: Space
 
@@ -626,7 +637,7 @@ class JLeftPadded(Generic[T]):
 
 
 
-@dataclass(frozen=True, slots=True)
+@lst_dataclass
 class JContainer(Generic[J2]):
     _before: Space
 
