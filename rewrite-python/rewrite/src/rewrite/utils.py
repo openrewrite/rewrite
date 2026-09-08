@@ -57,6 +57,42 @@ def _is_changed(old, new) -> bool:
     return True  # different identity → changed
 
 
+_MUTABLE_CACHE: Dict[type, bool] = {}
+
+
+def _accepts_assignment(cls: type) -> bool:
+    mutable = _MUTABLE_CACHE.get(cls)
+    if mutable is None:
+        mutable = _is_dataclass(cls) and not cls.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        _MUTABLE_CACHE[cls] = mutable
+    return mutable
+
+
+def assign_fields(obj: T, **kwargs) -> T:
+    """Set fields on an object the caller solely owns, mapping names as
+    `replace_if_changed` does."""
+    cls = type(obj)
+    if not _accepts_assignment(cls):
+        return replace_if_changed(obj, **kwargs)
+
+    init_fields = _INIT_FIELDS_CACHE.get(cls)
+    if init_fields is None:
+        init_fields = tuple(f.name for f in _dataclass_fields(cls) if f.init)
+        _INIT_FIELDS_CACHE[cls] = init_fields
+
+    for key, value in kwargs.items():
+        if key.startswith('_'):
+            private_key = key
+        else:
+            private_key = f'_{key.rstrip("_")}'
+            if private_key not in init_fields:
+                private_key = key
+        if private_key == '_id':
+            value = id_to_int(value)
+        setattr(obj, private_key, value)
+    return obj
+
+
 def replace_if_changed(obj: T, **kwargs) -> T:
     """Replace fields on a dataclass, returning the original if nothing changed.
 
