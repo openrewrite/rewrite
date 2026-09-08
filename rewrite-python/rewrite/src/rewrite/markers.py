@@ -104,9 +104,21 @@ class Markers:
     def __hash__(self) -> int:
         return hash(self._id)
 
+    _LAST_EMPTY: ClassVar[Optional[Markers]] = None
+
     @classmethod
     def build(cls, id: UUID, markers: List[Marker]) -> Markers:
-        return Markers(id, markers)
+        """Marker-free nodes share one instance, and so one id, on the sending
+        side; the last empty Markers stands in whenever that id comes round."""
+        if markers:
+            return Markers(id, markers)
+        key = id if type(id) is int else id_to_int(id)
+        cached = cls._LAST_EMPTY
+        if cached is not None and cached._id == key:
+            return cached
+        cached = Markers(key, markers)
+        cls._LAST_EMPTY = cached
+        return cached
 
 
 Markers.EMPTY = Markers(random_id(), [])

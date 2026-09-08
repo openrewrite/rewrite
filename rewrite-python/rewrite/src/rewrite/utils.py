@@ -18,6 +18,21 @@ def lst_dataclass(cls):
     """
     return dataclass(eq=False, slots=True)(cls)
 
+
+@dataclass_transform(frozen_default=True)
+def lst_value_dataclass(cls):
+    """An LST node compared by value, otherwise as `lst_dataclass`.
+
+    Whitespace and comments carry no id, so `prefix == Space.EMPTY` and the
+    like have to compare fields.
+    """
+    built = dataclass(slots=True)(cls)
+    # `dataclass` drops __hash__ wherever it generates __eq__ without freezing, so
+    # the hash these nodes' equality implies is put back explicitly.
+    names = tuple(f.name for f in _dataclass_fields(built) if f.compare)
+    built.__hash__ = lambda self: hash(tuple(getattr(self, n) for n in names))
+    return built
+
 # Per-class cache of init-field names. `dataclasses.replace` re-walks
 # `__dataclass_fields__` on every call to fill in missing fields via getattr;
 # we'd rather pay the introspection once per class and then construct directly

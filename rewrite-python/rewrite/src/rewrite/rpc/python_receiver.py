@@ -862,7 +862,7 @@ class PythonRpcReceiver:
         if comments is space.comments and whitespace is space.whitespace:
             return space
 
-        return space.replace(comments=comments).replace(whitespace=whitespace)
+        return Space.build(comments, whitespace)
 
     def _receive_comment(self, comment, q: RpcReceiveQueue):
         """Receive a Comment object (TextComment only for Python)."""

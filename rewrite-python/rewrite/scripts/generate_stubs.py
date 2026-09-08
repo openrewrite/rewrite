@@ -252,13 +252,13 @@ def is_dataclass(node: ast.ClassDef) -> bool:
 def is_frozen_dataclass(node: ast.ClassDef) -> bool:
     """Check whether a class is read-only to a type checker.
 
-    Either spelling counts: `@dataclass(frozen=True)`, or `@lst_dataclass`,
-    which is a `dataclass_transform` carrying `frozen_default=True` so that the
-    node stays read-only to a checker without the interpreter enforcing it.
-    Both must reach the stub as `@dataclass(frozen=True)`.
+    Three spellings count: `@dataclass(frozen=True)`, `@lst_dataclass` and
+    `@lst_value_dataclass`. The latter two are `dataclass_transform`s carrying
+    `frozen_default=True`, so the node stays read-only to a checker without the
+    interpreter enforcing it. All must reach the stub as `@dataclass(frozen=True)`.
     """
     for decorator in node.decorator_list:
-        if isinstance(decorator, ast.Name) and decorator.id == "lst_dataclass":
+        if isinstance(decorator, ast.Name) and decorator.id in ("lst_dataclass", "lst_value_dataclass"):
             return True
         if isinstance(decorator, ast.Call):
             if isinstance(decorator.func, ast.Name) and decorator.func.id == "dataclass":
