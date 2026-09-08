@@ -83,8 +83,14 @@ class PythonRpcThroughputTest {
     @BeforeEach
     void before() {
         // Tracing is deliberately off: it logs every batch, which is the thing being timed.
-        PythonRewriteRpc.setFactory(PythonRewriteRpc.builder()
-                .log(tempDir.resolve("python-rpc.log")));
+        PythonRewriteRpc.Builder builder = PythonRewriteRpc.builder()
+                .log(tempDir.resolve("python-rpc.log"));
+        String exe = System.getenv("REWRITE_PY_EXE");
+        if (exe != null) {
+            builder = builder.pythonPath(java.nio.file.Paths.get(exe));
+        }
+        System.out.println("PYEXE " + (exe == null ? "<default>" : exe));
+        PythonRewriteRpc.setFactory(builder);
     }
 
     @AfterEach
