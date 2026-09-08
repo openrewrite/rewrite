@@ -111,19 +111,132 @@ func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error)
 		return nil, fmt.Errorf("expected JSON array, got %v", open)
 	}
 	batch := make([]RpcObjectData, 0, len(data)/40+1)
-	var w wireObjectData
 	for dec.More() {
-		w = wireObjectData{}
-		if err := dec.Decode(&w); err != nil {
+		d, err := decodeObjectData(dec, intern)
+		if err != nil {
 			return nil, err
-		}
-		d := RpcObjectData{State: parseState(w.State), ValueType: w.ValueType, Ref: w.Ref}
-		if w.Value != nil {
-			d.Value = decodeValue(w.Value, intern)
 		}
 		batch = append(batch, d)
 	}
 	return batch, nil
+}
+
+// Reads one message straight off the token stream. Binding into a struct whose value
+// is an `any` materializes a map/slice tree that a second walk then has to revisit to
+// intern strings and give numbers the type their JSON shape implies; the tokens carry
+// enough to build the final value in one pass.
+func decodeObjectData(dec *json.Decoder, tbl map[string]string) (RpcObjectData, error) {
+	var d RpcObjectData
+	t, err := dec.Token()
+	if err != nil {
+		return d, err
+	}
+	if delim, ok := t.(json.Delim); !ok || delim != '{' {
+		return d, fmt.Errorf("expected JSON object, got %v", t)
+	}
+	for dec.More() {
+		kt, err := dec.Token()
+		if err != nil {
+			return d, err
+		}
+		key, ok := kt.(string)
+		if !ok {
+			return d, fmt.Errorf("expected member name, got %v", kt)
+		}
+		switch key {
+		case "state":
+			v, err := dec.Token()
+			if err != nil {
+				return d, err
+			}
+			name, ok := v.(string)
+			if !ok {
+				return d, fmt.Errorf("state is not a string: %v", v)
+			}
+			d.State = parseState(name)
+		case "valueType":
+			v, err := dec.Token()
+			if err != nil {
+				return d, err
+			}
+			if name, ok := v.(string); ok {
+				name = internString(name, tbl)
+				d.ValueType = &name
+			}
+		case "ref":
+			v, err := dec.Token()
+			if err != nil {
+				return d, err
+			}
+			if n, ok := v.(json.Number); ok {
+				ref, err := strconv.Atoi(n.String())
+				if err != nil {
+					return d, err
+				}
+				d.Ref = &ref
+			}
+		case "value":
+			if d.Value, err = decodeTokenValue(dec, tbl); err != nil {
+				return d, err
+			}
+		default:
+			var skipped any
+			if err := dec.Decode(&skipped); err != nil {
+				return d, err
+			}
+		}
+	}
+	if _, err := dec.Token(); err != nil { // closing brace
+		return d, err
+	}
+	return d, nil
+}
+
+func decodeTokenValue(dec *json.Decoder, tbl map[string]string) (any, error) {
+	t, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	switch v := t.(type) {
+	case json.Delim:
+		switch v {
+		case '[':
+			arr := []any{}
+			for dec.More() {
+				e, err := decodeTokenValue(dec, tbl)
+				if err != nil {
+					return nil, err
+				}
+				arr = append(arr, e)
+			}
+			_, err = dec.Token() // closing bracket
+			return arr, err
+		case '{':
+			m := map[string]any{}
+			for dec.More() {
+				kt, err := dec.Token()
+				if err != nil {
+					return nil, err
+				}
+				k, ok := kt.(string)
+				if !ok {
+					return nil, fmt.Errorf("expected member name, got %v", kt)
+				}
+				if m[internString(k, tbl)], err = decodeTokenValue(dec, tbl); err != nil {
+					return nil, err
+				}
+			}
+			_, err = dec.Token() // closing brace
+			return m, err
+		}
+		return nil, fmt.Errorf("unexpected delimiter %v", v)
+	case string:
+		return internString(v, tbl), nil
+	case json.Number:
+		return decodeNumber(v), nil
+	default:
+		return v, nil
+	}
 }
 
 func decodeValue(v any, tbl map[string]string) any {
