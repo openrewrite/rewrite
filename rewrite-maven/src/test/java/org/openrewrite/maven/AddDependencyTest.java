@@ -495,6 +495,152 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"compile", "provided", "test"})
+    @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
+    void addWhenTransitiveVersionIsOutsideTheRequestedRange(String scope) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.validation:jakarta.validation-api:3.0.x", null, scope, true)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>6.2.5.Final</version>%s
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(scopeElement(scope)),
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.validation</groupId>
+                          <artifactId>jakarta.validation-api</artifactId>
+                          <version>3.0.2</version>%s
+                      </dependency>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>6.2.5.Final</version>%s
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(scopeElement(scope), scopeElement(scope))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"compile", "provided", "test"})
+    @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
+    void doNotAddWhenTransitiveVersionSatisfiesTheRequestedRange(String scope) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.validation:jakarta.validation-api:3.0.x", null, scope, true)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>8.0.2.Final</version>%s
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(scopeElement(scope))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"compile", "provided", "test"})
+    @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
+    void doNotAddForLatestReleaseWhateverTheTransitiveVersion(String scope) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.validation:jakarta.validation-api:latest.release", null, scope, true)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>6.2.5.Final</version>%s
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(scopeElement(scope))
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
+    @Test
+    void addWithoutVersionWhenTransitiveIsNewerThanTheRequestedRangeButManaged() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.annotation:jakarta.annotation-api:2.0.x", null, "compile", true)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.0.5</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.0.5</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>jakarta.annotation</groupId>
+                    <artifactId>jakarta.annotation-api</artifactId>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void semverSelector(String onlyIfUsing) {
         rewriteRun(
@@ -2454,6 +2600,10 @@ class AddDependencyTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static String scopeElement(String scope) {
+        return "compile".equals(scope) ? "" : "\n            <scope>" + scope + "</scope>";
     }
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {

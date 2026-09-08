@@ -30,7 +30,7 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.Scope;
-import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.*;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -237,7 +237,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         if (d.isTransitive() &&
                             hasAcceptableTransitivity(d, acc) &&
                             groupId.equals(d.getGroupId()) &&
-                            artifactId.equals(d.getArtifactId())) {
+                            artifactId.equals(d.getArtifactId()) &&
+                            satisfiesRequestedVersion(d)) {
                             return maven;
                         }
                     }
@@ -249,7 +250,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     for (ResolvedDependency d : dependencies.get(resolvedScopeEnum)) {
                         if (d.isTransitive() &&
                                 hasAcceptableTransitivity(d, acc) &&
-                                groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId()) &&
+                                satisfiesRequestedVersion(d)) {
                             return maven;
                         }
                     }
@@ -294,5 +296,29 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     private boolean hasAcceptableTransitivity(ResolvedDependency d, Scanned acc) {
         return d.isDirect() || Boolean.TRUE.equals(acceptTransitive) && (onlyIfUsing == null || !acc.scopeByProject.isEmpty());
+    }
+
+    private boolean satisfiesRequestedVersion(ResolvedDependency d) {
+        //noinspection ConstantConditions
+        if (version == null) {
+            return true;
+        }
+        Validated<VersionComparator> validated = Semver.validate(version, versionPattern);
+        if (!validated.isValid()) {
+            // An unparseable selector says nothing about the resolved version, so accept it as before.
+            return true;
+        }
+        VersionComparator versionComparator = validated.getValue();
+        return versionComparator == null || !isRange(versionComparator) ||
+               versionComparator.isValid(d.getVersion(), d.getVersion());
+    }
+
+    private static boolean isRange(VersionComparator versionComparator) {
+        // exact and latest.* are deliberately excluded: neither states a constraint
+        return versionComparator instanceof XRange ||
+               versionComparator instanceof TildeRange ||
+               versionComparator instanceof CaretRange ||
+               versionComparator instanceof HyphenRange ||
+               versionComparator instanceof SetRange;
     }
 }
