@@ -401,11 +401,15 @@ export class RpcReceiveQueue {
         });
     }
 
+    /**
+     * Receives a list slot the model declares non-optional, reading an absent list as empty. A peer
+     * holds null for such a slot in an LST deserialized before the slot existed.
+     */
     async receiveListDefined<T>(
         before: T[] | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T[]> {
-        return (await this.receiveList(before, onChange))!;
+        return (await this.receiveList(before, onChange)) ?? [];
     }
 
     receiveList<T>(
