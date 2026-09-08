@@ -648,7 +648,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             .<ExecutionContext>asVisitor((property, c) -> property.withValue(version).getTree())
                             .visitNonNull(cu, ctx);
                 } else {
-                    cu = SpringBomProperty.addDeclaration(cu, name, version, ctx);
+                    cu = SpringBomProperty.addDeclaration(new Cursor(getCursor(), cu), name, version);
                 }
             }
             return cu;
