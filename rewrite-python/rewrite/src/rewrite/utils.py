@@ -1,4 +1,5 @@
 import os
+from random import Random
 from dataclasses import fields as _dataclass_fields, is_dataclass as _is_dataclass, replace as dataclass_replace
 from typing import Any, Callable, Dict, TypeVar, List, Tuple, Union, cast
 from uuid import UUID
@@ -99,16 +100,21 @@ def replace_if_changed(obj: T, **kwargs) -> T:
     return cls(**new_kwargs)
 
 
+# Ids come from a generator of our own, not the `random` module's shared one: an
+# id is the list-diff key, so a `random.seed()` call anywhere in the process, or a
+# fork, must not make two trees draw the same sequence.
+_ids = Random()
+if hasattr(os, 'register_at_fork'):
+    os.register_at_fork(after_in_child=_ids.seed)
+
+
 def random_id() -> int:
-    # LST/marker ids are stored internally as a 128-bit int (the UUID's own
-    # representation) to avoid the ~64-byte-per-id `uuid.UUID` wrapper. The public
-    # `.id` properties reconstruct a `UUID` lazily, so the API is unchanged.
-    #
-    # Equivalent to `uuid4().int` but without allocating/discarding a UUID object:
-    # `os.urandom(16)` is the same cryptographic source `uuid4()` uses, and we read
-    # the 128-bit value directly (skipping the v4 version/variant bit-twiddle, which
-    # is irrelevant for an opaque identity).
-    return int.from_bytes(os.urandom(16), 'big')
+    # Ids are stored as a 128-bit int (the UUID's own representation) to avoid the
+    # ~64-byte `uuid.UUID` wrapper; the `.id` properties rebuild a UUID lazily, so
+    # the API is unchanged. The value comes from userspace because an id names a
+    # node and carries no secret, while the kernel's costs a syscall per id and a
+    # tree has one per node -- Java draws these from ThreadLocalRandom.
+    return _ids.getrandbits(128)
 
 
 def id_to_str(value: int) -> str:
