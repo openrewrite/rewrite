@@ -729,9 +729,23 @@ public class RewriteRpc {
         // (e.g., via a Java-side recipe) since the remote doesn't know about those changes.
         Object before = remoteObjects.get(id);
 
+        GetObject request = new GetObject(id, sourceFileType);
+        AtomicReference<CompletableFuture<JsonRpcSuccess>> nextPage = new AtomicReference<>();
         RpcReceiveQueue q = new RpcReceiveQueue(
                 remoteRefs,
-                () -> send("GetObject", new GetObject(id, sourceFileType), GetObjectResponse.class),
+                () -> {
+                    CompletableFuture<JsonRpcSuccess> pending = nextPage.getAndSet(null);
+                    GetObjectResponse page = await(pending == null ? request("GetObject", request) : pending,
+                            GetObjectResponse.class);
+                    // The following page is requested before this one is handed over, so the
+                    // remote serializes it while this one is being deserialized. A page ending
+                    // in END_OF_OBJECT has no successor, and asking for one would restart the
+                    // transfer rather than return nothing.
+                    if (!page.isEmpty() && page.get(page.size() - 1).getState() != END_OF_OBJECT) {
+                        nextPage.set(request("GetObject", request));
+                    }
+                    return page;
+                },
                 sourceFileType,
                 log.get()
         );
@@ -742,6 +756,15 @@ public class RewriteRpc {
             // Reset our tracking of the remote state so the next interaction
             // forces a full object sync (ADD) instead of a delta (CHANGE).
             remoteObjects.remove(id);
+            CompletableFuture<JsonRpcSuccess> pending = nextPage.getAndSet(null);
+            if (pending != null) {
+                // The remote has already advanced past this page; leaving it unread would
+                // hand it to whichever request asks next.
+                try {
+                    await(pending, GetObjectResponse.class);
+                } catch (Exception ignored) {
+                }
+            }
             throw e;
         }
         RpcObjectData endMarker = q.take();
@@ -761,11 +784,22 @@ public class RewriteRpc {
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
+        return await(request(method, body), responseType);
+    }
+
+    /**
+     * Puts a request on the wire without waiting for it, so a caller can have the next
+     * one in flight while it works through the current response. Requests carry distinct
+     * ids and their futures complete independently, so several may be outstanding.
+     */
+    private CompletableFuture<JsonRpcSuccess> request(String method, @Nullable RpcRequest body) {
+        checkLiveness();
+        return jsonRpc.send(JsonRpcRequest.newRequest(method, body));
+    }
+
+    private <P> P await(CompletableFuture<JsonRpcSuccess> future, Class<P> responseType) {
         checkLiveness();
         try {
-
-            // Send the request and get the future
-            CompletableFuture<JsonRpcSuccess> future = jsonRpc.send(JsonRpcRequest.newRequest(method, body));
 
             // future.get(timeout) from a FJP worker triggers ManagedBlocker compensation,
             // which spawns helper threads that can leak per-thread RewriteRpc state. So the
