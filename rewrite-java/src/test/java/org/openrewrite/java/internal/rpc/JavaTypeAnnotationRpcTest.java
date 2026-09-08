@@ -72,6 +72,23 @@ class JavaTypeAnnotationRpcTest {
     }
 
     @Test
+    void roundTripsAnnotationWithNullValue() {
+        // e.g. C#'s `[Foo(null)]` — the value is null, so neither slot is set
+        JavaType.Method element = methodOn("com.example.Foo", "value", JavaType.Primitive.String);
+        JavaType.Annotation original = annotation("com.example.Foo", List.of(
+                new JavaType.Annotation.SingleElementValue(element, null, null)));
+
+        JavaType.Annotation roundTripped = sendAndReceive(original);
+
+        JavaType.Annotation.SingleElementValue sev =
+                (JavaType.Annotation.SingleElementValue) roundTripped.getValues().get(0);
+        assertThat(sev.getValue()).isNull();
+
+        // the type signature builder is the one production caller that reads getValue()
+        assertThat(roundTripped.toString()).endsWith("=null)");
+    }
+
+    @Test
     void roundTripsAnnotationWithArrayConstantValues() {
         // e.g. @SuppressWarnings({"a", "b"}) — array of strings
         JavaType.Method element = methodOn("java.lang.SuppressWarnings", "value", JavaType.Primitive.String);
