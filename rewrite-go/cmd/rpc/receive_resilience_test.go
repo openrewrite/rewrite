@@ -59,13 +59,19 @@ func TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs(t *testing.T) {
 	//  1) a bare reference to an object Go never received -> panics mid-receive
 	//     ("received reference to unknown object: 7"), a documented cascade
 	//     signature.
-	//  2) a clean full ADD of a simple value -> the follow-up request.
+	//  2) the page Go asks for ahead of the panic, since reply 1 does not close
+	//     the transfer; the failed transfer drains it rather than leaving it for
+	//     the next request to misread.
+	//  3) a clean full ADD of a simple value -> the follow-up request.
 	stream := append(
 		frameReverseGetObjectReply(t, []map[string]any{{"state": "ADD", "ref": 7}}),
-		frameReverseGetObjectReply(t, []map[string]any{
-			{"state": "ADD", "value": "package main\n"},
-			{"state": "END_OF_OBJECT"},
-		})...,
+		append(
+			frameReverseGetObjectReply(t, []map[string]any{{"state": "END_OF_OBJECT"}}),
+			frameReverseGetObjectReply(t, []map[string]any{
+				{"state": "ADD", "value": "package main\n"},
+				{"state": "END_OF_OBJECT"},
+			})...,
+		)...,
 	)
 	s.reader = bufio.NewReader(bytes.NewReader(stream))
 	s.writer = &bytes.Buffer{} // the GetObject requests Go writes are irrelevant here
