@@ -154,29 +154,34 @@ func (q *SendQueue) sendList(after, before []any, id func(any) any, onChange fun
 			return
 		}
 
-		// Build before index map
-		beforeIdx := make(map[any]int)
-		if before != nil {
+		positions := make([]any, len(after))
+		if len(before) == 0 {
+			// Every element is an addition, so the positions are a constant that needs
+			// neither an index map nor a key computed per element.
+			for i := range positions {
+				positions[i] = AddedListItem
+			}
+		} else {
+			beforeIdx := make(map[any]int, len(before))
 			for i, b := range before {
 				beforeIdx[id(b)] = i
 			}
-		}
-
-		// Send positions
-		positions := make([]any, len(after))
-		for i, a := range after {
-			if pos, ok := beforeIdx[id(a)]; ok {
-				positions[i] = pos
-			} else {
-				positions[i] = AddedListItem
+			for i, a := range after {
+				if pos, ok := beforeIdx[id(a)]; ok {
+					positions[i] = pos
+				} else {
+					positions[i] = AddedListItem
+				}
 			}
 		}
 		q.Put(RpcObjectData{State: Change, Value: positions})
 
 		// Send each item
-		for _, a := range after {
-			aid := id(a)
-			pos, existed := beforeIdx[aid]
+		for i, a := range after {
+			pos, existed := 0, false
+			if p, ok := positions[i].(int); ok && p != AddedListItem {
+				pos, existed = p, true
+			}
 			var onChangeRun func(any)
 			if onChange != nil {
 				item := a
