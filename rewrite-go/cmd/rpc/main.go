@@ -234,7 +234,7 @@ func newServer(cfg serverConfig) *server {
 		remoteObjects:           make(map[string]any),
 		localRefs:               rpc.NewReferenceMap(),
 		inProgressGetObjects:    make(map[string]*getObjectTransfer),
-		pendingDependencyTypes:       make(map[string][]rpc.RpcObjectData),
+		pendingDependencyTypes:  make(map[string][]rpc.RpcObjectData),
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		reverseTypePool:         make(map[string]java.JavaType),
@@ -434,8 +434,26 @@ func (s *server) writeMessage(resp *jsonRPCResponse) error {
 	if err != nil {
 		return err
 	}
-	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
-	_, err = s.writer.Write(append([]byte(header), body...))
+	return s.writeFramed(body)
+}
+
+// Frame buffers are pooled rather than held on the server: a framed write is
+// reachable from the request loop and from a transfer goroutine, so a shared
+// scratch buffer would race.
+var framePool = sync.Pool{New: func() any { b := make([]byte, 0, 1<<16); return &b }}
+
+// Writes one Content-Length framed message in a single Write. The frame is
+// assembled in a pooled buffer, so the payload is not copied into a freshly
+// allocated one, and the header does not cost a second write.
+func (s *server) writeFramed(body []byte) error {
+	bp := framePool.Get().(*[]byte)
+	b := append((*bp)[:0], "Content-Length: "...)
+	b = strconv.AppendInt(b, int64(len(body)), 10)
+	b = append(b, '\r', '\n', '\r', '\n')
+	b = append(b, body...)
+	_, err := s.writer.Write(b)
+	*bp = b
+	framePool.Put(bp)
 	return err
 }
 
@@ -1067,8 +1085,7 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			"params":  json.RawMessage(paramsJSON),
 		}
 		body, _ := json.Marshal(rpcReq)
-		header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
-		s.writer.Write(append([]byte(header), body...))
+		_ = s.writeFramed(body)
 
 		resp, err := s.readMessage()
 		if err != nil {
