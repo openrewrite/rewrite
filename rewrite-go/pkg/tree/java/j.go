@@ -928,8 +928,8 @@ type Switch struct {
 	ID      uuid.UUID
 	Prefix  Space
 	Markers Markers
-	Tag     *RightPadded[Expression] // optional tag expression; After = space before {
-	Body    *Block                   // contains Case statements
+	Selector *ControlParentheses // selector expression (matching J.Switch); Go has no parens, so the wrapper carries no whitespace and the inner element holds the tag. Tree.Element is an Empty for a tagless `switch {}`. Tree.After = space before {
+	Body     *Block              // contains Case statements
 }
 
 func (*Switch) IsTree()      {}

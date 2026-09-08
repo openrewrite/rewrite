@@ -18,9 +18,6 @@ package org.openrewrite.python.internal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.python.marker.CanonicalName;
-
-import java.util.Optional;
 
 /**
  * Reads the names and types an import binds, mirroring {@code rewrite.python.import_utils}.
@@ -52,15 +49,10 @@ public final class PythonImportNames {
     }
 
     /**
-     * The fully qualified name of the symbol the import binds, at the module defining it: the
-     * {@link CanonicalName} marker when that module re-exports it under the written path, else
-     * the qualid's own type.
+     * The fully qualified name of the symbol the import binds, at the module defining it,
+     * read off the qualid's own type.
      */
     public static @Nullable String canonicalFqn(J.Import imp) {
-        Optional<CanonicalName> canonical = imp.getMarkers().findFirst(CanonicalName.class);
-        if (canonical.isPresent()) {
-            return canonical.get().getFqn();
-        }
         JavaType type = imp.getQualid().getType();
         if (type instanceof JavaType.Method) {
             JavaType.Method method = (JavaType.Method) type;

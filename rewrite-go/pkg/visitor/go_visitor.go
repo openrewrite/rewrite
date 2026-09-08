@@ -962,26 +962,19 @@ func (v *GoVisitor) VisitAssignmentOperation(ao *java.AssignmentOperation, p any
 func (v *GoVisitor) VisitSwitch(sw *java.Switch, p any) java.J {
 	prefix := v.self().VisitSpace(sw.Prefix, p)
 	markers := v.visitMarkers(sw.Markers, p)
-	tag := sw.Tag
-	if tag != nil {
-		elem := visitExpression(v, tag.Element, p)
-		after := v.self().VisitSpace(tag.After, p)
-		if elem != tag.Element || !java.SpaceEqual(after, tag.After) {
-			c := *tag
-			c.Element = elem
-			c.After = after
-			tag = &c
-		}
+	var selector *java.ControlParentheses
+	if sw.Selector != nil {
+		selector = visitAndCast[*java.ControlParentheses](v, sw.Selector, p)
 	}
 	body := visitAndCast[*java.Block](v, sw.Body, p)
 	if java.SpaceEqual(prefix, sw.Prefix) && java.MarkersEqual(markers, sw.Markers) &&
-		tag == sw.Tag && body == sw.Body {
+		selector == sw.Selector && body == sw.Body {
 		return sw
 	}
 	c := *sw
 	c.Prefix = prefix
 	c.Markers = markers
-	c.Tag = tag
+	c.Selector = selector
 	c.Body = body
 	return &c
 }

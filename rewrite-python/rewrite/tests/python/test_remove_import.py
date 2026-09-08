@@ -369,15 +369,15 @@ class TestMaybeRemoveImport:
 
 class TestCanonicalRemoveImport:
     """A requested (module, name) also matches an import by its canonical FQN
-    (``os.path.join`` is canonically ``posixpath.join``), not just by its
+    (``posixpath.join`` is canonically ``os.path.join``), not just by its
     written path."""
 
     def test_remove_reexported_function_by_canonical_fqn(self, arm):
         RecipeSpec(recipe=from_visitor(
-            _remove_import_visitor(arm, 'posixpath', 'join', only_if_unused=False))).rewrite_run(
+            _remove_import_visitor(arm, 'os.path', 'join', only_if_unused=False))).rewrite_run(
             python(
                 """
-                from os.path import join
+                from posixpath import join
                 x = 1
                 """,
                 """
@@ -402,14 +402,14 @@ class TestCanonicalRemoveImport:
 
     def test_canonical_removal_keeps_other_names(self, arm):
         RecipeSpec(recipe=from_visitor(
-            _remove_import_visitor(arm, 'posixpath', 'join', only_if_unused=False))).rewrite_run(
+            _remove_import_visitor(arm, 'os.path', 'join', only_if_unused=False))).rewrite_run(
             python(
                 """
-                from os.path import exists, join
+                from posixpath import exists, join
                 x = 1
                 """,
                 """
-                from os.path import exists
+                from posixpath import exists
                 x = 1
                 """,
             )
@@ -471,12 +471,37 @@ class TestCanonicalRemoveImport:
 
 
 class TestRemoveImportUsageScoping:
-    """``only_if_unused`` counts every reference the enclosing scopes do not
-    rebind, including references that appear only in annotations."""
+    """``only_if_unused`` counts the references the code reads: not a name an enclosing
+    scope rebinds, nor one filling a slot that names a member, and including references
+    that appear only in annotations."""
 
     @staticmethod
     def _remove(arm, module, name):
         return from_visitor(_remove_import_visitor(arm, module, name))
+
+    def test_remove_import_a_member_name_merely_matches(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'json', None),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    import json
+
+
+                    def handle(resp, url, body, item):
+                        resp.json()
+                        post(url, json=body)
+                        return item.payload.json
+                    """,
+                    """\
+                    def handle(resp, url, body, item):
+                        resp.json()
+                        post(url, json=body)
+                        return item.payload.json
+                    """,
+                )
+            )
 
     def test_keep_import_referenced_in_function_annotations(self, arm):
         for type_attribution in (False, True):
@@ -787,16 +812,24 @@ class TestRemoveImportStringAnnotations:
         module = types.ModuleType('after_recipe')
         exec(source_file.print_all(), module.__dict__)
         typing.get_type_hints(module)
+        for value in list(module.__dict__.values()):
+            if isinstance(value, types.FunctionType):
+                typing.get_type_hints(value)
 
-    def test_names_inside_a_compound_reference_keep_their_imports(self, arm):
+    @pytest.mark.parametrize('annotation_position, source', [
+        ('variable', 'm: "typing.Dict[Any, Any]" = {}'),
+        ('parameter', 'def f(m: "typing.Dict[Any, Any]") -> None: ...'),
+        ('return', 'def f() -> "typing.Dict[Any, Any]": ...'),
+    ])
+    def test_names_inside_a_compound_reference_keep_their_imports(self, arm, annotation_position, source):
         spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing')))
         spec.rewrite_run(
             python(
-                """\
+                f"""\
                 import typing
                 from typing import Any
 
-                m: "typing.Dict[Any, Any]" = {}
+                {source}
                 """,
                 after_recipe=self._assert_type_hints_resolve,
             )

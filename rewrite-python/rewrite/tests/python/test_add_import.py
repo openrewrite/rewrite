@@ -148,6 +148,21 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_only_if_referenced_ignores_a_member_name_that_merely_matches(self, arm):
+        """``json`` occurs only in slots naming a member, never as a reference."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'json', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                def handle(resp, url, body, item):
+                    resp.json()
+                    post(url, json=body)
+                    return item.payload.json
+                """,
+            )
+        )
+
     def test_only_if_referenced_adds_when_referenced(self, arm):
         """The name is used, so the import is added."""
         spec = RecipeSpec(recipe=from_visitor(
@@ -164,18 +179,24 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_only_if_referenced_finds_a_reference_inside_a_string_annotation(self, arm):
+    @pytest.mark.parametrize('annotation_position, source', [
+        ('variable', 'm: "Dict[Any, Any]" = {}'),
+        ('parameter', 'def f(m: "Dict[Any, Any]") -> None: ...'),
+        ('return', 'def f() -> "Dict[Any, Any]": ...'),
+    ])
+    def test_only_if_referenced_finds_a_reference_inside_a_string_annotation(
+            self, arm, annotation_position, source):
         """A compound forward reference names the symbol, so it is a reference."""
         spec = RecipeSpec(recipe=from_visitor(
             _add_import_visitor(arm, 'typing', 'Any', only_if_referenced=True)))
         spec.rewrite_run(
             python(
-                """
-                m: "Dict[Any, Any]" = {}
+                f"""
+                {source}
                 """,
-                """
+                f"""
                 from typing import Any
-                m: "Dict[Any, Any]" = {}
+                {source}
                 """,
             )
         )
@@ -393,14 +414,14 @@ class TestMaybeAddImport:
 
 class TestCanonicalAddImportDedup:
     """An existing import already satisfies a requested (module, name) when
-    its canonical FQN matches (``os.path.join`` is canonically
-    ``posixpath.join``), not just when its written path does."""
+    its canonical FQN matches (``posixpath.join`` is canonically ``os.path.join``),
+    not just when its written path does."""
 
     def test_canonical_request_matches_written_from_import(self, arm):
-        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'posixpath', 'join'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os.path', 'join'))).rewrite_run(
             python(
                 """
-                from os.path import join
+                from posixpath import join
                 x = join('a', 'b')
                 """,
             )

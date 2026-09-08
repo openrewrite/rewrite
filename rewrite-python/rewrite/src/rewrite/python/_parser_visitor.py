@@ -15,7 +15,7 @@ from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType,
 from rewrite.java import tree as j
 from rewrite.java.support_types import TextComment
 from . import tree as py
-from .markers import CanonicalName, KeywordArguments, KeywordOnlyArguments, Quoted
+from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
 from .type_mapping import PythonTypeMapping, compute_source_line_data
 
 T = TypeVar('T')
@@ -835,12 +835,10 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_alias(self, node):
         alias_type = self._type_mapping.import_alias_type(node)
-        canonical = self._type_mapping.import_canonical_fqn(node)
         return j.Import(
             random_id(),
             self.__whitespace(),
-            Markers.EMPTY if canonical is None else
-            Markers(random_id(), [CanonicalName(random_id(), canonical)]),
+            Markers.EMPTY,
             self.__pad_left(Space.EMPTY, False),
             self.__convert_qualified_name(node.name, alias_type),
             None if not node.asname else
@@ -855,7 +853,9 @@ class ParserVisitor(ast.NodeVisitor):
                 Markers.EMPTY,
                 self.__convert_name(node.arg),
                 self.__pad_left(self.__source_before('='), self.__convert(node.value)),
-                self._type_mapping.type(node)
+                # A keyword argument is an expression whose type is its value's;
+                # ty attributes the value, not the `ast.keyword` wrapping it.
+                self._type_mapping.type(node.value)
             )
         prefix = self.__whitespace()
         if self.__skip('**'):
@@ -1419,24 +1419,22 @@ class ParserVisitor(ast.NodeVisitor):
                 children.append(converted)
             # Process keyword patterns
             for i, kwd in enumerate(node.kwd_attrs):
-                kwd_var = j.VariableDeclarations(
+                kwd_pattern = py.MatchCase.Pattern(
                     random_id(),
                     self.__whitespace(),
                     Markers.EMPTY,
-                    _EMPTY_LIST, _EMPTY_LIST, None, None, _EMPTY_LIST,
-                    [
-                        self.__pad_right(j.VariableDeclarations.NamedVariable(
-                            random_id(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            cast(j.Identifier, self.__convert_name(kwd)),
-                            _EMPTY_LIST,
-                            self.__pad_left(self.__source_before('='), self.__convert_match_pattern(node.kwd_patterns[i])),
-                            None
-                        ), Space.EMPTY)
-                    ]
+                    py.MatchCase.Pattern.Kind.KEYWORD,
+                    JContainer(
+                        Space.EMPTY,
+                        [
+                            self.__pad_right(self.__convert_name(kwd), self.__source_before('=')),
+                            self.__pad_right(self.__convert_match_pattern(node.kwd_patterns[i]), Space.EMPTY),
+                        ],
+                        Markers.EMPTY
+                    ),
+                    None
                 )
-                converted = self.__pad_list_element(kwd_var, last=i == len(node.kwd_attrs) - 1,
+                converted = self.__pad_list_element(kwd_pattern, last=i == len(node.kwd_attrs) - 1,
                                                     end_delim=')')
                 children.append(converted)
         else:
@@ -2228,13 +2226,11 @@ class ParserVisitor(ast.NodeVisitor):
             return_type = None
         else:
             arrow = self.__source_before('->')
-            with self.__type_context():
-                returns = self.__convert(node.returns)
             return_type = py.TypeHint(
                 random_id(),
                 arrow,
                 Markers.EMPTY,
-                returns,
+                self.__convert_type(node.returns),
                 self._type_mapping.type(node.returns)
             )
         body = self.__convert_block(node.body)
@@ -2338,13 +2334,11 @@ class ParserVisitor(ast.NodeVisitor):
                     self.__pad_right(wrapped, suffix)
                 )
 
-            # Wrap in ExpressionTypeTree to satisfy NameTree type requirement
-            name = py.ExpressionTypeTree(
-                random_id(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                wrapped
-            )
+            name = wrapped
+
+        # PEP 614 allows any expression here, but Annotation.annotation_type is a NameTree
+        if not isinstance(name, NameTree):
+            name = py.ExpressionTypeTree(random_id(), Space.EMPTY, Markers.EMPTY, name)
 
         return j.Annotation(
             random_id(),
@@ -2953,6 +2947,7 @@ class ParserVisitor(ast.NodeVisitor):
                         Markers.EMPTY,
                         converted.replace(prefix=Space.EMPTY)
                     )
+                expression = converted
                 # Unwrap parenthesized literals to get to the Literal inside
                 while isinstance(converted, j.Parentheses):
                     converted = converted.tree
@@ -2968,6 +2963,16 @@ class ParserVisitor(ast.NodeVisitor):
                 quote_start = 0
                 while quote_start < len(source) and source[quote_start] not in ('"', "'"):
                     quote_start += 1
+
+                if 0 < quote_start < len(source):
+                    # The Quoted marker records only the quote style, so a string carrying a
+                    # prefix (r, b, u) stays a literal, where value_source holds the prefix.
+                    return py.ExpressionTypeTree(
+                        random_id(),
+                        expression.prefix,
+                        Markers.EMPTY,
+                        expression.replace(prefix=Space.EMPTY)
+                    )
 
                 if quote_start < len(source):
                     quote_char = source[quote_start]

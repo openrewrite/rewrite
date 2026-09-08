@@ -901,6 +901,70 @@ class TestChangeImportPythonScopeRules:
             """,
         )
 
+    def test_a_class_attribute_re_exporting_the_import_reads_it_on_the_right(self):
+        """`clock = clock` binds `C.clock` from the module's `clock`."""
+        self._run(
+            """\
+            from time import clock
+
+
+            class C:
+                clock = clock
+            """,
+            """\
+            from time import perf_counter
+
+
+            class C:
+                clock = perf_counter
+            """,
+        )
+
+    def test_member_and_keyword_positions_name_something_else(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(resp, item):
+                resp.clock()
+                poll(clock=1)
+                return item.payload.clock, clock()
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(resp, item):
+                resp.clock()
+                poll(clock=1)
+                return item.payload.clock, perf_counter()
+            """,
+        )
+
+    def test_a_match_class_keyword_pattern_names_an_attribute(self):
+        """``Point(clock=v)`` matches ``Point``'s attribute and binds only ``v``."""
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(p):
+                match p:
+                    case Point(clock=v):
+                        return clock(), v
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(p):
+                match p:
+                    case Point(clock=v):
+                        return perf_counter(), v
+            """,
+        )
+
     def test_attribute_and_subscript_targets_do_not_bind(self):
         """``self.clock = 1`` and ``d[clock] = 1`` assign through an object."""
         self._run(
@@ -1005,6 +1069,52 @@ class TestChangeImportPythonScopeRules:
             def f(x=perf_counter):
                 clock = 1
                 return clock, x
+            """,
+        )
+
+    def test_a_module_level_def_moves_with_the_binding_it_rebinds(self):
+        """A `def` at module level rebinds the name the import bound, so the two move
+        together or the calls below it silently retarget the import."""
+        self._run(
+            """\
+            from time import clock
+
+
+            def clock():
+                return 1
+
+
+            print(clock())
+            """,
+            """\
+            from time import perf_counter
+
+
+            def perf_counter():
+                return 1
+
+
+            print(perf_counter())
+            """,
+        )
+
+    def test_a_quoted_annotation_renames_when_the_name_stands_alone(self):
+        """A quoted annotation parses to a single identifier, so only a name that is the
+        whole annotation is in reach."""
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(x: 'clock', y: 'List[clock]'):
+                pass
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(x: 'perf_counter', y: 'List[clock]'):
+                pass
             """,
         )
 

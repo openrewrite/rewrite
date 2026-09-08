@@ -1595,4 +1595,116 @@ describe('RemoveImport visitor', () => {
             }, {unsafeCleanup: true});
         });
     });
+
+    describe('reference positions', () => {
+        test('an identifier read anywhere in an expression keeps the import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        const handlers = {read: readFile};
+                        const first = [readFile][0] ?? readFile;
+                    `
+                )
+            );
+        });
+
+        test('a shorthand property is a use of the binding it names', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        export const handlers = {readFile};
+                    `
+                )
+            );
+        });
+
+        test('a reference inside a require call keeps the import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        const contents = require(readFile);
+                    `
+                )
+            );
+        });
+
+        test('a re-export keeps the import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        export {readFile};
+                    `
+                )
+            );
+        });
+    });
+
+    describe('shadowed names', () => {
+        test('a name an inner scope rebinds is not a use of the import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        function f() {
+                            const readFile = 1;
+                            return readFile;
+                        }
+                    `,
+                    `
+                        function f() {
+                            const readFile = 1;
+                            return readFile;
+                        }
+                    `
+                )
+            );
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        function g(readFile: number) {
+                            return readFile;
+                        }
+                    `,
+                    `
+                        function g(readFile: number) {
+                            return readFile;
+                        }
+                    `
+                )
+            );
+        });
+    });
 });

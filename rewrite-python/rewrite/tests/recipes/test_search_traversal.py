@@ -97,6 +97,14 @@ def test_uses_method_reaches_call_in_fstring_comprehension(cu):
     assert not _matches(UsesMethod("*..* unused(..)"), cu)
 
 
+def test_uses_method_can_widen_to_calls_that_have_no_declaring_type():
+    src = "MyHelper.do_something(1)\n"
+    unattributed = ParserVisitor(src, "unattributed.py", None).visit(ast.parse(src))
+    pattern = "com.foo.MyHelper do_something(..)"
+    assert not _matches(UsesMethod(pattern), unattributed)
+    assert _matches(UsesMethod(pattern, match_unknown_types=True), unattributed)
+
+
 def test_uses_import_reaches_import_in_except_block(cu):
     assert _matches(UsesImport("calendar"), cu)
     assert not _matches(UsesImport("datetime"), cu)

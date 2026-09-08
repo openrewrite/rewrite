@@ -2090,7 +2090,9 @@ class MovedTypes extends TypeVisitor<undefined> {
     /**
      * A type reached while it is still being visited is a cycle — a class holds a method whose
      * declaring type is that class — and answers with itself, which is what ends the walk. Every
-     * reference to a binding shares one type, so a completed walk is remembered for the next.
+     * type visited is remembered by its answer, so a graph whose references fan out or rejoin is
+     * walked once rather than once per path that reaches into it. An answer settled inside a cycle
+     * stands for the path it was on, so a walk reusing it can leave a rename unapplied.
      */
     override async visit<T extends Type>(type: T | undefined, p: undefined): Promise<T | undefined> {
         if (type === undefined || this.onPath.has(type)) {
@@ -2102,11 +2104,7 @@ class MovedTypes extends TypeVisitor<undefined> {
         this.onPath.add(type);
         try {
             const answer = await super.visit(type, p);
-            // Only the type a walk entered at is remembered: one reached inside it may have met
-            // a back edge, which answers with the type itself and so stands for the path it was on.
-            if (this.onPath.size === 1) {
-                this.answered.set(type, answer);
-            }
+            this.answered.set(type, answer);
             return answer;
         } finally {
             this.onPath.delete(type);

@@ -1659,6 +1659,20 @@ func controlParentheses(inner java.Expression) *java.ControlParentheses {
 	}
 }
 
+// switchSelector wraps a switch selector in a ControlParentheses (matching
+// J.Switch). The selector's leading space is hoisted onto the wrapper so it
+// lives on the outermost element (the selector's own prefix), matching Java's
+// `switch (x)` model; the printer emits only the inner element (Go has no parens).
+func switchSelector(inner java.Expression) *java.ControlParentheses {
+	prefix, hoisted := hoistLeftPrefix(inner)
+	return &java.ControlParentheses{
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Markers: java.Markers{ID: uuid.New()},
+		Tree:    java.RightPadded[java.Expression]{Element: hoisted},
+	}
+}
+
 // wrapWithInit wraps an inner if/switch in a golang.StatementWithInit when an
 // init clause is present, moving the keyword prefix onto the wrapper and
 // leaving the inner statement prefix-less. With no init it returns inner as-is.
@@ -1702,11 +1716,9 @@ func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) java.Statement {
 
 	init := ctx.mapInitClause(stmt.Init, stmt.Body.Lbrace)
 
-	var tag *java.RightPadded[java.Expression]
+	var selectorExpr java.Expression = &java.Empty{ID: uuid.New(), Markers: java.Markers{ID: uuid.New()}}
 	if stmt.Tag != nil {
-		tagExpr := ctx.mapExpr(stmt.Tag)
-		rp := java.RightPadded[java.Expression]{Element: tagExpr}
-		tag = &rp
+		selectorExpr = ctx.mapExpr(stmt.Tag)
 	}
 
 	body := ctx.mapBlockStmt(stmt.Body)
@@ -1716,10 +1728,10 @@ func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) java.Statement {
 		innerPrefix = java.EmptySpace
 	}
 	return wrapWithInit(prefix, init, &java.Switch{
-		ID:     uuid.New(),
-		Prefix: innerPrefix,
-		Tag:    tag,
-		Body:   body,
+		ID:       uuid.New(),
+		Prefix:   innerPrefix,
+		Selector: switchSelector(selectorExpr),
+		Body:     body,
 	})
 }
 
@@ -1860,22 +1872,19 @@ func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statem
 	init := ctx.mapInitClause(stmt.Init, stmt.Assign.Pos())
 
 	// The assign is `x.(type)` (ExprStmt) or `v := x.(type)` (AssignStmt)
-	var tag *java.RightPadded[java.Expression]
+	var selectorExpr java.Expression
 	switch a := stmt.Assign.(type) {
 	case *ast.ExprStmt:
 		// `x.(type)` — map the inner expression directly
-		expr := ctx.mapExpr(a.X)
-		if expr != nil {
-			rp := java.RightPadded[java.Expression]{Element: expr}
-			tag = &rp
-		}
+		selectorExpr = ctx.mapExpr(a.X)
 	case *ast.AssignStmt:
 		// `v := x.(type)` — map as assignment (which is also an Expression-like construct here)
-		assignStmt := ctx.mapAssignStmt(a)
-		if expr, ok := assignStmt.(java.Expression); ok {
-			rp := java.RightPadded[java.Expression]{Element: expr}
-			tag = &rp
+		if expr, ok := ctx.mapAssignStmt(a).(java.Expression); ok {
+			selectorExpr = expr
 		}
+	}
+	if selectorExpr == nil {
+		selectorExpr = &java.Empty{ID: uuid.New(), Markers: java.Markers{ID: uuid.New()}}
 	}
 
 	body := ctx.mapBlockStmt(stmt.Body)
@@ -1891,8 +1900,8 @@ func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statem
 			ID:      uuid.New(),
 			Entries: []java.Marker{golang.TypeSwitchGuard{Ident: uuid.New()}},
 		},
-		Tag:  tag,
-		Body: body,
+		Selector: switchSelector(selectorExpr),
+		Body:     body,
 	})
 }
 

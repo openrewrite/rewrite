@@ -24,6 +24,7 @@ from rewrite.java import J
 from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded
 from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Literal, Space
 from rewrite.markers import Markers
+from rewrite.python.binding_utils import is_reference
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
                                          get_canonical_fqn, pad_right, referenced_names)
 from rewrite.python.tree import CompilationUnit, ExpressionStatement, MultiImport
@@ -207,25 +208,9 @@ class AddImport(PythonVisitor):
             def __init__(self):
                 super().__init__()
                 self.found = False
-                self.in_import = False
-
-            def visit_import(self, import_: Import, p) -> J:
-                # Identifiers in import statements are bindings, not references.
-                self.in_import = True
-                try:
-                    return super().visit_import(import_, p)
-                finally:
-                    self.in_import = False
-
-            def visit_multi_import(self, multi: MultiImport, p) -> J:
-                self.in_import = True
-                try:
-                    return super().visit_multi_import(multi, p)
-                finally:
-                    self.in_import = False
 
             def visit_identifier(self, ident: Identifier, p) -> J:
-                if not self.in_import and target_name in referenced_names(ident):
+                if is_reference(self.cursor, ident) and target_name in referenced_names(ident):
                     self.found = True
                 return ident
 

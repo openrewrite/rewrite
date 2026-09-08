@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal.rpc;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.rpc.Reference;
 import org.openrewrite.rpc.RpcObjectData;
@@ -131,6 +132,23 @@ class JavaTypeAnnotationRpcTest {
         assertThat(((Number) intSev.getConstantValue()).intValue()).isEqualTo(42);
         assertThat(strSev.getConstantValue()).isEqualTo("hello");
         assertThat(arrAev.getConstantValues()).containsExactly("x", "y");
+    }
+
+    @Test
+    void roundTripsAnnotationWithNeitherArrayValuesSet() {
+        JavaType.Method element = methodOn("com.example.Foo", "value", JavaType.Primitive.String);
+        JavaType.Annotation original = annotation("com.example.Foo", List.of(
+                new JavaType.Annotation.ArrayElementValue(element, null, null)));
+
+        // Sending the annotations of a JavaType.Method keys the list diff on each
+        // annotation's signature, so this value has to have one.
+        assertThat(new DefaultJavaTypeSignatureBuilder().signature(original))
+                .isEqualTo("@com.example.Foo(com.example.Foo{name=value,return=String,parameters=[]}=[])");
+
+        JavaType.Annotation.ArrayElementValue aev =
+                (JavaType.Annotation.ArrayElementValue) sendAndReceive(original).getValues().get(0);
+        assertThat(aev.getConstantValues()).isNull();
+        assertThat(aev.getReferenceValues()).isNull();
     }
 
     @Test

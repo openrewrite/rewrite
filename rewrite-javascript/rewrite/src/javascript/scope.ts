@@ -153,6 +153,69 @@ export function namesDeclaredWithin(node: unknown, cacheKey: object = node as ob
 }
 
 /**
+ * The names `node` reads and nothing within it binds, so each one reaches a binding further out.
+ * A name its parent introduces rather than reads is not one, nor is a name an inner scope rebinds:
+ * that reference reads the rebinding.
+ */
+export function namesReferencedWithin(node: unknown, cacheKey: object = node as object): ReadonlySet<string> {
+    if (cacheKey === null || typeof cacheKey !== 'object') {
+        return noNames;
+    }
+    const cached = referenced.get(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    const names = new Set<string>();
+    collectReferences(node, undefined, undefined, names);
+    referenced.set(cacheKey, names);
+    return names;
+}
+
+/** The scopes enclosing a node, innermost first, each paired with what {@link frameBindings} reads. */
+interface Frames {
+    node: unknown;
+    parent: unknown;
+    outer?: Frames;
+}
+
+/** Whether a scope between the name and where the walk began binds it. */
+function shadowed(scopes: Frames | undefined, name: string): boolean {
+    for (let scope = scopes; scope; scope = scope.outer) {
+        if (frameBindings(scope.node, scope.parent).has(name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function collectReferences(node: unknown, parent: unknown, scopes: Frames | undefined, names: Set<string>): void {
+    if (Array.isArray(node)) {
+        node.forEach(child => collectReferences(child, parent, scopes, names));
+        return;
+    }
+    const kind = (node as { kind?: string } | undefined)?.kind;
+    if (kind === J.Kind.RightPadded || kind === J.Kind.LeftPadded) {
+        // A naming position reads against the tree parent, so padding forwards the one it was handed.
+        collectReferences((node as J.RightPadded<any>).element, parent, scopes, names);
+        return;
+    }
+    if (kind === J.Kind.Container) {
+        collectReferences((node as J.Container<any>).elements, parent, scopes, names);
+        return;
+    }
+    if (!isTree(node)) {
+        return;
+    }
+    const name = kind === J.Kind.Identifier ? (node as J.Identifier).simpleName : undefined;
+    if (name && reads(node as J.Identifier, parent) && !shadowed(scopes, name)) {
+        names.add(name);
+    }
+    const within = scopeKinds.has(kind!) ? {node, parent, outer: scopes} : scopes;
+    Object.entries(node as object).forEach(([key, value]) =>
+        key !== 'markers' && collectReferences(value, node, within, names));
+}
+
+/**
  * Every name a binding pattern introduces. `member` is the property a name takes its value from,
  * which only a name an object pattern binds directly has: anything deeper reads a property of a
  * property, an array element is chosen by position, and a rest name gathers what nothing claimed.
@@ -213,8 +276,12 @@ function frameBindings(node: any, parent: any): ReadonlySet<string> {
     // A function expression is the only function whose own name its body reaches: a declaration's
     // name belongs to the enclosing block, a method's to an instance.
     if (node?.kind === J.Kind.MethodDeclaration && parent?.kind === JS.Kind.StatementExpression) {
-        const self = bindingNames((node as J.MethodDeclaration).name).map(bound => bound.name);
-        return new Set([...self, ...ownBindings(node)]);
+        let names = selfNamed.get(node);
+        if (!names) {
+            const self = bindingNames((node as J.MethodDeclaration).name).map(bound => bound.name);
+            selfNamed.set(node, names = new Set([...self, ...ownBindings(node)]));
+        }
+        return names;
     }
     return ownBindings(node);
 }
@@ -369,7 +436,9 @@ const blockScoped = new Set(['let', 'const', 'using']);
 const hoisted = new WeakMap<object, string[]>();
 const declared = new WeakMap<object, ReadonlySet<string>>();
 const used = new WeakMap<object, ReadonlySet<string>>();
+const referenced = new WeakMap<object, ReadonlySet<string>>();
 const frames = new WeakMap<object, ReadonlySet<string>>();
+const selfNamed = new WeakMap<object, ReadonlySet<string>>();
 
 /**
  * The names blocks under `scope` hoist out to it. A `var` or function declaration reaches the whole
@@ -496,19 +565,46 @@ export function isValueReference(cursor: Cursor, identifier: J.Identifier): bool
     while (c && isPadding(c.value)) {
         c = c.parent;
     }
-    const parent = c?.value as
-        { kind?: string; name?: unknown; key?: unknown; label?: unknown; select?: unknown } | undefined;
+    return references(identifier, c?.value);
+}
+
+/** The position half of {@link isValueReference}, against a parent already found. */
+function references(identifier: J.Identifier, parent: unknown): boolean {
+    const owner = parent as {
+        kind?: string; name?: unknown; key?: unknown; label?: unknown; select?: unknown;
+        propertyName?: unknown;
+    } | undefined;
 
     // A call names a member of whatever it selects from. With nothing selected there is no member,
     // and its `name` is a reference to the function being called.
-    if (parent?.kind === J.Kind.MethodInvocation && !parent.select) {
+    if (owner?.kind === J.Kind.MethodInvocation && !owner.select) {
         return true;
+    }
+
+    // A binding element names the property it destructures and binds under `name`, so both slots
+    // name rather than reference.
+    if (owner?.kind === JS.Kind.BindingElement && holds(owner.propertyName, identifier)) {
+        return false;
     }
 
     // A JSX attribute keeps its prop name on `key`; the three label-bearing nodes keep theirs on
     // `label`. Every other kind that names rather than references keeps it on `name`.
-    const named = parent?.kind === JS.Kind.JsxAttribute ? parent.key : (parent?.name ?? parent?.label);
-    return named !== identifier && (named as { element?: unknown } | undefined)?.element !== identifier;
+    return !holds(owner?.kind === JS.Kind.JsxAttribute ? owner.key : (owner?.name ?? owner?.label), identifier);
+}
+
+/** Whether a node slot, padded or not, is the identifier itself. */
+function holds(slot: unknown, identifier: J.Identifier): boolean {
+    return slot === identifier || (slot as { element?: unknown } | undefined)?.element === identifier;
+}
+
+/**
+ * As {@link references}, for a collector rather than a renamer: a shorthand property's name slot is
+ * also the value it reads, which a rename has to expand rather than follow.
+ */
+function reads(identifier: J.Identifier, parent: unknown): boolean {
+    const owner = parent as { kind?: string; initializer?: unknown } | undefined;
+    return (owner?.kind === JS.Kind.PropertyAssignment && owner.initializer === undefined) ||
+        references(identifier, parent);
 }
 
 function isPadding(value: unknown): boolean {
