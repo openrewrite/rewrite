@@ -89,10 +89,10 @@ class TextComment(Comment):
 
     # IMPORTANT: This explicit constructor aligns the parameter order with the Java side
     def __init__(self, _multiline: bool, _text: str, _suffix: str, _markers: Markers) -> None:
-        self._multiline = _multiline
-        self._text = _text
-        self._suffix = _suffix
-        self._markers = _markers
+        self._multiline = _multiline  # ty: ignore[invalid-assignment]  # frozen to a checker only
+        self._text = _text  # ty: ignore[invalid-assignment]
+        self._suffix = _suffix  # ty: ignore[invalid-assignment]
+        self._markers = _markers  # ty: ignore[invalid-assignment]
 
 
 @lst_value_dataclass
@@ -219,6 +219,8 @@ class MethodCall(Expression):
 
 class JavaType(ABC):
     class FullyQualified:
+        __slots__ = ()
+
         class Kind(Enum):
             Class = 0
             Enum = 1
@@ -235,34 +237,44 @@ class JavaType(ABC):
             return getattr(self, '_interfaces', None) or []
 
     class Unknown(FullyQualified):
-        pass
+        __slots__ = ()
 
+    # Identity equality, unlike the siblings below: a type graph is cyclic through
+    # members and methods, and Java compares these on name and type parameters alone.
+    @lst_dataclass
     class Class(FullyQualified):
-        _flags_bit_map: int
-        _fully_qualified_name: str
-        _kind: JavaType.FullyQualified.Kind
-        _type_parameters: Optional[List[JavaType]]
-        _supertype: Optional[JavaType.FullyQualified]
-        _owning_class: Optional[JavaType.FullyQualified]
-        _annotations: Optional[List[JavaType.FullyQualified]]
-        _interfaces: Optional[List[JavaType.FullyQualified]]
-        _members: Optional[List[JavaType.Variable]]
-        _methods: Optional[List[JavaType.Method]]
+        _flags_bit_map: int = 0
+        _fully_qualified_name: str = ''
+        # `Kind` lives on the base, which a nested class body cannot see, so the
+        # declaration-time default is filled in once the module is loaded.
+        _kind: Optional[JavaType.FullyQualified.Kind] = None
+        _type_parameters: Optional[List[JavaType]] = None
+        _supertype: Optional[JavaType.FullyQualified] = None
+        _owning_class: Optional[JavaType.FullyQualified] = None
+        _annotations: Optional[List[JavaType.FullyQualified]] = None
+        _interfaces: Optional[List[JavaType.FullyQualified]] = None
+        _members: Optional[List[JavaType.Variable]] = None
+        _methods: Optional[List[JavaType.Method]] = None
+
+        def __post_init__(self):
+            if self._kind is None:
+                self._kind = JavaType.FullyQualified.Kind.Class
 
         @property
         def fully_qualified_name(self) -> str:
             return self._fully_qualified_name
 
     class ShallowClass(Class):
-        pass
+        __slots__ = ()
 
+    @lst_dataclass
     class Parameterized(FullyQualified):
-        _type: JavaType.FullyQualified
-        _type_parameters: Optional[List[JavaType]]
+        _type: Optional[JavaType.FullyQualified] = None
+        _type_parameters: Optional[List[JavaType]] = None
 
         @property
         def type(self) -> JavaType.FullyQualified:
-            return self._type
+            return cast(JavaType.FullyQualified, self._type)
 
         @property
         def type_parameters(self) -> Optional[List[JavaType]]:
@@ -285,13 +297,14 @@ class JavaType(ABC):
             t = getattr(self, '_type', None)
             return t.interfaces if t is not None else []
 
+    @lst_dataclass
     class Annotation(FullyQualified):
-        _type: JavaType.FullyQualified
-        _values: Optional[List[JavaType.Annotation.ElementValue]]
+        _type: Optional[JavaType.FullyQualified] = None
+        _values: Optional[List[JavaType.Annotation.ElementValue]] = None
 
         @property
         def type(self) -> JavaType.FullyQualified:
-            return self._type
+            return cast(JavaType.FullyQualified, self._type)
 
         @property
         def values(self) -> List[JavaType.Annotation.ElementValue]:
