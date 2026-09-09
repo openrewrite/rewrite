@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 
 import pytest
 
@@ -256,3 +257,23 @@ def test_the_process_exits_zero_when_the_host_closes_the_stream(tmp_path):
 
 def test_the_process_exits_eight_on_a_corrupt_frame(tmp_path):
     assert _spawn_server(b"garbage\r\n", tmp_path) == 8
+
+
+def test_a_read_outrunning_its_deadline_is_collected_by_the_next_fill(monkeypatch):
+    """Exercises the Windows branch on any platform; `select` is what Unix uses instead."""
+    monkeypatch.setattr(server.os, 'name', 'nt')
+    read_fd, write_fd = os.pipe()
+    buf = server._StdinBuffer()
+    buf._fd = read_fd
+    try:
+        # The read is already in flight and takes from the pipe whenever the peer
+        # writes, so losing it here would take those bytes out of the stream.
+        assert buf._fill(deadline=time.time() + 0.05) is False
+
+        os.write(write_fd, b'late payload')
+
+        assert buf._fill(deadline=time.time() + 5) is True
+        assert bytes(buf._buf) == b'late payload'
+    finally:
+        os.close(write_fd)
+        os.close(read_fd)
