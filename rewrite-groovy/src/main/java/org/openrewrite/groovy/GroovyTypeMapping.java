@@ -27,7 +27,6 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;

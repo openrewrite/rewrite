@@ -26,6 +26,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradeParentVersionTest implements RewriteTest {
@@ -299,6 +300,104 @@ class UpgradeParentVersionTest implements RewriteTest {
                 </properties>
               </project>
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8212")
+    @Test
+    void childDependencyPinRemovedWhenAggregatorParentUpgraded() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeParentVersion(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "3.1.12",
+            null,
+            null)),
+          mavenProject("sample-root",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>sample-root</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>3.0.13</version>
+                        <relativePath/>
+                    </parent>
+                    <modules>
+                        <module>sample-app</module>
+                    </modules>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>sample-root</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>3.1.12</version>
+                        <relativePath/>
+                    </parent>
+                    <modules>
+                        <module>sample-app</module>
+                    </modules>
+                </project>
+                """
+            )
+          ),
+          mavenProject("sample-app",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <artifactId>sample-app</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>sample-root</artifactId>
+                        <version>1.0-SNAPSHOT</version>
+                        <relativePath>../sample-root/pom.xml</relativePath>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.mockito</groupId>
+                            <artifactId>mockito-core</artifactId>
+                            <version>4.11.0</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <artifactId>sample-app</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>sample-root</artifactId>
+                        <version>1.0-SNAPSHOT</version>
+                        <relativePath>../sample-root/pom.xml</relativePath>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.mockito</groupId>
+                            <artifactId>mockito-core</artifactId>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
           )
         );
     }

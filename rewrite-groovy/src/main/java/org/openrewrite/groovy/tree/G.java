@@ -796,6 +796,7 @@ public interface G extends J {
             Match,
             In,
             NotIn,
+            NotInstanceOf,
             Access,
             Spaceship,
             ElvisAssignment,

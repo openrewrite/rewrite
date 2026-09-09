@@ -19,13 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
-
-import java.util.Arrays;
-import java.util.function.Function;
+import org.openrewrite.trait.Comments;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -57,29 +53,16 @@ public class AddPropertyComment extends Recipe {
         PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
-                Properties.File p = file.withContent(ListUtils.flatMap(file.getContent(), new Function<Properties.Content, Object>() {
-                            Properties.@Nullable Content previousContent = null;
-
-                            @Override
-                            public Object apply(Properties.Content c) {
-                                if (c instanceof Properties.Entry &&
-                                    ((Properties.Entry) c).getKey().equals(propertyKey) &&
-                                    !isCommentAlreadyPresent(previousContent, comment)) {
-                                    Properties.Comment commentContent = new Properties.Comment(
-                                            randomId(),
-                                            previousContent == null ? "" : "\n",
-                                            Markers.EMPTY,
-                                            Properties.Comment.Delimiter.HASH_TAG,
-                                            " " + comment.trim());
-                                    previousContent = c;
-                                    return Arrays.asList(commentContent, c.getPrefix().contains("\n") ?
-                                            c : c.withPrefix("\n" + c.getPrefix()));
-                                }
-                                previousContent = c;
-                                return c;
-                            }
-                        }
-                ));
+                // Insert the comment before each matching entry via the trait (the comment is a
+                // preceding sibling, so the trait returns the owning file). Comment-out, when
+                // requested, is applied afterwards as the file's entries are visited.
+                Properties.File p = file;
+                for (Properties.Content c : file.getContent()) {
+                    if (c instanceof Properties.Entry && ((Properties.Entry) c).getKey().equals(propertyKey)) {
+                        p = Comments.of(new Cursor(new Cursor(getCursor().getParentOrThrow(), p), c))
+                                .comment(" " + comment.trim());
+                    }
+                }
                 return super.visitFile(p, ctx);
             }
 
@@ -97,10 +80,5 @@ public class AddPropertyComment extends Recipe {
             }
         };
         return Preconditions.check(new FindProperties(propertyKey, false).getVisitor(), propertiesVisitor);
-    }
-
-    private boolean isCommentAlreadyPresent(Properties.@Nullable Content previousContent, String comment) {
-        return previousContent instanceof Properties.Comment &&
-               ((Properties.Comment) previousContent).getMessage().contains(comment.trim());
     }
 }

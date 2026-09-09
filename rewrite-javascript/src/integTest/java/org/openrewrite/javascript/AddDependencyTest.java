@@ -15,8 +15,11 @@
  */
 package org.openrewrite.javascript;
 
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.javascript.internal.PackageManagerExecutor;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
@@ -24,7 +27,17 @@ import java.nio.file.Path;
 import static org.openrewrite.javascript.Assertions.npm;
 import static org.openrewrite.javascript.Assertions.packageJson;
 
+/**
+ * PM-gated parity cross-check: exercises the recipe against a real {@code npm} workspace. Native
+ * PM-free regeneration is covered by {@code AddDependencyLockRegenTest} in {@code src/test}; this
+ * suite skips when npm is not on the PATH.
+ */
 class AddDependencyTest implements RewriteTest {
+
+    @BeforeEach
+    void requirePackageManager() {
+        Assumptions.assumeTrue(PackageManagerExecutor.NPM.find() != null, "npm not installed");
+    }
 
     @Test
     void addsDependencyToPackageJson(@TempDir Path tempDir) {

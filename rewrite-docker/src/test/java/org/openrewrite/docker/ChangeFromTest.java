@@ -1091,4 +1091,103 @@ class ChangeFromTest implements RewriteTest {
               .isTrue();
         }
     }
+
+    @Nested
+    class DigestPinned implements RewriteTest {
+
+        @Test
+        void emptyOldDigestSkipsDigestPinnedFrom() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "", null, "ubuntu", "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123def456
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void emptyOldDigestPreservesPinWhenRecipeWouldStripIt() {
+            // newDigest="" would normally remove the pin; oldDigest="" skips the FROM entirely.
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("registry.example.com/runtime", "*", "", null,
+                "registry.example.com/runtime", "3-jdk21", "", null)),
+              docker(
+                """
+                  FROM registry.example.com/runtime:3.9.16-jdk21@sha256:abcdef1234567890
+                  RUN ./build.sh
+                  """
+              )
+            );
+        }
+
+        @Test
+        void emptyOldDigestStillUpgradesUnpinnedFrom() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "", null, "ubuntu", "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void nullOldDigestStillChangesDigestPinnedFrom() {
+            // Default (oldDigest=null) is unchanged: the digest-pinned FROM is matched and its tag upgraded.
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123def456
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04@sha256:abc123def456
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void emptyOldDigestIsPerFromInMultiStage() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "", null, "ubuntu", "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123 AS pinned
+                  FROM ubuntu:20.04 AS floating
+                  """,
+                """
+                  FROM ubuntu:20.04@sha256:abc123 AS pinned
+                  FROM ubuntu:22.04 AS floating
+                  """
+              )
+            );
+        }
+
+        @Test
+        void digestGlobDoesNotMatchUnpinnedFrom() {
+            // A non-empty digest glob requires a digest to be present, so an unpinned FROM is not
+            // matched. This is the opposite of oldDigest="" (which matches only unpinned FROMs).
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "sha256:*", null, "ubuntu", "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+    }
 }

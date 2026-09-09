@@ -39,7 +39,10 @@ public class DependencyTreeWalker {
     @FunctionalInterface
     public interface Callback {
         /**
-         * Called when a dependency is visited or matches a pattern.
+         * Called once per matching dependency reachable from a given root, with a single
+         * representative path (the first one reached in depth-first order). Because the walk
+         * dedups dependencies it has already visited, a dependency reachable through multiple
+         * paths (a diamond) fires the callback only once rather than once per path.
          * <p>
          * The path is in <b>leaf-to-root order</b>: {@code path.getFirst()} returns the current
          * dependency, {@code path.getLast()} returns the direct (root) dependency.
@@ -61,9 +64,8 @@ public class DependencyTreeWalker {
      * @param callback called for each matching dependency with its path
      */
     public static void walk(List<ResolvedDependency> roots, @Nullable DependencyMatcher matcher, Callback callback) {
-        Deque<ResolvedDependency> path = new ArrayDeque<>();
         for (ResolvedDependency root : roots) {
-            walkRecursive(root, matcher, path, callback);
+            walk(root, matcher, callback);
         }
     }
 
@@ -75,18 +77,20 @@ public class DependencyTreeWalker {
      * @param callback called for each matching dependency with its path
      */
     public static void walk(ResolvedDependency root, @Nullable DependencyMatcher matcher, Callback callback) {
-        Deque<ResolvedDependency> path = new ArrayDeque<>();
-        walkRecursive(root, matcher, path,  callback);
+        walkRecursive(root, matcher, new ArrayDeque<>(), new HashSet<>(), callback);
     }
 
     private static void walkRecursive(
             ResolvedDependency dependency,
             @Nullable DependencyMatcher matcher,
             Deque<ResolvedDependency> path,
+            Set<GroupArtifactVersion> visited,
             Callback callback
     ) {
-        // Cycle detection - check if we've already visited this dependency in the current path
-        if (containsDependency(path, dependency)) {
+        // A single visited-set spanning the whole walk (not just the current path) both prevents
+        // cycles and dedups subtrees reachable through multiple paths. Without it a diamond-heavy
+        // graph expands combinatorially into O(paths); with it the walk stays O(nodes).
+        if (!visited.add(dependency.getGav().asGroupArtifactVersion())) {
             return;
         }
 
@@ -96,19 +100,9 @@ public class DependencyTreeWalker {
         }
 
         for (ResolvedDependency child : dependency.getDependencies()) {
-            walkRecursive(child, matcher, path, callback);
+            walkRecursive(child, matcher, path, visited, callback);
         }
         path.removeFirst();
-    }
-
-    private static boolean containsDependency(Deque<ResolvedDependency> path, ResolvedDependency dependency) {
-        for (ResolvedDependency dep : path) {
-            if (dep.getGroupId().equals(dependency.getGroupId()) &&
-                dep.getArtifactId().equals(dependency.getArtifactId())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**

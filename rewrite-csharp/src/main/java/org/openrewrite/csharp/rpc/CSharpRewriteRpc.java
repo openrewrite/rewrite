@@ -18,15 +18,25 @@ package org.openrewrite.csharp.rpc;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.DataTableStore;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.RpcObjectData;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -35,6 +45,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -148,6 +160,15 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 ParseSolutionResponse.Item item = response.getItems().get(index);
                 index++;
 
+                if (Quark.class.getName().equals(item.getSourceFileType())) {
+                    // Oversize file the C# side declined to parse; build the Quark locally
+                    // from its path (plus file attributes) — no content on the wire.
+                    Path sourcePath = Paths.get(Objects.requireNonNull(item.getSourcePath()));
+                    action.accept(new Quark(Tree.randomId(), sourcePath, Markers.EMPTY, null,
+                            FileAttributes.fromPath(rootDir.resolve(sourcePath))));
+                    return true;
+                }
+
                 SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
 
                 parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
@@ -174,6 +195,34 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }, false);
     }
 
+    /**
+     * Enumerate the public API of {@code ownAssemblies} into {@code JavaType}, resolving
+     * symbols against {@code referenceAssemblies} (the reference closure — other packages'
+     * assemblies plus the BCL). Returns one {@link org.openrewrite.java.tree.JavaType.FullyQualified}
+     * per top-level public type the own assemblies define, with complete members and methods;
+     * types they reference but don't define come back shallow (FQN only), for the caller to resolve.
+     * <p>
+     * Streaming: the engine sends the FQNs the own assemblies define first ({@code onFqns}, so the
+     * caller knows which names this package defines up front), then each defined type ({@code onType}) as
+     * a ref-deduplicated object stream (the same wire format {@code getObject} uses) so a shared type
+     * is transferred once and the caller never holds the whole list. A fresh ref space per call keeps it
+     * self-contained.
+     */
+    public void dependencyTypes(Dependency dependency,
+                                Consumer<Set<String>> onFqns, Consumer<JavaType.FullyQualified> onType) {
+        RpcReceiveQueue q = new RpcReceiveQueue(new HashMap<>(),
+                () -> send("DependencyTypes", dependency, GetObjectResponse.class),
+                JavaType.Class.class.getName(), null);
+        Set<String> ownFqns = new LinkedHashSet<>();
+        q.<String>receiveList(null, null, ownFqns::add);
+        onFqns.accept(ownFqns);
+        q.receiveList(null, v -> (JavaType.FullyQualified) new JavaTypeReceiver().visit(v, q), onType);
+        RpcObjectData end = q.take();
+        if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
+        }
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -183,6 +232,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private static final String TOOL_COMMAND = "rewrite-csharp";
         private static final String NUGET_PACKAGE_ID = "OpenRewrite.CSharp.Tool";
 
+        /**
+         * Serializes tool installs within this JVM. {@code RewriteRpcProcessManager}
+         * holds one RPC per thread, so several threads can each trigger an install of
+         * the same version at once. A {@link FileLock} alone is per-JVM (a second
+         * channel lock from the same JVM throws {@code OverlappingFileLockException}
+         * rather than blocking), so cross-thread serialization needs this monitor in
+         * addition to the cross-process file lock.
+         */
+        private static final Object INSTALL_LOCK = new Object();
+
 
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private List<RecipeBundleResolver> resolvers = new ArrayList<>();
@@ -191,11 +250,13 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private Supplier<@Nullable Path> dotnetPathSupplier = () -> DEFAULT_DOTNET_PATH;
         private @Nullable Path csharpServerEntry;
         private @Nullable Path log;
+        private @Nullable Path metricsCsv;
         private Duration timeout = Duration.ofSeconds(60);
         private boolean traceRpcMessages;
         private @Nullable Path workingDirectory;
         private @Nullable Path recipeInstallDir;
         private @Nullable Path profileOutputPath;
+        private @Nullable DataTableStore dataTableStore;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
@@ -254,6 +315,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         public Builder log(@Nullable Path log) {
             this.log = log;
+            return this;
+        }
+
+        public Builder metricsCsv(@Nullable Path metricsCsv) {
+            this.metricsCsv = metricsCsv;
+            return this;
+        }
+
+        public Builder dataTableStore(@Nullable DataTableStore dataTableStore) {
+            this.dataTableStore = dataTableStore;
             return this;
         }
 
@@ -319,24 +390,43 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
             Stream<@Nullable String> cmd;
 
-            if (csharpServerEntry != null) {
-                // Explicit override (used by tests)
-                if (csharpServerEntry.toString().endsWith(".csproj")) {
-                    cmd = buildCsprojCommand(dotnetPath, csharpServerEntry);
+            // An explicit builder value wins; otherwise fall back to the
+            // REWRITE_DOTNET_RPC_SERVER environment variable so a source .csproj
+            // or a pre-built dll/exe can be selected without code changes (local
+            // cross-repo development, parallel git worktrees). A .csproj is launched
+            // via `dotnet run --project`; anything else is treated as a server entry
+            // assembly/executable run directly.
+            Path serverEntry = csharpServerEntry;
+            if (serverEntry == null) {
+                String envServerEntry = System.getenv("REWRITE_DOTNET_RPC_SERVER");
+                if (envServerEntry != null && !envServerEntry.isEmpty()) {
+                    serverEntry = Paths.get(envServerEntry);
+                }
+            }
+
+            if (serverEntry != null) {
+                if (serverEntry.toString().endsWith(".csproj")) {
+                    cmd = buildCsprojCommand(dotnetPath, serverEntry);
                 } else {
                     cmd = Stream.of(
                             dotnetPath.toString(),
-                            csharpServerEntry.toAbsolutePath().normalize().toString(),
+                            serverEntry.toAbsolutePath().normalize().toString(),
                             log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                            metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                             traceRpcMessages ? "--trace-rpc-messages" : null,
                             recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                     );
                 }
             } else {
                 // Install and run the tool from a persistent tool-path, bypassing
-                // dotnet tool exec which has auth issues with private feeds (dotnet/sdk#51375)
-                String version = StringUtils.readFully(
-                        CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
+                // dotnet tool exec which has auth issues with private feeds (dotnet/sdk#51375).
+                // REWRITE_DOTNET_RPC_SERVER_VERSION overrides the embedded version so a
+                // specific package version of the tool can be pinned without rebuilding.
+                String version = System.getenv("REWRITE_DOTNET_RPC_SERVER_VERSION");
+                if (version == null || version.isEmpty()) {
+                    version = StringUtils.readFully(
+                            CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
+                }
                 cmd = buildToolPathCommand(dotnetPath, version);
             }
 
@@ -388,6 +478,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
+                        .dataTableStore(dataTableStore)
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
@@ -438,7 +529,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     "run",
                     "--project", csproj.toAbsolutePath().normalize().toString(),
                     "--framework", "net10.0",
+                    // Never let `dotnet run` build/restore here: the caller is expected to have
+                    // already built the tool (the Gradle integTest depends on csharpBuild). An
+                    // implicit restore/build streams MSBuild + NuGet audit output (e.g. NU1903
+                    // vulnerability warnings) to stdout, which is the JSON-RPC pipe. That corrupts
+                    // the stream: the Java peer rejects the non-Content-Length text and replies
+                    // with id-less JSON-RPC errors, which crash the C# SystemTextJsonFormatter
+                    // ("Non-default ID required"). --no-build also implies --no-restore.
+                    "--no-build",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null,
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
@@ -451,8 +551,9 @@ public class CSharpRewriteRpc extends RewriteRpc {
          * fails to authenticate against private NuGet feeds.
          * <p>
          * Uses {@code dotnet tool install --tool-path} which handles authentication
-         * correctly. The tool-path is version-specific so multiple versions can coexist
-         * without file-lock conflicts during parallel execution.
+         * correctly. The tool-path is version-specific so multiple versions can coexist;
+         * concurrent installs of the <em>same</em> version (parallel Gradle test forks
+         * hitting a fresh daily snapshot) are serialized by {@link #installToolPath}.
          */
         private Stream<@Nullable String> buildToolPathCommand(Path dotnetPath, String version) {
             Path toolPath = Paths.get(System.getProperty("user.home"),
@@ -460,18 +561,54 @@ public class CSharpRewriteRpc extends RewriteRpc {
             Path toolExecutable = toolPath.resolve(TOOL_COMMAND);
 
             if (!Files.isRegularFile(toolExecutable)) {
-                installTool(dotnetPath, version, toolPath);
+                installTool(dotnetPath, version, toolPath, toolExecutable);
             }
 
             return Stream.of(
                     toolExecutable.toAbsolutePath().normalize().toString(),
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null,
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
         }
 
-        private void installTool(Path dotnetPath, String version, Path toolPath) {
+        private void installTool(Path dotnetPath, String version, Path toolPath, Path toolExecutable) {
+            installToolPath(toolPath.getParent(), version, toolExecutable,
+                    () -> runDotnetInstall(dotnetPath, version, toolPath));
+        }
+
+        /**
+         * Runs {@code install} at most once for {@code toolExecutable}, serialized
+         * against other threads in this JVM and other processes on this host.
+         * {@code dotnet tool install} is not safe to run concurrently into a single
+         * {@code --tool-path}: racing installs of the same not-yet-cached version fail
+         * with "Directory not empty". Gradle runs test forks in parallel (one JVM per
+         * core), each lazily triggering an install of the same daily snapshot, so the
+         * install is guarded by an exclusive lock on a {@code <version>.lock} file in
+         * the shared tools directory. The executable presence is re-checked under the
+         * lock so a winner's install is reused rather than repeated.
+         */
+        static void installToolPath(Path toolsDir, String version, Path toolExecutable, Runnable install) {
+            synchronized (INSTALL_LOCK) {
+                try {
+                    Files.createDirectories(toolsDir);
+                    Path lockFile = toolsDir.resolve(version + ".lock");
+                    try (FileChannel channel = FileChannel.open(lockFile,
+                            StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                         FileLock ignored = channel.lock()) {
+                        if (!Files.isRegularFile(toolExecutable)) {
+                            install.run();
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Failed to install " + NUGET_PACKAGE_ID + "@" + version, e);
+                }
+            }
+        }
+
+        private void runDotnetInstall(Path dotnetPath, String version, Path toolPath) {
+            Path installCwd = null;
             try {
                 Files.createDirectories(toolPath);
 
@@ -493,9 +630,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 }
 
                 ProcessBuilder pb = new ProcessBuilder(installCmd);
-                if (workingDirectory != null) {
-                    pb.directory(workingDirectory.toFile());
-                }
+                // Run from a fresh, empty temp directory so NuGet's working-directory config
+                // walk finds no repo-level nuget.config up the hierarchy. Such a config could
+                // <clear/> global sources or enable <packageSourceMapping> that rejects
+                // --add-source with "The --add-source option cannot be combined with package
+                // source mapping". User- and machine-level config still apply, since they are
+                // discovered independently of the working directory.
+                installCwd = Files.createTempDirectory("rewrite-csharp-tool-install");
+                pb.directory(installCwd.toFile());
                 pb.environment().putAll(environment);
                 pb.redirectErrorStream(true);
                 Process process = pb.start();
@@ -512,6 +654,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while installing " + NUGET_PACKAGE_ID + "@" + version, e);
+            } finally {
+                if (installCwd != null) {
+                    try {
+                        Files.deleteIfExists(installCwd);
+                    } catch (IOException ignored) {
+                        // Best effort: the temp directory is empty and harmless if it lingers.
+                    }
+                }
             }
         }
     }

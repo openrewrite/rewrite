@@ -21,6 +21,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
@@ -39,7 +43,6 @@ import (
 // is built as Container[T] directly — no inference, no guessing for empty
 // containers, no raw cross-instantiation assertion.
 
-// makeImport returns an *Import shaped like a Go import (Qualid is a string Literal).
 func makeImport(path string) *java.Import {
 	return &java.Import{
 		ID: uuid.New(),
@@ -82,9 +85,7 @@ func TestCoerceRightPaddedTyped_NonMatchingElementFallsBack(t *testing.T) {
 	var wire any = java.RightPadded[java.Expression]{Element: makeIdent("x"), After: java.EmptySpace, Markers: java.Markers{}}
 
 	got := coerceRightPaddedTyped[*java.Import](wire)
-	if got.Element != nil {
-		t.Errorf("want nil Element on fallback, got %+v", got.Element)
-	}
+	assert.Nil(t, got.Element, "want nil Element on fallback")
 }
 
 func TestRawCastPanics_ContainerImportFromExpression(t *testing.T) {
@@ -97,8 +98,6 @@ func TestRawCastPanics_ContainerImportFromExpression(t *testing.T) {
 		_ = wire.(java.Container[*java.Import])
 	})
 }
-
-// ----- Full send->receive round trip through VisitCompilationUnit (Print path) -----
 
 func TestCompilationUnitRoundTrip_EmptyImports(t *testing.T) {
 	// given: a CU with a non-nil but EMPTY imports container — this is what
@@ -114,12 +113,8 @@ func TestCompilationUnitRoundTrip_EmptyImports(t *testing.T) {
 	got := roundTripNode(t, before, seed).(*golang.CompilationUnit)
 
 	// then: Imports stays a *Container[*Import].
-	if got.Imports == nil {
-		t.Fatal("Imports: got nil, want empty *Container[*Import]")
-	}
-	if len(got.Imports.Elements) != 0 {
-		t.Errorf("Imports.Elements: got %d, want 0", len(got.Imports.Elements))
-	}
+	require.NotNil(t, got.Imports, "Imports: got nil, want empty *Container[*Import]")
+	assert.Len(t, got.Imports.Elements, 0, "Imports.Elements")
 }
 
 func TestCompilationUnitRoundTrip_WithImports(t *testing.T) {
@@ -141,16 +136,10 @@ func TestCompilationUnitRoundTrip_WithImports(t *testing.T) {
 	got := roundTripNode(t, before, seed).(*golang.CompilationUnit)
 
 	// then: both imports survive, typed as *Import.
-	if got.Imports == nil {
-		t.Fatal("Imports: got nil, want non-nil")
-	}
-	if len(got.Imports.Elements) != 2 {
-		t.Fatalf("Imports.Elements: got %d, want 2", len(got.Imports.Elements))
-	}
+	require.NotNil(t, got.Imports, "Imports: got nil, want non-nil")
+	require.Len(t, got.Imports.Elements, 2, "Imports.Elements")
 	gotImp0 := got.Imports.Elements[0].Element
-	if gotImp0 == nil {
-		t.Fatal("Imports[0]: got nil *Import")
-	}
+	require.NotNil(t, gotImp0, "Imports[0]: got nil *Import")
 	if lit, ok := gotImp0.Qualid.(*java.Literal); !ok || lit.Value != "fmt" {
 		t.Errorf("Imports[0].Qualid: got %+v, want literal \"fmt\"", gotImp0.Qualid)
 	}
@@ -163,7 +152,5 @@ func TestCompilationUnitRoundTrip_NilImports(t *testing.T) {
 	seed := &golang.CompilationUnit{ID: cuID}
 
 	got := roundTripNode(t, before, seed).(*golang.CompilationUnit)
-	if got.Imports != nil {
-		t.Errorf("Imports: got %+v, want nil", got.Imports)
-	}
+	assert.Nilf(t, got.Imports, "Imports: got %+v, want nil", got.Imports)
 }

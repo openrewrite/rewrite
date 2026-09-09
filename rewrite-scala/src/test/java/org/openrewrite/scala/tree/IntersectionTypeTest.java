@@ -112,4 +112,33 @@ class IntersectionTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void ampersandOperatorForm() {
+        rewriteRun(
+          scala(
+            """
+              trait A
+              trait B
+              trait C
+              object Test {
+                def f(x: A & B & C): Int = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ampersandWithParameterizedOperand() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val x: Serializable & Comparable[String] = null
+              }
+              """
+          )
+        );
+    }
 }

@@ -17,12 +17,21 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.Markers;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.emptyList;
 
@@ -36,7 +45,12 @@ public class ChangeMethodInvocationReturnType extends Recipe {
     String methodPattern;
 
     @Option(displayName = "New method invocation return type",
-            description = "The fully qualified new return type of method invocation.",
+            description = "The fully qualified new return type of method invocation. " +
+                    "Parameterized types like `java.util.Set<java.lang.String>` are supported; " +
+                    "`java.lang` type arguments may use their simple name, e.g. `java.util.List<String>`. " +
+                    "Nested types may be written with a `$` separator, e.g. `mockwebserver3.MockResponse$Builder`; " +
+                    "dots also work, e.g. `mockwebserver3.MockResponse.Builder`, in which case the first segment " +
+                    "that is followed only by segments starting with an uppercase letter is taken to be the outermost type.",
             example = "long")
     String newReturnType;
 
@@ -51,8 +65,10 @@ public class ChangeMethodInvocationReturnType extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            private final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, false);
+        MethodMatcher methodMatcher = new MethodMatcher(methodPattern, false);
+        String returnTypeExpression = newReturnType.replace('$', '.');
+        String returnTypeSignature = binaryName(newReturnType);
+        return Preconditions.check(new UsesMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
 
             private boolean methodUpdated;
 
@@ -60,8 +76,8 @@ public class ChangeMethodInvocationReturnType extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 JavaType.Method type = m.getMethodType();
-                if (methodMatcher.matches(method) && type != null && !newReturnType.equals(type.getReturnType().toString())) {
-                    type = type.withReturnType(JavaType.buildType(newReturnType));
+                if (methodMatcher.matches(method) && type != null && !returnTypeSignature.equals(type.getReturnType().toString())) {
+                    type = type.withReturnType(JavaType.buildType(returnTypeSignature));
                     m = m.withMethodType(type);
                     if (m.getName().getType() != null) {
                         m = m.withName(m.getName().withType(type));
@@ -77,36 +93,205 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 JavaType.FullyQualified originalType = multiVariable.getTypeAsFullyQualified();
                 J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
 
-                if (methodUpdated) {
-                    JavaType newType = JavaType.buildType(newReturnType);
-                    JavaType.FullyQualified newFieldType = TypeUtils.asFullyQualified(newType);
-
-                    maybeRemoveImport(originalType);
-                    maybeAddImport(newFieldType);
-
-                    mv = mv.withTypeExpression(mv.getTypeExpression() == null ?
-                            null :
-                            new J.Identifier(mv.getTypeExpression().getId(),
-                                    mv.getTypeExpression().getPrefix(),
-                                    Markers.EMPTY,
-                                    emptyList(),
-                                    newReturnType.substring(newReturnType.lastIndexOf('.') + 1),
-                                    newType,
-                                    null
-                            )
-                    );
-
-                    mv = mv.withVariables(ListUtils.map(mv.getVariables(), var -> {
-                        JavaType.FullyQualified varType = TypeUtils.asFullyQualified(var.getType());
-                        if (varType != null && !varType.equals(newType)) {
-                            return var.withType(newType).withName(var.getName().withType(newType));
-                        }
-                        return var;
-                    }));
+                boolean initializedByMatch = mv.getVariables().stream()
+                        .anyMatch(v -> isInitializedByMatch(v.getInitializer()));
+                if (!methodUpdated || !initializedByMatch || mv.getTypeExpression() == null) {
+                    return mv;
                 }
 
-                return mv;
+                boolean needsSemicolon = getCursor().getParentTreeCursor().getValue() instanceof J.Block;
+                String template = returnTypeExpression + " __typePlaceholder__" + (needsSemicolon ? ";" : "");
+                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(template).contextSensitive();
+                List<String> stubs = synthesizeStubsForTypeAttribution(newReturnType);
+                if (!stubs.isEmpty()) {
+                    templateBuilder.javaParser(JavaParser.fromJavaVersion().dependsOn(stubs.toArray(new String[0])));
+                }
+                J.VariableDeclarations resolved = templateBuilder.build()
+                        .apply(updateCursor(mv), mv.getCoordinates().replace());
+                TypeTree newTypeExpression = resolved.getTypeExpression();
+                if (newTypeExpression == null || newTypeExpression.getType() instanceof JavaType.Unknown) {
+                    return mv;
+                }
+
+                JavaType newType = newTypeExpression.getType();
+                maybeRemoveImport(originalType);
+                mv = mv.withTypeExpression(newTypeExpression.withPrefix(mv.getTypeExpression().getPrefix()));
+                if (!(newTypeExpression instanceof J.Primitive)) {
+                    doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(mv.getTypeExpression()));
+                }
+                return mv.withVariables(ListUtils.map(mv.getVariables(), var -> {
+                    JavaType.FullyQualified varType = TypeUtils.asFullyQualified(var.getType());
+                    if (varType != null && !varType.equals(newType)) {
+                        return var.withType(newType).withName(var.getName().withType(newType));
+                    }
+                    return var;
+                }));
             }
-        };
+
+            private boolean isInitializedByMatch(@Nullable Expression expression) {
+                if (expression == null) {
+                    return false;
+                }
+                Expression unwrapped = expression.unwrap();
+                if (unwrapped instanceof J.MethodInvocation) {
+                    return methodMatcher.matches((J.MethodInvocation) unwrapped);
+                }
+                if (unwrapped instanceof J.Ternary) {
+                    J.Ternary ternary = (J.Ternary) unwrapped;
+                    return isInitializedByMatch(ternary.getTruePart()) ||
+                            isInitializedByMatch(ternary.getFalsePart());
+                }
+                return false;
+            }
+        });
+    }
+
+    private static List<String> synthesizeStubsForTypeAttribution(String type) {
+        Map<String, Integer> fqnToArity = new LinkedHashMap<>();
+        collectStubTypes(type, fqnToArity);
+        Map<String, Map<String, StubClass>> topLevelByPackage = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : fqnToArity.entrySet()) {
+            List<String> names = splitPackageAndTypeNames(entry.getKey());
+            Map<String, StubClass> topLevel = topLevelByPackage.computeIfAbsent(names.get(0), p -> new LinkedHashMap<>());
+            StubClass stubClass = topLevel.computeIfAbsent(names.get(1), n -> new StubClass());
+            for (int i = 2; i < names.size(); i++) {
+                stubClass = stubClass.nested.computeIfAbsent(names.get(i), n -> new StubClass());
+            }
+            stubClass.arity = Math.max(stubClass.arity, entry.getValue());
+        }
+        List<String> stubs = new ArrayList<>();
+        for (Map.Entry<String, Map<String, StubClass>> byPackage : topLevelByPackage.entrySet()) {
+            for (Map.Entry<String, StubClass> topLevel : byPackage.getValue().entrySet()) {
+                StringBuilder stub = new StringBuilder();
+                if (!byPackage.getKey().isEmpty()) {
+                    stub.append("package ").append(byPackage.getKey()).append("; ");
+                }
+                appendStubClass(stub, topLevel.getKey(), topLevel.getValue(), true);
+                stubs.add(stub.toString());
+            }
+        }
+        return stubs;
+    }
+
+    /**
+     * @return the package name, possibly empty, followed by each type simple name from outermost to innermost.
+     */
+    private static List<String> splitPackageAndTypeNames(String fqn) {
+        int dollar = fqn.indexOf('$');
+        String[] segments = (dollar == -1 ? fqn : fqn.substring(0, dollar)).split("\\.");
+        int firstType = segments.length - 1;
+        for (int i = 0; i < segments.length; i++) {
+            boolean nestedFromHere = true;
+            for (int j = i; j < segments.length; j++) {
+                if (segments[j].isEmpty() || !Character.isUpperCase(segments[j].charAt(0))) {
+                    nestedFromHere = false;
+                    break;
+                }
+            }
+            if (nestedFromHere) {
+                firstType = i;
+                break;
+            }
+        }
+        List<String> names = new ArrayList<>();
+        StringBuilder packageName = new StringBuilder();
+        for (int i = 0; i < firstType; i++) {
+            if (packageName.length() > 0) {
+                packageName.append('.');
+            }
+            packageName.append(segments[i]);
+        }
+        names.add(packageName.toString());
+        for (int i = firstType; i < segments.length; i++) {
+            names.add(segments[i]);
+        }
+        if (dollar != -1) {
+            for (String nested : fqn.substring(dollar + 1).split("\\$")) {
+                if (!nested.isEmpty()) {
+                    names.add(nested);
+                }
+            }
+        }
+        return names;
+    }
+
+    private static String binaryName(String type) {
+        int lt = type.indexOf('<');
+        List<String> names = splitPackageAndTypeNames(lt == -1 ? type : type.substring(0, lt));
+        StringBuilder binaryName = new StringBuilder(names.get(0));
+        for (int i = 1; i < names.size(); i++) {
+            if (binaryName.length() > 0) {
+                binaryName.append(i == 1 ? '.' : '$');
+            }
+            binaryName.append(names.get(i));
+        }
+        return lt == -1 ? binaryName.toString() : binaryName.append(type.substring(lt)).toString();
+    }
+
+    private static void appendStubClass(StringBuilder stub, String name, StubClass stubClass, boolean topLevel) {
+        stub.append("public ").append(topLevel ? "" : "static ").append("class ").append(name);
+        for (int i = 0; i < stubClass.arity; i++) {
+            stub.append(i == 0 ? "<T" : ", T").append(i);
+        }
+        if (stubClass.arity > 0) {
+            stub.append('>');
+        }
+        stub.append(" {");
+        for (Map.Entry<String, StubClass> nested : stubClass.nested.entrySet()) {
+            stub.append(' ');
+            appendStubClass(stub, nested.getKey(), nested.getValue(), false);
+        }
+        stub.append('}');
+    }
+
+    private static class StubClass {
+        final Map<String, StubClass> nested = new LinkedHashMap<>();
+        int arity;
+    }
+
+    private static void collectStubTypes(String type, Map<String, Integer> fqnToArity) {
+        type = type.trim();
+        while (type.endsWith("[]")) {
+            type = type.substring(0, type.length() - 2).trim();
+        }
+        if (type.startsWith("?")) {
+            int extendsIdx = type.indexOf("extends");
+            int superIdx = type.indexOf("super");
+            int boundIdx = extendsIdx != -1 ? extendsIdx + "extends".length() :
+                    superIdx != -1 ? superIdx + "super".length() : -1;
+            if (boundIdx != -1) {
+                collectStubTypes(type.substring(boundIdx), fqnToArity);
+            }
+            return;
+        }
+        int lt = type.indexOf('<');
+        String raw = (lt == -1 ? type : type.substring(0, lt)).trim();
+        List<String> arguments = lt == -1 ? emptyList() :
+                splitTypeArguments(type.substring(lt + 1, type.lastIndexOf('>')));
+        if (raw.indexOf('.') != -1 && !raw.startsWith("java.")) {
+            fqnToArity.merge(raw, arguments.size(), Math::max);
+        }
+        for (String argument : arguments) {
+            collectStubTypes(argument, fqnToArity);
+        }
+    }
+
+    private static List<String> splitTypeArguments(String arguments) {
+        List<String> result = new ArrayList<>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < arguments.length(); i++) {
+            char c = arguments.charAt(i);
+            if (c == '<') {
+                depth++;
+            } else if (c == '>') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                result.add(arguments.substring(start, i).trim());
+                start = i + 1;
+            }
+        }
+        result.add(arguments.substring(start).trim());
+        return result;
     }
 }

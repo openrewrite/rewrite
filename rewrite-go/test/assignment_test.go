@@ -21,6 +21,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -116,7 +118,6 @@ func TestParseMultiAssignFromFunc(t *testing.T) {
 		`))
 }
 
-// ident builds a bare identifier expression for the visitor fixtures.
 func ident(name string) java.Expression {
 	return &java.Identifier{ID: uuid.New(), Name: name}
 }
@@ -156,7 +157,5 @@ func TestMultiAssignmentVisitsRHSMethodInvocation(t *testing.T) {
 	v.Visit(ma, nil)
 
 	// then
-	if len(rec.visited) != 1 || rec.visited[0] != "ReadAll" {
-		t.Errorf("expected RHS method invocation %q to be visited, got %v", "ReadAll", rec.visited)
-	}
+	assert.Falsef(t, len(rec.visited) != 1 || rec.visited[0] != "ReadAll", "expected RHS method invocation %q to be visited", "ReadAll")
 }

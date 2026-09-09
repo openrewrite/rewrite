@@ -16,6 +16,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <!-- Test-only: fixtures build throwaway git repos with LibGit2Sharp. The production
+         tool resolves git through the host `git` CLI (see GitCli) and ships no native libs. -->
+    <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="coverlet.collector" Version="6.0.2" />

@@ -101,4 +101,24 @@ class BlockTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void trailingSemicolonAfterMultiLineInitializer() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def extract(a: String, b: String): Unit = {
+                    val converter =
+                      new Converter(
+                        a,
+                        b);
+
+                    run(converter);
+                  }
+                }
+                """
+            )
+        );
+    }
 }

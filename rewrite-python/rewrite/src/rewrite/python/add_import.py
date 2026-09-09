@@ -14,6 +14,7 @@
 
 """AddImport visitor for Python import handling."""
 
+import builtins
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -21,11 +22,24 @@ from typing import Optional
 from rewrite import random_id
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded
-from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Space
+from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Literal, Space
 from rewrite.markers import Markers
-from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, pad_right
-from rewrite.python.tree import CompilationUnit, MultiImport
+from rewrite.python.binding_utils import is_reference
+from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
+                                         get_canonical_fqn, module_binding_name, pad_right,
+                                         referenced_names)
+from rewrite.python.tree import CompilationUnit, ExpressionStatement, MultiImport
 from rewrite.python.visitor import PythonVisitor
+
+
+def _is_module_docstring(padded_stmts: list) -> bool:
+    """True when the file opens with a module docstring -- a bare string expression."""
+    if not padded_stmts:
+        return False
+    stmt = padded_stmts[0].element
+    if not isinstance(stmt, ExpressionStatement):
+        return False
+    return isinstance(stmt.expression, Literal) and isinstance(stmt.expression.value, str)
 
 
 class ImportStyle(Enum):
@@ -112,6 +126,15 @@ class AddImport(PythonVisitor):
         self.only_if_referenced = options.only_if_referenced
 
     def visit_compilation_unit(self, cu: CompilationUnit, p) -> J:
+        # builtins are always available; only import them under an explicit alias
+        if self.module == 'builtins' and self.alias is None:
+            return cu
+
+        # A bare builtin name (e.g. `list` when ChangeType retargets a type to a builtin) is
+        # not a module, so there is no import that could bind it.
+        if self.name is None and '.' not in self.module and hasattr(builtins, self.module):
+            return cu
+
         # Check if import already exists
         if self._import_exists(cu):
             return cu
@@ -154,10 +177,14 @@ class AddImport(PythonVisitor):
             if multi.from_ is None:
                 return False  # This is not a "from" import
             from_name = get_name_string(multi.from_)
-            if from_name != self.module:
-                return False
             for imp in multi.names:
-                if self._import_name_matches(imp, self.name, self.alias):
+                if from_name == self.module and self._import_name_matches(imp, self.name, self.alias):
+                    return True
+                # A member canonically matching the requested module.name
+                # satisfies the request too — provided it binds the same name,
+                # so references to the requested name resolve through it.
+                if get_canonical_fqn(imp) == f"{self.module}.{self.name}" and \
+                        (get_alias_name(imp) or get_qualid_name(imp.qualid)) == (self.alias or self.name):
                     return True
         return False
 
@@ -176,7 +203,7 @@ class AddImport(PythonVisitor):
 
     def _is_referenced(self, cu: CompilationUnit) -> bool:
         """Check if the identifier we're importing is actually used."""
-        target_name = self.alias or self.name or self.module.split('.')[-1]
+        target_name = self.alias or self.name or module_binding_name(self.module)
 
         class ReferenceChecker(PythonVisitor):
             def __init__(self):
@@ -184,7 +211,7 @@ class AddImport(PythonVisitor):
                 self.found = False
 
             def visit_identifier(self, ident: Identifier, p) -> J:
-                if ident.simple_name == target_name:
+                if is_reference(self.cursor, ident) and target_name in referenced_names(ident):
                     self.found = True
                 return ident
 
@@ -212,8 +239,8 @@ class AddImport(PythonVisitor):
             # case-insensitive alphabetical position (mirrors rewrite-javascript's
             # AddImport). Existing members are not reordered; only the new member
             # is positioned.
-            new_import = self._create_import_element(self.name, self.alias)
-            existing_padded = self._insert_member(
+            new_import = create_import_element(self.name, self.alias)
+            existing_padded = insert_member(
                 list(stmt.padding.names.padding.elements), new_import)
 
             # Recreate the MultiImport with the new names
@@ -238,74 +265,18 @@ class AddImport(PythonVisitor):
 
         return cu
 
-    def _insert_member(self, elements: list, new_import: Import) -> list:
-        """Insert ``new_import`` into a list of ``JRightPadded[Import]`` at its
-        case-insensitive alphabetical position.
-
-        The space after the ``import`` keyword lives in the surrounding
-        ``JContainer.before``, so the element at index 0 carries an empty prefix
-        while every later element carries a single-space prefix (the space after
-        the separating comma). Trailing whitespace (e.g. before a ``)`` in a
-        parenthesized import) lives in the last element's ``.after`` and must
-        travel with whichever element ends up last.
-        """
-        insert_idx = self._sorted_insert_index(elements, new_import)
-        end = len(elements)
-
-        if insert_idx == 0:
-            prefix = Space.EMPTY
-            if elements:
-                # The displaced first element now follows a comma.
-                first = elements[0]
-                elements[0] = first.replace(
-                    _element=first.element.replace(prefix=Space.SINGLE_SPACE))
-        else:
-            prefix = Space.SINGLE_SPACE
-        new_import = new_import.replace(prefix=prefix)
-
-        if insert_idx == end and elements:
-            # Appending at the end: the new element becomes the last, so any
-            # trailing whitespace moves from the old last element onto it.
-            last = elements[-1]
-            elements[-1] = last.replace(_after=Space.EMPTY)
-            after = last.after
-        else:
-            after = Space.EMPTY
-
-        elements.insert(insert_idx, JRightPadded(new_import, after, Markers.EMPTY))
-        return elements
-
-    def _sorted_insert_index(self, elements: list, new_import: Import) -> int:
-        """Return the index at which the new member keeps the list in
-        case-insensitive alphabetical order: the first existing member whose
-        bound name sorts after the new member's, or the end if none does.
-
-        Members are sorted by their bound name (alias if present, else the
-        imported name), matching rewrite-javascript's comparator.
-        """
-        new_key = self._sort_key(new_import)
-        for i, padded in enumerate(elements):
-            if new_key < self._sort_key(padded.element):
-                return i
-        return len(elements)
-
-    @staticmethod
-    def _sort_key(imp: Import) -> str:
-        """Case-insensitive sort key for an imported member: its alias if it has
-        one, otherwise the imported name."""
-        return (get_alias_name(imp) or get_qualid_name(imp.qualid)).lower()
-
     def _add_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Add a new import statement to the compilation unit."""
-        new_import = self._create_multi_import()
+        new_import = create_import_statement(self.module, self.name, self.alias)
 
-        # Find insertion point (after existing imports)
-        insert_idx = 0
+        # Insert after the module docstring (which must stay first) and any existing imports.
         padded_stmts = list(cu.padding.statements)
-        for i, padded in enumerate(padded_stmts):
-            if isinstance(padded.element, (Import, MultiImport)):
+        header = 1 if _is_module_docstring(padded_stmts) else 0
+        insert_idx = header
+        for i in range(header, len(padded_stmts)):
+            if isinstance(padded_stmts[i].element, (Import, MultiImport)):
                 insert_idx = i + 1
-            elif insert_idx > 0:
+            elif insert_idx > header:
                 break  # Stop after we've passed the import section
 
         # Insert the new import at the padding level
@@ -341,133 +312,191 @@ class AddImport(PythonVisitor):
 
         return cu.padding.replace(_statements=padded_stmts)
 
-    def _create_multi_import(self) -> MultiImport:
-        """Create a new MultiImport statement."""
-        if self.name is None:
-            # Direct import: import module [as alias]
-            import_elem = self._create_import_element(self.module, self.alias)
-            return MultiImport(
-                random_id(),
-                Space([], '\n'),
-                Markers.EMPTY,
-                None,  # No 'from'
-                False,  # Not parenthesized
-                JContainer(
-                    Space.SINGLE_SPACE,
-                    [pad_right(import_elem)],
-                    Markers.EMPTY
-                )
-            )
-        else:
-            # From import: from module import name [as alias]
-            from_name = self._create_module_name(self.module)
-            # Add space prefix (the space between 'from' and module name)
-            from_name = from_name.replace(prefix=Space.SINGLE_SPACE)
-            import_elem = self._create_import_element(self.name, self.alias)
-            return MultiImport(
-                random_id(),
-                Space([], '\n'),
-                Markers.EMPTY,
-                JRightPadded(from_name, Space.SINGLE_SPACE, Markers.EMPTY),
-                False,  # Not parenthesized
-                JContainer(
-                    Space.SINGLE_SPACE,
-                    [pad_right(import_elem)],
-                    Markers.EMPTY
-                )
-            )
 
-    def _create_import_element(self, name: str, alias: Optional[str]) -> Import:
-        """Create an Import element."""
-        qualid = self._create_qualified_name(name)
-        alias_left_padded = None
-        if alias:
-            alias_ident = Identifier(
-                random_id(),
+def insert_member(elements: list, new_import: Import) -> list:
+    """Insert ``new_import`` into a list of ``JRightPadded[Import]`` at its
+    case-insensitive alphabetical position.
+
+    The space after the ``import`` keyword lives in the surrounding
+    ``JContainer.before``, so the element at index 0 carries an empty prefix
+    while every later element carries a single-space prefix (the space after
+    the separating comma). Trailing whitespace (e.g. before a ``)`` in a
+    parenthesized import) lives in the last element's ``.after`` and must
+    travel with whichever element ends up last.
+    """
+    insert_idx = _sorted_insert_index(elements, new_import)
+    end = len(elements)
+
+    if insert_idx == 0:
+        prefix = Space.EMPTY
+        if elements:
+            # The displaced first element now follows a comma.
+            first = elements[0]
+            elements[0] = first.replace(
+                _element=first.element.replace(prefix=Space.SINGLE_SPACE))
+    else:
+        prefix = Space.SINGLE_SPACE
+    new_import = new_import.replace(prefix=prefix)
+
+    if insert_idx == end and elements:
+        # Appending at the end: the new element becomes the last, so any
+        # trailing whitespace moves from the old last element onto it.
+        last = elements[-1]
+        elements[-1] = last.replace(_after=Space.EMPTY)
+        after = last.after
+    else:
+        after = Space.EMPTY
+
+    elements.insert(insert_idx, JRightPadded(new_import, after, Markers.EMPTY))
+    return elements
+
+def _sorted_insert_index(elements: list, new_import: Import) -> int:
+    """Return the index at which the new member keeps the list in
+    case-insensitive alphabetical order: the first existing member whose
+    bound name sorts after the new member's, or the end if none does.
+
+    Members are sorted by their bound name (alias if present, else the
+    imported name), matching rewrite-javascript's comparator.
+    """
+    new_key = _sort_key(new_import)
+    for i, padded in enumerate(elements):
+        if new_key < _sort_key(padded.element):
+            return i
+    return len(elements)
+
+def _sort_key(imp: Import) -> str:
+    """Case-insensitive sort key for an imported member: its alias if it has
+    one, otherwise the imported name."""
+    return (get_alias_name(imp) or get_qualid_name(imp.qualid)).lower()
+
+
+def create_import_statement(module: str, name: Optional[str] = None,
+                            alias: Optional[str] = None) -> MultiImport:
+    """Build ``import module [as alias]`` or ``from module import name [as alias]``."""
+    if name is None:
+        # Direct import: import module [as alias]
+        import_elem = create_import_element(module, alias)
+        return MultiImport(
+            random_id(),
+            Space([], '\n'),
+            Markers.EMPTY,
+            None,  # No 'from'
+            False,  # Not parenthesized
+            JContainer(
                 Space.SINGLE_SPACE,
-                Markers.EMPTY,
-                [],
-                alias,
-                None,
-                None
-            )
-            alias_left_padded = JLeftPadded(
-                Space.SINGLE_SPACE,
-                alias_ident,
+                [pad_right(import_elem)],
                 Markers.EMPTY
             )
+        )
+    else:
+        # From import: from module import name [as alias]
+        from_name = _create_module_name(module)
+        # Add space prefix (the space between 'from' and module name)
+        from_name = from_name.replace(prefix=Space.SINGLE_SPACE)
+        import_elem = create_import_element(name, alias)
+        return MultiImport(
+            random_id(),
+            Space([], '\n'),
+            Markers.EMPTY,
+            JRightPadded(from_name, Space.SINGLE_SPACE, Markers.EMPTY),
+            False,  # Not parenthesized
+            JContainer(
+                Space.SINGLE_SPACE,
+                [pad_right(import_elem)],
+                Markers.EMPTY
+            )
+        )
 
-        return Import(
+def create_import_element(name: str, alias: Optional[str] = None) -> Import:
+    """Build one member of an import statement: ``name [as alias]``."""
+    qualid = _create_qualified_name(name)
+    alias_left_padded = None
+    if alias:
+        alias_ident = Identifier(
+            random_id(),
+            Space.SINGLE_SPACE,
+            Markers.EMPTY,
+            [],
+            alias,
+            None,
+            None
+        )
+        alias_left_padded = JLeftPadded(
+            Space.SINGLE_SPACE,
+            alias_ident,
+            Markers.EMPTY
+        )
+
+    return Import(
+        random_id(),
+        Space.EMPTY,
+        Markers.EMPTY,
+        JLeftPadded(Space.EMPTY, False, Markers.EMPTY),
+        qualid,
+        alias_left_padded
+    )
+
+def _create_qualified_name(name: str) -> FieldAccess:
+    """Create a FieldAccess for a qualified name."""
+    parts = name.split('.')
+    if len(parts) == 1:
+        return FieldAccess(
             random_id(),
             Space.EMPTY,
             Markers.EMPTY,
-            JLeftPadded(Space.EMPTY, False, Markers.EMPTY),
-            qualid,
-            alias_left_padded
+            Empty(random_id(), Space.EMPTY, Markers.EMPTY),
+            JLeftPadded(
+                Space.EMPTY,
+                Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], parts[0], None, None),
+                Markers.EMPTY
+            ),
+            None
         )
 
-    def _create_qualified_name(self, name: str) -> FieldAccess:
-        """Create a FieldAccess for a qualified name."""
-        parts = name.split('.')
-        if len(parts) == 1:
-            return FieldAccess(
-                random_id(),
+    # Build nested FieldAccess for qualified names like "os.path"
+    # Start with the first part as an Identifier target
+    result: J = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], parts[0], None, None)
+    # Wrap remaining parts as FieldAccess nodes
+    for part in parts[1:]:
+        result = FieldAccess(
+            random_id(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            result,
+            JLeftPadded(
                 Space.EMPTY,
-                Markers.EMPTY,
-                Empty(random_id(), Space.EMPTY, Markers.EMPTY),
-                JLeftPadded(
-                    Space.EMPTY,
-                    Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], parts[0], None, None),
-                    Markers.EMPTY
-                ),
-                None
-            )
+                Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], part, None, None),
+                Markers.EMPTY
+            ),
+            None
+        )
+    # For multi-part names, result is already a FieldAccess.
+    # Wrap single-part Identifier in FieldAccess(Empty, name) for consistency
+    # (but single-part is handled above, so this shouldn't happen)
+    assert isinstance(result, FieldAccess)
+    return result
 
-        # Build nested FieldAccess for qualified names like "os.path"
-        # Start with the first part as an Identifier target
-        result: J = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], parts[0], None, None)
-        # Wrap remaining parts as FieldAccess nodes
-        for part in parts[1:]:
-            result = FieldAccess(
-                random_id(),
+def _create_module_name(name: str) -> J:
+    """Create a name tree for use as a 'from' module name.
+
+    Single-part names become Identifier; multi-part become FieldAccess.
+    Unlike _create_qualified_name, this does NOT wrap single parts in
+    FieldAccess(Empty, name) since the 'from' printer has no special
+    handling for Empty targets.
+    """
+    parts = name.split('.')
+    result: J = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], parts[0], None, None)
+    for part in parts[1:]:
+        result = FieldAccess(
+            random_id(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            result,
+            JLeftPadded(
                 Space.EMPTY,
-                Markers.EMPTY,
-                result,
-                JLeftPadded(
-                    Space.EMPTY,
-                    Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], part, None, None),
-                    Markers.EMPTY
-                ),
-                None
-            )
-        # For multi-part names, result is already a FieldAccess.
-        # Wrap single-part Identifier in FieldAccess(Empty, name) for consistency
-        # (but single-part is handled above, so this shouldn't happen)
-        assert isinstance(result, FieldAccess)
-        return result
-
-    def _create_module_name(self, name: str) -> J:
-        """Create a name tree for use as a 'from' module name.
-
-        Single-part names become Identifier; multi-part become FieldAccess.
-        Unlike _create_qualified_name, this does NOT wrap single parts in
-        FieldAccess(Empty, name) since the 'from' printer has no special
-        handling for Empty targets.
-        """
-        parts = name.split('.')
-        result: J = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], parts[0], None, None)
-        for part in parts[1:]:
-            result = FieldAccess(
-                random_id(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                result,
-                JLeftPadded(
-                    Space.EMPTY,
-                    Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], part, None, None),
-                    Markers.EMPTY
-                ),
-                None
-            )
-        return result
-
+                Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], part, None, None),
+                Markers.EMPTY
+            ),
+            None
+        )
+    return result

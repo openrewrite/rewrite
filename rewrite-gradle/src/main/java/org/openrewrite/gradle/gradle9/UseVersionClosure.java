@@ -19,8 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.internal.GradleParseUtils;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -29,7 +29,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 
-import java.util.Collections;
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -67,7 +67,7 @@ public class UseVersionClosure extends Recipe {
                         return s;
                     }
                     J.Lambda lambda = (J.Lambda) assignment.getAssignment();
-                    J.MethodInvocation template = parseVersionTemplate(ctx);
+                    J.MethodInvocation template = GradleParseUtils.parseMethodInvocation(ctx, "version {\n}\n");
                     J.Lambda templateLambda = (J.Lambda) template.getArguments().get(0);
                     J.Block templateBody = (J.Block) templateLambda.getBody();
                     J.Block originalBody = (J.Block) lambda.getBody();
@@ -75,23 +75,11 @@ public class UseVersionClosure extends Recipe {
                     // inside closures may be wrapped in J.Return, so the indentation is on the wrapper)
                     return template
                             .withPrefix(((J) s).getPrefix())
-                            .withArguments(Collections.singletonList(
+                            .withArguments(singletonList(
                                     templateLambda.withBody(templateBody.withStatements(originalBody.getStatements()).withEnd(originalBody.getEnd()))));
                 }));
             }
         });
-    }
-
-    private static J.MethodInvocation parseVersionTemplate(ExecutionContext ctx) {
-        G.CompilationUnit parsed = (G.CompilationUnit) GradleParser.builder().build()
-                .parse(ctx, "version {\n}\n")
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Unable to parse `version { }` template"));
-        Statement first = parsed.getStatements().get(0);
-        if (!(first instanceof J.MethodInvocation)) {
-            throw new IllegalStateException("Expected a method invocation, got " + first.getClass().getName());
-        }
-        return (J.MethodInvocation) first;
     }
 
     private static J.Assignment asVersionClosureAssignment(Statement s) {

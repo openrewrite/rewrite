@@ -73,7 +73,8 @@ class GradleSnippetGlobalTransformReproTest {
 
         SourceFile parsed = parse(tmp);
 
-        // Before the fix this produced a ParseError: "Failed to parse build.gradle at cursor position N".
+        // An AST-mutating global transform on the classpath must not yield a ParseError
+        // ("Failed to parse build.gradle at cursor position N").
         assertThat(parsed).isNotInstanceOf(ParseError.class);
         // Registered only on the compile classpath, which the classpath-free transformLoader never scans.
         assertThat(InjectClosureStatementTransformation.executed)

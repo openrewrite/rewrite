@@ -14,17 +14,20 @@
  * limitations under the License.
  */
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
+using NuGet.Frameworks;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
 using Serilog;
 using StreamJsonRpc;
+using StreamJsonRpc.Protocol;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -48,9 +51,17 @@ public class RewriteRpcServer
     public static void SetCurrent(RewriteRpcServer? server) => _current = server;
 
     private readonly RecipeMarketplace _marketplace;
+
+    // Recipe name -> the package that contributed it, recorded at install time and persisted for the
+    // process lifetime so GetMarketplace can attribute each row even when a later install is a no-op.
+    private readonly ConcurrentDictionary<string, string> _recipeOrigin = new();
+
     private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
     private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
+
+    private volatile IDataTableStore? _configuredDataTableStore;
+
     private string? _recipesProjectDir;
     private readonly string? _recipeInstallDir;
     private JsonRpc? _jsonRpc;
@@ -69,12 +80,38 @@ public class RewriteRpcServer
     /// <summary>
     /// Referentially deduplicated objects and their ref IDs.
     /// </summary>
-    private readonly ConcurrentDictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
+    /// <summary>One in-flight transfer per object id, mirroring Java's inProgressGetRpcObjects.</summary>
+    private readonly ConcurrentDictionary<string, Lazy<Channel<List<RpcObjectData>>>> _inProgressGetObject = new();
+
+    internal int BatchSize = 1000;
+
+    private readonly RpcRefs _localRefs = new();
 
     /// <summary>
     /// Refs received from the remote process (Java) for deduplication.
     /// </summary>
     private readonly ConcurrentDictionary<int, object> _remoteRefs = new();
+
+    /// <summary>
+    /// Ref high-water per source file (send-side highest id issued, receive-side max _remoteRefs
+    /// key), captured before first visit so <see cref="Evict"/> rolls back exactly its refs.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, (int LocalRefs, int RemoteRefsMax)> _refCheckpoints = new();
+
+    /// <summary>
+    /// DependencyTypes pages its (potentially hundreds-of-MB) response: the full RpcObjectData list
+    /// is built once, cached keyed by coordinate, and handed back one
+    /// <see cref="DependencyTypesBatchSize"/> slice per repeated identical request — the Java
+    /// RpcReceiveQueue re-pulls when its local batch empties. Evicted once drained. Concurrent so
+    /// independent dependency builds (distinct keys) proceed in parallel under StreamJsonRpc's
+    /// concurrent dispatch; pulls for a single key are strictly sequential (the client awaits each
+    /// response before re-pulling), so a key's list is never mutated concurrently — the same
+    /// serial-per-key assumption the JS/Go/Python engines rely on.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, List<RpcObjectData>> _pendingDependencyTypes = new();
+
+    /// <summary>Items per DependencyTypes slice; 1000 matches the JS/Go/Python engines. Overridable for tests.</summary>
+    internal int DependencyTypesBatchSize = 1000;
 
     /// <summary>
     /// Connects this server to a remote JSON-RPC peer. Used by test infrastructure
@@ -101,6 +138,24 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.tree.Cs$Binary");
         RpcSendQueue.RegisterJavaTypeName(typeof(CsUnary),
             "org.openrewrite.csharp.tree.Cs$Unary");
+
+        // Structured XML doc-comment tree — nested C# types map to the Java CsDocComment model.
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.DocComment),
+            "org.openrewrite.csharp.tree.CsDocComment$DocComment");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlElement),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlElement");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlEmptyElement),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlEmptyElement");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlText),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlText");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlAttribute),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlAttribute");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlCrefAttribute),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlCrefAttribute");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.XmlNameAttribute),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlNameAttribute");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CsDocComment.LineBreak),
+            "org.openrewrite.csharp.tree.CsDocComment$LineBreak");
 
         // Types in nagoya's Rewrite.Java namespace that don't follow nesting conventions
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.NamedVariable),
@@ -278,16 +333,32 @@ public class RewriteRpcServer
                 });
             }
 
-            // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker
-            // Files are already on disk and restore happened during solution loading,
-            // so we parse XML directly and create the marker from project.assets.json.
+            // Oversize source files skipped during parsing are emitted as Quarks; the Java
+            // side builds each Quark from SourcePath locally, so they carry no content and
+            // are deliberately not registered in _localObjects (no GetObject round-trip).
+            foreach (var relPath in solutionParser.LastOversizePaths)
+            {
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = Tree.RandomId().ToString(),
+                    SourceFileType = "org.openrewrite.quark.Quark",
+                    SourcePath = relPath
+                });
+            }
+
+            // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker.
+            // The in-process restore during solution loading produced the in-memory LockFile
+            // for each project; fall back to a fresh in-process resolve when absent.
             try
             {
                 var content = ReadFilePreservingBom(project.FilePath!);
                 var relativePath = Path.GetRelativePath(rootDir, project.FilePath!);
                 var xmlParser = new OpenRewrite.Xml.XmlParser();
                 var csprojDoc = xmlParser.Parse(content, relativePath);
-                var marker = MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
+                var projectFullPath = Path.GetFullPath(project.FilePath!);
+                var marker = solutionParser.RestoredLockFiles.TryGetValue(projectFullPath, out var lockFile)
+                    ? MSBuildProjectHelper.CreateMarker(csprojDoc, lockFile, Path.GetDirectoryName(projectFullPath)!)
+                    : MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
                 if (marker != null)
                     csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
                 _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
@@ -347,68 +418,197 @@ public class RewriteRpcServer
         return fullPath;
     }
 
+    /// <summary>
+    /// Enumerates the exported public types of one dependency named by its NuGet coordinate:
+    /// resolves the coordinate to assemblies (<see cref="ResolveDependency"/>), reads their
+    /// public API (resolving symbols against the shared framework) into
+    /// <see cref="JavaType"/> and streams the resulting top-level types back as one
+    /// ref-deduplicated <see cref="RpcObjectData"/> batch — the same wire format
+    /// <see cref="GetObject"/> uses, but rooted at a list of types rather than a tree.
+    /// A fresh ref space per call keeps the batch self-contained (it never reuses the
+    /// tree-transfer refs).
+    /// </summary>
+    [JsonRpcMethod("DependencyTypes", UseSingleObjectParameterDeserialization = true)]
+    public Task<List<RpcObjectData>> DependencyTypes(DependencyRequest request)
+    {
+        var key = request.Id + '\0' + request.Version + '\0' + request.TargetFramework;
+        if (!_pendingDependencyTypes.TryGetValue(key, out var data))
+        {
+            var (own, references) = ResolveDependency(request);
+            Log.Debug("RPC DependencyTypes: {Id} {Version} -> {OwnCount} own, {RefCount} reference assemblies",
+                request.Id, request.Version, own.Count, references.Count);
+            var types = AssemblyTypeEnumerator.Enumerate(own, references);
+
+            data = new List<RpcObjectData>();
+            var sendRefs = new RpcRefs();
+            var q = new RpcSendQueue(1024, batch => data.AddRange(batch), sendRefs,
+                "org.openrewrite.java.tree.JavaType$Class", false);
+            var sender = new OpenRewrite.Java.Rpc.JavaSender();
+            // FQN strings first, so the caller can tell the types this package defines from references up front.
+            var fqns = types.Select(t => t is JavaType.Class c ? c.FullyQualifiedName : t.ToString() ?? "?").ToList();
+            q.GetAndSendList(fqns, l => l, s => (object)s, (Action<string>?)null);
+            var holder = new TypeListHolder { Types = types };
+            q.GetAndSendListAsRef(holder, h => h.Types, TypeId, t => sender.VisitType(t, q));
+            q.Put(new RpcObjectData { State = END_OF_OBJECT });
+            q.Flush();
+
+            _pendingDependencyTypes[key] = data;
+            Log.Debug("RPC DependencyTypes: {TypeCount} types, {ItemCount} items", types.Count, data.Count);
+        }
+
+        var take = Math.Min(DependencyTypesBatchSize, data.Count);
+        var batch = data.GetRange(0, take);
+        data.RemoveRange(0, take);
+        if (data.Count == 0)
+        {
+            _pendingDependencyTypes.TryRemove(key, out _);
+        }
+        return Task.FromResult(batch);
+    }
+
+    private static object TypeId(JavaType.FullyQualified type) =>
+        type is JavaType.Class cls ? cls.FullyQualifiedName : type.ToString() ?? "?";
+
+    private sealed class TypeListHolder
+    {
+        public List<JavaType.FullyQualified> Types { get; init; } = new();
+    }
+
+    /// <summary>
+    /// Resolves a coordinate to assembly paths: a null version names a BCL assembly in this
+    /// runtime's shared framework directory; otherwise the NuGet package's lib/ (or ref/)
+    /// assets nearest the target framework. References are always the shared framework.
+    /// </summary>
+    private static (List<string> Own, List<string> References) ResolveDependency(DependencyRequest request)
+    {
+        var bclDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        var bcl = Directory.GetFiles(bclDir, "*.dll").ToList();
+        if (request.Version == null)
+        {
+            var dll = Path.Combine(bclDir, request.Id + ".dll");
+            if (!File.Exists(dll))
+            {
+                throw new FileNotFoundException($"BCL assembly '{request.Id}' not found in {bclDir}", dll);
+            }
+            return ([dll], bcl);
+        }
+
+        var root = Environment.GetEnvironmentVariable("NUGET_PACKAGES")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
+        var package = Path.Combine(root, request.Id.ToLowerInvariant(), request.Version);
+        var target = NuGetFramework.Parse(request.TargetFramework);
+        var own = NearestAssets(Path.Combine(package, "lib"), target)
+            ?? NearestAssets(Path.Combine(package, "ref"), target)
+            ?? throw new InvalidOperationException(
+                $"No assemblies compatible with {request.TargetFramework} in {package}");
+        return (own, bcl);
+    }
+
+    /// <summary>
+    /// The *.dll files of the asset folder nearest <paramref name="target"/>, or null when no
+    /// folder is compatible or the nearest holds no assemblies (a _._ placeholder).
+    /// </summary>
+    private static List<string>? NearestAssets(string assetsDir, NuGetFramework target)
+    {
+        if (!Directory.Exists(assetsDir))
+        {
+            return null;
+        }
+        var candidates = Directory.GetDirectories(assetsDir)
+            .Select(dir => (Framework: NuGetFramework.Parse(Path.GetFileName(dir)), Dir: dir))
+            .ToList();
+        var nearest = new FrameworkReducer().GetNearest(target, candidates.Select(c => c.Framework).ToList());
+        if (nearest == null)
+        {
+            return null;
+        }
+        var dlls = Directory.GetFiles(candidates.First(c => nearest.Equals(c.Framework)).Dir, "*.dll").ToList();
+        return dlls.Count == 0 ? null : dlls;
+    }
+
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
-    public Task<List<RpcObjectData>> GetObject(GetObjectRequest request)
+    public async Task<List<RpcObjectData>> GetObject(GetObjectRequest request)
     {
         var after = _localObjects.GetValueOrDefault(request.Id);
 
         if (after == null)
         {
             Log.Debug("RPC GetObject: {Id} not found, returning DELETE", request.Id);
-            return Task.FromResult(new List<RpcObjectData>
+            return new List<RpcObjectData>
             {
                 new() { State = DELETE },
                 new() { State = END_OF_OBJECT }
-            });
+            };
         }
 
         // ExecutionContext is sent as a typed shell with no data,
         // matching the JavaScript pattern (empty codec).
         if (after is ExecutionContext)
         {
-            return Task.FromResult(new List<RpcObjectData>
+            return new List<RpcObjectData>
             {
                 new() { State = ADD, ValueType = "org.openrewrite.InMemoryExecutionContext" },
                 new() { State = END_OF_OBJECT }
-            });
+            };
         }
 
-        var before = _remoteObjects.GetValueOrDefault(request.Id);
-        var sw = Stopwatch.StartNew();
+        var pages = _inProgressGetObject.GetOrAdd(request.Id, id =>
+            new Lazy<Channel<List<RpcObjectData>>>(() => StartTransfer(id, after, request.SourceFileType))).Value;
 
-        // Accumulate all RPC data into a single list
-        var allData = new List<RpcObjectData>();
-        var sendQueue = new RpcSendQueue(
-            1024,
-            batch => allData.AddRange(batch),
-            _localRefs,
-            request.SourceFileType,
-            false,
-            TreeCodec.Instance
-        );
-
-        try
+        var page = await pages.Reader.ReadAsync();
+        if (page.Count > 0 && page[^1].State == END_OF_OBJECT)
         {
-            sendQueue.Send(after, before, null);
+            _inProgressGetObject.TryRemove(request.Id, out _);
         }
-        catch (Exception ex)
+        return page;
+    }
+
+    /// <summary>
+    /// Serializes one object into a bounded channel a page at a time. The capacity of one stalls
+    /// the producer until the remote takes the previous page, which bounds what is held to two
+    /// pages and lets the remote fetch one while this side fills the next.
+    /// </summary>
+    private Channel<List<RpcObjectData>> StartTransfer(string id, object after, string? sourceFileType)
+    {
+        var pages = Channel.CreateBounded<List<RpcObjectData>>(1);
+        var before = _remoteObjects.GetValueOrDefault(id);
+        var refHighWater = _localRefs.HighWater;
+
+        // On the thread pool because the drain blocks whenever the channel is full, and the
+        // thread that has to drain it is the one serving the next GetObject.
+        _ = Task.Run(() =>
         {
-            Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
-                request.Id, after.GetType().Name, ex.GetType().Name, ex.Message);
-            throw new InvalidOperationException(
-                $"Failed to send object {request.Id} (type: {after.GetType().Name}): {ex.Message}\n{ex.StackTrace}", ex);
-        }
-        sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
-        sendQueue.Flush();
-
-        // Update our understanding of remote's state
-        _remoteObjects[request.Id] = after;
-
-        sw.Stop();
-        Log.Debug("RPC GetObject: {Id} sent {ItemCount} items ({ElapsedMs}ms)",
-            request.Id, allData.Count, sw.Elapsed.TotalMilliseconds.ToString("F0"));
-
-        return Task.FromResult(allData);
+            var sendQueue = new RpcSendQueue(
+                BatchSize,
+                page => pages.Writer.WriteAsync(page).AsTask().GetAwaiter().GetResult(),
+                _localRefs,
+                sourceFileType,
+                false,
+                TreeCodec.Instance
+            );
+            try
+            {
+                sendQueue.Send(after, before, null);
+                _remoteObjects[id] = after;
+            }
+            catch (Exception ex)
+            {
+                // The remote holds a partial tree, so drop the baseline and the refs this exchange
+                // issued; the next request then sends a whole object rather than a delta against a
+                // baseline the remote never finished receiving.
+                _remoteObjects.TryRemove(id, out _);
+                _localRefs.RollbackTo(refHighWater);
+                Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
+                    id, after.GetType().Name, ex.GetType().Name, ex.Message);
+            }
+            finally
+            {
+                sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
+                sendQueue.Flush();
+                pages.Writer.Complete();
+            }
+        });
+        return pages;
     }
 
     [JsonRpcMethod("Print", UseSingleObjectParameterDeserialization = true)]
@@ -456,12 +656,30 @@ public class RewriteRpcServer
     {
         var localObject = _localObjects.GetValueOrDefault(id);
 
+        Task<List<RpcObjectData>> RequestPage() =>
+            _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
+                "GetObject",
+                new GetObjectRequest { Id = id, SourceFileType = sourceFileType });
+
+        // The following page is requested before this one is handed to the queue, so the
+        // remote serializes it while this side deserializes what it already has.
+        Task<List<RpcObjectData>>? nextPage = null;
         var q = new RpcReceiveQueue(
             _remoteRefs,
-            () => _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
-                "GetObject",
-                new GetObjectRequest { Id = id, SourceFileType = sourceFileType })
-                .GetAwaiter().GetResult(),
+            () =>
+            {
+                var pending = nextPage;
+                nextPage = null;
+                var page = (pending ?? RequestPage()).GetAwaiter().GetResult();
+                // A page ending in END_OF_OBJECT has no successor; the remote drops its
+                // transfer state when it sends that marker, so asking again would restart
+                // the transfer rather than return nothing.
+                if (page.Count > 0 && page[^1].State != END_OF_OBJECT)
+                {
+                    nextPage = RequestPage();
+                }
+                return page;
+            },
             sourceFileType,
             TreeCodec.Instance
         );
@@ -470,29 +688,54 @@ public class RewriteRpcServer
         try
         {
             remoteObject = q.Receive(localObject, (Func<object, object>?)null);
+
+            // Inside the try so that a missing end marker unwinds the same way a failed
+            // receive does: a page is in flight here whenever the last one did not end in
+            // END_OF_OBJECT, which is the condition this rejects.
+            var endMarker = q.Take();
+            if (endMarker.State != END_OF_OBJECT)
+            {
+                // Collect remaining items for debugging
+                var remaining = new System.Text.StringBuilder();
+                remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
+                // Only what is already buffered: pulling here would ask the remote for a page of a
+                // transfer it has finished, starting a fresh one that nothing will drain.
+                for (int i = 1; i < 20 && q.Buffered > 0; i++)
+                {
+                    try
+                    {
+                        var next = q.Take();
+                        remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
+                        if (next.State == END_OF_OBJECT) break;
+                    }
+                    catch { break; }
+                }
+                throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+            }
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException(
-                $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
-        }
-        var endMarker = q.Take();
-        if (endMarker.State != END_OF_OBJECT)
-        {
-            // Collect remaining items for debugging
-            var remaining = new System.Text.StringBuilder();
-            remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
-            for (int i = 1; i < 20; i++)
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            _remoteObjects.TryRemove(id, out _);
+            var pending = nextPage;
+            nextPage = null;
+            if (pending != null)
             {
+                // Awaited rather than abandoned so the remote's serialization of it is
+                // finished before the next request; the response itself is correlated by
+                // id, so an unawaited one is dropped rather than misdelivered.
                 try
                 {
-                    var next = q.Take();
-                    remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
-                    if (next.State == END_OF_OBJECT) break;
+                    pending.GetAwaiter().GetResult();
                 }
-                catch { break; }
+                catch
+                {
+                    // the original failure is the one worth reporting
+                }
             }
-            throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+            throw new InvalidOperationException(
+                $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
         }
 
         if (remoteObject != null)
@@ -517,7 +760,7 @@ public class RewriteRpcServer
         return Task.FromResult(rowByRecipeId.Values.ToList());
     }
 
-    private static void CollectRecipes(
+    private void CollectRecipes(
         Dictionary<string, GetMarketplaceResponseRow> rowByRecipeId,
         RecipeMarketplace.Category category,
         List<CategoryDescriptorDto> parentPath)
@@ -534,7 +777,8 @@ public class RewriteRpcServer
                 row = new GetMarketplaceResponseRow
                 {
                     Descriptor = RecipeDescriptorDto.FromDescriptor(descriptor),
-                    CategoryPaths = []
+                    CategoryPaths = [],
+                    PackageName = _recipeOrigin.GetValueOrDefault(descriptor.Name)
                 };
                 rowByRecipeId[descriptor.Name] = row;
             }
@@ -551,10 +795,12 @@ public class RewriteRpcServer
     public Task<InstallRecipesResponse> InstallRecipes(InstallRecipesRequest request)
     {
         var beforeCount = _marketplace.AllRecipes().Count;
-        string? version = null;
+        string? version = null;          // requested version, as supplied by the caller (never mutated)
+        string? resolvedVersion = null;  // concrete version NuGet resolved it to (null for a loose assembly)
+        string? publishDir = null;       // the bundle's publish output (null for a loose assembly)
 
         // SystemTextJsonFormatter deserializes the object-typed Recipes payload to a JsonElement:
-        // a JSON string is a local assembly path; a JSON object describes a NuGet package.
+        // a JSON string is a local path; a JSON object describes a NuGet package.
         var recipesString = request.Recipes switch
         {
             string s => s,
@@ -565,67 +811,66 @@ public class RewriteRpcServer
             ? (JsonElement?)obj
             : null;
 
+        string packageName;
         if (recipesString != null)
         {
-            // Local assembly path
-            var absolutePath = Path.GetFullPath(recipesString);
-            var context = new PluginLoadContext(absolutePath);
-            var assembly = context.LoadFromAssemblyPath(absolutePath);
-            CheckVersionCompatibility(assembly);
-            ActivateAssembly(assembly);
+            packageName = recipesString;
         }
         else if (recipesObject is { } packageObj)
         {
-            var packageName = (packageObj.TryGetProperty("packageName", out var pn) ? pn.GetString() : null)
-                              ?? throw new ArgumentException("Missing packageName in recipes object");
+            packageName = (packageObj.TryGetProperty("packageName", out var pn) ? pn.GetString() : null)
+                          ?? throw new ArgumentException("Missing packageName in recipes object");
             version = packageObj.TryGetProperty("version", out var v) ? v.GetString() : null;
-
-            if (File.Exists(packageName))
-            {
-                var absolutePath = Path.GetFullPath(packageName);
-                var context = new PluginLoadContext(absolutePath);
-                var assembly = context.LoadFromAssemblyPath(absolutePath);
-                CheckVersionCompatibility(assembly);
-                ActivateAssembly(assembly);
-            }
-            else
-            {
-                // NuGet package download via dotnet CLI
-                var csprojPath = EnsureRecipesProject();
-                var args = $"add \"{csprojPath}\" package {packageName}";
-                if (version != null)
-                    args += $" --version {version}";
-                RunDotnet(args);
-
-                // dotnet add package preserves the user-supplied version constraint
-                // verbatim in the csproj's PackageReference, so wildcards like "*" survive
-                // there. The resolved concrete version lives in obj/project.assets.json.
-                version = MSBuildProjectHelper.GetResolvedPackageVersion(
-                    Path.GetDirectoryName(csprojPath)!, packageName);
-
-                var assemblies = PublishAndLoadPlugin(csprojPath, packageName);
-                foreach (var assembly in assemblies)
-                {
-                    CheckVersionCompatibility(assembly);
-                    ActivateAssembly(assembly);
-                }
-            }
         }
         else
         {
             throw new ArgumentException($"Unexpected recipes type: {request.Recipes?.GetType().Name ?? "null"}");
         }
 
-        var afterCount = _marketplace.AllRecipes().Count;
+        if (File.Exists(packageName))
+        {
+            // Local assembly path
+            var absolutePath = Path.GetFullPath(packageName);
+            var context = new PluginLoadContext(absolutePath);
+            var assembly = context.LoadFromAssemblyPath(absolutePath);
+            CheckVersionCompatibility(assembly);
+            ActivateAssembly(assembly, packageName);
+        }
+        else if (Directory.Exists(packageName))
+        {
+            // The publish output of an earlier NuGet install, handed back by the host
+            publishDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(packageName));
+            resolvedVersion = ActivateBundle(publishDir, packageName).Version;
+        }
+        else if (recipesString != null)
+        {
+            throw new FileNotFoundException("Recipe assembly or publish directory not found", packageName);
+        }
+        else
+        {
+            // NuGet install reads as a three-stage pipeline: restore the bundle (which also
+            // resolves the concrete version), publish it into the resolved-version dir, then
+            // activate the publish output. The requested version may be a concrete pin or a
+            // floating/unspecified spec — restore resolves either uniformly.
+            var (stagingCsproj, resolved) = RestoreBundle(packageName, version);
+            resolvedVersion = resolved;
+            publishDir = PublishBundle(stagingCsproj, resolved);
+            ActivateBundle(publishDir, packageName);
+        }
+
         return Task.FromResult(new InstallRecipesResponse
         {
-            RecipesInstalled = afterCount - beforeCount,
-            Version = version
+            RecipesInstalled = _marketplace.AllRecipes().Count - beforeCount,
+            Version = resolvedVersion ?? version,
+            PublishDir = publishDir
         });
     }
 
-    private void ActivateAssembly(Assembly assembly)
+    private void ActivateAssembly(Assembly assembly, string? packageName = null)
     {
+        var before = packageName == null ? null
+            : new HashSet<string>(_marketplace.AllRecipes().Select(r => r.Name));
+
         Type[] exportedTypes;
         try
         {
@@ -649,25 +894,45 @@ public class RewriteRpcServer
                 activator.Activate(_marketplace);
             }
         }
+
+        if (packageName != null)
+        {
+            foreach (var name in _marketplace.AllRecipes().Select(r => r.Name))
+            {
+                if (!before!.Contains(name))
+                {
+                    _recipeOrigin[name] = packageName;
+                }
+            }
+        }
     }
 
-    private string EnsureRecipesProject()
+    // Sanitize a path segment (package id or version) for use as a directory name.
+    private static string Sanitize(string s) => string.Join("_", s.Split(Path.GetInvalidFileNameChars()));
+
+    private string EnsureRecipesProject(string packageName, string? version)
     {
-        if (_recipesProjectDir != null)
+        // Use the caller-supplied recipe install directory when provided (so a co-located
+        // NuGet.config is found by dotnet's project-directory config walk); otherwise fall
+        // back to a temp directory.
+        var root = _recipeInstallDir
+            ?? Path.Combine(Path.GetTempPath(), "rewrite-recipes");
+        // Mirror NuGet's global-packages layout: <root>/<id>/<version>/, versions as
+        // immutable siblings. Never deleted — old versions accumulate (no cleanup),
+        // matching ~/.nuget and existing Moderne/OpenRewrite practice.
+        var bundleDir = Path.Combine(root, Sanitize(packageName), Sanitize(version ?? "unversioned"));
+        var csprojPath = Path.Combine(bundleDir, "Recipes.csproj");
+        _recipesProjectDir = bundleDir;
+
+        // Reuse an already-published version dir (idempotent, like NuGet reusing an
+        // already-extracted package). Snapshots carry timestamps in their version string,
+        // so each publish lands in a fresh dir.
+        if (File.Exists(csprojPath))
         {
-            var existing = Path.Combine(_recipesProjectDir, "Recipes.csproj");
-            if (File.Exists(existing))
-                return existing;
+            return csprojPath;
         }
+        Directory.CreateDirectory(bundleDir);
 
-        // Use the caller-supplied recipe install directory when provided (so a
-        // co-located NuGet.config is found by dotnet's project-directory config
-        // walk); otherwise fall back to a unique temp directory.
-        _recipesProjectDir = _recipeInstallDir
-            ?? Path.Combine(Path.GetTempPath(), "rewrite-recipes", Guid.NewGuid().ToString("N")[..8]);
-        Directory.CreateDirectory(_recipesProjectDir);
-
-        var csprojPath = Path.Combine(_recipesProjectDir, "Recipes.csproj");
         File.WriteAllText(csprojPath, """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
@@ -681,14 +946,15 @@ public class RewriteRpcServer
         // whatever config already lives in the project dir. A caller (e.g. the Moderne
         // CLI) may have written its own nuget.config there — possibly an exclusive
         // configured feed — so we must not clobber it: append only the local feed when
-        // a config is present, and create the standalone dev default (public + local
-        // feed) only when none exists. No-ops in production, where local-feed is absent.
+        // a config is present, and create a standalone dev config that adds only the
+        // local feed (never nuget.org, so it merges with the user/machine config's
+        // default source) when none exists. No-ops in production, where local-feed is absent.
         var localFeed = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".nuget", "local-feed");
         if (Directory.Exists(localFeed))
         {
-            var nugetConfig = Path.Combine(_recipesProjectDir, "nuget.config");
+            var nugetConfig = Path.Combine(bundleDir, "nuget.config");
             var existing = File.Exists(nugetConfig) ? File.ReadAllText(nugetConfig) : null;
             File.WriteAllText(nugetConfig, BuildRecipesNuGetConfig(existing, localFeed));
         }
@@ -699,9 +965,11 @@ public class RewriteRpcServer
     /// <summary>
     /// Produces the recipe project's <c>nuget.config</c> with the local development
     /// feed present. When <paramref name="existingConfigXml"/> is null/empty, creates a
-    /// standalone config with nuget.org + the local feed. Otherwise the caller already
-    /// wrote a config (possibly an exclusive configured feed): only the local feed is
-    /// appended to <c>&lt;packageSources&gt;</c>, preserving the caller's sources and any
+    /// standalone config that adds only the local feed — never nuget.org — so it merges
+    /// with (rather than overrides) the user/machine NuGet configuration that supplies the
+    /// environment's default source. Otherwise the caller already wrote a config (possibly
+    /// an exclusive configured feed): only the local feed is appended to
+    /// <c>&lt;packageSources&gt;</c>, preserving the caller's sources and any
     /// <c>&lt;clear/&gt;</c>, and idempotently (no duplicate if already present).
     /// </summary>
     internal static string BuildRecipesNuGetConfig(string? existingConfigXml, string localFeedPath)
@@ -712,7 +980,6 @@ public class RewriteRpcServer
                 <?xml version="1.0" encoding="utf-8"?>
                 <configuration>
                   <packageSources>
-                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
                     <add key="local-feed" value="{localFeedPath}" />
                   </packageSources>
                 </configuration>
@@ -767,34 +1034,81 @@ public class RewriteRpcServer
     }
 
     /// <summary>
-    /// Publish the temp recipes project to produce a flat output directory with all transitive
-    /// dependencies and a .deps.json, then load plugin assemblies in an isolated
-    /// <see cref="PluginLoadContext"/>. Because the NuGet package name may not match the assembly
-    /// name, we scan all non-host DLLs in the publish output for <see cref="IRecipeActivator"/>
-    /// implementations.
+    /// Restore stage: restore a NuGet recipe bundle in a staging project under the install root
+    /// (so the caller's nuget.config is found by dotnet's upward project-directory config walk),
+    /// and return the staging project plus the resolved concrete version.
     /// </summary>
-    private List<Assembly> PublishAndLoadPlugin(string csprojPath, string packageName)
+    private (string Csproj, string ResolvedVersion) RestoreBundle(string packageName, string? requestedVersion)
     {
-        var projectDir = Path.GetDirectoryName(csprojPath)!;
-        var publishDir = Path.Combine(projectDir, "publish");
+        var stagingCsproj = EnsureRecipesProject(packageName, ".staging");
+        var addArgs = $"add \"{stagingCsproj}\" package {packageName}";
+        if (!string.IsNullOrWhiteSpace(requestedVersion))
+            addArgs += $" --version {requestedVersion}";
+        RunDotnet(addArgs);
 
-        RunDotnet($"publish \"{csprojPath}\" -c Release -o \"{publishDir}\"");
+        // dotnet add package preserves the requested constraint verbatim in the csproj;
+        // the resolved concrete version lives in obj/project.assets.json.
+        var resolvedVersion = MSBuildProjectHelper.GetResolvedPackageVersion(
+            Path.GetDirectoryName(stagingCsproj)!, packageName);
+        return (stagingCsproj, resolvedVersion);
+    }
 
-        // Use the Recipes.deps.json (from the temp project) for the dependency resolver
-        var depsJson = Path.Combine(publishDir, "Recipes.deps.json");
-        if (!File.Exists(depsJson))
+    /// <summary>
+    /// Publish stage: publish a restored staging project into its permanent, resolved-version-keyed
+    /// sibling dir (<c>&lt;root&gt;/&lt;id&gt;/&lt;resolvedVersion&gt;</c>), reusing it if already
+    /// present. Returns the publish output directory.
+    /// </summary>
+    private static string PublishBundle(string stagingCsproj, string resolvedVersion)
+    {
+        var bundleRoot = Directory.GetParent(Path.GetDirectoryName(stagingCsproj)!)!.FullName; // <root>/<id>
+        var publishDir = Path.Combine(bundleRoot, Sanitize(resolvedVersion));
+        // The publish output is an immutable sibling: publish only when this resolved version
+        // isn't there yet. --no-restore reuses the staging project's restore.
+        if (!File.Exists(Path.Combine(publishDir, "Recipes.dll")))
         {
-            Log.Warning("No .deps.json found in publish output at {PublishDir}", publishDir);
+            RunDotnet($"publish \"{stagingCsproj}\" --no-restore -c Release -o \"{publishDir}\"");
         }
+        return publishDir;
+    }
 
-        // The temp project's main DLL is the anchor for AssemblyDependencyResolver
+    /// <summary>
+    /// Activate stage: load a publish output directory (see <see cref="PublishBundle"/>) and
+    /// activate the recipes of the bundle package's own assemblies — never those of its
+    /// transitive dependencies. The directory carries everything this needs, so a host can hand
+    /// an <see cref="InstallRecipesResponse.PublishDir"/> back to a later server instance and
+    /// have the bundle loaded again without a registry.
+    /// </summary>
+    private PublishedBundle ActivateBundle(string publishDir, string origin)
+    {
+        var bundle = PublishedBundle.Read(publishDir);
+        if (bundle.OwnAssemblyNames.Count == 0)
+        {
+            Log.Warning("No own assemblies found for {Package} {Version} in {PublishDir}; no recipes activated",
+                bundle.PackageName, bundle.Version, publishDir);
+        }
+        foreach (var assembly in LoadPlugin(publishDir))
+        {
+            CheckVersionCompatibility(assembly);
+            if (bundle.OwnAssemblyNames.Contains(assembly.GetName().Name!))
+            {
+                ActivateAssembly(assembly, origin);
+            }
+        }
+        return bundle;
+    }
+
+    /// <summary>
+    /// Load the assemblies of a publish output directory into an isolated
+    /// <see cref="PluginLoadContext"/>, anchored on the staging project's <c>Recipes.dll</c> so
+    /// that transitive dependencies resolve through <c>Recipes.deps.json</c>.
+    /// </summary>
+    private List<Assembly> LoadPlugin(string publishDir)
+    {
         var anchorDll = Path.Combine(publishDir, "Recipes.dll");
         if (!File.Exists(anchorDll))
         {
-            // Fallback: pick any DLL that has a matching .deps.json
-            anchorDll = Directory.GetFiles(publishDir, "*.dll").FirstOrDefault()
-                        ?? throw new InvalidOperationException(
-                            $"No DLLs found in publish output at {publishDir}");
+            throw new InvalidOperationException(
+                $"{publishDir} is not a recipe bundle publish directory: no Recipes.dll");
         }
 
         var context = new PluginLoadContext(anchorDll);
@@ -928,7 +1242,28 @@ public class RewriteRpcServer
         var found = _marketplace.FindRecipe(request.Id);
         if (found == null)
         {
-            throw new InvalidOperationException($"Recipe not found: {request.Id}");
+            // The host re-prepares every sub-recipe of a composite by id while building
+            // RpcRecipe.getRecipeList(). A sub-recipe that delegates to a Java recipe is not in
+            // this marketplace, so a miss means the host owns this recipe: answer with delegatesTo
+            // so the host resolves the id locally (the Java recipe is on its classpath) rather than
+            // failing with "Recipe not found".
+            var delegateId = Tree.RandomId().ToString();
+            return Task.FromResult(new PrepareRecipeResponse
+            {
+                Id = delegateId,
+                Descriptor = new RecipeDescriptorDto
+                {
+                    Name = request.Id,
+                    DisplayName = request.Id,
+                    InstanceName = request.Id
+                },
+                EditVisitor = $"edit:{delegateId}",
+                DelegatesTo = new DelegatesTo
+                {
+                    RecipeName = request.Id,
+                    Options = request.Options ?? new()
+                }
+            });
         }
 
         var (descriptor, recipe) = found.Value;
@@ -937,13 +1272,43 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Recipe {request.Id} has no live instance (installed without constructor)");
         }
 
-        // If options are provided, create a new instance with options applied
-        if (request.Options is { Count: > 0 })
+        return Task.FromResult(PrepareInstance(recipe, request.Options));
+    }
+
+    /// <summary>
+    /// Prepares a single recipe instance (optionally applying options) and recursively
+    /// prepares the full child tree, storing every node in <see cref="_preparedRecipes"/>.
+    /// A child that is <see cref="IDelegatesTo"/> carries only <c>DelegatesTo</c> and
+    /// no children; all other children have their own <c>RecipeList</c> populated.
+    /// </summary>
+    private PrepareRecipeResponse PrepareInstance(Recipe recipe, Dictionary<string, object?>? options)
+    {
+        // If options are provided, create a new instance with options applied.
+        if (options is { Count: > 0 })
         {
-            recipe = InstantiateWithOptions(recipe.GetType(), request.Options);
+            recipe = InstantiateWithOptions(recipe.GetType(), options);
         }
 
-        var id = Guid.NewGuid().ToString();
+        // Validate required options on the instantiated recipe — the root against the caller's
+        // options, and every child against the values its parent set in GetRecipeList(). Because
+        // PrepareInstance recurses, this covers the whole tree, and it's the only place the C# tree
+        // gets validated: declarative recipes bundled in an artifact often ship without a test that
+        // runs validateAll, so this is the safety net against executing a broken recipe. Delegating
+        // recipes forward to a Java recipe that validates its own options, so they are skipped here.
+        if (recipe is not IDelegatesTo)
+        {
+            var descriptor = recipe.GetDescriptor();
+            foreach (var option in descriptor.Options)
+            {
+                if (option.Required && option.Value is null)
+                {
+                    throw new ArgumentException(
+                        $"Missing required option `{option.Name}` for recipe `{descriptor.Name}`.");
+                }
+            }
+        }
+
+        var id = Tree.RandomId().ToString();
         _preparedRecipes[id] = recipe;
 
         var response = new PrepareRecipeResponse
@@ -956,6 +1321,7 @@ public class RewriteRpcServer
 
         if (recipe is IDelegatesTo del)
         {
+            // Cross-ecosystem child: host resolves locally; no C# child tree.
             response.DelegatesTo = new DelegatesTo
             {
                 RecipeName = del.JavaRecipeName,
@@ -965,9 +1331,13 @@ public class RewriteRpcServer
         else
         {
             OptimizePreconditions(recipe, response);
+            // Whole-tree preparation: children are real instances in this recipe's own ALC.
+            response.RecipeList = recipe.GetRecipeList()
+                .Select(child => PrepareInstance(child, null))
+                .ToList();
         }
 
-        return Task.FromResult(response);
+        return response;
     }
 
     /// <summary>
@@ -1129,6 +1499,7 @@ public class RewriteRpcServer
         }
 
         // Fetch tree from the remote (Java) process
+        CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
 
         if (phase != "scan" && phase != "edit")
@@ -1183,6 +1554,7 @@ public class RewriteRpcServer
         }
 
         var sw = Stopwatch.StartNew();
+        CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
         var fetchMs = sw.ElapsedMilliseconds;
 
@@ -1311,6 +1683,7 @@ public class RewriteRpcServer
 
     public static async Task RunAsync(RecipeMarketplace? marketplace = null,
         string? recipeInstallDir = null,
+        string? metricsCsv = null,
         CancellationToken cancellationToken = default)
     {
         marketplace ??= new RecipeMarketplace();
@@ -1338,10 +1711,21 @@ public class RewriteRpcServer
             JsonSerializerOptions = RpcJson.Options,
         };
 
-        var handler = new HeaderDelimitedMessageHandler(outputStream, inputStream, formatter);
-        using var jsonRpc = new StringErrorDataJsonRpc(handler);
-
         var server = new RewriteRpcServer(marketplace, recipeInstallDir);
+
+        // Wrap the handler so each dispatched request records timing + cache residency
+        // (local/remote/refs) — flat with per-file Evict, ramping without.
+        IJsonRpcMessageHandler handler = new HeaderDelimitedMessageHandler(outputStream, inputStream, formatter);
+        RpcMetricsWriter? metrics = null;
+        if (!string.IsNullOrEmpty(metricsCsv))
+        {
+            metrics = new RpcMetricsWriter(metricsCsv, () =>
+                (server._localObjects.Count, server._remoteObjects.Count,
+                    server._localRefs.HighWater + server._remoteRefs.Count));
+            handler = new MetricsMessageHandler(handler, metrics);
+        }
+
+        using var jsonRpc = new StringErrorDataJsonRpc(handler);
         server._jsonRpc = jsonRpc;
         _current = server;
         // Allow concurrent request dispatch so reentrant callbacks don't deadlock.
@@ -1358,6 +1742,7 @@ public class RewriteRpcServer
         finally
         {
             _current = null;
+            metrics?.Dispose();
         }
     }
 
@@ -1409,11 +1794,15 @@ public class RewriteRpcServer
     /// Returns the (possibly modified) tree.
     /// </summary>
     public Tree VisitOnRemote(string visitorName, string treeId, string? sourceFileType,
-        string? pId = null)
+        string? pId = null, Dictionary<string, object?>? visitorOptions = null)
     {
         var response = _jsonRpc!.InvokeWithParameterObjectAsync<VisitResponse>(
             "Visit",
-            new VisitRequest { VisitorName = visitorName, TreeId = treeId, SourceFileType = sourceFileType, PId = pId }
+            new VisitRequest
+            {
+                VisitorName = visitorName, TreeId = treeId, SourceFileType = sourceFileType,
+                PId = pId, VisitorOptions = visitorOptions
+            }
         ).GetAwaiter().GetResult();
 
         Log.Debug("RPC VisitOnRemote: {VisitorName} on {TreeId} => modified={Modified}",
@@ -1425,6 +1814,13 @@ public class RewriteRpcServer
         }
 
         return (Tree)_localObjects[treeId]!;
+    }
+
+    [JsonRpcMethod("SetDataTableStore", UseSingleObjectParameterDeserialization = true)]
+    public Task<bool> SetDataTableStore(SetDataTableStoreRequest request)
+    {
+        _configuredDataTableStore = request.ToDataTableStore();
+        return Task.FromResult(true);
     }
 
     /// <summary>
@@ -1461,9 +1857,56 @@ public class RewriteRpcServer
         _remoteObjects.Clear();
         _localRefs.Clear();
         _remoteRefs.Clear();
+        _refCheckpoints.Clear();
         _preparedRecipes.Clear();
         _recipeAccumulators.Clear();
         _executionContexts.Clear();
+    }
+
+    /// <summary>
+    /// Records the ref high-water before a source file is first visited (first visit wins), so
+    /// <see cref="Evict"/> can roll back exactly the refs that file introduced.
+    /// </summary>
+    private void CaptureRefCheckpoint(string treeId)
+    {
+        _refCheckpoints.GetOrAdd(treeId, _ =>
+        {
+            var remoteMax = -1;
+            foreach (var key in _remoteRefs.Keys)
+            {
+                if (key > remoteMax)
+                {
+                    remoteMax = key;
+                }
+            }
+            return (_localRefs.HighWater, remoteMax);
+        });
+    }
+
+    /// <summary>
+    /// Drops one source file's tree and rolls back the refs it introduced; recipe/accumulator/
+    /// context state (keyed separately) is preserved. Fire-and-forget, so it returns no response.
+    /// </summary>
+    [JsonRpcMethod("Evict", UseSingleObjectParameterDeserialization = true)]
+    public void Evict(EvictRequest request)
+    {
+        if (string.IsNullOrEmpty(request.Id))
+        {
+            return;
+        }
+        _localObjects.TryRemove(request.Id, out _);
+        _remoteObjects.TryRemove(request.Id, out _);
+        if (_refCheckpoints.TryRemove(request.Id, out var cp))
+        {
+            _localRefs.RollbackTo(cp.LocalRefs);
+            foreach (var key in _remoteRefs.Keys)
+            {
+                if (key > cp.RemoteRefsMax)
+                {
+                    _remoteRefs.TryRemove(key, out _);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -1477,12 +1920,16 @@ public class RewriteRpcServer
     private ExecutionContext GetOrCreateExecutionContext(string? pId)
     {
         if (pId != null && _executionContexts.TryGetValue(pId, out var existing))
+        {
+            InstallDataTableStore(existing);
             return existing;
+        }
 
         var ctx = new ExecutionContext();
         // Inject the build context captured during ParseSolution so that
         // reattestation (MSBuildProjectHelper) can materialize build files
         _buildContext?.StoreIn(ctx);
+        InstallDataTableStore(ctx);
 
         if (pId != null)
         {
@@ -1490,6 +1937,15 @@ public class RewriteRpcServer
             _localObjects[pId] = ctx;
         }
         return ctx;
+    }
+
+    private void InstallDataTableStore(ExecutionContext ctx)
+    {
+        var store = _configuredDataTableStore;
+        if (store != null)
+        {
+            ctx.PutMessage(DataTable<object>.DataTableStoreKey, store);
+        }
     }
 
     /// <summary>
@@ -1530,6 +1986,126 @@ public class RewriteRpcServer
 }
 
 /// <summary>
+/// Writes one CSV row per dispatched RPC call: timing, managed-heap memory, and object/ref cache
+/// residency. Same schema as the Go and Python servers. Thread-safe; rows are flushed eagerly.
+/// </summary>
+internal sealed class RpcMetricsWriter : IDisposable
+{
+    private const string Header =
+        "timestamp,method,duration_ms,error,memory_used_bytes,memory_max_bytes,local_objects,remote_objects,refs";
+
+    private readonly StreamWriter _writer;
+    private readonly Func<(int Local, int Remote, int Refs)> _cacheSizes;
+    private readonly object _lock = new();
+    private bool _disposed;
+
+    public RpcMetricsWriter(string path, Func<(int, int, int)> cacheSizes)
+    {
+        _cacheSizes = cacheSizes;
+        _writer = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read));
+        _writer.WriteLine(Header);
+        _writer.Flush();
+    }
+
+    public void Record(string method, double durationMs, string? error)
+    {
+        var (local, remote, refs) = _cacheSizes();
+        var used = GC.GetTotalMemory(false);
+        var max = GC.GetGCMemoryInfo().HeapSizeBytes;
+        var timestamp = DateTimeOffset.UtcNow.ToString("O");
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _writer.WriteLine(
+                $"{timestamp},{method},{durationMs:F0},{Escape(error)},{used},{max},{local},{remote},{refs}");
+            _writer.Flush();
+        }
+    }
+
+    // Quote per RFC 4180 only when the field contains a comma, quote, or newline (errors can).
+    private static string Escape(string? field)
+    {
+        if (string.IsNullOrEmpty(field))
+        {
+            return "";
+        }
+        if (field.IndexOfAny([',', '"', '\n', '\r']) < 0)
+        {
+            return field;
+        }
+        return $"\"{field.Replace("\"", "\"\"")}\"";
+    }
+
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+            _writer.Dispose();
+        }
+    }
+}
+
+/// <summary>
+/// Wraps the message handler to record a metrics row when each inbound request's response is
+/// written. Notifications (Evict) get no response and aren't recorded; outbound requests are ignored.
+/// </summary>
+internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IDisposable
+{
+    private readonly IJsonRpcMessageHandler _inner;
+    private readonly RpcMetricsWriter _metrics;
+    private readonly ConcurrentDictionary<RequestId, (string Method, long Start)> _inflight = new();
+
+    public MetricsMessageHandler(IJsonRpcMessageHandler inner, RpcMetricsWriter metrics)
+    {
+        _inner = inner;
+        _metrics = metrics;
+    }
+
+    public bool CanRead => _inner.CanRead;
+    public bool CanWrite => _inner.CanWrite;
+    public IJsonRpcMessageFormatter Formatter => _inner.Formatter;
+
+    public async ValueTask<JsonRpcMessage?> ReadAsync(CancellationToken cancellationToken)
+    {
+        var message = await _inner.ReadAsync(cancellationToken).ConfigureAwait(false);
+        if (message is JsonRpcRequest { IsResponseExpected: true } request)
+        {
+            _inflight[request.RequestId] = (request.Method ?? "", Stopwatch.GetTimestamp());
+        }
+        return message;
+    }
+
+    public async ValueTask WriteAsync(JsonRpcMessage message, CancellationToken cancellationToken)
+    {
+        await _inner.WriteAsync(message, cancellationToken).ConfigureAwait(false);
+        // Only responses to inbound requests carry an id we put in _inflight; outbound requests we
+        // send to Java are JsonRpcRequest and never match, so their ids can't collide here.
+        if (message is JsonRpcResult or JsonRpcError &&
+            message is IJsonRpcMessageWithId withId &&
+            _inflight.TryRemove(withId.RequestId, out var entry))
+        {
+            var durationMs = Stopwatch.GetElapsedTime(entry.Start).TotalMilliseconds;
+            var error = (message as JsonRpcError)?.Error?.Message;
+            _metrics.Record(entry.Method, durationMs, error);
+        }
+    }
+
+    public void Dispose()
+    {
+        (_inner as IDisposable)?.Dispose();
+        _metrics.Dispose();
+    }
+}
+
+/// <summary>
 /// A JsonRpc subclass that ensures error.data is always a string,
 /// for compatibility with the Java io.moderne:jsonrpc library which
 /// expects error.detail.data to be a string, not a structured object.
@@ -1561,6 +2137,18 @@ public class ParseSolutionRequest
     public Dictionary<string, object>? Options { get; set; }
 }
 
+public class DependencyRequest
+{
+    /// <summary>NuGet package id, or a BCL assembly name when <see cref="Version"/> is null.</summary>
+    public string Id { get; set; } = "";
+
+    /// <summary>Package version; null names a BCL assembly in the runtime's shared framework.</summary>
+    public string? Version { get; set; }
+
+    /// <summary>Framework whose nearest lib/ assets to enumerate, e.g. "net10.0".</summary>
+    public string TargetFramework { get; set; } = "";
+}
+
 public class ParseSolutionResponse
 {
     public List<ParseSolutionResponseItem> Items { get; set; } = new();
@@ -1570,12 +2158,44 @@ public class ParseSolutionResponseItem
 {
     public string Id { get; set; } = "";
     public string SourceFileType { get; set; } = "";
+
+    // Relative source path; only populated for Quark items, from which the Java
+    // side builds the Quark locally. Null for normal items (fetched via GetObject).
+    public string? SourcePath { get; set; }
 }
 
 public class GetObjectRequest
 {
     public string Id { get; set; } = "";
     public string? SourceFileType { get; set; }
+}
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(Csv), "CSV")]
+[JsonDerivedType(typeof(NoOp), "NOOP")]
+public abstract class SetDataTableStoreRequest
+{
+    public abstract IDataTableStore ToDataTableStore();
+
+    public sealed class Csv : SetDataTableStoreRequest
+    {
+        public string? OutputDir { get; set; }
+        public Dictionary<string, string>? PrefixColumns { get; set; }
+        public Dictionary<string, string>? SuffixColumns { get; set; }
+
+        public override IDataTableStore ToDataTableStore() =>
+            string.IsNullOrEmpty(OutputDir)
+                ? new InMemoryDataTableStore()
+                : new CsvDataTableStore(
+                    OutputDir,
+                    PrefixColumns ?? new Dictionary<string, string>(),
+                    SuffixColumns ?? new Dictionary<string, string>());
+    }
+
+    public sealed class NoOp : SetDataTableStoreRequest
+    {
+        public override IDataTableStore ToDataTableStore() => new InMemoryDataTableStore();
+    }
 }
 
 public class ParseRequest
@@ -1598,10 +2218,16 @@ public class PrintRequest
     public string? MarkerPrinter { get; set; }
 }
 
+public class EvictRequest
+{
+    public string Id { get; set; } = "";
+}
+
 public class GetMarketplaceResponseRow
 {
     public RecipeDescriptorDto Descriptor { get; set; } = null!;
     public List<List<CategoryDescriptorDto>> CategoryPaths { get; set; } = [];
+    public string? PackageName { get; set; }
 }
 
 public class CategoryDescriptorDto
@@ -1719,6 +2345,13 @@ public class InstallRecipesResponse
 {
     public int RecipesInstalled { get; set; }
     public string? Version { get; set; }
+
+    /// <summary>
+    /// Where a NuGet bundle's publish output landed. Passing it back as the
+    /// <see cref="InstallRecipesRequest.Recipes"/> path of a later server instance loads the
+    /// bundle again without a registry. Null for a loose assembly.
+    /// </summary>
+    public string? PublishDir { get; set; }
 }
 
 public class PrepareRecipeRequest
@@ -1736,6 +2369,7 @@ public class PrepareRecipeResponse
     public string? ScanVisitor { get; set; }
     public List<Precondition> ScanPreconditions { get; set; } = [];
     public DelegatesTo? DelegatesTo { get; set; }
+    public List<PrepareRecipeResponse> RecipeList { get; set; } = [];
 }
 
 public class DelegatesTo
@@ -1784,6 +2418,12 @@ public class VisitRequest
     public string? PId { get; set; }
     [JsonPropertyName("cursor")]
     public List<string>? CursorIds { get; set; }
+
+    /// <summary>
+    /// Constructor/property values for a visitor the peer instantiates by class name
+    /// (see Java's <c>PreparedRecipeCache.instantiateVisitor</c>).
+    /// </summary>
+    public Dictionary<string, object?>? VisitorOptions { get; set; }
 }
 
 public class VisitResponse

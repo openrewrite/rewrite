@@ -183,7 +183,10 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
 
     private JavaType generic(Type.TypeVar type, String signature) {
         String name;
-        if (type instanceof Type.CapturedType && ((Type.CapturedType) type).wildcard.kind == BoundKind.UNBOUND) {
+        if (type instanceof Type.CapturedType) {
+            // A captured wildcard is javac's internal representation of the wildcard it was captured
+            // from; represent it as "?" (as the signature builder already does) rather than leaking
+            // javac's invalid-Java name "<captured wildcard>".
             name = "?";
         } else {
             name = type.tsym.name.toString();
@@ -425,6 +428,15 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
                 }
             } catch (Exception e) {
                 // ignore
+            }
+
+            // An unresolvable argument leaves the select as a plain ErrorType even though the callee
+            // resolved; recover the invocation type javac computed (kept in the error's original
+            // type), falling back to the symbol's declared type, to keep the JavaType.Method.
+            if (symbol instanceof Symbol.MethodSymbol && symbol.kind != Kinds.Kind.ERR &&
+                symbol.type != null && !(symbol.type instanceof Type.ErrorType)) {
+                Type originalType = selectType.getOriginalType();
+                return methodInvocationType(originalType instanceof Type.MethodType ? originalType : symbol.type, symbol);
             }
         }
 

@@ -20,8 +20,10 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -83,16 +85,27 @@ public class ChangeType extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        // Normalize nested-class separators ($ -> .) so the package pre-filter can prefix-match the
+        // file's package declaration regardless of which form the old FQN was given in.
+        String normalizedOldName = oldFullyQualifiedTypeName.replace('$', '.');
         TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
-                    if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
+                    // UsesType is an O(1) lookup against the cached type index; check it first and
+                    // only fall back to the definition scan when the type isn't used.
+                    Tree used = new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
+                    if (used != cu) {
+                        return used;
+                    }
+                    if (!Boolean.TRUE.equals(ignoreDefinition) &&
+                            mayContainDefinition(cu, normalizedOldName) &&
+                            containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
-                    return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
+                    return cu;
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
@@ -174,13 +187,13 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitImport(J.Import import_, ExecutionContext ctx) {
-            // Collect alias import information here
-            // If there is an existing import with an alias, we need to add a target import with an alias accordingly.
-            // If there is an existing import without an alias, we need to add a target import with an alias accordingly.
-            if (hasSameFQN(import_, originalType)) {
-                if (import_.getAlias() != null) {
-                    importAlias = import_.getAlias();
-                }
+            // An alias on the original type has to be reused for the target import, or references to
+            // it stop resolving. Imports nested in a block (a function body, an `if TYPE_CHECKING:`)
+            // bind a narrower scope than the file-level import that would be added in their place,
+            // so only file-level ones are considered.
+            if (import_.getAlias() != null && getCursor().firstEnclosing(J.Block.class) == null &&
+                    hasSameFQN(import_, originalType)) {
+                importAlias = import_.getAlias();
             }
 
             // visitCompilationUnit() handles changing the imports.
@@ -268,6 +281,11 @@ public class ChangeType extends Recipe {
                     }
                 }
 
+                if (targetType instanceof JavaType.FullyQualified && service(ImportService.class).usesStatementBasedImports()) {
+                    // Queued after the addition so the import service sees the name already bound by
+                    // the new import, which is what makes the old one safe to retire.
+                    maybeRemoveImport(originalType.getFullyQualifiedName());
+                }
                 j = sf.withImports(ListUtils.map(sf.getImports(), i -> {
                     Cursor cursor = getCursor();
                     setCursor(new Cursor(cursor, i));
@@ -736,8 +754,13 @@ public class ChangeType extends Recipe {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 for (J.ClassDeclaration declaration : cu.getClasses()) {
-                    // Check the class name instead of source path, as it might differ
-                    String fqn = declaration.getType().getFullyQualifiedName();
+                    // Check the class name instead of source path, as it might differ.
+                    // Non-Java (e.g. Python) class declarations may lack type attribution.
+                    JavaType.FullyQualified declarationType = declaration.getType();
+                    if (declarationType == null) {
+                        continue;
+                    }
+                    String fqn = declarationType.getFullyQualifiedName();
                     if (fqn.equals(originalType.getFullyQualifiedName())) {
                         getCursor().putMessage("UPDATE_PACKAGE", true);
                         break;
@@ -775,7 +798,7 @@ public class ChangeType extends Recipe {
         public J.@Nullable Package visitPackage(J.Package pkg, ExecutionContext ctx) {
             Boolean updatePackage = getCursor().pollNearestMessage("UPDATE_PACKAGE");
             if (updatePackage != null && updatePackage) {
-                String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+                String original = PackageNameUtils.getPackageName(pkg);
                 if (original.equals(originalType.getPackageName())) {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
                     if (fq != null) {
@@ -878,6 +901,30 @@ public class ChangeType extends Recipe {
             String newNestedFqn = targetFqn + nestedFqn.substring(originalFqn.length());
             return JavaType.ShallowClass.build(newNestedFqn);
         }
+    }
+
+    /**
+     * Cheap pre-filter for {@link #containsClassDefinition}: a Java file can only declare a type
+     * whose package equals the file's package declaration, so a file whose package is not a prefix
+     * of the old type's name can skip the (potentially full-tree) definition scan entirely. This
+     * invariant is Java-specific, so it is only applied to {@link J.CompilationUnit}; other
+     * {@link JavaSourceFile} dialects (e.g. {@code K.CompilationUnit}, {@code G.CompilationUnit})
+     * always fall through to the scan.
+     *
+     * @param normalizedOldName the old fully qualified type name with {@code $} normalized to {@code .}
+     */
+    private static boolean mayContainDefinition(JavaSourceFile sourceFile, String normalizedOldName) {
+        if (!(sourceFile instanceof J.CompilationUnit)) {
+            return true;
+        }
+        J.Package packageDeclaration = sourceFile.getPackageDeclaration();
+        if (packageDeclaration == null) {
+            // Default package: can't cheaply rule out a declaration here, so scan.
+            return true;
+        }
+        // The declared type's package equals the file's, so the old name must begin with the file's
+        // package. The prefix check never rejects a file that actually declares the type.
+        return PackageNameUtils.isPrefixOf(packageDeclaration, normalizedOldName);
     }
 
     public static boolean containsClassDefinition(JavaSourceFile sourceFile, String fullyQualifiedTypeName) {

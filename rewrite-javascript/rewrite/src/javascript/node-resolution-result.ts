@@ -60,13 +60,65 @@ export interface PackageLockEntry {
 }
 
 /**
- * Parsed package-lock.json content structure (npm lockfile v3 format).
+ * Entry in a legacy npm lockfileVersion 1 `dependencies` tree (npm 5/6), with its
+ * requirements under `requires` and nested conflicting versions under `dependencies`.
+ */
+export interface LockfileV1Entry {
+    readonly version?: string;
+    readonly resolved?: string;
+    readonly integrity?: string;
+    readonly license?: string | string[] | { type?: string; url?: string };
+    readonly engines?: Record<string, string> | string[];
+    readonly requires?: Record<string, string>;
+    readonly dependencies?: Record<string, LockfileV1Entry>;
+}
+
+/**
+ * Parsed package-lock.json content structure. The `packages` map is the modern
+ * (lockfileVersion 2/3) shape; `dependencies` is the legacy lockfileVersion 1 tree.
  */
 export interface PackageLockContent {
     readonly name?: string;
     readonly version?: string;
     readonly lockfileVersion?: number;
     readonly packages?: Record<string, PackageLockEntry>;
+    readonly dependencies?: Record<string, LockfileV1Entry>;
+}
+
+/**
+ * Converts a legacy npm lockfileVersion 1 `dependencies` tree into the modern
+ * `packages` map keyed by node_modules path, so the resolver can walk transitive
+ * dependencies the same way it does for lockfileVersion 2/3 files. Returns
+ * undefined when the tree is absent or empty.
+ */
+function convertV1DependencyTree(
+    tree: Record<string, LockfileV1Entry> | undefined
+): Record<string, PackageLockEntry> | undefined {
+    if (!tree || Object.keys(tree).length === 0) {
+        return undefined;
+    }
+    const packages: Record<string, PackageLockEntry> = {};
+
+    function walk(deps: Record<string, LockfileV1Entry>, pathPrefix: string): void {
+        for (const [name, entry] of Object.entries(deps)) {
+            const pkgPath = `${pathPrefix}node_modules/${name}`;
+            packages[pkgPath] = {
+                version: entry.version,
+                resolved: entry.resolved,
+                integrity: entry.integrity,
+                license: entry.license,
+                engines: entry.engines,
+                // v1 folds all declared deps into `requires`; the resolver reads `dependencies`.
+                dependencies: entry.requires,
+            };
+            if (entry.dependencies) {
+                walk(entry.dependencies, `${pkgPath}/`);
+            }
+        }
+    }
+
+    walk(tree, "");
+    return packages;
 }
 
 /**
@@ -524,9 +576,12 @@ export function createNodeResolutionResultMarker(
     function parseResolutions(
         lockContent: PackageLockContent
     ): ResolvedDependency[] {
-        if (!lockContent.packages) return [];
-
-        const packages = lockContent.packages;
+        // Prefer the modern `packages` map; fall back to converting a legacy
+        // lockfileVersion 1 `dependencies` tree when no `packages` map is present.
+        const packages = lockContent.packages && Object.keys(lockContent.packages).length > 0
+            ? lockContent.packages
+            : convertV1DependencyTree(lockContent.dependencies);
+        if (!packages) return [];
 
         // First pass: Create all ResolvedDependency placeholders and build path map
         const packageInfos: Array<{ path: string; name: string; version: string; entry: PackageLockEntry }> = [];
@@ -897,17 +952,19 @@ RpcCodecs.registerCodec(NpmrcKind, {
  */
 RpcCodecs.registerCodec(DependencyKind, {
     async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
-        return updateIfChanged(before, {
-            name: await q.receive(before.name),
-            versionConstraint: await q.receive(before.versionConstraint),
-            resolved: await q.receive(before.resolved),
-        });
+        // Populated in place: the receive queue registered this instance for the ref before calling
+        // the codec, so a back-reference closing a cycle resolves to the finished object.
+        const dep = castDraft(before);
+        dep.name = await q.receive(before.name);
+        dep.versionConstraint = await q.receive(before.versionConstraint);
+        dep.resolved = await q.receive(before.resolved);
+        return before;
     },
 
     async rpcSend(after: Dependency, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.name);
         await q.getAndSend(after, a => a.versionConstraint);
-        await q.getAndSend(after, a => a.resolved);
+        await q.getAndSend(after, a => asRef(a.resolved));
     }
 });
 
@@ -916,16 +973,16 @@ RpcCodecs.registerCodec(DependencyKind, {
  */
 RpcCodecs.registerCodec(ResolvedDependencyKind, {
     async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
-        return updateIfChanged(before, {
-            name: await q.receive(before.name),
-            version: await q.receive(before.version),
-            dependencies: (await q.receiveList(before.dependencies)) || undefined,
-            devDependencies: (await q.receiveList(before.devDependencies)) || undefined,
-            peerDependencies: (await q.receiveList(before.peerDependencies)) || undefined,
-            optionalDependencies: (await q.receiveList(before.optionalDependencies)) || undefined,
-            engines: await q.receive(before.engines),
-            license: await q.receive(before.license),
-        });
+        const resolved = castDraft(before);
+        resolved.name = await q.receive(before.name);
+        resolved.version = await q.receive(before.version);
+        resolved.dependencies = (await q.receiveList(before.dependencies)) || undefined;
+        resolved.devDependencies = (await q.receiveList(before.devDependencies)) || undefined;
+        resolved.peerDependencies = (await q.receiveList(before.peerDependencies)) || undefined;
+        resolved.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || undefined;
+        resolved.engines = await q.receive(before.engines);
+        resolved.license = await q.receive(before.license);
+        return before;
     },
 
     async rpcSend(after: ResolvedDependency, q: RpcSendQueue): Promise<void> {

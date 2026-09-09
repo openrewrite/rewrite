@@ -19,8 +19,13 @@ package test
 import (
 	"testing"
 
+	"github.com/google/uuid"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -39,38 +44,87 @@ func (v *markBinaryVisitor) VisitBinary(bin *java.Binary, p any) java.J {
 
 func TestCollectSearchResultIDsEmpty(t *testing.T) {
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := java.CollectSearchResultIDs(cu); len(got) != 0 {
+	require.NoError(t, err)
+	if got := visitor.CollectSearchResultIDs(cu); len(got) != 0 {
 		t.Fatalf("expected no search results, got %v", got)
 	}
 }
 
 func TestCollectSearchResultIDsAfterMark(t *testing.T) {
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\n\nvar x = 1 + 2\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	mark := java.NewSearchResult("found a binary expr")
 	v := &markBinaryVisitor{marker: mark}
 	visitor.Init(v)
 
 	result := v.Visit(cu, recipe.NewExecutionContext()).(java.Tree)
-	ids := java.CollectSearchResultIDs(result)
-	if len(ids) != 1 {
-		t.Fatalf("expected exactly one search result id, got %d (%v)", len(ids), ids)
-	}
+	ids := visitor.CollectSearchResultIDs(result)
+	require.Len(t, ids, 1, "expected exactly one search result id")
 	if ids[0] != mark.Ident {
 		t.Fatalf("collected id %v does not match marker id %v", ids[0], mark.Ident)
 	}
 }
 
+// go.mod nodes are Tree, not J. The collector still reaches their markers
+// because every node routes its Markers through visitMarkers -> VisitMarker,
+// matching what the former reflection walker collected from the struct field.
+func TestCollectSearchResultIDsOnGoModNode(t *testing.T) {
+	// given
+	mark := java.NewSearchResult("found a require value")
+	val := &golang.GoModValue{
+		Ident:   uuid.New(),
+		Text:    "example.com/x",
+		Markers: java.AddMarker(java.Markers{}, mark),
+	}
+	dir := &golang.GoModDirective{Ident: uuid.New(), Keyword: "require", Values: []*golang.GoModValue{val}}
+	gm := &golang.GoMod{
+		Ident:      uuid.New(),
+		Statements: []java.RightPadded[golang.GoModStatement]{{Element: dir}},
+	}
+
+	// when
+	ids := visitor.CollectSearchResultIDs(gm)
+
+	// then
+	require.Falsef(t, len(ids) != 1 || ids[0] != mark.Ident, "expected [%v", mark.Ident)
+}
+
+// rewriteMarkerVisitor swaps the ID of every SearchResult it encounters via
+// the VisitMarker dispatch seam, proving the returned marker threads back
+// into the tree (not just observed, like the collector).
+type rewriteMarkerVisitor struct {
+	visitor.GoVisitor
+	newID uuid.UUID
+}
+
+func (v *rewriteMarkerVisitor) VisitMarker(m java.Marker, p any) java.Marker {
+	if sr, ok := m.(java.SearchResult); ok {
+		sr.Ident = v.newID
+		return sr
+	}
+	return m
+}
+
+func TestVisitMarkerRewritesInPlace(t *testing.T) {
+	// given
+	cu, err := parser.NewGoParser().Parse("a.go", "package main\n\nvar x = 1 + 2\n")
+	require.NoError(t, err)
+	marked := visitor.Init(&markBinaryVisitor{marker: java.NewSearchResult("orig")}).
+		Visit(cu, recipe.NewExecutionContext()).(java.Tree)
+
+	// when
+	newID := uuid.New()
+	rewritten := visitor.Init(&rewriteMarkerVisitor{newID: newID}).
+		Visit(marked, recipe.NewExecutionContext()).(java.Tree)
+
+	// then
+	ids := visitor.CollectSearchResultIDs(rewritten)
+	require.Falsef(t, len(ids) != 1 || ids[0] != newID, "expected VisitMarker to rewrite the id to %v", newID)
+}
+
 func TestCollectSearchResultIDsDedupes(t *testing.T) {
 	cu, err := parser.NewGoParser().Parse("a.go", "package main\n\nvar x = 1 + 2 + 3\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	// Same marker (same UUID) attached to two binary expressions: collector
 	// should only return it once.
 	mark := java.NewSearchResult("dup")
@@ -78,8 +132,6 @@ func TestCollectSearchResultIDsDedupes(t *testing.T) {
 	visitor.Init(v)
 
 	result := v.Visit(cu, recipe.NewExecutionContext()).(java.Tree)
-	ids := java.CollectSearchResultIDs(result)
-	if len(ids) != 1 {
-		t.Fatalf("expected dedup to produce 1 id, got %d (%v)", len(ids), ids)
-	}
+	ids := visitor.CollectSearchResultIDs(result)
+	require.Len(t, ids, 1, "expected dedup to produce 1 id")
 }

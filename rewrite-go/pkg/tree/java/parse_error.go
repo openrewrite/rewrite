@@ -18,7 +18,6 @@ package java
 
 import "github.com/google/uuid"
 
-// ParseError represents a source file that failed to parse.
 // Mirrors org.openrewrite.tree.ParseError on the Java side.
 type ParseError struct {
 	Ident            uuid.UUID
@@ -38,7 +37,6 @@ type ParseError struct {
 // dispatch.
 func (*ParseError) IsTree() {}
 
-// NewParseError creates a ParseError from a source path, source text, and error.
 func NewParseError(sourcePath string, source string, err error) *ParseError {
 	marker := ParseExceptionResult{
 		Ident:         uuid.New(),

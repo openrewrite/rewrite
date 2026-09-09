@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.synchronizedSet;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -54,7 +55,7 @@ public class JavaUnrestrictedClassLoader extends URLClassLoader {
     }
 
     final List<Path> modules;
-    private final Set<String> exportedPackages = Collections.synchronizedSet(new HashSet<>());
+    private final Set<String> exportedPackages = synchronizedSet(new HashSet<>());
 
     public JavaUnrestrictedClassLoader(ClassLoader parentClassloader) {
         this(parentClassloader, getLombok());

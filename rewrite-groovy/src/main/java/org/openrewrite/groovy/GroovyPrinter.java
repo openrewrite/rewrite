@@ -166,6 +166,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             case NotIn:
                 keyword = "!in";
                 break;
+            case NotInstanceOf:
+                keyword = "!instanceof";
+                break;
             case Spaceship:
                 keyword = "<=>";
                 break;
@@ -518,6 +521,11 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
+            // The parser gives a zero-argument call a J.Empty argument; an element-less container is
+            // recipe-built, and the loop below only emits parentheses alongside an argument.
+            if (args.isEmpty()) {
+                p.append("()");
+            }
             boolean argsAreAllClosures = args.stream().allMatch(it -> it.getElement() instanceof J.Lambda);
             boolean hasParentheses = true;
             boolean applyTrailingLambdaParenthese = true;

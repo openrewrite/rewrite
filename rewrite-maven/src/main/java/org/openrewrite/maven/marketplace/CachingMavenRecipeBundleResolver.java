@@ -33,7 +33,7 @@ import java.util.Map;
  * <p>
  * <strong>Lifetime of handed-out readers.</strong> The readers (and the
  * {@link org.openrewrite.marketplace.RecipeClassLoader}s they own) returned by
- * {@link #resolve(RecipeBundle)} are intended to outlive this resolver. Once a {@link Recipe}
+ * {@link #resolve(RecipeBundle)} are intended to outlive this resolver. Once a {@link org.openrewrite.Recipe}
  * has been prepared from a reader, the JVM's class cache contains classes defined by that
  * classloader, and any later {@code getResourceAsStream}/inner-class load against those
  * classes requires the classloader's {@code URLClassPath} jar handles to remain open.

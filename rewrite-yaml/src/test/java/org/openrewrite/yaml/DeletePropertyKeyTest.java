@@ -666,4 +666,90 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deleteEntryAfterFoldedBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("doomed", null, null, null)),
+          yaml(
+            """
+              keep: >-
+                line one
+                line two
+              doomed: value
+              after: tail
+              """,
+            """
+              keep: >-
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteEntryAfterLiteralKeepBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("doomed", null, null, null)),
+          yaml(
+            """
+              keep: |+
+                line one
+                line two
+
+              doomed: value
+              after: tail
+              """,
+            """
+              keep: |+
+                line one
+                line two
+
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteEntryBeforeBlockScalarIsUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("doomed", null, null, null)),
+          yaml(
+            """
+              doomed: value
+              keep: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              keep: >-
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteEntryAfterCrlfBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("doomed", null, null, null)),
+          yaml(
+            "keep: >-\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "doomed: value\r\n" +
+            "after: tail\r\n",
+            "keep: >-\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n"
+          )
+        );
+    }
 }

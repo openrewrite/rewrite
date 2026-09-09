@@ -28,6 +28,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.AnnotatedExpression visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, P p) {
+        return (K.AnnotatedExpression) super.visitAnnotatedExpression(annotatedExpression, p);
+    }
+
+    @Override
     public K.AnnotationType visitAnnotationType(K.AnnotationType annotationType, P p) {
         return (K.AnnotationType) super.visitAnnotationType(annotationType, p);
     }
@@ -60,6 +65,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     @Override
     public K.DestructuringDeclaration visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, P p) {
         return (K.DestructuringDeclaration) super.visitDestructuringDeclaration(destructuringDeclaration, p);
+    }
+
+    @Override
+    public K.ExpressionStatement visitExpressionStatement(K.ExpressionStatement expressionStatement, P p) {
+        return (K.ExpressionStatement) super.visitExpressionStatement(expressionStatement, p);
     }
 
     @Override
@@ -118,6 +128,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.StatementExpression visitStatementExpression(K.StatementExpression statementExpression, P p) {
+        return (K.StatementExpression) super.visitStatementExpression(statementExpression, p);
+    }
+
+    @Override
     public K.TypeAlias visitTypeAlias(K.TypeAlias typeAlias, P p) {
         return (K.TypeAlias) super.visitTypeAlias(typeAlias, p);
     }
@@ -130,6 +145,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     @Override
     public K.When visitWhen(K.When when, P p) {
         return (K.When) super.visitWhen(when, p);
+    }
+
+    @Override
+    public K.ContextParameters visitContextParameters(K.ContextParameters contextParameters, P p) {
+        return (K.ContextParameters) super.visitContextParameters(contextParameters, p);
     }
 
     @Override

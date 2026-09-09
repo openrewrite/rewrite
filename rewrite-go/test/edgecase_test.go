@@ -19,6 +19,8 @@ package test
 import (
 	"testing"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
@@ -391,4 +393,74 @@ func TestParseBitwiseComplement(t *testing.T) {
 				return ^x
 			}
 		`))
+}
+
+func TestParseByteOrderMark(t *testing.T) {
+	src := "\ufeffpackage main\n\nfunc f() {\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if !cu.CharsetBomMarked {
+		t.Error("CharsetBomMarked should be set")
+	}
+	if cu.Prefix.Whitespace != "" {
+		t.Errorf("Prefix should not hold the BOM, got %q", cu.Prefix.Whitespace)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}
+
+func TestParseWithoutByteOrderMark(t *testing.T) {
+	src := "package main\n\nfunc f() {\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if cu.CharsetBomMarked {
+		t.Error("CharsetBomMarked should be unset")
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}
+
+// gofmt writes no space inside an empty argument list or composite
+// literal, so hand-written spacing there is the only source of it.
+
+func TestParseSpaceInsideEmptyCallArguments(t *testing.T) {
+	src := "package main\n\nfunc g() int { return 0 }\n\nfunc f() {\n\tx := g( )\n\t_ = x\n}\n"
+	assertRoundtrip(t, src)
+}
+
+func TestParseSpaceInsideEmptyMethodCallArguments(t *testing.T) {
+	src := "package main\n\ntype T struct{}\n\nfunc (T) M() {}\n\nfunc f() {\n\tvar t T\n\tt.M(\n\t)\n}\n"
+	assertRoundtrip(t, src)
+}
+
+func TestParseSpaceInsideEmptyCompositeLiteral(t *testing.T) {
+	src := "package main\n\nfunc f() {\n\t_ = []int{ }\n\t_ = map[string]int{\n\t}\n\t_ = struct{}{ }\n}\n"
+	assertRoundtrip(t, src)
+}
+
+func assertRoundtrip(t *testing.T, src string) {
+	t.Helper()
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}
+
+func TestParseParenthesizedCallStatement(t *testing.T) {
+	src := "package main\n\nfunc h() {}\n\nfunc f() {\n\t(h())\n}\n"
+	assertRoundtrip(t, src)
+}
+
+func TestParseFieldAccessStatement(t *testing.T) {
+	src := "package main\n\nvar x struct{ Y int }\n\nfunc f() {\n\tx.Y\n}\n"
+	assertRoundtrip(t, src)
 }

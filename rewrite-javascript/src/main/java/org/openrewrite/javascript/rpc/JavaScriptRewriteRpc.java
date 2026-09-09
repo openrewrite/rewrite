@@ -20,6 +20,8 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.tree.JS;
@@ -28,15 +30,20 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.RpcObjectData;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -49,6 +56,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import java.util.stream.StreamSupport;
 
@@ -84,6 +92,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         MANAGER.setFactory(builder);
     }
 
+    public static void resetFactory() {
+        MANAGER.resetFactory();
+    }
+
     @Override
     public void shutdown() {
         super.shutdown();
@@ -117,6 +129,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         new InstallRecipesByPackage.Package(packageName, version)),
                 InstallRecipesResponse.class
         );
+    }
+
+    /**
+     * Parser options forwarded to the Node server with every parse request, carrying this context's
+     * {@link ExecutionContext#REQUIRE_PRINT_EQUALS_INPUT} setting.
+     */
+    public static Map<String, String> parseOptions(ExecutionContext ctx) {
+        return Collections.singletonMap(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                String.valueOf(ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)));
     }
 
     /**
@@ -157,6 +178,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+        // The server relativizes only against this, so without it source paths land on the LST absolute.
+        Path base = relativeTo == null ? projectPath : relativeTo;
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
 
@@ -168,7 +191,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, base, parseOptions(ctx)), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -178,6 +201,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
+
+                if (Quark.class.getName().equals(item.getSourceFileType())) {
+                    // Oversize file the TypeScript side declined to parse; build the Quark
+                    // locally from its path (plus file attributes) — no content on the wire.
+                    Path sourcePath = Paths.get(item.getSourcePath());
+                    action.accept(new Quark(Tree.randomId(), sourcePath, Markers.EMPTY, null,
+                            FileAttributes.fromPath(base.resolve(sourcePath))));
+                    return true;
+                }
 
                 SourceFile sourceFile;
                 try {
@@ -243,6 +275,25 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         }, false);
     }
 
+    /**
+     * Stream the public types the {@code dependency} defines: its defined FQNs to {@code onFqns}
+     * first, then each type to {@code onType}; referenced-but-undefined types come back shallow.
+     */
+    public void dependencyTypes(Dependency dependency,
+                                Consumer<Set<String>> onFqns, Consumer<JavaType.FullyQualified> onType) {
+        RpcReceiveQueue q = new RpcReceiveQueue(new HashMap<>(),
+                () -> send("DependencyTypes", dependency, GetObjectResponse.class),
+                JavaType.Class.class.getName(), null);
+        Set<String> ownFqns = new LinkedHashSet<>();
+        q.<String>receiveList(null, null, ownFqns::add);
+        onFqns.accept(ownFqns);
+        q.receiveList(null, v -> (JavaType.FullyQualified) new JavaTypeReceiver().visit(v, q), onType);
+        RpcObjectData end = q.take();
+        if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
+        }
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -250,7 +301,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     @RequiredArgsConstructor
     public static class Builder implements Supplier<JavaScriptRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
-        private List<RecipeBundleResolver> resolvers = Collections.emptyList();
+        private List<RecipeBundleResolver> resolvers = emptyList();
         private final Map<String, String> environment = new HashMap<>();
         private final Set<String> unsetEnvNames = new LinkedHashSet<>();
         private static final Path DEFAULT_NPX_PATH = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
@@ -265,6 +316,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private @Nullable Path inspectBrkRewriteSourcePath;
 
         private @Nullable Path workingDirectory;
+
+        private @Nullable DataTableStore dataTableStore;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
@@ -394,6 +447,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Where recipes in the JavaScript runtime write data table rows, conveyed via the
+         * {@link org.openrewrite.rpc.request.SetDataTableStore} handshake.
+         */
+        public Builder dataTableStore(@Nullable DataTableStore dataTableStore) {
+            this.dataTableStore = dataTableStore;
+            return this;
+        }
+
         @Override
         public JavaScriptRewriteRpc get() {
             Path npxPath = npxPathSupplier.get();
@@ -460,10 +522,22 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
-                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
+                        .dataTableStore(dataTableStore)
+                        .log(log == null ? null : new PrintStream(openLog(log)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        }
+
+        private static OutputStream openLog(Path log) throws IOException {
+            // The parent directory may not exist yet (e.g. a previously configured
+            // temp directory that has since been deleted), so create it defensively
+            // rather than failing the (re)start of the RPC process.
+            Path parent = log.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            return Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE);
         }
     }
 }

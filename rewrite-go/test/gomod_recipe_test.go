@@ -26,8 +26,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// --- Sample refactoring recipe that rewrites the `go` directive version ---
-
 type changeGoVersion struct {
 	recipe.Base
 	NewVersion string
@@ -35,7 +33,9 @@ type changeGoVersion struct {
 
 func (r *changeGoVersion) Name() string        { return "org.openrewrite.golang.test.ChangeGoVersion" }
 func (r *changeGoVersion) DisplayName() string { return "Change the go directive version" }
-func (r *changeGoVersion) Description() string { return "Rewrites the `go` directive to a new version." }
+func (r *changeGoVersion) Description() string {
+	return "Rewrites the `go` directive to a new version."
+}
 
 func (r *changeGoVersion) Editor() recipe.TreeVisitor {
 	return visitor.Init(&changeGoVersionVisitor{newVersion: r.NewVersion})
@@ -48,13 +48,11 @@ type changeGoVersionVisitor struct {
 
 func (v *changeGoVersionVisitor) VisitGoModDirective(d *golang.GoModDirective, p any) java.Tree {
 	d = v.GoVisitor.VisitGoModDirective(d, p).(*golang.GoModDirective)
-	if d.Keyword == "go" && len(d.Values) == 1 {
+	if d.Keyword == "go" && len(d.Values) == 1 && d.Values[0].Text != v.newVersion {
 		d = d.WithValues([]*golang.GoModValue{d.Values[0].WithText(v.newVersion)})
 	}
 	return d
 }
-
-// --- Sample search recipe that marks the module path ---
 
 type findModulePath struct {
 	recipe.Base
@@ -82,8 +80,6 @@ func (v *findModulePathVisitor) VisitGoModDirective(d *golang.GoModDirective, p 
 	}
 	return d
 }
-
-// --- Tests ---
 
 func TestGoModRecipeSetGoVersion(t *testing.T) {
 	spec := test.NewRecipeSpec().WithRecipe(&changeGoVersion{NewVersion: "1.22"})

@@ -16,6 +16,8 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -2767,6 +2769,61 @@ class TabsAndIndentsTest implements RewriteTest {
               \t\t\t""\"
               \t\t\t\t\tNO
               \t\t\t\t\t""\";
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8096")
+    @Test
+    void ternaryAsLambdaBodyArgument() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Optional;
+
+              class A {
+                  Optional<String> repository(String in) {
+                      return Optional.of(in);
+                  }
+
+                  public String convert(String in) {
+                      var optionalConverter = repository(in);
+                      return optionalConverter.map(arg -> arg.isEmpty()
+                              ? in.toLowerCase()
+                              : in
+                      ).orElse(in);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void nonPositiveTabSize(int tabSize) {
+        rewriteRun(
+          // Autodetect derives the indent size from the tab size, so both are non-positive together, leaving no width to indent by
+          autoFormat(style -> style.withUseTabCharacter(true).withTabSize(tabSize).withIndentSize(tabSize)),
+          java(
+            """
+              class Test {
+              \tvoid m() {
+              \t\tif (true) {
+              int n = 0;
+              \t\t}
+              \t}
+              }
+              """,
+            """
+              class Test {
+              void m() {
+              if (true) {
+              int n = 0;
+              }
+              }
               }
               """
           )

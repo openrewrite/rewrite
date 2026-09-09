@@ -16,10 +16,16 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
@@ -81,6 +87,129 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
     }
 
     @Test
+    void shouldNotChangeVariableTypeWhenMatchIsNestedInInitializer() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Foo {
+                  void bar() {
+                      int direct = Integer.parseInt("1");
+                      // Integer.parseInt(...) is only an argument here, not the initializer of `s`
+                      String s = String.valueOf(Integer.parseInt("2"));
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void bar() {
+                      long direct = Integer.parseInt("1");
+                      // Integer.parseInt(...) is only an argument here, not the initializer of `s`
+                      String s = String.valueOf(Integer.parseInt("2"));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceParenthesizedInitializer() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Foo {
+                  void bar() {
+                      int one = (Integer.parseInt("1"));
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void bar() {
+                      long one = (Integer.parseInt("1"));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceTernaryInitializerWithMatchInBothBranches() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Foo {
+                  void bar(boolean flag) {
+                      int one = flag ? Integer.parseInt("1") : Integer.parseInt("2");
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void bar(boolean flag) {
+                      long one = flag ? Integer.parseInt("1") : Integer.parseInt("2");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceTernaryInitializerWithMatchInOneBranch() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Foo {
+                  void bar(boolean flag) {
+                      int one = flag ? (Integer.parseInt("1")) : 0;
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void bar(boolean flag) {
+                      long one = flag ? (Integer.parseInt("1")) : 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotChangeVariableTypeWhenInitializerIsTypeCast() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Foo {
+                  void bar() {
+                      int direct = Integer.parseInt("1");
+                      // the cast, not the matched invocation, determines the type of `one`
+                      int one = (int) Integer.parseInt("2");
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void bar() {
+                      long direct = Integer.parseInt("1");
+                      // the cast, not the matched invocation, determines the type of `one`
+                      int one = (int) Integer.parseInt("2");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceVariableAssignmentFullyQualified() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.math.BigInteger"))
@@ -115,6 +244,670 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
               class Foo {
                   void foo() {
                       BigInteger one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVariableAssignmentWithGenericReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.Set<java.lang.String>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.util.Set;
+
+              class Foo {
+                  void foo() {
+                      Set<java.lang.String> one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVariableAssignmentWithNestedGenericReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.Map<java.lang.String, java.util.List<java.lang.Integer>>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              import java.util.List;
+              import java.util.Map;
+
+              class Foo {
+                  void foo() {
+                      Map<java.lang.String, List<java.lang.Integer>> one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVariableAssignmentWithDeeplyNestedGenericReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.Map<java.lang.String, java.util.Map<java.lang.Integer, java.lang.Long>>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.Map;
+                  public class Bar {
+                      public static Map<String, String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.Map;
+              class Foo {
+                  void foo() {
+                      Map<String, String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              import java.util.Map;
+              class Foo {
+                  void foo() {
+                      Map<java.lang.String, Map<java.lang.Integer, java.lang.Long>> one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceParameterizedReturnTypeWithRaw() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.lang.Object"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      java.lang.Object one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void newReturnTypeIsResolvedAgainstTheClasspath() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.ArrayList<java.lang.String>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.util.ArrayList;
+
+              class Foo {
+                  void foo() {
+                      ArrayList<java.lang.String> one = Bar.bar();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("one".equals(variable.getSimpleName())) {
+                        JavaType.Parameterized type = (JavaType.Parameterized) variable.getType();
+                        assertThat(type.getType()).isNotInstanceOf(JavaType.ShallowClass.class);
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void resolvesExternalRawTypeWithExternalTypeArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "jakarta.validation.ConstraintViolation<org.springframework.http.ResponseEntity>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static Object bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      Object one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              import jakarta.validation.ConstraintViolation;
+              import org.springframework.http.ResponseEntity;
+
+              class Foo {
+                  void foo() {
+                      ConstraintViolation<ResponseEntity> one = Bar.bar();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("one".equals(variable.getSimpleName())) {
+                        JavaType.Parameterized type = (JavaType.Parameterized) variable.getType();
+                        assertThat(type.getType()).isNotInstanceOf(JavaType.ShallowClass.class);
+                        assertThat(type.getTypeParameters().get(0)).isNotInstanceOf(JavaType.ShallowClass.class);
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"mockwebserver3.MockResponse.Builder", "mockwebserver3.MockResponse$Builder"})
+    void nestedNewReturnType(String newReturnType) {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("mockwebserver3.MockResponse setResponseCode(int)", newReturnType))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package mockwebserver3;
+                  public class MockResponse {
+                      public MockResponse setResponseCode(int code) {
+                          return this;
+                      }
+                      public static class Builder {
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import mockwebserver3.MockResponse;
+              class Foo {
+                  void foo() {
+                      MockResponse response = new MockResponse().setResponseCode(200);
+                  }
+              }
+              """,
+            """
+              import mockwebserver3.MockResponse;
+              class Foo {
+                  void foo() {
+                      MockResponse.Builder response = new MockResponse().setResponseCode(200);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("response".equals(variable.getSimpleName())) {
+                        assertThat(variable.getType()).satisfies(t ->
+                          assertThat(((JavaType.FullyQualified) t).getFullyQualifiedName())
+                            .isEqualTo("mockwebserver3.MockResponse$Builder"));
+                    }
+                    return super.visitVariable(variable, p);
+                }
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    assertThat(method.getMethodType()).satisfies(t ->
+                      assertThat(((JavaType.FullyQualified) t.getReturnType()).getFullyQualifiedName())
+                        .isEqualTo("mockwebserver3.MockResponse$Builder"));
+                    return super.visitMethodInvocation(method, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void nestedNewReturnTypeAlreadyInPlaceIsNotChanged() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("mockwebserver3.MockResponse setResponseCode(int)", "mockwebserver3.MockResponse$Builder"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package mockwebserver3;
+                  public class MockResponse {
+                      public Builder setResponseCode(int code) {
+                          return null;
+                      }
+                      public static class Builder {
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import mockwebserver3.MockResponse;
+              class Foo {
+                  void foo() {
+                      MockResponse.Builder response = new MockResponse().setResponseCode(200);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void twoLevelNestedNewReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "bar.Outer.Middle.Inner"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static Object bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      Object one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              import bar.Outer;
+
+              class Foo {
+                  void foo() {
+                      Outer.Middle.Inner one = Bar.bar();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("one".equals(variable.getSimpleName())) {
+                        assertThat(variable.getType()).satisfies(t ->
+                          assertThat(((JavaType.FullyQualified) t).getFullyQualifiedName())
+                            .isEqualTo("bar.Outer$Middle$Inner"));
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void nestedNewReturnTypeWithTypeParameters() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "bar.Outer.Inner<java.lang.String>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static Object bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      Object one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              import bar.Outer;
+
+              class Foo {
+                  void foo() {
+                      Outer.Inner<java.lang.String> one = Bar.bar();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("one".equals(variable.getSimpleName())) {
+                        JavaType.Parameterized type = (JavaType.Parameterized) variable.getType();
+                        assertThat(type.getType().getFullyQualifiedName()).isEqualTo("bar.Outer$Inner");
+                        assertThat(type.getTypeParameters().get(0)).isNotInstanceOf(JavaType.ShallowClass.class);
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void newReturnTypeMayUseSimpleNamesForJavaLangTypeArguments() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.List<String>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static Object bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      Object one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.util.List;
+
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8478")
+    @Test
+    void nestedNewReturnTypeInsideAnonymousClassArgument() {
+        // Both the anonymous class in argument position and the member following the enclosing
+        // method are load-bearing; without either one this templates cleanly.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("okhttp3.mockwebserver.MockResponse setResponseCode(int)", "mockwebserver3.MockResponse.Builder"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package okhttp3.mockwebserver;
+                  public class MockResponse {
+                      public MockResponse setResponseCode(int code) {
+                          return this;
+                      }
+                  }
+                  """,
+                """
+                  package okhttp3.mockwebserver;
+                  public class RecordedRequest {
+                  }
+                  """,
+                """
+                  package okhttp3.mockwebserver;
+                  public abstract class Dispatcher {
+                      public abstract MockResponse dispatch(RecordedRequest request);
+                  }
+                  """,
+                """
+                  package okhttp3.mockwebserver;
+                  public class MockWebServer {
+                      public void setDispatcher(Dispatcher dispatcher) {
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import okhttp3.mockwebserver.Dispatcher;
+              import okhttp3.mockwebserver.MockResponse;
+              import okhttp3.mockwebserver.MockWebServer;
+              import okhttp3.mockwebserver.RecordedRequest;
+
+              class Foo {
+                  void foo() {
+                      MockWebServer server = new MockWebServer();
+                      server.setDispatcher(new Dispatcher() {
+                          @Override
+                          public MockResponse dispatch(RecordedRequest request) {
+                              MockResponse response = new MockResponse().setResponseCode(200);
+                              return response;
+                          }
+                      });
+                  }
+
+                  void trailing() {
+                  }
+              }
+              """,
+            """
+              import okhttp3.mockwebserver.Dispatcher;
+              import okhttp3.mockwebserver.MockResponse;
+              import okhttp3.mockwebserver.MockWebServer;
+              import okhttp3.mockwebserver.RecordedRequest;
+
+              class Foo {
+                  void foo() {
+                      MockWebServer server = new MockWebServer();
+                      server.setDispatcher(new Dispatcher() {
+                          @Override
+                          public MockResponse dispatch(RecordedRequest request) {
+                              mockwebserver3.MockResponse.Builder response = new MockResponse().setResponseCode(200);
+                              return response;
+                          }
+                      });
+                  }
+
+                  void trailing() {
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("response".equals(variable.getSimpleName())) {
+                        assertThat(variable.getType()).satisfies(t ->
+                          assertThat(((JavaType.FullyQualified) t).getFullyQualifiedName())
+                            .isEqualTo("mockwebserver3.MockResponse$Builder"));
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void newReturnTypeOnATryWithResourcesVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar reader()", "java.io.LineNumberReader"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static java.io.BufferedReader reader() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+
+              import java.io.BufferedReader;
+
+              class Foo {
+                  void foo() throws Exception {
+                      try (BufferedReader one = Bar.reader()) {
+                      }
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.io.LineNumberReader;
+
+              class Foo {
+                  void foo() throws Exception {
+                      try (LineNumberReader one = Bar.reader()) {
+                      }
                   }
               }
               """

@@ -20,13 +20,16 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.search.DeclaresMethod;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 @EqualsAndHashCode(callSuper = false)
@@ -66,13 +69,27 @@ public class RemoveMethodThrows extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides != null ? matchOverrides : true);
         TypeMatcher typeMatcher = new TypeMatcher(exceptionTypePattern, true);
-        return Preconditions.check(new DeclaresMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> precondition = new DeclaresMethod<>(methodMatcher);
+        // An exception can only be removed if it appears in a `throws` clause (or `@Throws`), so also
+        // require its type to be used — unless the pattern matches all exceptions, where no single
+        // type applies.
+        if (!StringUtils.isBlank(exceptionTypePattern) && !"*".equals(exceptionTypePattern)) {
+            precondition = Preconditions.and(new UsesType<>(exceptionTypePattern, true), precondition);
+        }
+        return Preconditions.check(precondition, new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                        J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                        boolean matches = enclosingClass != null ?
-                                methodMatcher.matches(method, enclosingClass) :
-                                methodMatcher.matches(method.getMethodType());
+                        Iterator<Object> enclosingPath = getCursor().getPath(o ->
+                                o instanceof J.ClassDeclaration || o instanceof J.NewClass);
+                        Object enclosing = enclosingPath.hasNext() ? enclosingPath.next() : null;
+                        boolean matches;
+                        if (enclosing instanceof J.NewClass) {
+                            matches = methodMatcher.matches(method, (J.NewClass) enclosing);
+                        } else if (enclosing instanceof J.ClassDeclaration) {
+                            matches = methodMatcher.matches(method, (J.ClassDeclaration) enclosing);
+                        } else {
+                            matches = methodMatcher.matches(method.getMethodType());
+                        }
                         getCursor().putMessage(METHOD_MATCHES_KEY, matches);
 
                         J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
@@ -80,7 +97,7 @@ public class RemoveMethodThrows extends Recipe {
                         List<J.Annotation> originalAnnotations = method.getLeadingAnnotations();
                         if (removedAnnotation != null && originalAnnotations.size() == 1 &&
                                 originalAnnotations.get(0) == removedAnnotation) {
-                            m = collapseBlankLineLeftByRemovedAnnotation(m, enclosingClass == null);
+                            m = collapseBlankLineLeftByRemovedAnnotation(m, enclosing == null);
                         }
                         if (!matches || m.getThrows() == null) {
                             return m;

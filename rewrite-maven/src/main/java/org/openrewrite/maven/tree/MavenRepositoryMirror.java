@@ -127,8 +127,10 @@ public class MavenRepositoryMirror {
         if (matches(repo)) {
             return repo.withUri(url)
                     .withId(id)
-                    .withReleases(!Boolean.FALSE.equals(releases) ? "true" : "false")
-                    .withSnapshots(!Boolean.FALSE.equals(snapshots) ? "true" : "false")
+                    // As in Maven, a mirror has no policy of its own: the mirrored repository keeps its own
+                    // unless the mirror explicitly overrides it
+                    .withReleases(releases == null ? repo.getReleases() : releases.toString())
+                    .withSnapshots(snapshots == null ? repo.getSnapshots() : snapshots.toString())
                     // Since the URL has likely changed we cannot assume that the new repository is known to exist
                     .withKnownToExist(false)
                     .withTimeout(repo.getTimeout());

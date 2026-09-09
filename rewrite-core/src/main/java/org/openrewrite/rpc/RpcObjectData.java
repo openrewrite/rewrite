@@ -102,13 +102,20 @@ public class RpcObjectData {
             try {
                 Class<?> valueClass = Class.forName(valueType);
 
-                // While we know exactly what type of value we are converting to,
-                // Jackson will still require the '@c' field in the map when the type
-                // we are converting to is annotated with @JsonTypeInfo.
-                //noinspection unchecked
-                ((Map<String, Object>) value).put("@c", valueType);
-                //noinspection unchecked
-                ((Map<String, Object>) value).put("@ref", 1);
+                // A plain Map is serialized structurally and consumes no type/identity
+                // metadata, so the "@c"/"@ref" keys below would leak as real entries and
+                // corrupt it -- e.g. a Map<String, String> would gain an "@ref" -> Integer
+                // entry that breaks strict serialization downstream. Only inject them for
+                // POJOs (which may be annotated with @JsonTypeInfo/@JsonIdentityInfo).
+                if (!Map.class.isAssignableFrom(valueClass)) {
+                    // While we know exactly what type of value we are converting to,
+                    // Jackson will still require the '@c' field in the map when the type
+                    // we are converting to is annotated with @JsonTypeInfo.
+                    //noinspection unchecked
+                    ((Map<String, Object>) value).put("@c", valueType);
+                    //noinspection unchecked
+                    ((Map<String, Object>) value).put("@ref", 1);
+                }
 
                 //noinspection unchecked
                 return (V) mapper.convertValue(value, valueClass);

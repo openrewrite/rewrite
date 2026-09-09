@@ -56,7 +56,6 @@ type ScanningRecipe interface {
 	Generate(acc any, ctx *ExecutionContext) []java.Tree
 }
 
-// ScanningBase provides default implementations for optional ScanningRecipe methods.
 // Embed it in your scanning recipe struct.
 type ScanningBase struct {
 	Base

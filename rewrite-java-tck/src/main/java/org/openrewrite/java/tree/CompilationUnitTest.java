@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -38,6 +39,38 @@ class CompilationUnitTest implements RewriteTest {
               import java.util.List;
               import java.io.*;
               public class A {}
+              """
+          )
+        );
+    }
+
+    // A lone ';' (a valid empty type declaration, JLS §7.6) between imports and a class
+    // declaration ends up in a Space.whitespace field after parsing, violating the
+    // whitespace-only invariant. This is a known structural limitation: J.CompilationUnit.classes
+    // only holds ClassDeclaration, so there is nowhere to attach a J.Empty for the top-level ';'.
+    // The class structure and print idempotency are both correct; only the whitespace validator
+    // is suppressed here.
+    @Test
+    void emptyTypeDeclarationBetweenImportsAndClass() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().allowNonWhitespaceInWhitespace(true).build()),
+          java(
+            """
+              package com.example;
+
+              import java.util.List;
+
+              ;
+
+              /**
+               * A test class.
+               */
+              public class MyTest {
+
+                  void myMethod() {
+                      // do something
+                  }
+              }
               """
           )
         );

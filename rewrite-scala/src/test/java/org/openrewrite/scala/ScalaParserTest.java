@@ -22,8 +22,15 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.tree.ParseError;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -226,5 +233,45 @@ class ScalaParserTest {
         assertThat(forLoop.getBody()).isInstanceOf(J.Block.class);
         J.Block block = (J.Block) forLoop.getBody();
         assertThat(block.getStatements()).hasSize(2);
+    }
+
+    @Test
+    void doesNotLeakTempDirectories() throws Exception {
+        // given
+        Path tmpRoot = Paths.get(System.getProperty("java.io.tmpdir"));
+        Set<Path> before = listRewriteScalaTempDirs(tmpRoot);
+
+        // when
+        ScalaParser parser = ScalaParser.builder().build();
+        List<SourceFile> parsed = parser.parse("val x = 42\n").collect(Collectors.toList());
+
+        // then
+        assertThat(parsed).hasSize(1);
+        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+
+        // Other test JVMs on this machine continuously create and delete their own
+        // rewrite-scala temp dirs, so waiting for the directory listing to become
+        // empty never converges. Instead take the candidates once and wait for each
+        // of them to disappear: theirs are removed when their compile finishes,
+        // while a directory genuinely leaked by our parse persists.
+        Set<Path> candidates = listRewriteScalaTempDirs(tmpRoot);
+        candidates.removeAll(before);
+        long deadline = System.currentTimeMillis() + 30_000;
+        while (!candidates.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(250);
+            candidates.removeIf(p -> !Files.exists(p));
+        }
+        assertThat(candidates)
+          .as("Parsing should not leak any rewrite-scala temp directories")
+          .isEmpty();
+    }
+
+    private static Set<Path> listRewriteScalaTempDirs(Path tmpRoot) throws IOException {
+        try (Stream<Path> entries = Files.list(tmpRoot)) {
+            return entries
+              .filter(Files::isDirectory)
+              .filter(p -> p.getFileName().toString().startsWith("rewrite-scala"))
+              .collect(Collectors.toCollection(HashSet::new));
+        }
     }
 }

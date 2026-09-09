@@ -32,6 +32,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // JavaRpcClient communicates with a Java RPC server process
@@ -85,18 +87,12 @@ func StartJavaRpcClient(t *testing.T, recipes []RecipeEntry) *JavaRpcClient {
 	)
 
 	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		t.Fatalf("failed to get stdin pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to get stdin pipe")
 	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatalf("failed to get stdout pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to get stdout pipe")
 	cmd.Stderr = os.Stderr
 
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("failed to start Java RPC server: %v", err)
-	}
+	require.NoError(t, cmd.Start(), "failed to start Java RPC server")
 
 	client := &JavaRpcClient{
 		process: cmd,
@@ -230,14 +226,12 @@ func (c *JavaRpcClient) readMessage() (*jsonRPCResponse, error) {
 	}
 }
 
-// RecipeEntry describes a recipe for the marketplace CSV.
 type RecipeEntry struct {
 	Name        string
 	PackageName string
 	Version     string
 }
 
-// DefaultJavaRecipes returns the common Java recipes used for testing.
 func DefaultJavaRecipes() []RecipeEntry {
 	return []RecipeEntry{
 		{Name: "org.openrewrite.java.ChangeType", PackageName: "org.openrewrite:rewrite-java", Version: "8.73.0"},
@@ -285,9 +279,7 @@ func writeMarketplaceCSV(t *testing.T, recipes []RecipeEntry) string {
 	t.Helper()
 
 	tmpFile, err := os.CreateTemp("", "marketplace-*.csv")
-	if err != nil {
-		t.Fatalf("failed to create marketplace CSV: %v", err)
-	}
+	require.NoError(t, err, "failed to create marketplace CSV")
 	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
 
 	w := csv.NewWriter(tmpFile)

@@ -19,10 +19,11 @@ package rpc
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// queueOf returns a ReceiveQueue that yields the given messages once.
 func queueOf(msgs ...RpcObjectData) *ReceiveQueue {
 	delivered := false
 	return NewReceiveQueue(make(map[int]any), func() []RpcObjectData {
@@ -51,7 +52,5 @@ func TestReceiveValue_DeleteReturnsNil(t *testing.T) {
 	before := makeIdent("x")
 	got := receiveValue(queueOf(RpcObjectData{State: Delete}), java.Expression(before),
 		func(e java.Expression) any { return e })
-	if got != nil {
-		t.Errorf("DELETE: want nil, got %v", got)
-	}
+	assert.Nil(t, got, "DELETE: want nil")
 }

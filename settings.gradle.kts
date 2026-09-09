@@ -1,5 +1,17 @@
 pluginManagement {
     repositories {
+        maven {
+            name = "codegenome"
+            url = uri("https://artifacts.codegenomeproject.org/maven")
+            credentials {
+                username = providers.gradleProperty("codegenomeUsername").orNull ?: System.getenv("CODEGENOME_USERNAME")
+                password = providers.gradleProperty("codegenomePassword").orNull ?: System.getenv("CODEGENOME_TOKEN")
+            }
+            content {
+                includeGroupAndSubgroups("org.openrewrite")
+                includeGroupAndSubgroups("io.moderne")
+            }
+        }
         gradlePluginPortal()
     }
 }
@@ -35,6 +47,7 @@ val allProjects = listOf(
     "rewrite-properties",
     "rewrite-protobuf",
     "rewrite-python",
+    "rewrite-ruby",
     "rewrite-scala",
     "rewrite-test",
     "rewrite-toml",
@@ -85,7 +98,8 @@ plugins {
 
 develocity {
     val isCiServer = System.getenv("CI")?.equals("true") ?: false
-    server = "https://ge.openrewrite.org/"
+    server = "https://community.develocity.cloud"
+    projectId = "openrewrite"
     val accessKey = System.getenv("GRADLE_ENTERPRISE_ACCESS_KEY")
     val authenticated = !accessKey.isNullOrBlank()
     buildCache {

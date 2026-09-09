@@ -41,6 +41,7 @@ public final class PackageManagerExecutor {
     public static final PackageManagerExecutor YARN = new PackageManagerExecutor("yarn", 120);
     public static final PackageManagerExecutor PNPM = new PackageManagerExecutor("pnpm", 120);
     public static final PackageManagerExecutor BUN  = new PackageManagerExecutor("bun",  120);
+    public static final PackageManagerExecutor COREPACK = new PackageManagerExecutor("corepack", 120);
 
     private static final boolean IS_WINDOWS =
             System.getProperty("os.name").toLowerCase().contains("windows");
@@ -86,6 +87,12 @@ public final class PackageManagerExecutor {
 
         Process process = pb.start();
 
+        // Close the child's stdin so any prompt sees EOF immediately instead of blocking forever.
+        // ProcessBuilder leaves stdin as an open pipe that never receives data or EOF; a package
+        // manager that reads stdin (e.g. pnpm during a cold-store install) would otherwise hang
+        // until the timeout. This mirrors the TS side's spawnSync, which feeds an empty stdin.
+        process.getOutputStream().close();
+
         StringBuilder stdout = new StringBuilder();
         StringBuilder stderr = new StringBuilder();
         Thread stdoutReader = new Thread(() -> drain(process.getInputStream(), stdout));
@@ -108,27 +115,84 @@ public final class PackageManagerExecutor {
 
     /**
      * Find the executable on the system, returning {@code null} if not installed.
-     * Searches standard install locations first, then falls back to {@code which <name>}.
+     * <p>
+     * Resolution order, most to least preferred:
+     * <ol>
+     *     <li>The executable co-located with the active {@code node}. Package managers
+     *     re-invoke node through a {@code #!/usr/bin/env node} shebang, so the one sitting
+     *     next to the node on PATH is guaranteed to run under a compatible runtime. This
+     *     prevents npm's {@code validate-engines} failure (exit 7) when a hardcoded npm is
+     *     newer or older than the node that actually executes it.</li>
+     *     <li>The executable resolved through PATH ({@code which}/{@code where}), which
+     *     stays consistent with the user's shell environment (nvm, fnm, volta, ...).</li>
+     *     <li>Common install locations, for processes launched with a minimal PATH
+     *     (e.g. GUI-launched IDEs on macOS).</li>
+     * </ol>
      */
     public @Nullable String find() {
         if (cachedPath != null) {
             return cachedPath;
         }
         String exeName = IS_WINDOWS ? name + ".cmd" : name;
-        String[] locations = {
-                System.getProperty("user.home") + "/.local/bin/" + exeName,
-                "/opt/homebrew/bin/" + exeName,
-                "/usr/local/bin/" + exeName,
-                "/usr/bin/" + exeName
-        };
-        for (String location : locations) {
+
+        Path nodeDir = activeNodeDir();
+        if (nodeDir != null) {
+            Path colocated = nodeDir.resolve(exeName);
+            if (Files.isExecutable(colocated)) {
+                cachedPath = colocated.toAbsolutePath().toString();
+                return cachedPath;
+            }
+        }
+
+        String onPath = which(exeName);
+        if (onPath != null) {
+            cachedPath = onPath;
+            return cachedPath;
+        }
+
+        for (String location : standardLocations(exeName)) {
             Path path = Paths.get(location);
             if (Files.isExecutable(path)) {
                 cachedPath = path.toAbsolutePath().toString();
                 return cachedPath;
             }
         }
+        return null;
+    }
 
+    /** Directory of the {@code node} that will execute the package manager, or {@code null}. */
+    private static @Nullable Path activeNodeDir() {
+        String nodeExe = IS_WINDOWS ? "node.exe" : "node";
+        String onPath = which(nodeExe);
+        if (onPath != null) {
+            Path parent = Paths.get(onPath).toAbsolutePath().getParent();
+            if (parent != null) {
+                return parent;
+            }
+        }
+        for (String location : standardLocations(nodeExe)) {
+            Path path = Paths.get(location);
+            if (Files.isExecutable(path)) {
+                Path parent = path.toAbsolutePath().getParent();
+                if (parent != null) {
+                    return parent;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String[] standardLocations(String exeName) {
+        return new String[]{
+                System.getProperty("user.home") + "/.local/bin/" + exeName,
+                "/opt/homebrew/bin/" + exeName,
+                "/usr/local/bin/" + exeName,
+                "/usr/bin/" + exeName
+        };
+    }
+
+    /** Resolve an executable through the shell's PATH, returning {@code null} if not found. */
+    static @Nullable String which(String exeName) {
         try {
             ProcessBuilder pb = new ProcessBuilder(IS_WINDOWS ? "where" : "which", exeName);
             pb.redirectErrorStream(true);
@@ -143,12 +207,13 @@ public final class PackageManagerExecutor {
                 }
                 String output = sb.toString().trim();
                 if (process.waitFor() == 0 && !output.isEmpty()) {
-                    cachedPath = output;
-                    return cachedPath;
+                    return output;
                 }
             }
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             // Ignore and return null below.
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
         return null;
     }

@@ -260,9 +260,9 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                  (Comment.Style.INLINE != space.getComments().get(0).getStyle() &&
                   (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r"))))) {
                 if (style.getUseTabCharacter()) {
-                    space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
+                    space = space.withWhitespace(space.getWhitespace().replace(" ", ""));
                 } else {
-                    space = space.withWhitespace(space.getWhitespace().replaceAll("\t", ""));
+                    space = space.withWhitespace(space.getWhitespace().replace("\t", ""));
                 }
             }
 

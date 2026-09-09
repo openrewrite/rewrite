@@ -224,6 +224,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         beforeSyntax(functionType, KSpace.Location.FUNCTION_TYPE_PREFIX, p);
 
         visit(functionType.getLeadingAnnotations(), p);
+        visit(functionType.getContextParameters(), p);
         for (J.Modifier modifier : functionType.getModifiers()) {
             delegate.visitModifier(modifier, p);
         }
@@ -347,7 +348,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitMethodDeclaration(K.MethodDeclaration methodDeclaration, PrintOutputCapture<P> p) {
-        return delegate.visitMethodDeclaration0(methodDeclaration.getMethodDeclaration(), methodDeclaration.getTypeConstraints(), p);
+        return delegate.visitMethodDeclaration0(methodDeclaration.getMethodDeclaration(), methodDeclaration.getTypeConstraints(),
+                methodDeclaration.getContextParameters(), p);
     }
 
     @Override
@@ -363,6 +365,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         J.VariableDeclarations vd = property.getVariableDeclarations();
         visit(vd.getLeadingAnnotations(), p);
+        visit(property.getContextParameters(), p);
         for (J.Modifier m : vd.getModifiers()) {
             delegate.visitModifier(m, p);
             if (m.getType() == J.Modifier.Type.Final) {
@@ -412,9 +415,55 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append(";");
         }
 
+        visitBackingField(property.getBackingField(), p);
         visitContainer(property.getAccessors(), p);
         afterSyntax(property, p);
         return property;
+    }
+
+    /**
+     * Prints a Kotlin 2.2 context parameter list, as in `context(c: Ctx)`.
+     */
+    @Override
+    public J visitContextParameters(K.ContextParameters contextParameters, PrintOutputCapture<P> p) {
+        beforeSyntax(contextParameters, KSpace.Location.CONTEXT_PARAMETERS_PREFIX, p);
+        p.append("context");
+        delegate.visitContainer("(", contextParameters.getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
+        afterSyntax(contextParameters, p);
+        return contextParameters;
+    }
+
+    /**
+     * Prints `field`, its optional `: Type`, and its optional initializer. The declaration is laid out in
+     * Kotlin order rather than the Java order {@link JavaPrinter} would use for a {@link J.VariableDeclarations}.
+     */
+    private void visitBackingField(J.@Nullable VariableDeclarations backingField, PrintOutputCapture<P> p) {
+        if (backingField == null) {
+            return;
+        }
+        beforeSyntax(backingField, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+        visit(backingField.getLeadingAnnotations(), p);
+        for (J.Modifier m : backingField.getModifiers()) {
+            delegate.visitModifier(m, p);
+        }
+
+        JRightPadded<J.VariableDeclarations.NamedVariable> rpv = backingField.getPadding().getVariables().get(0);
+        J.VariableDeclarations.NamedVariable nv = rpv.getElement();
+        beforeSyntax(nv, Space.Location.VARIABLE_PREFIX, p);
+        visit(nv.getName(), p);
+        visitSpace(rpv.getAfter(), Space.Location.TYPE_PARAMETERS, p);
+
+        if (backingField.getTypeExpression() != null) {
+            p.append(":");
+            visit(backingField.getTypeExpression(), p);
+        }
+
+        if (nv.getInitializer() != null) {
+            visitSpace(Objects.requireNonNull(nv.getPadding().getInitializer()).getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
+            p.append("=");
+            visit(nv.getInitializer(), p);
+        }
+        afterSyntax(backingField, p);
     }
 
     @Override
@@ -492,7 +541,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitWhenBranch(K.WhenBranch whenBranch, PrintOutputCapture<P> p) {
         beforeSyntax(whenBranch, KSpace.Location.WHEN_BRANCH_PREFIX, p);
-        visitContainer("", whenBranch.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, "->", p);
+        JRightPadded<Expression> guard = whenBranch.getPadding().getGuard();
+        visitContainer("", whenBranch.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION,
+                guard == null ? "->" : "if", p);
+        if (guard != null) {
+            visit(guard.getElement(), p);
+            visitSpace(guard.getAfter(), KSpace.Location.WHEN_BRANCH_GUARD_SUFFIX, p);
+            p.append("->");
+        }
         visit(whenBranch.getBody(), p);
         afterSyntax(whenBranch, p);
         return whenBranch;
@@ -913,10 +969,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
-            return visitMethodDeclaration0(method, null, p);
+            return visitMethodDeclaration0(method, null, null, p);
         }
 
-        private J.MethodDeclaration visitMethodDeclaration0(J.MethodDeclaration method, K.@Nullable TypeConstraints typeConstraints, PrintOutputCapture<P> p) {
+        private J.MethodDeclaration visitMethodDeclaration0(J.MethodDeclaration method, K.@Nullable TypeConstraints typeConstraints,
+                                                            K.@Nullable ContextParameters contextParameters, PrintOutputCapture<P> p) {
             // Do not print generated methods.
             for (Marker marker : method.getMarkers().getMarkers()) {
                 if (marker instanceof Implicit || marker instanceof PrimaryConstructor) {
@@ -926,6 +983,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
             visit(method.getLeadingAnnotations(), p);
+            kotlinPrinter.visit(contextParameters, p);
             for (J.Modifier m : method.getModifiers()) {
                 visitModifier(m, p);
             }

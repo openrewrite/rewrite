@@ -50,18 +50,20 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
         if (reader == null) {
-            if (StringUtils.isBlank(bundle.getVersion())) {
-                return new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to read a Maven recipe bundle that has no version"));
-            }
+            // Blank means no constraint requested, which every other ecosystem resolves as latest.
+            // RELEASE rather than LATEST because LATEST is snapshot-eligible, and an unexpressed
+            // preference should not opt a caller into pre-release artifacts.
+            String requested = StringUtils.isBlank(bundle.getEffectiveVersion()) ? "RELEASE" : bundle.getEffectiveVersion();
             String[] ga = bundle.getPackageName().split(":");
-            GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
+            GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], requested);
             return resolveDependencies(gav)
                     .map(mrr -> {
-                        ResolvedDependency resolvedDependency = mrr.getDependencies().get(Scope.Runtime).stream().filter(ResolvedDependency::isDirect)
+                        ResolvedDependency resolvedDependency = mrr.getDependencies().get(Scope.Runtime).stream()
+                                .filter(ResolvedDependency::isDirect)
                                 .findFirst().orElseThrow(() -> new IllegalStateException("Failed to find direct dependency for " + gav));
-                        bundle.setVersion(resolvedDependency.getDatedSnapshotVersion() == null ?
+                        RecipeBundle resolved = bundle.withVersion(resolvedDependency.getDatedSnapshotVersion() == null ?
                                 resolvedDependency.getVersion() : resolvedDependency.getDatedSnapshotVersion());
-                        reader = new MavenRecipeBundleReader(bundle, mrr, downloader, classLoaderFactory);
+                        reader = new MavenRecipeBundleReader(resolved, mrr, downloader, classLoaderFactory);
                         return (RecipeBundleReader) reader;
                     })
                     .orElseGet(() -> new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to resolve recipe " + gav)));

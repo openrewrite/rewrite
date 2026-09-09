@@ -30,7 +30,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
 
-    implementation("io.moderne:jsonrpc:latest.integration")
+    implementation("io.moderne:jsonrpc:latest.release")
 
     compileOnly(project(":rewrite-test"))
     compileOnly(project(":rewrite-xml"))
@@ -145,9 +145,11 @@ val csharpTest by tasks.registering(Exec::class) {
         // JunitXml.TestLogger resolves a relative LogFilePath against the test project's
         // TargetDir, so pin the absolute path and pass --results-directory to match.
         junitXmlFile.parentFile.mkdirs()
+        // -PverboseTests restores the per-passing-test console output
+        val dotnetVerbosity = if (project.hasProperty("verboseTests")) "normal" else "minimal"
         commandLine(
             findDotnet(), "test", "OpenRewrite.Tests/OpenRewrite.Tests.csproj",
-            "--no-build", "--verbosity", "normal",
+            "--no-build", "--verbosity", dotnetVerbosity,
             "--results-directory", junitXmlFile.parentFile.absolutePath,
             "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
         )
@@ -232,10 +234,14 @@ tasks.withType<Test> {
     }
     // Add timeout to identify hanging tests
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
-    // Show test names as they run
     testLogging {
-        events("started", "passed", "failed", "skipped")
-        showStandardStreams = true
+        // -PverboseTests shows every test plus its stdout/stderr (for diagnosing RPC hangs)
+        if (project.hasProperty("verboseTests")) {
+            events("started", "passed", "failed", "skipped")
+            showStandardStreams = true
+        } else {
+            events("failed", "skipped")
+        }
     }
 }
 
@@ -267,6 +273,12 @@ val nugetVersion: String = if (System.getenv("CI") != null) {
 } else {
     project.version.toString().replace("-SNAPSHOT", "-zlocal")
 }
+
+// Null when the property is absent OR blank: the release workflow sets
+// ORG_GRADLE_PROJECT_nugetApiKey unconditionally, so a deleted secret still defines it as "" and a
+// hasProperty check would be true — the push would then run with no credential and fail.
+fun nugetApiKey(): String? =
+    project.findProperty("nugetApiKey")?.toString()?.takeIf { it.isNotBlank() }
 
 val generateVersionTxt by tasks.registering {
     group = "csharp"
@@ -348,17 +360,64 @@ val csharpPublish by tasks.registering(Exec::class) {
     workingDir = csharpDir
 
     doFirst {
-        if (!project.hasProperty("nugetApiKey")) {
-            throw GradleException("nugetApiKey property is required for NuGet publishing")
-        }
+        val apiKey = nugetApiKey()
+            ?: throw GradleException("nugetApiKey property is required for NuGet publishing")
         commandLine(
             findDotnet(), "nuget", "push",
             "dist/*.nupkg",
             "--source", "https://api.nuget.org/v3/index.json",
-            "--api-key", project.findProperty("nugetApiKey")?.toString() ?: "",
+            "--api-key", apiKey,
             "--skip-duplicate"
         )
         logger.lifecycle("Publishing C# NuGet package (version: $nugetVersion)")
+    }
+}
+
+// Null when the property is absent OR blank, for the same reason nugetApiKey() is.
+fun cgpPublishToken(): String? =
+    project.findProperty("cgpPublishToken")?.toString()?.takeIf { it.isNotBlank() }
+
+// Task to publish NuGet packages to the Code Genome Project
+val csharpPublishCgp by tasks.registering(Exec::class) {
+    group = "csharp"
+    description = "Publish C# NuGet packages to the Code Genome Project"
+
+    dependsOn(csharpPack)
+
+    workingDir = csharpDir
+
+    doFirst {
+        val token = cgpPublishToken()
+            ?: throw GradleException("cgpPublishToken property is required for Code Genome Project publishing")
+        // `dotnet nuget push` resolves the PackagePublish resource from the service index first,
+        // over the SOURCE's stored credentials — --api-key rides on the push alone — and that index
+        // is 401-on-anonymous. Hence a throwaway config naming a source that carries credentials.
+        val config = temporaryDir.resolve("NuGet.config")
+        config.writeText("""
+            <?xml version="1.0" encoding="utf-8"?>
+            <configuration>
+              <packageSources>
+                <clear />
+                <add key="codegenome" value="https://artifacts.codegenomeproject.org/nuget/v3/index.json" />
+              </packageSources>
+              <packageSourceCredentials>
+                <codegenome>
+                  <add key="Username" value="cgp" />
+                  <add key="ClearTextPassword" value="$token" />
+                </codegenome>
+              </packageSourceCredentials>
+            </configuration>
+        """.trimIndent())
+        commandLine(
+            findDotnet(), "nuget", "push",
+            "dist/*.nupkg",
+            "--source", "codegenome",
+            "--configfile", config.absolutePath,
+            "--api-key", token,
+            // Keys off the 409 the repository answers on a version it already holds.
+            "--skip-duplicate"
+        )
+        logger.lifecycle("Publishing C# NuGet packages to the Code Genome Project (version: $nugetVersion)")
     }
 }
 
@@ -465,10 +524,22 @@ tasks.named("publishToMavenLocal") {
     dependsOn(csharpPublishLocal)
 }
 
-// Wire into the main publish task only when the NuGet API key is available
-if (project.hasProperty("nugetApiKey")) {
+// The .nupkg files are packed whenever we publish, regardless of where they are going.
+tasks.named("publish") {
+    dependsOn(csharpPack)
+}
+
+// Only the pushes are gated, each on its own credential, so retiring a destination is deleting one
+// block and one secret.
+if (nugetApiKey() != null) {
     tasks.named("publish") {
         dependsOn(csharpPublish)
+    }
+}
+
+if (cgpPublishToken() != null) {
+    tasks.named("publish") {
+        dependsOn(csharpPublishCgp)
     }
 }
 

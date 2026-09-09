@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -66,7 +67,7 @@ public class RemoveUnusedImports extends Recipe {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
                     .orElse(IntelliJ.importLayout());
             String sourcePackage = cu.getPackageDeclaration() == null ? "" :
-                    cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+                    PackageNameUtils.getPackageName(cu.getPackageDeclaration());
             Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
             Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
 

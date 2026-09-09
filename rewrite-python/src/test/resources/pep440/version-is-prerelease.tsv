@@ -1,0 +1,26 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_version.py (test_version_is_prerelease)
+# Retrieved: 2026-07-16
+# version<TAB>is prerelease flag.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+1.0.dev0	true
+1.0.dev1	true
+1.0a1.dev1	true
+1.0b1.dev1	true
+1.0c1.dev1	true
+1.0rc1.dev1	true
+1.0a1	true
+1.0b1	true
+1.0c1	true
+1.0rc1	true
+1.0a1.post1.dev1	true
+1.0b1.post1.dev1	true
+1.0c1.post1.dev1	true
+1.0rc1.post1.dev1	true
+1.0a1.post1	true
+1.0b1.post1	true
+1.0c1.post1	true
+1.0rc1.post1	true
+1.0	false
+1.0+dev	false
+1.0.post1	false
+1.0.post1+dev	false

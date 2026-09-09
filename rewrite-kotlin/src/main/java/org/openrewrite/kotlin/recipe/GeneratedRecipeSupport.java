@@ -50,7 +50,7 @@ import org.openrewrite.kotlin.tree.K;
  * are parallel paths selected by the LST-structural classifier in the IR
  * extension: the default is {@code methodInvocationRewriteJava} (a
  * {@link JavaVisitor} walks both Java AND Kotlin sources via
- * {@link org.openrewrite.kotlin.TreeVisitorAdapter}); the Kotlin variant kicks
+ * {@link org.openrewrite.internal.TreeVisitorAdapter}); the Kotlin variant kicks
  * in only when the before/after templates structurally reference a {@code K.*}
  * LST node — see {@code RecipeIrLanguageDescriptors.isKotlinSpecificTreeNode}.
  */
@@ -472,7 +472,7 @@ public final class GeneratedRecipeSupport {
      * Java-rooted parallel of {@link #methodInvocationRewrite}. Used when the
      * LST-structural classifier defaults a {@code rewrite { } to { }} clause
      * to a {@link JavaVisitor}: the visitor walks both Java and Kotlin sources
-     * via {@link org.openrewrite.kotlin.TreeVisitorAdapter}, but the template
+     * via {@link org.openrewrite.internal.TreeVisitorAdapter}, but the template
      * is parsed via {@link JavaTemplate}.
      *
      * <p>Matching, substitution-source semantics, and the multi-spec {@code \n}

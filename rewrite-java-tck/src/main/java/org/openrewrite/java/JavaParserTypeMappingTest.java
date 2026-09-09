@@ -142,6 +142,48 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         );
     }
 
+    @Test
+    void boundedCapturedWildcardMapsToQuestionMark() {
+        // Inferring `wrap`'s type variable from a bounded wildcard argument involves capture conversion
+        // (`List<CAP of (? extends Number)>`). javac names a captured wildcard "<captured wildcard>",
+        // which is not valid Java. Whether the capture reaches the type mapper depends on the JDK: modern
+        // javac upward-projects it back to a `?` wildcard, while older builders leave the capture in place,
+        // where the mapper must normalize it. Either way the LST must never surface "<captured wildcard>".
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  static <T> List<T> wrap(List<T> list) {
+                      return list;
+                  }
+
+                  void test(List<? extends Number> list) {
+                      Object o = wrap(list);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType> wrapInvocationType = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        if ("wrap".equals(method.getSimpleName())) {
+                            wrapInvocationType.set(method.getType());
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                Parameterized list = asParameterized(wrapInvocationType.get());
+                assertThat(list.getTypeParameters().get(0).toString())
+                  .isEqualTo("Generic{? extends java.lang.Number}")
+                  .doesNotContain("captured wildcard");
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
     @MinimumJava11
     @Test
@@ -394,6 +436,120 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                     assertThat(firstDimension.get()).isTrue();
                     assertThat(secondDimension.get()).isTrue();
                 })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-testing-frameworks/issues/1061")
+    @MinimumJava11
+    @Test
+    void methodInvocationTypeBoundWhenArgumentTypeUnresolvable() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+          java(
+            """
+              import static java.util.Objects.requireNonNull;
+              class MyTest {
+                  void test() {
+                      requireNonNull(UnknownType.unknownMethod());
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean asserted = new AtomicBoolean(false);
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer n) {
+                        if ("requireNonNull".equals(method.getSimpleName())) {
+                            assertThat(method.getMethodType()).isNotNull();
+                            assertThat(method.getMethodType().getName()).isEqualTo("requireNonNull");
+                            assertThat(method.getMethodType().getDeclaringType().getFullyQualifiedName())
+                                    .isEqualTo("java.util.Objects");
+                            asserted.set(true);
+                        }
+                        return super.visitMethodInvocation(method, n);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted.get()).isTrue();
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8318")
+    @MinimumJava25
+    @Test
+    void methodInvocationTypeResolvedFromRecoveredInvocationTypeWhenArgumentTypeUnresolvable() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+          java(
+            """
+              import static java.util.Objects.requireNonNull;
+              class MyTest {
+                  void test() {
+                      requireNonNull(UnknownType.unknownMethod());
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean asserted = new AtomicBoolean(false);
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer n) {
+                        if ("requireNonNull".equals(method.getSimpleName())) {
+                            JavaType.Method methodType = method.getMethodType();
+                            assertThat(methodType).isNotNull();
+                            assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName())
+                                    .isEqualTo("java.lang.Object");
+                            assertThat(methodType.getParameterTypes()).hasSize(1);
+                            assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().get(0)).getFullyQualifiedName())
+                                    .isEqualTo("java.lang.Object");
+                            asserted.set(true);
+                        }
+                        return super.visitMethodInvocation(method, n);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted.get()).isTrue();
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8318")
+    @MinimumJava11
+    @Test
+    void methodInvocationTypeBoundOnOverloadedCalleeWithUnresolvableArgument() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+          java(
+            """
+              class MyTest {
+                  Object test() {
+                      return String.valueOf(UnknownType.unknownMethod());
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean asserted = new AtomicBoolean(false);
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer n) {
+                        if ("valueOf".equals(method.getSimpleName())) {
+                            // With an unresolvable argument, overload resolution cannot pick a
+                            // principled winner; we bind javac's recovery candidate rather than
+                            // leaving the method type null, so only name and declaring type are
+                            // stable across JDKs.
+                            assertThat(method.getMethodType()).isNotNull();
+                            assertThat(method.getMethodType().getName()).isEqualTo("valueOf");
+                            assertThat(method.getMethodType().getDeclaringType().getFullyQualifiedName())
+                                    .isEqualTo("java.lang.String");
+                            asserted.set(true);
+                        }
+                        return super.visitMethodInvocation(method, n);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted.get()).isTrue();
+            })
           )
         );
     }

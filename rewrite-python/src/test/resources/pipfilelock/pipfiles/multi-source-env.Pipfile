@@ -1,0 +1,13 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[[source]]
+name = "internal"
+url = "https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@artifactory.example.com/api/pypi/pypi-local/simple"
+verify_ssl = false
+
+[packages]
+requests = "*"
+internal-lib = {version = ">=1.0", index = "internal"}

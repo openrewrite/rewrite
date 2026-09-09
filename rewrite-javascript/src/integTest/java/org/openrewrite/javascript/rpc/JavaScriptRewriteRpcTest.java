@@ -23,6 +23,11 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
+import org.openrewrite.config.DeclarativeRecipe;
+import org.openrewrite.config.Environment;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.YamlResourceLoader;
+import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -32,20 +37,29 @@ import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeBundleReader;
+import org.openrewrite.marketplace.RecipeBundleResolver;
+import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.javascript.Assertions.*;
 import static org.openrewrite.json.Assertions.json;
@@ -76,6 +90,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         if (Files.exists(tempDir.resolve("rpc.log"))) {
             System.out.println(Files.readString(tempDir.resolve("rpc.log")));
         }
+        // Restore the default factory so this test's per-test @TempDir-backed
+        // factory does not leak into later test classes that lazily (re)start
+        // the RPC process on the same thread.
+        JavaScriptRewriteRpc.resetFactory();
     }
 
     @Override
@@ -107,6 +125,30 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             spec -> spec.path("package.json")
           )
         );
+    }
+
+    @Test
+    void startsWhenLogParentDirectoryIsMissing() {
+        // given a log path whose parent directory does not exist yet (mimics a
+        // torn-down @TempDir that a stale factory still references)
+        Path missingParent = tempDir.resolve("does-not-exist-yet");
+        Path log = missingParent.resolve("rpc.log");
+        assertThat(Files.exists(missingParent)).isFalse();
+
+        // when starting the RPC process configured to log there
+        JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .log(log)
+          .get();
+
+        // then the process starts and the log (with its parent) is created
+        // rather than failing with NoSuchFileException
+        try {
+            assertThat(rpc).isNotNull();
+            assertThat(Files.exists(log)).isTrue();
+        } finally {
+            rpc.shutdown();
+        }
     }
 
     @Test
@@ -194,9 +236,8 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void installRecipesFromNpm() {
         assertThat(client().installRecipes("@openrewrite/recipes-npm").getRecipesInstalled()).isEqualTo(1);
         assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null)).getAllRecipes()).satisfiesExactly(
-          d -> {
-              assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`");
-          }
+          d ->
+              assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`")
         );
     }
 
@@ -618,6 +659,101 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             )
           )
         );
+    }
+
+    /**
+     * A JS composite whose {@code recipeList()} delegates to a Java recipe: the JS peer sends that
+     * child as a {@code delegatesTo} stand-in, which the host resolves from its marketplace only
+     * when the composite runs.
+     */
+    @Test
+    void jsCompositeWithJavaDelegateChild() {
+        File fixture = new File("rewrite/dist-fixtures/composite-with-java-delegate.js");
+        String composite = "org.openrewrite.example.npm.composite-with-java-delegate";
+        // Declarative on purpose: the host's inbound PrepareRecipe handler loads class names off the
+        // classpath, so only a marketplace-only delegate proves nothing was prepared before the run.
+        String delegate = "org.openrewrite.example.host.replace-hello";
+        String optionDelegate = "org.openrewrite.text.FindAndReplace";
+
+        // Builder defaults: no marketplace to resolve the delegate from, yet install and describe succeed.
+        assertThat(client().installRecipes(fixture).getRecipesInstalled()).isGreaterThan(0);
+        Recipe unwired = client().prepareRecipe(composite);
+        assertThat(unwired.getDescriptor().getRecipeList())
+          .extracting(RecipeDescriptor::getName)
+          .containsExactly(delegate, optionDelegate);
+        assertThatThrownBy(unwired::getRecipeList)
+          .hasMessageContaining("no recipe found in marketplace")
+          .hasMessageContaining(delegate);
+
+        JavaScriptRewriteRpc.shutdownCurrent();
+        Environment env = Environment.builder()
+          .scanRuntimeClasspath("org.openrewrite.text")
+          .load(new YamlResourceLoader(new ByteArrayInputStream("""
+            type: specs.openrewrite.org/v1beta/recipe
+            name: %s
+            displayName: Replace hello
+            description: Replaces hello with goodbye.
+            recipeList:
+              - org.openrewrite.text.FindAndReplace:
+                  find: hello
+                  replace: goodbye
+            """.formatted(delegate).getBytes(StandardCharsets.UTF_8)), URI.create("rewrite.yml"), new Properties()))
+          .build();
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .marketplace(env.toMarketplace(RecipeBundle.runtimeClasspath()))
+          .resolvers(List.of(new RuntimeClasspathResolver(env)))
+          .log(tempDir.resolve("rpc.log")));
+        assertThat(client().installRecipes(fixture).getRecipesInstalled()).isGreaterThan(0);
+        rewriteRun(
+          spec -> spec.recipe(client().prepareRecipe(composite)),
+          text("hello world", "farewell world")
+        );
+    }
+
+    /**
+     * A {@link RecipeBundleResolver} that materializes a listed recipe from an {@link Environment}
+     * scanned off the JVM classpath, the shape of a host's runtime-classpath resolver.
+     */
+    private static class RuntimeClasspathResolver implements RecipeBundleResolver {
+        private final Environment env;
+
+        RuntimeClasspathResolver(Environment env) {
+            this.env = env;
+        }
+
+        @Override
+        public String getEcosystem() {
+            return "runtime";
+        }
+
+        @Override
+        public RecipeBundleReader resolve(RecipeBundle bundle) {
+            return new RecipeBundleReader() {
+                @Override
+                public RecipeBundle getBundle() {
+                    return bundle;
+                }
+
+                @Override
+                public RecipeMarketplace read() {
+                    return env.toMarketplace(bundle);
+                }
+
+                @Override
+                public RecipeDescriptor describe(RecipeListing listing) {
+                    return prepare(listing, Map.of()).getDescriptor();
+                }
+
+                @Override
+                public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
+                    return env.listRecipes().stream()
+                      .filter(r -> r instanceof DeclarativeRecipe && r.getName().equals(listing.getName()))
+                      .findFirst()
+                      .orElseGet(() -> new RecipeLoader(null).load(listing.getName(), options));
+                }
+            };
+        }
     }
 
     /**

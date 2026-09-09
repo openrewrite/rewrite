@@ -1,0 +1,27 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_requirements.py (test_error_* functions)
+# Retrieved: 2026-07-16
+# Strings that must not parse as requirements.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+
+==0.0
+name[bar baz]
+name[bar, baz,]
+name (>= 1.0
+black (>=20.*) ; extra == 'format'
+name==1.2.3.post4.*
+name[bar, baz >= 1.0
+name[bar, baz
+name @ https://example.com/; extra == 'example'
+name; (extra == 'example'
+name @ 
+name; invalid_name
+name; '3.7' <= invalid_name
+name; '3.7' notin python_version
+name; '3.6'inpython_version
+name; '3.7' not python_version
+name; '3.7' ~ python_version
+name==1.0.org1
+name==
+name 1.0
+name >= 1.0 #
+name >= 1.0 <= 2.0

@@ -265,9 +265,20 @@ public class YamlResourceLoader implements ResourceLoader {
         String description = (String) yaml.get("description");
 
         Set<String> tags = emptySet();
-        List<String> rawTags = (List<String>) yaml.get("tags");
+        List<Object> invalidTags = emptyList();
+        List<Object> rawTags = (List<Object>) yaml.get("tags");
         if (rawTags != null) {
-            tags = new HashSet<>(rawTags);
+            tags = new HashSet<>(rawTags.size());
+            for (Object rawTag : rawTags) {
+                if (rawTag instanceof String) {
+                    tags.add((String) rawTag);
+                } else {
+                    if (invalidTags.isEmpty()) {
+                        invalidTags = new ArrayList<>();
+                    }
+                    invalidTags.add(rawTag);
+                }
+            }
         }
 
         String estimatedEffortPerOccurrenceStr = (String) yaml.get("estimatedEffortPerOccurrence");
@@ -306,6 +317,14 @@ public class YamlResourceLoader implements ResourceLoader {
                 source,
                 (boolean) yaml.getOrDefault("causesAnotherCycle", false),
                 maintainers);
+
+        for (Object invalidTag : invalidTags) {
+            recipe.addValidation(invalid(
+                    name + ".tags",
+                    invalidTag,
+                    "tags must be a list of strings, but found a " +
+                            (invalidTag == null ? "null value" : invalidTag.getClass().getSimpleName())));
+        }
 
         List<Object> recipeList = (List<Object>) yaml.get("recipeList");
         if (recipeList == null) {
@@ -356,12 +375,13 @@ public class YamlResourceLoader implements ResourceLoader {
                         recipeName,
                         null,
                         e.getMessage());
-            } catch (NoClassDefFoundError e) {
+            } catch (LinkageError e) {
                 addInvalidRecipeValidation(
                         addValidation,
                         recipeName,
                         null,
-                        "Recipe class " + recipeName + " cannot be found");
+                        "Recipe class " + recipeName + " could not be loaded: " + e,
+                        e);
             }
         } else if (recipeData instanceof Map) {
             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) recipeData).entrySet().iterator().next();
@@ -377,7 +397,8 @@ public class YamlResourceLoader implements ResourceLoader {
                                     addValidation,
                                     recipeName,
                                     recipeArgs,
-                                    "Recipe class " + recipeName + " cannot be found");
+                                    "Recipe class " + recipeName + " cannot be found",
+                                    e);
                         } else {
                             addInvalidRecipeValidation(
                                     addValidation,
@@ -391,12 +412,13 @@ public class YamlResourceLoader implements ResourceLoader {
                                 recipeName,
                                 recipeArgs,
                                 e.getMessage());
-                    } catch (NoClassDefFoundError e) {
+                    } catch (LinkageError e) {
                         addInvalidRecipeValidation(
                                 addValidation,
                                 recipeName,
                                 recipeArgs,
-                                "Recipe class " + nameAndConfig.getKey() + " cannot be found");
+                                "Recipe class " + nameAndConfig.getKey() + " could not be loaded: " + e,
+                                e);
                     }
                 } else {
                     addInvalidRecipeValidation(
@@ -423,7 +445,13 @@ public class YamlResourceLoader implements ResourceLoader {
 
     private void addInvalidRecipeValidation(Consumer<Validated<Object>> addValidation, String recipeName,
                                             @Nullable Object recipeArgs, String message) {
-        addValidation.accept(Validated.invalid(recipeName, recipeArgs, message));
+        addInvalidRecipeValidation(addValidation, recipeName, recipeArgs, message, null);
+    }
+
+    private void addInvalidRecipeValidation(Consumer<Validated<Object>> addValidation, String recipeName,
+                                            @Nullable Object recipeArgs, String message,
+                                            @Nullable Throwable exception) {
+        addValidation.accept(Validated.invalid(recipeName, recipeArgs, message, exception));
     }
 
     public Collection<RecipeListing> listRecipeListings(RecipeBundle bundle) {

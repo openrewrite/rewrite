@@ -1,0 +1,8 @@
+[project]
+name = "gitprobe"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = ["six"]
+
+[tool.uv.sources]
+six = { git = "https://github.com/benjaminp/six", tag = "1.17.0" }

@@ -26,6 +26,7 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.SourceSpecs;
 
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -36,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 class AddDevelocityGradlePluginTest implements RewriteTest {
@@ -53,6 +55,19 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
             assertThat(version.find()).isTrue();
             return after.formatted(version.group(0));
         });
+    }
+
+    private static SourceSpecs wrapperProperties(String gradleVersion) {
+        return properties(
+          """
+            distributionBase=GRADLE_USER_HOME
+            distributionPath=wrapper/dists
+            distributionUrl=https\\://services.gradle.org/distributions/gradle-%s-bin.zip
+            zipStoreBase=GRADLE_USER_HOME
+            zipStorePath=wrapper/dists
+            """.formatted(gradleVersion),
+          spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+        );
     }
 
     private static Consumer<SourceSpec<K.CompilationUnit>> interpolateResolvedVersionKts(@Language("kotlin") String after) {
@@ -323,6 +338,200 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
               }
 
               rootProject.name = 'my-project'
+              """
+            )
+          )
+        );
+    }
+
+    @Test
+    void settingsPluginsBlockUsingWrapperPropertiesWithoutBuildToolMarker() {
+        rewriteRun(
+          wrapperProperties("7.6.1"),
+          buildGradle(
+            ""
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              """,
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'com.gradle.develocity' version '%s'
+              }
+
+              rootProject.name = 'my-project'
+              """
+            )
+          )
+        );
+    }
+
+    @Test
+    void buildPluginsBlockUsingWrapperPropertiesWithoutBuildToolMarker() {
+        rewriteRun(
+          wrapperProperties("5.6.1"),
+          buildGradle(
+            "",
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'com.gradle.build-scan' version '%s'
+              }
+              """
+            )
+          ),
+          dir("subproject", buildGradle("")),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              include("subproject")
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapperPropertiesUsedWhenBuildToolMarkerIsForAnotherBuildTool() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.ModerneCli, "3.44.0"))),
+          wrapperProperties("7.6.1"),
+          buildGradle(
+            ""
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              """,
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'com.gradle.develocity' version '%s'
+              }
+
+              rootProject.name = 'my-project'
+              """
+            )
+          )
+        );
+    }
+
+    @Test
+    void buildToolMarkerWinsOverWrapperProperties() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
+          // The marker says Gradle 5, so the plugin belongs in the root build.gradle even though the wrapper says 7
+          wrapperProperties("7.6.1"),
+          buildGradle(
+            "",
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'com.gradle.build-scan' version '%s'
+              }
+              """
+            )
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedBuildUsesItsOwnWrapperRatherThanTheRootWrapper() {
+        rewriteRun(
+          // Gradle 5 at the root puts the plugin in the root build.gradle
+          wrapperProperties("5.6.1"),
+          buildGradle(
+            "",
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'com.gradle.build-scan' version '%s'
+              }
+              """
+            )
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              """
+          ),
+          // Gradle 7 in the nested build puts it in that build's settings.gradle instead
+          dir("nested",
+            wrapperProperties("7.6.1"),
+            buildGradle(""),
+            settingsGradle(
+              """
+                rootProject.name = 'nested'
+                """,
+              interpolateResolvedVersion("""
+                plugins {
+                    id 'com.gradle.develocity' version '%s'
+                }
+
+                rootProject.name = 'nested'
+                """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void noBuildToolMarkerAndNoWrapperPropertiesMakesNoChanges() {
+        rewriteRun(
+          buildGradle(
+            ""
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              """
+          )
+        );
+    }
+
+    @Test
+    void distributionUrlWithoutExtractableVersionMakesNoChanges() {
+        rewriteRun(
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.example/repo/gradle-nightly.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          buildGradle(
+            ""
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              """
+          )
+        );
+    }
+
+    @Test
+    void settingsPluginsBlockKtsUsingWrapperPropertiesWithoutBuildToolMarker() {
+        rewriteRun(
+          wrapperProperties("7.6.1"),
+          buildGradleKts(
+            ""
+          ),
+          settingsGradleKts(
+            """
+              rootProject.name = "my-project"
+              """,
+            interpolateResolvedVersionKts("""
+              plugins {
+                  id("com.gradle.develocity") version "%s"
+              }
+
+              rootProject.name = "my-project"
               """
             )
           )

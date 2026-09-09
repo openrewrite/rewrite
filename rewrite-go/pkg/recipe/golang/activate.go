@@ -18,7 +18,6 @@ package golang
 
 import "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 
-// Activate registers all Go recipes with the given registry.
 func Activate(r *recipe.Registry) {
 	golangCategory := recipe.CategoryDescriptor{DisplayName: "Go"}
 	searchCategory := recipe.CategoryDescriptor{DisplayName: "Search"}
@@ -28,6 +27,7 @@ func Activate(r *recipe.Registry) {
 	r.Register(&FindTypes{}, golangCategory, searchCategory)
 	r.Register(&FindMethods{}, golangCategory, searchCategory)
 	r.Register(&RenameXToFlag{}, golangCategory)
+	r.Register(&WrapErrorWithContext{}, golangCategory)
 	r.Register(&AddImport{}, golangCategory)
 	r.Register(&RemoveImport{}, golangCategory)
 	r.Register(&RemoveUnusedImports{}, golangCategory)

@@ -47,12 +47,12 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 public interface Cs extends J {
@@ -179,7 +179,7 @@ public interface Cs extends J {
         @Override
         @Transient
         public List<Import> getImports() {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         @Override
@@ -190,7 +190,7 @@ public interface Cs extends J {
         @Override
         @Transient
         public List<J.ClassDeclaration> getClasses() {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         @Override
@@ -305,7 +305,7 @@ public interface Cs extends J {
 
             @Override
             public List<JRightPadded<Import>> getImports() {
-                return Collections.emptyList();
+                return emptyList();
             }
 
             @Override
@@ -1899,7 +1899,7 @@ public interface Cs extends J {
         JContainer<Statement> accessors;
 
         public List<Statement> getAccessors() {
-            return accessors == null ? Collections.emptyList() : accessors.getElements();
+            return accessors == null ? emptyList() : accessors.getElements();
         }
 
         public EventDeclaration withAccessors(@Nullable List<Statement> accessors) {
@@ -4410,7 +4410,7 @@ public interface Cs extends J {
         JContainer<TypeTree> typeOperator;
 
         public List<TypeTree> getTypeOperator() {
-            return typeOperator == null ? Collections.emptyList() : typeOperator.getElements();
+            return typeOperator == null ? emptyList() : typeOperator.getElements();
         }
 
         public DefaultExpression withTypeOperator(@Nullable List<TypeTree> typeOperator) {
@@ -6193,7 +6193,7 @@ public interface Cs extends J {
         JContainer<Statement> parameters;
 
         public List<J.TypeParameter> getTypeParameters() {
-            return typeParameters == null ? Collections.emptyList() : typeParameters.getElements();
+            return typeParameters == null ? emptyList() : typeParameters.getElements();
         }
 
         public DelegateDeclaration withTypeParameters(@Nullable List<J.TypeParameter> typeParameters) {

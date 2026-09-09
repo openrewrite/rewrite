@@ -242,6 +242,50 @@ class ParameterizedTypeTest implements RewriteTest {
     }
 
     @Test
+    void higherKindedTypeParamNotCrammedIntoIdentifier() {
+        // visitTypeParameter — `F[_]` must be modeled as J.ParameterizedType, not crammed into the name
+        assertNoTypeArgInIdentifier(
+          """
+          trait Functor[F[_]] {
+            val x: Int = 1
+          }
+          """
+        );
+    }
+
+    @Test
+    void multipleHigherKindedParamsNotCrammedIntoIdentifier() {
+        assertNoTypeArgInIdentifier(
+          """
+          trait Iso[F[_], G[_]] {
+            val x: Int = 1
+          }
+          """
+        );
+    }
+
+    private void assertNoTypeArgInIdentifier(String source) {
+        rewriteRun(
+          scala(
+            source,
+            spec -> spec.afterRecipe(cu -> {
+                java.util.List<String> identifierNames = new java.util.ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                        identifierNames.add(identifier.getSimpleName());
+                        return super.visitIdentifier(identifier, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(identifierNames)
+                  .as("higher-kinded type-param brackets should not be crammed into an identifier name")
+                  .allSatisfy(name -> assertThat(name).doesNotContain("[", "]", "_"));
+            })
+          )
+        );
+    }
+
+    @Test
     void significantCharactersInComments() {
         // visitAppliedTypeTree — `[` in block comment between type constructor and type args
         rewriteRun(

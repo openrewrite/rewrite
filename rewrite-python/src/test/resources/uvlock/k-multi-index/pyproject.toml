@@ -1,0 +1,21 @@
+[project]
+name = "fixture-k"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "six>=1.16",
+    "iniconfig>=2.0",
+]
+
+[tool.uv.sources]
+six = { index = "testpypi" }
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+explicit = true
+
+[[tool.uv.index]]
+name = "pypi-main"
+url = "https://pypi.org/simple"
+default = true

@@ -16,9 +16,16 @@
 
 package rpc
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"math/big"
+	"strconv"
+	"strings"
+)
 
-// State represents the state of an RPC object data message.
 type State int
 
 const (
@@ -28,6 +35,12 @@ const (
 	Change
 	EndOfObject
 )
+
+// Text, not JSON: the encoder quotes and escapes this directly, where a Marshaler's
+// JSON bytes would have to be reparsed and re-emitted to splice into the stream.
+func (s State) MarshalText() ([]byte, error) {
+	return []byte(s.String()), nil
+}
 
 func (s State) String() string {
 	switch s {
@@ -57,37 +70,213 @@ type RpcObjectData struct {
 	Ref       *int    `json:"ref,omitempty"`
 }
 
-// MarshalJSON implements custom JSON marshaling for RpcObjectData.
-func (d RpcObjectData) MarshalJSON() ([]byte, error) {
-	type Alias struct {
-		State     string  `json:"state"`
-		ValueType *string `json:"valueType,omitempty"`
-		Value     any     `json:"value,omitempty"`
-		Ref       *int    `json:"ref,omitempty"`
+// A value that carries no valueType is bound on the JVM side by its JSON shape,
+// and Go writes a float64 without a fraction or an exponent for every magnitude
+// between 1e-6 and 1e21 -- a shape the receiver reads as an integer. Only a value
+// sent on its own is bound that way; one nested in an inlined map arrives under a
+// valueType, which binds it against the type of the field it fills.
+func wireNumber(v any) any {
+	f, ok := v.(float64)
+	if !ok {
+		return v
 	}
-	return json.Marshal(Alias{
-		State:     d.State.String(),
-		ValueType: d.ValueType,
-		Value:     d.Value,
-		Ref:       d.Ref,
-	})
+	s := strconv.FormatFloat(f, 'g', -1, 64)
+	if !strings.ContainsAny(s, ".eE") {
+		s += ".0"
+	}
+	return json.Number(s)
 }
 
-// ParseObjectData converts a JSON-decoded map to an RpcObjectData.
-func ParseObjectData(m map[string]any) RpcObjectData {
-	d := RpcObjectData{}
-	if s, ok := m["state"].(string); ok {
-		d.State = parseState(s)
+func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	open, err := dec.Token()
+	if err != nil {
+		if err == io.EOF {
+			return nil, nil
+		}
+		return nil, err
 	}
-	if vt, ok := m["valueType"].(string); ok {
-		d.ValueType = &vt
+	if open == nil {
+		return nil, nil
 	}
-	d.Value = m["value"]
-	if ref, ok := m["ref"]; ok && ref != nil {
-		r := int(ref.(float64))
-		d.Ref = &r
+	if d, ok := open.(json.Delim); !ok || d != '[' {
+		return nil, fmt.Errorf("expected JSON array, got %v", open)
 	}
-	return d
+	batch := make([]RpcObjectData, 0, len(data)/40+1)
+	for dec.More() {
+		d, err := decodeObjectData(dec, intern)
+		if err != nil {
+			return nil, err
+		}
+		batch = append(batch, d)
+	}
+	return batch, nil
+}
+
+// Reads one message straight off the token stream. Binding into a struct whose value
+// is an `any` materializes a map/slice tree that a second walk then has to revisit to
+// intern strings and give numbers the type their JSON shape implies; the tokens carry
+// enough to build the final value in one pass.
+func decodeObjectData(dec *json.Decoder, tbl map[string]string) (RpcObjectData, error) {
+	var d RpcObjectData
+	t, err := dec.Token()
+	if err != nil {
+		return d, err
+	}
+	if delim, ok := t.(json.Delim); !ok || delim != '{' {
+		return d, fmt.Errorf("expected JSON object, got %v", t)
+	}
+	for dec.More() {
+		kt, err := dec.Token()
+		if err != nil {
+			return d, err
+		}
+		key, ok := kt.(string)
+		if !ok {
+			return d, fmt.Errorf("expected member name, got %v", kt)
+		}
+		switch key {
+		case "state":
+			v, err := dec.Token()
+			if err != nil {
+				return d, err
+			}
+			name, ok := v.(string)
+			if !ok {
+				return d, fmt.Errorf("state is not a string: %v", v)
+			}
+			d.State = parseState(name)
+		case "valueType":
+			v, err := dec.Token()
+			if err != nil {
+				return d, err
+			}
+			if name, ok := v.(string); ok {
+				name = internString(name, tbl)
+				d.ValueType = &name
+			}
+		case "ref":
+			v, err := dec.Token()
+			if err != nil {
+				return d, err
+			}
+			if n, ok := v.(json.Number); ok {
+				ref, err := strconv.Atoi(n.String())
+				if err != nil {
+					return d, err
+				}
+				d.Ref = &ref
+			}
+		case "value":
+			if d.Value, err = decodeTokenValue(dec, tbl); err != nil {
+				return d, err
+			}
+		default:
+			var skipped any
+			if err := dec.Decode(&skipped); err != nil {
+				return d, err
+			}
+		}
+	}
+	if _, err := dec.Token(); err != nil { // closing brace
+		return d, err
+	}
+	return d, nil
+}
+
+func decodeTokenValue(dec *json.Decoder, tbl map[string]string) (any, error) {
+	t, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	switch v := t.(type) {
+	case json.Delim:
+		switch v {
+		case '[':
+			arr := []any{}
+			for dec.More() {
+				e, err := decodeTokenValue(dec, tbl)
+				if err != nil {
+					return nil, err
+				}
+				arr = append(arr, e)
+			}
+			_, err = dec.Token() // closing bracket
+			return arr, err
+		case '{':
+			m := map[string]any{}
+			for dec.More() {
+				kt, err := dec.Token()
+				if err != nil {
+					return nil, err
+				}
+				k, ok := kt.(string)
+				if !ok {
+					return nil, fmt.Errorf("expected member name, got %v", kt)
+				}
+				if m[internString(k, tbl)], err = decodeTokenValue(dec, tbl); err != nil {
+					return nil, err
+				}
+			}
+			_, err = dec.Token() // closing brace
+			return m, err
+		}
+		return nil, fmt.Errorf("unexpected delimiter %v", v)
+	case string:
+		return internString(v, tbl), nil
+	case json.Number:
+		return decodeNumber(v), nil
+	default:
+		return v, nil
+	}
+}
+
+// The remote's numbers arrive as text (see UseNumber above) and take the Go type
+// their JSON shape implies, so a value keeps both its kind and its full precision
+// across a round trip.
+// Converting an int64 to an interface allocates unless the runtime holds the value
+// statically, which it does only for 0..255. List positions are small and dominated
+// by ADDED_LIST_ITEM, so the range that covers them is pre-boxed once.
+var boxedInts = func() [1025]any {
+	var b [1025]any
+	for i := range b {
+		b[i] = int64(i - 1)
+	}
+	return b
+}()
+
+func boxInt(v int64) any {
+	// Bounded before the shift: v+1 overflows for MaxInt64 and would index negatively.
+	if v >= -1 && v < int64(len(boxedInts))-1 {
+		return boxedInts[v+1]
+	}
+	return v
+}
+
+func decodeNumber(n json.Number) any {
+	s := n.String()
+	if !strings.ContainsAny(s, ".eE") {
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return boxInt(i)
+		}
+		if i, ok := new(big.Int).SetString(s, 10); ok {
+			return i
+		}
+	}
+	f, _ := n.Float64()
+	return f
+}
+
+func internString(s string, tbl map[string]string) string {
+	if s == "" || tbl == nil {
+		return s
+	}
+	if c, ok := tbl[s]; ok {
+		return c
+	}
+	tbl[s] = s
+	return s
 }
 
 func parseState(s string) State {

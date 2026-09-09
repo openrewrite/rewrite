@@ -13,29 +13,36 @@
 # limitations under the License.
 
 """
-Java RPC Client for Python recipe testing.
+Java RPC client for Python-hosted recipe runs and tests.
 
-This module provides infrastructure to spawn a Java RPC server process
-and communicate with it, enabling Python tests to use Java recipes
-like ChangeType, AddLiteralMethodArgument, etc.
+Spawns a ``org.openrewrite.maven.rpc.JavaRewriteRpc`` JVM as a child process
+and exchanges Content-Length-framed JSON-RPC over its stdin/stdout — the
+Python-as-host mirror of the usual JVM-as-host deployment, and the same
+transport the JavaScript module's ``JavaRpcTestServer`` uses.
+
+The connection is fully bidirectional: while a request to Java is pending,
+Java issues requests of its own back to Python (e.g. ``Visit`` makes Java call
+``GetObject`` to fetch the tree and execution context being visited). The
+transport is :class:`~rewrite.rpc.child_connection.ChildConnection`, whose
+read loop dispatches such inbound requests — here to the regular server
+handlers (``rewrite.rpc.server.handle_request``). Reads block without a
+deadline; run RPC tests under pytest ``--timeout`` (see the module CLAUDE.md)
+so a wedged peer fails the test instead of hanging the session.
 
 Usage:
     from rewrite.rpc.java_rpc_client import JavaRpcClient
 
     with JavaRpcClient() as client:
-        # Now Python RPC calls (like prepare_java_recipe) will be
-        # routed to the Java server
         result = client.send_request("PrepareRecipe", {...})
 """
 
-import json
 import logging
 import os
 import subprocess
-import sys
-import threading
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
+
+from rewrite.rpc.child_connection import ChildConnection
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +61,33 @@ def set_java_rpc_client(client: Optional["JavaRpcClient"]) -> None:
     _java_rpc_client = client
 
 
+def find_test_classpath() -> str | None:
+    """Find the Java classpath for spawning the RPC peer.
+
+    Resolution order:
+      1. ``REWRITE_PYTHON_CLASSPATH`` environment variable.
+      2. ``test-classpath.txt`` written by ``./gradlew
+         :rewrite-python:generateTestClasspath``, looked up relative to the
+         working directory and to this package's root.
+
+    Returns None if no source is configured (callers typically skip).
+    """
+    classpath = os.environ.get("REWRITE_PYTHON_CLASSPATH")
+    if classpath:
+        return classpath
+
+    package_root = Path(__file__).resolve().parents[3]
+    for candidate in (Path("test-classpath.txt"),
+                      Path("rewrite/test-classpath.txt"),
+                      package_root / "test-classpath.txt"):
+        if candidate.exists():
+            return candidate.read_text().strip()
+    return None
+
+
 class JavaRpcClient:
     """
-    Client for communicating with a Java RPC server process.
+    Client for communicating with a Java RPC peer process.
 
     This class spawns a Java subprocess running JavaRewriteRpc and
     communicates with it using the header-delimited JSON-RPC protocol.
@@ -64,98 +95,89 @@ class JavaRpcClient:
 
     def __init__(
         self,
-        marketplace_csv: Path,
-        java_classpath: Optional[str] = None,
-        java_home: Optional[str] = None,
-        log_file: Optional[Path] = None,
+        marketplace_csv: Path | None = None,
+        java_classpath: str | None = None,
+        java_home: str | None = None,
+        log_file: Path | None = None,
         trace: bool = False,
-        timeout: float = 30.0,
+        command: list[str] | None = None,
     ):
         """
         Initialize the Java RPC client.
 
         Args:
-            marketplace_csv: Path to the marketplace CSV file specifying
-                            which recipes and bundles are available.
-            java_classpath: Classpath for Java process. If None, attempts to
-                           find rewrite-python classes from environment.
+            marketplace_csv: Optional path to a marketplace CSV specifying
+                            which recipes and bundles are available. Without
+                            it, the Java peer resolves recipes by class name
+                            from its own classpath — the right default when
+                            the wanted recipes (e.g. rewrite-java's) are
+                            already on ``java_classpath``.
+            java_classpath: Classpath for the Java process. If None, resolved
+                           via :func:`find_test_classpath`.
             java_home: Java home directory. If None, uses JAVA_HOME env var.
-            log_file: Path to log file for Java server debugging.
-            trace: Enable RPC message tracing.
-            timeout: Timeout in seconds for RPC requests.
+            log_file: Path receiving the Java peer's stderr output. This
+                     captures both JVM startup failures (bad classpath, etc.)
+                     and everything the server logs once running.
+            trace: Enable RPC message tracing on the Java side.
+            command: Full command line to spawn instead of a JVM — a test
+                    seam for exercising the transport against a fake peer.
         """
         self._marketplace_csv = marketplace_csv
         self._java_classpath = java_classpath
         self._java_home = java_home or os.environ.get("JAVA_HOME")
         self._log_file = log_file
         self._trace = trace
-        self._timeout = timeout
+        self._command = command
 
-        self._process: Optional[subprocess.Popen] = None
-        self._request_id = 0
-        self._request_lock = threading.Lock()
-        self._response_lock = threading.Lock()
-        self._pending_responses: Dict[int, Any] = {}
-        self._reader_thread: Optional[threading.Thread] = None
-        self._shutdown = False
+        self._connection: ChildConnection | None = None
+        self._stderr_file = None
 
     def start(self) -> "JavaRpcClient":
-        """Start the Java RPC server process."""
-        java_cmd = self._find_java_command()
-        classpath = self._find_classpath()
+        """Start the Java RPC peer process."""
+        from rewrite.rpc.server import handle_request
 
-        if not self._marketplace_csv.exists():
-            raise RuntimeError(f"Marketplace CSV not found: {self._marketplace_csv}")
-
-        cmd = [
-            java_cmd,
-            "-cp", classpath,
-            "org.openrewrite.maven.rpc.JavaRewriteRpc",
-            f"--marketplace={self._marketplace_csv}",
-        ]
-
-        if self._log_file:
-            cmd.append(f"--log-file={self._log_file}")
-        if self._trace:
-            cmd.append("--trace")
+        cmd = self._command or self._java_command_line()
 
         logger.info(f"Starting Java RPC server: {' '.join(cmd)}")
 
-        self._process = subprocess.Popen(
+        # Give the child's stderr a real sink: an unread PIPE fills up and
+        # blocks the JVM mid-write, wedging the whole connection.
+        stderr: Any = subprocess.DEVNULL
+        if self._log_file:
+            self._stderr_file = open(self._log_file, "ab")
+            stderr = self._stderr_file
+
+        process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE if not self._log_file else subprocess.DEVNULL,
-            bufsize=0,  # Unbuffered for real-time communication
+            stderr=stderr,
         )
-
-        # Start reader thread to handle responses
-        self._reader_thread = threading.Thread(target=self._read_responses, daemon=True)
-        self._reader_thread.start()
-
+        self._connection = ChildConnection(process, upstream=handle_request)
         return self
 
+    def _java_command_line(self) -> list[str]:
+        cmd = [
+            self._find_java_command(),
+            "-cp", self._find_classpath(),
+            "org.openrewrite.maven.rpc.JavaRewriteRpc",
+        ]
+        if self._marketplace_csv is not None:
+            if not self._marketplace_csv.exists():
+                raise RuntimeError(f"Marketplace CSV not found: {self._marketplace_csv}")
+            cmd.append(f"--marketplace={self._marketplace_csv}")
+        if self._trace:
+            cmd.append("--trace")
+        return cmd
+
     def shutdown(self) -> None:
-        """Shutdown the Java RPC server process."""
-        self._shutdown = True
-
-        if self._process:
-            try:
-                # Close stdin to signal EOF to Java
-                if self._process.stdin:
-                    self._process.stdin.close()
-
-                # Wait for graceful shutdown
-                self._process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                # Force kill if not responding
-                self._process.kill()
-                self._process.wait(timeout=2)
-            finally:
-                self._process = None
-
-        if self._reader_thread and self._reader_thread.is_alive():
-            self._reader_thread.join(timeout=2)
+        """Shutdown the Java RPC peer process."""
+        if self._connection:
+            self._connection.close()
+            self._connection = None
+        if self._stderr_file:
+            self._stderr_file.close()
+            self._stderr_file = None
 
     def __enter__(self) -> "JavaRpcClient":
         """Context manager entry."""
@@ -165,9 +187,10 @@ class JavaRpcClient:
         """Context manager exit."""
         self.shutdown()
 
-    def send_request(self, method: str, params: Dict[str, Any]) -> Any:
+    def send_request(self, method: str, params: dict[str, Any]) -> Any:
         """
-        Send a JSON-RPC request to the Java server and wait for response.
+        Send a JSON-RPC request to the Java peer and wait for its response,
+        answering any requests the peer makes back at us in the meantime.
 
         Args:
             method: The RPC method name (e.g., "PrepareRecipe", "Visit")
@@ -177,126 +200,11 @@ class JavaRpcClient:
             The result from the RPC response
 
         Raises:
-            RuntimeError: If the request fails or times out
+            RuntimeError: If the request fails or the peer exits
         """
-        if not self._process or self._process.poll() is not None:
+        if self._connection is None:
             raise RuntimeError("Java RPC server is not running")
-
-        with self._request_lock:
-            self._request_id += 1
-            request_id = self._request_id
-
-        request = {
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "method": method,
-            "params": params,
-        }
-
-        # Create a condition for waiting on this specific response
-        condition = threading.Condition()
-        with self._response_lock:
-            self._pending_responses[request_id] = {"condition": condition, "response": None}
-
-        try:
-            # Send the request
-            self._write_message(request)
-
-            # Wait for response
-            with condition:
-                deadline = threading.Event()
-                if not condition.wait_for(
-                    lambda: self._pending_responses.get(request_id, {}).get("response") is not None,
-                    timeout=self._timeout
-                ):
-                    raise RuntimeError(f"Timeout waiting for response to {method}")
-
-            with self._response_lock:
-                response = self._pending_responses.pop(request_id, {}).get("response")
-
-            if response is None:
-                raise RuntimeError(f"No response received for {method}")
-
-            if "error" in response:
-                error = response["error"]
-                raise RuntimeError(f"RPC error: {error.get('message', 'Unknown error')}")
-
-            return response.get("result")
-
-        except Exception:
-            with self._response_lock:
-                self._pending_responses.pop(request_id, None)
-            raise
-
-    def _write_message(self, message: Dict[str, Any]) -> None:
-        """Write a JSON-RPC message to the Java process."""
-        if not self._process or not self._process.stdin:
-            raise RuntimeError("Java RPC server stdin not available")
-
-        content = json.dumps(message)
-        content_bytes = content.encode("utf-8")
-
-        header = f"Content-Length: {len(content_bytes)}\r\n\r\n"
-        self._process.stdin.write(header.encode("utf-8"))
-        self._process.stdin.write(content_bytes)
-        self._process.stdin.flush()
-
-    def _read_responses(self) -> None:
-        """Background thread that reads responses from Java process."""
-        while not self._shutdown and self._process and self._process.stdout:
-            try:
-                response = self._read_message()
-                if response is None:
-                    break
-
-                request_id = response.get("id")
-                if request_id is not None:
-                    with self._response_lock:
-                        if request_id in self._pending_responses:
-                            pending = self._pending_responses[request_id]
-                            pending["response"] = response
-                            condition = pending["condition"]
-                            with condition:
-                                condition.notify_all()
-                else:
-                    # This might be a notification or server-initiated request
-                    logger.debug(f"Received message without id: {response}")
-
-            except Exception as e:
-                if not self._shutdown:
-                    logger.error(f"Error reading Java RPC response: {e}")
-                break
-
-    def _read_message(self) -> Optional[Dict[str, Any]]:
-        """Read a single JSON-RPC message from the Java process."""
-        if not self._process or not self._process.stdout:
-            return None
-
-        # Read headers
-        headers = {}
-        while True:
-            line = self._process.stdout.readline()
-            if not line:
-                return None
-
-            line = line.decode("utf-8").rstrip("\r\n")
-            if not line:
-                break
-
-            if ":" in line:
-                key, value = line.split(":", 1)
-                headers[key.strip()] = value.strip()
-
-        # Read content
-        content_length = int(headers.get("Content-Length", 0))
-        if content_length == 0:
-            return None
-
-        content = self._process.stdout.read(content_length)
-        if not content:
-            return None
-
-        return json.loads(content.decode("utf-8"))
+        return self._connection.request(method, params)
 
     def _find_java_command(self) -> str:
         """Find the Java command to use."""
@@ -313,54 +221,47 @@ class JavaRpcClient:
         if self._java_classpath:
             return self._java_classpath
 
-        # Try to find classpath from environment
-        classpath = os.environ.get("REWRITE_PYTHON_CLASSPATH")
+        classpath = find_test_classpath()
         if classpath:
             return classpath
 
-        # Try to find classpath from Gradle build output
-        # This looks for the typical Gradle build layout
-        possible_paths = [
-            # From rewrite-python directory
-            Path("build/classes/java/main"),
-            Path("build/libs"),
-            # From rewrite root directory
-            Path("rewrite-python/build/classes/java/main"),
-            Path("rewrite-python/build/libs"),
-        ]
-
-        # Also need rewrite-core and dependencies
-        # In practice, tests should set REWRITE_PYTHON_CLASSPATH explicitly
         raise RuntimeError(
             "Could not find Java classpath. Set REWRITE_PYTHON_CLASSPATH environment variable "
             "or pass java_classpath parameter. You can generate the classpath using:\n"
-            "  ./gradlew :rewrite-python:printTestClasspath"
+            "  ./gradlew :rewrite-python:generateTestClasspath"
         )
 
 
 def install_java_rpc_hooks() -> None:
     """
-    Install hooks to route Python RPC requests to Java.
+    Route ``rewrite.rpc.server.send_request`` to the active Java RPC client.
 
-    This modifies the RPC server module to use the Java RPC client
-    for handling requests when running in test mode.
+    Idempotent: re-installing over an already-hooked function is a no-op, so
+    module-scoped fixtures can call it freely.
     """
     from rewrite.rpc import server
 
+    if getattr(server.send_request, "_java_rpc_original", None) is not None:
+        return
+
     original_send_request = server.send_request
 
-    def hooked_send_request(method: str, params: dict, timeout_seconds: float = 10.0) -> Any:
-        """Send request to Java RPC server if available, else use original."""
+    def hooked_send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
+        """Send request to the Java RPC client if one is active, else use the stdio path."""
         client = get_java_rpc_client()
         if client:
             return client.send_request(method, params)
         return original_send_request(method, params, timeout_seconds)
 
+    hooked_send_request._java_rpc_original = original_send_request  # ty: ignore[unresolved-attribute]
     server.send_request = hooked_send_request  # ty: ignore[invalid-assignment]  # monkey-patching (ty#2193)
 
 
 def uninstall_java_rpc_hooks() -> None:
-    """Remove the Java RPC hooks and restore original behavior."""
-    # In practice, this would restore the original send_request
-    # For now, reloading the module is simplest
-    pass
+    """Restore the original ``send_request`` installed over by
+    :func:`install_java_rpc_hooks`."""
+    from rewrite.rpc import server
+
+    original = getattr(server.send_request, "_java_rpc_original", None)
+    if original is not None:
+        server.send_request = original

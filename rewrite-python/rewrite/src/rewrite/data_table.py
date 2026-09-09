@@ -21,7 +21,8 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, Iterator, List, Optional, Type, TypeVar, TYPE_CHECKING, cast
+from typing import (Any, Dict, Generic, Iterator, List, Optional, Type, TypeVar, TYPE_CHECKING,
+                    Union, cast, get_args, get_origin)
 
 if TYPE_CHECKING:
     from rewrite.execution import ExecutionContext
@@ -155,15 +156,19 @@ class _Bucket:
 
 class CsvDataTableStore(DataTableStore):
     """
-    Writes data table rows directly to CSV files (RFC 4180 format).
-
-    Each data table bucket is written to a separate CSV file named using
-    the data table's file-safe key.
+    Writes data table rows to raw CSV files (RFC 4180), one per file-safe key.
+    Prefix/suffix columns are static columns the host conveys so writers sharing a file agree on them.
     """
 
-    def __init__(self, output_dir: str):
+    def __init__(
+        self,
+        output_dir: str,
+        prefix_columns: Optional[Dict[str, str]] = None,
+        suffix_columns: Optional[Dict[str, str]] = None,
+    ):
         self._output_dir = output_dir
-        self._initialized_tables: set[str] = set()
+        self._prefix_columns: Dict[str, str] = dict(prefix_columns or {})
+        self._suffix_columns: Dict[str, str] = dict(suffix_columns or {})
         self._row_counts: Dict[str, int] = {}
         self._data_tables: Dict[str, DataTable] = {}
         os.makedirs(output_dir, exist_ok=True)
@@ -173,27 +178,33 @@ class CsvDataTableStore(DataTableStore):
     ) -> None:
         file_key = self._file_key(data_table)
         csv_path = os.path.join(self._output_dir, f"{file_key}.csv")
+        self._data_tables[file_key] = data_table
 
-        # Write metadata comments and header on first row
-        if file_key not in self._initialized_tables:
-            self._initialized_tables.add(file_key)
-            self._row_counts[file_key] = 0
-            self._data_tables[file_key] = data_table
-            descriptor = data_table.descriptor()
-            headers = [
-                self._escape_csv(col["displayName"]) for col in descriptor["columns"]
+        descriptor = data_table.descriptor()
+        columns = descriptor["columns"]
+
+        # Key the header on file existence (not in-memory state) so writers sharing a
+        # file emit it once; use column NAMES, not display names, to match the Java writer.
+        if not os.path.exists(csv_path):
+            header = [
+                self._escape_csv(name) for name in self._prefix_columns.keys()
+            ] + [
+                self._escape_csv(col["name"]) for col in columns
+            ] + [
+                self._escape_csv(name) for name in self._suffix_columns.keys()
             ]
             with open(csv_path, "w") as f:
                 f.write(f"# @name {data_table.name}\n")
                 f.write(f"# @instanceName {data_table.instance_name}\n")
                 f.write(f"# @group {data_table.group or ''}\n")
-                f.write(",".join(headers) + "\n")
+                f.write(",".join(header) + "\n")
 
-        # Write data row
-        descriptor = data_table.descriptor()
-        columns = descriptor["columns"]
         values = [
+            self._escape_csv(value) for value in self._prefix_columns.values()
+        ] + [
             self._escape_csv(getattr(row, col["name"], "")) for col in columns
+        ] + [
+            self._escape_csv(value) for value in self._suffix_columns.values()
         ]
         with open(csv_path, "a") as f:
             f.write(",".join(values) + "\n")
@@ -214,14 +225,21 @@ class CsvDataTableStore(DataTableStore):
     @property
     def table_names(self) -> List[str]:
         """Get the file-safe keys of all data tables that have been written to."""
-        return list(self._initialized_tables)
+        return list(self._data_tables.keys())
 
     @staticmethod
     def _file_key(data_table: DataTable) -> str:
-        suffix = data_table.group if data_table.group else data_table.instance_name
-        if suffix == data_table.name:
+        # Mirror org.openrewrite.CsvDataTableStore#fileKey exactly so a table shared
+        # by Java and Python recipes resolves to the same filename.
+        group = data_table.group
+        if group is not None:
+            if group == data_table.name:
+                return data_table.name
+            return f"{data_table.name}--{sanitize_scope(group)}"
+        instance_name = data_table.instance_name
+        if instance_name == data_table.display_name:
             return data_table.name
-        return f"{data_table.name}--{sanitize_scope(suffix)}"
+        return f"{data_table.name}--{sanitize_scope(instance_name)}"
 
     @staticmethod
     def _escape_csv(value: Any) -> str:
@@ -232,6 +250,63 @@ class CsvDataTableStore(DataTableStore):
         if "," in s or '"' in s or "\n" in s or "\r" in s:
             return '"' + s.replace('"', '""') + '"'
         return s
+
+
+# Java derives a column's type from `field.getType().getSimpleName()` (see
+# RecipeIntrospectionUtils). `type` is one of only two non-nullable fields on
+# ColumnDescriptor, so a Python table that omits it produces a descriptor Java
+# consumers cannot render. Map the annotation onto the Java simple name that an
+# equivalent Java-authored table would report.
+_JAVA_TYPE_NAMES = {
+    "str": "String",
+    # Python integers are arbitrary-precision, so Long is the closer analogue.
+    "int": "Long",
+    "bool": "Boolean",
+    "float": "Double",
+}
+
+# Every value is displayable as text, so an unrecognized annotation degrades to
+# String rather than failing the descriptor.
+DEFAULT_COLUMN_TYPE = "String"
+
+_OPTIONAL = re.compile(r"(?:typing\.)?Optional\[(.+)\]")
+
+
+def _unwrap_optional(annotation: Any) -> Any:
+    """Strip Optional/Union-with-None, which describes nullability, not type.
+
+    Java names a nullable column by its underlying type, so `Optional[str]` and
+    `str` must both report String.
+    """
+    args = [a for a in get_args(annotation) if a is not type(None)]
+    if get_origin(annotation) is Union and len(args) == 1:
+        return args[0]
+    return annotation
+
+
+def _java_type_name(annotation: Any) -> str:
+    """Map a dataclass field annotation to its Java simple type name."""
+    if annotation is None:
+        return DEFAULT_COLUMN_TYPE
+
+    if not isinstance(annotation, str):
+        # A real annotation object: unwrap before reading its name, since
+        # `Optional[int].__name__` is "Optional" and loses the inner type.
+        annotation = _unwrap_optional(annotation)
+        name = getattr(annotation, "__name__", str(annotation))
+    else:
+        # Under `from __future__ import annotations` the annotation is source
+        # text, so unwrap the same two spellings textually.
+        name = annotation.strip()
+        optional = _OPTIONAL.fullmatch(name)
+        if optional:
+            name = optional.group(1)
+        else:
+            union = [part.strip() for part in name.split("|")]
+            if len(union) == 2 and "None" in union:
+                name = next(part for part in union if part != "None")
+
+    return _JAVA_TYPE_NAMES.get(name.strip(), DEFAULT_COLUMN_TYPE)
 
 
 Row = TypeVar("Row")
@@ -323,6 +398,7 @@ class DataTable(Generic[Row]):
                     columns.append(
                         {
                             "name": field_name,
+                            "type": _java_type_name(field.type),
                             "displayName": col_desc.display_name,
                             "description": col_desc.description,
                         }

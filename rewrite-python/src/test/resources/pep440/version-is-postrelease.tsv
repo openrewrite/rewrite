@@ -1,0 +1,9 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_version.py (test_version_is_postrelease)
+# Retrieved: 2026-07-16
+# version<TAB>is postrelease flag.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+1.0.dev1	false
+1.0	false
+1.0+foo	false
+1.0.post1.dev1	true
+1.0.post1	true

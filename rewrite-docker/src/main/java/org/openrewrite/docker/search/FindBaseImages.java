@@ -87,15 +87,15 @@ public class FindBaseImages extends Recipe {
             matcher.platform(platformPattern);
         }
         return matcher.asVisitor((image, ctx) -> {
-            String imageName = image.getImageName();
+            String imageName = image.getImageName().orElse(null);
             Docker.From from = image.getTree();
             if (imageName == null) {
                 return from;
             }
 
             String stageName = image.getStageName();
-            String tag = image.getTag();
-            String digest = image.getDigest();
+            String tag = image.getTag().orElse(null);
+            String digest = image.getDigest().orElse(null);
             String platform = image.getPlatform();
 
             // Insert row into data table

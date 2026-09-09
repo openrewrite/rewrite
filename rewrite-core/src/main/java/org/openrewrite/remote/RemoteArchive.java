@@ -27,14 +27,17 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.Markers;
 
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -91,70 +94,115 @@ public class RemoteArchive implements Remote {
     public InputStream getInputStream(ExecutionContext ctx) {
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getLargeFileHttpSender();
         RemoteArtifactCache cache = RemoteExecutionContextView.view(ctx).getArtifactCache();
+
+        Path extracted = extractedFile(cache, httpSender, ctx);
+        if (extracted == null) {
+            throw new IllegalStateException("Failed to download " + uri + " to artifact cache");
+        }
+
         try {
-            Path localArchive = cache.compute(uri, () -> {
-                if ("file".equals(uri.getScheme())) {
-                    return Files.newInputStream(Paths.get(uri));
-                }
-                //noinspection resource
-                HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
-                if (response.isSuccessful()) {
-                    InputStream body = response.getBody();
-                    if (response.getHeaders().containsKey("Content-Length")) {
-                        return new InputStream() {
-                            private final long contentLength = Long.parseLong(response.getHeaders().get("Content-Length").get(0));
-                            private long count;
-
-                            @Override
-                            public int read() throws IOException {
-                                int i = body.read();
-                                if (i != -1) {
-                                    count++;
-                                    if (count > contentLength) {
-                                        throw new IOException("Too much data received");
-                                    }
-                                } else {
-                                    if (count < contentLength) {
-                                        throw new IOException("Unexpected end of stream");
-                                    }
-                                }
-                                return i;
-                            }
-
-                            @Override
-                            public int read(byte[] b, int off, int len) throws IOException {
-                                int bytesRead = body.read(b, off, len);
-                                if (bytesRead > 0) {
-                                    count += bytesRead;
-                                    if (count > contentLength) {
-                                        throw new IOException("Too much data received");
-                                    }
-                                } else if (bytesRead == -1 && count < contentLength) {
-                                    throw new IOException("Unexpected end of stream");
-                                }
-                                return bytesRead;
-                            }
-                        };
-                    }
-                    return body;
-                } else {
-                    throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
-                }
-            }, ctx.getOnError());
-
-            if (localArchive == null) {
-                throw new IllegalStateException("Failed to download " + uri + " to artifact cache");
-            }
-
-            InputStream body = Files.newInputStream(localArchive);
-            InputStream inner = readIntoArchive(body, paths, 0);
-            if (inner == null) {
-                throw new IllegalArgumentException("Unable to find path " + paths + " in zip file " + uri);
-            }
-            return inner;
+            return Files.newInputStream(extracted);
         } catch (IOException e) {
             throw new UncheckedIOException("Unable to download " + uri + " to file", e);
         }
+    }
+
+    /**
+     * Returns the cache path of the file extracted from within the archive, streaming the archive on a cache miss so
+     * that only the small extracted entry is persisted rather than the entire (potentially very large) archive.
+     */
+    private @Nullable Path extractedFile(RemoteArtifactCache cache, HttpSender httpSender, ExecutionContext ctx) {
+        URI cacheKey = extractedFileCacheKey();
+        Path extracted = cache.get(cacheKey);
+        if (extracted == null) {
+            InputStream archive;
+            try {
+                archive = getArchiveInputStream(httpSender);
+            } catch (Exception e) {
+                ctx.getOnError().accept(e);
+                throw new IllegalStateException("Failed to download " + uri + " to artifact cache");
+            }
+            try {
+                InputStream inner = readIntoArchive(archive, paths, 0);
+                if (inner == null) {
+                    throw new IllegalArgumentException("Unable to find path " + paths + " in zip file " + uri);
+                }
+                extracted = cache.put(cacheKey, inner, ctx.getOnError());
+            } catch (RuntimeException e) {
+                closeQuietly(archive);
+                throw e;
+            }
+        }
+        return extracted;
+    }
+
+    private static void closeQuietly(InputStream is) {
+        try {
+            is.close();
+        } catch (IOException ignored) {
+            // Suppress
+        }
+    }
+
+    /**
+     * A cache key that identifies the file extracted from within the archive rather than the archive itself, so that
+     * extracting different entries from the same archive URI does not collide and only the extracted entry is stored.
+     */
+    private URI extractedFileCacheKey() {
+        Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
+        // Encode each part separately and join with '!', which never appears in base64url output, so a regex path
+        // containing '!' (such as the "(?!shared)" lookahead) cannot be confused with the separator between parts.
+        StringBuilder key = new StringBuilder(encoder.encodeToString(uri.toString().getBytes(StandardCharsets.UTF_8)));
+        for (String path : paths) {
+            key.append('!').append(encoder.encodeToString(path.getBytes(StandardCharsets.UTF_8)));
+        }
+        return URI.create("archive:" + key);
+    }
+
+    private InputStream getArchiveInputStream(HttpSender httpSender) throws IOException {
+        if ("file".equals(uri.getScheme())) {
+            return Files.newInputStream(Paths.get(uri));
+        }
+        //noinspection resource
+        HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
+        if (!response.isSuccessful()) {
+            throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
+        }
+        InputStream body = response.getBody();
+        if (!response.getHeaders().containsKey("Content-Length")) {
+            return body;
+        }
+        long contentLength = Long.parseLong(response.getHeaders().get("Content-Length").get(0));
+        return new FilterInputStream(body) {
+            private long count;
+
+            @Override
+            public int read() throws IOException {
+                int i = super.read();
+                if (i != -1) {
+                    if (++count > contentLength) {
+                        throw new IOException("Too much data received");
+                    }
+                } else if (count < contentLength) {
+                    throw new IOException("Unexpected end of stream");
+                }
+                return i;
+            }
+
+            @Override
+            public int read(byte[] b, int off, int len) throws IOException {
+                int bytesRead = super.read(b, off, len);
+                if (bytesRead > 0) {
+                    count += bytesRead;
+                    if (count > contentLength) {
+                        throw new IOException("Too much data received");
+                    }
+                } else if (bytesRead == -1 && count < contentLength) {
+                    throw new IOException("Unexpected end of stream");
+                }
+                return bytesRead;
+            }
+        };
     }
 
     private @Nullable InputStream readIntoArchive(InputStream body, List<String> paths, int index) {

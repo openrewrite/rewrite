@@ -43,7 +43,7 @@ class ImportTest implements RewriteTest {
           )
         );
     }
-    
+
     @Test
     void singleImportNoNewline() {
         // Test import without trailing newline (from SingleImportDebugTest)

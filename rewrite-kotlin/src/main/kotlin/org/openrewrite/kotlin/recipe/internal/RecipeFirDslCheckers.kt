@@ -29,8 +29,12 @@ import org.jetbrains.kotlin.fir.analysis.extensions.FirAdditionalCheckersExtensi
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.expressions.FirAnonymousFunctionExpression
 import org.jetbrains.kotlin.fir.expressions.FirBlock
+import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
+import org.jetbrains.kotlin.fir.expressions.FirLiteralExpression
 import org.jetbrains.kotlin.fir.expressions.FirStatement
+import org.jetbrains.kotlin.fir.expressions.FirStringConcatenationCall
+import org.jetbrains.kotlin.fir.expressions.impl.FirResolvedArgumentList
 import org.jetbrains.kotlin.fir.references.toResolvedCallableSymbol
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.FqName
@@ -80,6 +84,10 @@ import org.jetbrains.kotlin.name.Name
 internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common) {
 
     private val RECIPE_FQN = CallableId(FqName("org.openrewrite"), Name.identifier("recipe"))
+    private val RECIPES_FQN = CallableId(FqName("org.openrewrite"), Name.identifier("recipes"))
+
+    private val NAME_DISPLAY_NAME = Name.identifier("displayName")
+    private val NAME_DESCRIPTION = Name.identifier("description")
 
     private val NAME_TO = Name.identifier("to")
     private val NAME_SCAN = Name.identifier("scan")
@@ -119,7 +127,11 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
     context(@Suppress("unused") context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirProperty) {
         val initializer = declaration.initializer as? FirFunctionCall ?: return
-        if (!initializer.callsRecipeBuilder()) return
+        val calleeId = initializer.calleeReference.toResolvedCallableSymbol()?.callableId
+        if (calleeId != RECIPE_FQN && calleeId != RECIPES_FQN) return
+
+        checkConstantMetadata(initializer, declaration)
+        if (calleeId != RECIPE_FQN) return // remaining rules are specific to the trailing-lambda form
 
         val body = initializer.findTrailingLambdaBody() ?: return
 
@@ -221,6 +233,44 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
     }
 
     /**
+     * `displayName` / `description` that aren't compile-time constant are
+     * silently dropped by `RecipeIrGenerationExtension` (it can't fold them);
+     * report a compile error instead of losing the recipe with no diagnostic.
+     */
+    context(@Suppress("unused") context: CheckerContext, reporter: DiagnosticReporter)
+    private fun checkConstantMetadata(call: FirFunctionCall, declaration: FirProperty) {
+        val mapping = (call.argumentList as? FirResolvedArgumentList)?.mapping ?: return
+        for ((argExpr, param) in mapping) {
+            if (param.name != NAME_DISPLAY_NAME && param.name != NAME_DESCRIPTION) continue
+            if (!isConstantString(argExpr)) {
+                reportError(
+                    argExpr.source ?: declaration.source ?: return,
+                    "Recipe `${param.name}` must be a compile-time constant String — " +
+                        "a literal, a concatenation of literals (`\"a\" + \"b\"`), or a text " +
+                        "block with `trimIndent()`. A non-constant value (a `val`, parameter, " +
+                        "or `const val` reference) is silently dropped by the recipe code generator.",
+                )
+            }
+        }
+    }
+
+    /** Must accept at least what `RecipeIrGenerationExtension.evalConstString` folds, or this rejects valid metadata. */
+    private fun isConstantString(expr: FirExpression?): Boolean = when (expr) {
+        null -> false
+        is FirLiteralExpression -> true
+        is FirStringConcatenationCall -> expr.argumentList.arguments.all { isConstantString(it) }
+        is FirFunctionCall -> when (expr.callableSimpleName()?.asString()) {
+            "plus" -> isConstantString(expr.explicitReceiver) &&
+                expr.argumentList.arguments.all { isConstantString(it) }
+            "trimIndent" -> isConstantString(expr.explicitReceiver)
+            "trimMargin" -> isConstantString(expr.explicitReceiver) &&
+                expr.argumentList.arguments.all { isConstantString(it) }
+            else -> false
+        }
+        else -> false
+    }
+
+    /**
      * Classify a top-level statement of the recipe block by walking the
      * outermost call's simple-name chain. Only the structural shape matters;
      * we never recurse into argument lambdas, so user code inside an `edit`
@@ -288,11 +338,6 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
             cursor = receiver
         }
         return ChainInfo(outermost = call, head = cursor, tailNames = tail)
-    }
-
-    private fun FirFunctionCall.callsRecipeBuilder(): Boolean {
-        val symbol = calleeReference.toResolvedCallableSymbol() ?: return false
-        return symbol.callableId == RECIPE_FQN
     }
 
     private fun FirFunctionCall.findTrailingLambdaBody(): FirBlock? {

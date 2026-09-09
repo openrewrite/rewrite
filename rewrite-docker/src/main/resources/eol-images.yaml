@@ -46,7 +46,7 @@
 
 - imageName: debian
   tagPatterns: [bookworm, "bookworm-*", "12", "12.*"]
-  eolDate: "2026-06-10"
+  eolDate: "2026-07-11"
   suggestedReplacement: trixie (13)
 
 - imageName: ubuntu
@@ -157,6 +157,11 @@
 - imageName: ubuntu
   tagPatterns: [plucky, "plucky-*", "25.04", "25.04.*"]
   eolDate: "2026-01-17"
+  suggestedReplacement: plucky (26.04)
+
+- imageName: ubuntu
+  tagPatterns: [questing, "questing-*", "25.10", "25.10.*"]
+  eolDate: "2026-07-01"
   suggestedReplacement: plucky (26.04)
 
 - imageName: alpine
@@ -757,7 +762,12 @@
 
 - imageName: golang
   tagPatterns: ["1.24", "1.24.*", "1.24-*"]
-  eolDate: "2026-02-11"
+  eolDate: "2026-02-10"
+  suggestedReplacement: 
+
+- imageName: golang
+  tagPatterns: ["1.25", "1.25.*", "1.25-*"]
+  eolDate: "2026-08-19"
   suggestedReplacement: 
 
 # Official OpenJDK image (deprecated in 2022, recommends eclipse-temurin)

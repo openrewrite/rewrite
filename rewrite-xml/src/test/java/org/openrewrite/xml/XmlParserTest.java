@@ -26,6 +26,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser.Input;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RecipeSpec;
@@ -91,6 +92,25 @@ class XmlParserTest implements RewriteTest {
               ]>
               <book></book>
               """
+          )
+        );
+    }
+
+    @Test
+    void websphereTableMapping() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <RDBSchema:RDBTable xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:RDBSchema="RDBSchema.xmi" xmi:id="RDBTable_1" name="XBONUS">
+                <database href="META-INF/Schema/SAMPLE.dbxmi#RDBDatabase_1"/>
+                <schema href="META-INF/Schema/SAMPLE_APP.schxmi#RDBSchema_1"/>
+                <columns xmi:type="RDBSchema:RDBColumn" xmi:id="RDBColumn_1" name="ADDR_ID" allowNull="false">
+                  <type xmi:type="RDBSchema:SQLCharacterStringType" xmi:id="SQLCharacterStringType_1" length="250"/>
+                </columns>
+              </RDBSchema:RDBTable>
+              """,
+            spec -> spec.path("ejbModule/META-INF/Schema/XBONUS.tblxmi")
           )
         );
     }
@@ -395,6 +415,64 @@ class XmlParserTest implements RewriteTest {
         assertThat(parsed.printAll()).isEqualTo("<root>\n<br>\n</root>");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "<t k=\"\" abc \"v\"/>",
+      "<t k=\"\" a b \"v\"/>",
+      "<t k=\"\" x = 1 \"v\"/>",
+      "<t k=\"\" 10.0.0.1 \"v\"/>",
+      "<t k=\"\" \"orphan\"/>",
+      "<?xml version=\"1.0\" \"orphan\"?><t/>",
+      "<t k=\"\"\fabc=\"v\"/>",
+    })
+    void malformedAttributeIsNotSilentlyAccepted(@Language("xml") String source) {
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), source)
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo(source);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains("Malformed attribute");
+    }
+
+    @Test
+    void attributeValueWithUnescapedQuotes() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), """
+            <policies>
+                <inbound>
+                    <set-variable name="allowedIps" value="@{
+                        string ips = "";
+                        ips += "10.0.0.1,";
+                        return ips;
+                    }" />
+                </inbound>
+            </policies>
+            """)
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains("Malformed attribute");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "<set-variable value='@{ string ips = \"\"; ips += \"10.0.0.1,\"; return ips; }'/>",
+      "<set-variable value=\"@{ string ips = &quot;10.0.0.1&quot;; return ips; }\"/>",
+    })
+    void wellFormedEmbeddedExpressionsKeepTheirFullValue(@Language("xml") String source) {
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), source)
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(Xml.Document.class);
+        assertThat(((Xml.Document) parsed).getRoot().getAttributes().get(0).getValueAsString())
+          .contains("10.0.0.1")
+          .endsWith("}");
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2189")
     @Test
     void specialCharacters() {
@@ -687,6 +765,37 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    /**
+     * The XML specification makes a processing instruction's data optional:
+     * {@code PI ::= '<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'}.
+     */
+    @Test
+    void processingInstructionWithoutData() {
+        rewriteRun(
+          xml(
+            """
+              <?xml-stylesheet?>
+              <execution>
+                  <?m2e?>
+              </execution>
+              """
+          )
+        );
+    }
+
+    @Test
+    void processingInstructionWithOnlyWhitespaceAfterTarget() {
+        rewriteRun(
+          xml(
+            """
+              <execution>
+                  <?m2e ?>
+              </execution>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1382")
     @Test
     void utf8BOMCharacters() {
@@ -790,6 +899,10 @@ class XmlParserTest implements RewriteTest {
       "proj.csproj",
       "proj.Csproj",
       "/foo/bar/baz.jsp",
+      "ejbModule/META-INF/Map.mapxmi",
+      "ejbModule/META-INF/Schema/CUSTOMER.tblxmi",
+      "ejbModule/META-INF/Schema/SAMPLE.dbxmi",
+      "ejbModule/META-INF/Schema/SAMPLE_APP.schxmi",
       "packages.config",
       "Packages.config",
       "nuget.config",

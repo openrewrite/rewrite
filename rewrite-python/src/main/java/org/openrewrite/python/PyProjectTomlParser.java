@@ -19,19 +19,24 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.internal.LockFileRegeneration;
+import org.openrewrite.python.internal.InstalledEnvParser;
 import org.openrewrite.python.internal.PythonDependencyParser;
+import org.openrewrite.python.internal.PdmLockParser;
+import org.openrewrite.python.internal.PoetryLockParser;
 import org.openrewrite.python.internal.PythonResolutionLinker;
 import org.openrewrite.python.internal.UvLockParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
+
+import static java.util.Collections.emptyMap;
 
 /**
  * Parser for pyproject.toml files that delegates to TomlParser and attaches a
@@ -40,6 +45,24 @@ import java.util.stream.Stream;
 public class PyProjectTomlParser implements Parser {
 
     private final TomlParser tomlParser = new TomlParser();
+    private final Map<String, String> subprocessEnvironment;
+
+    @Nullable
+    private final Path installedEnv;
+
+    public PyProjectTomlParser() {
+        this(emptyMap(), null);
+    }
+
+    /**
+     * @param subprocessEnvironment environment for the {@code uv} resolution subprocess
+     * @param installedEnv          an already-installed virtual env for this project's dependencies,
+     *                              read in preference to running {@code uv} when no lock file exists
+     */
+    public PyProjectTomlParser(Map<String, String> subprocessEnvironment, @Nullable Path installedEnv) {
+        this.subprocessEnvironment = subprocessEnvironment;
+        this.installedEnv = installedEnv;
+    }
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
@@ -53,14 +76,13 @@ public class PyProjectTomlParser implements Parser {
                 return sf;
             }
 
-            // Try to resolve dependencies from uv.lock
-            marker = resolveFromLockFile(marker, doc, relativeTo);
+            marker = resolveDependencies(marker, doc, relativeTo);
 
             return doc.withMarkers(doc.getMarkers().addIfAbsent(marker));
         });
     }
 
-    private PythonResolutionResult resolveFromLockFile(PythonResolutionResult marker,
+    private PythonResolutionResult resolveDependencies(PythonResolutionResult marker,
                                                        Toml.Document doc,
                                                        @Nullable Path relativeTo) {
         Path sourcePath = doc.getSourcePath();
@@ -75,32 +97,53 @@ public class PyProjectTomlParser implements Parser {
             return marker;
         }
 
-        List<ResolvedDependency> resolvedDeps = UvLockParser.findAndParse(pyprojectDir, relativeTo);
+        PythonResolutionResult.PackageManager pm = marker.getPackageManager();
+        List<ResolvedDependency> resolvedDeps;
+        boolean lockPresent;
+        boolean uvManaged = false;
+        if (pm == PythonResolutionResult.PackageManager.Poetry) {
+            lockPresent = Files.exists(pyprojectDir.resolve("poetry.lock"));
+            resolvedDeps = PoetryLockParser.findAndParse(pyprojectDir, relativeTo);
+        } else if (pm == PythonResolutionResult.PackageManager.Pdm) {
+            lockPresent = Files.exists(pyprojectDir.resolve("pdm.lock"));
+            resolvedDeps = PdmLockParser.findAndParse(pyprojectDir, relativeTo);
+        } else {
+            lockPresent = Files.exists(pyprojectDir.resolve("uv.lock"));
+            resolvedDeps = UvLockParser.findAndParse(pyprojectDir, relativeTo);
+            pm = PythonResolutionResult.PackageManager.Uv;
+            uvManaged = true;
+        }
         if (!resolvedDeps.isEmpty()) {
-            return PythonResolutionLinker.applyPyproject(marker, resolvedDeps);
+            return PythonResolutionLinker.applyPyproject(marker, resolvedDeps, pm);
         }
-
-        // No uv.lock found — check if another package manager owns this project
-        if (UvLockParser.hasAlternativeLockFile(pyprojectDir, relativeTo)) {
-            return marker;
-        }
-        PackageManager pm = marker.getPackageManager();
-        if (pm == PackageManager.Poetry || pm == PackageManager.Pdm) {
+        if (lockPresent) {
+            // A lock file exists but yielded nothing — it stays authoritative; don't re-resolve.
             return marker;
         }
 
-        // Fall back to running uv lock
-        LockFileRegeneration.Result result = LockFileRegeneration.UV.regenerate(doc.printAll());
-        if (!result.isSuccess() || result.getLockFileContent() == null) {
-            return marker;
+        // No lock file: read the caller-installed env if one was provided. Installed dists are
+        // ground truth for any package manager.
+        if (installedEnv != null) {
+            List<ResolvedDependency> installed = InstalledEnvParser.parse(installedEnv);
+            if (!installed.isEmpty()) {
+                return PythonResolutionLinker.applyPyproject(marker, installed, marker.getPackageManager());
+            }
         }
-
-        resolvedDeps = UvLockParser.parse(result.getLockFileContent());
-        if (resolvedDeps.isEmpty()) {
-            return marker;
+        // Else resolve into a content-hash-cached workspace, the same way requirements.txt and
+        // setup.cfg already do — only for uv-managed projects (a Poetry/Pdm pyproject is not
+        // valid `uv pip install` input).
+        if (uvManaged) {
+            try {
+                Path workspace = DependencyWorkspace.getOrCreateWorkspace(doc.printAll(), subprocessEnvironment);
+                List<ResolvedDependency> frozen = RequirementsTxtParser.parseFreezeOutput(workspace);
+                if (!frozen.isEmpty()) {
+                    return PythonResolutionLinker.applyPyproject(marker, frozen, pm);
+                }
+            } catch (RuntimeException e) {
+                // uv unavailable or the install failed — leave the marker unresolved, as before.
+            }
         }
-
-        return PythonResolutionLinker.applyPyproject(marker, resolvedDeps);
+        return marker;
     }
 
     @Override

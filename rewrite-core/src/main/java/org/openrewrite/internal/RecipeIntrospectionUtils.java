@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.unmodifiableList;
 
 @SuppressWarnings("unused")
 public class RecipeIntrospectionUtils {
@@ -244,20 +245,31 @@ public class RecipeIntrospectionUtils {
         return new RecipeIntrospectionException("Unable to call primary constructor for Recipe " + recipeClass, e);
     }
 
-    private static List<ColumnDescriptor> getColumnDescriptors(DataTable<?> dataTable) {
-        List<ColumnDescriptor> columns = new ArrayList<>();
-
-        for (Field field : dataTable.getType().getDeclaredFields()) {
-            field.setAccessible(true);
-            Column column = field.getAnnotation(Column.class);
-            if (column != null) {
-                columns.add(new ColumnDescriptor(field.getName(),
-                        field.getType().getSimpleName(),
-                        column.displayName(),
-                        column.description()));
+    /**
+     * Column descriptors depend only on the data table's row type, so memoize them per class.
+     * {@link ClassValue} is thread-safe, computes each entry lazily exactly once, and lets entries be
+     * reclaimed when the row class (and its classloader) is unloaded.
+     */
+    private static final ClassValue<List<ColumnDescriptor>> COLUMN_DESCRIPTORS = new ClassValue<List<ColumnDescriptor>>() {
+        @Override
+        protected List<ColumnDescriptor> computeValue(Class<?> type) {
+            List<ColumnDescriptor> columns = new ArrayList<>();
+            for (Field field : type.getDeclaredFields()) {
+                field.setAccessible(true);
+                Column column = field.getAnnotation(Column.class);
+                if (column != null) {
+                    columns.add(new ColumnDescriptor(field.getName(),
+                            field.getType().getSimpleName(),
+                            column.displayName(),
+                            column.description()));
+                }
             }
+            return unmodifiableList(columns);
         }
-        return columns;
+    };
+
+    private static List<ColumnDescriptor> getColumnDescriptors(DataTable<?> dataTable) {
+        return COLUMN_DESCRIPTORS.get(dataTable.getType());
     }
 
     private static Object getPrimitiveDefault(Class<?> t) {

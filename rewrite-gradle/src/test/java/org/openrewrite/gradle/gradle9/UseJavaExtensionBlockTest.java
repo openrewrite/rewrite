@@ -308,6 +308,134 @@ class UseJavaExtensionBlockTest implements RewriteTest {
     }
 
     @Nested
+    class InsideSubprojectsBlock {
+        @Test
+        void movesBothCompatibilityIntoJavaBlock() {
+            rewriteRun(
+              buildGradle(
+                """
+                  subprojects {
+                      sourceCompatibility = 11
+                      targetCompatibility = 11
+                  }
+                  """,
+                """
+                  subprojects {
+                      java {
+                          sourceCompatibility = JavaVersion.VERSION_11
+                          targetCompatibility = JavaVersion.VERSION_11
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void mirrorsWhenOnlySourceDeclaredInSubprojects() {
+            rewriteRun(
+              buildGradle(
+                """
+                  subprojects {
+                      sourceCompatibility = 11
+                  }
+                  """,
+                """
+                  subprojects {
+                      java {
+                          sourceCompatibility = JavaVersion.VERSION_11
+                          targetCompatibility = JavaVersion.VERSION_11
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void mergesIntoExistingJavaBlockInSubprojects() {
+            rewriteRun(
+              buildGradle(
+                """
+                  subprojects {
+                      sourceCompatibility = 11
+                      targetCompatibility = 11
+                      java {
+                          withSourcesJar()
+                      }
+                  }
+                  """,
+                """
+                  subprojects {
+                      java {
+                          withSourcesJar()
+                          sourceCompatibility = JavaVersion.VERSION_11
+                          targetCompatibility = JavaVersion.VERSION_11
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void leavesSurroundingStatementsUntouched() {
+            rewriteRun(
+              buildGradle(
+                """
+                  subprojects {
+                      apply plugin: 'java'
+
+                      sourceCompatibility = 11
+                      targetCompatibility = 11
+
+                      repositories {
+                          mavenCentral()
+                      }
+                  }
+                  """,
+                """
+                  subprojects {
+                      apply plugin: 'java'
+
+                      repositories {
+                          mavenCentral()
+                      }
+
+                      java {
+                          sourceCompatibility = JavaVersion.VERSION_11
+                          targetCompatibility = JavaVersion.VERSION_11
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void handlesAllprojectsBlock() {
+            rewriteRun(
+              buildGradle(
+                """
+                  allprojects {
+                      sourceCompatibility = 11
+                      targetCompatibility = 11
+                  }
+                  """,
+                """
+                  allprojects {
+                      java {
+                          sourceCompatibility = JavaVersion.VERSION_11
+                          targetCompatibility = JavaVersion.VERSION_11
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class NoChange {
         @Test
         void alreadyInJavaBlock() {

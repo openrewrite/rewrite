@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
+
+using OpenRewrite.Core;
 
 namespace OpenRewrite.Core.Rpc;
 
@@ -28,6 +31,21 @@ namespace OpenRewrite.Core.Rpc;
 /// </summary>
 public class RpcReceiveQueue
 {
+    /// <summary>
+    /// Memoizes <see cref="FromJavaTypeName"/>, which scans every loaded assembly for a name a
+    /// receive resolves once per tree node. A plugin assembly can make a name that resolved to
+    /// null resolve, so an entry records the generation it was resolved in and an assembly load
+    /// makes every entry from an earlier generation a miss.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, (int Generation, Type? Type)> TypeByJavaName = new();
+
+    private static int _assemblyGeneration;
+
+    static RpcReceiveQueue()
+    {
+        AppDomain.CurrentDomain.AssemblyLoad += (_, _) => Interlocked.Increment(ref _assemblyGeneration);
+    }
+
     private readonly Queue<RpcObjectData> _batch = new();
     private readonly IDictionary<int, object> _refs;
     private readonly Func<List<RpcObjectData>>? _pull;
@@ -51,6 +69,10 @@ public class RpcReceiveQueue
         _sourceFileType = sourceFileType;
         _treeCodec = treeCodec;
     }
+
+    /// <summary>Messages already pulled and not yet taken, which a caller can drain without asking
+    /// the remote for another page.</summary>
+    internal int Buffered => _batch.Count;
 
     public RpcObjectData Take()
     {
@@ -114,7 +136,7 @@ public class RpcReceiveQueue
                 // New object or forward declaration with ref
                 if (message.ValueType != null && message.Value != null)
                 {
-                    // Non-codec type with inline value (e.g. RecipesThatMadeChanges)
+                    // Non-codec type with inline value (e.g. Markup)
                     before = DeserializeInline<T>(message.ValueType, message.Value);
                 }
                 else if (message.ValueType != null)
@@ -147,8 +169,10 @@ public class RpcReceiveQueue
                 }
                 else if (message.Value != null)
                 {
-                    // Simple value types (enums, primitives) sent with both valueType and value
-                    after = ExtractValue<T>(message.Value);
+                    // Inline value: typed payloads (markers, enums) carry a valueType; primitives don't
+                    after = message.ValueType != null
+                        ? DeserializeInline<T>(message.ValueType, message.Value)
+                        : ExtractValue<T>(message.Value);
                 }
                 else if (message.State == ADD && message.ValueType != null)
                 {
@@ -312,7 +336,7 @@ public class RpcReceiveQueue
             else if (typeof(Marker).IsAssignableFrom(typeof(T)))
             {
                 // Unknown marker type from Java — use UnknownMarker as fallback
-                return (T)(object)new UnknownMarker(Guid.NewGuid());
+                return (T)(object)new UnknownMarker(Tree.RandomId());
             }
             else
             {
@@ -344,7 +368,7 @@ public class RpcReceiveQueue
         if (type.IsInterface || type.IsAbstract)
         {
             if (typeof(Marker).IsAssignableFrom(type))
-                return (T)(object)new UnknownMarker(Guid.NewGuid());
+                return (T)(object)new UnknownMarker(Tree.RandomId());
             throw new InvalidOperationException(
                 $"Cannot instantiate interface/abstract type: {type.FullName} (from {javaTypeName})");
         }
@@ -413,10 +437,10 @@ public class RpcReceiveQueue
             {
                 var id = je.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String
                     ? Guid.Parse(idProp.GetString()!)
-                    : Guid.NewGuid();
+                    : Tree.RandomId();
                 return (T)(object)new UnknownMarker(id);
             }
-            return (T)(object)new UnknownMarker(Guid.NewGuid());
+            return (T)(object)new UnknownMarker(Tree.RandomId());
         }
 
         if (value is JsonElement jeNormal)
@@ -436,17 +460,30 @@ public class RpcReceiveQueue
     /// <summary>
     /// Maps a Java type name to its C# Type. Reverse of RpcSendQueue.ToJavaTypeName.
     /// </summary>
-    private static Type? FromJavaTypeName(string javaTypeName)
+    internal static Type? FromJavaTypeName(string javaTypeName)
+    {
+        var generation = Volatile.Read(ref _assemblyGeneration);
+        if (TypeByJavaName.TryGetValue(javaTypeName, out var cached) && cached.Generation == generation)
+            return cached.Type;
+
+        // Stamped with the generation read before resolving, so a store that lands after a load
+        // carries the earlier generation and is rejected rather than surviving as a stale miss.
+        var resolved = ResolveJavaTypeName(javaTypeName);
+        TypeByJavaName[javaTypeName] = (generation, resolved);
+        return resolved;
+    }
+
+    private static Type? ResolveJavaTypeName(string javaTypeName)
     {
         // Known direct mappings
         return javaTypeName switch
         {
             "org.openrewrite.java.tree.Space" => typeof(Space),
             "org.openrewrite.java.tree.TextComment" => typeof(TextComment),
-            "org.openrewrite.csharp.tree.CsDocCommentRawComment" => typeof(XmlDocComment),
             "org.openrewrite.marker.Markers" => typeof(Markers),
             "org.openrewrite.marker.SearchResult" => typeof(SearchResult),
             "org.openrewrite.marker.RecipesThatMadeChanges" => typeof(RecipesThatMadeChanges),
+            "org.openrewrite.marker.RecipeThatMadeChanges" => typeof(RecipeThatMadeChanges),
             "org.openrewrite.Checksum" => typeof(Checksum),
             "org.openrewrite.FileAttributes" => typeof(FileAttributes),
 
@@ -462,25 +499,23 @@ public class RpcReceiveQueue
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable" =>
                 typeof(NamedVariable),
 
-            // Structured XML doc-comment tree (Java-only model). The C# side has no
-            // equivalent, so these map to sentinel shells that CsDocCommentReceiver drains
-            // and re-flattens into a raw XmlDocComment.
+            // Structured XML doc-comment tree, mirrored node-for-node on the C# side.
             "org.openrewrite.csharp.tree.CsDocComment$DocComment" =>
-                typeof(OpenRewrite.CSharp.Rpc.StructuredDocComment),
+                typeof(OpenRewrite.CSharp.CsDocComment.DocComment),
             "org.openrewrite.csharp.tree.CsDocComment$XmlElement" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlElement),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlElement),
             "org.openrewrite.csharp.tree.CsDocComment$XmlEmptyElement" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlEmptyElement),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlEmptyElement),
             "org.openrewrite.csharp.tree.CsDocComment$XmlText" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlText),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlText),
             "org.openrewrite.csharp.tree.CsDocComment$XmlAttribute" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlAttribute),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlAttribute),
             "org.openrewrite.csharp.tree.CsDocComment$XmlCrefAttribute" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlCrefAttribute),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlCrefAttribute),
             "org.openrewrite.csharp.tree.CsDocComment$XmlNameAttribute" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlNameAttribute),
+                typeof(OpenRewrite.CSharp.CsDocComment.XmlNameAttribute),
             "org.openrewrite.csharp.tree.CsDocComment$LineBreak" =>
-                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocLineBreak),
+                typeof(OpenRewrite.CSharp.CsDocComment.LineBreak),
 
             // Marker type overrides
             "org.openrewrite.java.marker.Semicolon" =>

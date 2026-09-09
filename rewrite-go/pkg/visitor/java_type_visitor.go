@@ -86,7 +86,6 @@ func (v *JavaTypeVisitor) Visit(javaType java.JavaType, p any) java.JavaType {
 	}
 }
 
-// VisitList visits a list of JavaTypes.
 func (v *JavaTypeVisitor) VisitList(javaTypes []java.JavaType, p any) []java.JavaType {
 	if javaTypes == nil {
 		return nil

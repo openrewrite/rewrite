@@ -165,10 +165,12 @@ public class Markers implements RpcCodec<Markers> {
     }
 
     public <M extends Marker> Optional<M> findFirst(Class<M> markerType) {
-        return markers.stream()
-                .filter(markerType::isInstance)
-                .map(markerType::cast)
-                .findFirst();
+        for (Marker marker : markers) {
+            if (markerType.isInstance(marker)) {
+                return Optional.of(markerType.cast(marker));
+            }
+        }
+        return Optional.empty();
     }
 
     @Override

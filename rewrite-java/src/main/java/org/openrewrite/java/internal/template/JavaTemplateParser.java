@@ -91,7 +91,7 @@ public class JavaTemplateParser {
     }
 
     public List<Statement> parseParameters(Cursor cursor, String template) {
-        @Language("java") String stub = addImports(substitute(PARAMETER_STUB, template));
+        @Language("java") String stub = addImports(cursor, substitute(PARAMETER_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(cursor, stub, () -> {
             JavaSourceFile cu = compileTemplate(cursor, stub);
@@ -274,6 +274,24 @@ public class JavaTemplateParser {
             return withImports.toString();
         }
         return stub;
+    }
+
+    /**
+     * Context-sensitive templates see the enclosing source file's imports in addition to the template's own,
+     * so type references relying on those imports resolve when the stub is compiled.
+     */
+    private String addImports(Cursor cursor, String stub) {
+        if (contextSensitive) {
+            JavaSourceFile sourceFile = cursor.firstEnclosing(JavaSourceFile.class);
+            if (sourceFile != null && !sourceFile.getImports().isEmpty()) {
+                StringBuilder withImports = new StringBuilder();
+                for (J.Import anImport : sourceFile.getImports()) {
+                    withImports.append(anImport.withPrefix(Space.EMPTY).printTrimmed(cursor)).append(";\n");
+                }
+                return withImports.append(addImports(stub)).toString();
+            }
+        }
+        return addImports(stub);
     }
 
     private JavaSourceFile compileTemplate(Cursor cursor, @Language("java") String stub) {

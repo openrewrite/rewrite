@@ -15,7 +15,7 @@
  */
 import {Cursor, ExecutionContext, Recipe, TreeVisitor} from '../..';
 import {J, Statement} from '../../java';
-import {PostMatchContext, PreMatchContext, RewriteConfig, RewriteRule} from './types';
+import {PostMatchContext, PreMatchContext, RewriteConfig, RewriteRule, TryOnOptions} from './types';
 import {MatchResult, Pattern} from './pattern';
 import {Template} from './template';
 import {JavaScriptVisitor} from '../visitor';
@@ -28,11 +28,12 @@ class RewriteRuleImpl implements RewriteRule {
         private readonly before: Pattern[],
         private readonly after: Template | ((match: MatchResult) => Template),
         private readonly preMatch?: (node: J, context: PreMatchContext) => boolean | Promise<boolean>,
-        private readonly postMatch?: (node: J, context: PostMatchContext) => boolean | Promise<boolean>
+        private readonly postMatch?: (node: J, context: PostMatchContext) => boolean | Promise<boolean>,
+        private readonly format?: boolean
     ) {
     }
 
-    async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
+    async tryOn(cursor: Cursor, node: J, options?: TryOnOptions): Promise<J | undefined> {
         // Evaluate preMatch before attempting any pattern matching
         if (this.preMatch) {
             const preMatchResult = await this.preMatch(node, { cursor });
@@ -56,14 +57,18 @@ class RewriteRuleImpl implements RewriteRule {
                 // Apply transformation
                 let result: J | undefined;
 
-                if (typeof this.after === 'function') {
-                    // Call the function to get a template, then apply it
-                    const template = this.after(match);
-                    result = await template.apply(node, cursor, { values: match });
-                } else {
-                    // Use template.apply() as before
-                    result = await this.after.apply(node, cursor, { values: match });
+                const template = typeof this.after === 'function' ? this.after(match) : this.after;
+                const bindings = options?.bindings ??
+                    (options?.visitor ? await template.resolveBindings(options.visitor) : undefined);
+                // Applying without them would splice the context's own names in unbound, which
+                // reads as a working edit and is not one.
+                if (bindings === undefined && await template.bindsModules()) {
+                    throw new Error(
+                        "Template binds modules in its context, so applying it needs their local names. " +
+                        "Pass {visitor: this} to tryOn, or bindings you resolved yourself.");
                 }
+                result = await template.apply(node, cursor,
+                    { values: match, format: this.format, bindings: bindings || undefined });
 
                 if (result) {
                     return result;
@@ -84,10 +89,10 @@ class RewriteRuleImpl implements RewriteRule {
                 super([], () => undefined as unknown as Template);
             }
 
-            async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
-                const firstResult = await first.tryOn(cursor, node);
+            async tryOn(cursor: Cursor, node: J, options?: TryOnOptions): Promise<J | undefined> {
+                const firstResult = await first.tryOn(cursor, node, options);
                 if (firstResult !== undefined) {
-                    const secondResult = await next.tryOn(cursor, firstResult);
+                    const secondResult = await next.tryOn(cursor, firstResult, options);
                     return secondResult ?? firstResult;
                 }
                 return undefined;
@@ -104,12 +109,12 @@ class RewriteRuleImpl implements RewriteRule {
                 super([], () => undefined as unknown as Template);
             }
 
-            async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
-                const firstResult = await first.tryOn(cursor, node);
+            async tryOn(cursor: Cursor, node: J, options?: TryOnOptions): Promise<J | undefined> {
+                const firstResult = await first.tryOn(cursor, node, options);
                 if (firstResult !== undefined) {
                     return firstResult;
                 }
-                return await alternative.tryOn(cursor, node);
+                return await alternative.tryOn(cursor, node, options);
             }
         })();
     }
@@ -171,7 +176,8 @@ export function rewrite(
         Array.isArray(config.before) ? config.before : [config.before],
         config.after,
         config.preMatch,
-        config.postMatch
+        config.postMatch,
+        config.format
     );
 }
 

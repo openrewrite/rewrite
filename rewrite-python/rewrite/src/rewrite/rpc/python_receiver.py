@@ -18,6 +18,7 @@ Python RPC Receiver that mirrors Java's PythonReceiver structure.
 This uses the visitor pattern with pre_visit handling common fields (id, prefix, markers)
 and type-specific visit methods handling only additional fields.
 """
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional, Type, TypeVar
@@ -28,12 +29,12 @@ from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
     StatementExpression, MultiImport, KeyValue, DictLiteral, CollectionLiteral,
-    FormattedString, Pass, TrailingElseWrapper, ComprehensionExpression,
+    FormattedString, Pass, Shebang, TrailingElseWrapper, ComprehensionExpression,
     TypeAlias, YieldFrom, UnionType, VariableScope, Del, SpecialParameter,
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
 from rewrite.rpc.receive_queue import RpcReceiveQueue
-from rewrite.utils import replace_if_changed, random_id, id_to_int, id_to_str
+from rewrite.utils import random_id, id_to_int, id_to_str
 
 T = TypeVar('T')
 E = TypeVar('E', bound=Enum)
@@ -86,8 +87,7 @@ class PythonRpcReceiver:
         # wrapped child: the sender skips them here and sends them via the child's preVisit.
         if isinstance(tree, J):
             if isinstance(tree, (ExpressionStatement, StatementExpression)):
-                new_id = q.receive(tree._id)
-                tree = tree.replace(_id=id_to_int(new_id)) if new_id is not tree._id else tree
+                tree = q.apply(tree, _id=q.receive(tree._id))
             else:
                 tree = self._pre_visit(tree, q)
 
@@ -128,6 +128,8 @@ class PythonRpcReceiver:
             return self._visit_formatted_string(tree, q)
         elif isinstance(tree, Pass):
             return self._visit_pass(tree, q)
+        elif isinstance(tree, Shebang):
+            return self._visit_shebang(tree, q)
         elif isinstance(tree, TrailingElseWrapper):
             return self._visit_trailing_else_wrapper(tree, q)
         elif isinstance(tree, ComprehensionExpression.Condition):
@@ -174,14 +176,7 @@ class PythonRpcReceiver:
         new_prefix = q.receive(j.prefix)
         new_markers = q.receive_markers(j.markers)
 
-        changes = {}
-        if new_id is not j._id:  # ty: ignore[unresolved-attribute]  # _id on concrete J subclasses
-            changes['_id'] = id_to_int(new_id)
-        if new_prefix is not j.prefix:
-            changes['_prefix'] = new_prefix
-        if new_markers is not j.markers:
-            changes['_markers'] = new_markers
-        return replace_if_changed(j, **changes) if changes else j
+        return q.apply(j, _id=new_id, _prefix=new_prefix, _markers=new_markers)
 
     def _visit_compilation_unit(self, cu: CompilationUnit, q: RpcReceiveQueue) -> CompilationUnit:
         """Visit CompilationUnit - only non-common fields."""
@@ -194,7 +189,7 @@ class PythonRpcReceiver:
         statements = q.receive_list(cu.padding.statements)
         eof = q.receive(cu.eof)
 
-        return replace_if_changed(
+        return q.apply(
             cu,
             source_path=Path(source_path) if source_path else cu.source_path,
             charset_name=charset_name,
@@ -208,12 +203,12 @@ class PythonRpcReceiver:
 
     def _visit_async(self, async_: Async, q: RpcReceiveQueue) -> Async:
         statement = q.receive(async_.statement)
-        return replace_if_changed(async_, statement=statement)
+        return q.apply(async_, statement=statement)
 
     def _visit_await(self, await_: Await, q: RpcReceiveQueue) -> Await:
         expression = q.receive(await_.expression)
         type_ = q.receive(await_.type)
-        return replace_if_changed(await_, expression=expression, type=type_)
+        return q.apply(await_, expression=expression, type=type_)
 
     def _visit_binary(self, binary: Binary, q: RpcReceiveQueue) -> Binary:
         left = q.receive(binary.left)
@@ -221,86 +216,90 @@ class PythonRpcReceiver:
         negation = q.receive(binary.negation)
         right = q.receive(binary.right)
         type_ = q.receive(binary.type)
-        return replace_if_changed(binary, left=left, operator=operator, negation=negation, right=right, type=type_)
+        return q.apply(binary, left=left, operator=operator, negation=negation, right=right, type=type_)
 
     def _visit_chained_assignment(self, ca: ChainedAssignment, q: RpcReceiveQueue) -> ChainedAssignment:
         variables = q.receive_list(ca.padding.variables)
         assignment = q.receive(ca.assignment)
         type_ = q.receive(ca.type)
-        return replace_if_changed(ca, variables=variables, assignment=assignment, type=type_)
+        return q.apply(ca, variables=variables, assignment=assignment, type=type_)
 
     def _visit_exception_type(self, et: ExceptionType, q: RpcReceiveQueue) -> ExceptionType:
         type_ = q.receive(et.type)
         exception_group = q.receive(et.exception_group)
         expression = q.receive(et.expression)
-        return replace_if_changed(et, type=type_, exception_group=exception_group, expression=expression)
+        return q.apply(et, type=type_, exception_group=exception_group, expression=expression)
 
     def _visit_literal_type(self, lt: LiteralType, q: RpcReceiveQueue) -> LiteralType:
         literal = q.receive(lt.literal)
         type_ = q.receive(lt.type)
-        return replace_if_changed(lt, literal=literal, type=type_)
+        return q.apply(lt, literal=literal, type=type_)
 
     def _visit_type_hint(self, th: TypeHint, q: RpcReceiveQueue) -> TypeHint:
         type_tree = q.receive(th.type_tree)
         type_ = q.receive(th.type)
-        return replace_if_changed(th, type_tree=type_tree, type=type_)
+        return q.apply(th, type_tree=type_tree, type=type_)
 
     def _visit_expression_statement(self, es: ExpressionStatement, q: RpcReceiveQueue) -> ExpressionStatement:
         expression = q.receive(es.expression)
-        return replace_if_changed(es, expression=expression)
+        return q.apply(es, expression=expression)
 
     def _visit_expression_type_tree(self, ett: ExpressionTypeTree, q: RpcReceiveQueue) -> ExpressionTypeTree:
         reference = q.receive(ett.reference)
-        return replace_if_changed(ett, reference=reference)
+        return q.apply(ett, reference=reference)
 
     def _visit_statement_expression(self, se: StatementExpression, q: RpcReceiveQueue) -> StatementExpression:
         statement = q.receive(se.statement)
-        return replace_if_changed(se, statement=statement)
+        return q.apply(se, statement=statement)
 
     def _visit_multi_import(self, mi: MultiImport, q: RpcReceiveQueue) -> MultiImport:
         from_ = q.receive(mi.padding.from_)
         parenthesized = q.receive(mi.parenthesized)
         names = q.receive(mi.padding.names)
-        return replace_if_changed(mi, from_=from_, parenthesized=parenthesized, names=names)
+        return q.apply(mi, from_=from_, parenthesized=parenthesized, names=names)
 
     def _visit_key_value(self, kv: KeyValue, q: RpcReceiveQueue) -> KeyValue:
         key = q.receive(kv.padding.key)
         value = q.receive(kv.value)
         type_ = q.receive(kv.type)
-        return replace_if_changed(kv, key=key, value=value, type=type_)
+        return q.apply(kv, key=key, value=value, type=type_)
 
     def _visit_dict_literal(self, dl: DictLiteral, q: RpcReceiveQueue) -> DictLiteral:
         elements = q.receive(dl.padding.elements)
         type_ = q.receive(dl.type)
-        return replace_if_changed(dl, elements=elements, type=type_)
+        return q.apply(dl, elements=elements, type=type_)
 
     def _visit_collection_literal(self, cl: CollectionLiteral, q: RpcReceiveQueue) -> CollectionLiteral:
         kind = _to_enum(CollectionLiteral.Kind)(q.receive(cl.kind))
         elements = q.receive(cl.padding.elements)
         type_ = q.receive(cl.type)
-        return replace_if_changed(cl, kind=kind, elements=elements, type=type_)
+        return q.apply(cl, kind=kind, elements=elements, type=type_)
 
     def _visit_formatted_string(self, fs: FormattedString, q: RpcReceiveQueue) -> FormattedString:
         delimiter = q.receive(fs.delimiter)
         parts = q.receive_list(fs.parts)
         type_ = q.receive(fs.type)
-        return replace_if_changed(fs, delimiter=delimiter, parts=parts, type=type_)
+        return q.apply(fs, delimiter=delimiter, parts=parts, type=type_)
 
     def _visit_formatted_string_value(self, v: FormattedString.Value, q: RpcReceiveQueue) -> FormattedString.Value:
         expression = q.receive(v.padding.expression)
         debug = q.receive(v.padding.debug)
         conversion = _to_enum(FormattedString.Value.Conversion)(q.receive(v.conversion))
         format_ = q.receive(v.format)
-        return replace_if_changed(v, expression=expression, debug=debug, conversion=conversion, format=format_)
+        return q.apply(v, expression=expression, debug=debug, conversion=conversion, format=format_)
 
     def _visit_pass(self, pass_: Pass, q: RpcReceiveQueue) -> Pass:
         # No additional fields beyond id/prefix/markers
         return pass_
 
+    def _visit_shebang(self, shebang: Shebang, q: RpcReceiveQueue) -> Shebang:
+        text = q.receive(shebang.text)
+        return q.apply(shebang, text=text)
+
     def _visit_trailing_else_wrapper(self, tew: TrailingElseWrapper, q: RpcReceiveQueue) -> TrailingElseWrapper:
         statement = q.receive(tew.statement)
         else_block = q.receive(tew.padding.else_block)
-        return replace_if_changed(tew, statement=statement, else_block=else_block)
+        return q.apply(tew, statement=statement, else_block=else_block)
 
     def _visit_comprehension_expression(self, ce: ComprehensionExpression, q: RpcReceiveQueue) -> ComprehensionExpression:
         kind = _to_enum(ComprehensionExpression.Kind)(q.receive(ce.kind))
@@ -308,85 +307,86 @@ class PythonRpcReceiver:
         clauses = q.receive_list(ce.clauses)
         suffix = q.receive(ce.suffix)
         type_ = q.receive(ce.type)
-        return replace_if_changed(ce, kind=kind, result=result, clauses=clauses, suffix=suffix, type=type_)
+        return q.apply(ce, kind=kind, result=result, clauses=clauses, suffix=suffix, type=type_)
 
     def _visit_comprehension_condition(self, cc: ComprehensionExpression.Condition, q: RpcReceiveQueue) -> ComprehensionExpression.Condition:
         expression = q.receive(cc.expression)
-        return replace_if_changed(cc, expression=expression)
+        return q.apply(cc, expression=expression)
 
     def _visit_comprehension_clause(self, cc: ComprehensionExpression.Clause, q: RpcReceiveQueue) -> ComprehensionExpression.Clause:
         async_ = q.receive(cc.padding.async_)
         iterator_variable = q.receive(cc.iterator_variable)
         iterated_list = q.receive(cc.padding.iterated_list)
         conditions = q.receive_list(cc.conditions)
-        return replace_if_changed(cc, async_=async_, iterator_variable=iterator_variable, iterated_list=iterated_list, conditions=conditions)
+        return q.apply(cc, async_=async_, iterator_variable=iterator_variable, iterated_list=iterated_list, conditions=conditions)
 
     def _visit_type_alias(self, ta: TypeAlias, q: RpcReceiveQueue) -> TypeAlias:
         name = q.receive(ta.name)
+        type_parameters = q.receive(ta.padding.type_parameters, lambda c: self._receive_container(c, q) if c else None)
         value = q.receive(ta.padding.value)
         type_ = q.receive(ta.type)
-        return replace_if_changed(ta, name=name, value=value, type=type_)
+        return q.apply(ta, name=name, type_parameters=type_parameters, value=value, type=type_)
 
     def _visit_yield_from(self, yf: YieldFrom, q: RpcReceiveQueue) -> YieldFrom:
         expression = q.receive(yf.expression)
         type_ = q.receive(yf.type)
-        return replace_if_changed(yf, expression=expression, type=type_)
+        return q.apply(yf, expression=expression, type=type_)
 
     def _visit_union_type(self, ut: UnionType, q: RpcReceiveQueue) -> UnionType:
         types = q.receive_list(ut.padding.types)
         type_ = q.receive(ut.type)
-        return replace_if_changed(ut, types=types, type=type_)
+        return q.apply(ut, types=types, type=type_)
 
     def _visit_variable_scope(self, vs: VariableScope, q: RpcReceiveQueue) -> VariableScope:
         kind = _to_enum(VariableScope.Kind)(q.receive(vs.kind))
         names = q.receive_list(vs.padding.names)
-        return replace_if_changed(vs, kind=kind, names=names)
+        return q.apply(vs, kind=kind, names=names)
 
     def _visit_del(self, del_: Del, q: RpcReceiveQueue) -> Del:
         targets = q.receive_list(del_.padding.targets)
-        return replace_if_changed(del_, targets=targets)
+        return q.apply(del_, targets=targets)
 
     def _visit_special_parameter(self, sp: SpecialParameter, q: RpcReceiveQueue) -> SpecialParameter:
         kind = _to_enum(SpecialParameter.Kind)(q.receive(sp.kind))
         type_hint = q.receive(sp.type_hint)
         type_ = q.receive(sp.type)
-        return replace_if_changed(sp, kind=kind, type_hint=type_hint, type=type_)
+        return q.apply(sp, kind=kind, type_hint=type_hint, type=type_)
 
     def _visit_star(self, star: Star, q: RpcReceiveQueue) -> Star:
         kind = _to_enum(Star.Kind)(q.receive(star.kind))
         expression = q.receive(star.expression)
         type_ = q.receive(star.type)
-        return replace_if_changed(star, kind=kind, expression=expression, type=type_)
+        return q.apply(star, kind=kind, expression=expression, type=type_)
 
     def _visit_named_argument(self, na: NamedArgument, q: RpcReceiveQueue) -> NamedArgument:
         name = q.receive(na.name)
         value = q.receive(na.padding.value)
         type_ = q.receive(na.type)
-        return replace_if_changed(na, name=name, value=value, type=type_)
+        return q.apply(na, name=name, value=value, type=type_)
 
     def _visit_type_hinted_expression(self, the: TypeHintedExpression, q: RpcReceiveQueue) -> TypeHintedExpression:
         expression = q.receive(the.expression)
         type_hint = q.receive(the.type_hint)
         type_ = q.receive(the.type)
-        return replace_if_changed(the, expression=expression, type_hint=type_hint, type=type_)
+        return q.apply(the, expression=expression, type_hint=type_hint, type=type_)
 
     def _visit_error_from(self, ef: ErrorFrom, q: RpcReceiveQueue) -> ErrorFrom:
         error = q.receive(ef.error)
         from_ = q.receive(ef.padding.from_)
         type_ = q.receive(ef.type)
-        return replace_if_changed(ef, error=error, from_=from_, type=type_)
+        return q.apply(ef, error=error, from_=from_, type=type_)
 
     def _visit_match_case(self, mc: MatchCase, q: RpcReceiveQueue) -> MatchCase:
         pattern = q.receive(mc.pattern)
         guard = q.receive(mc.padding.guard)
         type_ = q.receive(mc.type)
-        return replace_if_changed(mc, pattern=pattern, guard=guard, type=type_)
+        return q.apply(mc, pattern=pattern, guard=guard, type=type_)
 
     def _visit_match_case_pattern(self, p: MatchCase.Pattern, q: RpcReceiveQueue) -> MatchCase.Pattern:
         kind = _to_enum(MatchCase.Pattern.Kind)(q.receive(p.kind))
         children = q.receive(p.padding.children)
         type_ = q.receive(p.type)
-        return replace_if_changed(p, kind=kind, children=children, type=type_)
+        return q.apply(p, kind=kind, children=children, type=type_)
 
     def _visit_slice(self, slice_: Slice, q: RpcReceiveQueue) -> Slice:
         start = q.receive(slice_.padding.start)
@@ -394,7 +394,7 @@ class PythonRpcReceiver:
         step = q.receive(slice_.padding.step)
         # Python's Slice doesn't have a type field, but Java sends one (always null)
         _ = q.receive(None)  # Consume the null type field
-        return replace_if_changed(slice_, start=start, stop=stop, step=step)
+        return q.apply(slice_, start=start, stop=stop, step=step)
 
     def _visit_java(self, j: J, q: RpcReceiveQueue) -> J:
         """Handle Java tree types that Python extends."""
@@ -505,8 +505,8 @@ class PythonRpcReceiver:
         annotations = q.receive_list(ident.annotations)
         simple_name = q.receive(ident.simple_name)
         type_ = q.receive(ident.type)
-        field_type = q.receive(ident.field_type, lambda t: self._receive_type(t, q))
-        return replace_if_changed(ident, annotations=annotations, simple_name=simple_name, type=type_, field_type=field_type)
+        field_type = q.receive(ident.field_type)
+        return q.apply(ident, annotations=annotations, simple_name=simple_name, type=type_, field_type=field_type)
 
     def _visit_literal(self, lit, q: RpcReceiveQueue):
         from rewrite.java.tree import Literal
@@ -517,19 +517,19 @@ class PythonRpcReceiver:
             q.receive(s.code_point if s else None),
         ))
         type_ = q.receive(lit.type)
-        return replace_if_changed(lit, value=value, value_source=value_source, unicode_escapes=unicode_escapes, type=type_)
+        return q.apply(lit, value=value, value_source=value_source, unicode_escapes=unicode_escapes, type=type_)
 
     def _visit_import(self, imp, q: RpcReceiveQueue):
         static = q.receive(imp.padding.static)
         qualid = q.receive(imp.qualid)
         alias = q.receive(imp.padding.alias)
-        return replace_if_changed(imp, static=static, qualid=qualid, alias=alias)
+        return q.apply(imp, static=static, qualid=qualid, alias=alias)
 
     def _visit_field_access(self, fa, q: RpcReceiveQueue):
         target = q.receive(fa.target)
         name = q.receive(fa.padding.name)
         type_ = q.receive(fa.type)
-        return replace_if_changed(fa, target=target, name=name, type=type_)
+        return q.apply(fa, target=target, name=name, type=type_)
 
     def _visit_method_invocation(self, mi, q: RpcReceiveQueue):
         select = q.receive(mi.padding.select)
@@ -537,20 +537,20 @@ class PythonRpcReceiver:
         name = q.receive(mi.name)
         arguments = q.receive(mi.padding.arguments)
         method_type = q.receive(mi.method_type)
-        return replace_if_changed(mi, select=select, type_parameters=type_parameters, name=name, arguments=arguments, method_type=method_type)
+        return q.apply(mi, select=select, type_parameters=type_parameters, name=name, arguments=arguments, method_type=method_type)
 
     def _visit_block(self, block, q: RpcReceiveQueue):
         static = q.receive(block.padding.static)
         statements = q.receive_list(block.padding.statements)
         end = q.receive(block.end)
-        return replace_if_changed(block, static=static, statements=statements, end=end)
+        return q.apply(block, static=static, statements=statements, end=end)
 
     def _visit_j_unary(self, unary, q: RpcReceiveQueue):
         from rewrite.java.tree import Unary
         operator = q.receive(unary.padding.operator, lambda lp: self._receive_left_padded(lp, q, _to_enum(Unary.Type)))
         expression = q.receive(unary.expression)
         type_ = q.receive(unary.type)
-        return replace_if_changed(unary, operator=operator, expression=expression, type=type_)
+        return q.apply(unary, operator=operator, expression=expression, type=type_)
 
     def _visit_j_binary(self, binary, q: RpcReceiveQueue):
         from rewrite.java.tree import Binary as JBinary
@@ -558,13 +558,13 @@ class PythonRpcReceiver:
         operator = q.receive(binary.padding.operator, lambda lp: self._receive_left_padded(lp, q, _to_enum(JBinary.Type)))
         right = q.receive(binary.right)
         type_ = q.receive(binary.type)
-        return replace_if_changed(binary, left=left, operator=operator, right=right, type=type_)
+        return q.apply(binary, left=left, operator=operator, right=right, type=type_)
 
     def _visit_j_assignment(self, assign, q: RpcReceiveQueue):
         variable = q.receive(assign.variable)
         assignment = q.receive(assign.padding.assignment)
         type_ = q.receive(assign.type)
-        return replace_if_changed(assign, variable=variable, assignment=assignment, type=type_)
+        return q.apply(assign, variable=variable, assignment=assignment, type=type_)
 
     def _visit_j_assignment_operation(self, assign, q: RpcReceiveQueue):
         from rewrite.java.tree import AssignmentOperation
@@ -572,36 +572,36 @@ class PythonRpcReceiver:
         operator = q.receive(assign.padding.operator, lambda lp: self._receive_left_padded(lp, q, _to_enum(AssignmentOperation.Type)))
         assignment = q.receive(assign.assignment)
         type_ = q.receive(assign.type)
-        return replace_if_changed(assign, variable=variable, operator=operator, assignment=assignment, type=type_)
+        return q.apply(assign, variable=variable, operator=operator, assignment=assignment, type=type_)
 
     def _visit_j_return(self, ret, q: RpcReceiveQueue):
         expression = q.receive(ret.expression)
-        return replace_if_changed(ret, expression=expression)
+        return q.apply(ret, expression=expression)
 
     def _visit_j_if(self, if_stmt, q: RpcReceiveQueue):
         if_condition = q.receive(if_stmt.if_condition)
         then_part = q.receive(if_stmt.padding.then_part)
         else_part = q.receive(if_stmt.else_part)
-        return replace_if_changed(if_stmt, if_condition=if_condition, then_part=then_part, else_part=else_part)
+        return q.apply(if_stmt, if_condition=if_condition, then_part=then_part, else_part=else_part)
 
     def _visit_j_else(self, else_stmt, q: RpcReceiveQueue):
         body = q.receive(else_stmt.padding.body)
-        return replace_if_changed(else_stmt, body=body)
+        return q.apply(else_stmt, body=body)
 
     def _visit_j_while_loop(self, while_loop, q: RpcReceiveQueue):
         condition = q.receive(while_loop.condition)
         body = q.receive(while_loop.padding.body)
-        return replace_if_changed(while_loop, condition=condition, body=body)
+        return q.apply(while_loop, condition=condition, body=body)
 
     def _visit_j_for_each_loop(self, for_each, q: RpcReceiveQueue):
         control = q.receive(for_each.control)
         body = q.receive(for_each.padding.body)
-        return replace_if_changed(for_each, control=control, body=body)
+        return q.apply(for_each, control=control, body=body)
 
     def _visit_j_for_each_control(self, control, q: RpcReceiveQueue):
         variable = q.receive(control.padding.variable)
         iterable = q.receive(control.padding.iterable)
-        return replace_if_changed(control, variable=variable, iterable=iterable)
+        return q.apply(control, variable=variable, iterable=iterable)
 
     def _visit_j_try(self, try_stmt, q: RpcReceiveQueue):
         resources = q.receive(
@@ -614,34 +614,34 @@ class PythonRpcReceiver:
             try_stmt.padding.finally_ if hasattr(try_stmt.padding, 'finally_') else None,
             lambda lp: self._receive_left_padded(lp, q) if lp else None
         )
-        return replace_if_changed(try_stmt, resources=resources, body=body, catches=catches, finally_=finally_)
+        return q.apply(try_stmt, resources=resources, body=body, catches=catches, finally_=finally_)
 
     def _visit_j_catch(self, catch, q: RpcReceiveQueue):
         parameter = q.receive(catch.parameter)
         body = q.receive(catch.body)
-        return replace_if_changed(catch, parameter=parameter, body=body)
+        return q.apply(catch, parameter=parameter, body=body)
 
     def _visit_j_try_resource(self, resource, q: RpcReceiveQueue):
         variable_declarations = q.receive(resource.variable_declarations)
         terminated_with_semicolon = q.receive(resource.terminated_with_semicolon)
-        return replace_if_changed(resource, variable_declarations=variable_declarations, terminated_with_semicolon=terminated_with_semicolon)
+        return q.apply(resource, variable_declarations=variable_declarations, terminated_with_semicolon=terminated_with_semicolon)
 
     def _visit_j_throw(self, throw, q: RpcReceiveQueue):
         exception = q.receive(throw.exception)
-        return replace_if_changed(throw, exception=exception)
+        return q.apply(throw, exception=exception)
 
     def _visit_j_assert(self, assert_stmt, q: RpcReceiveQueue):
         condition = q.receive(assert_stmt.condition)
         detail = q.receive(assert_stmt.detail)
-        return replace_if_changed(assert_stmt, condition=condition, detail=detail)
+        return q.apply(assert_stmt, condition=condition, detail=detail)
 
     def _visit_j_break(self, break_stmt, q: RpcReceiveQueue):
         label = q.receive(break_stmt.label)
-        return replace_if_changed(break_stmt, label=label)
+        return q.apply(break_stmt, label=label)
 
     def _visit_j_continue(self, continue_stmt, q: RpcReceiveQueue):
         label = q.receive(continue_stmt.label)
-        return replace_if_changed(continue_stmt, label=label)
+        return q.apply(continue_stmt, label=label)
 
     def _visit_j_empty(self, empty, q: RpcReceiveQueue):
         # No additional fields
@@ -652,19 +652,19 @@ class PythonRpcReceiver:
         true_part = q.receive(ternary.padding.true_part)
         false_part = q.receive(ternary.padding.false_part)
         type_ = q.receive(ternary.type)
-        return replace_if_changed(ternary, condition=condition, true_part=true_part, false_part=false_part, type=type_)
+        return q.apply(ternary, condition=condition, true_part=true_part, false_part=false_part, type=type_)
 
     def _visit_j_lambda(self, lam, q: RpcReceiveQueue):
         parameters = q.receive(lam.parameters)
         arrow = q.receive(lam.arrow)
         body = q.receive(lam.body)
         type_ = q.receive(lam.type)
-        return replace_if_changed(lam, parameters=parameters, arrow=arrow, body=body, type=type_)
+        return q.apply(lam, parameters=parameters, arrow=arrow, body=body, type=type_)
 
     def _visit_j_lambda_parameters(self, params, q: RpcReceiveQueue):
         parenthesized = q.receive(params.parenthesized)
         parameters = q.receive_list(params.padding.parameters)
-        return replace_if_changed(params, parenthesized=parenthesized, parameters=parameters)
+        return q.apply(params, parenthesized=parenthesized, parameters=parameters)
 
     def _visit_j_variable_declarations(self, var_decl, q: RpcReceiveQueue):
         leading_annotations = q.receive_list(var_decl.leading_annotations)
@@ -672,7 +672,7 @@ class PythonRpcReceiver:
         type_expression = q.receive(var_decl.type_expression)
         varargs = q.receive(var_decl.varargs)
         variables = q.receive_list(var_decl.padding.variables)
-        return replace_if_changed(var_decl, leading_annotations=leading_annotations, modifiers=modifiers,
+        return q.apply(var_decl, leading_annotations=leading_annotations, modifiers=modifiers,
                                   type_expression=type_expression, varargs=varargs, variables=variables)
 
     def _visit_j_named_variable(self, var, q: RpcReceiveQueue):
@@ -682,8 +682,8 @@ class PythonRpcReceiver:
             var.padding.initializer if hasattr(var.padding, 'initializer') else None,
             lambda lp: self._receive_left_padded(lp, q) if lp else None
         )
-        variable_type = q.receive(var.variable_type, lambda t: self._receive_type(t, q))
-        return replace_if_changed(var, name=name, dimensions_after_name=dimensions_after_name,
+        variable_type = q.receive(var.variable_type)
+        return q.apply(var, name=name, dimensions_after_name=dimensions_after_name,
                                   initializer=initializer, variable_type=variable_type)
 
     def _visit_j_class_declaration(self, class_decl, q: RpcReceiveQueue):
@@ -713,7 +713,7 @@ class PythonRpcReceiver:
         )
         body = q.receive(class_decl.body)
         type_ = q.receive(class_decl.type)
-        return replace_if_changed(class_decl, leading_annotations=leading_annotations, modifiers=modifiers,
+        return q.apply(class_decl, leading_annotations=leading_annotations, modifiers=modifiers,
                                   kind=kind, name=name, type_parameters=type_parameters,
                                   primary_constructor=primary_constructor, extends=extends, implements=implements,
                                   permits=permits, body=body, type=type_)
@@ -723,7 +723,7 @@ class PythonRpcReceiver:
         # Note: _pre_visit is already called by _visit before this method
         annotations = q.receive_list(kind.annotations)
         type_ = _to_enum(ClassDeclaration.Kind.Type)(q.receive(kind.type))
-        return replace_if_changed(kind, annotations=annotations, type=type_)
+        return q.apply(kind, annotations=annotations, type=type_)
 
     def _visit_j_method_declaration(self, method, q: RpcReceiveQueue):
         leading_annotations = q.receive_list(method.leading_annotations)
@@ -748,7 +748,7 @@ class PythonRpcReceiver:
             lambda lp: self._receive_left_padded(lp, q) if lp else None
         )
         method_type = q.receive(method.method_type)
-        return replace_if_changed(method, leading_annotations=leading_annotations, modifiers=modifiers,
+        return q.apply(method, leading_annotations=leading_annotations, modifiers=modifiers,
                                   type_parameters=type_parameters, return_type_expression=return_type_expression,
                                   name_annotations=name_annotations, name=name,
                                   parameters=parameters, dimensions_after_name=dimensions_after_name,
@@ -758,7 +758,7 @@ class PythonRpcReceiver:
     def _visit_j_switch(self, switch, q: RpcReceiveQueue):
         selector = q.receive(switch.selector)
         cases = q.receive(switch.cases)
-        return replace_if_changed(switch, selector=selector, cases=cases)
+        return q.apply(switch, selector=selector, cases=cases)
 
     def _visit_j_case(self, case, q: RpcReceiveQueue):
         from rewrite.java.tree import Case
@@ -767,16 +767,16 @@ class PythonRpcReceiver:
         statements = q.receive(case.padding.statements)
         body = q.receive(case.padding.body, lambda rp: self._receive_right_padded(rp, q) if rp else None)
         guard = q.receive(case.guard, lambda el: self._visit(el, q) if el else None)
-        return replace_if_changed(case, type=type_, case_labels=case_labels, statements=statements, body=body, guard=guard)
+        return q.apply(case, type=type_, case_labels=case_labels, statements=statements, body=body, guard=guard)
 
     def _visit_j_array_access(self, arr, q: RpcReceiveQueue):
         indexed = q.receive(arr.indexed)
         dimension = q.receive(arr.dimension)
-        return replace_if_changed(arr, indexed=indexed, dimension=dimension)
+        return q.apply(arr, indexed=indexed, dimension=dimension)
 
     def _visit_j_array_dimension(self, dim, q: RpcReceiveQueue):
         index = q.receive(dim.padding.index)
-        return replace_if_changed(dim, index=index)
+        return q.apply(dim, index=index)
 
     def _visit_j_new_array(self, new_arr, q: RpcReceiveQueue):
         type_expression = q.receive(new_arr.type_expression)
@@ -786,7 +786,7 @@ class PythonRpcReceiver:
             lambda c: self._receive_container(c, q) if c else None
         )
         type_ = q.receive(new_arr.type)
-        return replace_if_changed(new_arr, type_expression=type_expression, dimensions=dimensions,
+        return q.apply(new_arr, type_expression=type_expression, dimensions=dimensions,
                                   initializer=initializer, type=type_)
 
     def _visit_j_annotation(self, annot, q: RpcReceiveQueue):
@@ -795,27 +795,27 @@ class PythonRpcReceiver:
             annot.padding.arguments if hasattr(annot.padding, 'arguments') else None,
             lambda c: self._receive_container(c, q) if c else None
         )
-        return replace_if_changed(annot, annotation_type=annotation_type, arguments=arguments)
+        return q.apply(annot, annotation_type=annotation_type, arguments=arguments)
 
     def _visit_j_parentheses(self, parens, q: RpcReceiveQueue):
         tree = q.receive(parens.padding.tree)
-        return replace_if_changed(parens, tree=tree)
+        return q.apply(parens, tree=tree)
 
     def _visit_j_control_parentheses(self, parens, q: RpcReceiveQueue):
         tree = q.receive(parens.padding.tree)
-        return replace_if_changed(parens, tree=tree)
+        return q.apply(parens, tree=tree)
 
     def _visit_j_modifier(self, mod, q: RpcReceiveQueue):
         from rewrite.java.tree import Modifier
         keyword = q.receive(mod.keyword)
         type_ = _to_enum(Modifier.Type)(q.receive(mod.type))
         annotations = q.receive_list(mod.annotations)
-        return replace_if_changed(mod, keyword=keyword, type=type_, annotations=annotations)
+        return q.apply(mod, keyword=keyword, type=type_, annotations=annotations)
 
     def _visit_j_yield(self, yield_stmt, q: RpcReceiveQueue):
         implicit = q.receive(yield_stmt.implicit)
         value = q.receive(yield_stmt.value)
-        return replace_if_changed(yield_stmt, implicit=implicit, value=value)
+        return q.apply(yield_stmt, implicit=implicit, value=value)
 
     def _visit_j_parameterized_type(self, param_type, q: RpcReceiveQueue):
         clazz = q.receive(param_type.clazz)
@@ -824,7 +824,7 @@ class PythonRpcReceiver:
             lambda c: self._receive_container(c, q) if c else None
         )
         type_ = q.receive(param_type.type)
-        return replace_if_changed(param_type, clazz=clazz, type_parameters=type_parameters, type=type_)
+        return q.apply(param_type, clazz=clazz, type_parameters=type_parameters, type=type_)
 
     def _visit_j_type_parameter(self, tp, q: RpcReceiveQueue):
         annotations = q.receive_list(tp.annotations)
@@ -834,12 +834,12 @@ class PythonRpcReceiver:
             tp.padding.bounds if hasattr(tp, 'padding') and hasattr(tp.padding, 'bounds') else None,
             lambda c: self._receive_container(c, q) if c else None
         )
-        return replace_if_changed(tp, annotations=annotations, modifiers=modifiers, name=name, bounds=bounds)
+        return q.apply(tp, annotations=annotations, modifiers=modifiers, name=name, bounds=bounds)
 
     def _visit_j_type_parameters(self, tps, q: RpcReceiveQueue):
         annotations = q.receive_list(tps.annotations)
         type_parameters = q.receive_list(tps.padding.type_parameters, lambda rp: self._receive_right_padded(rp, q))
-        return replace_if_changed(tps, annotations=annotations, type_parameters=type_parameters)
+        return q.apply(tps, annotations=annotations, type_parameters=type_parameters)
 
     # Helper methods for Space, JRightPadded, JLeftPadded, JContainer
 
@@ -854,7 +854,7 @@ class PythonRpcReceiver:
         if comments is space.comments and whitespace is space.whitespace:
             return space
 
-        return space.replace(comments=comments).replace(whitespace=whitespace)
+        return Space.build(comments, whitespace)
 
     def _receive_comment(self, comment, q: RpcReceiveQueue):
         """Receive a Comment object (TextComment only for Python)."""
@@ -922,170 +922,6 @@ class PythonRpcReceiver:
             return container
 
         return JContainer(before, elements, markers)
-
-    def _receive_type(self, java_type, q: RpcReceiveQueue):
-        """Receive a JavaType object with expanded fields.
-
-        This matches the sender's _visit_type which sends expanded type fields.
-        The callback pattern ensures message counts match between sender and receiver.
-
-        IMPORTANT: isinstance ordering matters here. Parameterized must be checked
-        before Class because both are separate types. If inheritance changes, review
-        this ordering. Mirrors the sender's _visit_type chain.
-        """
-        from rewrite.java.support_types import JavaType as JT
-
-        if java_type is None:
-            return None
-
-        if isinstance(java_type, JT.Primitive):
-            # For Primitive types, receive the keyword
-            keyword = q.receive(None)
-            # Map keyword back to JavaType.Primitive enum
-            keyword_to_primitive = {
-                'boolean': JT.Primitive.Boolean,
-                'byte': JT.Primitive.Byte,
-                'char': JT.Primitive.Char,
-                'double': JT.Primitive.Double,
-                'float': JT.Primitive.Float,
-                'int': JT.Primitive.Int,
-                'long': JT.Primitive.Long,
-                'short': JT.Primitive.Short,
-                'void': JT.Primitive.Void,
-                'String': JT.Primitive.String,
-                '': JT.Primitive.None_,
-                'null': JT.Primitive.Null,
-            }
-            return keyword_to_primitive.get(keyword, java_type)
-
-        elif isinstance(java_type, JT.Method):
-            # Method: declaringType, name, flagsBitMap, returnType, parameterNames,
-            #         parameterTypes, thrownExceptions, annotations, defaultValue, declaredFormalTypeNames
-            declaring_type = q.receive(getattr(java_type, '_declaring_type', None),
-                                        lambda t: self._receive_type(t, q))
-            name = q.receive(getattr(java_type, '_name', ''))
-            flags = q.receive(getattr(java_type, '_flags_bit_map', 0))
-            return_type = q.receive(getattr(java_type, '_return_type', None),
-                                     lambda t: self._receive_type(t, q))
-            param_names = q.receive_list(getattr(java_type, '_parameter_names', None) or [])
-            param_types = q.receive_list(getattr(java_type, '_parameter_types', None) or [],
-                                          lambda t: self._receive_type(t, q))
-            thrown = q.receive_list(getattr(java_type, '_thrown_exceptions', None) or [],
-                                     lambda t: self._receive_type(t, q))
-            annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
-                                          lambda t: self._receive_type(t, q))
-            default_value = q.receive_list(getattr(java_type, '_default_value', None) or [])
-            formal_type_names = q.receive_list(getattr(java_type, '_declared_formal_type_names', None) or [])
-
-            return JT.Method(
-                _flags_bit_map=flags,
-                _declaring_type=declaring_type,
-                _name=name,
-                _return_type=return_type,
-                _parameter_names=param_names,
-                _parameter_types=param_types,
-                _thrown_exceptions=thrown,
-                _annotations=annotations,
-                _default_value=default_value,
-                _declared_formal_type_names=formal_type_names,
-            )
-
-        elif isinstance(java_type, JT.Parameterized):
-            type_ = q.receive(getattr(java_type, '_type', None),
-                              lambda t: self._receive_type(t, q))
-            type_params = q.receive_list(getattr(java_type, '_type_parameters', None) or [],
-                                          lambda t: self._receive_type(t, q))
-            p = JT.Parameterized()
-            p._type = type_  # ty: ignore[invalid-assignment]  # RPC deserialization
-            p._type_parameters = type_params
-            return p
-
-        elif isinstance(java_type, JT.Class):
-            # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
-            #        owningClass, annotations, interfaces, members, methods
-            flags = q.receive_defined(getattr(java_type, '_flags_bit_map', 0))
-            kind = _to_enum(JT.FullyQualified.Kind)(q.receive(getattr(java_type, '_kind', JT.FullyQualified.Kind.Class)))
-            fqn = q.receive_defined(getattr(java_type, 'fully_qualified_name', ''))
-            type_params = q.receive_list(getattr(java_type, '_type_parameters', None) or [],
-                                          lambda t: self._receive_type(t, q))
-            supertype = q.receive(getattr(java_type, '_supertype', None),
-                                   lambda t: self._receive_type(t, q))
-            owning_class = q.receive(getattr(java_type, '_owning_class', None),
-                                      lambda t: self._receive_type(t, q))
-            annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
-                                          lambda t: self._receive_type(t, q))
-            interfaces = q.receive_list(getattr(java_type, '_interfaces', None) or [],
-                                         lambda t: self._receive_type(t, q))
-            members = q.receive_list(getattr(java_type, '_members', None) or [],
-                                      lambda t: self._receive_type(t, q))
-            methods = q.receive_list(getattr(java_type, '_methods', None) or [],
-                                      lambda t: self._receive_type(t, q))
-
-            class_type = JT.Class()
-            class_type._flags_bit_map = flags
-            class_type._kind = kind
-            class_type._fully_qualified_name = fqn
-            class_type._type_parameters = type_params
-            class_type._supertype = supertype
-            class_type._owning_class = owning_class
-            class_type._annotations = annotations
-            class_type._interfaces = interfaces
-            class_type._members = members
-            class_type._methods = methods
-            return class_type
-
-        elif isinstance(java_type, JT.Array):
-            elem_type = q.receive(getattr(java_type, '_elem_type', None),
-                                   lambda t: self._receive_type(t, q))
-            annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
-                                          lambda t: self._receive_type(t, q))
-            arr = JT.Array()
-            arr._elem_type = elem_type
-            arr._annotations = annotations
-            return arr
-
-        elif isinstance(java_type, JT.Variable):
-            name = q.receive(getattr(java_type, '_name', ''))
-            owner = q.receive(getattr(java_type, '_owner', None),
-                               lambda t: self._receive_type(t, q))
-            type_ = q.receive(getattr(java_type, '_type', None),
-                               lambda t: self._receive_type(t, q))
-            annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
-                                          lambda t: self._receive_type(t, q))
-            var = JT.Variable()
-            var._name = name  # ty: ignore[invalid-assignment]  # RPC deserialization
-            var._owner = owner
-            var._type = type_
-            var._annotations = annotations
-            return var
-
-        elif isinstance(java_type, JT.GenericTypeVariable):
-            # GenericTypeVariable: name, variance, bounds
-            name = q.receive(getattr(java_type, '_name', ''))
-            variance_raw = q.receive(getattr(java_type, '_variance', JT.GenericTypeVariable.Variance.Invariant))
-            variance = _to_variance(variance_raw, JT)
-            bounds = q.receive_list(getattr(java_type, '_bounds', None) or [],
-                                     lambda t: self._receive_type(t, q))
-            return JT.GenericTypeVariable(_name=name, _variance=variance, _bounds=bounds)
-
-        elif isinstance(java_type, JT.Union):
-            # Union (MultiCatch in Java): bounds list
-            bounds = q.receive_list(getattr(java_type, '_bounds', None) or [],
-                                     lambda t: self._receive_type(t, q))
-            return JT.Union(_bounds=bounds)
-
-        elif isinstance(java_type, JT.Intersection):
-            # Intersection: bounds list
-            bounds = q.receive_list(getattr(java_type, '_bounds', None) or [],
-                                     lambda t: self._receive_type(t, q))
-            return JT.Intersection(_bounds=bounds)
-
-        elif isinstance(java_type, JT.Unknown):
-            # Unknown has no additional fields
-            return java_type
-
-        # Default: return as-is
-        return java_type
 
 
 # Register marker codecs
@@ -1157,6 +993,71 @@ def _register_marker_codecs():
     )
 
 
+def _register_file_attributes_codec():
+    """A source file's ``file_attributes`` is a codec field on the Java side, so it arrives as a
+    typed ADD followed by one message per sub-field. Consuming only the ADD leaves the rest to be
+    read as whatever field comes next.
+
+    The sub-fields are consumed and discarded rather than parsed. Java sends timestamps with
+    nanosecond precision and a zone id; ``datetime`` holds neither, so keeping the value would
+    degrade it and then hand the degraded form back on the return leg. Discarding leaves
+    ``file_attributes`` at None, which the sender reports as NO_CHANGE, so the peer keeps its own.
+    """
+    from rewrite.tree import FileAttributes
+    from rewrite.rpc.receive_queue import register_codec_with_both_names
+    from rewrite.rpc.send_queue import RpcSendQueue
+
+    def _local_iso(value: Optional[datetime]) -> Optional[str]:
+        # Java's FileAttributes.fromPath stamps the system zone, so a naive datetime (what
+        # FileAttributes.from_path builds) has to acquire one or ZonedDateTime.parse rejects it.
+        if value is None:
+            return None
+        return (value if value.tzinfo else value.astimezone()).isoformat()
+
+    def _receive_file_attributes(_attrs: FileAttributes, q: RpcReceiveQueue) -> None:
+        for _field in ('creation_time', 'last_modified_time', 'last_access_time',
+                       'is_readable', 'is_writable', 'is_executable', 'size'):
+            q.receive(None)
+        return None
+
+    def _send_file_attributes(attrs: FileAttributes, q: RpcSendQueue) -> None:
+        q.get_and_send(attrs, lambda a: _local_iso(a.creation_time))
+        q.get_and_send(attrs, lambda a: _local_iso(a.last_modified_time))
+        q.get_and_send(attrs, lambda a: _local_iso(a.last_access_time))
+        q.get_and_send(attrs, lambda a: a.is_readable)
+        q.get_and_send(attrs, lambda a: a.is_writable)
+        q.get_and_send(attrs, lambda a: a.is_executable)
+        q.get_and_send(attrs, lambda a: a.size)
+
+    register_codec_with_both_names(
+        'org.openrewrite.FileAttributes',
+        FileAttributes,
+        _receive_file_attributes,
+        lambda: FileAttributes(None, None, None, False, False, False, 0),
+        _send_file_attributes
+    )
+
+
+def _register_execution_context_codec():
+    """Codec for execution contexts crossing the RPC boundary (e.g. Java
+    fetching the ``p`` of a Visit from a Python host via GetObject).
+
+    Mirrors Java's ``ExecutionContext.rpcSend``/``rpcReceive`` defaults and the
+    JavaScript ``executionContextCodec``: the wire carries no properties, the
+    receiver reconstructs the context from ``valueType`` alone.
+    """
+    from rewrite import InMemoryExecutionContext
+    from rewrite.rpc.receive_queue import register_codec_with_both_names
+
+    register_codec_with_both_names(
+        'org.openrewrite.InMemoryExecutionContext',
+        InMemoryExecutionContext,
+        lambda ctx, q: ctx,
+        lambda: InMemoryExecutionContext(),
+        lambda ctx, q: None,
+    )
+
+
 # ============================================================================
 # Codec registration - registers all AST, support, and marker types
 # ============================================================================
@@ -1219,12 +1120,61 @@ def _receive_search_result(marker, q: RpcReceiveQueue):
     from rewrite.markers import SearchResult
 
     # SearchResult sends: id, description
-    before_id = str(marker.id) if marker and marker.id else None
+    before_id = id_to_str(marker._id) if marker is not None and marker._id is not None else None
     id_str = q.receive(before_id)
     description = q.receive(marker.description if marker else None)
 
     new_id = id_to_int(id_str) if id_str else (marker._id if marker else None)
     return SearchResult(_id=new_id, _description=description)
+
+
+def _receive_recipe_that_made_changes(recipe, q: RpcReceiveQueue):
+    """Codec for receiving RecipeThatMadeChanges."""
+    from rewrite.markers import RecipeThatMadeChanges
+
+    # RecipeThatMadeChanges sends: name, displayName, instanceName, options, effort millis
+    name = q.receive(recipe.name if recipe else None)
+    display_name = q.receive(recipe.display_name if recipe else None)
+    instance_name = q.receive(recipe.instance_name if recipe else None)
+    options = q.receive(recipe.options if recipe else None)
+    effort = q.receive(recipe.estimated_effort_per_occurrence_millis if recipe else None)
+    return RecipeThatMadeChanges(name, display_name, instance_name, options, effort)
+
+
+def _send_recipe_that_made_changes(recipe, q):
+    """Codec for sending RecipeThatMadeChanges."""
+    q.get_and_send(recipe, lambda x: x.name)
+    q.get_and_send(recipe, lambda x: x.display_name)
+    q.get_and_send(recipe, lambda x: x.instance_name)
+    q.get_and_send(recipe, lambda x: x.options)
+    q.get_and_send(recipe, lambda x: x.estimated_effort_per_occurrence_millis)
+
+
+def _receive_recipes_that_made_changes(marker, q: RpcReceiveQueue):
+    """Codec for receiving RecipesThatMadeChanges."""
+    from rewrite.markers import RecipesThatMadeChanges
+
+    # RecipesThatMadeChanges sends: id, recipes (a list of stacks)
+    before_id = id_to_str(marker._id) if marker is not None and marker._id is not None else None
+    id_str = q.receive(before_id)
+
+    before_stacks = marker.recipes if marker is not None else None
+    stacks = q.receive_list(before_stacks, lambda stack: q.receive_list(stack) or [])
+
+    new_id = id_to_int(id_str) if id_str else (marker._id if marker else None)
+    return RecipesThatMadeChanges(_id=new_id, _recipes=stacks or [])
+
+
+def _send_recipes_that_made_changes(marker, q):
+    """Codec for sending RecipesThatMadeChanges."""
+    q.get_and_send(marker, lambda x: id_to_str(x._id))
+    # The stack key never travels; it only has to identify a stack within this process.
+    q.get_and_send_list(
+        marker,
+        lambda x: list(x.recipes) if x.recipes else [],
+        lambda stack: tuple(recipe.name for recipe in stack),
+        lambda stack: q.get_and_send_list(stack, lambda s: list(s), lambda recipe: recipe.name)
+    )
 
 
 def _receive_parse_exception_result(marker, q: RpcReceiveQueue):
@@ -1236,7 +1186,7 @@ def _receive_parse_exception_result(marker, q: RpcReceiveQueue):
     from rewrite.markers import ParseExceptionResult
 
     # Receive in Java's send order: id, parserType, exceptionType, message, treeType
-    id_str = q.receive(str(marker.id) if marker else None)
+    id_str = q.receive(id_to_str(marker._id) if marker is not None and marker._id is not None else None)
     parser_type = q.receive(marker.parser_type if marker else None)
     exception_type = q.receive(marker.exception_type if marker else None)
     message = q.receive(marker.message if marker else None)
@@ -1282,7 +1232,7 @@ def _receive_markup_marker(marker, q: RpcReceiveQueue, cls):
     Matches Java's Markup.{Warn,Error,Info,Debug}.rpcReceive().
     """
 
-    id_str = q.receive(str(marker.id) if marker else None)
+    id_str = q.receive(id_to_str(marker._id) if marker is not None and marker._id is not None else None)
     message = q.receive(marker.message if marker else None)
     detail = q.receive(marker.detail if marker else None)
 
@@ -1348,6 +1298,21 @@ def _receive_java_type_unknown(unknown, q: RpcReceiveQueue):
     return unknown
 
 
+def _unsafe_set(obj, **fields):
+    """Assign received field values on `obj`, bypassing the stubs' frozen contract.
+
+    JavaType codecs populate `before` in place (like the Java and TypeScript
+    receivers) rather than building a fresh instance: on ADD-with-ref the queue
+    pre-registers `before` in `_refs`, so any back-reference in a cyclic type
+    graph resolves to that same instance and must see the final field values.
+    Keyword arguments evaluate left to right, so `q.receive(...)` calls passed
+    as arguments consume the wire fields in declaration order.
+    """
+    for name, value in fields.items():
+        setattr(obj, name, value)
+    return obj
+
+
 def _receive_java_type_method(method, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Method - consumes all method fields."""
     from rewrite.java.support_types import JavaType as JT
@@ -1355,28 +1320,18 @@ def _receive_java_type_method(method, q: RpcReceiveQueue):
     # Receive fields in the same order as JavaTypeSender.visitMethod:
     # declaringType, name, flagsBitMap, returnType, parameterNames,
     # parameterTypes, thrownExceptions, annotations, defaultValue, declaredFormalTypeNames
-    declaring_type = q.receive(method._declaring_type if method else None)
-    name = q.receive(method._name if method else '')
-    flags = q.receive(method._flags_bit_map if method else 0)
-    return_type = q.receive(method._return_type if method else None)
-    param_names = q.receive_list(method._parameter_names if method else None)
-    param_types = q.receive_list(method._parameter_types if method else None)
-    thrown = q.receive_list(method._thrown_exceptions if method else None)
-    annotations = q.receive_list(method._annotations if method else None)
-    default_value = q.receive_list(method._default_value if method else None)
-    formal_type_names = q.receive_list(method._declared_formal_type_names if method else None)
-
-    return JT.Method(
-        _flags_bit_map=flags,
-        _declaring_type=declaring_type,
-        _name=name,
-        _return_type=return_type,
-        _parameter_names=param_names,
-        _parameter_types=param_types,
-        _thrown_exceptions=thrown,
-        _annotations=annotations,
-        _default_value=default_value,
-        _declared_formal_type_names=formal_type_names,
+    return _unsafe_set(
+        method if isinstance(method, JT.Method) else JT.Method(),
+        _declaring_type=q.receive(method._declaring_type if method else None),
+        _name=q.receive(method._name if method else ''),
+        _flags_bit_map=q.receive(method._flags_bit_map if method else 0),
+        _return_type=q.receive(method._return_type if method else None),
+        _parameter_names=q.receive_list(method._parameter_names if method else None),
+        _parameter_types=q.receive_list(method._parameter_types if method else None),
+        _thrown_exceptions=q.receive_list(method._thrown_exceptions if method else None),
+        _annotations=q.receive_list(method._annotations if method else None),
+        _default_value=q.receive_list(method._default_value if method else None),
+        _declared_formal_type_names=q.receive_list(method._declared_formal_type_names if method else None),
     )
 
 
@@ -1387,70 +1342,55 @@ def _receive_java_type_class_fields(cls, q: RpcReceiveQueue, result):
     # Receive fields in the same order as JavaTypeSender.visitClass:
     # flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
     # owningClass, annotations, interfaces, members, methods
-    flags = q.receive_defined(getattr(cls, '_flags_bit_map', 0) if cls else 0)
-    kind = _to_enum(JT.FullyQualified.Kind)(q.receive(getattr(cls, '_kind', JT.FullyQualified.Kind.Class) if cls else JT.FullyQualified.Kind.Class))
-    fqn = q.receive_defined(getattr(cls, 'fully_qualified_name', '') if cls else '')
-    type_params = q.receive_list(getattr(cls, '_type_parameters', None) if cls else None)
-    supertype = q.receive(getattr(cls, '_supertype', None) if cls else None)
-    owning_class = q.receive(getattr(cls, '_owning_class', None) if cls else None)
-    annotations = q.receive_list(getattr(cls, '_annotations', None) if cls else None)
-    interfaces = q.receive_list(getattr(cls, '_interfaces', None) if cls else None)
-    members = q.receive_list(getattr(cls, '_members', None) if cls else None)
-    methods = q.receive_list(getattr(cls, '_methods', None) if cls else None)
-
-    result._flags_bit_map = flags
-    result._kind = kind
-    result._fully_qualified_name = fqn
-    result._type_parameters = type_params
-    result._supertype = supertype
-    result._owning_class = owning_class
-    result._annotations = annotations
-    result._interfaces = interfaces
-    result._members = members
-    result._methods = methods
-
-    return result
+    return _unsafe_set(
+        result,
+        _flags_bit_map=q.receive_defined(getattr(cls, '_flags_bit_map', 0) if cls else 0),
+        _kind=_to_enum(JT.FullyQualified.Kind)(q.receive(getattr(cls, '_kind', JT.FullyQualified.Kind.Class) if cls else JT.FullyQualified.Kind.Class)),
+        _fully_qualified_name=q.receive_defined(getattr(cls, 'fully_qualified_name', '') if cls else ''),
+        _type_parameters=q.receive_list(getattr(cls, '_type_parameters', None) if cls else None),
+        _supertype=q.receive(getattr(cls, '_supertype', None) if cls else None),
+        _owning_class=q.receive(getattr(cls, '_owning_class', None) if cls else None),
+        _annotations=q.receive_list(getattr(cls, '_annotations', None) if cls else None),
+        _interfaces=q.receive_list(getattr(cls, '_interfaces', None) if cls else None),
+        _members=q.receive_list(getattr(cls, '_members', None) if cls else None),
+        _methods=q.receive_list(getattr(cls, '_methods', None) if cls else None),
+    )
 
 
 def _receive_java_type_class(cls, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Class - consumes all class fields."""
     from rewrite.java.support_types import JavaType as JT
 
-    return _receive_java_type_class_fields(cls, q, JT.Class())
+    return _receive_java_type_class_fields(cls, q, cls if isinstance(cls, JT.Class) else JT.Class())
 
 
 def _receive_java_type_shallow_class(cls, q: RpcReceiveQueue):
     """Codec for receiving JavaType.ShallowClass - same wire shape as Class."""
     from rewrite.java.support_types import JavaType as JT
 
-    return _receive_java_type_class_fields(cls, q, JT.ShallowClass())
+    return _receive_java_type_class_fields(cls, q, cls if isinstance(cls, JT.ShallowClass) else JT.ShallowClass())
 
 
 def _receive_java_type_parameterized(param, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Parameterized - consumes type and typeParameters."""
     from rewrite.java.support_types import JavaType as JT
 
-    type_ = q.receive(getattr(param, '_type', None))
-    type_params = q.receive_list(getattr(param, '_type_parameters', None))
-
-    p = JT.Parameterized()
-    p._type = type_  # ty: ignore[invalid-assignment]  # RPC deserialization
-    p._type_parameters = type_params
-    return p
+    return _unsafe_set(
+        param if isinstance(param, JT.Parameterized) else JT.Parameterized(),
+        _type=q.receive(getattr(param, '_type', None)),
+        _type_parameters=q.receive_list(getattr(param, '_type_parameters', None)),
+    )
 
 
 def _receive_java_type_annotation(annotation, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Annotation - consumes type and values."""
     from rewrite.java.support_types import JavaType as JT
 
-    type_ = q.receive(getattr(annotation, '_type', None))
-    before_values = getattr(annotation, '_values', None)
-    values = q.receive_list(before_values, lambda v: _receive_annotation_element_value(v, q))
-
-    a = JT.Annotation()
-    a._type = type_  # ty: ignore[invalid-assignment]  # RPC deserialization
-    a._values = values
-    return a
+    return _unsafe_set(
+        annotation if isinstance(annotation, JT.Annotation) else JT.Annotation(),
+        _type=q.receive(getattr(annotation, '_type', None)),
+        _values=q.receive_list(getattr(annotation, '_values', None), lambda v: _receive_annotation_element_value(v, q)),
+    )
 
 
 def _receive_annotation_element_value(v, q: RpcReceiveQueue):
@@ -1463,20 +1403,17 @@ def _receive_annotation_element_value(v, q: RpcReceiveQueue):
 
     element = q.receive(getattr(v, '_element', None))
     if isinstance(v, JT.Annotation.ArrayElementValue):
-        constant_values = q.receive_list(getattr(v, '_constant_values', None), None)
-        ref_values = q.receive_list(getattr(v, '_reference_values', None) or [])
-        return JT.Annotation.ArrayElementValue(
+        return _unsafe_set(
+            v,
             _element=element,
-            _constant_values=constant_values,
-            _reference_values=ref_values,
+            _constant_values=q.receive_list(getattr(v, '_constant_values', None), None),
+            _reference_values=q.receive_list(getattr(v, '_reference_values', None) or []),
         )
-    sev = v if isinstance(v, JT.Annotation.SingleElementValue) else None
-    constant_value = q.receive(getattr(sev, '_constant_value', None) if sev is not None else None)
-    ref_value = q.receive(getattr(sev, '_reference_value', None) if sev is not None else None)
-    return JT.Annotation.SingleElementValue(
+    return _unsafe_set(
+        v if isinstance(v, JT.Annotation.SingleElementValue) else JT.Annotation.SingleElementValue(),
         _element=element,
-        _constant_value=constant_value,
-        _reference_value=ref_value,
+        _constant_value=q.receive(getattr(v, '_constant_value', None)),
+        _reference_value=q.receive(getattr(v, '_reference_value', None)),
     )
 
 
@@ -1484,13 +1421,11 @@ def _receive_java_type_array(array, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Array - consumes elemType and annotations."""
     from rewrite.java.support_types import JavaType as JT
 
-    elem_type = q.receive(array._elem_type)
-    annotations = q.receive_list(array._annotations)
-
-    arr = JT.Array()
-    arr._elem_type = elem_type
-    arr._annotations = annotations
-    return arr
+    return _unsafe_set(
+        array if isinstance(array, JT.Array) else JT.Array(),
+        _elem_type=q.receive(array._elem_type),
+        _annotations=q.receive_list(array._annotations),
+    )
 
 
 def _receive_java_type_variable(variable, q: RpcReceiveQueue):
@@ -1499,44 +1434,45 @@ def _receive_java_type_variable(variable, q: RpcReceiveQueue):
 
     # Receive fields in the same order as JavaTypeSender.visitVariable:
     # name, owner, type, annotations (no flags over RPC)
-    name = q.receive(variable._name)
-    owner = q.receive(variable._owner)
-    type_ = q.receive(variable._type)
-    annotations = q.receive_list(variable._annotations)
-
-    var = JT.Variable()
-    var._name = name  # ty: ignore[invalid-assignment]  # RPC deserialization
-    var._owner = owner
-    var._type = type_
-    var._annotations = annotations
-    return var
+    return _unsafe_set(
+        variable if isinstance(variable, JT.Variable) else JT.Variable(),
+        _name=q.receive(variable._name),
+        _owner=q.receive(variable._owner),
+        _type=q.receive(variable._type),
+        _annotations=q.receive_list(variable._annotations),
+    )
 
 
 def _receive_java_type_generic_type_variable(gtv, q: RpcReceiveQueue):
     """Codec for receiving JavaType.GenericTypeVariable - consumes name, variance, bounds."""
     from rewrite.java.support_types import JavaType as JT
 
-    name = q.receive(gtv._name)
-    variance_raw = q.receive(gtv._variance)
-    variance = _to_variance(variance_raw, JT)
-    bounds = q.receive_list(gtv._bounds or [])
-    return JT.GenericTypeVariable(_name=name, _variance=variance, _bounds=bounds)
+    return _unsafe_set(
+        gtv if isinstance(gtv, JT.GenericTypeVariable) else JT.GenericTypeVariable(),
+        _name=q.receive(gtv._name),
+        _variance=_to_variance(q.receive(gtv._variance), JT),
+        _bounds=q.receive_list(gtv._bounds or []),
+    )
 
 
 def _receive_java_type_union(union, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Union (MultiCatch in Java) - consumes bounds list."""
     from rewrite.java.support_types import JavaType as JT
 
-    bounds = q.receive_list(union._bounds)
-    return JT.Union(_bounds=bounds)
+    return _unsafe_set(
+        union if isinstance(union, JT.Union) else JT.Union(),
+        _bounds=q.receive_list(union._bounds),
+    )
 
 
 def _receive_java_type_intersection(intersection, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Intersection - consumes bounds list."""
     from rewrite.java.support_types import JavaType as JT
 
-    bounds = q.receive_list(intersection._bounds)
-    return JT.Intersection(_bounds=bounds)
+    return _unsafe_set(
+        intersection if isinstance(intersection, JT.Intersection) else JT.Intersection(),
+        _bounds=q.receive_list(intersection._bounds),
+    )
 
 
 def _register_java_type_codecs():
@@ -1727,19 +1663,22 @@ def _register_support_type_codecs():
 
 def _register_core_marker_codecs():
     """Register codecs for core marker types."""
-    from rewrite.markers import Markers, ParseExceptionResult, SearchResult
+    from rewrite.markers import (Markers, ParseExceptionResult, RecipeThatMadeChanges,
+                                 RecipesThatMadeChanges, SearchResult)
     from rewrite.rpc.receive_queue import (
         register_codec_with_both_names,
         make_dataclass_factory,
         _receive_markers
     )
 
-    # Core markers - Markers uses Markers.EMPTY as factory
+    # A factory owes the receive queue an instance nobody else holds: the queue
+    # fills what it builds in place. Handing back Markers.EMPTY would let a codec
+    # rewrite the global singleton.
     register_codec_with_both_names(
         'org.openrewrite.marker.Markers',
         Markers,
         _receive_markers,
-        lambda: Markers.EMPTY
+        lambda: Markers(random_id(), [])
     )
     # SearchResult - has specific fields to receive/send
     register_codec_with_both_names(
@@ -1748,6 +1687,21 @@ def _register_core_marker_codecs():
         _receive_search_result,
         make_dataclass_factory(SearchResult),
         sender=_send_search_result
+    )
+    # RecipeThatMadeChanges / RecipesThatMadeChanges - identity of the recipes that changed a file
+    register_codec_with_both_names(
+        'org.openrewrite.marker.RecipeThatMadeChanges',
+        RecipeThatMadeChanges,
+        _receive_recipe_that_made_changes,
+        make_dataclass_factory(RecipeThatMadeChanges),
+        sender=_send_recipe_that_made_changes
+    )
+    register_codec_with_both_names(
+        'org.openrewrite.marker.RecipesThatMadeChanges',
+        RecipesThatMadeChanges,
+        _receive_recipes_that_made_changes,
+        make_dataclass_factory(RecipesThatMadeChanges),
+        sender=_send_recipes_that_made_changes
     )
     # ParseExceptionResult - has specific fields to receive/send
     register_codec_with_both_names(
@@ -1799,7 +1753,7 @@ def _receive_parse_error(parse_error, q: RpcReceiveQueue):
     from pathlib import Path
 
     # Receive all fields in order (matching Java's ParseError.rpcSend)
-    id_str = q.receive(str(parse_error.id) if parse_error else None)
+    id_str = q.receive(id_to_str(parse_error._id) if parse_error is not None and parse_error._id is not None else None)
     markers = q.receive_markers(parse_error.markers if parse_error else None)
     source_path = q.receive(str(parse_error.source_path) if parse_error else None)
     charset_name = q.receive(parse_error.charset_name if parse_error else None)
@@ -2216,3 +2170,5 @@ _register_style_codecs()
 _register_parse_error_codec()  # ParseError handling
 _register_python_marker_codecs()  # Python-specific markers including PrintSyntax, ExecSyntax
 _register_python_resolution_result_codecs()  # PythonResolutionResult and nested types
+_register_file_attributes_codec()  # Consumes the source-file fileAttributes sub-fields
+_register_execution_context_codec()

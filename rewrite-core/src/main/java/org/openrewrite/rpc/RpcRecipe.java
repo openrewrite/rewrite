@@ -19,9 +19,9 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.config.RecipeExample;
+import org.openrewrite.rpc.request.PrepareRecipeResponse;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -29,14 +29,15 @@ import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toMap;
 
 
 @RequiredArgsConstructor
 public class RpcRecipe extends ScanningRecipe<Integer> {
     @Getter
     private final transient RewriteRpc rpc;
+
     private transient @Nullable List<Recipe> recipeList;
 
     /**
@@ -45,8 +46,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     private final String remoteId;
 
     private final RecipeDescriptor descriptor;
+
     @Getter
     private final String editVisitor;
+
     /**
      * Composite of all editPreconditions resolved during PrepareRecipe. Exposed so that the
      * BatchVisit batching path in {@link org.openrewrite.scheduling.RecipeRunCycle} can
@@ -57,10 +60,19 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      */
     @Getter
     private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
+
     @Getter
     private final @Nullable String scanVisitor;
+
     @Getter
     private final @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
+
+    /**
+     * The prepared child recipe responses returned by the server as part of the whole-tree
+     * prepare response. {@link #getRecipeList()} builds the children locally from these. Every
+     * RPC server populates this (an empty list for a leaf), so it is effectively required.
+     */
+    private final @Nullable List<PrepareRecipeResponse> childResponses;
 
     @Override
     public String getName() {
@@ -126,10 +138,12 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     @Override
     public synchronized List<Recipe> getRecipeList() {
         if (recipeList == null) {
-            recipeList = descriptor.getRecipeList().stream()
-                    .map(r -> rpc.prepareRecipe(r.getName(), r.getOptions().stream()
-                            .filter(opt -> opt.getValue() != null)
-                            .collect(toMap(OptionDescriptor::getName, OptionDescriptor::getValue))))
+            // Every RPC server returns the whole prepared tree, so build the children locally from
+            // the child responses — no individual PrepareRecipe RPC per child.
+            recipeList = requireNonNull(childResponses,
+                    "RPC server returned a recipe without a prepared child tree (recipeList)")
+                    .stream()
+                    .map(rpc::recipeFromPrepareResponse)
                     .collect(toList());
         }
         return recipeList;

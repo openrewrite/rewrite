@@ -17,6 +17,8 @@ package org.openrewrite.golang.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
@@ -38,9 +40,9 @@ public class ImportBlock implements Marker, RpcCodec<ImportBlock> {
     public void rpcSend(ImportBlock after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
         q.getAndSend(after, ImportBlock::isClosePrevious);
-        q.getAndSend(after, b -> b.getBefore().getWhitespace());
+        q.getAndSend(after, ImportBlock::getBefore, space -> new JavaSender().visitSpace(space, q));
         q.getAndSend(after, ImportBlock::isGrouped);
-        q.getAndSend(after, b -> b.getGroupedBefore().getWhitespace());
+        q.getAndSend(after, ImportBlock::getGroupedBefore, space -> new JavaSender().visitSpace(space, q));
     }
 
     @Override
@@ -48,8 +50,8 @@ public class ImportBlock implements Marker, RpcCodec<ImportBlock> {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                 .withClosePrevious(q.receive(before.isClosePrevious()))
-                .withBefore(Space.format(q.receive(before.getBefore() == null ? "" : before.getBefore().getWhitespace())))
+                .withBefore(q.receive(before.getBefore(), space -> new JavaReceiver().visitSpace(space, q)))
                 .withGrouped(q.receive(before.isGrouped()))
-                .withGroupedBefore(Space.format(q.receive(before.getGroupedBefore() == null ? "" : before.getGroupedBefore().getWhitespace())));
+                .withGroupedBefore(q.receive(before.getGroupedBefore(), space -> new JavaReceiver().visitSpace(space, q)));
     }
 }

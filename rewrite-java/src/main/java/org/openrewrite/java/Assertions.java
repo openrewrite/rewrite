@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -85,14 +86,17 @@ public class Assertions {
                 List<J.Unknown> allUnknown = new JavaIsoVisitor<List<J.Unknown>>() {
                     @Override
                     public J.Unknown visitUnknown(J.Unknown unknown, List<J.Unknown> list) {
-                        J.Unknown err = super.visitUnknown(unknown, list);
-                        list.add(err);
-                        return err;
+                        J.Unknown u = super.visitUnknown(unknown, list);
+                        list.add(u);
+                        return u;
                     }
                 }.reduce(source, new ArrayList<>());
                 if (!allUnknown.isEmpty()) {
-                    throw new IllegalStateException("LST contains erroneous nodes\n" + allUnknown.stream()
-                            .map(unknown -> unknown.getSource().getText())
+                    throw new IllegalStateException("LST contains unknown elements\n" + allUnknown.stream()
+                            .map(unknown -> unknown.getSource().getMarkers()
+                                    .findFirst(ParseExceptionResult.class)
+                                    .map(per -> per.getMessage() + "\n")
+                                    .orElse("") + unknown.getSource().getText())
                             .collect(joining("\n\n")));
                 }
             }
@@ -233,6 +237,21 @@ public class Assertions {
         return sourceSpec;
     }
 
+    /**
+     * Attach a {@link JavaVersion} where the compiling JDK ({@code createdBy}) may differ from the
+     * {@code -source}/{@code --release} bytecode level, e.g. JDK 23 producing Java 8 bytecode.
+     */
+    public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int createdByMajor, int sourceCompatibility, int targetCompatibility) {
+        return sourceSpec.markers(javaVersion(createdByMajor, sourceCompatibility, targetCompatibility));
+    }
+
+    public static SourceSpecs version(SourceSpecs sourceSpec, int createdByMajor, int sourceCompatibility, int targetCompatibility) {
+        for (SourceSpec<?> spec : sourceSpec) {
+            spec.markers(javaVersion(createdByMajor, sourceCompatibility, targetCompatibility));
+        }
+        return sourceSpec;
+    }
+
     public static SourceSpec<?> project(SourceSpec<?> sourceSpec, String projectName) {
         return sourceSpec.markers(javaProject(projectName));
     }
@@ -316,8 +335,18 @@ public class Assertions {
 
     public static JavaVersion javaVersion(int version) {
         return javaVersions.computeIfAbsent(version, v ->
-                new JavaVersion(Tree.randomId(), "openjdk", "adoptopenjdk",
+                new JavaVersion(Tree.randomId(), v + ".0.1", "adoptopenjdk",
                         Integer.toString(v), Integer.toString(v)));
+    }
+
+    /**
+     * @param createdByMajor       the major version of the compiling JDK ({@code createdBy})
+     * @param sourceCompatibility  the {@code -source} level
+     * @param targetCompatibility  the {@code --release}/target bytecode level
+     */
+    public static JavaVersion javaVersion(int createdByMajor, int sourceCompatibility, int targetCompatibility) {
+        return new JavaVersion(Tree.randomId(), createdByMajor + ".0.1", "adoptopenjdk",
+                Integer.toString(sourceCompatibility), Integer.toString(targetCompatibility));
     }
 
     private static JavaProject javaProject(String projectName) {

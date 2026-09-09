@@ -17,12 +17,13 @@
 package printer
 
 import (
+	"strconv"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// GoPrinter prints an OpenRewrite LST back to Go source code.
 type GoPrinter struct {
 	visitor.GoVisitor
 }
@@ -63,6 +64,9 @@ func (p *GoPrinter) afterSyntax(markers java.Markers, out *PrintOutputCapture) {
 
 func (p *GoPrinter) VisitCompilationUnit(cu *golang.CompilationUnit, param any) java.J {
 	out := param.(*PrintOutputCapture)
+	if cu.CharsetBomMarked {
+		out.Append("\ufeff")
+	}
 	p.beforeSyntax(cu.Prefix, cu.Markers, out)
 	out.Append("package")
 
@@ -97,6 +101,9 @@ func (p *GoPrinter) VisitCompilationUnit(cu *golang.CompilationUnit, param any) 
 			}
 			p.Visit(rp.Element, out)
 			p.visitSpace(rp.After, out)
+			if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+				out.Append(";")
+			}
 		}
 		if isGrouped {
 			out.Append(")")
@@ -106,6 +113,9 @@ func (p *GoPrinter) VisitCompilationUnit(cu *golang.CompilationUnit, param any) 
 	for _, rp := range cu.Statements {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 
 	p.afterSyntax(cu.Markers, out)
@@ -146,9 +156,6 @@ func (p *GoPrinter) VisitBlock(block *java.Block, param any) java.J {
 	out.Append("{")
 	for _, rp := range block.Statements {
 		p.Visit(rp.Element, out)
-		// If the source had `;` separating this statement from the
-		// next, the parser captured the leading space as After and
-		// stamped a Semicolon marker on the RightPadded.
 		p.visitSpace(rp.After, out)
 		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
 			out.Append(";")
@@ -202,7 +209,9 @@ func (p *GoPrinter) VisitIf(ifStmt *java.If, param any) java.J {
 	if wrapped {
 		p.Visit(wrapper.Init.Element, out)
 		p.visitSpace(wrapper.Init.After, out)
-		out.Append(";")
+		if java.FindMarker[golang.Semicolon](wrapper.Init.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	// The condition is a ControlParentheses (matching J.If), but Go has no parens,
 	// so emit only its inner element. The wrapper's own spaces are empty for
@@ -211,11 +220,12 @@ func (p *GoPrinter) VisitIf(ifStmt *java.If, param any) java.J {
 	p.visitSpace(cond.Prefix, out)
 	p.Visit(cond.Tree.Element, out)
 	p.visitSpace(cond.Tree.After, out)
-	p.Visit(ifStmt.Then, out)
+	p.Visit(ifStmt.ThenPart.Element, out)
+	p.visitSpace(ifStmt.ThenPart.After, out)
 	if ifStmt.ElsePart != nil {
-		p.visitSpace(ifStmt.ElsePart.After, out)
+		p.visitSpace(ifStmt.ElsePart.Prefix, out)
 		out.Append("else")
-		p.Visit(ifStmt.ElsePart.Element, out)
+		p.Visit(ifStmt.ElsePart.Body.Element, out)
 	}
 	p.afterSyntax(ifStmt.Markers, out)
 	return ifStmt
@@ -282,7 +292,6 @@ func (p *GoPrinter) VisitMethodDeclaration(md *java.MethodDeclaration, param any
 	return md
 }
 
-// VisitGoMethodDeclaration prints a method declaration with a receiver. The
 // wrapper owns the prefix and the receiver, but both are emitted by the inner
 // declaration's VisitMethodDeclaration (which sources them via the cursor),
 // keeping the receiver correctly positioned between `func` and the name and the
@@ -304,7 +313,6 @@ func (p *GoPrinter) methodDeclarationWrapper() (*golang.MethodDeclaration, bool)
 	return wrapper, ok
 }
 
-// VisitStatementWithInit prints an if/switch carrying an init clause. The
 // wrapper owns the prefix and the init statement, but both are emitted by the
 // inner statement's VisitIf/VisitSwitch (which source them via the cursor),
 // keeping `<init>;` correctly positioned between the keyword and the condition.
@@ -330,11 +338,18 @@ func (p *GoPrinter) VisitTypeParameters(tps *java.TypeParameters, param any) jav
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(tps.Prefix, tps.Markers, out)
 	out.Append("[")
+	tc := java.FindMarker[golang.TrailingComma](tps.Markers)
 	for i, rp := range tps.TypeParameters {
 		p.Visit(rp.Element, out)
-		p.visitSpace(rp.After, out)
 		if i < len(tps.TypeParameters)-1 {
+			p.visitSpace(rp.After, out)
 			out.Append(",")
+		} else if tc != nil {
+			p.visitSpace(tc.Before, out)
+			out.Append(",")
+			p.visitSpace(tc.After, out)
+		} else {
+			p.visitSpace(rp.After, out)
 		}
 	}
 	out.Append("]")
@@ -405,16 +420,7 @@ func (p *GoPrinter) VisitMethodInvocation(mi *java.MethodInvocation, param any) 
 		p.Visit(mi.Name, out)
 	}
 	if mi.TypeParameters != nil {
-		p.visitSpace(mi.TypeParameters.Before, out)
-		out.Append("[")
-		for i, rp := range mi.TypeParameters.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-			if i < len(mi.TypeParameters.Elements)-1 {
-				out.Append(",")
-			}
-		}
-		out.Append("]")
+		p.printTypeArgs(mi.TypeParameters, out)
 	}
 	p.visitSpace(mi.Arguments.Before, out)
 	out.Append("(")
@@ -488,15 +494,26 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *java.VariableDeclarations, par
 	// chose Option 1 in the design discussion: lossy on non-canonical
 	// input, exact on gofmt'd input).
 	if len(vd.LeadingAnnotations) > 0 && p.insideStructType() {
+		quote := "`"
+		if q := java.FindMarker[golang.StructTagQuote](vd.Markers); q != nil {
+			quote = q.Quote
+		}
 		first := vd.LeadingAnnotations[0]
 		p.visitSpace(first.Prefix, out)
-		out.Append("`")
-		p.printAnnotationBody(first, out)
+		body := NewPrintOutputCaptureWithMarkers(out.markerPrinter)
+		p.printAnnotationBody(first, body)
 		for _, ann := range vd.LeadingAnnotations[1:] {
-			p.visitSpace(ann.Prefix, out)
-			p.printAnnotationBody(ann, out)
+			p.visitSpace(ann.Prefix, body)
+			p.printAnnotationBody(ann, body)
 		}
-		out.Append("`")
+		if quote == "`" {
+			out.Append(quote + body.String() + quote)
+		} else {
+			// An interpreted string spells out what a raw string carries
+			// literally — the quotes and backslashes in `json:"a"`, and
+			// any control character in the key or value.
+			out.Append(strconv.Quote(body.String()))
+		}
 	}
 	// Then initializers
 	firstInit := true
@@ -533,14 +550,23 @@ func (p *GoPrinter) VisitDeclarationBlock(db *golang.DeclarationBlock, param any
 	if db.Specs != nil {
 		p.visitSpace(db.Specs.Before, out)
 		out.Append("(")
-		for _, rp := range db.Specs.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-		}
+		p.printSpecGroup(db.Specs.Elements, out)
 		out.Append(")")
 	}
 	p.afterSyntax(db.Markers, out)
 	return db
+}
+
+// printSpecGroup emits the specs of a parenthesized `var`/`const`/`type`
+// group, including any explicit `;` written after one.
+func (p *GoPrinter) printSpecGroup(elements []java.RightPadded[java.Statement], out *PrintOutputCapture) {
+	for _, rp := range elements {
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
+	}
 }
 
 func (p *GoPrinter) VisitVariableDeclarator(vd *java.VariableDeclarator, param any) java.J {
@@ -573,29 +599,56 @@ func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 		prefix = wrapper.Prefix
 	}
 	p.beforeSyntax(prefix, sw.Markers, out)
-	if java.FindMarker[golang.SelectStmt](sw.Markers) != nil {
-		out.Append("select")
-	} else {
-		out.Append("switch")
-	}
+	out.Append("switch")
 	if wrapped {
 		p.Visit(wrapper.Init.Element, out)
 		p.visitSpace(wrapper.Init.After, out)
-		out.Append(";")
+		if java.FindMarker[golang.Semicolon](wrapper.Init.Markers) != nil {
+			out.Append(";")
+		}
 	}
-	if sw.Tag != nil {
-		p.Visit(sw.Tag.Element, out)
-		p.visitSpace(sw.Tag.After, out)
+	// The selector is a ControlParentheses (matching J.Switch), but Go has no
+	// parens, so emit only its inner element (an Empty for a tagless `switch {}`).
+	if sw.Selector != nil {
+		p.visitSpace(sw.Selector.Prefix, out)
+		p.Visit(sw.Selector.Tree.Element, out)
+		p.visitSpace(sw.Selector.Tree.After, out)
 	}
 	p.Visit(sw.Body, out)
 	p.afterSyntax(sw.Markers, out)
 	return sw
 }
 
+func (p *GoPrinter) VisitSelect(sel *golang.Select, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(sel.Prefix, sel.Markers, out)
+	out.Append("select")
+	p.Visit(sel.Body, out)
+	p.afterSyntax(sel.Markers, out)
+	return sel
+}
+
+// isDefaultCase reports whether a J.Case is Go's `default:` clause, modeled as a
+// single J.Identifier label named "default" (matching every other parser). Since
+// `default` is a reserved keyword, no real case expression can be that identifier.
+func isDefaultCase(c *java.Case) bool {
+	if len(c.Expressions.Elements) != 1 {
+		return false
+	}
+	id, ok := c.Expressions.Elements[0].Element.(*java.Identifier)
+	return ok && id.Name == "default"
+}
+
 func (p *GoPrinter) VisitCase(c *java.Case, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(c.Prefix, c.Markers, out)
-	if len(c.Expressions.Elements) > 0 {
+	if isDefaultCase(c) {
+		// `default:` — a single J.Identifier named "default" (mirroring Java);
+		// print the label itself, with no `case` keyword.
+		rp := c.Expressions.Elements[0]
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+	} else if len(c.Expressions.Elements) > 0 {
 		out.Append("case")
 		for i, rp := range c.Expressions.Elements {
 			p.Visit(rp.Element, out)
@@ -606,14 +659,14 @@ func (p *GoPrinter) VisitCase(c *java.Case, param any) java.J {
 				p.visitSpace(rp.After, out)
 			}
 		}
-	} else {
-		out.Append("default")
-		p.visitSpace(c.Expressions.Before, out)
 	}
 	out.Append(":")
 	for _, rp := range c.Body {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	p.afterSyntax(c.Markers, out)
 	return c
@@ -643,7 +696,16 @@ func (p *GoPrinter) VisitForLoop(forLoop *java.ForLoop, param any) java.J {
 func (p *GoPrinter) VisitForControl(control *java.ForControl, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(control.Prefix, control.Markers, out)
-	if control.Init != nil {
+	if java.FindMarker[golang.ImplicitForClauses](control.Markers) != nil {
+		// Go's condition-only `for cond {}` or infinite `for {}`. Init and
+		// update hold synthetic J.Empty placeholders (kept only so the Java
+		// J.ForLoop.Control list contract holds); print just the condition,
+		// with no `;` separators.
+		if control.Condition != nil {
+			p.Visit(control.Condition.Element, out)
+			p.visitSpace(control.Condition.After, out)
+		}
+	} else if control.Init != nil {
 		// 3-clause form: init; cond; update
 		p.Visit(control.Init.Element, out)
 		p.visitSpace(control.Init.After, out)
@@ -691,7 +753,6 @@ func (p *GoPrinter) VisitForEachControl(control *java.ForEachControl, param any)
 	return control
 }
 
-// VisitAnnotation prints an Annotation in struct-tag form
 // (`key:"value"`) — including its leading whitespace via Prefix.
 // Backtick wrapping is the VariableDeclarations printer's job for
 // struct-field context; this method only emits the annotation's own
@@ -769,9 +830,9 @@ func (p *GoPrinter) VisitUnary(unary *java.Unary, param any) java.J {
 	if unary.Operator.Element == java.PostIncrement || unary.Operator.Element == java.PostDecrement || unary.Operator.Element == java.SpreadPostfix {
 		p.Visit(unary.Operand, out)
 		p.visitSpace(unary.Operator.Before, out)
-		out.Append(unaryOperatorString(unary.Operator.Element))
+		out.Append(UnaryOperatorString(unary.Operator.Element))
 	} else {
-		out.Append(unaryOperatorString(unary.Operator.Element))
+		out.Append(UnaryOperatorString(unary.Operator.Element))
 		p.Visit(unary.Operand, out)
 	}
 	p.afterSyntax(unary.Markers, out)
@@ -961,15 +1022,45 @@ func (p *GoPrinter) VisitParentheses(paren *java.Parentheses, param any) java.J 
 	return paren
 }
 
+func (p *GoPrinter) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ptt.Prefix, ptt.Markers, out)
+	p.Visit(ptt.Type, out)
+	p.afterSyntax(ptt.Markers, out)
+	return ptt
+}
+
+// VisitTypeCast renders Go's conversion `T(x)`.
 func (p *GoPrinter) VisitTypeCast(tc *java.TypeCast, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(tc.Prefix, tc.Markers, out)
-	// Go type assertion: expr.(Type)
+	if tc.Clazz != nil {
+		p.Visit(tc.Clazz.Tree.Element, out)
+		p.visitSpace(tc.Clazz.Prefix, out)
+	}
+	out.Append("(")
 	p.Visit(tc.Expr, out)
-	out.Append(".")
-	p.Visit(tc.Clazz, out)
+	if trailing := java.FindMarker[golang.TrailingComma](tc.Markers); trailing != nil {
+		p.visitSpace(trailing.Before, out)
+		out.Append(",")
+		p.visitSpace(trailing.After, out)
+	} else if tc.Clazz != nil {
+		p.visitSpace(tc.Clazz.Tree.After, out)
+	}
+	out.Append(")")
 	p.afterSyntax(tc.Markers, out)
 	return tc
+}
+
+func (p *GoPrinter) VisitTypeAssertion(ta *golang.TypeAssertion, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ta.Prefix, ta.Markers, out)
+	p.Visit(ta.Left.Element, out)
+	p.visitSpace(ta.Left.After, out)
+	out.Append(".")
+	p.Visit(ta.AssertedType, out)
+	p.afterSyntax(ta.Markers, out)
+	return ta
 }
 
 func (p *GoPrinter) VisitControlParentheses(cp *java.ControlParentheses, param any) java.J {
@@ -1021,21 +1112,33 @@ func (p *GoPrinter) VisitIndexList(il *golang.IndexList, param any) java.J {
 	return il
 }
 
+// printTypeArgs emits the `[T, U]` of a generic instantiation.
+func (p *GoPrinter) printTypeArgs(args *java.Container[java.Expression], out *PrintOutputCapture) {
+	p.visitSpace(args.Before, out)
+	out.Append("[")
+	tc := java.FindMarker[golang.TrailingComma](args.Markers)
+	for i, rp := range args.Elements {
+		p.Visit(rp.Element, out)
+		if i < len(args.Elements)-1 {
+			p.visitSpace(rp.After, out)
+			out.Append(",")
+		} else if tc != nil {
+			p.visitSpace(tc.Before, out)
+			out.Append(",")
+			p.visitSpace(tc.After, out)
+		} else {
+			p.visitSpace(rp.After, out)
+		}
+	}
+	out.Append("]")
+}
+
 func (p *GoPrinter) VisitParameterizedType(pt *java.ParameterizedType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(pt.Prefix, pt.Markers, out)
 	p.Visit(pt.Clazz, out)
 	if pt.TypeParameters != nil {
-		p.visitSpace(pt.TypeParameters.Before, out)
-		out.Append("[")
-		for i, rp := range pt.TypeParameters.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-			if i < len(pt.TypeParameters.Elements)-1 {
-				out.Append(",")
-			}
-		}
-		out.Append("]")
+		p.printTypeArgs(pt.TypeParameters, out)
 	}
 	p.afterSyntax(pt.Markers, out)
 	return pt
@@ -1112,6 +1215,14 @@ func (p *GoPrinter) VisitMapType(mt *golang.MapType, param any) java.J {
 	p.Visit(mt.Value, out)
 	p.afterSyntax(mt.Markers, out)
 	return mt
+}
+
+func (p *GoPrinter) VisitExpressionStatement(es *golang.ExpressionStatement, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(es.Prefix, es.Markers, out)
+	p.Visit(es.Expression, out)
+	p.afterSyntax(es.Markers, out)
+	return es
 }
 
 func (p *GoPrinter) VisitStatementExpression(se *golang.StatementExpression, param any) java.J {
@@ -1197,11 +1308,16 @@ func (p *GoPrinter) VisitTypeList(tl *golang.TypeList, param any) java.J {
 	p.beforeSyntax(tl.Prefix, tl.Markers, out)
 	p.visitSpace(tl.Types.Before, out)
 	out.Append("(")
+	tc := java.FindMarker[golang.TrailingComma](tl.Types.Markers)
 	for i, rp := range tl.Types.Elements {
 		p.Visit(rp.Element, out)
 		if i < len(tl.Types.Elements)-1 {
 			p.visitSpace(rp.After, out)
 			out.Append(",")
+		} else if tc != nil {
+			p.visitSpace(tc.Before, out)
+			out.Append(",")
+			p.visitSpace(tc.After, out)
 		} else {
 			p.visitSpace(rp.After, out)
 		}
@@ -1225,6 +1341,9 @@ func (p *GoPrinter) VisitCommClause(cc *golang.CommClause, param any) java.J {
 	for _, rp := range cc.Body {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	p.afterSyntax(cc.Markers, out)
 	return cc
@@ -1291,10 +1410,7 @@ func (p *GoPrinter) VisitTypeDecl(td *golang.TypeDecl, param any) java.J {
 		// Grouped: type ( ... )
 		p.visitSpace(td.Specs.Before, out)
 		out.Append("(")
-		for _, rp := range td.Specs.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-		}
+		p.printSpecGroup(td.Specs.Elements, out)
 		out.Append(")")
 	} else {
 		// Single: type Name[TypeParams] Type
@@ -1315,6 +1431,9 @@ func (p *GoPrinter) VisitTypeDecl(td *golang.TypeDecl, param any) java.J {
 func (p *GoPrinter) VisitEmpty(empty *java.Empty, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(empty.Prefix, empty.Markers, out)
+	if java.FindMarker[golang.Semicolon](empty.Markers) != nil {
+		out.Append(";")
+	}
 	p.afterSyntax(empty.Markers, out)
 	return empty
 }
@@ -1325,8 +1444,23 @@ func (p *GoPrinter) VisitEmpty(empty *java.Empty, param any) java.J {
 func (p *GoPrinter) visitSpace(space java.Space, out *PrintOutputCapture) {
 	out.Append(space.Whitespace)
 	for _, comment := range space.Comments {
-		out.Append(comment.Text)
+		printComment(comment, out)
 		out.Append(comment.Suffix)
+	}
+}
+
+// printComment emits a comment's source, re-adding the `//` or `/* */`
+// delimiters around its delimiter-free Text. Mirrors Java's
+// TextComment.printComment, which likewise reconstructs the delimiters from
+// the comment kind rather than storing them in the text.
+func printComment(comment java.Comment, out *PrintOutputCapture) {
+	if comment.Multiline {
+		out.Append("/*")
+		out.Append(comment.Text)
+		out.Append("*/")
+	} else {
+		out.Append("//")
+		out.Append(comment.Text)
 	}
 }
 
@@ -1409,7 +1543,8 @@ func assignmentOperatorString(op java.AssignmentOperator) string {
 	}
 }
 
-func unaryOperatorString(op java.UnaryOperator) string {
+// UnaryOperatorString returns the source text of a unary operator.
+func UnaryOperatorString(op java.UnaryOperator) string {
 	switch op {
 	case java.Negate:
 		return "-"

@@ -19,12 +19,15 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// deletingVisitor returns nil for Return nodes, exercising the nil guard in visitAndCast/visitExpression.
 type deletingVisitor struct {
 	visitor.GoVisitor
 }
@@ -37,19 +40,14 @@ func TestVisitorReturningNilDoesNotPanic(t *testing.T) {
 	src := "package main\n\nfunc foo() int {\n\treturn 1\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 
 	v := visitor.Init(&deletingVisitor{})
 	// This should not panic even though VisitReturn returns nil.
 	result := v.Visit(cu, nil)
-	if result == nil {
-		t.Fatal("visitor returned nil for compilation unit")
-	}
+	require.NotNil(t, result, "visitor returned nil for compilation unit")
 }
 
-// importCountingVisitor counts how many Import nodes are visited.
 type importCountingVisitor struct {
 	visitor.GoVisitor
 	count int
@@ -64,18 +62,13 @@ func TestVisitorVisitsImports(t *testing.T) {
 	src := "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\nfunc main() {\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 
 	v := visitor.Init(&importCountingVisitor{})
 	v.Visit(cu, nil)
-	if v.count != 2 {
-		t.Errorf("expected 2 imports visited, got %d", v.count)
-	}
+	assert.Equal(t, 2, v.count, "expected 2 imports visited")
 }
 
-// identCountingVisitor counts how many Identifier nodes are visited.
 type identCountingVisitor struct {
 	visitor.GoVisitor
 	names []string
@@ -92,9 +85,7 @@ func TestVisitorVisitsPackageDecl(t *testing.T) {
 	src := "package pkg\n\nfunc foo() {\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
+	require.NoError(t, err, "parse error")
 
 	v := visitor.Init(&identCountingVisitor{})
 	v.Visit(cu, nil)
@@ -106,7 +97,5 @@ func TestVisitorVisitsPackageDecl(t *testing.T) {
 			break
 		}
 	}
-	if !found {
-		t.Errorf("visitor did not visit package decl identifier 'pkg'; visited: %v", v.names)
-	}
+	assert.Truef(t, found, "visitor did not visit package decl identifier 'pkg'; visited: %v", v.names)
 }

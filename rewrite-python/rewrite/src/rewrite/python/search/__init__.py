@@ -36,12 +36,21 @@ that :class:`Check` interprets as the gate matching.
 from __future__ import annotations
 
 import fnmatch
-from typing import Any, Optional
+import logging
+from typing import Any, Optional, cast
 
+from rewrite.java.support_types import J
+from rewrite.java.tree import Import, MethodInvocation
 from rewrite.markers import SearchResult
+from rewrite.python.import_utils import get_name_string, get_qualid_name
 from rewrite.python.method_matcher import MethodMatcher
+from rewrite.python.support_types import Py
+from rewrite.python.tree import MultiImport
+from rewrite.python.visitor import PythonVisitor
 from rewrite.tree import SourceFile, Tree
 from rewrite.visitor import Cursor, TreeVisitor
+
+logger = logging.getLogger(__name__)
 
 
 class IsSourceFile(TreeVisitor[Tree, Any]):
@@ -91,11 +100,11 @@ class UsesType(TreeVisitor[Tree, Any]):
     ) -> Optional[Tree]:
         if not isinstance(tree, SourceFile):
             return tree
-        if self._tree_uses_type(tree):
+        if self._tree_uses_type(tree, p):
             return SearchResult.found(tree)
         return tree
 
-    def _tree_uses_type(self, tree: Tree) -> bool:
+    def _tree_uses_type(self, tree: Tree, p: Any) -> bool:
         # Prefer TypesInUse on the source file when present (cheap O(N))
         types_in_use = getattr(tree, "types_in_use", None)
         if types_in_use is not None:
@@ -108,24 +117,7 @@ class UsesType(TreeVisitor[Tree, Any]):
                     if fqn and fnmatch.fnmatch(fqn, self._pattern):
                         return True
                 return False
-        return self._walk_for_type(tree)
-
-    def _walk_for_type(self, tree: Tree) -> bool:
-        """Fall back to walking every node looking for a typed reference
-        whose fully-qualified name matches ``self._pattern``."""
-        found = [False]
-
-        def check(node: Any) -> None:
-            if found[0]:
-                return
-            t = getattr(node, "type", None)
-            if t is not None:
-                fqn = _fully_qualified_name(t)
-                if fqn and fnmatch.fnmatch(fqn, self._pattern):
-                    found[0] = True
-
-        _walk(tree, check)
-        return found[0]
+        return _TypeSearch(self._pattern).search(tree, p)
 
 
 class UsesMethod(TreeVisitor[Tree, Any]):
@@ -134,10 +126,19 @@ class UsesMethod(TreeVisitor[Tree, Any]):
     Mirrors ``org.openrewrite.java.search.HasMethod``. The ``method_pattern``
     follows the OpenRewrite method-pattern syntax
     (``<receiver-type> <method-name>(<args>)``) — e.g. ``"*..* tostring(..)"``.
+
+    With ``match_overrides``, a call whose declaring type is a subtype of the
+    pattern's receiver matches too.
+
+    ``match_unknown_types`` widens a concrete receiver pattern to calls whose
+    declaring type is ``JavaType.Unknown``; see :meth:`MethodMatcher.matches`
+    for the false-positive trade-off.
     """
 
-    def __init__(self, method_pattern: str) -> None:
-        self._matcher = MethodMatcher.create(method_pattern)
+    def __init__(self, method_pattern: str, match_overrides: bool = False,
+                 match_unknown_types: bool = False) -> None:
+        self._matcher = MethodMatcher.create(method_pattern, match_overrides)
+        self._match_unknown_types = match_unknown_types
 
     def visit(
         self,
@@ -147,23 +148,63 @@ class UsesMethod(TreeVisitor[Tree, Any]):
     ) -> Optional[Tree]:
         if not isinstance(tree, SourceFile):
             return tree
-        if self._tree_uses_method(tree):
+        if _MethodSearch(self._matcher, self._match_unknown_types).search(tree, p):
             return SearchResult.found(tree)
         return tree
 
-    def _tree_uses_method(self, tree: Tree) -> bool:
-        from rewrite.java.tree import MethodInvocation
 
-        found = [False]
+class UsesImport(TreeVisitor[Tree, Any]):
+    """Match files that import a given module, by import *syntax* rather than
+    type attribution.
 
-        def check(node: Any) -> None:
-            if found[0]:
-                return
-            if isinstance(node, MethodInvocation) and self._matcher.matches(node):
-                found[0] = True
+    Mirrors ``org.openrewrite.python.search.UsesImport``. Reads the as-written
+    import path off ``Py.MultiImport`` statements, so it is robust to two
+    failure modes that make :class:`UsesType` unusable for gating
+    import-migration recipes:
 
-        _walk(tree, check)
-        return found[0]
+    * the type checker canonicalizes aliases (``from typing import List``
+      resolves to ``list``), erasing the deprecated import path; and
+    * removed/unresolvable symbols (``from base64 import encodestring``) get
+      no type attribution at all.
+
+    ``module`` is a dotted module path (e.g. ``"datetime"``, ``"os.path"``).
+    A file matches if it imports that module, a submodule of it, or a parent
+    module of it — a generous superset, which is what a precondition wants
+    (over-matching merely runs the gated visitor; under-matching would skip a
+    file the recipe should change).
+    """
+
+    def __init__(self, module: str) -> None:
+        self._module = module
+
+    def visit(
+        self,
+        tree: Optional[Tree],
+        p: Any,
+        parent: Optional[Cursor] = None,
+    ) -> Optional[Tree]:
+        if not isinstance(tree, SourceFile):
+            return tree
+        if _ImportSearch(self._module).search(tree, p):
+            return SearchResult.found(tree)
+        return tree
+
+
+def _import_path_matches(imported: str, query: str) -> bool:
+    """True when an as-written import path references the queried module.
+
+    Matches the module exactly, a submodule of it (``import os.path`` for
+    query ``os``), or a parent of it (``import os`` for query ``os.path``,
+    since ``os.path`` is then reachable). Dotted-boundary aware so ``os`` does
+    not match ``ossaudiodev``.
+    """
+    if not imported or not query:
+        return False
+    return (
+        imported == query
+        or imported.startswith(query + ".")
+        or query.startswith(imported + ".")
+    )
 
 
 def _fully_qualified_name(type_obj: Any) -> Optional[str]:
@@ -181,39 +222,112 @@ def _fully_qualified_name(type_obj: Any) -> Optional[str]:
     return None
 
 
-def _walk(node: Any, visit_fn) -> None:
-    """Iterative DFS over a tree, calling ``visit_fn`` on each node.
+class _FindFirst(PythonVisitor[Any]):
+    """Traversal that stops at the first node :meth:`matches` accepts.
 
-    Cheap reflection over public attributes — sufficient for matching
-    against type / method-invocation attributes which are publicly
-    exposed on LST nodes.
+    Dispatches straight to ``accept`` because a search reads nodes and never
+    rewrites them, so nothing consumes the cursor the base ``visit`` builds.
     """
-    stack = [node]
-    seen: set = set()
-    while stack:
-        cur = stack.pop()
-        if cur is None:
-            continue
-        cur_id = id(cur)
-        if cur_id in seen:
-            continue
-        seen.add(cur_id)
-        visit_fn(cur)
-        # Walk public attribute values that look tree-shaped
-        for attr in dir(cur):
-            if attr.startswith("_"):
-                continue
-            try:
-                val = getattr(cur, attr)
-            except Exception:
-                continue
-            if isinstance(val, (list, tuple)):
-                for item in val:
-                    if hasattr(item, "id") or hasattr(item, "markers"):
-                        stack.append(item)
-            elif hasattr(val, "id") or hasattr(val, "markers"):
-                if val is not cur:
-                    stack.append(val)
+
+    def __init__(self) -> None:
+        self.found = False
+
+    def matches(self, tree: Tree) -> bool:
+        raise NotImplementedError
+
+    def visit(
+        self,
+        tree: Optional[Tree],
+        p: Any,
+        parent: Optional[Cursor] = None,
+    ) -> Optional[J]:
+        if tree is None or self.found:
+            return cast(Optional[J], tree)
+        if self.matches(tree):
+            self.found = True
+            return cast(J, tree)
+        return tree.accept(self, p)
+
+    def search(self, tree: Tree, p: Any) -> bool:
+        """Whether ``tree`` or any node under it matches.
+
+        Only the Python model is searchable: a source file of another language
+        reaching a Python precondition is a file its recipe cannot edit anyway.
+        """
+        if not isinstance(tree, Py):
+            return False
+        try:
+            self.visit(tree, p)
+        except RecursionError:
+            # A tree deeper than the interpreter stack (generated data files
+            # nest thousands of implicit string concatenations) is one the gated
+            # visitor cannot edit either. Answering "no match" leaves no other
+            # trace of the file, hence the log line.
+            logger.warning(
+                "%s nests too deeply to search; treating it as no match",
+                getattr(tree, "source_path", tree),
+            )
+            return False
+        return self.found
 
 
-__all__ = ["IsSourceFile", "UsesType", "UsesMethod"]
+class _TypeSearch(_FindFirst):
+    def __init__(self, pattern: str) -> None:
+        super().__init__()
+        self._pattern = pattern
+
+    def matches(self, tree: Tree) -> bool:
+        # Read the attribution off any node that carries it: `Expression`
+        # declares its own `type` alongside `TypedTree` rather than under it,
+        # so a class check on either one alone misses the other's nodes.
+        fqn = _fully_qualified_name(getattr(tree, "type", None))
+        return fqn is not None and fnmatch.fnmatch(fqn, self._pattern)
+
+
+class _MethodSearch(_FindFirst):
+    def __init__(self, matcher: MethodMatcher, match_unknown_types: bool = False) -> None:
+        super().__init__()
+        self._matcher = matcher
+        self._match_unknown_types = match_unknown_types
+
+    def matches(self, tree: Tree) -> bool:
+        return isinstance(tree, MethodInvocation) and self._matcher.matches(
+            tree, match_unknown_types=self._match_unknown_types)
+
+
+class _ImportSearch(_FindFirst):
+    def __init__(self, module: str) -> None:
+        super().__init__()
+        self._module = module
+
+    def visit(
+        self,
+        tree: Optional[Tree],
+        p: Any,
+        parent: Optional[Cursor] = None,
+    ) -> Optional[J]:
+        if isinstance(tree, MultiImport):
+            # A MultiImport decides the whole statement: under
+            # `from <module> import a, b` its children are names, not modules.
+            self.found = self.found or self._multi_import_matches(tree)
+            return tree
+        return super().visit(tree, p, parent)
+
+    def _multi_import_matches(self, multi: MultiImport) -> bool:
+        if multi.from_ is not None:
+            # `from <module> import ...` — the module is the `from` clause.
+            return _import_path_matches(get_name_string(multi.from_), self._module)
+        # `import <a>, <b>` — each name's qualid is itself a module.
+        return any(
+            _import_path_matches(get_qualid_name(imp.qualid), self._module)
+            for imp in multi.names
+        )
+
+    def matches(self, tree: Tree) -> bool:
+        # A J.Import outside a MultiImport is `import <module>`.
+        return isinstance(tree, Import) and _import_path_matches(
+            get_qualid_name(tree.qualid), self._module
+        )
+
+
+__all__ = ["IsSourceFile", "UsesType", "UsesMethod", "UsesImport"]

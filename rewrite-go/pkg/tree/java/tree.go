@@ -18,7 +18,6 @@ package java
 
 import "github.com/google/uuid"
 
-// Tree is the root interface for all LST nodes.
 type Tree interface{ IsTree() }
 
 // J is the interface for all Java-like AST nodes that carry a prefix
@@ -50,19 +49,16 @@ type J interface {
 	GetMarkers() Markers
 }
 
-// Expression is a J node that evaluates to a value.
 type Expression interface {
 	J
 	IsExpression()
 }
 
-// Statement is a J node that can appear at statement level.
 type Statement interface {
 	J
 	IsStatement()
 }
 
-// SourceFile is a J node representing an entire source file.
 type SourceFile interface {
 	J
 	IsSourceFile()

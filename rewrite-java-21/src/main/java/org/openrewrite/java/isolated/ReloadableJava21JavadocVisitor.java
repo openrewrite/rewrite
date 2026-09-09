@@ -36,7 +36,9 @@ import com.sun.tools.javac.util.Context;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.marker.JavadocParameterName;
 import org.openrewrite.java.marker.LeadingBrace;
+import org.openrewrite.java.marker.Varargs;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -651,8 +653,21 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     for (int i = 0; i < paramTypes.size(); i++) {
                         JCTree param = paramTypes.get(i);
                         Expression paramExpr = (Expression) javaVisitor.scan(param, Space.build(whitespaceBeforeAsString(), emptyList()));
-                        Space rightFmt = Space.format(i == paramTypes.size() - 1 ?
-                                sourceBeforeAsString(")") : sourceBeforeAsString(","));
+                        // javac only records parameter types, so a non-standard parameter name such
+                        // as `str` in `#bar(String str)` is left in `afterParam`. Keep it out of the
+                        // whitespace-only Space by recording it on the parameter type expression; the
+                        // JavadocPrinter re-emits it verbatim.
+                        String afterParam = i == paramTypes.size() - 1 ?
+                                sourceBeforeAsString(")") : sourceBeforeAsString(",");
+                        int nameStart = 0;
+                        while (nameStart < afterParam.length() && Character.isWhitespace(afterParam.charAt(nameStart))) {
+                            nameStart++;
+                        }
+                        if (nameStart < afterParam.length()) {
+                            paramExpr = paramExpr.withMarkers(paramExpr.getMarkers().add(
+                                    new JavadocParameterName(randomId(), afterParam.substring(nameStart))));
+                        }
+                        Space rightFmt = Space.format(afterParam.substring(0, nameStart));
                         parameters.add(new JRightPadded<>(paramExpr, rightFmt, Markers.EMPTY));
                     }
                     paramContainer = JContainer.build(
@@ -1290,6 +1305,19 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             if (source.startsWith("[", cursor)) {
                 cursor++;
                 dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
+            } else if (source.startsWith("...", cursor)) {
+                // Varargs (e.g. `Object...`) is array-typed; model it as a J.ArrayType and record
+                // the `...` syntax with a marker so it round-trips and is structurally discoverable.
+                cursor += 3;
+                return new J.ArrayType(
+                        randomId(),
+                        fmt,
+                        Markers.EMPTY.add(new Varargs(randomId())),
+                        elemType,
+                        null,
+                        JLeftPadded.build(Space.EMPTY).withBefore(before),
+                        typeMapping.type(node)
+                );
             } else {
                 cursor = saveCursor;
                 return elemType.withPrefix(fmt);

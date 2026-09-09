@@ -18,12 +18,12 @@ package java
 
 import "fmt"
 
-// JavaType is the interface for all Java type representations used for type attribution.
+// JavaType is what the type checker made of a node. Every slot holding one is
+// optional — nil is the answer for a node no checker attributed.
 type JavaType interface {
 	isJavaType()
 }
 
-// FullyQualified is a JavaType with a fully qualified name.
 type FullyQualified interface {
 	JavaType
 	GetFullyQualifiedName() string
@@ -47,14 +47,12 @@ const (
 	JavaTypeUnknownKind                      = "org.openrewrite.java.tree.JavaType$Unknown"
 )
 
-// JavaTypePrimitive represents a primitive type like int, boolean, etc.
 type JavaTypePrimitive struct {
 	Keyword string
 }
 
 func (*JavaTypePrimitive) isJavaType() {}
 
-// JavaTypeClass represents a class, interface, enum, or annotation type.
 type JavaTypeClass struct {
 	FlagsBitMap        int64
 	Kind               string
@@ -88,7 +86,6 @@ type JavaTypeShallowClass struct {
 
 func (*JavaTypeShallowClass) isJavaType() {}
 
-// JavaTypeParameterized represents a parameterized type like List<String>.
 type JavaTypeParameterized struct {
 	Type           FullyQualified
 	TypeParameters []JavaType
@@ -103,7 +100,6 @@ func (p *JavaTypeParameterized) GetFullyQualifiedName() string {
 	return ""
 }
 
-// JavaTypeGenericTypeVariable represents a generic type variable like T extends Comparable.
 type JavaTypeGenericTypeVariable struct {
 	Name     string
 	Variance string
@@ -112,7 +108,6 @@ type JavaTypeGenericTypeVariable struct {
 
 func (*JavaTypeGenericTypeVariable) isJavaType() {}
 
-// JavaTypeArray represents an array type.
 type JavaTypeArray struct {
 	ElemType    JavaType
 	Annotations []FullyQualified
@@ -120,7 +115,6 @@ type JavaTypeArray struct {
 
 func (*JavaTypeArray) isJavaType() {}
 
-// JavaTypeMethod represents a method type signature.
 type JavaTypeMethod struct {
 	DeclaringType           FullyQualified
 	Name                    string
@@ -136,7 +130,6 @@ type JavaTypeMethod struct {
 
 func (*JavaTypeMethod) isJavaType() {}
 
-// JavaTypeVariable represents a variable type.
 type JavaTypeVariable struct {
 	Name        string
 	Owner       JavaType
@@ -146,7 +139,6 @@ type JavaTypeVariable struct {
 
 func (*JavaTypeVariable) isJavaType() {}
 
-// JavaTypeAnnotation represents an annotation type reference.
 type JavaTypeAnnotation struct {
 	Type   FullyQualified
 	Values []JavaTypeAnnotationElementValue
@@ -154,7 +146,6 @@ type JavaTypeAnnotation struct {
 
 func (*JavaTypeAnnotation) isJavaType() {}
 
-// JavaTypeAnnotationElementValue is the interface for annotation element values.
 // One of *JavaTypeAnnotationSingleElementValue or *JavaTypeAnnotationArrayElementValue.
 type JavaTypeAnnotationElementValue interface {
 	isJavaTypeAnnotationElementValue()
@@ -174,7 +165,6 @@ func (*JavaTypeAnnotationSingleElementValue) isJavaTypeAnnotationElementValue() 
 
 func (s *JavaTypeAnnotationSingleElementValue) GetElement() JavaType { return s.Element }
 
-// JavaTypeAnnotationArrayElementValue is an array of annotation element values.
 type JavaTypeAnnotationArrayElementValue struct {
 	Element         JavaType
 	ConstantValues  []any
@@ -185,26 +175,42 @@ func (*JavaTypeAnnotationArrayElementValue) isJavaTypeAnnotationElementValue() {
 
 func (a *JavaTypeAnnotationArrayElementValue) GetElement() JavaType { return a.Element }
 
-// JavaTypeMultiCatch represents a multi-catch type (e.g., IOException | SQLException).
 type JavaTypeMultiCatch struct {
 	ThrowableTypes []JavaType
 }
 
 func (*JavaTypeMultiCatch) isJavaType() {}
 
-// JavaTypeIntersection represents an intersection type (e.g., Serializable & Comparable).
 type JavaTypeIntersection struct {
 	Bounds []JavaType
 }
 
 func (*JavaTypeIntersection) isJavaType() {}
 
-// JavaTypeUnknown represents an unknown or unresolved type.
 type JavaTypeUnknown struct{}
 
 func (*JavaTypeUnknown) isJavaType() {}
 
-// UnknownType is the singleton instance of JavaTypeUnknown.
+// GetFullyQualifiedName makes Unknown a FullyQualified, as it is in Java, so it
+// keeps its place in a supertype's interfaces or a type's annotations.
+func (*JavaTypeUnknown) GetFullyQualifiedName() string { return "<unknown>" }
+
+// IsUnknown reports whether attribution produced no type. Unknown names itself
+// so it can travel as a FullyQualified, but "<unknown>" is a placeholder: nothing
+// resolves against it and no pattern should match it.
+func IsUnknown(t JavaType) bool {
+	_, unknown := t.(*JavaTypeUnknown)
+	return unknown
+}
+
+// FQNOf is the name to match a type by, empty when there is none.
+func FQNOf(fq FullyQualified) string {
+	if fq == nil || IsUnknown(fq) {
+		return ""
+	}
+	return fq.GetFullyQualifiedName()
+}
+
 var UnknownType = &JavaTypeUnknown{}
 
 // TypeSignature computes a string signature for a JavaType, used for list identity

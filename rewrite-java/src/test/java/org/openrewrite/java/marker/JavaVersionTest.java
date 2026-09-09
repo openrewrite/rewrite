@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@SuppressWarnings("DataFlowIssue")
 class JavaVersionTest {
 
     @Test
@@ -60,5 +61,24 @@ class JavaVersionTest {
         var javaVersion = new JavaVersion(UUID.randomUUID(), "", "", null, null);
         assertThat(javaVersion.getMajorVersion()).isEqualTo(-1);
         assertThat(javaVersion.getMajorReleaseVersion()).isEqualTo(-1);
+    }
+
+    @Test
+    void majorCreatedByVersionFromRuntimeVersionStrings() {
+        assertThat(createdBy("23.0.1+11").getMajorCreatedByVersion()).isEqualTo(23);
+        assertThat(createdBy("21+35-2513").getMajorCreatedByVersion()).isEqualTo(21);
+        assertThat(createdBy("17.0.5+8").getMajorCreatedByVersion()).isEqualTo(17);
+        assertThat(createdBy("1.8.0_312-b07").getMajorCreatedByVersion()).isEqualTo(8);
+    }
+
+    @Test
+    void majorCreatedByVersionUnparseableReturnsMinusOne() {
+        assertThat(createdBy("openjdk").getMajorCreatedByVersion()).isEqualTo(-1);
+        assertThat(createdBy("").getMajorCreatedByVersion()).isEqualTo(-1);
+        assertThat(new JavaVersion(UUID.randomUUID(), null, "", "", "").getMajorCreatedByVersion()).isEqualTo(-1);
+    }
+
+    private static JavaVersion createdBy(String runtimeVersion) {
+        return new JavaVersion(UUID.randomUUID(), runtimeVersion, "", "", "");
     }
 }

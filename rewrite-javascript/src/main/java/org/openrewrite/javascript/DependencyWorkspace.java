@@ -21,6 +21,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -111,8 +112,10 @@ class DependencyWorkspace {
             // createDirectories is idempotent and safe to call even if directory exists
             Files.createDirectories(WORKSPACE_BASE);
 
-            // Use temp directory for atomic creation
-            Path tempDir = Files.createTempDirectory(WORKSPACE_BASE, key + ".tmp-");
+            // Use temp directory for atomic creation. The pid is stamped into the name so the
+            // TS RPC server's workspace reaper (dependency-workspace.ts) can tell this in-flight
+            // install apart from a crashed one and won't delete the package manager's cwd mid-run.
+            Path tempDir = Files.createTempDirectory(WORKSPACE_BASE, key + ".tmp-" + currentPid() + "-");
 
             try {
                 // Write package.json
@@ -136,12 +139,17 @@ class DependencyWorkspace {
                 try {
                     Files.move(tempDir, workspaceDir);
                 } catch (IOException e) {
-                    // If move fails, another thread might have created it
+                    // The move can fail because another thread already created the workspace, or
+                    // because a stale/corrupt directory (e.g. one missing package.json from an
+                    // interrupted prior run) is occupying the target.
                     if (isWorkspaceValid(workspaceDir)) {
                         // Use the other thread's workspace
                         cleanupDirectory(tempDir);
                     } else {
-                        throw e;
+                        // Target is stale/invalid; replace it with our freshly built workspace so a
+                        // corrupt directory can't permanently wedge workspace creation.
+                        cleanupDirectory(workspaceDir);
+                        Files.move(tempDir, workspaceDir);
                     }
                 }
 
@@ -183,8 +191,18 @@ class DependencyWorkspace {
                 args = new String[]{"install", "--ignore-scripts"};
                 break;
             case YarnBerry:
-                executor = PackageManagerExecutor.YARN;
-                args = new String[]{"install", "--mode", "skip-build"};
+                // Yarn Berry projects pin their version via the package.json "packageManager"
+                // field and rely on Corepack to provision it. A global Yarn Classic refuses to
+                // run such a project, so prefer Corepack when it is available and fall back to a
+                // plain yarn otherwise (e.g. when the yarn on PATH is already a Corepack shim).
+                String corepackExe = PackageManagerExecutor.COREPACK.find();
+                if (corepackExe != null) {
+                    executor = PackageManagerExecutor.COREPACK;
+                    args = new String[]{"yarn", "install", "--mode", "skip-build"};
+                } else {
+                    executor = PackageManagerExecutor.YARN;
+                    args = new String[]{"install", "--mode", "skip-build"};
+                }
                 break;
             case Pnpm:
                 executor = PackageManagerExecutor.PNPM;
@@ -206,6 +224,21 @@ class DependencyWorkspace {
         if (!result.isSuccess()) {
             throw new RuntimeException(executor.getName() + " install failed (exit "
                     + result.getExitCode() + "): " + result.getStderr());
+        }
+    }
+
+    /**
+     * The current process id, used to tag in-flight install temp dirs so a cross-process
+     * reaper can distinguish them from abandoned ones. Java 8 has no {@code ProcessHandle},
+     * so derive it from the {@code pid@host} runtime name; falls back to {@code 0} if absent.
+     */
+    private static long currentPid() {
+        String name = ManagementFactory.getRuntimeMXBean().getName();
+        int at = name.indexOf('@');
+        try {
+            return Long.parseLong(at > 0 ? name.substring(0, at) : name);
+        } catch (NumberFormatException e) {
+            return 0;
         }
     }
 

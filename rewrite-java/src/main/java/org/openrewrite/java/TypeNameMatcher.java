@@ -156,9 +156,10 @@ class PatternTypeNameMatcher implements TypeNameMatcher {
 
             if (tIdx >= tLength) {
                 while (pIdx < pLength) {
-                    if (p == '*') {
+                    char pc = pattern.charAt(pIdx);
+                    if (pc == '*') {
                         pIdx++;
-                    } else if (p == '.' && pIdx + 1 < pLength && pattern.charAt(pIdx + 1) == '.') {
+                    } else if (pc == '.' && pIdx + 1 < pLength && pattern.charAt(pIdx + 1) == '.') {
                         pIdx += 2;
                     } else {
                         return false;
@@ -197,7 +198,7 @@ class PatternTypeNameMatcher implements TypeNameMatcher {
                     return true;
                 }
 
-                if (pattern.charAt(pIdx) == '*') {
+                if (pattern.charAt(pIdx) == '*' && pIdx + 1 >= pLength) {
                     return true;
                 }
 

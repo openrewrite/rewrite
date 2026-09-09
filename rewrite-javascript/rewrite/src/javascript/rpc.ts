@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import {JavaScriptVisitor} from "./visitor";
-import {asRef, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {asRef, registerVisitor, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {AutoformatVisitor} from "./format";
 import {isJavaScript, JS, JSX} from "./tree";
 import {Expression, J, Statement, Type, TypedTree, TypeTree} from "../java";
 import {JavaReceiver, JavaSender, registerJLanguageCodecs} from "../java/rpc";
@@ -228,6 +229,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSendList(propertyAssignment, el => el.modifiers, el => el.id, el => this.visit(el, q));
         await q.getAndSend(propertyAssignment, el => el.name, el => this.visitRightPadded(el, q));
         await q.getAndSend(propertyAssignment, el => el.assigmentToken);
         await q.getAndSend(propertyAssignment, el => el.initializer, el => this.visit(el, q));
@@ -815,6 +817,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
+            modifiers: await q.receiveListDefined(propertyAssignment.modifiers, el => this.visitDefined<J.Modifier>(el, q)),
             name: await q.receive(propertyAssignment.name, el => this.visitRightPadded(el, q)),
             assigmentToken: await q.receive(propertyAssignment.assigmentToken),
             initializer: await q.receive(propertyAssignment.initializer, el => this.visitDefined<Expression>(el, q))
@@ -1226,3 +1229,5 @@ class JavaScriptDelegateReceiver extends JavaReceiver {
 }
 
 registerJLanguageCodecs(JS.Kind.CompilationUnit, new JavaScriptReceiver(), new JavaScriptSender(), JS.Kind);
+
+registerVisitor("org.openrewrite.javascript.format.AutoformatVisitor", AutoformatVisitor);

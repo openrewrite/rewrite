@@ -24,6 +24,8 @@ import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1094,6 +1096,69 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/8114")
+    @Test
+    void seeMethodReferenceWithNamedParameter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * @see #bar(String str)
+                   */
+                  void foo() {
+                  }
+
+                  void bar(String str) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8114")
+    @Test
+    void seeMethodReferenceWithNamedParameters() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * @see #bar(String str, int count)
+                   */
+                  void foo() {
+                  }
+
+                  void bar(String str, int count) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8114")
+    @Test
+    void linkMethodReferenceWithNamedVarargsParameter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * {@link #bar(String... strs)}
+                   */
+                  void foo() {
+                  }
+
+                  void bar(String... strs) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     // see
     @Test
     void see() {
@@ -1627,6 +1692,77 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    // Java 25's Javadoc parser emits "// comment" inside <pre><code> blocks as nodes whose body lacks
+    // the leading space after the margin asterisk. The visitText whitespace compensation must re-insert
+    // that space before the "//" (not after it), otherwise "* // comment" reprints as "*//  comment".
+    @Issue("https://github.com/openrewrite/rewrite/issues/8002")
+    @Test
+    void lineCommentInPreCodeBlockIsIdempotent() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Example:
+                   * <pre><code class='java'>
+                   *
+                   * // assertions will pass
+                   * assertThat(1).isEqualTo(1);
+                   *
+                   * </code></pre>
+                   */
+                  void method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8002")
+    @Test
+    void lineCommentDirectlyAfterAsteriskSpaceIsIdempotent() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * <pre><code>
+                   * // line comment
+                   * int x = 1;
+                   * </code></pre>
+                   */
+                  void method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8002")
+    @Test
+    void lineCommentInPreBlockWithMultipleLines() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Description.
+                   * <pre><code class='java'>
+                   *
+                   * // first comment
+                   * doSomething();
+                   * // second comment
+                   * doSomethingElse();
+                   *
+                   * </code></pre>
+                   */
+                  void method() {}
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1409")
     @Test
     void trailingWhitespaceWithWhitespaceOnEmptyLine() {
@@ -2058,6 +2194,38 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    @Test
+    void varargsReferenceModeledAsArrayType() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  /**
+                   * Reference: {@link A#varargsMethod(String...)}.
+                   */
+                  public static void varargsMethod(String... args) {
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean foundVarargs = new AtomicBoolean();
+                new org.openrewrite.java.JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Integer p) {
+                        if (arrayType.getMarkers().findFirst(org.openrewrite.java.marker.Varargs.class).isPresent()) {
+                            assertThat(((J.Identifier) arrayType.getElementType()).getSimpleName()).isEqualTo("String");
+                            foundVarargs.set(true);
+                        }
+                        return super.visitArrayType(arrayType, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(foundVarargs).as("varargs reference should be a J.ArrayType carrying the Varargs marker").isTrue();
+            })
           )
         );
     }
@@ -2999,6 +3167,47 @@ class JavadocTest implements RewriteTest {
                   /// First doc-comment block.
 
                   /// Second doc-comment block.
+                  class Test {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashEndingInBackslash() {
+            rewriteRun(
+              java(
+                """
+                  /// Trailing backslash \\
+                  class Test {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void bannerCommentEndingInBackslashes() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                  \t////Section\\\\\\\\
+                  \tvoid first() {}
+
+                  \t///////////Section\\\\\\\\\\\\\\
+                  \tvoid second() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashWithNonEscapingBackslash() {
+            rewriteRun(
+              java(
+                """
+                  ///a\\b
                   class Test {}
                   """
               )

@@ -116,7 +116,7 @@ public class MavenDependency implements Trait<Xml.Tag> {
                         // fact that it's not in the metadata. Usually it won't be, only in situations like the
                         // MapR repository mentioned in the comment above will it be.
                         Pom pom = new MavenPomDownloader(emptyMap(), ctx,
-                                mrr.getMavenSettings(), mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
+                                settings, mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
                                 null, null, mrr.getPom().getRepositories());
                         if (pom.getGav().getVersion().equals(exactVersion) &&
                             !exactVersion.equals(finalVersion) &&

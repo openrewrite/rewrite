@@ -22,6 +22,9 @@ dependencies {
 
     api("org.jspecify:jspecify:latest.release")
 
+    // @MustBeClosed on DataTableStore.getRows; CLASS-retention, not needed at runtime.
+    compileOnly("com.google.errorprone:error_prone_annotations:latest.release")
+
     // Recipe marketplace
     implementation("com.univocity:univocity-parsers:latest.release")
 
@@ -34,7 +37,7 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("org.yaml:snakeyaml:latest.release")
 
-    implementation("io.moderne:jsonrpc:latest.integration")
+    implementation("io.moderne:jsonrpc:latest.release")
     implementation("org.objenesis:objenesis:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")

@@ -136,9 +136,10 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             List<JRightPadded<Expression>> expressions;
             if (node.getArguments().size() == 1) {
                 ExpressionTree arg = node.getArguments().get(0);
-                if (arg instanceof JCAssign) {
-                    if (endPos(arg) < 0) {
-                        expressions = singletonList(convert(((JCAssign) arg).rhs, t -> sourceBefore(")")));
+                if (arg instanceof JCAssign assign && assign.lhs instanceof JCIdent) {
+                    // javac's `Annotate#enterAnnotation` builds an elided `value =` with `make.at(rhs.pos)`
+                    if (assign.lhs.pos == assign.rhs.pos) {
+                        expressions = singletonList(convert(assign.rhs, t -> sourceBefore(")")));
                     } else {
                         expressions = singletonList(convert(arg, t -> sourceBefore(")")));
                     }
@@ -418,14 +419,14 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         } else if (hasFlag(node.getModifiers(), Flags.RECORD)) {
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("record"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Record);
         } else {
-            Space prefix = whitespace();
-            if (source.startsWith("class", cursor)) {
-                skip("class");
+            if (!hasFlag(node.getModifiers(), Flags.IMPLICIT_CLASS)) {
+                kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
             } else {
+                Space prefix = whitespace();
                 compactSourceFile = new CompactSourceFile(randomId());
                 cursor = saveCursor;
+                kind = new J.ClassDeclaration.Kind(randomId(), prefix, Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
             }
-            kind = new J.ClassDeclaration.Kind(randomId(), prefix, Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
         }
 
         J.Identifier name = new J.Identifier(randomId(), compactSourceFile != null ? EMPTY : sourceBefore(node.getSimpleName().toString()),
@@ -870,9 +871,26 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         if (node.getPattern() instanceof JCBindingPattern b && b.var.mods.flags == Flags.FINAL) {
             modifier = new J.Modifier(randomId(), sourceBefore("final"), Markers.EMPTY, null, J.Modifier.Type.Final, emptyList());
         }
-        J clazz = convert(node.getType());
+        J clazz = convertInstanceOfTree(node);
         J pattern = getNodePattern(node.getPattern(), type);
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
+    }
+
+    private J convertInstanceOfTree(InstanceOfTree node) {
+        if (!(node.getPattern() instanceof JCBindingPattern b) || b.var.mods.annotations.isEmpty()) {
+            return convert(node.getType());
+        }
+
+        Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(b.var.mods.annotations, new HashMap<>());
+        List<J.Annotation> typeAnnotations = collectAnnotations(annotationPosTable);
+        TypeTree typeExpr = convert(node.getType());
+        if (typeAnnotations.isEmpty()) {
+            return typeExpr;
+        }
+
+        Space prefix = typeAnnotations.getFirst().getPrefix();
+        return new J.AnnotatedType(randomId(), prefix, Markers.EMPTY,
+                ListUtils.mapFirst(typeAnnotations, a -> a.withPrefix(Space.EMPTY)), typeExpr);
     }
 
     @Override
@@ -1176,7 +1194,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         Symbol.MethodSymbol nodeSym = jcMethod.sym;
 
         J.MethodDeclaration.IdentifierWithAnnotations name;
-        if ("<init>".equals(node.getName().toString())) {
+        if ("<init>".contentEquals(node.getName())) {
             String owner = null;
             if (nodeSym == null) {
                 for (Tree tree : getCurrentPath()) {
@@ -2394,9 +2412,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         boolean afterFirstModifier = false;
         boolean inComment = false;
         boolean inMultilineComment = false;
+        int multilineCommentStart = -1;
         int afterLastModifierPosition = cursor;
         int lastAnnotationPosition = cursor;
-        boolean noSpace = false;
 
         int keywordStartIdx = -1;
         for (int i = cursor; i < source.length(); i++) {
@@ -2416,24 +2434,28 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             char c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1) {
+            if (c == '/' && source.length() > i + 1 && !inComment && !inMultilineComment) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
                     inMultilineComment = true;
+                    multilineCommentStart = i;
                 } else if (next == '/') {
                     inComment = true;
                 }
             }
 
-            if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
+            // The closing `/` cannot be part of the opener, so `/*/` does not terminate a block comment.
+            if (inMultilineComment && c == '/' && i >= multilineCommentStart + 3 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
-                // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
-                if (Character.isWhitespace(c) || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
+                // Modifiers end at whitespace, at a type parameter list's `<`, or at an adjacent annotation's `@`
+                boolean beforeAnnotation = !Character.isWhitespace(c) && c != '<' &&
+                        i + 1 < source.length() && source.charAt(i + 1) == '@';
+                if (Character.isWhitespace(c) || c == '<' || beforeAnnotation) {
                     if (keywordStartIdx != -1) {
-                        Modifier matching = MODIFIER_BY_KEYWORD.get(source.substring(keywordStartIdx, noSpace ? i + 1 : i));
+                        Modifier matching = MODIFIER_BY_KEYWORD.get(source.substring(keywordStartIdx, beforeAnnotation ? i + 1 : i));
                         keywordStartIdx = -1;
 
                         if (matching == null) {
@@ -2525,6 +2547,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> annotations = new ArrayList<>();
         boolean inComment = false;
         boolean inMultilineComment = false;
+        int multilineCommentStart = -1;
         for (int i = cursor; i <= maxAnnotationPosition && i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
@@ -2537,16 +2560,18 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             char c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1) {
+            if (c == '/' && source.length() > i + 1 && !inComment && !inMultilineComment) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
                     inMultilineComment = true;
+                    multilineCommentStart = i;
                 } else if (next == '/') {
                     inComment = true;
                 }
             }
 
-            if (inMultilineComment && c == '/' && i > 0 && source.charAt(i - 1) == '*') {
+            // The closing `/` cannot be part of the opener, so `/*/` does not terminate a block comment.
+            if (inMultilineComment && c == '/' && i >= multilineCommentStart + 3 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;

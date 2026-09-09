@@ -1007,4 +1007,79 @@ class HclCommentTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8184")
+    @Test
+    void hashCommentContainingForOnBlockHeaderLine() {
+        rewriteRun(
+          hcl(
+            """
+              resource "aws_security_group_rule" "my_rule" {  #waiting for results
+                type = "ingress"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8184")
+    @Test
+    void hashCommentContainingForWithSpaceOnBlockHeaderLine() {
+        rewriteRun(
+          hcl(
+            """
+              resource "aws_security_group_rule" "my_rule" {  # waiting for results
+                type = "ingress"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8184")
+    @Test
+    void hashCommentContainingForInsideBlockBody() {
+        rewriteRun(
+          hcl(
+            """
+              resource "aws_security_group_rule" "my_rule" {
+                #waiting for results
+                type = "ingress"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8184")
+    @Test
+    void slashCommentContainingForInsideBlockBody() {
+        rewriteRun(
+          hcl(
+            """
+              resource "aws_security_group_rule" "my_rule" {
+                // waiting for results
+                type = "ingress"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8184")
+    @Test
+    void objectForExpressionWithLeadingComment() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                m = {
+                  # build a map
+                  for k, v in var.input : k => v
+                }
+              }
+              """
+          )
+        );
+    }
 }

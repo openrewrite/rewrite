@@ -18,12 +18,14 @@ import * as fs from "fs";
 import * as path from "path";
 import {RecipeMarketplace} from "../../src";
 import {InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
+import {GetMarketplace, GetMarketplaceResponseRow} from "../../src/rpc/request/get-marketplace";
 
 describe("InstallRecipes", () => {
 
     type RequestHandler = (request: InstallRecipes) => Promise<InstallRecipesResponse>;
 
-    function captureHandler(installDir: string, marketplace: RecipeMarketplace): RequestHandler {
+    function captureHandler(installDir: string, marketplace: RecipeMarketplace,
+                            recipeOrigin: Map<string, string> = new Map()): RequestHandler {
         let capturedHandler: RequestHandler | undefined;
 
         const dummyConnection = {
@@ -32,13 +34,32 @@ describe("InstallRecipes", () => {
             }
         } as any;
 
-        InstallRecipes.handle(dummyConnection, installDir, marketplace);
+        InstallRecipes.handle(dummyConnection, installDir, marketplace, recipeOrigin);
 
         if (!capturedHandler) {
             throw new Error("Handler was not registered");
         }
 
         return capturedHandler;
+    }
+
+    function captureGetMarketplace(marketplace: RecipeMarketplace,
+                                   recipeOrigin: Map<string, string>): () => Promise<GetMarketplaceResponseRow[]> {
+        let capturedHandler: ((token?: any) => Promise<GetMarketplaceResponseRow[]>) | undefined;
+
+        const dummyConnection = {
+            onRequest: (_requestType: any, handler: any) => {
+                capturedHandler = handler;
+            }
+        } as any;
+
+        GetMarketplace.handle(dummyConnection, marketplace, recipeOrigin);
+
+        if (!capturedHandler) {
+            throw new Error("GetMarketplace handler was not registered");
+        }
+
+        return () => capturedHandler!();
     }
 
     describe("local file path installation", () => {
@@ -284,6 +305,92 @@ describe("InstallRecipes", () => {
                 expect(match).not.toBeNull();
                 const minorVersion = parseInt(match![2], 10);
                 expect(minorVersion).toBeGreaterThan(36);
+            }, {unsafeCleanup: true});
+        }, 120000);
+    });
+
+    describe("recipe attribution", () => {
+
+        test("attributes recipes installed from a local path to that path", async () => {
+            await withDir(async (dir) => {
+                const recipeModulePath = path.join(dir.path, "local-recipe.js");
+                fs.writeFileSync(recipeModulePath, `
+                    module.exports = {
+                        activate: async function(marketplace) {
+                            await marketplace.install(
+                                class LocalRecipe {
+                                    async descriptor() {
+                                        return { name: "local.recipe", displayName: "Local", description: "" };
+                                    }
+                                },
+                                [{displayName: "Local"}]
+                            );
+                        }
+                    };
+                `);
+
+                const installDir = path.join(dir.path, "recipes");
+                const marketplace = new RecipeMarketplace();
+                const recipeOrigin = new Map<string, string>();
+                const handler = captureHandler(installDir, marketplace, recipeOrigin);
+
+                await handler({recipes: recipeModulePath} as any);
+
+                expect(marketplace.allRecipes().length).toBe(1);
+                // Attributed to the install path (the host's bundle identity), not left unattributed.
+                expect(recipeOrigin.get("local.recipe")).toBe(recipeModulePath);
+            }, {unsafeCleanup: true});
+        });
+
+        test("GetMarketplace tags each row with its recipe's origin package", async () => {
+            await withDir(async (dir) => {
+                const recipeModulePath = path.join(dir.path, "row-recipe.js");
+                fs.writeFileSync(recipeModulePath, `
+                    module.exports = {
+                        activate: async function(marketplace) {
+                            await marketplace.install(
+                                class RowRecipe {
+                                    async descriptor() {
+                                        return { name: "row.recipe", displayName: "Row", description: "" };
+                                    }
+                                },
+                                [{displayName: "Row"}]
+                            );
+                        }
+                    };
+                `);
+
+                const installDir = path.join(dir.path, "recipes");
+                const marketplace = new RecipeMarketplace();
+                const recipeOrigin = new Map<string, string>();
+                const install = captureHandler(installDir, marketplace, recipeOrigin);
+                await install({recipes: recipeModulePath} as any);
+
+                // Stand in for the attribution InstallRecipes records for a package install.
+                recipeOrigin.set("row.recipe", "@example/recipes");
+
+                const getMarketplace = captureGetMarketplace(marketplace, recipeOrigin);
+                const rows = await getMarketplace();
+
+                const row = rows.find(r => r.descriptor.name === "row.recipe");
+                expect(row).toBeDefined();
+                expect(row!.packageName).toBe("@example/recipes");
+            }, {unsafeCleanup: true});
+        });
+
+        test("attributes npm-installed recipes to their package", async () => {
+            await withDir(async (dir) => {
+                const installDir = path.join(dir.path, "recipes");
+                const marketplace = new RecipeMarketplace();
+                const recipeOrigin = new Map<string, string>();
+                const handler = captureHandler(installDir, marketplace, recipeOrigin);
+
+                await handler({recipes: {packageName: "@openrewrite/recipes-nodejs"}} as any);
+
+                expect(recipeOrigin.size).toBeGreaterThan(0);
+                for (const recipe of marketplace.allRecipes()) {
+                    expect(recipeOrigin.get(recipe.name)).toBe("@openrewrite/recipes-nodejs");
+                }
             }, {unsafeCleanup: true});
         }, 120000);
     });

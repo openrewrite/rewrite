@@ -21,6 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
+@SuppressWarnings("Convert2Lambda")
 class FindImplementationsTest implements RewriteTest {
 
     @DocumentExample
@@ -183,6 +184,175 @@ class FindImplementationsTest implements RewriteTest {
                   @Override
                   public void bar() {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void anonymousClass() {
+        rewriteRun(
+          spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
+          java(
+            """
+              class Test {
+                  Runnable r = new Runnable() {
+                      @Override
+                      public void run() {
+                      }
+                  };
+              }
+              """,
+            """
+              class Test {
+                  Runnable r = /*~~>*/new Runnable() {
+                      @Override
+                      public void run() {
+                      }
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void anonymousClassOfTransitiveSubtype() {
+        rewriteRun(
+          spec -> spec.recipe(new FindImplementations("org.x.A")),
+          java(
+            """
+              package org.x;
+              interface A {
+                  void foo();
+              }
+              """
+          ),
+          java(
+            """
+              package org.x;
+              interface B extends A {
+              }
+              """,
+            """
+              package org.x;
+              /*~~>*/interface B extends A {
+              }
+              """
+          ),
+          java(
+            """
+              package org.x;
+              class C {
+                  B b = new B() {
+                      @Override
+                      public void foo() {
+                      }
+                  };
+              }
+              """,
+            """
+              package org.x;
+              class C {
+                  B b = /*~~>*/new B() {
+                      @Override
+                      public void foo() {
+                      }
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void lambda() {
+        rewriteRun(
+          spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
+          java(
+            """
+              class Test {
+                  Runnable r = () -> {
+                  };
+              }
+              """,
+            """
+              class Test {
+                  Runnable r = /*~~>*/() -> {
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void lambdaOfTransitiveSubtype() {
+        rewriteRun(
+          spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
+          java(
+            """
+              interface MyRunnable extends Runnable {
+              }
+              """,
+            """
+              /*~~>*/interface MyRunnable extends Runnable {
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  MyRunnable r = () -> {
+                  };
+              }
+              """,
+            """
+              class Test {
+                  MyRunnable r = /*~~>*/() -> {
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void lambdaOfUnrelatedType() {
+        rewriteRun(
+          spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
+          java(
+            """
+              import java.util.function.Supplier;
+
+              class Test {
+                  Supplier<String> s = () -> "hello";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodReference() {
+        rewriteRun(
+          spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
+          java(
+            """
+              class Test {
+                  void doSomething() {
+                  }
+
+                  Runnable r = this::doSomething;
+              }
+              """,
+            """
+              class Test {
+                  void doSomething() {
+                  }
+
+                  Runnable r = /*~~>*/this::doSomething;
               }
               """
           )

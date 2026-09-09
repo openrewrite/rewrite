@@ -1,0 +1,14 @@
+[project]
+name = "fixture-q"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "libone",
+    "six>=1.16",
+]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+libone = { workspace = true }

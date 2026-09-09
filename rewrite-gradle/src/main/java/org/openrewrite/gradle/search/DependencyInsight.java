@@ -199,15 +199,18 @@ public class DependencyInsight extends Recipe {
                         continue;
                     }
                     String configName = c.getName();
+                    List<ResolvedDependency> roots = new ArrayList<>();
                     for (ResolvedDependency resolvedDependency : c.getDirectResolved()) {
                         if (!resolvedDependency.isDirect()) {
                             continue;
                         }
-                        matches.collect(configName, resolvedDependency, dependencyMatcher,
-                                (matched, path) -> {
-                                    dependencyPathsByConfiguration.computeIfAbsent(configName, __ -> new HashMap<>())
-                                            .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(configName, path);
-                                });
+                        roots.add(resolvedDependency);
+                        matches.collect(configName, resolvedDependency, dependencyMatcher, null);
+                    }
+                    Map<ResolvedGroupArtifactVersion, DependencyGraph> graphs =
+                            DependencyGraph.build(configName, roots, dependencyMatcher);
+                    if (!graphs.isEmpty()) {
+                        dependencyPathsByConfiguration.computeIfAbsent(configName, __ -> new HashMap<>()).putAll(graphs);
                     }
                 }
             }

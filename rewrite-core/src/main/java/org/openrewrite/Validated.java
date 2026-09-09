@@ -20,11 +20,9 @@ import org.openrewrite.internal.StringUtils;
 
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyIterator;
-import static java.util.stream.StreamSupport.stream;
+import static java.util.Collections.singletonList;
 
 /**
  * A container object which may or may not contain a valid value.
@@ -223,7 +221,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
 
         @Override
         public Iterator<Validated<T>> iterator() {
-            return Stream.of((Validated<T>) this).iterator();
+            return singletonList((Validated<T>) this).iterator();
         }
 
         public String getProperty() {
@@ -274,7 +272,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
 
         @Override
         public Iterator<Validated<T>> iterator() {
-            return Stream.of((Validated<T>) this).iterator();
+            return singletonList((Validated<T>) this).iterator();
         }
 
         public String getMessage() {
@@ -324,9 +322,12 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         public Optional<Validated<T>> findAny() {
-            return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator(), Spliterator.CONCURRENT), false)
-                    .filter(Validated::isValid)
-                    .findAny();
+            for (Validated<T> v : this) {
+                if (v.isValid()) {
+                    return Optional.of(v);
+                }
+            }
+            return Optional.empty();
         }
 
         @Override
@@ -340,15 +341,24 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         public Iterator<Validated<T>> iterator() {
             //If only one side is valid, this short circuits the invalid path.
             if (left.isValid() && right.isInvalid()) {
-                return stream(left.spliterator(), false).iterator();
+                return left.iterator();
             } else if (left.isInvalid() && right.isValid()) {
-                return stream(right.spliterator(), false).iterator();
+                return right.iterator();
             } else {
                 //If both are valid/invalid, concat all validations.
-                return Stream.concat(
-                        stream(left.spliterator(), false),
-                        stream(right.spliterator(), false)
-                ).iterator();
+                Iterator<Validated<T>> leftIt = left.iterator();
+                Iterator<Validated<T>> rightIt = right.iterator();
+                return new Iterator<Validated<T>>() {
+                    @Override
+                    public boolean hasNext() {
+                        return leftIt.hasNext() || rightIt.hasNext();
+                    }
+
+                    @Override
+                    public Validated<T> next() {
+                        return leftIt.hasNext() ? leftIt.next() : rightIt.next();
+                    }
+                };
             }
         }
     }

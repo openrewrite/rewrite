@@ -1,0 +1,7 @@
+[project]
+name = "fixture-g3"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "requests[use_chardet_on_py3,socks]>=2.31",
+]

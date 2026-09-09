@@ -1,0 +1,33 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_version.py (test_version_epoch)
+# Retrieved: 2026-07-16
+# version<TAB>epoch.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+1.0	0
+1.0.dev0	0
+1.0.dev6	0
+1.0a1	0
+1.0a1.post5	0
+1.0a1.post5.dev6	0
+1.0rc4	0
+1.0.post5	0
+1!1.0	1
+1!1.0.dev6	1
+1!1.0a1	1
+1!1.0a1.post5	1
+1!1.0a1.post5.dev6	1
+1!1.0rc4	1
+1!1.0.post5	1
+1.0+deadbeef	0
+1.0.dev6+deadbeef	0
+1.0a1+deadbeef	0
+1.0a1.post5+deadbeef	0
+1.0a1.post5.dev6+deadbeef	0
+1.0rc4+deadbeef	0
+1.0.post5+deadbeef	0
+1!1.0+deadbeef	1
+1!1.0.dev6+deadbeef	1
+1!1.0a1+deadbeef	1
+1!1.0a1.post5+deadbeef	1
+1!1.0a1.post5.dev6+deadbeef	1
+1!1.0rc4+deadbeef	1
+1!1.0.post5+deadbeef	1

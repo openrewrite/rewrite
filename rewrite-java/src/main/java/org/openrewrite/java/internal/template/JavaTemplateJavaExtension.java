@@ -58,8 +58,6 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
     @Override
     public TreeVisitor<? extends J, Integer> getMixin() {
         return new JavaVisitor<Integer>() {
-            private boolean substituted;
-
             @Override
             public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, Integer p, Cursor parent) {
                 return autoFormat ? super.autoFormat(j, stopAfter, p, parent) : j;
@@ -410,6 +408,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                 if (getCursor().firstEnclosing(Javadoc.DocComment.class) != null) {
                     // We don't have support for changing method references in Javadoc comments (yet), so it's safer not to attempt any changes
+                    if (isScope(method)) {
+                        // Record the deliberate skip, so it isn't reported as a scope that could never be matched
+                        substituted = true;
+                    }
                     return method;
                 }
                 if ((loc == METHOD_INVOCATION_ARGUMENTS || loc == METHOD_INVOCATION_NAME) && isScope(method)) {

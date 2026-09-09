@@ -20,7 +20,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.csharp.tree.CsDocComment;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
@@ -82,13 +81,7 @@ public class CsDocCommentPrinter<P> extends CsDocCommentVisitor<PrintOutputCaptu
     public CsDocComment visitXmlAttribute(CsDocComment.XmlAttribute attribute, PrintOutputCapture<P> p) {
         beforeSyntax(attribute, p);
         p.append(attribute.getName());
-        if (attribute.getSpaceBeforeEquals() != null && !attribute.getSpaceBeforeEquals().isEmpty()) {
-            visit(attribute.getSpaceBeforeEquals(), p);
-            if (attribute.getValue() != null) {
-                p.append('=');
-                visit(attribute.getValue(), p);
-            }
-        }
+        printAttributeValue(attribute.getSpaceBeforeEquals(), attribute.getValue(), p);
         afterSyntax(attribute, p);
         return attribute;
     }
@@ -97,13 +90,7 @@ public class CsDocCommentPrinter<P> extends CsDocCommentVisitor<PrintOutputCaptu
     public CsDocComment visitXmlCrefAttribute(CsDocComment.XmlCrefAttribute attribute, PrintOutputCapture<P> p) {
         beforeSyntax(attribute, p);
         p.append("cref");
-        if (attribute.getSpaceBeforeEquals() != null && !attribute.getSpaceBeforeEquals().isEmpty()) {
-            visit(attribute.getSpaceBeforeEquals(), p);
-            if (attribute.getValue() != null) {
-                p.append('=');
-                visit(attribute.getValue(), p);
-            }
-        }
+        printAttributeValue(attribute.getSpaceBeforeEquals(), attribute.getValue(), p);
         afterSyntax(attribute, p);
         return attribute;
     }
@@ -112,15 +99,26 @@ public class CsDocCommentPrinter<P> extends CsDocCommentVisitor<PrintOutputCaptu
     public CsDocComment visitXmlNameAttribute(CsDocComment.XmlNameAttribute attribute, PrintOutputCapture<P> p) {
         beforeSyntax(attribute, p);
         p.append("name");
-        if (attribute.getSpaceBeforeEquals() != null && !attribute.getSpaceBeforeEquals().isEmpty()) {
-            visit(attribute.getSpaceBeforeEquals(), p);
-            if (attribute.getValue() != null) {
-                p.append('=');
-                visit(attribute.getValue(), p);
-            }
-        }
+        printAttributeValue(attribute.getSpaceBeforeEquals(), attribute.getValue(), p);
         afterSyntax(attribute, p);
         return attribute;
+    }
+
+    /**
+     * Print the {@code =value} portion of an XML attribute. Standard XML attributes have no
+     * whitespace around the {@code =}, so {@code spaceBeforeEquals} is normally null/empty;
+     * the value must still be printed whenever it is present.
+     */
+    private void printAttributeValue(@Nullable List<? extends CsDocComment> spaceBeforeEquals,
+                                     @Nullable List<? extends CsDocComment> value, PrintOutputCapture<P> p) {
+        if (value == null) {
+            return;
+        }
+        if (spaceBeforeEquals != null) {
+            visit(spaceBeforeEquals, p);
+        }
+        p.append('=');
+        visit(value, p);
     }
 
     @Override

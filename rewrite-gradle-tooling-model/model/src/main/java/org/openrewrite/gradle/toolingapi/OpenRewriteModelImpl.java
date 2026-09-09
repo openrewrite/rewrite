@@ -19,10 +19,13 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
+import java.util.Map;
 
 @Value
 public class OpenRewriteModelImpl implements OpenRewriteModelProxy, Serializable {
     byte[] gradleProjectBytes;
+
+    @Nullable Map<String, byte[]> gradleProjectsByPathBytes;
 
     byte @Nullable [] gradleSettingsBytes;
 }

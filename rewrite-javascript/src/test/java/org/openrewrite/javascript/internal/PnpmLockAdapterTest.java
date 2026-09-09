@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -147,6 +148,165 @@ class PnpmLockAdapterTest {
 
         assertThat(result.getTopLevel().keySet())
                 .containsExactlyInAnyOrder("prod-dep", "dev-dep", "peer-dep");
+    }
+
+    @Test
+    void convertsLockfileVersion5TopLevelAndTransitive() {
+        // pnpm 7.x and earlier: name and version are separated by '/', not '@'.
+        String pnpm = "lockfileVersion: 5.4\n" +
+                "\n" +
+                "specifiers:\n" +
+                "  is-even: 1.0.0\n" +
+                "\n" +
+                "dependencies:\n" +
+                "  is-even: 1.0.0\n" +
+                "\n" +
+                "packages:\n" +
+                "\n" +
+                "  /is-even/1.0.0:\n" +
+                "    resolution: {integrity: sha512-x}\n" +
+                "    engines: {node: '>=0.10.0'}\n" +
+                "    dependencies:\n" +
+                "      is-odd: 0.1.2\n" +
+                "    dev: false\n" +
+                "\n" +
+                "  /is-odd/0.1.2:\n" +
+                "    resolution: {integrity: sha512-y}\n" +
+                "    dev: false\n";
+        String npm = PnpmLockAdapter.toNpmV3(pnpm);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        assertThat(result.getAll())
+                .extracting(d -> d.getName() + "@" + d.getVersion())
+                .containsExactlyInAnyOrder("is-even@1.0.0", "is-odd@0.1.2");
+        // Only is-even is top-level; is-odd is transitive.
+        assertThat(result.getTopLevel()).containsOnlyKeys("is-even");
+        assertThat(result.getTopLevel().get("is-even").getDependencies())
+                .extracting(NodeResolutionResult.Dependency::getName)
+                .containsExactly("is-odd");
+    }
+
+    @Test
+    void convertsLockfileVersion5ScopedAndPeerSuffix() {
+        String pnpm = "lockfileVersion: 5.4\n" +
+                "\n" +
+                "dependencies:\n" +
+                "  '@scope/foo': 1.0.0\n" +
+                "\n" +
+                "packages:\n" +
+                "\n" +
+                "  /@scope/foo/1.0.0_react@18.2.0:\n" +
+                "    resolution: {integrity: sha512-x}\n" +
+                "    dev: false\n";
+        String npm = PnpmLockAdapter.toNpmV3(pnpm);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        assertThat(result.getAll().get(0).getName()).isEqualTo("@scope/foo");
+        assertThat(result.getAll().get(0).getVersion()).isEqualTo("1.0.0");
+        assertThat(result.getTopLevel()).containsKey("@scope/foo");
+    }
+
+    @Test
+    void parseLegacyPackageKeyHandlesShapes() {
+        var simple = PnpmLockAdapter.parseLegacyPackageKey("/lodash/4.17.21");
+        assertThat(simple).isNotNull();
+        assertThat(simple.name).isEqualTo("lodash");
+        assertThat(simple.version).isEqualTo("4.17.21");
+
+        var scoped = PnpmLockAdapter.parseLegacyPackageKey("/@types/node/20.0.0");
+        assertThat(scoped).isNotNull();
+        assertThat(scoped.name).isEqualTo("@types/node");
+        assertThat(scoped.version).isEqualTo("20.0.0");
+
+        var peer = PnpmLockAdapter.parseLegacyPackageKey("/react-redux/8.0.5_react@18.2.0");
+        assertThat(peer).isNotNull();
+        assertThat(peer.name).isEqualTo("react-redux");
+        assertThat(peer.version).isEqualTo("8.0.5");
+
+        assertThat(PnpmLockAdapter.parseLegacyPackageKey("/no-version-suffix")).isNull();
+        assertThat(PnpmLockAdapter.parseLegacyPackageKey("not-a-valid-key")).isNull();
+        assertThat(PnpmLockAdapter.parseLegacyPackageKey("")).isNull();
+        assertThat(PnpmLockAdapter.parseLegacyPackageKey(null)).isNull();
+    }
+
+    @Test
+    void convertsLockfileVersion9TopLevelAndTransitive() {
+        // pnpm 9.x/10.x: top-level deps live under `importers`, package keys have no
+        // leading slash, and the dependency graph lives in `snapshots`.
+        String pnpm = "lockfileVersion: '9.0'\n" +
+                "\n" +
+                "importers:\n" +
+                "\n" +
+                "  .:\n" +
+                "    dependencies:\n" +
+                "      is-even:\n" +
+                "        specifier: 1.0.0\n" +
+                "        version: 1.0.0\n" +
+                "\n" +
+                "packages:\n" +
+                "\n" +
+                "  is-even@1.0.0:\n" +
+                "    resolution: {integrity: sha512-x}\n" +
+                "    engines: {node: '>=0.10.0'}\n" +
+                "\n" +
+                "  is-odd@0.1.2:\n" +
+                "    resolution: {integrity: sha512-y}\n" +
+                "\n" +
+                "snapshots:\n" +
+                "\n" +
+                "  is-even@1.0.0:\n" +
+                "    dependencies:\n" +
+                "      is-odd: 0.1.2\n" +
+                "\n" +
+                "  is-odd@0.1.2: {}\n";
+        String npm = PnpmLockAdapter.toNpmV3(pnpm);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        assertThat(result.getAll())
+                .extracting(d -> d.getName() + "@" + d.getVersion())
+                .containsExactlyInAnyOrder("is-even@1.0.0", "is-odd@0.1.2");
+        // Only is-even is top-level; is-odd is transitive.
+        assertThat(result.getTopLevel()).containsOnlyKeys("is-even");
+        assertThat(result.getTopLevel().get("is-even").getDependencies())
+                .extracting(NodeResolutionResult.Dependency::getName)
+                .containsExactly("is-odd");
+    }
+
+    @Test
+    void convertsLockfileVersion9ScopedAndPeerSuffix() {
+        String pnpm = "lockfileVersion: '9.0'\n" +
+                "\n" +
+                "importers:\n" +
+                "\n" +
+                "  .:\n" +
+                "    dependencies:\n" +
+                "      '@scope/foo':\n" +
+                "        specifier: ^1.0.0\n" +
+                "        version: 1.0.0(react@18.2.0)\n" +
+                "\n" +
+                "packages:\n" +
+                "\n" +
+                "  '@scope/foo@1.0.0':\n" +
+                "    resolution: {integrity: sha512-x}\n";
+        String npm = PnpmLockAdapter.toNpmV3(pnpm);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        assertThat(result.getAll().get(0).getName()).isEqualTo("@scope/foo");
+        assertThat(result.getAll().get(0).getVersion()).isEqualTo("1.0.0");
+        assertThat(result.getTopLevel()).containsKey("@scope/foo");
+    }
+
+    @Test
+    void parsePackageKeyHandlesNoLeadingSlash() {
+        var nv = PnpmLockAdapter.parsePackageKey("is-even@1.0.0");
+        assertThat(nv).isNotNull();
+        assertThat(nv.name).isEqualTo("is-even");
+        assertThat(nv.version).isEqualTo("1.0.0");
+
+        var scoped = PnpmLockAdapter.parsePackageKey("@types/node@20.0.0");
+        assertThat(scoped).isNotNull();
+        assertThat(scoped.name).isEqualTo("@types/node");
+        assertThat(scoped.version).isEqualTo("20.0.0");
     }
 
     @Test

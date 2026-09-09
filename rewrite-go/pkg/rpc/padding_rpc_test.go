@@ -21,6 +21,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -35,7 +37,6 @@ import (
 // pre-fix; the "Coerce…" tests demonstrate the same input flowing through
 // the coerce helpers without panicking.
 
-// makeIdent returns an *Identifier (which implements Expression only).
 func makeIdent(name string) *java.Identifier {
 	return &java.Identifier{ID: uuid.New(), Name: name}
 }
@@ -60,8 +61,6 @@ func expectPanic(t *testing.T, label string, fn func()) {
 	t.Fatalf("%s: unreachable — fn returned without panic", label)
 }
 
-// ----- Group 1: RightPadded[Statement] vs RightPadded[Expression] -----
-
 func TestCoerceToStatementRP_AcceptsExpressionVariant(t *testing.T) {
 	// given: a RightPadded[Expression] wrapping a *MethodInvocation
 	// (exactly what Java emits for a for-loop init expression that
@@ -77,9 +76,7 @@ func TestCoerceToStatementRP_AcceptsExpressionVariant(t *testing.T) {
 	got := coerceToStatementRP(wire)
 
 	// then: the element survives, now typed as Statement
-	if got.Element == nil {
-		t.Fatal("Element nil after coerce")
-	}
+	require.NotNil(t, got.Element, "Element nil after coerce")
 	if got.Element.(*java.MethodInvocation) != mi {
 		t.Errorf("Element identity lost: want %p, got %p", mi, got.Element)
 	}
@@ -96,8 +93,6 @@ func TestRawCastPanics_RightPaddedStatementFromExpression(t *testing.T) {
 		_ = wire.(java.RightPadded[java.Statement])
 	})
 }
-
-// ----- Group 2: LeftPadded[*Identifier] from LeftPadded[Expression] -----
 
 func TestCoerceLeftPaddedIdent_AcceptsExpressionVariant(t *testing.T) {
 	// given: a LeftPadded[Expression] wrapping an *Identifier — the shape
@@ -128,8 +123,6 @@ func TestRawCastPanics_LeftPaddedIdentFromExpression(t *testing.T) {
 	})
 }
 
-// ----- Group 4: coerceRightPaddedTyped[T] element coercion -----
-//
 // receiveContainerTyped[T] builds Container[T] by running each received element
 // through coerceRightPaddedTyped[T], so these element-level tests lock in the
 // guarantees the deleted coerceContainerStatement/coerceContainerExpression/

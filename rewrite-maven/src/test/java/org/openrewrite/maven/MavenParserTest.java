@@ -1457,6 +1457,39 @@ class MavenParserTest implements RewriteTest {
             );
         }
 
+        @DisplayName("a profile deactivated with `-P !id` is inactive even though it activates itself")
+        @Test
+        void deactivatedProfileIsNotActive() {
+            rewriteRun(
+              recipeSpec -> recipeSpec
+                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()))
+                .parser(MavenParser.builder().activeProfiles("!active-profile-2")),
+              mavenProject("c",
+                pomXml(
+                  parent
+                )
+              ),
+              pomXml(
+                child, spec -> spec.afterRecipe(pomXml -> {
+                      Map<String, List<ResolvedDependency>> deps =
+                        pomXml.getMarkers()
+                          .findFirst(MavenResolutionResult.class)
+                          .orElseThrow()
+                          .getDependencies()
+                          .get(Scope.Compile)
+                          .stream()
+                          .collect(groupingBy(ResolvedDependency::getArtifactId));
+
+                      assertThat(deps)
+                        .hasEntrySatisfying("slf4j-api", rds -> assertThat(rds)
+                          .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.0.9"))
+                        .doesNotContainKey("commons-io");
+                  }
+                )
+              )
+            );
+        }
+
         @Test
         void settingsActiveProfiles() {
             var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
@@ -3500,7 +3533,7 @@ class MavenParserTest implements RewriteTest {
                 spec -> spec.afterRecipe(pomXml -> {
                     ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
                     assertThat(pom.getVersion()).isEqualTo("1.2.3");
-                    assertThat(pom.getRequestedDependencies().get(0).getVersion()).isEqualTo("${project.version}");
+                    assertThat(pom.getRequestedDependencies().getFirst().getVersion()).isEqualTo("${project.version}");
                     assertThat(pom.getValue("${project.version}")).isEqualTo("1.2.3");
                 })
               )

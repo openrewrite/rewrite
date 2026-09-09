@@ -30,6 +30,32 @@ type Receiver interface {
 	Visit(t java.Tree, p any) java.Tree
 }
 
+// receiveBlockBody receives a `*Block` field that Java ships as a
+// RightPadded<Statement> (J.ForLoop/ForEachLoop.body, ...).
+//
+// Passing the existing block as the receive baseline is essential. On a CHANGE
+// — e.g. a recipe edited a single nested statement — the unchanged siblings and
+// every whitespace/sub-field resolve to NO_CHANGE against this baseline. The
+// previous code passed nil, so q.Receive's CHANGE path materialized a fresh,
+// empty block (newObj) and every NO_CHANGE field then resolved to its zero
+// value: block prefix, statement prefixes and End space all collapsed (printed
+// `if cond{returnx}`), and nested NO_CHANGE nodes such as an inner If's
+// Condition came back nil — crashing the printer / coerceToStatementRP.
+func receiveBlockBody(r Receiver, q *ReceiveQueue, before *java.Block) *java.Block {
+	var baseline any
+	if before != nil {
+		baseline = java.RightPadded[java.Statement]{Element: before}
+	}
+	result := q.Receive(baseline, func(v any) any { return receiveRightPadded(r, q, v) })
+	if result == nil {
+		return before
+	}
+	if blk, ok := coerceToStatementRP(result).Element.(*java.Block); ok {
+		return blk
+	}
+	return before
+}
+
 // JavaReceiver deserializes J (shared Java-like) AST nodes via the
 // visitor pattern. Mirrors org.openrewrite.java.internal.rpc.JavaReceiver.
 //
@@ -90,23 +116,15 @@ func (r *JavaReceiver) receiveType(before java.JavaType, q *ReceiveQueue) java.J
 	return result.(java.JavaType)
 }
 
-// --- J nodes ---
-
 func (r *JavaReceiver) VisitIdentifier(id *java.Identifier, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *id // shallow copy to avoid mutating remoteObjects baseline
 	id = &c
 	// annotations
-	beforeAnns := make([]any, len(id.Annotations))
-	for i, a := range id.Annotations {
-		beforeAnns[i] = a
-	}
-	afterAnns := q.ReceiveList(beforeAnns, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if afterAnns != nil {
-		id.Annotations = make([]java.Tree, len(afterAnns))
-		for i, a := range afterAnns {
-			id.Annotations[i] = a.(java.Tree)
-		}
+	if after := receiveTypedList(q, id.Annotations,
+		func(v any) any { return r.Visit(v.(java.Tree), q) },
+		func(v any) java.Tree { return v.(java.Tree) }); after != nil {
+		id.Annotations = after
 	}
 	// simpleName
 	id.Name = receiveScalar[string](q, id.Name)
@@ -131,25 +149,12 @@ func (r *JavaReceiver) VisitLiteral(lit *java.Literal, p any) java.J {
 	// valueSource
 	lit.Source = receiveScalar[string](q, lit.Source)
 	// unicodeEscapes (typically empty for Go)
-	before := make([]any, len(lit.UnicodeEscapes))
-	for i, e := range lit.UnicodeEscapes {
-		before[i] = e
-	}
-	after := q.ReceiveList(before, func(v any) any {
+	lit.UnicodeEscapes = receiveTypedList(q, lit.UnicodeEscapes, func(v any) any {
 		e, _ := v.(java.UnicodeEscape)
 		e.ValueSourceIndex = receiveScalar[int](q, e.ValueSourceIndex)
 		e.CodePoint = receiveScalar[string](q, e.CodePoint)
 		return e
-	})
-	if after != nil {
-		escapes := make([]java.UnicodeEscape, len(after))
-		for i, v := range after {
-			escapes[i] = v.(java.UnicodeEscape)
-		}
-		lit.UnicodeEscapes = escapes
-	} else {
-		lit.UnicodeEscapes = nil
-	}
+	}, func(v any) java.UnicodeEscape { return v.(java.UnicodeEscape) })
 	// type (as ref)
 	lit.Type = r.receiveType(lit.Type, q)
 	return lit
@@ -173,16 +178,10 @@ func (r *JavaReceiver) VisitBlock(b *java.Block, p any) java.J {
 	// static (right-padded) - Java-only field, not stored in Go Block
 	q.Receive(nil, func(v any) any { return receiveRightPadded(r, q, v) })
 	// statements
-	beforeStmts := make([]any, len(b.Statements))
-	for i, s := range b.Statements {
-		beforeStmts[i] = s
-	}
-	afterStmts := q.ReceiveList(beforeStmts, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterStmts != nil {
-		b.Statements = make([]java.RightPadded[java.Statement], len(afterStmts))
-		for i, s := range afterStmts {
-			b.Statements[i] = coerceToStatementRP(s)
-		}
+	if after := receiveTypedList(q, b.Statements,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToStatementRP); after != nil {
+		b.Statements = after
 	}
 	// end space
 	b.End = receiveValue(q, b.End, func(e java.Space) any { return receiveSpace(e, q) })
@@ -281,18 +280,10 @@ func (r *JavaReceiver) VisitMethodDeclaration(md *java.MethodDeclaration, p any)
 	c := *md // shallow copy to avoid mutating remoteObjects baseline
 	md = &c
 	// leadingAnnotations
-	beforeAnns := make([]any, len(md.LeadingAnnotations))
-	for i, a := range md.LeadingAnnotations {
-		beforeAnns[i] = a
-	}
-	afterAnns := q.ReceiveList(beforeAnns, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if afterAnns != nil {
-		md.LeadingAnnotations = make([]*java.Annotation, 0, len(afterAnns))
-		for _, a := range afterAnns {
-			if a != nil {
-				md.LeadingAnnotations = append(md.LeadingAnnotations, a.(*java.Annotation))
-			}
-		}
+	if after := receiveTypedListNonNil(q, md.LeadingAnnotations,
+		func(v any) any { return r.Visit(v.(java.Tree), q) },
+		coerceAnnotation, annotationIsNil); after != nil {
+		md.LeadingAnnotations = after
 	}
 	// modifiers
 	q.ReceiveList(nil, nil)
@@ -331,16 +322,10 @@ func (r *JavaReceiver) VisitTypeParameters(tps *java.TypeParameters, p any) java
 	// annotations
 	q.ReceiveList(nil, nil)
 	// typeParameters (list of right-padded J$TypeParameter)
-	beforeElems := make([]any, len(tps.TypeParameters))
-	for i, e := range tps.TypeParameters {
-		beforeElems[i] = e
-	}
-	afterElems := q.ReceiveList(beforeElems, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterElems != nil {
-		tps.TypeParameters = make([]java.RightPadded[java.J], len(afterElems))
-		for i, e := range afterElems {
-			tps.TypeParameters[i] = e.(java.RightPadded[java.J])
-		}
+	if after := receiveTypedList(q, tps.TypeParameters,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		func(v any) java.RightPadded[java.J] { return v.(java.RightPadded[java.J]) }); after != nil {
+		tps.TypeParameters = after
 	}
 	return tps
 }
@@ -365,18 +350,10 @@ func (r *JavaReceiver) VisitVariableDeclarations(vd *java.VariableDeclarations, 
 	c := *vd // shallow copy to avoid mutating remoteObjects baseline
 	vd = &c
 	// leadingAnnotations
-	beforeAnns := make([]any, len(vd.LeadingAnnotations))
-	for i, a := range vd.LeadingAnnotations {
-		beforeAnns[i] = a
-	}
-	afterAnns := q.ReceiveList(beforeAnns, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if afterAnns != nil {
-		vd.LeadingAnnotations = make([]*java.Annotation, 0, len(afterAnns))
-		for _, a := range afterAnns {
-			if a != nil {
-				vd.LeadingAnnotations = append(vd.LeadingAnnotations, a.(*java.Annotation))
-			}
-		}
+	if after := receiveTypedListNonNil(q, vd.LeadingAnnotations,
+		func(v any) any { return r.Visit(v.(java.Tree), q) },
+		coerceAnnotation, annotationIsNil); after != nil {
+		vd.LeadingAnnotations = after
 	}
 	// modifiers
 	q.ReceiveList(nil, nil)
@@ -392,16 +369,12 @@ func (r *JavaReceiver) VisitVariableDeclarations(vd *java.VariableDeclarations, 
 		vd.Varargs = &sp
 	}
 	// variables
-	beforeVars := make([]any, len(vd.Variables))
-	for i, v := range vd.Variables {
-		beforeVars[i] = v
-	}
-	afterVars := q.ReceiveList(beforeVars, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterVars != nil {
-		vd.Variables = make([]java.RightPadded[*java.VariableDeclarator], len(afterVars))
-		for i, v := range afterVars {
-			vd.Variables[i] = v.(java.RightPadded[*java.VariableDeclarator])
-		}
+	if after := receiveTypedList(q, vd.Variables,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		func(v any) java.RightPadded[*java.VariableDeclarator] {
+			return v.(java.RightPadded[*java.VariableDeclarator])
+		}); after != nil {
+		vd.Variables = after
 	}
 	return vd
 }
@@ -446,20 +419,13 @@ func (r *JavaReceiver) VisitIf(i *java.If, p any) java.J {
 	if cpResult := q.Receive(i.Condition, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
 		i.Condition = cpResult.(*java.ControlParentheses)
 	}
-	// thenPart - Java sends RightPadded<Statement> wrapping the Block
-	if thenResult := q.Receive(nil, func(v any) any { return receiveRightPadded(r, q, v) }); thenResult != nil {
-		rp := coerceToStatementRP(thenResult)
-		if blk, ok := rp.Element.(*java.Block); ok {
-			i.Then = blk
-		}
+	// thenPart
+	if thenResult := q.Receive(i.ThenPart, func(v any) any { return receiveRightPadded(r, q, v) }); thenResult != nil {
+		i.ThenPart = coerceToStatementRP(thenResult)
 	}
-	// elsePart - Java sends Else node, convert to RightPadded
-	if elseResult := q.Receive(nil, func(v any) any { return r.Visit(v.(java.Tree), q) }); elseResult != nil {
-		el := elseResult.(*java.Else)
-		i.ElsePart = &java.RightPadded[java.J]{
-			Element: el.Body.Element,
-			After:   el.Prefix,
-		}
+	// elsePart
+	if elseResult := q.Receive(i.ElsePart, func(v any) any { return r.Visit(v.(java.Tree), q) }); elseResult != nil {
+		i.ElsePart = elseResult.(*java.Else)
 	} else {
 		i.ElsePart = nil
 	}
@@ -485,12 +451,7 @@ func (r *JavaReceiver) VisitForLoop(f *java.ForLoop, p any) java.J {
 		f.Control = *result.(*java.ForControl)
 	}
 	// body - Java sends RightPadded<Statement> wrapping the Block
-	if bodyResult := q.Receive(nil, func(v any) any { return receiveRightPadded(r, q, v) }); bodyResult != nil {
-		rp := coerceToStatementRP(bodyResult)
-		if blk, ok := rp.Element.(*java.Block); ok {
-			f.Body = blk
-		}
-	}
+	f.Body = receiveBlockBody(r, q, f.Body)
 	return f
 }
 
@@ -499,13 +460,13 @@ func (r *JavaReceiver) VisitForControl(fc *java.ForControl, p any) java.J {
 	c := *fc // shallow copy to avoid mutating remoteObjects baseline
 	fc = &c
 	// init (list of right-padded)
-	var beforeInit []any
+	var beforeInit []java.RightPadded[java.Statement]
 	if fc.Init != nil {
-		beforeInit = []any{*fc.Init}
+		beforeInit = []java.RightPadded[java.Statement]{*fc.Init}
 	}
-	initList := q.ReceiveList(beforeInit, func(v any) any { return receiveRightPadded(r, q, v) })
+	initList := receiveTypedList(q, beforeInit, func(v any) any { return receiveRightPadded(r, q, v) }, coerceToStatementRP)
 	if len(initList) > 0 {
-		rp := coerceToStatementRP(initList[0])
+		rp := initList[0]
 		fc.Init = &rp
 	} else {
 		fc.Init = nil
@@ -522,13 +483,13 @@ func (r *JavaReceiver) VisitForControl(fc *java.ForControl, p any) java.J {
 		fc.Condition = nil
 	}
 	// update (list of right-padded)
-	var beforeUpdate []any
+	var beforeUpdate []java.RightPadded[java.Statement]
 	if fc.Update != nil {
-		beforeUpdate = []any{*fc.Update}
+		beforeUpdate = []java.RightPadded[java.Statement]{*fc.Update}
 	}
-	updateList := q.ReceiveList(beforeUpdate, func(v any) any { return receiveRightPadded(r, q, v) })
+	updateList := receiveTypedList(q, beforeUpdate, func(v any) any { return receiveRightPadded(r, q, v) }, coerceToStatementRP)
 	if len(updateList) > 0 {
-		rp := coerceToStatementRP(updateList[0])
+		rp := updateList[0]
 		fc.Update = &rp
 	} else {
 		fc.Update = nil
@@ -545,12 +506,7 @@ func (r *JavaReceiver) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
 		f.Control = *result.(*java.ForEachControl)
 	}
 	// body - Java sends RightPadded<Statement> wrapping the Block
-	if bodyResult := q.Receive(nil, func(v any) any { return receiveRightPadded(r, q, v) }); bodyResult != nil {
-		rp := coerceToStatementRP(bodyResult)
-		if blk, ok := rp.Element.(*java.Block); ok {
-			f.Body = blk
-		}
-	}
+	f.Body = receiveBlockBody(r, q, f.Body)
 	return f
 }
 
@@ -573,16 +529,10 @@ func (r *JavaReceiver) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *sw // shallow copy to avoid mutating remoteObjects baseline
 	sw = &c
-	// selector - Java sends ControlParentheses, extract inner Expression for Tag
-	if cpResult := q.Receive(nil, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
-		if cp, ok := cpResult.(*java.ControlParentheses); ok {
-			if _, isEmpty := cp.Tree.Element.(*java.Empty); !isEmpty {
-				sw.Tag = &java.RightPadded[java.Expression]{
-					Element: cp.Tree.Element,
-					After:   cp.Tree.After,
-				}
-			}
-		}
+	// selector - a ControlParentheses matching J.Switch; pass the existing one as
+	// the baseline so a changed selector keeps its unchanged children (mirroring VisitIf).
+	if cpResult := q.Receive(sw.Selector, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
+		sw.Selector = cpResult.(*java.ControlParentheses)
 	}
 	sw.Body = receiveValue(q, sw.Body, func(e *java.Block) any { return r.Visit(e, q) })
 	return sw
@@ -595,7 +545,11 @@ func (r *JavaReceiver) VisitCase(cs *java.Case, p any) java.J {
 	q.Receive(nil, nil) // type enum
 	cs.Expressions = receiveContainer[java.Expression](r, q, cs.Expressions)
 	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's []RightPadded[Statement]
-	if result := q.Receive(nil, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
+	var stmtsBefore any
+	if cs.Body != nil {
+		stmtsBefore = java.Container[java.Statement]{Elements: cs.Body}
+	}
+	if result := q.Receive(stmtsBefore, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
 		cont := result.(java.Container[java.Statement])
 		cs.Body = cont.Elements
 	}
@@ -681,6 +635,23 @@ func (r *JavaReceiver) VisitParentheses(parens *java.Parentheses, p any) java.J 
 		parens.Tree = coerceToExpressionRP(result)
 	}
 	return parens
+}
+
+func (r *JavaReceiver) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ptt // shallow copy to avoid mutating remoteObjects baseline
+	ptt = &c
+	// annotations
+	if after := receiveTypedList(q, ptt.Annotations,
+		func(v any) any { return r.Visit(v.(java.Tree), q) },
+		func(v any) *java.Annotation { return v.(*java.Annotation) }); after != nil {
+		ptt.Annotations = after
+	}
+	// parenthesizedType
+	if result := q.Receive(ptt.Type, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
+		ptt.Type = result.(*java.Parentheses)
+	}
+	return ptt
 }
 
 func (r *JavaReceiver) VisitTypeCast(tc *java.TypeCast, p any) java.J {

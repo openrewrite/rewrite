@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PackageJsonHelperTest {
@@ -148,7 +149,7 @@ class PackageJsonHelperTest {
                 "}\n");
         Json.Document modified = PackageJsonHelper.upgradeVersion(
                 doc,
-                java.util.Collections.singletonList(new MatchedDependency("lodash", "dependencies", "^4.17.20")),
+                singletonList(new MatchedDependency("lodash", "dependencies", "^4.17.20")),
                 "^4.17.21");
         assertThat(modified.printAll()).isEqualTo(
                 "{\n" +
@@ -263,6 +264,93 @@ class PackageJsonHelperTest {
     }
 
     @Test
+    void overlayResolvedDepsLinksTransitiveDependencies() {
+        String json = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"dependencies\": { \"a\": \"^1.0.0\" }\n" +
+                "}\n";
+        Json.Document doc = parsePackageJson(json);
+        NodeResolutionResult marker = new NodeResolutionResult(
+                UUID.randomUUID(), "x", null, null, ".",
+                null,
+                asList(new Dependency("a", "^1.0.0", null)),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<NodeResolutionResult.ResolvedDependency>emptyList(),
+                NodeResolutionResult.PackageManager.Npm,
+                null, null);
+        Json.Document withMarker = doc.withMarkers(doc.getMarkers().add(marker));
+
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/a\": { \"version\": \"1.0.0\", \"dependencies\": { \"b\": \"^1.0.0\" } },\n" +
+                "    \"node_modules/b\": { \"version\": \"1.0.0\", \"dependencies\": { \"c\": \"^1.0.0\" } },\n" +
+                "    \"node_modules/c\": { \"version\": \"1.0.0\" }\n" +
+                "  }\n" +
+                "}";
+        SourceFile result = PackageJsonHelper.overlayResolvedDeps(
+                withMarker, lock, NodeResolutionResult.PackageManager.Npm);
+
+        NodeResolutionResult m = result.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElseThrow();
+        Dependency aRequest = m.getDependencies().get(0);
+        // The declared dep must point into the same graph as resolvedDependencies…
+        assertThat(aRequest.getResolved()).isSameAs(m.getResolvedDependency("a"));
+        // …and the graph must be navigable to arbitrary depth via getResolved().
+        Dependency bRequest = aRequest.getResolved().getDependencies().get(0);
+        assertThat(bRequest.getResolved()).isNotNull();
+        assertThat(bRequest.getResolved().getName()).isEqualTo("b");
+        Dependency cRequest = bRequest.getResolved().getDependencies().get(0);
+        assertThat(cRequest.getResolved()).isNotNull();
+        assertThat(cRequest.getResolved().getName()).isEqualTo("c");
+        assertThat(cRequest.getResolved().getVersion()).isEqualTo("1.0.0");
+    }
+
+    @Test
+    void overlayResolvedDepsResolvesShadowedNestedVersion() {
+        String json = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"dependencies\": { \"a\": \"^1.0.0\", \"b\": \"^2.0.0\" }\n" +
+                "}\n";
+        Json.Document doc = parsePackageJson(json);
+        NodeResolutionResult marker = new NodeResolutionResult(
+                UUID.randomUUID(), "x", null, null, ".",
+                null,
+                asList(new Dependency("a", "^1.0.0", null), new Dependency("b", "^2.0.0", null)),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<NodeResolutionResult.ResolvedDependency>emptyList(),
+                NodeResolutionResult.PackageManager.Npm,
+                null, null);
+        Json.Document withMarker = doc.withMarkers(doc.getMarkers().add(marker));
+
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/a\": { \"version\": \"1.0.0\", \"dependencies\": { \"b\": \"^1.0.0\" } },\n" +
+                "    \"node_modules/b\": { \"version\": \"2.0.0\" },\n" +
+                "    \"node_modules/a/node_modules/b\": { \"version\": \"1.5.0\" }\n" +
+                "  }\n" +
+                "}";
+        SourceFile result = PackageJsonHelper.overlayResolvedDeps(
+                withMarker, lock, NodeResolutionResult.PackageManager.Npm);
+
+        NodeResolutionResult m = result.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElseThrow();
+        // The root-level declared dep on b resolves to the top-level 2.0.0…
+        assertThat(m.getDependencies().get(1).getResolved().getVersion()).isEqualTo("2.0.0");
+        // …while a's own dep on b resolves to the shadowing nested 1.5.0.
+        Dependency nestedB = m.getDependencies().get(0).getResolved().getDependencies().get(0);
+        assertThat(nestedB.getResolved()).isNotNull();
+        assertThat(nestedB.getResolved().getVersion()).isEqualTo("1.5.0");
+    }
+
+    @Test
     void overlayResolvedDepsReturnsUnchangedWhenNoMarker() {
         Json.Document doc = parsePackageJson("{\"name\":\"x\"}");
         SourceFile result = PackageJsonHelper.overlayResolvedDeps(
@@ -303,7 +391,7 @@ class PackageJsonHelperTest {
                 withMarker,
                 d -> PackageJsonHelper.addDependency(d, "uuid", "^9.0.0", "dependencies"),
                 null,
-                null);
+                new InMemoryExecutionContext());
 
         assertThat(result.isChanged()).isTrue();
         NodeResolutionResult after = result.getModifiedPackageJson().getMarkers()
@@ -415,7 +503,7 @@ class PackageJsonHelperTest {
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(
-                Collections.singletonList(
+                singletonList(
                         org.openrewrite.Parser.Input.fromString(Paths.get("package.json"), content)),
                 null,
                 new InMemoryExecutionContext(Throwable::printStackTrace))

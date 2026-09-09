@@ -41,10 +41,12 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -126,9 +128,8 @@ class RecipeSchedulerTest implements RewriteTest {
                   if (cycle.incrementAndGet() == 2) {
                       assertThat(workingDirectory.resolve("foo.txt")).hasContent("foo");
                   }
-                  assertDoesNotThrow(() -> {
-                      Files.writeString(workingDirectory.resolve("foo.txt"), plainText.getText());
-                  });
+                  assertDoesNotThrow(() ->
+                      Files.writeString(workingDirectory.resolve("foo.txt"), plainText.getText()));
                   return plainText.withText("bar");
               }
           })),
@@ -232,7 +233,7 @@ class RecipeSchedulerTest implements RewriteTest {
                     @Override
                     protected void recordSourceFileResultAndSearchResults(
                             @Nullable SourceFile before, @Nullable SourceFile after,
-                            java.util.Stack<Recipe> recipeStack, ExecutionContext ctx) {
+                            List<Recipe> recipeStack, ExecutionContext ctx) {
                         if (before instanceof PlainText) {
                             beforeContents.add(((PlainText) before).getText());
                         }
@@ -264,6 +265,31 @@ class RecipeSchedulerTest implements RewriteTest {
     }
 
     @Test
+    void firesRecipeTimeoutWhenCycleExceedsRunTimeout() {
+        AtomicReference<Throwable> timedOut = new AtomicReference<>();
+        var ctx = new InMemoryExecutionContext(
+          t -> {
+          },
+          Duration.ZERO,
+          (t, c) -> timedOut.set(t));
+        rewriteRun(
+          spec -> spec
+            .executionContext(ctx)
+            .recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return text.withText("changed");
+                }
+            })),
+          // No "after": a zero run timeout fires before any edit, so the file is left unchanged.
+          text("hello")
+        );
+        assertThat(timedOut.get())
+          .as("onTimeout should be invoked with a RecipeTimeoutException once the cycle exceeds the run timeout")
+          .isInstanceOf(RecipeTimeoutException.class);
+    }
+
+    @Test
     void recordsGeneratedSourceFiles() {
         List<String> generatedPaths = new java.util.ArrayList<>();
 
@@ -279,7 +305,7 @@ class RecipeSchedulerTest implements RewriteTest {
                     @Override
                     protected void recordSourceFileResultAndSearchResults(
                             @Nullable SourceFile before, @Nullable SourceFile after,
-                            java.util.Stack<Recipe> recipeStack, ExecutionContext ctx) {
+                            List<Recipe> recipeStack, ExecutionContext ctx) {
                         // Track files that were generated (before is null)
                         if (before == null && after != null) {
                             generatedPaths.add(after.getSourcePath().toString());
@@ -297,6 +323,23 @@ class RecipeSchedulerTest implements RewriteTest {
         trackingScheduler.scheduleRun(generatingRecipe, new InMemoryLargeSourceSet(sources), ctx, 3, 1);
 
         assertThat(generatedPaths).containsExactly("generated.txt");
+    }
+
+    @Test
+    void invalidGeneratedPathIsDroppedAndSurfaced() {
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        var ctx = new InMemoryExecutionContext(error::set);
+        List<SourceFile> sources = List.of(PlainText.builder().text("existing").sourcePath(Path.of("existing.txt")).build());
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new GeneratesInvalidPathRecipe(), new InMemoryLargeSourceSet(sources), ctx, 3, 1);
+
+        // the invalid file is dropped, so it never enters the changeset
+        assertThat(run.getChangeset().getAllResults()).isEmpty();
+        // but the drop is surfaced for visibility rather than silently swallowed
+        assertThat(error.get())
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("generated a source file with an invalid path");
     }
 }
 
@@ -396,6 +439,32 @@ class GeneratingRecipe extends ScanningRecipe<AtomicInteger> {
     }
 }
 
+class GeneratesInvalidPathRecipe extends ScanningRecipe<AtomicInteger> {
+    @Getter
+    final String displayName = "Generates a file with an invalid path";
+
+    @Getter
+    final String description = "Generates a source file whose path points outside the source root.";
+
+    @Override
+    public AtomicInteger getInitialValue(ExecutionContext ctx) {
+        return new AtomicInteger(0);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicInteger acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicInteger acc, ExecutionContext ctx) {
+        return List.of(PlainText.builder()
+          .text("outside")
+          .sourcePath(Path.of("../outside.txt"))
+          .build());
+    }
+}
+
 @AllArgsConstructor
 class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator> {
 
@@ -433,9 +502,8 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
                 Path workingDirectory = validateExecutionContext(ctx);
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
                 assertThat(workingDirectory).isEmptyDirectory();
-                assertDoesNotThrow(() -> {
-                    Files.writeString(workingDirectory.resolve("manifest.txt"), ((SourceFile) tree).getSourcePath().toString(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
-                });
+                assertDoesNotThrow(() ->
+                    Files.writeString(workingDirectory.resolve("manifest.txt"), ((SourceFile) tree).getSourcePath().toString(), StandardOpenOption.APPEND, StandardOpenOption.CREATE));
                 return tree;
             }
         };
@@ -446,9 +514,8 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
         Path workingDirectory = validateExecutionContext(ctx);
         assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
         assertThat(workingDirectory).isDirectoryContaining(path -> "manifest.txt".equals(path.getFileName().toString()));
-        assertDoesNotThrow(() -> {
-            assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
-        });
+        assertDoesNotThrow(() ->
+            assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt"));
         return List.of();
     }
 
@@ -462,9 +529,8 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
                 assertThat(workingDirectory).isDirectory();
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
                 assertThat(workingDirectory).isDirectoryContaining(path -> "manifest.txt".equals(path.getFileName().toString()));
-                assertDoesNotThrow(() -> {
-                    assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
-                });
+                assertDoesNotThrow(() ->
+                    assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt"));
                 assert tree instanceof PlainText;
                 return ((PlainText) tree).withText("bar");
             }

@@ -30,11 +30,11 @@ import java.util.UUID;
 @With
 public class LambdaParameter implements Marker {
     UUID id;
-    
+
     public LambdaParameter() {
         this.id = Tree.randomId();
     }
-    
+
     public LambdaParameter(UUID id) {
         this.id = id;
     }

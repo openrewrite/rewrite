@@ -605,6 +605,46 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.RemoveBomManagedDirectDependencies
+examples:
+- description: '`RemoveBomManagedDirectDependenciesTest#removeDependencyWithDifferentMajorVersion`'
+  parameters:
+  - org.springframework.boot
+  - '*-dependencies'
+  - '*'
+  - '*'
+  sources:
+  - before: |
+      plugins {
+          id "java"
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+          implementation("org.springframework.boot:spring-boot-starter-web")
+          implementation("org.apache.tomcat.embed:tomcat-embed-core:9.0.50")
+      }
+    after: |
+      plugins {
+          id "java"
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+          implementation("org.springframework.boot:spring-boot-starter-web")
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.RemoveDependency
 examples:
 - description: '`RemoveDependencyTest#removeGradleDependencyUsingStringNotation`'
@@ -1078,6 +1118,39 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.OneDependencyDeclarationPerStatement
+examples:
+- description: '`OneDependencyDeclarationPerStatementTest#splitsMultipleStringLiteralCoordinates`'
+  sources:
+  - before: |
+      plugins {
+          id 'java-library'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          implementation 'com.google.guava:guava:30.0-jre', 'org.apache.commons:commons-lang3:3.12.0'
+      }
+    after: |
+      plugins {
+          id 'java-library'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          implementation 'com.google.guava:guava:30.0-jre'
+          implementation 'org.apache.commons:commons-lang3:3.12.0'
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.gradle9.RewriteSpreadAllInConfigurationsBlock
 examples:
 - description: '`RewriteSpreadAllInConfigurationsBlockTest#rewriteSpreadAllAtTopLevel`'
@@ -1137,6 +1210,34 @@ examples:
 
       application {
           mainClass = "com.example.AppMain"
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.UseMatchingInsteadOfFindAll
+examples:
+- description: '`UseMatchingInsteadOfFindAllTest#tasksFindAll`'
+  sources:
+  - before: |
+      def checkTasks = tasks.findAll { it.name.startsWith("check") }
+    after: |
+      def checkTasks = tasks.matching { it.name.startsWith("check") }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.UseProjectDependencyInsteadOfModuleCoordinates
+examples:
+- description: '`UseProjectDependencyInsteadOfModuleCoordinatesTest#replacesSelfCoordinatesWithProjectNotation`'
+  sources:
+  - before: |
+      dependencies {
+          implementation 'com.example:my-project:1.0.0'
+      }
+    after: |
+      dependencies {
+          implementation project(':my-project')
       }
     path: build.gradle
     language: groovy

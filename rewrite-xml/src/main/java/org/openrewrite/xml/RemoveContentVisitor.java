@@ -44,7 +44,13 @@ public class RemoveContentVisitor<P> extends XmlVisitor<P> {
                     int indexOf = contents.indexOf(content);
                     contents.remove(indexOf);
 
-                    if (removePrecedingComment && 0 < indexOf && contents.get(indexOf - 1) instanceof Xml.Comment) {
+                    if (indexOf < contents.size() && content.getPrefix().contains("\n") &&
+                        !contents.get(indexOf).getPrefix().contains("\n")) {
+                        contents.set(indexOf, (Content) contents.get(indexOf).withPrefix(content.getPrefix()));
+                    }
+
+                    if (removePrecedingComment && 0 < indexOf && contents.get(indexOf - 1) instanceof Xml.Comment &&
+                        !isTrailingComment(contents, indexOf - 1)) {
                         doAfterVisit(new RemoveContentVisitor<>(contents.get(indexOf - 1), true, removePrecedingComment));
                     }
 
@@ -62,5 +68,12 @@ public class RemoveContentVisitor<P> extends XmlVisitor<P> {
         }
 
         return t;
+    }
+
+    /**
+     * A comment that shares a line with the sibling before it documents that sibling, not the one after it.
+     */
+    private static boolean isTrailingComment(List<Content> contents, int index) {
+        return 0 < index && !contents.get(index).getPrefix().contains("\n");
     }
 }

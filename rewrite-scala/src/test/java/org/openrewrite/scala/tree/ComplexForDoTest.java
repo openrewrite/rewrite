@@ -88,4 +88,21 @@ class ComplexForDoTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void forLoopWithBracedSingleGenerator() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                for {
+                  invalidMode <- Seq("ADAPTIVE", null)
+                } {
+                  println(invalidMode)
+                }
+              }
+              """
+          )
+        );
+    }
 }

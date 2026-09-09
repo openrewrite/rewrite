@@ -1,9 +1,17 @@
 ---
 name: npm-publish
 
-# Publishes after `ci` succeeds for a push to (or manual dispatch on) main, or
-# `publish` succeeds for a version tag. `ci` also runs for PRs and schedules;
-# those must not publish to npm.
+# npmjs, and nothing else — the Code Genome Project npm publish is the `npmPublishCgp` task that
+# `ci`/`publish` already runs. This workflow exists solely because npm's OIDC Trusted Publishing
+# binds a package to a single workflow filename, and it can be deleted wholesale when npmjs
+# publishing is retired.
+#
+# Publishes after `ci` succeeds for any non-PR event on main (push, manual
+# dispatch, or the daily schedule), or `publish` succeeds for a version tag.
+# This mirrors the Maven snapshot publish in gh-automation's ci-gradle.yml,
+# which publishes for `event_name != 'pull_request'` on main — so npm gets a
+# counterpart for every Maven snapshot. `ci` also runs for PRs; those must not
+# publish to npm.
 on:
   workflow_run:
     workflows:
@@ -24,8 +32,7 @@ jobs:
       (
         (
           github.event.workflow_run.name == 'ci' &&
-          (github.event.workflow_run.event == 'push' ||
-           github.event.workflow_run.event == 'workflow_dispatch') &&
+          github.event.workflow_run.event != 'pull_request' &&
           github.event.workflow_run.head_branch == 'main'
         ) ||
         (
@@ -37,8 +44,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: read  # download the published-snapshot-version artifact from the triggering `ci` run
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
@@ -57,28 +65,65 @@ jobs:
 
       # Trusted Publisher auto-detection in `npm publish` requires npm >= 11.5.1.
       # GitHub-hosted ubuntu runners currently ship Node 22 / npm 10.x, and the
-      # global install needs sudo to write under /usr/local.
+      # global install needs sudo to write under /usr/local. Pinned off `@latest`
+      # because npm 12 breaks provenance publish with `Cannot find module 'sigstore'`
+      # (https://github.com/npm/cli/issues/9722); revisit once that ships fixed.
       - shell: bash
-        run: sudo npm install -g npm@latest
+        run: sudo npm install -g npm@11.18.0
+
+      # The `ci` run records the exact version string baked into its rewrite-javascript jar
+      # (META-INF/rewrite-javascript-version.txt) and uploads it as the
+      # `published-snapshot-version` artifact. Download it so the npm package publishes that
+      # identical string — a downstream consumer feeds the jar's embedded value to
+      # `npx --package=@openrewrite/rewrite@<version>`, so npm must match it exactly. Best-effort:
+      # absent on the `publish` tag path (and on older `ci` runs), in which case the step below
+      # falls back to Gradle's own snapshot-version derivation.
+      - if: github.event.workflow_run.name == 'ci'
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: published-snapshot-version
+          path: .published-version
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
 
       # For a tag-triggered upstream `publish` run, `head_branch` is the tag name
       # (e.g. `v8.83.0`). Strip the leading `v` and publish to dist-tag `latest`.
-      # Otherwise this is the `ci`-triggered snapshot path: let Gradle derive the
-      # dated snapshot version and publish to dist-tag `next`.
+      # `publish.yml` also fires on `v<x.y.z>-rc.<n>` tags, and a release candidate
+      # must not claim `latest` ahead of the actual latest release — so an `-rc.`
+      # tag goes to `next` alongside the snapshots.
+      # Otherwise this is the `ci`-triggered snapshot path: publish the exact version string
+      # handed off above (= the version embedded in the ci run's jar), and publish to
+      # dist-tag `next`.
       - id: ver
         shell: bash
         env:
           TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           if [[ '${{ github.event.workflow_run.name }}' == 'publish' ]]; then
-            echo "version=${TAG#v}"   >> "$GITHUB_OUTPUT"
-            echo "dist_tag=latest"    >> "$GITHUB_OUTPUT"
-          else
-            echo "version="           >> "$GITHUB_OUTPUT"
-            echo "dist_tag=next"      >> "$GITHUB_OUTPUT"
+            echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+            if [[ "$TAG" == *-rc.* ]]; then
+              echo "dist_tag=next"   >> "$GITHUB_OUTPUT"
+            else
+              echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
           fi
+          V=''
+          F=$(find .published-version -name publishedVersion.txt 2>/dev/null | head -1)
+          if [[ -n "$F" ]]; then
+            V=$(tr -d '[:space:]' < "$F")
+            echo "Publishing the version handed off from the ci run (== jar's embedded version): $V"
+          else
+            echo "No handed-off version found; falling back to Gradle-derived snapshot version"
+          fi
+          echo "version=$V"     >> "$GITHUB_OUTPUT"
+          echo "dist_tag=next"  >> "$GITHUB_OUTPUT"
 
       - shell: bash
+        env:
+          CODEGENOME_USERNAME: ${{ secrets.CODEGENOME_USERNAME }}
+          CODEGENOME_TOKEN: ${{ secrets.CODEGENOME_TOKEN }}
         run: |
           ARGS=()
           if [[ -n '${{ steps.ver.outputs.version }}' ]]; then
@@ -87,9 +132,10 @@ jobs:
           ./gradlew --no-daemon --console=plain --info --stacktrace \
             :rewrite-javascript:npmPack "${ARGS[@]}"
 
-      # npm has no `--skip-duplicate`. The daily scheduled snapshot publish would
-      # otherwise 403 whenever no new commit had landed since the previous run
-      # (the snapshot version is derived from the latest commit timestamp).
+      # npm has no `--skip-duplicate`. Guards against a re-run of the same upstream
+      # event (which resolves to the identical version) 403-ing. A genuine new Maven
+      # snapshot always carries a fresh build number, so this never suppresses a
+      # legitimate publish — including the daily schedule, even with no new commit.
       - shell: bash
         env:
           CI: 'true'

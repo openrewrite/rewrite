@@ -18,6 +18,7 @@ package org.openrewrite.groovy;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -50,6 +51,78 @@ class GroovyTemplateTest implements RewriteTest {
               class Test {
                   def foo() {
                       println("foo")
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnMethodWithNestedClassSibling() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
+              @Override
+              public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("SuppressWarnings".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("all"))) {
+                      return GroovyTemplate.builder("\"all\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          groovy(
+            """
+              class A {
+                  static class Sibling {
+                  }
+
+                  @SuppressWarnings("unchecked")
+                  def method() {}
+              }
+              """,
+            """
+              class A {
+                  static class Sibling {
+                  }
+
+                  @SuppressWarnings("all")
+                  def method() {}
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceArgumentsOfExplicitConstructorInvocation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("super".equals(method.getSimpleName()) && method.getMethodType() != null && method.getArguments().size() == 1) {
+                      return JavaTemplate.builder("message, null")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replaceArguments());
+                  }
+                  return method;
+              }
+          })),
+          groovy(
+            """
+              @groovy.transform.CompileStatic
+              class A extends RuntimeException {
+                  A(String message) {
+                      super(message)
+                  }
+              }
+              """,
+            """
+              @groovy.transform.CompileStatic
+              class A extends RuntimeException {
+                  A(String message) {
+                      super(message, null)
                   }
               }
               """

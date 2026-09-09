@@ -28,5 +28,6 @@ public record RecipeDescriptor(
     IReadOnlySet<string> Tags,
     TimeSpan? EstimatedEffortPerOccurrence,
     IReadOnlyList<OptionDescriptor> Options,
-    IReadOnlyList<RecipeDescriptor> RecipeList
+    IReadOnlyList<RecipeDescriptor> RecipeList,
+    IReadOnlyList<DataTableDescriptor> DataTables
 );

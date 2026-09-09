@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JavaScriptParser} from "../../src/javascript";
+import {JavaScriptParser, sourceFileCache} from "../../src/javascript";
 import {JavaScriptPrinter} from "../../src/javascript/print";
 import {MarkerPrinter, PrintOutputCapture} from "../../src/print";
 import {J} from "../../src/java";
@@ -175,10 +175,15 @@ describe('whitespace should be attached to the outermost element', () => {
         "const userScores = new Map<string, number>()",
         "function* generateUsers() { yield { id: 1 } };",
         "type T = undefined extends undefined ? string : never;",
-        "const FirstEntity = class FirstEntityClass {};"
+        "const FirstEntity = class FirstEntityClass {};",
+        `
+        for (
+          let i = 0; i < numberOfConnections; i++
+        ) {}
+        `
     ])('%s', async (sourceCode) => {
         // given
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const cu = await (await parser.parse({text: sourceCode, sourcePath: 'test.ts'}).next()).value;
         const capture = new TreeStructurePrintOutputCapture(MarkerPrinter.SANITIZED);
         const printer = new TreeCapturingJavaScriptPrinter();

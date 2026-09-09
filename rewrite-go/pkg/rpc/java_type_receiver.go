@@ -21,14 +21,12 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// JavaTypeReceiver deserializes JavaType objects from the receive queue.
 // Field ordering MUST match JavaTypeReceiver.java exactly.
 // Embeds JavaTypeVisitor for dispatch; override methods deserialize each type.
 type JavaTypeReceiver struct {
 	visitor.JavaTypeVisitor
 }
 
-// NewJavaTypeReceiver creates a JavaTypeReceiver with virtual dispatch wired.
 func NewJavaTypeReceiver() *JavaTypeReceiver {
 	r := &JavaTypeReceiver{}
 	r.Self = r // wire virtual dispatch
@@ -147,6 +145,10 @@ func (r *JavaTypeReceiver) VisitArray(a *java.JavaTypeArray, p any) java.JavaTyp
 	q := p.(*ReceiveQueue)
 	a.ElemType = receiveAsType[java.JavaType](r, q, a.ElemType)
 	a.Annotations = receiveClassList(r, q, a.Annotations)
+	// Annotations sit outside TypeSignature, so only canonicalize the plain case.
+	if len(a.Annotations) == 0 {
+		return q.internType(a)
+	}
 	return a
 }
 
@@ -154,7 +156,7 @@ func (r *JavaTypeReceiver) VisitArray(a *java.JavaTypeArray, p any) java.JavaTyp
 func (r *JavaTypeReceiver) VisitPrimitive(pr *java.JavaTypePrimitive, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
 	pr.Keyword = receiveScalar[string](q, pr.Keyword)
-	return pr
+	return q.internType(pr)
 }
 
 // VisitMethod mirrors JavaTypeReceiver.visitMethod field order:
@@ -188,6 +190,9 @@ func (r *JavaTypeReceiver) VisitVariable(v *java.JavaTypeVariable, p any) java.J
 // receiveAsType receives a ref-tracked type from the queue.
 func receiveAsType[T java.JavaType](r *JavaTypeReceiver, q *ReceiveQueue, before T) T {
 	result := q.Receive(before, func(v any) any {
+		if v == nil {
+			return nil
+		}
 		return r.Visit(v.(java.JavaType), q)
 	})
 	if result == nil {
@@ -232,10 +237,7 @@ func receiveClassList(r *JavaTypeReceiver, q *ReceiveQueue, before []java.FullyQ
 	}
 	result := make([]java.FullyQualified, len(afterAny))
 	for i, v := range afterAny {
-		if fq, ok := v.(java.FullyQualified); ok {
-			result[i] = fq
-		}
-		// Unknown / non-fully-qualified types are skipped (nil in the list)
+		result[i] = v.(java.FullyQualified)
 	}
 	return result
 }
@@ -248,6 +250,9 @@ func receiveAsFullyQualified(r *JavaTypeReceiver, q *ReceiveQueue, before java.F
 		beforeAny = before
 	}
 	result := q.Receive(beforeAny, func(v any) any {
+		if v == nil {
+			return nil
+		}
 		return r.Visit(v.(java.JavaType), q)
 	})
 	if result == nil {

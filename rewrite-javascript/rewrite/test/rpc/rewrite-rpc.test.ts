@@ -23,6 +23,8 @@ import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
+import {activate as activateCompositeWithJavaDelegate} from "../../fixtures/composite-with-java-delegate";
+import {activate as activateJavaDelegatePrecondition} from "../../fixtures/java-delegate-precondition";
 import {
     findNodeResolutionResult,
     javascript,
@@ -34,11 +36,13 @@ import {
 } from "../../src/javascript";
 import {J} from "../../src/java";
 import {withDir} from "tmp-promise";
+import {PrepareRecipe, PrepareRecipeResponse} from "../../src/rpc/request/prepare-recipe";
 
 describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
 
     let server: RewriteRpc;
+    let serverMarketplace: RecipeMarketplace;
     let client: RewriteRpc;
 
     beforeEach(async () => {
@@ -58,10 +62,10 @@ describe("Rewrite RPC", () => {
             new rpc.StreamMessageReader(clientToServer),
             new rpc.StreamMessageWriter(serverToClient)
         );
-        const marketplace = new RecipeMarketplace();
-        await activate(marketplace);
+        serverMarketplace = new RecipeMarketplace();
+        await activate(serverMarketplace);
         server = new RewriteRpc(serverConnection, {
-            marketplace: marketplace
+            marketplace: serverMarketplace
         });
     });
 
@@ -137,6 +141,20 @@ describe("Rewrite RPC", () => {
         const recipe = await client.prepareRecipe("org.openrewrite.example.text.change-text", {text: "hello"});
         expect(recipe.displayName).toEqual("Change text");
         expect(recipe.instanceName()).toEqual("Change text to 'hello'");
+    });
+
+    test("prepareRecipe rejects a missing required option", async () => {
+        // The server validates required options when preparing a recipe. `text` is required, so
+        // omitting it must fail rather than silently preparing a broken recipe.
+        await expect(client.prepareRecipe("org.openrewrite.example.text.change-text", {}))
+            .rejects.toThrow("Missing required option `text`");
+    });
+
+    test("prepareRecipe validates required options of child recipes", async () => {
+        // The composite's child ChangeText is missing its required `text`. Validation recurses through
+        // the whole prepared tree (like the C# server), so preparing the composite must fail.
+        await expect(client.prepareRecipe("org.openrewrite.example.text.composite-with-invalid-child"))
+            .rejects.toThrow("Missing required option `text`");
     });
 
     // TODO: Re-enable once @openrewrite/recipes-npm is updated to use RecipeMarketplace API
@@ -254,14 +272,67 @@ describe("Rewrite RPC", () => {
 
     test("prepareRecipeWithRpcSubRecipeInRecipeList", async () => {
         // A composite recipe whose recipeList() mixes a local recipe with an
-        // already-prepared remote (RpcRecipe) sub-recipe — the shape of e.g.
-        // Angular's UpgradeToAngular21, which lists upgradeDependencyVersion()
-        // (a Java recipe prepared over RPC). Preparing it must not try to
-        // re-install the RpcRecipe by its (no-arg-incompatible) constructor.
+        // already-prepared remote (RpcRecipe) sub-recipe — the shape of a
+        // framework-upgrade composite listing a Java recipe prepared over RPC.
+        // Preparing it must not try to re-install the RpcRecipe by its
+        // (no-arg-incompatible) constructor.
         const recipe = await client.prepareRecipe("org.openrewrite.example.text.with-rpc-sub-recipe");
         const descriptor = await recipe.descriptor();
         expect(descriptor.recipeList.map(r => r.name)).toContain(
             "org.openrewrite.example.text.remote-change-text"
+        );
+    });
+
+    test("sameTypeChildrenPreserveDistinctOptions", async () => {
+        // A composite whose recipeList() yields multiple instances of the same recipe class with
+        // different option values must keep each prepared child its own options, rather than
+        // collapsing them.
+        const recipe = await client.prepareRecipe("org.openrewrite.example.text.same-type-children");
+        const descriptor = await recipe.descriptor();
+
+        expect(descriptor.recipeList.map(r => r.name)).toEqual([
+            "org.openrewrite.example.text.change-text",
+            "org.openrewrite.example.text.change-text",
+            "org.openrewrite.example.text.change-text"
+        ]);
+
+        const texts = descriptor.recipeList.map(
+            r => r.options.find(o => o.name === "text")?.value
+        );
+        expect(texts).toEqual(["a", "b", "c"]);
+    });
+
+    test("preparing an unknown recipe id delegates to the host instead of failing", async () => {
+        const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe("org.openrewrite.javascript.UpgradeDependencyVersion", {newVersion: "19.x"})
+        );
+        expect(response.delegatesTo).toEqual({
+            recipeName: "org.openrewrite.javascript.UpgradeDependencyVersion",
+            options: {newVersion: "19.x"}
+        });
+    });
+
+    test("a composite's Java-delegate children are emitted as delegatesTo with the options as passed", async () => {
+        await activateCompositeWithJavaDelegate(serverMarketplace);
+        const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe("org.openrewrite.example.npm.composite-with-java-delegate")
+        );
+        expect(response.recipeList!.map(child => child.delegatesTo)).toEqual([
+            {recipeName: "org.openrewrite.example.host.replace-hello", options: {}},
+            {recipeName: "org.openrewrite.text.FindAndReplace", options: {find: "goodbye", replace: "farewell"}}
+        ]);
+    });
+
+    test("a Java-delegate precondition is sent as a named visitor for the host to gate on", async () => {
+        await activateJavaDelegatePrecondition(serverMarketplace);
+        const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe("org.openrewrite.example.npm.find-identifier-gated-by-java-recipe")
+        );
+        expect(response.editPreconditions).toContainEqual(
+            {visitorName: "org.openrewrite.text.Find", visitorOptions: {find: "gate"}}
         );
     });
 

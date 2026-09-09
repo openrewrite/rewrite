@@ -23,7 +23,6 @@ type Marker interface {
 	ID() uuid.UUID
 }
 
-// Markers holds a collection of Marker instances attached to a tree node.
 type Markers struct {
 	ID      uuid.UUID
 	Entries []Marker
@@ -40,8 +39,27 @@ type GenericMarker struct {
 
 func (m GenericMarker) ID() uuid.UUID { return m.Ident }
 
-// SearchResultMarker represents a SearchResult marker from Java.
-// It implements RpcCodec on the Java side, sending 2 sub-fields (id, description).
+// RecipeThatMadeChanges is one frame of a RecipesThatMadeChanges stack: how the recipe is
+// named, how it was configured, and what it is worth.
+type RecipeThatMadeChanges struct {
+	Name         string
+	DisplayName  *string
+	InstanceName *string
+	// Options are configured option values. Go never interprets them, so they stay in
+	// whatever shape the wire delivered.
+	Options                            any
+	EstimatedEffortPerOccurrenceMillis *int64
+}
+
+// RecipesThatMadeChanges records which recipe stacks changed a source file. Go holds the
+// stacks without interpreting them, so a marker served to this peer returns to the host intact.
+type RecipesThatMadeChanges struct {
+	Ident   uuid.UUID
+	Recipes [][]RecipeThatMadeChanges
+}
+
+func (m RecipesThatMadeChanges) ID() uuid.UUID { return m.Ident }
+
 type SearchResultMarker struct {
 	Ident       uuid.UUID
 	Description string
@@ -49,7 +67,6 @@ type SearchResultMarker struct {
 
 func (m SearchResultMarker) ID() uuid.UUID { return m.Ident }
 
-// FindMarker returns a pointer to the first marker of type T, or nil if not found.
 func FindMarker[T any](markers Markers) *T {
 	for _, m := range markers.Entries {
 		if t, ok := m.(T); ok {
@@ -59,7 +76,6 @@ func FindMarker[T any](markers Markers) *T {
 	return nil
 }
 
-// HasMarker reports whether a marker of type T exists in the markers collection.
 func HasMarker[T any](markers Markers) bool {
 	for _, m := range markers.Entries {
 		if _, ok := m.(T); ok {
@@ -69,15 +85,12 @@ func HasMarker[T any](markers Markers) bool {
 	return false
 }
 
-// AddMarker returns a new Markers with the given marker appended.
 func AddMarker(markers Markers, marker Marker) Markers {
 	entries := make([]Marker, len(markers.Entries)+1)
 	copy(entries, markers.Entries)
 	entries[len(markers.Entries)] = marker
 	return Markers{ID: markers.ID, Entries: entries}
 }
-
-// --- Cross-cutting markers used by the recipe framework ---
 
 // SearchResult is a marker indicating that a search recipe found a match.
 // It is rendered as a comment in printed output (e.g., /*~~(description)~~>*/).
@@ -133,22 +146,18 @@ type Semicolon struct {
 
 func (m Semicolon) ID() uuid.UUID { return m.Ident }
 
-// NewSemicolon creates a Semicolon marker with a fresh UUID.
 func NewSemicolon() Semicolon {
 	return Semicolon{Ident: uuid.New()}
 }
 
-// NewGoProject creates a GoProject marker with a new UUID.
 func NewGoProject(projectName string) GoProject {
 	return GoProject{Ident: uuid.New(), ProjectName: projectName}
 }
 
-// NewSearchResult creates a SearchResult marker with a new UUID.
 func NewSearchResult(description string) SearchResult {
 	return SearchResult{Ident: uuid.New(), Description: description}
 }
 
-// NewMarkup creates a Markup marker with the given level and message.
 func NewMarkup(level MarkupLevel, message, detail string) Markup {
 	return Markup{Ident: uuid.New(), Level: level, Message: message, Detail: detail}
 }
@@ -176,4 +185,15 @@ func MarkupInfo(markers Markers, message string) Markers {
 // MarkupError attaches an error-level Markup marker to the given Markers.
 func MarkupError(markers Markers, message string) Markers {
 	return AddMarker(markers, NewMarkup(MarkupErrorLevel, message, ""))
+}
+
+const markupWarnJavaType = "org.openrewrite.marker.Markup$Warn"
+
+func AddMarkupWarn(markers Markers, message, detail string) Markers {
+	id := uuid.New()
+	data := map[string]any{"id": id.String(), "message": message}
+	if detail != "" {
+		data["detail"] = detail
+	}
+	return AddMarker(markers, GenericMarker{Ident: id, JavaType: markupWarnJavaType, Data: data})
 }

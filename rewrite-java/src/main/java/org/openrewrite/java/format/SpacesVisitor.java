@@ -90,7 +90,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
         Map<String, Object> messages = new HashMap<>();
         messages.put("containerLocation", loc);
-        messages.put("empty", container.getElements().stream().allMatch(element -> element instanceof J.Empty));
+        messages.put("empty", container.getElements().stream().allMatch(J.Empty.class::isInstance));
         messages.put("size", container.getElements().size());
         List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), (index, t) -> {
             messages.put("index", index);
@@ -163,7 +163,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 break;
             case FOR_INIT:
                 J.ForLoop.Control controlInit = getCursor().getValue();
-                if (controlInit.getInit().stream().allMatch(i -> i instanceof J.Empty)) {
+                if (controlInit.getInit().stream().allMatch(J.Empty.class::isInstance)) {
                     if (emptyForInitializerPadStyle != null) {
                         before = evaluate(() -> emptyForInitializerPadStyle.getSpace(), false) ? " " : "";
                     } else {
@@ -188,7 +188,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 break;
             case FOR_UPDATE:
                 J.ForLoop.Control controlUpdate = getCursor().getValue();
-                if (controlUpdate.getUpdate().stream().allMatch(i -> i instanceof J.Empty)) {
+                if (controlUpdate.getUpdate().stream().allMatch(J.Empty.class::isInstance)) {
                     if (emptyForIteratorPadStyle != null) {
                         before = evaluate(() -> emptyForIteratorPadStyle.getSpace(), false) ? " " : "";
                     } else {
@@ -606,7 +606,17 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getMethodCall(), false) ? " " : "";
                 break;
             case NEW_ARRAY_INITIALIZER:
-                whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace(), false) ? " " : "";
+                if (getCursor().firstEnclosing(J.Annotation.class) != null) {
+                    if (getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.Assignment) {
+                        // For a named annotation value pair (e.g. `value = {...}`) the space before the
+                        // brace is governed by the `=` spacing, so don't add another one here.
+                        whitespace = "";
+                    } else {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getAnnotationArrayInitializerLeftBrace(), false) ? " " : "";
+                    }
+                } else {
+                    whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace(), false) ? " " : "";
+                }
                 break;
             case UNARY_OPERATOR: //intelliJ does not format the i++ to i ++ when spacesStyle.getAroundOperators().getUnary() is true;
             case METHOD_SELECT_SUFFIX:

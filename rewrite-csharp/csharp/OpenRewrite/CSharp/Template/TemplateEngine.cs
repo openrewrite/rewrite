@@ -29,7 +29,7 @@ namespace OpenRewrite.CSharp.Template;
 public sealed class SyntheticBlockContainer : Marker
 {
     public static readonly SyntheticBlockContainer Instance = new();
-    public Guid Id { get; } = Guid.NewGuid();
+    public Guid Id { get; } = Tree.RandomId();
 }
 
 /// <summary>
@@ -603,7 +603,7 @@ internal static class TemplateEngine
 
         // Assign a fresh ID so FindById targets exactly this instance,
         // not a stale node from a prior application of the same template
-        tree = J.SetId(tree, Guid.NewGuid());
+        tree = J.SetId(tree, Tree.RandomId());
 
         var formatted = RoslynFormatter.FormatSubtree(cu, original.Id, tree, stopAfter: null);
 
@@ -624,7 +624,7 @@ internal static class TemplateEngine
         foreach (var s in blk.Statements)
         {
             var stmt = (J)s.Element;
-            stmt = J.SetId(stmt, Guid.NewGuid());
+            stmt = J.SetId(stmt, Tree.RandomId());
             var formatted = RoslynFormatter.FormatSubtree(cu, original.Id, stmt, stopAfter: null);
             formattedStmts.Add(s.WithElement((Statement)formatted));
         }

@@ -23,12 +23,37 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 public class TreeVisitorAdapterClassLoader extends ClassLoader implements ClassOutput {
     private final Map<String, Class<?>> adaptedClasses = new HashMap<>();
 
+    /**
+     * Caches the result of the {@code META-INF/rewrite/mixins} classpath scan, keyed by
+     * delegate class then {@code adaptTo} class. The scan is invoked on every node of a
+     * foreign-language subtree, so without this cache it would enumerate the whole
+     * classpath per node. {@link Optional#empty()} caches the common "no mixin registered"
+     * answer so the negative result is not re-scanned. A {@link ClassValue} ties each entry
+     * to its key classes' lifecycle, so it never pins classloaders or needs eviction.
+     */
+    private final ClassValue<ClassValue<Optional<Class<?>>>> mixinClasses = new ClassValue<ClassValue<Optional<Class<?>>>>() {
+        @Override
+        protected ClassValue<Optional<Class<?>>> computeValue(Class<?> delegateClass) {
+            return new ClassValue<Optional<Class<?>>>() {
+                @Override
+                protected Optional<Class<?>> computeValue(Class<?> adaptTo) {
+                    return TreeVisitorAdapter.discoverRegisteredMixinClass(delegateClass, adaptTo);
+                }
+            };
+        }
+    };
+
     public TreeVisitorAdapterClassLoader(ClassLoader parent) {
         super(parent);
+    }
+
+    Optional<Class<?>> mixinClass(Class<?> delegateClass, Class<?> adaptTo) {
+        return mixinClasses.get(delegateClass).get(adaptTo);
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")

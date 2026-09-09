@@ -89,6 +89,10 @@ export class ReferenceMap {
         return this.refCount;
     }
 
+    get size(): number {
+        return this.refsById.size;
+    }
+
     rollbackTo(savedRefCount: number): void {
         for (let i = savedRefCount; i < this.refCount; i++) {
             const obj = this.refsById.get(i);

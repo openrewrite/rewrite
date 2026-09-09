@@ -35,7 +35,7 @@ callable in unit tests without an active RPC connection.
 from __future__ import annotations
 
 from rewrite.preconditions import RecipeRef
-from rewrite.python.search import IsSourceFile, UsesMethod, UsesType
+from rewrite.python.search import IsSourceFile, UsesImport, UsesMethod, UsesType
 
 
 def has_source_path(file_pattern: str) -> RecipeRef:
@@ -64,13 +64,23 @@ def uses_method(method_pattern: str, match_overrides: bool = False) -> RecipeRef
         uses_method("*..* tostring(..)")
         uses_method("java.util.Collections emptyList()")
 
+    ``match_overrides`` widens the receiver to its subtypes.
+
+    ``match_unknown_types`` is deliberately absent: ``HasMethod`` gates on the
+    file's used ``JavaType.Method`` set, with no call site to match structurally,
+    so the host would reject files the flag admits. Gate on it by passing
+    ``UsesMethod(pattern, match_unknown_types=True)`` to ``Preconditions.check``.
+
+    For a pattern that does not fire, ``REWRITE_PYTHON_DUMP_TYPES=1`` prints the
+    declaring type each call got during the test run.
+
     Bundles a native :class:`UsesMethod` visitor so unit tests without
     an active RPC connection still see real filtering behavior.
     """
     return RecipeRef(
         "org.openrewrite.java.search.HasMethod",
         {"methodPattern": method_pattern, "matchOverrides": match_overrides},
-        UsesMethod(method_pattern),
+        UsesMethod(method_pattern, match_overrides),
     )
 
 
@@ -92,6 +102,28 @@ def uses_type(
     )
 
 
+def uses_import(module: str) -> RecipeRef:
+    """Match files that import ``module`` (delegates to ``org.openrewrite.python.search.UsesImport``).
+
+    Gates on the as-written import syntax, not type attribution, so it works
+    for deprecated-import migrations where the type checker either
+    canonicalizes the alias (``from typing import List`` -> ``list``) or cannot
+    resolve a removed symbol (``from base64 import encodestring``). In both
+    cases :func:`uses_type` would miss the file; ``uses_import`` does not.
+
+    ``module`` is a dotted module path; a file matches if it imports that
+    module, a submodule, or a parent module of it.
+
+    Bundles a native :class:`UsesImport` visitor so unit tests without an
+    active RPC connection still see real filtering behavior.
+    """
+    return RecipeRef(
+        "org.openrewrite.python.search.UsesImport",
+        {"module": module},
+        UsesImport(module),
+    )
+
+
 def find_methods(
     method_pattern: str, match_overrides: bool = False
 ) -> RecipeRef:
@@ -103,7 +135,7 @@ def find_methods(
     return RecipeRef(
         "org.openrewrite.java.search.FindMethods",
         {"methodPattern": method_pattern, "matchOverrides": match_overrides},
-        UsesMethod(method_pattern),
+        UsesMethod(method_pattern, match_overrides),
     )
 
 

@@ -23,11 +23,13 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.python.PythonVisitor;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.python.service.PythonAutoFormatService;
+import org.openrewrite.python.service.PythonImportService;
 import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
@@ -46,11 +48,6 @@ public interface Py extends J {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        final String visitorName = v.getClass().getCanonicalName();
-        // FIXME HACK TO AVOID RUNTIME VISITOR-ADAPTING IN NATIVE IMAGE
-        if (visitorName != null && visitorName.startsWith("io.moderne.serialization.")) {
-            return (R) this;
-        }
         return (R) acceptPython(v.adapt(PythonVisitor.class), p);
     }
 
@@ -94,6 +91,36 @@ public interface Py extends J {
             return v.visitAsync(this, p);
         }
 
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    @Getter
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false)
+    @AllArgsConstructor
+    final class Shebang implements Py, Statement {
+        @With
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        String text;
+
+        @Override
+        public <P> J acceptPython(PythonVisitor<P> v, P p) {
+            return v.visitShebang(this, p);
+        }
+
+        @Transient
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
@@ -555,6 +582,8 @@ public interface Py extends J {
         public <S, T extends S> T service(Class<S> service) {
             if (AutoFormatService.class.getName().equals(service.getName())) {
                 return (T) new PythonAutoFormatService();
+            } else if (ImportService.class.getName().equals(service.getName())) {
+                return (T) new PythonImportService();
             }
             return JavaSourceFile.super.service(service);
         }
@@ -1562,6 +1591,17 @@ public interface Py extends J {
         @Getter
         J.Identifier name;
 
+        @Nullable
+        JContainer<J.TypeParameter> typeParameters;
+
+        public @Nullable List<J.TypeParameter> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElements();
+        }
+
+        public TypeAlias withTypeParameters(@Nullable List<J.TypeParameter> typeParameters) {
+            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
+        }
+
         JLeftPadded<J> value;
 
         public J getValue() {
@@ -1612,12 +1652,20 @@ public interface Py extends J {
         public static class Padding {
             private final TypeAlias t;
 
+            public @Nullable JContainer<J.TypeParameter> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public TypeAlias withTypeParameters(@Nullable JContainer<J.TypeParameter> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new TypeAlias(t.id, t.prefix, t.markers, t.name, typeParameters, t.value, t.type);
+            }
+
             public JLeftPadded<J> getValue() {
                 return t.value;
             }
 
             public TypeAlias withValue(JLeftPadded<J> assignment) {
-                return t.value == assignment ? t : new TypeAlias(t.id, t.prefix, t.markers, t.name, assignment, t.type);
+                return t.value == assignment ? t : new TypeAlias(t.id, t.prefix, t.markers, t.name, t.typeParameters, assignment, t.type);
             }
         }
     }

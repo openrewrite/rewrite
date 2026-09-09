@@ -19,9 +19,12 @@ import dev.failsafe.Failsafe;
 import dev.failsafe.FailsafeException;
 import dev.failsafe.RetryPolicy;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.tree.MavenRepository;
@@ -37,11 +40,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.internal.StreamUtils.readAllBytes;
@@ -59,21 +65,50 @@ public class MavenArtifactDownloader {
     private final Map<String, MavenSettings.Server> serverIdToServer;
     private final Consumer<Throwable> onError;
     private final HttpSender httpSender;
+    private final ExecutionContext ctx;
 
 
+    /**
+     * @deprecated Use {@link #MavenArtifactDownloader(MavenArtifactCache, MavenSettings, Consumer, ExecutionContext)}
+     * and pass the session {@link ExecutionContext} so the anonymous-first authentication cache is shared with
+     * POM/metadata resolution instead of living on a throwaway context.
+     */
+    @Deprecated
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
                                    Consumer<Throwable> onError) {
-        this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError);
+        this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError, new InMemoryExecutionContext());
+    }
+
+    public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
+                                   @Nullable MavenSettings settings,
+                                   Consumer<Throwable> onError,
+                                   ExecutionContext ctx) {
+        this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError, ctx);
+    }
+
+    /**
+     * @deprecated Use {@link #MavenArtifactDownloader(MavenArtifactCache, MavenSettings, HttpSender, Consumer, ExecutionContext)}
+     * and pass the session {@link ExecutionContext} so the anonymous-first authentication cache is shared with
+     * POM/metadata resolution instead of living on a throwaway context.
+     */
+    @Deprecated
+    public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
+                                   @Nullable MavenSettings settings,
+                                   HttpSender httpSender,
+                                   Consumer<Throwable> onError) {
+        this(mavenArtifactCache, settings, httpSender, onError, new InMemoryExecutionContext());
     }
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
                                    HttpSender httpSender,
-                                   Consumer<Throwable> onError) {
+                                   Consumer<Throwable> onError,
+                                   ExecutionContext ctx) {
         this.httpSender = httpSender;
         this.mavenArtifactCache = mavenArtifactCache;
         this.onError = onError;
+        this.ctx = ctx;
         this.serverIdToServer = settings == null || settings.getServers() == null ?
                 new HashMap<>() :
                 settings.getServers().getServers().stream()
@@ -109,16 +144,50 @@ public class MavenArtifactDownloader {
             } else if ("file".equals(URI.create(uri).getScheme())) {
                 bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
             } else {
-                HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
-                try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
-                     InputStream body = response.getBody()) {
-                    if (!response.isSuccessful() || body == null) {
-                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s from %s. Response was %d",
-                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, response.getCode()), null,
+                try {
+                    MavenRepository repository = dependency.getRepository();
+                    // Mirror Apache Maven's DeferredCredentialsProvider: anonymous first, unless this host has
+                    // already required credentials in this session, in which case authenticate preemptively.
+                    Set<String> authenticationRequiredEndpoints = MavenExecutionContextView.view(ctx).getAuthenticationRequiredEndpoints();
+                    String endpoint = endpointOrNull(uri);
+                    boolean preemptive = hasAuthentication(repository) && endpoint != null &&
+                                         authenticationRequiredEndpoints.contains(endpoint);
+                    byte[] responseBytes = null;
+                    int responseCode;
+                    HttpSender.Request firstRequest = preemptive ?
+                            applyAuthentication(repository, httpSender.get(uri)).build() :
+                            httpSender.get(uri).build();
+                    try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(firstRequest));
+                         InputStream body = response.getBody()) {
+                        responseCode = response.getCode();
+                        if (response.isSuccessful() && body != null) {
+                            responseBytes = readAllBytes(body);
+                        }
+                    }
+                    // Retry with credentials if the anonymous request failed with a client error
+                    if (responseBytes == null && !preemptive && isClientSideError(responseCode) && hasAuthentication(repository)) {
+                        HttpSender.Request.Builder request = applyAuthentication(repository, httpSender.get(uri));
+                        try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
+                             InputStream body = response.getBody()) {
+                            responseCode = response.getCode();
+                            if (response.isSuccessful() && body != null) {
+                                responseBytes = readAllBytes(body);
+                            }
+                        }
+                        if (responseBytes != null && endpoint != null) {
+                            // Remember so later artifacts from this host authenticate preemptively
+                            authenticationRequiredEndpoints.add(endpoint);
+                        }
+                    }
+                    if (responseBytes == null) {
+                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s%s from %s. Response was %d",
+                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(),
+                                dependency.getClassifier() == null ? "" : ":" + dependency.getClassifier(),
+                                uri, responseCode), null,
                                 dependency.getRequested().getGav()));
                         return null;
                     }
-                    bodyStream = new ByteArrayInputStream(readAllBytes(body));
+                    bodyStream = new ByteArrayInputStream(responseBytes);
                 } catch (Throwable t) {
                     Throwable cause = t instanceof FailsafeException && t.getCause() != null ? t.getCause() : t;
                     throw new MavenDownloadingException("Unable to download dependency", cause,
@@ -130,14 +199,50 @@ public class MavenArtifactDownloader {
     }
 
     private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
+        for (MavenSettings.HttpHeader header : resolveHttpHeaders(repository)) {
+            request.withHeader(header.getName(), header.getValue());
+        }
+        String[] credentials = resolveCredentials(repository);
+        if (credentials != null) {
+            return request.withBasicAuthentication(credentials[0], credentials[1]);
+        }
+        return request;
+    }
+
+    private boolean hasAuthentication(MavenRepository repository) {
+        return !resolveHttpHeaders(repository).isEmpty() || resolveCredentials(repository) != null;
+    }
+
+    private static @Nullable String endpointOrNull(String uri) {
+        URI parsed = URI.create(uri);
+        String host = parsed.getHost();
+        return host == null ? null : host + ':' + parsed.getPort();
+    }
+
+    /**
+     * All 400s are client-side errors, but 408 (timeout), 425 (too early) and 429 (too many requests) are transient
+     * rather than credential rejections, so an anonymous retry is pointless for them. Mirrors
+     * {@code MavenPomDownloader.HttpSenderResponseException#isClientSideException()}.
+     */
+    private static boolean isClientSideError(int responseCode) {
+        if (responseCode < 400 || responseCode > 499) {
+            return false;
+        }
+        return responseCode != 408 && responseCode != 425 && responseCode != 429;
+    }
+
+    private List<MavenSettings.HttpHeader> resolveHttpHeaders(MavenRepository repository) {
+        MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
+        if (authInfo != null && authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
+            return authInfo.getConfiguration().getHttpHeaders();
+        }
+        return emptyList();
+    }
+
+    private String @Nullable [] resolveCredentials(MavenRepository repository) {
         String username, password;
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
-            if (authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
-                for (MavenSettings.HttpHeader header : authInfo.getConfiguration().getHttpHeaders()) {
-                    request.withHeader(header.getName(), header.getValue());
-                }
-            }
             username = authInfo.getUsername();
             password = authInfo.getPassword();
         } else {
@@ -146,8 +251,8 @@ public class MavenArtifactDownloader {
         }
         if (username != null && !username.contains("${") &&
                 password != null && !password.contains("${")) {
-            return request.withBasicAuthentication(username, password);
+            return new String[]{username, password};
         }
-        return request;
+        return null;
     }
 }

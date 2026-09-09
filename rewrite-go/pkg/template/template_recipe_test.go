@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
@@ -46,7 +48,6 @@ func TestDetectScaffoldKind(t *testing.T) {
 }
 
 func TestNewRecipeSimpleRewrite(t *testing.T) {
-	// Replace identifier `x` with `y`
 	r := NewRecipe(
 		RecipeName("test.ReplaceXWithY"),
 		WithDisplayName("Replace x with y"),
@@ -112,7 +113,6 @@ func TestNewRecipeNoChangeWhenNoMatch(t *testing.T) {
 }
 
 func TestNewRecipeMultipleBefores(t *testing.T) {
-	// Replace both `1 + 2` and `2 + 1` with `3`
 	r := NewRecipe(
 		RecipeName("test.OnePlusTwo"),
 		WithDisplayName("Simplify 1+2"),
@@ -123,7 +123,6 @@ func TestNewRecipeMultipleBefores(t *testing.T) {
 
 	spec := test.NewRecipeSpec().WithRecipe(r)
 
-	// First alternative matches
 	spec.RewriteRun(t,
 		test.Golang(`
 			package main
@@ -148,7 +147,6 @@ func TestNewRecipeMultipleBeforeSecondMatches(t *testing.T) {
 
 	spec := test.NewRecipeSpec().WithRecipe(r)
 
-	// Second alternative matches
 	spec.RewriteRun(t,
 		test.Golang(`
 			package main
@@ -267,18 +265,10 @@ func TestNewRecipeMetadata(t *testing.T) {
 		WithAfter(`y`),
 	)
 
-	if r.Name() != "org.openrewrite.golang.MyRecipe" {
-		t.Errorf("Name() = %q", r.Name())
-	}
-	if r.DisplayName() != "My Recipe" {
-		t.Errorf("DisplayName() = %q", r.DisplayName())
-	}
-	if r.Description() != "Does something useful." {
-		t.Errorf("Description() = %q", r.Description())
-	}
-	if len(r.Tags()) != 2 || r.Tags()[0] != "cleanup" {
-		t.Errorf("Tags() = %v", r.Tags())
-	}
+	assert.Equal(t, "org.openrewrite.golang.MyRecipe", r.Name(), "Name")
+	assert.Equal(t, "My Recipe", r.DisplayName(), "DisplayName")
+	assert.Equal(t, "Does something useful.", r.Description(), "Description")
+	assert.False(t, len(r.Tags()) != 2 || r.Tags()[0] != "cleanup", "Tags")
 }
 
 type myRecipe struct {
@@ -332,6 +322,48 @@ func TestNewRecipePreservesFormatting(t *testing.T) {
 			package main
 
 			var longVariableName = someFunction()
+		`),
+	)
+}
+
+func TestNewRecipeWithSourceImportsKeepsVersionedPathImport(t *testing.T) {
+	// Declaring SourceImports runs the import cleanup over the whole file,
+	// including imports the recipe never touches.
+	r := NewRecipe(
+		RecipeName("test.RenameX"),
+		WithDisplayName("Rename x to y"),
+		WithBefore(`x`),
+		WithAfter(`y`, SourceImports("fmt")),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			import (
+				"fmt"
+
+				"gopkg.in/yaml.v3"
+			)
+
+			func load(b []byte, out any) error {
+				fmt.Println(x)
+				return yaml.Unmarshal(b, out)
+			}
+		`, `
+			package main
+
+			import (
+				"fmt"
+
+				"gopkg.in/yaml.v3"
+			)
+
+			func load(b []byte, out any) error {
+				fmt.Println(y)
+				return yaml.Unmarshal(b, out)
+			}
 		`),
 	)
 }

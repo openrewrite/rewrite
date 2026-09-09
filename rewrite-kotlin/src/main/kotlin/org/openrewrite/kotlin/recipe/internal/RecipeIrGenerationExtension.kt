@@ -60,13 +60,17 @@ import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.expressions.IrReturn
 import org.jetbrains.kotlin.ir.expressions.IrSpreadElement
+import org.jetbrains.kotlin.ir.expressions.IrStringConcatenation
 import org.jetbrains.kotlin.ir.expressions.IrVararg
 import org.jetbrains.kotlin.ir.expressions.IrVarargElement
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrValueSymbol
+import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.IrTypeArgument
+import org.jetbrains.kotlin.ir.types.IrTypeProjection
 import org.jetbrains.kotlin.ir.types.classFqName
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.util.addChild
@@ -81,6 +85,7 @@ import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.types.Variance
 import java.io.File
 
 /**
@@ -426,8 +431,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val displayNameIdx = params.indexOfFirst { it.name == Name.identifier("displayName") }
         val descriptionIdx = params.indexOfFirst { it.name == Name.identifier("description") }
         if (displayNameIdx < 0 || descriptionIdx < 0) return null
-        val displayName = (call.arguments[displayNameIdx] as? IrConst)?.value as? String ?: return null
-        val description = (call.arguments[descriptionIdx] as? IrConst)?.value as? String ?: return null
+        val displayName = evalConstString(call.arguments[displayNameIdx]) ?: return null
+        val description = evalConstString(call.arguments[descriptionIdx]) ?: return null
 
         val tagsIdx = params.indexOfFirst { it.name == Name.identifier("tags") }
         val tagsArg = if (tagsIdx >= 0) substantiveArgOrNull(call.arguments[tagsIdx]) else null
@@ -451,8 +456,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val descriptionIdx = params.indexOfFirst { it.name == Name.identifier("description") }
         val recipesIdx = params.indexOfFirst { it.name == Name.identifier("recipes") }
         if (displayNameIdx < 0 || descriptionIdx < 0 || recipesIdx < 0) return null
-        val displayName = (call.arguments[displayNameIdx] as? IrConst)?.value as? String ?: return null
-        val description = (call.arguments[descriptionIdx] as? IrConst)?.value as? String ?: return null
+        val displayName = evalConstString(call.arguments[displayNameIdx]) ?: return null
+        val description = evalConstString(call.arguments[descriptionIdx]) ?: return null
         val recipesVararg = call.arguments[recipesIdx] as? org.jetbrains.kotlin.ir.expressions.IrVararg ?: return null
         return CompositeRecipeMetadata(displayName, description, recipesVararg)
     }
@@ -474,6 +479,38 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             }
         }
         return arg
+    }
+
+    /**
+     * Fold a `displayName` / `description` argument to a compile-time constant
+     * String. This runs BEFORE the IR const-evaluation lowering, so even a
+     * literal `"a" + "b"` is still an unlowered `IrCall`/`IrStringConcatenation`
+     * here — a plain `as? IrConst` would miss it and silently drop the recipe.
+     */
+    private fun evalConstString(expr: IrExpression?): String? {
+        return when (expr) {
+            null -> null
+            is IrConst -> expr.value?.toString()
+            is IrStringConcatenation -> buildString {
+                for (part in expr.arguments) append(evalConstString(part) ?: return null)
+            }
+            is IrCall -> when (expr.symbol.owner.kotlinFqName.asString()) {
+                "kotlin.String.plus" -> {
+                    val left = evalConstString(expr.arguments.getOrNull(0)) ?: return null
+                    val right = evalConstString(expr.arguments.getOrNull(1)) ?: return null
+                    left + right
+                }
+                "kotlin.text.trimIndent" -> evalConstString(expr.arguments.getOrNull(0))?.trimIndent()
+                "kotlin.text.trimMargin" -> {
+                    val receiver = evalConstString(expr.arguments.getOrNull(0)) ?: return null
+                    val marginArg = expr.arguments.getOrNull(1)
+                    if (marginArg == null) receiver.trimMargin()
+                    else receiver.trimMargin(evalConstString(marginArg) ?: return null)
+                }
+                else -> null
+            }
+            else -> null
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1620,9 +1657,23 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // templated call's method type. Only remap reference FQNs (those with a
         // dot); leave primitives (`int`) and non-builtins alone. KotlinTemplate
         // keeps the Kotlin spelling, which is what it resolves against.
-        if (!javaTemplate) return fqn
-        val mapped = KOTLIN_BUILTIN_TO_JAVA_FQN[fqn]
-        return if (mapped != null && mapped.contains('.')) mapped else fqn
+        if (javaTemplate) {
+            val mapped = KOTLIN_BUILTIN_TO_JAVA_FQN[fqn]
+            return if (mapped != null && mapped.contains('.')) mapped else fqn
+        }
+        // KotlinTemplate path: spell out concrete type arguments so overloads that
+        // dispatch on a generic argument resolve (e.g. `Iterable<T>.sumOf` on the
+        // selector's return type). Anything but an invariant, concrete argument
+        // (star projection, use-site variance, type parameter) falls back to raw.
+        val args = (type as? IrSimpleType)?.arguments
+        if (args.isNullOrEmpty()) return fqn
+        val rendered = args.map { renderTypeArgument(it) ?: return fqn }
+        return "$fqn<${rendered.joinToString(", ")}>"
+    }
+
+    private fun renderTypeArgument(arg: IrTypeArgument): String? {
+        if (arg !is IrTypeProjection || arg.variance != Variance.INVARIANT) return null
+        return renderPlaceholderType(arg.type, javaTemplate = false)
     }
 
     private fun renderPlaceholder(typeFqn: String?): String =

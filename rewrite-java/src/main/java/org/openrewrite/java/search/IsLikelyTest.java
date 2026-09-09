@@ -43,6 +43,7 @@ public class IsLikelyTest extends Recipe {
         return Preconditions.or(
                 new HasSourceSet("test").getVisitor(),
                 new HasSourceSetNameContainingTestVisitor<>(),
+                new UsesType<>("io.mockk..*", true),
                 new UsesType<>("org.junit..*", true), // Covers both JUnit 4 and 5
                 new UsesType<>("org.testng..*", true),
                 new UsesType<>("org.hamcrest..*", true),

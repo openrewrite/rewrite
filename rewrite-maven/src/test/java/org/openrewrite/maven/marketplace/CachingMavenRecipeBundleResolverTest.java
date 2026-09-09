@@ -59,7 +59,8 @@ class CachingMavenRecipeBundleResolverTest {
                 artifactCache,
                 null,
                 new HttpUrlConnectionSender(),
-                Throwable::printStackTrace
+                Throwable::printStackTrace,
+                ctx
         );
     }
 

@@ -44,6 +44,9 @@ public sealed class ParseError(
     public Tree WithId(Guid id) =>
         id == Id ? this : new ParseError(id, Markers, SourcePath, CharsetName, CharsetBomMarked, Checksum, FileAttributes, Text);
 
+    public ParseError WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new ParseError(Id, markers, SourcePath, CharsetName, CharsetBomMarked, Checksum, FileAttributes, Text);
+
     public SourceFile WithSourcePath(string sourcePath) =>
         sourcePath == SourcePath ? this : new ParseError(Id, Markers, sourcePath, CharsetName, CharsetBomMarked, Checksum, FileAttributes, Text);
 
@@ -53,9 +56,9 @@ public sealed class ParseError(
     public static ParseError Build(string sourcePath, string source, Exception ex)
     {
         var marker = ParseExceptionResult.Build("CSharpParser", ex);
-        var markers = new Markers(Guid.NewGuid(), new List<Marker> { marker });
+        var markers = new Markers(Tree.RandomId(), new List<Marker> { marker });
         return new ParseError(
-            Guid.NewGuid(),
+            Tree.RandomId(),
             markers,
             sourcePath,
             "UTF-8",

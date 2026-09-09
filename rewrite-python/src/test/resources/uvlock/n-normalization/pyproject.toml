@@ -1,0 +1,9 @@
+[project]
+name = "fixture-n"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "Requests [socks] >= 2.0",
+    "Charset_Normalizer  >=3.0 ,  <4",
+    "six ; python_version>='3.8'",
+]

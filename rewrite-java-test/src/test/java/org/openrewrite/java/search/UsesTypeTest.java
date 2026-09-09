@@ -16,12 +16,16 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
+import static org.openrewrite.xml.Assertions.xml;
 
 class UsesTypeTest implements RewriteTest {
 
@@ -448,6 +452,169 @@ class UsesTypeTest implements RewriteTest {
               class Test {
                   ArrayList<String> list = new ArrayList<>();
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTypeInDottedForm() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.b.Outer.Inner", false))),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """,
+            """
+              /*~~>*/import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTypeInBinaryForm() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.b.Outer$Inner", false))),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """,
+            """
+              /*~~>*/import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a.b.Outer.Mid.Inner", "a.b.Outer$Mid$Inner", "a.b.Outer.Mid$Inner"})
+    void doublyNestedType(String type) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>(type, false))),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Mid {
+                      public static class Inner {}
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Mid.Inner i;
+              }
+              """,
+            """
+              /*~~>*/import a.b.Outer;
+              class Test {
+                  Outer.Mid.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void topLevelTypeMiss() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.b.Other", false))),
+          java(
+            """
+              package a.b;
+              public class Thing {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Thing;
+              class Test {
+                  Thing t;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void packageSegmentStartingUppercase() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.B.Thing", false))),
+          java(
+            """
+              package a.B;
+              public class Thing {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.B.Thing;
+              class Test {
+                  Thing t;
+              }
+              """,
+            """
+              /*~~>*/import a.B.Thing;
+              class Test {
+                  Thing t;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a.b.Outer.Inner", "a.b.Outer$Inner"})
+    void nestedTypeReference(String type) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>(type, false))),
+          xml(
+            """
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                  <bean id="abc" class="a.b.Outer$Inner"/>
+              </beans>
+              """,
+            """
+              <!--~~>--><beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                  <bean id="abc" class="a.b.Outer$Inner"/>
+              </beans>
               """
           )
         );

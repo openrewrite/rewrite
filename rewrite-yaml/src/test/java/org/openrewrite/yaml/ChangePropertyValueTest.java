@@ -234,6 +234,207 @@ class ChangePropertyValueTest implements RewriteTest {
     }
 
     @Test
+    void preservesFoldedClipBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: >
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesFoldedStripBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >-
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesFoldedKeepBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: >+
+                line one
+                line two
+
+              after: tail
+              """,
+            """
+              key: >+
+                replaced
+
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesLiteralClipBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: |
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: |
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesLiteralStripBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: |-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: |-
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesLiteralKeepBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            """
+              key: |+
+                line one
+                line two
+
+              after: tail
+              """,
+            """
+              key: |+
+                replaced
+
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiLineNewValueReindentsAcrossBlockBody() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "first\nsecond", null, null, null, null)),
+          yaml(
+            """
+              key: |
+                old line
+              after: tail
+              """,
+            """
+              key: |
+                first
+                second
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexReplacementOnBlockScalarOperatesOnBodyOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "B", "A", true, null, null)),
+          yaml(
+            """
+              key: |-
+                line A one
+                line A two
+              after: tail
+              """,
+            """
+              key: |-
+                line B one
+                line B two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesCrlfLiteralBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            "key: |\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n",
+            "key: |\r\n" +
+            "  replaced\r\n" +
+            "after: tail\r\n"
+          )
+        );
+    }
+
+    @Test
+    void multilineReplacementOnCrlfBlockScalarKeepsCrlf() {
+        // The new value introduces its own interior line break (a bare '\n' from the recipe
+        // argument). On a CRLF file that break must be emitted as CRLF, not glued in as a lone
+        // LF that would leave the block with mixed line endings.
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "new one\nnew two", null, null, null, null)),
+          yaml(
+            "key: |\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n",
+            "key: |\r\n" +
+            "  new one\r\n" +
+            "  new two\r\n" +
+            "after: tail\r\n"
+          )
+        );
+    }
+
+    @Test
     void validatesThatOldValueIsRequiredIfRegexEnabled() {
         assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null, null).validate().isInvalid());
     }

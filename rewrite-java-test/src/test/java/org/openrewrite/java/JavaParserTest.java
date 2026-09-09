@@ -32,6 +32,8 @@ import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -182,6 +184,27 @@ class JavaParserTest implements RewriteTest {
         ctx.setParserClasspathDownloadTarget(updatedTemp.toFile());
         ctx.getParserClasspathDownloadTarget();
         assertThat(updatedTemp.toFile().exists()).isTrue();
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8334")
+    @Test
+    void runtimeClasspathIncludesIsolatedClassLoaderEntries(@TempDir Path temp) throws Exception {
+        // Build tools load recipe artifacts into their own class loader, never reflected in `java.class.path`
+        Path recipeJar = Files.createFile(temp.resolve("recipe-artifact-1.0.jar"));
+        ClassLoader originalTccl = Thread.currentThread().getContextClassLoader();
+        Thread.currentThread().setContextClassLoader(
+          new URLClassLoader(new URL[]{recipeJar.toUri().toURL()}, originalTccl));
+        try {
+            assertThat(JavaParser.runtimeClasspath())
+              .contains(recipeJar)
+              .containsAll(Stream.of(System.getProperty("java.class.path").split(System.getProperty("path.separator")))
+                .map(Paths::get)
+                .filter(Files::exists)
+                .toList());
+            assertThat(JavaParser.dependenciesFromClasspath("recipe-artifact")).containsExactly(recipeJar);
+        } finally {
+            Thread.currentThread().setContextClassLoader(originalTccl);
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/3222")

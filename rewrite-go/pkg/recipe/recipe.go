@@ -33,49 +33,36 @@ type TreeVisitor interface {
 
 // Recipe defines a source code transformation.
 type Recipe interface {
-	// Name returns the fully qualified recipe name (e.g., "org.openrewrite.golang.ChangePackageName").
 	Name() string
 
-	// DisplayName returns a human-readable name for display in UIs.
 	DisplayName() string
 
-	// Description returns a markdown-enabled description of the recipe's purpose.
 	Description() string
 
-	// Tags returns categorization tags (e.g., "cleanup", "security"). May be nil.
 	Tags() []string
 
-	// EstimatedEffortPerOccurrence returns the estimated manual effort per change.
 	EstimatedEffortPerOccurrence() time.Duration
 
-	// Editor returns the visitor that performs the transformation.
 	// Returns nil for recipes that only compose sub-recipes via RecipeList.
 	Editor() TreeVisitor
 
-	// RecipeList returns sub-recipes that run as part of this recipe. May be nil.
 	RecipeList() []Recipe
 
-	// Options returns descriptors for this recipe's configurable options.
 	Options() []OptionDescriptor
 
-	// DataTables returns descriptors for any DataTable rows this recipe emits.
 	// May be nil. The runtime for writing rows is provided by the DataTable
 	// type and DataTableStore (separate from these descriptors).
 	DataTables() []DataTableDescriptor
 
-	// Maintainers returns the people responsible for the recipe. May be nil.
 	Maintainers() []Maintainer
 
-	// Contributors returns the people who have contributed code or design.
 	// May be nil.
 	Contributors() []Contributor
 
-	// Examples returns before/after examples illustrating the recipe.
 	// May be nil.
 	Examples() []Example
 }
 
-// Base provides default implementations for optional Recipe methods.
 // Embed it in your recipe struct to avoid implementing every method:
 //
 //	type MyRecipe struct {
@@ -100,39 +87,21 @@ func (Base) Examples() []Example                         { return nil }
 type DelegatesTo interface {
 	Recipe
 
-	// JavaRecipeName returns the fully qualified Java recipe name
-	// (e.g., "org.openrewrite.java.ChangeType").
 	JavaRecipeName() string
 
-	// JavaOptions returns options to configure the Java recipe, keyed by option name.
 	JavaOptions() map[string]any
 }
 
-// OptionDescriptor describes a configurable option on a recipe.
 type OptionDescriptor struct {
-	// Name is the programmatic name (e.g., "oldPackageName").
-	Name string
-
-	// DisplayName is the human-readable label.
+	Name        string
 	DisplayName string
-
-	// Description explains the option's purpose.
 	Description string
-
-	// Example shows a sample value.
-	Example string
-
-	// Required indicates the option must be set.
-	Required bool
-
-	// Valid lists allowed values (nil means any value is accepted).
-	Valid []string
-
-	// Value is the current value, if set.
-	Value any
+	Example     string
+	Required    bool
+	Valid       []string
+	Value       any
 }
 
-// Option creates a required OptionDescriptor with the given name, display name, and description.
 // Use the fluent With* methods to customize further:
 //
 //	recipe.Option("oldName", "Old name", "The identifier to rename.").WithValue(r.OldName)
@@ -142,19 +111,14 @@ func Option(name, displayName, description string) OptionDescriptor {
 	return OptionDescriptor{Name: name, DisplayName: displayName, Description: description, Required: true}
 }
 
-// WithValue sets the current value of the option.
 func (o OptionDescriptor) WithValue(v any) OptionDescriptor { o.Value = v; return o }
 
-// WithExample sets an example value for the option.
 func (o OptionDescriptor) WithExample(e string) OptionDescriptor { o.Example = e; return o }
 
-// WithValid sets the allowed values for the option.
 func (o OptionDescriptor) WithValid(v ...string) OptionDescriptor { o.Valid = v; return o }
 
-// AsOptional marks the option as not required.
 func (o OptionDescriptor) AsOptional() OptionDescriptor { o.Required = false; return o }
 
-// TypeName returns a Java-style type name derived from the option's Value.
 // Used to populate the marketplace option `type` wire field.
 func (o OptionDescriptor) TypeName() string {
 	if o.Value == nil {
@@ -176,7 +140,6 @@ func (o OptionDescriptor) TypeName() string {
 	}
 }
 
-// DataTableDescriptor describes a DataTable a recipe emits.
 type DataTableDescriptor struct {
 	Name        string
 	DisplayName string
@@ -184,7 +147,6 @@ type DataTableDescriptor struct {
 	Columns     []ColumnDescriptor
 }
 
-// ColumnDescriptor describes a column within a DataTable.
 type ColumnDescriptor struct {
 	Name        string
 	DisplayName string
@@ -192,28 +154,24 @@ type ColumnDescriptor struct {
 	Type        string // e.g. "String", "Integer", "Long"
 }
 
-// Maintainer represents a recipe maintainer.
 type Maintainer struct {
 	Name  string
 	Email string
 	Logo  string
 }
 
-// Contributor represents someone who has contributed to the recipe.
 type Contributor struct {
 	Name      string
 	Email     string
 	LineCount int
 }
 
-// Example is a before/after example illustrating the recipe.
 type Example struct {
 	Description string
 	Sources     []ExampleSource
 	Parameters  []string
 }
 
-// ExampleSource is one before/after pair within an Example.
 type ExampleSource struct {
 	Before   string
 	After    string
@@ -221,8 +179,6 @@ type ExampleSource struct {
 	Language string
 }
 
-// RecipeDescriptor provides metadata about a recipe for display and serialization.
-//
 // Note: the Preconditions field carries declarative-recipe metadata
 // (the Java RecipeDescriptor.preconditions list, for YAML
 // DeclarativeRecipe). Runtime precondition gates are expressed via the

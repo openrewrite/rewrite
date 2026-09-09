@@ -117,11 +117,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             c = c.withImports(ListUtils.flatMap(c.getImports(), import_ -> {
                 Space removedPrefix = spaceForNextImport.get();
                 if (removedPrefix != null) {
-                    Space currentPrefix = import_.getPrefix();
-                    if (removedPrefix.getLastWhitespace().isEmpty() ||
-                        (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix))) {
-                        import_ = import_.withPrefix(currentPrefix.withWhitespace(removedPrefix.getLastWhitespace()));
-                    }
+                    import_ = import_.withPrefix(mergeRemovedImportPrefix(removedPrefix, import_.getPrefix(), true));
                     spaceForNextImport.set(null);
                 }
 
@@ -164,6 +160,19 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 return import_;
             }));
 
+            Space removedLastImportPrefix = spaceForNextImport.get();
+            if (removedLastImportPrefix != null) {
+                // The last import was removed, so there is no following import to carry its prefix
+                // onto. Forward it to the first element after the imports (the first class, or the
+                // EOF when there are none) so a preceding line's comment is not lost.
+                if (!c.getClasses().isEmpty()) {
+                    c = c.withClasses(ListUtils.mapFirst(c.getClasses(), cd ->
+                            cd.withPrefix(mergeRemovedImportPrefix(removedLastImportPrefix, cd.getPrefix(), false))));
+                } else {
+                    c = c.withEof(mergeRemovedImportPrefix(removedLastImportPrefix, c.getEof(), false));
+                }
+            }
+
             if (c != cu && c.getPackageDeclaration() == null && c.getImports().isEmpty() &&
                     c.getPrefix() == Space.EMPTY) {
                 doAfterVisit(new FormatFirstClassPrefix<>());
@@ -177,6 +186,64 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
     private long countTrailingLinebreaks(Space space) {
         return space.getLastWhitespace().chars().filter(s -> s == '\n').count();
+    }
+
+    /**
+     * Carry a removed import's prefix onto the element that now follows it. The removed import's own
+     * end-of-line comment is dropped, while a preceding line's trailing comment and standalone
+     * (commented-out) lines are preserved. When the follower is another import, the blank line that
+     * separated import groups is preserved too; when it is the first class / EOF (the last import was
+     * removed) the follower keeps its own spacing, so import-group blank lines are not pushed onto it.
+     */
+    private Space mergeRemovedImportPrefix(Space removedPrefix, Space targetPrefix, boolean targetIsImport) {
+        // An end-of-line comment on the removed import's line is stored at the start of the follower's
+        // prefix (no newline before it). It described the now-removed import, so drop it. What remains
+        // is the spacing/comments that genuinely belong to the follower.
+        Space followerPrefix = dropTrailingCommentOfRemovedImport(targetPrefix);
+
+        // Case 1: the removed import carried comments in its prefix - a comment on the line above it,
+        // or commented-out lines. Those belong to neither import specifically, so keep them by
+        // prepending them to the follower's own comments.
+        if (!removedPrefix.getComments().isEmpty()) {
+            List<Comment> comments = ListUtils.concatAll(removedPrefix.getComments(), followerPrefix.getComments());
+            // If the follower had no comments of its own but was separated by a wider gap (a blank
+            // line starting a new import group) than the removed import, preserve that wider gap by
+            // moving the follower's trailing whitespace onto the last carried comment's suffix.
+            // Otherwise the comment would inherit the removed import's narrower spacing and the blank
+            // line between groups would be lost.
+            if (followerPrefix.getComments().isEmpty() &&
+                countTrailingLinebreaks(followerPrefix) > countTrailingLinebreaks(removedPrefix)) {
+                String followerWhitespace = followerPrefix.getLastWhitespace();
+                comments = ListUtils.mapLast(comments, comment -> comment.withSuffix(followerWhitespace));
+            }
+            return removedPrefix.withComments(comments);
+        }
+
+        // Case 2: the removed import had no comments, but when the follower is another import we may
+        // still need to carry the removed import's leading whitespace onto it - specifically when the
+        // removed import was the first import (empty prefix, so the follower must not gain a leading
+        // blank line) or started a new group (a wider blank-line gap that should be kept).
+        if (targetIsImport && (removedPrefix.getLastWhitespace().isEmpty() ||
+            countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(followerPrefix))) {
+            return followerPrefix.withWhitespace(removedPrefix.getLastWhitespace());
+        }
+
+        // Case 3: nothing to carry over - the follower keeps its own prefix unchanged.
+        return followerPrefix;
+    }
+
+    /**
+     * The end-of-line comment of a removed import is stored as the first comment of the following
+     * import's prefix, on the same line as the removed import (i.e. no newline precedes it). It
+     * described the removed import, so drop it. Standalone comments (preceded by a newline, such as
+     * commented-out import lines) and the trailing comments of earlier lines are left untouched.
+     */
+    private static Space dropTrailingCommentOfRemovedImport(Space prefix) {
+        List<Comment> comments = prefix.getComments();
+        if (comments.isEmpty() || prefix.getWhitespace().contains("\n")) {
+            return prefix;
+        }
+        return Space.build(comments.get(0).getSuffix(), comments.subList(1, comments.size()));
     }
 
     private Object unfoldStarImport(J.Import starImport, Set<String> otherImportsUsed, JavaSourceFile cu) {

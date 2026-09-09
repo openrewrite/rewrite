@@ -23,6 +23,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
 import org.openrewrite.java.tree.*;
@@ -48,6 +49,18 @@ public class Substitutions {
             "#{", "}", null);
     @Getter
     private final Set<JavaType.GenericTypeVariable> typeVariables = newSetFromMap(new IdentityHashMap<>());
+    private final Set<UUID> splicedParameterIds = new HashSet<>();
+
+    /**
+     * Parameters are spliced into the parsed template verbatim, so a node serving more than one
+     * occurrence would repeat its {@link org.openrewrite.Tree#getId()}; later occurrences get fresh ids.
+     */
+    private J spliceParameter(int index) {
+        J parameter = (J) parameters[index];
+        return splicedParameterIds.add(parameter.getId()) ?
+                parameter :
+                new RandomizeIdVisitor<Integer>().visitNonNull(parameter, 0);
+    }
 
     public String substitute() {
         Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
@@ -335,7 +348,7 @@ public class Substitutions {
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
                 if (TypeUtils.isOfClassType(annotation.getType(), "SubAnnotation")) {
                     J.Literal index = (J.Literal) annotation.getArguments().get(0);
-                    J a2 = (J) parameters[(Integer) index.getValue()];
+                    J a2 = spliceParameter((Integer) index.getValue());
                     return a2.withPrefix(a2.getPrefix().withWhitespace(annotation.getPrefix().getWhitespace()));
                 }
                 return super.visitAnnotation(annotation, integer);
@@ -352,7 +365,7 @@ public class Substitutions {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                J param = maybeParameter(method.getName());
+                J param = maybeParameter(method.getName(), method);
                 if (param instanceof Expression) {
                     return maybeParenthesize((Expression) param, getCursor());
                 } else if (param != null) {
@@ -399,10 +412,15 @@ public class Substitutions {
             }
 
             private @Nullable J maybeParameter(J j1) {
-                Integer param = parameterIndex(j1.getPrefix());
+                return maybeParameter(j1, j1);
+            }
+
+            // marker carries the __pN__ comment; replaced supplies the whitespace preceding the placeholder
+            private @Nullable J maybeParameter(J marker, J replaced) {
+                Integer param = parameterIndex(marker.getPrefix());
                 if (param != null) {
-                    J j2 = (J) parameters[param];
-                    return j2.withPrefix(j2.getPrefix().withWhitespace(j1.getPrefix().getWhitespace()));
+                    J j2 = spliceParameter(param);
+                    return j2.withPrefix(j2.getPrefix().withWhitespace(replaced.getPrefix().getWhitespace()));
                 }
                 return null;
             }

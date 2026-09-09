@@ -15,7 +15,6 @@
  */
 package org.openrewrite.python.internal;
 
-import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
@@ -27,29 +26,24 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
- * Locates and runs a Python package manager CLI. Pre-configured instances are
- * provided for {@code uv} ({@link #UV}) and {@code pipenv} ({@link #PIPENV});
- * each caches the resolved executable path on first {@link #find()}.
+ * Locates and runs a Python package manager CLI for {@link org.openrewrite.python.DependencyWorkspace}.
+ * A pre-configured instance is provided for {@code uv} ({@link #UV}); it caches the
+ * resolved executable path on first {@link #find()}.
  * <p>
  * Callers that just need the executable path can call {@link #find()} and skip
- * lock regeneration when it returns {@code null}. Callers that already have the
+ * workspace creation when it returns {@code null}. Callers that already have the
  * path can run subcommands via {@link #run(Path, String, Map, String...)}.
  */
 public final class PackageManagerExecutor {
 
     public static final PackageManagerExecutor UV = new PackageManagerExecutor(
-            "uv", 120, PackageManagerExecutor::uvExtraLocations, Collections.emptyMap());
-
-    public static final PackageManagerExecutor PIPENV = new PackageManagerExecutor(
-            "pipenv", 300, Collections::emptyList, pipenvEnvDefaults());
+            "uv", 120, PackageManagerExecutor::uvExtraLocations);
 
     @Value
     public static class RunResult {
@@ -59,27 +53,16 @@ public final class PackageManagerExecutor {
         String stderr;
     }
 
-    @Getter
     private final String name;
-
     private final long timeoutSeconds;
     private final Supplier<List<String>> extraLocations;
 
-    /**
-     * Environment variables that should be merged into every invocation of this
-     * tool (caller-supplied values win on key collision).
-     */
-    @Getter
-    private final Map<String, String> envDefaults;
-
     private @Nullable String cachedPath;
 
-    private PackageManagerExecutor(String name, long timeoutSeconds,
-                                   Supplier<List<String>> extraLocations, Map<String, String> envDefaults) {
+    private PackageManagerExecutor(String name, long timeoutSeconds, Supplier<List<String>> extraLocations) {
         this.name = name;
         this.timeoutSeconds = timeoutSeconds;
         this.extraLocations = extraLocations;
-        this.envDefaults = envDefaults;
     }
 
     /**
@@ -174,16 +157,6 @@ public final class PackageManagerExecutor {
         } catch (IOException e) {
             // Ignore
         }
-    }
-
-    private static Map<String, String> pipenvEnvDefaults() {
-        // PIPENV_VENV_IN_PROJECT keeps the virtualenv inside the temp dir so it's
-        // torn down with the rest of the work area; NOSPIN/QUIET keep stderr clean.
-        Map<String, String> defaults = new LinkedHashMap<>();
-        defaults.put("PIPENV_VENV_IN_PROJECT", "1");
-        defaults.put("PIPENV_NOSPIN", "1");
-        defaults.put("PIPENV_QUIET", "1");
-        return Collections.unmodifiableMap(defaults);
     }
 
     private static List<String> uvExtraLocations() {

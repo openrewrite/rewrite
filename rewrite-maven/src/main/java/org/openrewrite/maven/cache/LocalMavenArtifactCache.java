@@ -85,7 +85,7 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
 
         return resolvedPath.resolve(dependency.getArtifactId() + "-" +
                                     (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                                    (dependency.getRequested().getClassifier() == null ? "" : dependency.getRequested().getClassifier()) +
+                                    (dependency.getRequested().getClassifier() == null ? "" : "-" + dependency.getRequested().getClassifier()) +
                                     ".jar");
     }
 }

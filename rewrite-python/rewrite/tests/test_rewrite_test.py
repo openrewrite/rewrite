@@ -14,14 +14,19 @@
 
 """Tests for the Python test harness."""
 
+from pathlib import Path
+from uuid import uuid4
+
 import pytest
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
+from rewrite.markers import Markers
 from rewrite.test import RecipeSpec, python, pyproject, uv, from_visitor, dedent
 from rewrite.test.spec import SourceSpec
 from rewrite.python.visitor import PythonVisitor
-from rewrite.python.tree import CompilationUnit
-from rewrite.java import J
+from rewrite.java.tree import MethodInvocation, Yield
+from rewrite.python.tree import Await, CompilationUnit
+from rewrite.java import J, JavaType, Space
 
 
 class TestDedent:
@@ -342,6 +347,65 @@ def _uv_available() -> bool:
     return shutil.which("uv") is not None
 
 
+def _ty_types_available() -> bool:
+    """Check if the ty-types CLI is installed."""
+    import shutil
+    try:
+        from ty_types.__main__ import find_ty_types_bin  # noqa: F401
+        return True
+    except Exception:
+        return shutil.which("ty-types") is not None
+
+
+class TestWorkspace:
+    """Tests for the directory a run parses its sources under."""
+
+    @pytest.mark.skipif(not _ty_types_available(), reason="ty-types not installed")
+    def test_sources_in_a_run_resolve_against_each_other(self):
+        returns = {}
+
+        class Collect(PythonVisitor):
+            def visit_method_invocation(self, mi, p):
+                returns[mi.name.simple_name] = (
+                    mi.method_type.return_type if mi.method_type else None
+                )
+                return super().visit_method_invocation(mi, p)
+
+        def collect(cu):
+            Collect().visit(cu, None)
+
+        RecipeSpec().rewrite_run(
+            python("def answer() -> int:\n    return 42\n", path=Path("helper.py")),
+            python("import helper\n\nvalue = helper.answer()\n", before_recipe=collect),
+        )
+
+        # Resolved through the import, which names a module of the same directory.
+        assert returns["answer"] == JavaType.Primitive.Int
+
+    def test_a_source_path_leading_out_of_the_workspace_is_rejected(self):
+        with pytest.raises(ValueError, match="inside the workspace"):
+            RecipeSpec().rewrite_run(python("x = 1\n", path=Path("../escaped.py")))
+
+    @pytest.mark.skipif(not _uv_available(), reason="uv not installed")
+    def test_a_borrowed_workspace_keeps_its_own_files(self):
+        specs = uv(
+            pyproject(
+                """
+                [project]
+                name = "test"
+                version = "0.0.0"
+                requires-python = ">=3.10"
+                """
+            ),
+            python("x = 1\n"),
+        )
+        root = Path(specs[0].project_root)
+
+        RecipeSpec().rewrite_run(*specs)
+
+        assert (root / "pyproject.toml").is_file()
+
+
 class TestPyprojectHelper:
     """Tests for the pyproject() helper."""
 
@@ -434,3 +498,36 @@ class TestUvHelper:
                 ),
             )
         )
+
+
+def _await(node: J) -> Await:
+    return Await(uuid4(), node.prefix, Markers.EMPTY, node.replace(prefix=Space([], ' ')), None)
+
+
+class TestWellFormedness:
+    """The harness rejects an `after` tree whose slots hold the wrong node kind."""
+
+    def test_expression_in_statement_list_slot(self):
+        class AwaitEveryCall(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+                return _await(mi)
+
+        spec = RecipeSpec(recipe=from_visitor(AwaitEveryCall()))
+        with pytest.raises(AssertionError, match=r"CompilationUnit\.statements\[0\] holds Await, expected Statement"):
+            spec.rewrite_run(python("foo()"))
+
+    def test_expression_in_single_statement_slot(self):
+        class AwaitEveryYield(PythonVisitor[ExecutionContext]):
+            def visit_yield(self, y: Yield, ctx: ExecutionContext) -> J:
+                return _await(y)
+
+        spec = RecipeSpec(recipe=from_visitor(AwaitEveryYield()))
+        with pytest.raises(AssertionError, match=r"holds Await, expected Statement \(StatementExpression\.statement\)"):
+            spec.rewrite_run(
+                python(
+                    """
+                    def f():
+                        yield 1
+                    """
+                )
+            )

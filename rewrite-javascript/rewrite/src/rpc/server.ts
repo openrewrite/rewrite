@@ -16,6 +16,8 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {RewriteRpc} from "./rewrite-rpc";
+import {chunkedJsonDecoder} from "./message-decoder";
+import {chunkedJsonEncoder} from "./message-encoder";
 import * as fs from "fs";
 import {Command} from 'commander';
 import {dir} from 'tmp-promise';
@@ -141,8 +143,15 @@ async function main() {
 
     // Create the connection with the custom logger
     const connection = rpc.createMessageConnection(
-        new rpc.StreamMessageReader(process.stdin),
-        new rpc.StreamMessageWriter(process.stdout),
+        // Parse incoming messages straight from their bytes: a large inbound message (e.g. a tree
+        // carrying RecipesThatMadeChanges markers, whose recipe descriptors repeat per changed file)
+        // overflows V8's ~512 MB string limit in the default `JSON.parse(buffer.toString())` decoder,
+        // which drops the message and hangs the caller until it times out.
+        new rpc.StreamMessageReader(process.stdin, {contentTypeDecoder: chunkedJsonDecoder}),
+        // Serialize outgoing messages without materializing the whole document as one JS string:
+        // a large PrepareRecipe response (a deep recipe tree) overflows the same limit in the
+        // default `Buffer.from(JSON.stringify(msg))` encoder.
+        new rpc.StreamMessageWriter(process.stdout, {contentTypeEncoder: chunkedJsonEncoder}),
         logger
     );
 

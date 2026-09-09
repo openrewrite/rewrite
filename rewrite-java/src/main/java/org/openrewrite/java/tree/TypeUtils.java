@@ -161,6 +161,64 @@ public class TypeUtils {
         return isOfTypeCore(type1, type2, context);
     }
 
+    /**
+     * Compares two method types for being the same method, ignoring differences that arise purely
+     * from generic parameterization at the use site. This is looser than
+     * {@link #isOfType(JavaType, JavaType)}: a raw type matches its parameterized form (e.g. raw
+     * {@code Set} matches {@code Set<String>}) and a generic type variable matches any type.
+     * <p>
+     * It is intended for matching the {@link JavaType.Method} recorded for an invocation (such as
+     * the entries of {@code JavaSourceFile.getTypesInUse().getUsedMethods()}) back to the
+     * declaration it resolves to. The recorded call-site type can diverge from the declaration when
+     * the invocation is an unchecked invocation (the result type is erased to its raw form) or when
+     * the call binds a generic parameter to a concrete type, so neither {@link Object#equals} nor
+     * {@link #isOfType(JavaType, JavaType)} reliably matches the two.
+     */
+    public static boolean isOfTypeIgnoringGenerics(JavaType.@Nullable Method declaration, JavaType.@Nullable Method use) {
+        if (declaration == use) {
+            return true;
+        }
+        if (declaration == null || use == null ||
+            !declaration.getName().equals(use.getName()) ||
+            declaration.getParameterTypes().size() != use.getParameterTypes().size() ||
+            !isOfTypeIgnoringGenerics(declaration.getDeclaringType(), use.getDeclaringType()) ||
+            !isOfTypeIgnoringGenerics(declaration.getReturnType(), use.getReturnType())) {
+            return false;
+        }
+        for (int i = 0; i < declaration.getParameterTypes().size(); i++) {
+            if (!isOfTypeIgnoringGenerics(declaration.getParameterTypes().get(i), use.getParameterTypes().get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isOfTypeIgnoringGenerics(@Nullable JavaType type1, @Nullable JavaType type2) {
+        if (type1 == type2) {
+            return true;
+        }
+        if (type1 == null || type2 == null) {
+            return false;
+        }
+        // A generic type variable can be bound to any type at a use site, so treat it as a wildcard.
+        if (type1 instanceof JavaType.GenericTypeVariable || type2 instanceof JavaType.GenericTypeVariable) {
+            return true;
+        }
+        if (isString(type1) && isString(type2)) {
+            return true;
+        }
+        if (type1 instanceof JavaType.Primitive || type2 instanceof JavaType.Primitive) {
+            return type1 == type2;
+        }
+        if (type1 instanceof JavaType.Array && type2 instanceof JavaType.Array) {
+            return isOfTypeIgnoringGenerics(((JavaType.Array) type1).getElemType(), ((JavaType.Array) type2).getElemType());
+        }
+        // Ignore any type parameters: compare only the raw fully qualified names.
+        JavaType.FullyQualified fq1 = asFullyQualified(type1);
+        JavaType.FullyQualified fq2 = asFullyQualified(type2);
+        return fq1 != null && fq2 != null && fullyQualifiedNamesAreEqual(fq1.getFullyQualifiedName(), fq2.getFullyQualifiedName());
+    }
+
     private static boolean isOfTypeMethod(JavaType.Method type1, JavaType.Method type2, ComparisonContext context) {
         if (!type1.getName().equals(type2.getName()) ||
             type1.getFlagsBitMap() != type2.getFlagsBitMap() ||
@@ -224,6 +282,11 @@ public class TypeUtils {
         } else if (value2 instanceof JavaType.Annotation.ArrayElementValue) {
             JavaType.Annotation.ArrayElementValue arrayValue1 = (JavaType.Annotation.ArrayElementValue) value1;
             JavaType.Annotation.ArrayElementValue arrayValue2 = (JavaType.Annotation.ArrayElementValue) value2;
+            // `@Foo({})` parses to an empty `constantValues`, while a peer can send an empty
+            // array as neither slot set. With no elements there is no distinction to draw.
+            if (isEmptyArray(arrayValue1) || isEmptyArray(arrayValue2)) {
+                return isEmptyArray(arrayValue1) && isEmptyArray(arrayValue2);
+            }
             if (arrayValue1.getConstantValues() != null) {
                 Object[] constantValues1 = arrayValue1.getConstantValues();
                 if (arrayValue2.getConstantValues() == null || arrayValue2.getConstantValues().length != constantValues1.length) {
@@ -252,6 +315,13 @@ public class TypeUtils {
             return isOfTypeAnnotationElement(value2, value1);
         }
         return false;
+    }
+
+    private static boolean isEmptyArray(JavaType.Annotation.ArrayElementValue value) {
+        Object[] constantValues = value.getConstantValues();
+        JavaType[] referenceValues = value.getReferenceValues();
+        return (constantValues == null || constantValues.length == 0) &&
+                (referenceValues == null || referenceValues.length == 0);
     }
 
     private static boolean isOfTypeCore(@Nullable JavaType to, @Nullable JavaType from, ComparisonContext context) {
@@ -345,11 +415,11 @@ public class TypeUtils {
         }
 
         JavaType.FullyQualified[] toFq = to.stream()
-                .map(e -> (JavaType.FullyQualified) e)
+                .map(JavaType.FullyQualified.class::cast)
                 .sorted(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName))
                 .toArray(JavaType.FullyQualified[]::new);
         JavaType.FullyQualified[] fromFq = from.stream()
-                .map(e -> (JavaType.FullyQualified) e)
+                .map(JavaType.FullyQualified.class::cast)
                 .sorted(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName))
                 .toArray(JavaType.FullyQualified[]::new);
         for (int i = 0; i < toFq.length; i++) {
@@ -990,7 +1060,16 @@ public class TypeUtils {
                 .filter(m -> !m.getFlags().contains(Flag.Private))
                 .filter(m -> !m.getFlags().contains(Flag.Static))
                 // If access level is default then check if subclass package is the same from parent class
-                .filter(m -> m.getFlags().contains(Flag.Public) || m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
+                // A protected method is overridable from any package, but only by a class; an interface
+                // does not inherit the protected members of java.lang.Object (JLS 9.2).
+                .filter(m -> m.getFlags().contains(Flag.Public) ||
+                             (m.getFlags().contains(Flag.Protected) && !isInterface(dt)) ||
+                             m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
+    }
+
+    private static boolean isInterface(JavaType.FullyQualified type) {
+        return type.getKind() == JavaType.FullyQualified.Kind.Interface ||
+               type.getKind() == JavaType.FullyQualified.Kind.Annotation;
     }
 
     public static Optional<JavaType.Method> findDeclaredMethod(JavaType.@Nullable FullyQualified clazz, String name, List<JavaType> argumentTypes) {

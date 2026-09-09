@@ -69,11 +69,24 @@ public class DependencyVersionSelector {
                          @Nullable String versionPattern,
                          ExecutionContext ctx) throws MavenDownloadingException {
         String currentVersion = "0";
-        if (gradleProject != null && configuration != null) {
-            GradleDependencyConfiguration gdc = gradleProject.getConfiguration(configuration);
-            if(gdc != null) {
+        if (configuration != null) {
+            // For "classpath" lookups (plugin markers, buildscript classpath deps), the requested
+            // dependency lives on the buildscript or settings buildscript, not the project's configs.
+            GradleDependencyConfiguration gdc = null;
+            if ("classpath".equals(configuration)) {
+                if (gradleSettings != null) {
+                    gdc = gradleSettings.getBuildscript().getConfiguration(configuration);
+                }
+                if (gdc == null && gradleProject != null) {
+                    gdc = gradleProject.getBuildscript().getConfiguration(configuration);
+                }
+            }
+            if (gdc == null && gradleProject != null) {
+                gdc = gradleProject.getConfiguration(configuration);
+            }
+            if (gdc != null) {
                 Dependency requested = gdc.findRequestedDependency(ga.getGroupId(), ga.getArtifactId());
-                if(requested != null && requested.getVersion() != null) {
+                if (requested != null && requested.getVersion() != null) {
                     currentVersion = requested.getVersion();
                 }
             }

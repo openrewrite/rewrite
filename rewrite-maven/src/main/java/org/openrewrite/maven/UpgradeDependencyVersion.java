@@ -107,7 +107,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
-        return validated;
+        return validated.and(RetainVersions.validate("retainVersions", retainVersions));
     }
 
     String displayName = "Upgrade Maven dependency version";
@@ -142,9 +142,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public Xml.Tag visitTag(final Xml.Tag tag, final ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId)) {
                     ResolvedDependency d = findDependency(tag);
-                    if (d != null && d.getRepository() != null) {
+                    if (isExternalDependency(accumulator, d)) {
                         // if the resolved dependency exists AND it does not represent an artifact that was parsed
-                        // as a source file, attempt to find a new version.
+                        // as a source file (a module in this build, which has no released version to upgrade to),
+                        // attempt to find a new version.
                         try {
                             String newerVersion = MavenDependency.findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), getResolutionResult(), metadataFailures,
                                     versionComparator, ctx);
@@ -206,7 +207,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator accumulator) {
-        MavenIsoVisitor<ExecutionContext> mavenVisitor = new MavenIsoVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             private final VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
             @Override
@@ -352,9 +353,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
             private Xml.Tag upgradeDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
                 ResolvedDependency d = findDependency(t);
-                if (d != null && d.getRepository() != null) {
-                    // if the resolved dependency exists AND it does not represent an artifact that was parsed
-                    // as a source file, attempt to find a new version.
+                if (isExternalDependency(accumulator, d)) {
                     String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                     if (newerVersion != null) {
                         if (t.getChild("version").isPresent()) {
@@ -582,8 +581,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return null;
             }
         };
+    }
 
-        return mavenVisitor;
+    /**
+     * Used to skip GAV coordinates which represent a dependency produced within the repository the recipe is running on
+     */
+    private static boolean isExternalDependency(Accumulator accumulator, @Nullable ResolvedDependency d) {
+        return d != null && !accumulator.projectArtifacts.contains(new GroupArtifact(d.getGroupId(), d.getArtifactId()));
     }
 
     @Value

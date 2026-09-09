@@ -224,6 +224,11 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     }
 
     @Override
+    public S.Try visitSTry(S.Try tryable, P p) {
+        return (S.Try) super.visitSTry(tryable, p);
+    }
+
+    @Override
     public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, P p) {
         return (J.InstanceOf) super.visitInstanceOf(instanceOf, p);
     }
@@ -372,5 +377,10 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     @Override
     public J.Yield visitYield(J.Yield yield, P p) {
         return (J.Yield) super.visitYield(yield, p);
+    }
+
+    @Override
+    public S.ConstructorInvocation visitConstructorInvocation(S.ConstructorInvocation constructorInvocation, P p) {
+        return (S.ConstructorInvocation) super.visitConstructorInvocation(constructorInvocation, p);
     }
 }

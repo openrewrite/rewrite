@@ -1,0 +1,12 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_markers.py (test_str_repr_eq_hash)
+# Retrieved: 2026-07-16
+# input<TAB>normalized form (packaging double-quoted; this port emits single quotes).
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+python_version == '2.7'	python_version == "2.7"
+python_version == "2.7"	python_version == "2.7"
+python_version == "2.7" and os_name == "linux"	python_version == "2.7" and os_name == "linux"
+python_version == "2.7" or os_name == "linux"	python_version == "2.7" or os_name == "linux"
+python_version == "2.7" and os_name == "linux" or sys_platform == "win32"	python_version == "2.7" and os_name == "linux" or sys_platform == "win32"
+(python_version == "2.7")	python_version == "2.7"
+(python_version == "2.7" and sys_platform == "win32")	python_version == "2.7" and sys_platform == "win32"
+python_version == "2.7" and (sys_platform == "win32" or sys_platform == "linux")	python_version == "2.7" and (sys_platform == "win32" or sys_platform == "linux")

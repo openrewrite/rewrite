@@ -20,6 +20,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
@@ -30,157 +34,109 @@ import (
 )
 
 func TestScaffoldExpression(t *testing.T) {
-	source, _ := buildScaffold("1 + 2", nil, nil, ScaffoldExpression)
-	if source == "" {
-		t.Fatal("expected non-empty scaffold source")
-	}
+	source, _ := buildScaffold("1 + 2", nil, nil, nil, ScaffoldExpression)
+	require.NotEqual(t, "", source, "expected non-empty scaffold source")
 
 	p := parser.NewGoParser()
 	_, err := p.Parse("test.go", source)
-	if err != nil {
-		t.Fatalf("scaffold should parse: %v\nsource:\n%s", err, source)
-	}
+	require.NoErrorf(t, err, "scaffold should parse: %v\nsource:\n%s", err, source)
 }
 
 func TestScaffoldStatement(t *testing.T) {
-	source, _ := buildScaffold("x = 1", nil, nil, ScaffoldStatement)
-	if source == "" {
-		t.Fatal("expected non-empty scaffold source")
-	}
+	source, _ := buildScaffold("x = 1", nil, nil, nil, ScaffoldStatement)
+	require.NotEqual(t, "", source, "expected non-empty scaffold source")
 
 	p := parser.NewGoParser()
 	_, err := p.Parse("test.go", source)
-	if err != nil {
-		t.Fatalf("scaffold should parse: %v\nsource:\n%s", err, source)
-	}
+	require.NoErrorf(t, err, "scaffold should parse: %v\nsource:\n%s", err, source)
 }
 
 func TestScaffoldWithCaptures(t *testing.T) {
 	caps := captureMap([]*Capture{Expr("x")})
-	source, count := buildScaffold(fmt.Sprintf("%s + 1", Expr("x")), caps, nil, ScaffoldExpression)
-	if count != 1 {
-		t.Errorf("expected preamble count 1, got %d", count)
-	}
+	source, _ := buildScaffold(fmt.Sprintf("%s + 1", Expr("x")), caps, nil, nil, ScaffoldExpression)
 
 	p := parser.NewGoParser()
 	_, err := p.Parse("test.go", source)
-	if err != nil {
-		t.Fatalf("scaffold with captures should parse: %v\nsource:\n%s", err, source)
-	}
+	require.NoErrorf(t, err, "scaffold with captures should parse: %v\nsource:\n%s", err, source)
+}
+
+// The count says how far into __f__'s body the target sits.
+func TestStatementScaffoldCountsItsPreamble(t *testing.T) {
+	caps := captureMap([]*Capture{Expr("x")})
+	_, count := buildScaffold(fmt.Sprintf("_ = %s", Expr("x")), caps, nil, nil, ScaffoldStatement)
+	assert.Equal(t, 1, count)
 }
 
 func TestParseScaffoldExpression(t *testing.T) {
-	node, err := parseScaffold("1 + 2", nil, nil, ScaffoldExpression)
-	if err != nil {
-		t.Fatalf("parseScaffold error: %v", err)
-	}
-	if node == nil {
-		t.Fatal("expected non-nil node")
-	}
+	node, err := parseScaffold("1 + 2", nil, nil, nil, ScaffoldExpression, nil)
+	require.NoError(t, err, "parseScaffold error")
+	require.NotNil(t, node, "expected non-nil node")
 	bin, ok := node.(*java.Binary)
-	if !ok {
-		t.Fatalf("expected *java.Binary, got %T", node)
-	}
-	if bin.Left == nil || bin.Right == nil {
-		t.Fatal("binary should have left and right")
-	}
+	require.Truef(t, ok, "expected *java.Binary, got %T", node)
+	require.False(t, bin.Left == nil || bin.Right == nil, "binary should have left and right")
 }
 
 func TestPatternMatchIdentifier(t *testing.T) {
-	// Parse source containing identifier "x"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", "package main\n\nvar y = x\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	// Build a pattern that matches identifier "x"
 	pat := Expression("x").Build()
 
-	// Find the identifier "x" in the parsed tree
 	var found java.J
 	v := visitor.Init(&identFinder{target: "x", found: &found})
 	v.Visit(cu, nil)
 
-	if found == nil {
-		t.Fatal("could not find identifier 'x' in parsed tree")
-	}
+	require.NotNil(t, found, "could not find identifier 'x' in parsed tree")
 
 	result := pat.Match(found, nil)
-	if result == nil {
-		t.Error("pattern should match identifier 'x'")
-	}
+	assert.NotNil(t, result, "pattern should match identifier 'x'")
 }
 
 func TestPatternNoMatch(t *testing.T) {
-	// Parse source containing identifier "y"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", "package main\n\nvar z = y\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	// Build a pattern that matches identifier "x"
 	pat := Expression("x").Build()
 
-	// Find identifier "y" in the tree
 	var found java.J
 	v := visitor.Init(&identFinder{target: "y", found: &found})
 	v.Visit(cu, nil)
 
-	if found == nil {
-		t.Fatal("could not find identifier 'y'")
-	}
+	require.NotNil(t, found, "could not find identifier 'y'")
 
 	result := pat.Match(found, nil)
-	if result != nil {
-		t.Error("pattern 'x' should not match identifier 'y'")
-	}
+	assert.Nil(t, result, "pattern 'x' should not match identifier 'y'")
 }
 
 func TestPatternMatchWithCapture(t *testing.T) {
-	// Parse: 1 + 2
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", "package main\n\nvar x = 1 + 2\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	// Pattern: <expr> + 2
 	expr := Expr("expr")
 	pat := Expression(fmt.Sprintf("%s + 2", expr)).
 		Captures(expr).
 		Build()
 
-	// Find the binary expression
 	var found java.J
 	v := visitor.Init(&binaryFinder{found: &found})
 	v.Visit(cu, nil)
 
-	if found == nil {
-		t.Fatal("could not find binary expression")
-	}
+	require.NotNil(t, found, "could not find binary expression")
 
 	result := pat.Match(found, nil)
-	if result == nil {
-		t.Fatal("pattern should match binary expression")
-	}
+	require.NotNil(t, result, "pattern should match binary expression")
 
 	captured := result.Get("expr")
-	if captured == nil {
-		t.Fatal("expected capture 'expr' to be bound")
-	}
+	require.NotNil(t, captured, "expected capture 'expr' to be bound")
 	lit, ok := captured.(*java.Literal)
-	if !ok {
-		t.Fatalf("expected captured value to be *java.Literal, got %T", captured)
-	}
-	if lit.Source != "1" {
-		t.Errorf("expected captured literal source '1', got %q", lit.Source)
-	}
+	require.Truef(t, ok, "expected captured value to be *java.Literal, got %T", captured)
+	assert.Equal(t, "1", lit.Source, "expected captured literal source")
 }
 
 func TestRewriteVisitor(t *testing.T) {
-	// Recipe that rewrites `x` identifiers to `y`
 	pat := Expression("x").Build()
 	tmpl := ExpressionTemplate("y").Build()
 	rewriter := Rewrite(pat, tmpl)
@@ -201,7 +157,6 @@ func TestRewriteVisitor(t *testing.T) {
 }
 
 func TestRewriteBinaryExpression(t *testing.T) {
-	// Recipe that rewrites `1 + 2` to `3`
 	pat := Expression("1 + 2").Build()
 	tmpl := ExpressionTemplate("3").Build()
 	rewriter := Rewrite(pat, tmpl)
@@ -222,7 +177,6 @@ func TestRewriteBinaryExpression(t *testing.T) {
 }
 
 func TestRewriteWithCapture(t *testing.T) {
-	// Recipe that rewrites `<expr> + 0` to `<expr>`
 	expr := Expr("expr")
 	pat := Expression(fmt.Sprintf("%s + 0", expr)).
 		Captures(expr).
@@ -248,7 +202,6 @@ func TestRewriteWithCapture(t *testing.T) {
 }
 
 func TestPatternNoChangeWhenNoMatch(t *testing.T) {
-	// Pattern that matches `1 + 2` should not change `3 + 4`
 	pat := Expression("1 + 2").Build()
 	tmpl := ExpressionTemplate("99").Build()
 	rewriter := Rewrite(pat, tmpl)
@@ -265,7 +218,6 @@ func TestPatternNoChangeWhenNoMatch(t *testing.T) {
 }
 
 func TestRewritePreservesFormatting(t *testing.T) {
-	// Rewriting should preserve the original node's prefix (whitespace).
 	pat := Expression("x").Build()
 	tmpl := ExpressionTemplate("y").Build()
 	rewriter := Rewrite(pat, tmpl)
@@ -273,37 +225,27 @@ func TestRewritePreservesFormatting(t *testing.T) {
 	src := "package main\n\nvar a = x\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	ctx := recipe.NewExecutionContext()
 	result := rewriter.Visit(cu, ctx)
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
+	require.NotNil(t, result, "expected non-nil result")
 
 	actual := printer.Print(result)
 	expected := "package main\n\nvar a = y\n"
-	if actual != expected {
-		t.Errorf("formatting not preserved\nexpected: %q\nactual:   %q", expected, actual)
-	}
+	assert.Equal(t, expected, actual, "formatting not preserved")
 }
 
 func TestPatternMatchGoUnary(t *testing.T) {
 	// given a Go-specific unary (address-of) expression `&b` in the source
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", "package main\n\nfunc f(b int) { g(&b) }\n")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	var found java.J
 	v := visitor.Init(&goUnaryFinder{found: &found})
 	v.Visit(cu, nil)
-	if found == nil {
-		t.Fatal("could not find golang.Unary '&b' in parsed tree")
-	}
+	require.NotNil(t, found, "could not find golang.Unary '&b' in parsed tree")
 
 	// when matching a pattern that captures the operand of `&<expr>`
 	expr := Expr("expr")
@@ -313,20 +255,12 @@ func TestPatternMatchGoUnary(t *testing.T) {
 
 	// then the pattern matches (regression: golang.Unary had no comparator case)
 	result := pat.Match(found, nil)
-	if result == nil {
-		t.Fatal("pattern '&<expr>' should match golang.Unary '&b'")
-	}
+	require.NotNil(t, result, "pattern '&<expr>' should match golang.Unary '&b'")
 	captured := result.Get("expr")
-	if captured == nil {
-		t.Fatal("expected capture 'expr' to be bound")
-	}
+	require.NotNil(t, captured, "expected capture 'expr' to be bound")
 	ident, ok := captured.(*java.Identifier)
-	if !ok || ident.Name != "b" {
-		t.Fatalf("expected captured identifier 'b', got %T %v", captured, captured)
-	}
+	require.Falsef(t, !ok || ident.Name != "b", "expected captured identifier 'b', got %T %v", captured, captured)
 }
-
-// --- Test helpers ---
 
 type rewriteRecipeWithVisitor struct {
 	recipe.Base
@@ -338,7 +272,6 @@ func (r *rewriteRecipeWithVisitor) DisplayName() string        { return "Test Re
 func (r *rewriteRecipeWithVisitor) Description() string        { return "Test rewrite recipe" }
 func (r *rewriteRecipeWithVisitor) Editor() recipe.TreeVisitor { return r.visitor }
 
-// identFinder walks the tree to find the first Identifier with the given name.
 type identFinder struct {
 	visitor.GoVisitor
 	target string
@@ -352,7 +285,6 @@ func (v *identFinder) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	return v.GoVisitor.VisitIdentifier(ident, p)
 }
 
-// goUnaryFinder walks the tree to find the first Go-specific Unary expression.
 type goUnaryFinder struct {
 	visitor.GoVisitor
 	found *java.J
@@ -365,7 +297,6 @@ func (v *goUnaryFinder) VisitGoUnary(u *golang.Unary, p any) java.J {
 	return v.GoVisitor.VisitGoUnary(u, p)
 }
 
-// binaryFinder walks the tree to find the first Binary expression.
 type binaryFinder struct {
 	visitor.GoVisitor
 	found *java.J

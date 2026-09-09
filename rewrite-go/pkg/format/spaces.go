@@ -19,13 +19,13 @@ package format
 import (
 	"strings"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // SpacesVisitor enforces gofmt's intra-line spacing rules:
 //
-//   - One space around binary operators (`a + b`, not `a+b`).
 //   - No space around unary operators (`!x`, `-y`).
 //   - One space after commas in argument/parameter lists
 //     (RightPadded.After fields don't get touched here — they precede
@@ -41,8 +41,6 @@ type SpacesVisitor struct {
 	stopAfterTracker
 }
 
-// NewSpacesVisitor returns a visitor configured with the given
-// stopAfter bound. Pass nil to format the entire visited tree.
 func NewSpacesVisitor(stopAfter java.Tree) *SpacesVisitor {
 	return visitor.Init(&SpacesVisitor{
 		stopAfterTracker: stopAfterTracker{stopAfter: stopAfter},
@@ -56,13 +54,6 @@ func (v *SpacesVisitor) Visit(t java.Tree, p any) java.Tree {
 	out := v.GoVisitor.Visit(t, p)
 	v.noteVisited(t)
 	return out
-}
-
-func (v *SpacesVisitor) VisitBinary(bin *java.Binary, p any) java.J {
-	bin = v.GoVisitor.VisitBinary(bin, p).(*java.Binary)
-	bin.Operator.Before = ensureSingleSpace(bin.Operator.Before)
-	bin = bin.WithRight(ensureLeadingSingleSpace(bin.Right))
-	return bin
 }
 
 func (v *SpacesVisitor) VisitAssignment(a *java.Assignment, p any) java.J {
@@ -79,10 +70,27 @@ func (v *SpacesVisitor) VisitAssignmentOperation(ao *java.AssignmentOperation, p
 	return ao
 }
 
+// VisitUnary writes the operand straight after the operator, except where the
+// two would then lex as one token.
 func (v *SpacesVisitor) VisitUnary(u *java.Unary, p any) java.J {
 	u = v.GoVisitor.VisitUnary(u, p).(*java.Unary)
-	u.Operand = clearExpressionLeadingSpace(u.Operand)
+	tightened := clearExpressionLeadingSpace(u.Operand)
+	op, ahead := prefixOperator(u.Operator.Element)
+	if !ahead || !fusesWith(op, printer.Print(tightened)) {
+		u.Operand = tightened
+	}
 	return u
+}
+
+// prefixOperator returns the operator text for the forms that write it ahead of
+// the operand. The postfix forms report false: their operator lands on the far
+// side of the operand and never meets its leading space.
+func prefixOperator(op java.UnaryOperator) (string, bool) {
+	switch op {
+	case java.PostIncrement, java.PostDecrement, java.SpreadPostfix:
+		return "", false
+	}
+	return printer.UnaryOperatorString(op), true
 }
 
 // ensureSingleSpace returns the space unchanged if it contains a

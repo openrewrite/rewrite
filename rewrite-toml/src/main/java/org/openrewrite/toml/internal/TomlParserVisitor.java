@@ -201,13 +201,16 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     public Toml visitString(TomlParser.StringContext ctx) {
         return convert(ctx, (c, prefix) -> {
             String string = c.getText();
+            String value = (string.startsWith("\"\"\"") || string.startsWith("'''"))
+                    ? string.substring(3, string.length() - 3)
+                    : string.substring(1, string.length() - 1);
             return new Toml.Literal(
                     randomId(),
                     prefix,
                     Markers.EMPTY,
                     TomlType.Primitive.String,
                     string,
-                    string.substring(1, string.length() - 1)
+                    value
             );
         });
     }

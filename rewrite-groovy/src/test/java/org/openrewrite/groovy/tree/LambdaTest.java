@@ -113,6 +113,26 @@ class LambdaTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/298")
+    @Test
+    void compileStaticLambdaArgumentWithoutParameters() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.CompileStatic
+
+              @CompileStatic
+              class Main {
+                  static void main(String[] args) {
+                      Optional<String> myOptional = Optional.ofNullable("test")
+                      String myStr = myOptional.orElseGet(() -> "alternative")
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2168")
     @Test
     void closureNoArguments() {

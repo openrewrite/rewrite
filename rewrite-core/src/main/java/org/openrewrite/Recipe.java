@@ -51,10 +51,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
@@ -325,7 +325,7 @@ public abstract class Recipe implements Cloneable {
         if (type.isEnum()) {
             return Arrays.stream(type.getEnumConstants())
                     .map(e -> ((Enum<?>) e).name())
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return null;
     }
@@ -618,12 +618,12 @@ public abstract class Recipe implements Cloneable {
                 m.putAll(options);
                 for (OptionDescriptor optionDescriptor : clone.getDescriptor().getOptions()) {
                     Object value = options.get(optionDescriptor.getName());
-                    if (value instanceof String) {
+                    if (value != null) {
                         Map<String, Object> option = new HashMap<>();
                         option.put("value", value);
                         objectMapper.updateValue(optionDescriptor, option);
 
-                        if (optionDescriptor.getType().equals("List")) {
+                        if (value instanceof String && optionDescriptor.getType().equals("List")) {
                             m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
                         }
                     }

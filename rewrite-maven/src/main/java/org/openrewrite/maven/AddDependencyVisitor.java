@@ -120,7 +120,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                 } else {
                     String versionToUse = null;
                     String managedVersion = getResolutionResult().getPom().getManagedVersion(groupId, artifactId, type, classifier);
-                    if (managedVersion == null || (versionComparator != null && !versionComparator.isValid(version, managedVersion))) {
+                    if (managedVersion == null || (versionComparator != null && !versionComparator.isValid(managedVersion, managedVersion))) {
                         versionToUse = tryGetFamilyVersion();
                         if (versionToUse == null) {
                             try {
@@ -249,7 +249,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                             return e.warn(tag);
                         }
                     }
-                } else if (versionComparator != null && !versionComparator.isValid(version, managedVersion)) {
+                } else if (versionComparator != null && !versionComparator.isValid(managedVersion, managedVersion)) {
                     scheduleVersionUpgrade = true;
                 }
 

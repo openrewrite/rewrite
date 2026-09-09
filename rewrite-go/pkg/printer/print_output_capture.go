@@ -28,12 +28,10 @@ type PrintOutputCapture struct {
 	markerPrinter MarkerPrinter
 }
 
-// NewPrintOutputCapture creates a PrintOutputCapture with no marker printer.
 func NewPrintOutputCapture() *PrintOutputCapture {
 	return &PrintOutputCapture{}
 }
 
-// NewPrintOutputCaptureWithMarkers creates a PrintOutputCapture with the given MarkerPrinter.
 func NewPrintOutputCaptureWithMarkers(mp MarkerPrinter) *PrintOutputCapture {
 	return &PrintOutputCapture{markerPrinter: mp}
 }
@@ -46,7 +44,6 @@ func (p *PrintOutputCapture) String() string {
 	return p.buf.String()
 }
 
-// BeforePrefix emits marker output before a node's prefix space.
 func (p *PrintOutputCapture) BeforePrefix(markers java.Markers) {
 	if p.markerPrinter == nil {
 		return
@@ -58,7 +55,6 @@ func (p *PrintOutputCapture) BeforePrefix(markers java.Markers) {
 	}
 }
 
-// BeforeSyntax emits marker output after a node's prefix but before its syntax.
 func (p *PrintOutputCapture) BeforeSyntax(markers java.Markers) {
 	if p.markerPrinter == nil {
 		return
@@ -70,7 +66,6 @@ func (p *PrintOutputCapture) BeforeSyntax(markers java.Markers) {
 	}
 }
 
-// AfterSyntax emits marker output after a node's syntax.
 func (p *PrintOutputCapture) AfterSyntax(markers java.Markers) {
 	if p.markerPrinter == nil {
 		return

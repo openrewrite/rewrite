@@ -72,7 +72,7 @@ export class InstallRecipes {
     }
 
     static handle(connection: rpc.MessageConnection, installDir: string, marketplace: RecipeMarketplace,
-                  logger?: rpc.Logger, metricsCsv?: string): void {
+                  recipeOrigin: Map<string, string>, logger?: rpc.Logger, metricsCsv?: string): void {
         connection.onRequest(
             new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"),
             withMetrics<InstallRecipes, InstallRecipesResponse>(
@@ -80,7 +80,7 @@ export class InstallRecipes {
                 metricsCsv,
                 (context) => async (request) => {
                     context.target = typeof request.recipes === "object" ? request.recipes.packageName : request.recipes;
-                    const beforeInstall = marketplace.allRecipes().length;
+                    const beforeNames = new Set(marketplace.allRecipes().map(r => r.name));
                     let resolvedPath;
                     let recipesName = request.recipes;
 
@@ -150,8 +150,17 @@ export class InstallRecipes {
                         throw new Error(`${recipesName} does not export an 'activate' function`);
                     }
 
+                    const origin = typeof request.recipes === "object"
+                        ? request.recipes.packageName
+                        : request.recipes;
+                    for (const recipe of marketplace.allRecipes()) {
+                        if (!beforeNames.has(recipe.name)) {
+                            recipeOrigin.set(recipe.name, origin);
+                        }
+                    }
+
                     return {
-                        recipesInstalled: marketplace.allRecipes().length - beforeInstall,
+                        recipesInstalled: marketplace.allRecipes().length - beforeNames.size,
                         version: installedVersion
                     };
                 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {JavaScriptParser, JavaScriptVisitor, JS, typescript} from "../../src/javascript";
+import {JavaScriptParser, JavaScriptVisitor, JS, typescript, sourceFileCache} from "../../src/javascript";
 import {J} from "../../src/java";
 import {ParseErrorKind} from "../../src/parse-error";
 
@@ -47,7 +47,7 @@ test("comments", () =>
 
 describe('parseOnly', () => {
     test('parses basic TypeScript code', async () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const result = await parser.parseOnly({
             sourcePath: 'test.ts',
             text: 'const x: number = 1 + 2;'
@@ -59,7 +59,7 @@ describe('parseOnly', () => {
     });
 
     test('parses JSX code', async () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const result = await parser.parseOnly({
             sourcePath: 'test.tsx',
             text: 'const element = <div className="test">Hello</div>;'
@@ -69,7 +69,7 @@ describe('parseOnly', () => {
     });
 
     test('returns ParseExceptionResult for syntax errors', async () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const result = await parser.parseOnly({
             sourcePath: 'test.ts',
             text: 'const x = {;'  // Invalid syntax
@@ -79,7 +79,7 @@ describe('parseOnly', () => {
     });
 
     test('parses without type attribution', async () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const result = await parser.parseOnly({
             sourcePath: 'test.ts',
             text: `
@@ -95,7 +95,7 @@ describe('parseOnly', () => {
     });
 
     test('preserves source path', async () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const result = await parser.parseOnly({
             sourcePath: 'src/components/Button.tsx',
             text: 'export const Button = () => <button />;'

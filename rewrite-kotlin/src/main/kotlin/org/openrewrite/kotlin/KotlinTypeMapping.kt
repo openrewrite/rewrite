@@ -1168,7 +1168,10 @@ class KotlinTypeMapping(
 
     @OptIn(SymbolInternals::class)
     fun variableType(variable: FirVariable, parent: Any?, signature: String): Variable {
-        val variableFlags = mapToFlagsBitmap(variable.visibility, variable.modality, variable.isStatic)
+        var variableFlags = mapToFlagsBitmap(variable.visibility, variable.modality, variable.isStatic)
+        if (variable is FirEnumEntry) {
+            variableFlags = variableFlags or (1L shl 14) // Enum
+        }
         val resolvedName = variableName(variable.name.asString())
         return typeFactory.variableFor(signature) {
             val vt = Variable(null, variableFlags, resolvedName, null, null, null)

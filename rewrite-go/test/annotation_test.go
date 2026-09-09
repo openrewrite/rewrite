@@ -21,6 +21,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -53,9 +57,7 @@ func TestAnnotation_PrintsBasicTagShape(t *testing.T) {
 	ann := newJSONTagAnnotation("json", "name")
 	out := printer.Print(ann)
 	want := `json:"name"`
-	if out != want {
-		t.Errorf("got %q, want %q", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 func TestAnnotation_PrintsWithoutArguments(t *testing.T) {
@@ -67,9 +69,7 @@ func TestAnnotation_PrintsWithoutArguments(t *testing.T) {
 	}
 	out := printer.Print(ann)
 	want := `go:noinline`
-	if out != want {
-		t.Errorf("got %q, want %q", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 func TestAnnotation_PrintsPrefixWhitespace(t *testing.T) {
@@ -79,9 +79,7 @@ func TestAnnotation_PrintsPrefixWhitespace(t *testing.T) {
 	ann.Prefix = java.Space{Whitespace: " "}
 	out := printer.Print(ann)
 	want := ` validate:"required"`
-	if out != want {
-		t.Errorf("got %q, want %q", out, want)
-	}
+	assert.Equal(t, want, out)
 }
 
 func TestAnnotation_VisitorRoundtripIdentity(t *testing.T) {
@@ -92,14 +90,10 @@ func TestAnnotation_VisitorRoundtripIdentity(t *testing.T) {
 
 	v := visitor.Init(&visitor.GoVisitor{})
 	out := v.Visit(ann, nil)
-	if out == nil {
-		t.Fatal("visitor returned nil")
-	}
+	require.NotNil(t, out, "visitor returned nil")
 	got := printer.Print(out.(java.Tree))
 	want := ` json:"user_id"`
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
+	assert.Equal(t, want, got)
 }
 
 func TestAnnotation_VisitorReachesAnnotationType(t *testing.T) {
@@ -111,9 +105,7 @@ func TestAnnotation_VisitorReachesAnnotationType(t *testing.T) {
 
 	got := printer.Print(out)
 	want := `yaml:"x"`
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
+	assert.Equal(t, want, got)
 }
 
 func TestAnnotation_VisitorReachesArguments(t *testing.T) {
@@ -125,9 +117,7 @@ func TestAnnotation_VisitorReachesArguments(t *testing.T) {
 
 	got := printer.Print(out)
 	want := `json:"y"`
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
+	assert.Equal(t, want, got)
 }
 
 type renamingVisitor struct {

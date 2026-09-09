@@ -21,6 +21,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.ParenthesizeVisitor;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -36,11 +37,11 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         if (asBinary.getOperator() == J.Binary.Type.And) {
             if (isLiteralFalse(asBinary.getLeft())) {
                 j = asBinary.getLeft();
-            } else if (isLiteralFalse(asBinary.getRight())) {
+            } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (isLiteralTrue(asBinary.getLeft())) {
                 j = asBinary.getRight();
-            } else if (isLiteralTrue(asBinary.getRight())) {
+            } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
             } else if (!(asBinary.getLeft() instanceof MethodCall) &&
                        SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
@@ -49,11 +50,11 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
             if (isLiteralTrue(asBinary.getLeft())) {
                 j = asBinary.getLeft();
-            } else if (isLiteralTrue(asBinary.getRight())) {
+            } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (isLiteralFalse(asBinary.getLeft())) {
                 j = asBinary.getRight();
-            } else if (isLiteralFalse(asBinary.getRight())) {
+            } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
             } else if (!(asBinary.getLeft() instanceof MethodCall) &&
                        SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
@@ -146,6 +147,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
             if (asUnary.getOperator() == J.Unary.Type.Not) {
                 j = unpackExpression(asUnary.getExpression(), asUnary);
+                if (j instanceof J.Ternary) {
+                    j = ParenthesizeVisitor.maybeParenthesize((Expression) j, getCursor());
+                }
             }
             if (asUnary != j) {
                 j = j.withPrefix(asUnary.getPrefix());
@@ -200,6 +204,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             J parenthesized = ((J.Parentheses<?>) expr).getTree();
             if (parenthesized instanceof J.Binary) {
                 J.Binary binary = (J.Binary) parenthesized;
+                if (isComparison(binary.getLeft()) || isComparison(binary.getRight())) {
+                    return j;
+                }
                 J.Binary.Type negated = maybeNegate(binary.getOperator());
                 if (negated != binary.getOperator()) {
                     j = binary.withOperator(negated).withPrefix(j.getPrefix());
@@ -225,22 +232,23 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
     private Expression maybeNegate(Expression expr) {
         if (expr instanceof J.Binary) {
-            J.Binary.Type negated = maybeNegate(((J.Binary) expr).getOperator());
-            if (negated != ((J.Binary) expr).getOperator()) {
-                return ((J.Binary) expr).withOperator(negated).withPrefix(expr.getPrefix());
+            J.Binary binary = (J.Binary) expr;
+            if (!isComparison(binary.getLeft()) && !isComparison(binary.getRight())) {
+                J.Binary.Type negated = maybeNegate(binary.getOperator());
+                if (negated != binary.getOperator()) {
+                    return binary.withOperator(negated).withPrefix(expr.getPrefix());
+                }
             }
         } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
             return ((J.Unary) expr).getExpression().withPrefix(expr.getPrefix());
         } else if (expr instanceof J.Ternary) {
+            // The negation of `c ? t : f` is `c ? !t : !f`. Flipping the condition and swapping the
+            // branches instead would preserve the ternary's value rather than negate it.
             J.Ternary ternary = (J.Ternary) expr;
-            Expression negatedCondition = maybeNegate(ternary.getCondition());
-            if (negatedCondition != ternary.getCondition()) {
-                return ternary
-                        .withCondition(negatedCondition)
-                        .withTruePart(ternary.getFalsePart())
-                        .withFalsePart(ternary.getTruePart())
-                        .withPrefix(expr.getPrefix());
-            }
+            return ternary
+                    .withTruePart(maybeNegate(ternary.getTruePart()))
+                    .withFalsePart(maybeNegate(ternary.getFalsePart()))
+                    .withPrefix(expr.getPrefix());
         } else if (isLiteralTrue(expr)) {
             return ((J.Literal) expr).withValue(false).withValueSource("false");
         } else if (isLiteralFalse(expr)) {
@@ -266,6 +274,21 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             default:
                 return operator;
         }
+    }
+
+    private boolean isComparison(Expression expr) {
+        if (expr instanceof J.Binary) {
+            switch (((J.Binary) expr).getOperator()) {
+                case LessThan:
+                case GreaterThan:
+                case LessThanOrEqual:
+                case GreaterThanOrEqual:
+                case Equal:
+                case NotEqual:
+                    return true;
+            }
+        }
+        return false;
     }
 
     private final MethodMatcher isEmpty = new MethodMatcher("java.lang.String isEmpty()");
@@ -309,6 +332,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
     private static boolean isNumericLiteral(Expression expression) {
         return expression instanceof J.Literal &&
+                expression.getType() instanceof JavaType.Primitive &&
                 ((JavaType.Primitive) expression.getType()).isNumeric();
     }
 
@@ -416,9 +440,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             !(sideRetained instanceof J.Parentheses) &&
             !(sideRetained instanceof J.Unary)) {
             sideRetained = new J.Parentheses<>(Tree.randomId(),
-                    Space.EMPTY,
+                    sideRetained.getPrefix(),
                     Markers.EMPTY,
-                    JRightPadded.build(sideRetained));
+                    JRightPadded.build(sideRetained.withPrefix(Space.EMPTY)));
         }
         return new J.Unary(Tree.randomId(),
                 sideRetained.getPrefix(),
@@ -441,7 +465,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
             return true;
         }
-        return innerExpression.getType() == JavaType.Primitive.Boolean;
+        return isBooleanValued(innerExpression);
     }
 
     /**
@@ -464,5 +488,56 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             return true;
         }
         return j instanceof Expression && ((Expression) j).getType() == JavaType.Primitive.Boolean;
+    }
+
+    /**
+     * Determines whether a short-circuit expression with a boolean literal operand can be simplified,
+     * e.g. {@code x && true}, {@code x && false}, {@code x || true}, or {@code x || false}.
+     * <p>
+     * In Java, {@code &&} and {@code ||} are boolean-only, so these always simplify to {@code x} or the
+     * literal. In languages like JavaScript/TypeScript and Groovy, {@code &&}/{@code ||} return one of
+     * their operands unchanged based on truthiness, so {@code x || false} yields {@code false} when
+     * {@code x} is falsy (e.g. {@code undefined}) rather than the original value. Simplifying then
+     * changes semantics unless {@code x} is boolean-typed.
+     *
+     * @param nonLiteralOperand the operand that is not the boolean literal
+     * @return true if the short-circuit expression can be safely simplified
+     */
+    protected boolean shouldSimplifyShortCircuitOn(J nonLiteralOperand) {
+        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
+            return true;
+        }
+        return nonLiteralOperand instanceof Expression && isBooleanValued((Expression) nonLiteralOperand);
+    }
+
+    private boolean isBooleanValued(Expression expression) {
+        if (expression instanceof J.Binary) {
+            J.Binary binary = (J.Binary) expression;
+            switch (binary.getOperator()) {
+                case LessThan:
+                case GreaterThan:
+                case LessThanOrEqual:
+                case GreaterThanOrEqual:
+                case Equal:
+                case NotEqual:
+                    return true;
+                case And:
+                case Or:
+                    return isBooleanValued(binary.getLeft()) && isBooleanValued(binary.getRight());
+                default:
+                    return false;
+            }
+        }
+        if (expression instanceof J.Parentheses) {
+            J tree = ((J.Parentheses<?>) expression).getTree();
+            return tree instanceof Expression && isBooleanValued((Expression) tree);
+        }
+        if (expression instanceof J.Unary) {
+            return ((J.Unary) expression).getOperator() == J.Unary.Type.Not;
+        }
+        if (expression instanceof J.Literal) {
+            return ((J.Literal) expression).getValue() instanceof Boolean;
+        }
+        return expression.getType() == JavaType.Primitive.Boolean;
     }
 }

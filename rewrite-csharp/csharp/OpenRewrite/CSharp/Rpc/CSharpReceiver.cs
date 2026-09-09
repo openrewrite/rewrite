@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Text.Json;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
@@ -507,12 +508,19 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitNullableDirective(NullableDirective nd, RpcReceiveQueue q)
     {
         var setting = q.ReceiveAndGet(nd.Setting, RpcReceiveQueue.ToEnum<NullableSetting>());
-        // Target is a nullable enum — receive as object and convert
+        // Target is a nullable enum. NO_CHANGE echoes back the string we seed below;
+        // ADD/CHANGE arrives as a JsonElement (string- or number-encoded enum). The prior
+        // `(NullableTarget)targetObj` fallback threw InvalidCastException on the JsonElement,
+        // aborting receipt of the whole CompilationUnit for any file with a `#nullable`
+        // directive and leaving a partially-built tree (later surfacing as NPEs downstream).
         var targetObj = q.Receive<object?>(nd.Target != null ? nd.Target.Value.ToString() : null);
         NullableTarget? target = targetObj switch
         {
-            string s => Enum.Parse<NullableTarget>(s, true),
             null => null,
+            NullableTarget nt => nt,
+            string s => Enum.Parse<NullableTarget>(s, true),
+            JsonElement { ValueKind: JsonValueKind.String } je => Enum.Parse<NullableTarget>(je.GetString()!, true),
+            JsonElement { ValueKind: JsonValueKind.Number } je => (NullableTarget)je.GetInt32(),
             _ => (NullableTarget)targetObj
         };
         var hashSpacing = q.Receive(nd.HashSpacing)!;
@@ -1102,21 +1110,17 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         {
             var comments = q.ReceiveList(space.Comments, c =>
             {
-                // The Java side decomposes a structured CsDocComment.DocComment tree; the C#
-                // side has no such model, so drain it and re-flatten to a raw XmlDocComment.
-                if (c is StructuredDocComment)
+                // A structured /// XML documentation comment is decomposed as a proper tree;
+                // reconstruct it node-by-node rather than flattening it to text.
+                if (c is CsDocComment.DocComment docComment)
                 {
-                    return CsDocCommentReceiver.ReceiveDocComment(q);
+                    return (Comment)new CsDocCommentReceiver(_outer).Visit(docComment, q)!;
                 }
                 var multiline = q.Receive(c.Multiline);
                 var text = q.Receive(c.Text);
                 var suffix = q.Receive(c.Suffix);
                 // C# Comment doesn't have Markers; consume and discard
                 q.Receive<Markers>(Markers.Empty);
-                if (c is XmlDocComment)
-                {
-                    return new XmlDocComment(text!, suffix!, multiline);
-                }
                 return new TextComment(text!, suffix!, multiline);
             });
             var whitespace = q.Receive(space.Whitespace);

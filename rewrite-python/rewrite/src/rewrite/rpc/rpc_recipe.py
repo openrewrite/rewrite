@@ -29,8 +29,9 @@ longer called directly by any recipe.
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
+from rewrite.data_table import DataTable
 from rewrite.recipe import Recipe
 from rewrite.tree import Tree
 from rewrite.visitor import TreeVisitor
@@ -83,7 +84,8 @@ class RpcRecipe(Recipe):
         ``RpcRecipe`` on the Java and JavaScript sides) is future work.
     """
 
-    def __init__(self, name: str, **options: Any):
+    def __init__(self, name: str, data_tables: Optional[List[DataTable]] = None,
+                 **options: Any):
         self._name = name
         # ``java_recipe_name`` / ``delegates_to_options`` are the (internal)
         # attribute names the server's delegatesTo production reads; see
@@ -91,11 +93,26 @@ class RpcRecipe(Recipe):
         # delegatesTo payload is the ecosystem-neutral ``{recipeName, options}``.
         self.java_recipe_name = name
         self.delegates_to_options: Dict[str, Any] = dict(options)
+        self._data_tables: List[DataTable] = list(data_tables or [])
         self._prepared: Optional["PreparedJavaRecipe"] = None
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def data_tables(self) -> List[DataTable]:
+        """Data tables the delegate produces.
+
+        The reference carries only an id + options, so the delegate lives on another
+        peer and its tables cannot be introspected from here -- a descriptor is built
+        during marketplace registration, when no peer is necessarily connected. The
+        composite author declares them instead, matching the delegate's table names
+        and columns, so the composite's descriptor advertises everything its run will
+        produce. Rows are still written by the peer that owns the recipe; declaring
+        the table here only makes it resolvable by descriptor consumers.
+        """
+        return self._data_tables
 
     @property
     def display_name(self) -> str:
@@ -239,11 +256,16 @@ class JavaRecipeVisitor(TreeVisitor[Tree, Any]):
         if tree is None:
             return None
 
-        from .server import local_objects, get_object_from_java
+        from rewrite.execution import ExecutionContext
+        from .server import local_object, local_objects, get_object_from_java
 
         # Ensure tree is in local_objects so Java can fetch it
         tree_id = str(tree.id)
         local_objects[tree_id] = tree
+
+        # Java's Visit handler fetches the execution context (`p`) over
+        # GetObject, so it must be resolvable by id as well.
+        context_id = local_object(p) if isinstance(p, ExecutionContext) else None
 
         # Determine source file type
         source_file_type = f"{tree.__class__.__module__}.{tree.__class__.__name__}"
@@ -256,6 +278,7 @@ class JavaRecipeVisitor(TreeVisitor[Tree, Any]):
             self._prepared_recipe,
             tree_id,
             source_file_type,
+            context_id=context_id,
             phase=self._phase
         )
 

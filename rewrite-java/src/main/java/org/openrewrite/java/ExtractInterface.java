@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -48,7 +49,7 @@ public class ExtractInterface {
                 JavaSourceFile c = (JavaSourceFile) requireNonNull(tree);
 
                 String pkg = c.getPackageDeclaration() == null ? "" :
-                        Arrays.stream(c.getPackageDeclaration().getExpression().printTrimmed(getCursor()).split("\\."))
+                        Arrays.stream(PackageNameUtils.getPackageName(c.getPackageDeclaration()).split("\\."))
                                 .map(subpackage -> "..")
                                 .collect(joining("/", "../", "/"));
 

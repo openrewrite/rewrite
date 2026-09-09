@@ -101,6 +101,12 @@ export interface DiscoveredFiles {
     };
     /** JavaScript/TypeScript files (includes .prettierrc.js, prettier.config.js) */
     jsFiles: string[];
+    /**
+     * JS/TS files that won't be parsed into an AST and are instead recorded as
+     * Quarks (path only, no content). Currently only files over
+     * {@link MAX_PARSEABLE_SIZE_BYTES}; other unparseable cases may join later.
+     */
+    unparseableFiles: string[];
     /** JSON files (tsconfig.json, .prettierrc.json, other .json) */
     jsonFiles: string[];
     /** YAML files (.prettierrc.yaml, other .yaml/.yml) */
@@ -123,11 +129,30 @@ export const DEFAULT_EXCLUSIONS = [
 ];
 
 /**
+ * Exclusions that apply even to files git reports. Dependency trees and minified
+ * bundles are sometimes committed but are never a project's own source, whereas the
+ * remaining entries in {@link DEFAULT_EXCLUSIONS} are what a .gitignore already says.
+ */
+export const DEFAULT_TRACKED_EXCLUSIONS = [
+    "**/node_modules/**",
+    "**/*.min.js",
+    "**/*.bundle.js"
+];
+
+/**
  * Source file extensions for JavaScript/TypeScript.
  */
 const SOURCE_EXTENSIONS = new Set([
     ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"
 ]);
+
+/**
+ * JS/TS files larger than this are recorded as Quarks rather than parsed into a
+ * full AST. Matches the 1 MB default in the JVM {@code JavaScriptParser}, which
+ * likewise diverts oversize files off the parse path. A ~20 MB JSON-like `.js`
+ * otherwise balloons the TypeScript parser to multi-GB / OOM.
+ */
+const MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024;
 
 /**
  * All lock file names for quick lookup.
@@ -163,6 +188,7 @@ export class ProjectParser {
     private readonly projectPath: string;
     private readonly relativeTo: string;
     private readonly exclusions: string[];
+    private readonly gitExclusions: string[];
     private readonly ctx: ExecutionContext;
     private readonly useGit: boolean;
     private readonly onProgress?: ProjectParserOptions["onProgress"];
@@ -173,6 +199,7 @@ export class ProjectParser {
         this.projectPath = path.resolve(projectPath);
         this.relativeTo = options.relativeTo ? path.resolve(options.relativeTo) : this.projectPath;
         this.exclusions = options.exclusions ?? DEFAULT_EXCLUSIONS;
+        this.gitExclusions = options.exclusions ?? DEFAULT_TRACKED_EXCLUSIONS;
         this.ctx = options.ctx ?? new ExecutionContext();
         this.useGit = options.useGit ?? this.isGitRepository();
         this.onProgress = options.onProgress;
@@ -412,6 +439,7 @@ export class ProjectParser {
                 text: []
             },
             jsFiles: [],
+            unparseableFiles: [],
             jsonFiles: [],
             yamlFiles: [],
             textFiles: []
@@ -434,7 +462,7 @@ export class ProjectParser {
             if (basename === "package.json") {
                 discovered.packageJsonFiles.push(file);
             } else if (SOURCE_EXTENSIONS.has(ext)) {
-                discovered.jsFiles.push(file);
+                (this.isOversize(file) ? discovered.unparseableFiles : discovered.jsFiles).push(file);
             } else if ((JSON_LOCK_FILE_NAMES as readonly string[]).includes(basename)) {
                 discovered.lockFiles.json.push(file);
             } else if (basename === "yarn.lock") {
@@ -517,8 +545,14 @@ export class ProjectParser {
             }
         }
 
+        // A project inside an ignored directory is invisible to git; the walk is what
+        // discovers it.
+        if (files.length === 0) {
+            return this.discoverFilesWithWalk();
+        }
+
         // Filter by our exclusion patterns and accepted file types
-        return files.filter(file => this.isAcceptedFile(file));
+        return files.filter(file => this.isAcceptedFile(file, this.gitExclusions));
     }
 
     /**
@@ -565,13 +599,13 @@ export class ProjectParser {
     /**
      * Checks if a file should be accepted for parsing.
      */
-    private isAcceptedFile(filePath: string): boolean {
+    private isAcceptedFile(filePath: string, exclusions: string[] = this.exclusions): boolean {
         const basename = path.basename(filePath);
         const ext = path.extname(filePath).toLowerCase();
 
         // Check exclusion patterns with relative path
         const relativePath = path.relative(this.projectPath, filePath);
-        const isExcluded = picomatch(this.exclusions);
+        const isExcluded = picomatch(exclusions);
         if (isExcluded(relativePath)) {
             return false;
         }
@@ -605,6 +639,19 @@ export class ProjectParser {
     }
 
     /**
+     * Whether a source file exceeds {@link MAX_PARSEABLE_SIZE_BYTES}. A stat
+     * failure returns false so the file follows the normal parse path (which
+     * surfaces a real read error as a ParseError) rather than being quarked.
+     */
+    private isOversize(filePath: string): boolean {
+        try {
+            return fs.statSync(filePath).size > MAX_PARSEABLE_SIZE_BYTES;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Classifies a yarn.lock file as YAML (Berry) or text (Classic).
      */
     private async classifyYarnLockFile(filePath: string): Promise<"yaml" | "text"> {
@@ -617,10 +664,20 @@ export class ProjectParser {
     }
 
     /**
-     * Checks if the project is a git repository.
+     * Checks whether a git work tree encloses the project, which for a project below the
+     * repository root is an ancestor directory. A linked work tree or submodule has `.git`
+     * as a file, so presence rather than kind is what counts.
      */
     private isGitRepository(): boolean {
-        return fs.existsSync(path.join(this.projectPath, ".git"));
+        let dir = this.projectPath;
+        while (!fs.existsSync(path.join(dir, ".git"))) {
+            const parent = path.dirname(dir);
+            if (parent === dir) {
+                return false;
+            }
+            dir = parent;
+        }
+        return true;
     }
 
     /**
@@ -633,6 +690,7 @@ export class ProjectParser {
             discovered.lockFiles.yaml.length +
             discovered.lockFiles.text.length +
             discovered.jsFiles.length +
+            discovered.unparseableFiles.length +
             discovered.jsonFiles.length +
             discovered.yamlFiles.length +
             discovered.textFiles.length
@@ -652,6 +710,7 @@ export class ProjectParser {
                 text: discovered.lockFiles.text.filter(filter)
             },
             jsFiles: discovered.jsFiles.filter(filter),
+            unparseableFiles: discovered.unparseableFiles.filter(filter),
             jsonFiles: discovered.jsonFiles.filter(filter),
             yamlFiles: discovered.yamlFiles.filter(filter),
             textFiles: discovered.textFiles.filter(filter)

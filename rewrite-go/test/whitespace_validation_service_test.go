@@ -20,6 +20,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
@@ -31,9 +35,7 @@ import (
 // importing pkg/recipe/golang registers the service.
 func TestWhitespaceValidationService_RegisteredOnInit(t *testing.T) {
 	svc := recipe.Service[*recipes.WhitespaceValidationService](nil)
-	if svc == nil {
-		t.Fatal("recipe.Service returned nil for *golang.WhitespaceValidationService")
-	}
+	require.NotNil(t, svc, "recipe.Service returned nil for *golang.WhitespaceValidationService")
 }
 
 // TestWhitespaceValidationService_CleanTree confirms a freshly parsed
@@ -42,16 +44,12 @@ func TestWhitespaceValidationService_CleanTree(t *testing.T) {
 	src := "package main\n\nfunc main() {\n\tprintln(\"hi\")\n}\n"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
+	require.NoError(t, err, "parse")
 	svc := &recipes.WhitespaceValidationService{}
 	if errs := svc.Validate(cu); len(errs) != 0 {
 		t.Fatalf("expected clean tree to validate, got %d errs:\n%s", len(errs), strings.Join(errs, "\n"))
 	}
-	if !svc.IsValid(cu) {
-		t.Error("IsValid disagrees with Validate on a clean tree")
-	}
+	assert.True(t, svc.IsValid(cu), "IsValid disagrees with Validate on a clean tree")
 }
 
 // TestWhitespaceValidationService_DetectsCorruption hand-crafts a tree
@@ -66,26 +64,30 @@ func TestWhitespaceValidationService_DetectsCorruption(t *testing.T) {
 	if len(errs) == 0 {
 		t.Fatal("expected validator to flag non-whitespace in Space.Whitespace")
 	}
-	if !strings.Contains(errs[0], "non-whitespace") {
-		t.Errorf("error should mention non-whitespace, got: %s", errs[0])
-	}
-	if svc.IsValid(cu) {
-		t.Error("IsValid should be false when Validate returned errors")
-	}
+	assert.Truef(t, strings.Contains(errs[0], "non-whitespace"), "error should mention non-whitespace, got: %s", errs[0])
+	assert.False(t, svc.IsValid(cu), "IsValid should be false when Validate returned errors")
 }
 
-// TestWhitespaceValidationService_DetectsBadComment crafts a Comment
-// whose Text doesn't begin with `//` or `/*` — the printer would emit
-// it raw, so the validator must catch it.
+// TestWhitespaceValidationService_DetectsBadComment crafts comments whose
+// delimiter-free Text carries content it cannot hold — a line comment spanning
+// a newline and a block comment containing `*/` — which the printer would
+// re-emit as corrupted source, so the validator must catch both.
 func TestWhitespaceValidationService_DetectsBadComment(t *testing.T) {
-	cu := &golang.CompilationUnit{
+	lineSpansNewline := &golang.CompilationUnit{
 		Prefix: java.Space{
-			Comments: []java.Comment{{Text: "this is not a comment", Suffix: "\n"}},
+			Comments: []java.Comment{{Multiline: false, Text: "a\nb", Suffix: "\n"}},
+		},
+	}
+	blockClosesEarly := &golang.CompilationUnit{
+		Prefix: java.Space{
+			Comments: []java.Comment{{Multiline: true, Text: " x */ y ", Suffix: "\n"}},
 		},
 	}
 	svc := &recipes.WhitespaceValidationService{}
-	errs := svc.Validate(cu)
-	if len(errs) == 0 {
-		t.Fatal("expected validator to flag a non-comment Text")
+	if errs := svc.Validate(lineSpansNewline); len(errs) == 0 {
+		t.Fatal("expected validator to flag a line comment spanning a newline")
+	}
+	if errs := svc.Validate(blockClosesEarly); len(errs) == 0 {
+		t.Fatal("expected validator to flag a block comment containing */")
 	}
 }

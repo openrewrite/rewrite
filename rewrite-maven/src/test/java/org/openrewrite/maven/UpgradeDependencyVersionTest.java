@@ -16,10 +16,13 @@
 package org.openrewrite.maven;
 
 import com.google.common.collect.Lists;
+import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.tls.HandshakeCertificates;
+import okhttp3.tls.HeldCertificate;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -27,14 +30,18 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
+import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.net.InetAddress;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -381,6 +388,105 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8145")
+    @Test
+    void changeDependencyThenUpgradeManagedVersionInParentOfMultiModule() {
+        rewriteRun(
+          spec -> spec.recipes(
+            // Phase 1: rename javax -> jakarta (EE9 migration)
+            new ChangeDependencyGroupIdAndArtifactId(
+              "javax.servlet", "javax.servlet-api",
+              "jakarta.servlet", "jakarta.servlet-api",
+              "5.0.x", null),
+            // Phase 2: bump jakarta EE9 -> EE10, which must upgrade the parent's managed version
+            new UpgradeDependencyVersion(
+              "jakarta.servlet", "jakarta.servlet-api",
+              "6.0.x", null, null, null)
+          ),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>javax.servlet</groupId>
+                                <artifactId>javax.servlet-api</artifactId>
+                                <version>4.0.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>jakarta.servlet</groupId>
+                                <artifactId>jakarta.servlet-api</artifactId>
+                                <version>6.0.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            ),
+            // The child inherits the version from the parent, so it must remain version-less
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1.0-SNAPSHOT</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.servlet</groupId>
+                              <artifactId>javax.servlet-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1.0-SNAPSHOT</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.servlet</groupId>
+                              <artifactId>jakarta.servlet-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
           )
         );
     }
@@ -1172,6 +1278,60 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void upgradesExistingParentOverridePropertyInSamePom() {
+        // Child pom redeclares a parent-managed version property below the managed value.
+        // overrideManagedVersion=true should bump that local property rather than leaving it orphaned
+        // (or adding a redundant explicit <version> that RemoveRedundantDependencyVersions would strip).
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
+          pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>3.3.0</version>
+                  </parent>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <flyway.version>10.10.0</flyway.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.flywaydb</groupId>
+                          <artifactId>flyway-core</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>3.3.0</version>
+                  </parent>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <flyway.version>10.15.0</flyway.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.flywaydb</groupId>
+                          <artifactId>flyway-core</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4193")
     @Test
     void upgradeVersionDefinedViaExplicitPropertyInRemoteParent() {
@@ -1761,7 +1921,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void deriveFromNexusUpgrade() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
@@ -1827,7 +1986,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void badManagedVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
@@ -2280,6 +2438,58 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         <version>1.1.1</version>
                       </dependency>
                     </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void retainVersionWithoutArtifactIdFailsValidation() {
+            assertThat(new UpgradeDependencyVersion("*", "jackson*", "latest.patch", null, null,
+              singletonList("com.jcraft")).validate().isValid()).isFalse();
+        }
+
+        @Test
+        void blankRetainVersionIsIgnored() {
+            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("*", "spring-cloud-config*", "3.1.4", null, true, singletonList(""))),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-config-dependencies</artifactId>
+                          <version>3.1.2</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.cloud</groupId>
+                          <artifactId>spring-cloud-config-dependencies</artifactId>
+                          <version>3.1.4</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
                   </project>
                   """
               )
@@ -2951,7 +3161,21 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
     void bomUpgradeSkipsSnapshotVersions() throws Exception {
+        // Serve over TLS: MavenPomDownloader#normalizeRepository probes https first and only falls back to
+        // http once that fails, so a plaintext mock costs two doomed handshakes per repository before anything
+        // resolves.
+        HeldCertificate certificate = new HeldCertificate.Builder()
+          .addSubjectAlternativeName(InetAddress.getByName("localhost").getCanonicalHostName())
+          .build();
+        HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+          .heldCertificate(certificate)
+          .build();
+        HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+          .addTrustedCertificate(certificate.certificate())
+          .build();
+
         try (var mockRepo = new MockWebServer()) {
+            mockRepo.useHttps(serverCertificates.sslSocketFactory(), false);
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
@@ -3071,7 +3295,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         <mirror>
                             <mirrorOf>*</mirrorOf>
                             <name>mock</name>
-                            <url>http://%s:%d</url>
+                            <url>https://%s:%d</url>
                             <id>mock</id>
                         </mirror>
                     </mirrors>
@@ -3079,10 +3303,18 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 """.formatted(mockRepo.getHostName(), mockRepo.getPort())
             ), new InMemoryExecutionContext());
 
+            OkHttpClient client = new OkHttpClient.Builder()
+              .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+              .connectTimeout(Duration.ofSeconds(1))
+              .readTimeout(Duration.ofSeconds(1))
+              .build();
+
             rewriteRun(
               spec -> spec
                 .recipe(new UpgradeDependencyVersion("com.example", "my-lib", "2.x", null, true, null))
-                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                .executionContext(MavenExecutionContextView.view(
+                    HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+                      .setHttpSender(new OkHttpSender(client)))
                   .setMavenSettings(settings, "mock")),
               pomXml(
                 """
@@ -3167,6 +3399,58 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """,
             spec -> spec.beforeRecipe(doc -> doc.getMarkers().findFirst(MavenResolutionResult.class)
               .ifPresent(mrr -> mrr.getPom().getDependencyManagement().replaceAll(dm -> dm.withRequested(null))))
+          )
+        );
+    }
+
+    @Test
+    void upgradesDependencyWhenResolvedRepositoryIsNull() {
+        // Some LSTs are built without recording the origin repository on resolved dependencies (the
+        // repository ends up null even for genuine external dependencies). Historically the recipe used a
+        // null repository as the signal for "parsed from source" and silently skipped every such dependency.
+        // The dependency is now recognized as external via the project artifacts collected during scanning,
+        // so it is upgraded regardless of a missing origin repository. Here the version is defined by a
+        // property in the same POM, mirroring the reported reproduction.
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.7.2", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <junit.version>5.6.2</junit.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>${junit.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <junit.version>5.7.2</junit.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>${junit.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec.beforeRecipe(doc -> doc.getMarkers().findFirst(MavenResolutionResult.class)
+              .ifPresent(mrr -> mrr.getDependencies().values()
+                .forEach(deps -> deps.replaceAll(d -> d.withRepository(null)))))
           )
         );
     }

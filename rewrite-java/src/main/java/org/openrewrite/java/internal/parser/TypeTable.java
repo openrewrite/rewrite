@@ -34,7 +34,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.jar.JarEntry;
@@ -271,23 +270,25 @@ public class TypeTable implements JavaParserClasspathLoader {
          */
         public void parseTsvAndProcess(InputStream is, Options options,
                                         ClassesProcessor processor) throws IOException {
-            AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
+            GroupArtifactVersion matchedGav = null;
             Map<String, ClassDefinition> classesByName = new HashMap<>();
             // nested types appear first in type tables and therefore not stored in a `ClassDefinition` field
             Map<String, List<ClassDefinition>> nestedTypesByOwner = new HashMap<>();
             Map<String, byte[]> resourcesByPath = new LinkedHashMap<>();
 
             try (BufferedReader in = new BufferedReader(new InputStreamReader(is))) {
-                AtomicReference<@Nullable GroupArtifactVersion> lastGav = new AtomicReference<>();
-                in.lines().skip(1).forEach(line -> {
+                GroupArtifactVersion lastGav = null;
+                in.readLine(); // skip the header row
+                String line;
+                while ((line = in.readLine()) != null) {
                     TsvRow row = TsvRow.parse(line);
                     GroupArtifactVersion rowGav = new GroupArtifactVersion(row.getGroupId(), row.getArtifactId(), row.getVersion());
 
-                    if (!Objects.equals(rowGav, lastGav.get())) {
-                        if (matchedGav.get() != null) {
-                            processor.accept(matchedGav.get(), classesByName, nestedTypesByOwner, resourcesByPath);
+                    if (!Objects.equals(rowGav, lastGav)) {
+                        if (matchedGav != null) {
+                            processor.accept(matchedGav, classesByName, nestedTypesByOwner, resourcesByPath);
                         }
-                        matchedGav.set(null);
+                        matchedGav = null;
                         classesByName.clear();
                         nestedTypesByOwner.clear();
                         resourcesByPath.clear();
@@ -296,17 +297,17 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                         // Check if this artifact matches our predicate
                         if (options.getArtifactMatcher().test(artifactVersion)) {
-                            matchedGav.set(rowGav);
+                            matchedGav = rowGav;
                         }
                     }
-                    lastGav.set(rowGav);
+                    lastGav = rowGav;
 
-                    if (matchedGav.get() != null) {
+                    if (matchedGav != null) {
                         switch (row.kind()) {
                             case RESOURCE: {
                                 resourcesByPath.put(row.getClassName(),
                                         Base64.getDecoder().decode(row.getConstantValue()));
-                                return;
+                                break;
                             }
                             case CLASS: {
                                 getOrCreateClassDefinition(row, classesByName, nestedTypesByOwner);
@@ -331,12 +332,12 @@ public class TypeTable implements JavaParserClasspathLoader {
                             }
                         }
                     }
-                });
+                }
             }
 
             // Process final GAV if any
-            if (matchedGav.get() != null) {
-                processor.accept(matchedGav.get(), classesByName, nestedTypesByOwner, resourcesByPath);
+            if (matchedGav != null) {
+                processor.accept(matchedGav, classesByName, nestedTypesByOwner, resourcesByPath);
             }
         }
 

@@ -18,7 +18,6 @@ package org.openrewrite.rpc;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -27,6 +26,7 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.newSetFromMap;
 
 public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
     private static final Map<String, List<DynamicDispatchRpcCodec<?>>> CODEC_BY_TYPE = new ConcurrentHashMap<>();
@@ -38,7 +38,7 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
      * classloader that didn't have them visible at class-init time.
      */
     private static final Set<ClassLoader> SCANNED_CLASSLOADERS =
-            Collections.newSetFromMap(new WeakHashMap<>());
+            newSetFromMap(new WeakHashMap<>());
 
     static {
         // Scan with this class's defining classloader so codecs co-located with rewrite-core
@@ -46,10 +46,21 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
         discoverFrom(DynamicDispatchRpcCodec.class.getClassLoader());
     }
 
+    /**
+     * Bumped whenever discovery registers a provider, so memoized lookups re-resolve.
+     * A memoized miss would otherwise outlive the arrival of the codec that answers it,
+     * leaving the sender to inline a value the remote expects property messages for.
+     */
+    private static volatile int generation;
+
+    /** The context classloader of the most recent lookup, to keep the scan off the hot path. */
+    private static volatile @Nullable ClassLoader lastScannedContext;
+
     private static synchronized void discoverFrom(@Nullable ClassLoader cl) {
         if (cl == null || !SCANNED_CLASSLOADERS.add(cl)) {
             return;
         }
+        boolean registered = false;
         @SuppressWarnings({"unchecked", "rawtypes"}) ServiceLoader<DynamicDispatchRpcCodec<?>> loader =
                 (ServiceLoader<DynamicDispatchRpcCodec<?>>) (ServiceLoader) ServiceLoader.load(DynamicDispatchRpcCodec.class, cl);
         for (DynamicDispatchRpcCodec<?> provider : loader) {
@@ -65,7 +76,11 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
             }
             if (!alreadyPresent) {
                 bucket.add(provider);
+                registered = true;
             }
+        }
+        if (registered) {
+            generation++;
         }
     }
 
@@ -88,11 +103,50 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
         }
     }
 
+    private static final class CodecEntry {
+        final int generation;
+        final @Nullable RpcCodec<?> codec;
+
+        CodecEntry(int generation, @Nullable RpcCodec<?> codec) {
+            this.generation = generation;
+            this.codec = codec;
+        }
+    }
+
+    private static final ClassValue<Map<String, CodecEntry>> CODEC_CACHE = new ClassValue<Map<String, CodecEntry>>() {
+        @Override
+        protected Map<String, CodecEntry> computeValue(Class<?> type) {
+            return new ConcurrentHashMap<>();
+        }
+    };
+
     @SuppressWarnings("unchecked")
     public static <T> @Nullable RpcCodec<T> getCodec(Object t, @Nullable String sourceFileType) {
         if (sourceFileType == null) {
             return null;
         }
+        // A context classloader this lookup has not seen may carry providers, and a
+        // memoized entry never reaches resolveCodec, which is the only other caller of
+        // discoverFrom. Scanning here is a reference comparison once the loader is known;
+        // registering a provider bumps the generation, which stales every memo.
+        ClassLoader context = Thread.currentThread().getContextClassLoader();
+        if (context != lastScannedContext) {
+            discoverFrom(context);
+            lastScannedContext = context;
+        }
+        Map<String, CodecEntry> bySourceFileType = CODEC_CACHE.get(t.getClass());
+        CodecEntry entry = bySourceFileType.get(sourceFileType);
+        if (entry == null || entry.generation != generation) {
+            // The generation is read before resolving, so a provider that resolution
+            // itself discovers stales this entry and it is resolved once more.
+            entry = new CodecEntry(generation, resolveCodec(t, sourceFileType));
+            bySourceFileType.put(sourceFileType, entry);
+        }
+        return (RpcCodec<T>) entry.codec;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> @Nullable RpcCodec<T> resolveCodec(Object t, String sourceFileType) {
         // Discover codecs from any classloader we haven't seen yet. Covers plugin/recipe
         // classloaders that weren't visible when this class's static initializer ran.
         discoverFrom(Thread.currentThread().getContextClassLoader());

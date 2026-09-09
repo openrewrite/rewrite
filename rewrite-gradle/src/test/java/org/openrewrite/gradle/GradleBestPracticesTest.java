@@ -20,8 +20,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.buildGradleKts;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.properties.Assertions.properties;
 
 class GradleBestPracticesTest implements RewriteTest {
@@ -133,6 +131,91 @@ class GradleBestPracticesTest implements RewriteTest {
               org.gradle.jvmargs=-Xmx2g
               org.gradle.parallel=true
               project.name=myproject
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
+    void usePropertyAssignmentSyntaxForDistributionUrl() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+
+              wrapper {
+                  distributionUrl("https://example.com/files/example.zip")
+              }
+              """,
+            """
+              plugins { id 'java' }
+
+              wrapper {
+                  distributionUrl = "https://example.com/files/example.zip"
+              }
+              """),
+          properties(
+            //language=properties
+            """
+              """,
+            //language=properties
+            """
+              org.gradle.caching=true
+              org.gradle.parallel=true
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
+    void removeEmptyBuildscriptBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              buildscript { }
+              plugins { id 'java' }
+              """,
+            """
+              plugins { id 'java' }
+              """),
+          properties(
+            //language=properties
+            """
+              """,
+            //language=properties
+            """
+              org.gradle.caching=true
+              org.gradle.parallel=true
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
+    void noChangeToDependencyHandlerAddCalls() {
+        rewriteRun(
+          buildGradle(
+            """
+              subprojects {
+                 plugins.withId('java') {
+                     dependencies {
+                         add('testImplementation', platform("org.junit:junit-bom:6.1.2"))
+                         add('testImplementation', platform("org.mockito:mockito-bom:5.23.0"))
+                     }
+                  }
+              }
+              """),
+          properties(
+            //language=properties
+            """
+              """,
+            //language=properties
+            """
+              org.gradle.caching=true
+              org.gradle.parallel=true
               """,
             spec -> spec.path("gradle.properties")
           )

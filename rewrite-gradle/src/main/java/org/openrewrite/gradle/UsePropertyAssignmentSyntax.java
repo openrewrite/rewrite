@@ -18,9 +18,12 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -74,14 +77,33 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                     return m;
                 }
 
+                // The transformation is purely structural (`name arg` -> `name = arg`, or
+                // `select.name arg` -> `select.name = arg`), so synthesize the assignment
+                // directly rather than going through a parser round-trip. This avoids the
+                // template-stub pipeline entirely, preserving the original argument LST (types,
+                // markers, formatting) and sidestepping classpath-sensitive parse failures.
+                Expression rhs = m.getArguments().get(0).withPrefix(Space.SINGLE_SPACE);
+
+                Expression lhs;
                 if (m.getSelect() != null) {
-                    return GroovyTemplate.apply("#{any()}." + propertyName + " = #{any()}",
-                            getCursor(), m.getCoordinates().replace(),
-                            m.getSelect(), m.getArguments().get(0));
+                    lhs = new J.FieldAccess(
+                            Tree.randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            m.getSelect(),
+                            new JLeftPadded<>(Space.EMPTY, m.getName().withPrefix(Space.EMPTY), Markers.EMPTY),
+                            m.getName().getType());
+                } else {
+                    lhs = m.getName().withPrefix(Space.EMPTY);
                 }
-                return GroovyTemplate.apply(propertyName + " = #{any()}",
-                        getCursor(), m.getCoordinates().replace(),
-                        m.getArguments().get(0));
+
+                return new J.Assignment(
+                        Tree.randomId(),
+                        m.getPrefix(),
+                        m.getMarkers(),
+                        lhs,
+                        new JLeftPadded<>(Space.SINGLE_SPACE, rhs, Markers.EMPTY),
+                        rhs.getType());
             }
         });
     }

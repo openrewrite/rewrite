@@ -1,0 +1,15 @@
+[project]
+name = "fixture-f"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "six>=1.16",
+]
+
+[dependency-groups]
+dev = [
+    "iniconfig>=2.0",
+]
+lint = [
+    "pyflakes>=3.0",
+]

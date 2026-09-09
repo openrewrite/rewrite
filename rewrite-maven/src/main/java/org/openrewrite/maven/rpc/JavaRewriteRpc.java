@@ -93,7 +93,7 @@ public class JavaRewriteRpc {
                 marketplaceCsv = Paths.get(arg.substring("--marketplace=".length()));
             } else if (arg.startsWith("--log-file=")) {
                 logFile = Paths.get(arg.substring("--log-file=".length()));
-            } else if (arg.equals("--trace")) {
+            } else if ("--trace".equals(arg)) {
                 trace = true;
             }
         }
@@ -172,7 +172,8 @@ public class JavaRewriteRpc {
                 artifactCache,
                 null, // No custom Maven settings
                 new HttpUrlConnectionSender(),
-                t -> errorHandler.println("Download error: " + t.getMessage())
+                t -> errorHandler.println("Download error: " + t.getMessage()),
+                ctx // Share the session auth cache with POM resolution
         );
 
         // Set up resolvers

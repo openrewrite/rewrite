@@ -20,6 +20,7 @@ import {ChangeText} from "./change-text";
 import {ChangeVersion} from "./change-version";
 import {RecipeWithRecipeList} from "./recipe-with-recipe-list";
 import {RecipeWithRpcSubRecipe} from "./recipe-with-rpc-sub-recipe";
+import {RecipeWithSameTypeChildren} from "./recipe-with-same-type-children";
 import {ReplaceId} from "./replace-id";
 import {FindIdentifierWithRemotePathPrecondition} from "./remote-path-precondition";
 import {FindIdentifierWithPathPrecondition} from "./path-precondition";
@@ -30,6 +31,7 @@ import {ScanningEditor} from "./scanning-editor";
 import {ReplaceAssignment} from "./replace-assignment";
 import {JavaChangeMethodName} from "./java-change-method-name";
 import {CrossModuleRecipeList} from "./cross-module-recipe-list";
+import {CompositeWithInvalidChild} from "./composite-with-invalid-child";
 
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ChangeText, JavaScript);
@@ -37,6 +39,7 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ChangeVersion, JavaScript);
     await marketplace.install(RecipeWithRecipeList, JavaScript);
     await marketplace.install(RecipeWithRpcSubRecipe, JavaScript);
+    await marketplace.install(RecipeWithSameTypeChildren, JavaScript);
     await marketplace.install(ReplaceId, JavaScript);
     await marketplace.install(FindIdentifier, JavaScript);
     await marketplace.install(FindIdentifierWithRemotePathPrecondition, JavaScript);
@@ -48,4 +51,5 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ReplaceAssignment, JavaScript);
     await marketplace.install(JavaChangeMethodName, JavaScript);
     await marketplace.install(CrossModuleRecipeList, JavaScript);
+    await marketplace.install(CompositeWithInvalidChild, JavaScript);
 }

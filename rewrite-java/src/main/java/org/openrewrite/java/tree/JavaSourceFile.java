@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.CommentService;
 import org.openrewrite.internal.NamingService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.internal.JavaWhitespaceValidationService;
@@ -76,6 +77,8 @@ public interface JavaSourceFile extends J, SourceFile {
                 return (T) new JavaWhitespaceValidationService();
             } else if (NamingService.class.getName().equals(service.getName())) {
                 return (T) new JavaNamingService();
+            } else if (CommentService.class.getName().equals(service.getName())) {
+                return (T) new JavaCommentService();
             } else if (SourcePositionService.class.getName().equals(service.getName())) {
                 return (T) service.getConstructor().newInstance();
             } else {

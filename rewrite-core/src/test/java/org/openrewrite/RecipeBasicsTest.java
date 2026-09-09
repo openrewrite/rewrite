@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -227,5 +228,48 @@ class RecipeBasicsTest {
         assertThat(result).isInstanceOf(RecipeWithListOption.class);
         assertThat(((RecipeWithListOption) result).fieldNames)
                 .containsExactly("firstName", "lastName", "email", "emailAddress");
+    }
+
+    @Test
+    void withOptionsPreservesNonStringOptionValuesInDescriptor() {
+        // given
+        RecipeWithMixedOptionTypes recipe = new RecipeWithMixedOptionTypes(null, null, null);
+        Map<String, Object> options = new HashMap<>();
+        options.put("text", "hello");
+        options.put("flag", true);
+        options.put("count", 5);
+
+        // when
+        Recipe result = recipe.withOptions(options);
+
+        // then the descriptor must report every supplied value, not just the String one
+        Map<String, Object> values = new HashMap<>();
+        for (OptionDescriptor o : result.getDescriptor().getOptions()) {
+            values.put(o.getName(), o.getValue());
+        }
+        assertThat(values.get("text")).isEqualTo("hello");
+        assertThat(values.get("flag")).isEqualTo(true);
+        assertThat(values.get("count")).isEqualTo(5);
+    }
+
+    @Getter
+    static class RecipeWithMixedOptionTypes extends Recipe {
+        private final String displayName = "Mixed option types recipe";
+        private final String description = "Mixed option types recipe.";
+
+        @Option(displayName = "Text", description = "A string option.", example = "hello")
+        final @Nullable String text;
+
+        @Option(displayName = "Flag", description = "A boolean option.", required = false)
+        final @Nullable Boolean flag;
+
+        @Option(displayName = "Count", description = "An integer option.", required = false)
+        final @Nullable Integer count;
+
+        public RecipeWithMixedOptionTypes(@Nullable String text, @Nullable Boolean flag, @Nullable Integer count) {
+            this.text = text;
+            this.flag = flag;
+            this.count = count;
+        }
     }
 }

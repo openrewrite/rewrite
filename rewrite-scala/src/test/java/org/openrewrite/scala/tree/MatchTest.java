@@ -569,6 +569,17 @@ class MatchTest implements RewriteTest {
     }
 
     @Test
+    void partialFunctionLiteralCasesSeparatedBySemicolon() {
+        rewriteRun(
+          scala(
+            """
+            val r = List(1).map { case '\\t' => '\\t'; case _ => ' ' }
+            """
+          )
+        );
+    }
+
+    @Test
     void dottedMatchOnRightSideOfInfixOperator() {
         rewriteRun(
           scala(

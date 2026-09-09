@@ -1,11 +1,11 @@
 /*
  * Copyright 2026 the original author or authors.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // isSourceFile reports whether t is a source-file root for gating purposes.
@@ -35,8 +36,6 @@ func isSourceFile(t java.Tree) bool {
 	return ok
 }
 
-// IsSourceFileVisitor matches SourceFile trees by path glob.
-//
 // Mirrors org.openrewrite.FindSourceFiles. Used as the LocalVisitor
 // bundled with the *RecipeRef returned by HasSourcePath so unit tests
 // without an active RPC connection still see real filtering.
@@ -86,13 +85,13 @@ func (v *UsesTypeVisitor) Visit(t java.Tree, _ any) java.Tree {
 
 func (v *UsesTypeVisitor) treeUsesType(t java.Tree) bool {
 	found := false
-	java.WalkTree(t, func(node java.Tree) bool {
+	visitor.Walk(t, func(node java.Tree) bool {
 		jt := nodeType(node)
 		if jt == nil {
 			return true
 		}
 		if fq, ok := jt.(java.FullyQualified); ok {
-			fqn := fq.GetFullyQualifiedName()
+			fqn := java.FQNOf(fq)
 			if fqn != "" && matchTypeGlob(v.pattern, fqn) {
 				found = true
 				return false
@@ -151,7 +150,7 @@ func (v *UsesMethodVisitor) Visit(t java.Tree, _ any) java.Tree {
 
 func (v *UsesMethodVisitor) treeUsesMethod(t java.Tree) bool {
 	found := false
-	java.WalkTree(t, func(node java.Tree) bool {
+	visitor.Walk(t, func(node java.Tree) bool {
 		if mi, ok := node.(*java.MethodInvocation); ok {
 			if v.matcher.Matches(mi) {
 				found = true

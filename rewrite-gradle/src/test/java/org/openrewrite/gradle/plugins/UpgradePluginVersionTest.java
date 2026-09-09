@@ -202,6 +202,29 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
+    void latestPatchPluginVersionInProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "latest.patch", null)),
+          properties(
+            """
+              rewriteVersion=5.40.0
+              """,
+            """
+              rewriteVersion=5.40.6
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version "$rewriteVersion"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void change() {
         rewriteRun(
           spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.x", null)),

@@ -286,7 +286,8 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
 
         @Override
         public boolean matchesReference(Reference reference) {
-            return reference.getKind() == Reference.Kind.TYPE && qualifiedName.equals(reference.getValue());
+            return reference.getKind() == Reference.Kind.TYPE &&
+                   TypeUtils.fullyQualifiedNamesAreEqual(qualifiedName, reference.getValue());
         }
 
         @Override

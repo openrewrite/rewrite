@@ -83,6 +83,12 @@ public class PythonReceiver extends PythonVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitShebang(Py.Shebang shebang, RpcReceiveQueue q) {
+        return shebang
+                .withText(q.receive(shebang.getText()));
+    }
+
+    @Override
     public J visitAwait(Py.Await await, RpcReceiveQueue q) {
         return await
                 .withExpression(q.receive(await.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
@@ -237,6 +243,7 @@ public class PythonReceiver extends PythonVisitor<RpcReceiveQueue> {
     public J visitTypeAlias(Py.TypeAlias typeAlias, RpcReceiveQueue q) {
         return typeAlias
                 .withName(q.receive(typeAlias.getName(), name -> (J.Identifier) visitNonNull(name, q)))
+                .getPadding().withTypeParameters(q.receive(typeAlias.getPadding().getTypeParameters(), el -> visitContainer(el, q)))
                 .getPadding().withValue(q.receive(typeAlias.getPadding().getValue(), el -> visitLeftPadded(el, q)))
                 .withType(q.receive(typeAlias.getType(), type -> visitType(type, q)));
     }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -116,6 +117,47 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void isOverrideProtectedInDifferentPackage() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+              public class Superclass {
+                  protected void foo() { }
+              }
+              """
+          ),
+          java(
+            """
+              package bar;
+              import foo.Superclass;
+              class Clazz extends Superclass {
+                  @Override protected void foo() { }
+              }
+              """,
+            typeIsPresent()
+          )
+        );
+    }
+
+    @Test
+    void isNotOverrideOfProtectedObjectMethodFromInterface() {
+        rewriteRun(
+          java(
+            """
+              interface Reproducer extends Cloneable {
+                  Reproducer clone();
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                var cloneMethodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+                assertThat(TypeUtils.findOverriddenMethod(cloneMethodType)).isEmpty();
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1759")
     @Test
     void isOverrideParameterizedInterface() {
@@ -183,6 +225,154 @@ class TypeUtilsTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/877")
+    @Test
+    void isOfTypeIgnoringGenericsMatchesRawCollectionInvocation() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+              import java.util.Map;
+              import java.util.Set;
+
+              class Main {
+                  Main(Map templates) {
+                      compileTemplates(templates.keySet(), templates.values());
+                  }
+
+                  private Set<String> compileTemplates(Set<String> compiledParam, Collection<String> toCheck) {
+                      return compiledParam;
+                  }
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                // `templates` is raw, so the call is an unchecked invocation: javac erases the
+                // result type of `compileTemplates` to raw `Set`, so the recorded usage is neither
+                // `==` nor `.equals` to the declaration, but it is the same method ignoring generics.
+                JavaType.Method declaration = methodType(cu, "compileTemplates");
+                JavaType.Method use = usedMethod(cu, "compileTemplates");
+                assertThat(declaration).isNotEqualTo(use);
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(declaration, use)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/877")
+    @Test
+    void isOfTypeIgnoringGenericsMatchesParameterizedMapInvocation() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+              import java.util.Map;
+              import java.util.Set;
+
+              class Main {
+                  Main(Map<String, String> templates) {
+                      compileTemplates(templates.keySet(), templates.values());
+                  }
+
+                  private Set<String> compileTemplates(Set<String> compiledParam, Collection<String> toCheck) {
+                      return compiledParam;
+                  }
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                JavaType.Method declaration = methodType(cu, "compileTemplates");
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(declaration, usedMethod(cu, "compileTemplates"))).isTrue();
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1536")
+    @Test
+    void isOfTypeIgnoringGenericsMatchesGenericOverloads() {
+        rewriteRun(
+          java(
+            """
+              public class TestClass {
+                  void method() {
+                      checkMethodInUse("String", "String");
+                  }
+
+                  private static void checkMethodInUse(String arg0, String arg1) {
+                  }
+
+                  private static <T> void checkMethodInUse(String arg0, T arg1) {
+                  }
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                var statements = cu.getClasses().get(0).getBody().getStatements();
+                JavaType.Method nonGenericOverload = ((J.MethodDeclaration) statements.get(1)).getMethodType();
+                JavaType.Method genericOverload = ((J.MethodDeclaration) statements.get(2)).getMethodType();
+                JavaType.Method use = usedMethod(cu, "checkMethodInUse");
+
+                // The call binds to the non-generic overload, but a use ignoring generics matches
+                // both overloads: the generic parameter `T` is treated as a wildcard. This keeps a
+                // generic method that is actually invoked from looking unused.
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(nonGenericOverload, use)).isTrue();
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(genericOverload, use)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void isOfTypeIgnoringGenericsDistinguishesDifferentMethods() {
+        rewriteRun(
+          java(
+            """
+              class Main {
+                  void method() {
+                      a("x");
+                  }
+
+                  private void a(String s) {
+                  }
+
+                  private void a(Integer i) {
+                  }
+
+                  private void b(String s) {
+                  }
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                var statements = cu.getClasses().get(0).getBody().getStatements();
+                JavaType.Method aString = ((J.MethodDeclaration) statements.get(1)).getMethodType();
+                JavaType.Method aInteger = ((J.MethodDeclaration) statements.get(2)).getMethodType();
+                JavaType.Method b = ((J.MethodDeclaration) statements.get(3)).getMethodType();
+                JavaType.Method use = usedMethod(cu, "a");
+
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(aString, use)).isTrue();
+                // Differing parameter type and differing name are not matched.
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(aInteger, use)).isFalse();
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(b, use)).isFalse();
+            })
+          )
+        );
+    }
+
+    private static JavaType.Method methodType(J.CompilationUnit cu, String name) {
+        return cu.getClasses().get(0).getBody().getStatements().stream()
+          .filter(J.MethodDeclaration.class::isInstance)
+          .map(J.MethodDeclaration.class::cast)
+          .map(J.MethodDeclaration::getMethodType)
+          .filter(m -> m != null && name.equals(m.getName()))
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("No method declaration named " + name));
+    }
+
+    private static JavaType.Method usedMethod(J.CompilationUnit cu, String name) {
+        return cu.getTypesInUse().getUsedMethods().stream()
+          .filter(m -> name.equals(m.getName()))
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("No used method named " + name));
     }
 
     @Test
@@ -255,6 +445,32 @@ class TypeUtilsTest implements RewriteTest {
             }.visit(cu, new InMemoryExecutionContext()))
           )
         );
+    }
+
+    @Test
+    void annotationArrayElementValuesWithoutValuesAreOfSameType() {
+        // Hand-built because the parser routes through `ArrayElementValue.from`, which sets
+        // exactly one of the two arrays; an RPC peer builds the type directly and can set neither.
+        JavaType.Method element = new JavaType.Method(null, 0L, JavaType.ShallowClass.build("com.example.Foo"),
+          "value", JavaType.Primitive.String, emptyList(), emptyList(), emptyList(), emptyList(), null, emptyList());
+        JavaType.Annotation neither = annotationWithArray(element, null, null);
+        JavaType.Annotation empty = annotationWithArray(element, new Object[0], null);
+        JavaType.Annotation constants = annotationWithArray(element, new Object[]{"a"}, null);
+        JavaType.Annotation references = annotationWithArray(element, null,
+          new JavaType[]{JavaType.ShallowClass.build("java.lang.String")});
+
+        assertTrue(TypeUtils.isOfType(neither, annotationWithArray(element, null, null)));
+        assertTrue(TypeUtils.isOfType(neither, empty));
+        assertTrue(TypeUtils.isOfType(empty, neither));
+
+        assertFalse(TypeUtils.isOfType(neither, constants));
+        assertFalse(TypeUtils.isOfType(neither, references));
+    }
+
+    private static JavaType.Annotation annotationWithArray(JavaType.Method element, Object @Nullable [] constantValues,
+                                                           JavaType @Nullable [] referenceValues) {
+        return new JavaType.Annotation(JavaType.ShallowClass.build("com.example.Foo"),
+          singletonList(new JavaType.Annotation.ArrayElementValue(element, constantValues, referenceValues)));
     }
 
     @Test

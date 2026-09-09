@@ -128,8 +128,7 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
         t = t.withChecksum(q.receive(t.getChecksum()));
         t = t.withFileAttributes(q.receive(t.getFileAttributes()));
         t = t.withStatements(q.receiveList(t.getStatements(), rp -> receiveRightPadded(receiver, rp, q)));
-        t = t.withEof(q.receive(t.getEof(), space -> receiver.visitSpace(space, q)));
-        return t;
+        return t.withEof(q.receive(t.getEof(), space -> receiver.visitSpace(space, q)));
     }
 
     private static JRightPadded<GoModStatement> receiveRightPadded(GolangReceiver receiver,

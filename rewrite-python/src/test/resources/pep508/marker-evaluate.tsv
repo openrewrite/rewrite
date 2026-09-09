@@ -1,0 +1,23 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_markers.py (test_evaluates, test_evaluate_pep345_markers; environment-independent rows only)
+# Retrieved: 2026-07-16
+# expected<TAB>marker<TAB>key=value...
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+true	os_name == 'foo'	os_name=foo
+false	os_name == 'foo'	os_name=bar
+true	'2.7' in python_version	python_version=2.7.5
+false	'2.7' not in python_version	python_version=2.7
+true	os_name == 'foo' and python_version ~= '2.7.0'	os_name=foo	python_version=2.7.6
+true	python_version ~= '2.7.0' and (os_name == 'foo' or os_name == 'bar')	os_name=foo	python_version=2.7.4
+true	python_version ~= '2.7.0' and (os_name == 'foo' or os_name == 'bar')	os_name=bar	python_version=2.7.4
+false	python_version ~= '2.7.0' and (os_name == 'foo' or os_name == 'bar')	os_name=other	python_version=2.7.4
+false	extra == 'security'	extra=quux
+true	extra == 'security'	extra=security
+true	extra == 'SECURITY'	extra=security
+true	extra == 'security'	extra=SECURITY
+true	extra == 'pep-685-norm'	extra=PEP_685...norm
+true	extra == 'Different.punctuation..is...equal'	extra=different__punctuation_is_EQUAL
+false	sys.platform == 'win32'	sys_platform=linux2
+false	platform.version in 'Ubuntu'	platform_version=#39
+true	platform.machine=='x86_64'	platform_machine=x86_64
+false	platform.python_implementation=='Jython'	platform_python_implementation=CPython
+false	python_version == '2.5' and platform.python_implementation!= 'Jython'	python_version=2.7

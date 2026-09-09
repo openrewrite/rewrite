@@ -406,7 +406,7 @@ public class ReloadableJava11Parser implements JavaParser {
 
         @Override
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
-            if (StandardLocation.CLASS_PATH.equals(location)) {
+            if (StandardLocation.CLASS_PATH == location) {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
                 return Stream.concat(classByteClasspath.stream()
                                 .filter(jfo -> jfo.getPackage().equals(packageName)),

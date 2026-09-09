@@ -86,6 +86,66 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void functionTypeAsTypeArgument() {
+        rewriteRun(
+          scala(
+            """
+            val xs: List[A => B] = ???
+            """,
+            spec -> spec.afterRecipe(FunctionTypeTest::firstFunctionType)
+          )
+        );
+    }
+
+    @Test
+    void functionTypeInSummon() {
+        rewriteRun(
+          scala(
+            """
+            val f = summon[A => B]
+            """,
+            spec -> spec.afterRecipe(FunctionTypeTest::firstFunctionType)
+          )
+        );
+    }
+
+    @Test
+    void functionTypeInIsInstanceOf() {
+        rewriteRun(
+          scala(
+            """
+            val b = x.isInstanceOf[A => B]
+            """,
+            spec -> spec.afterRecipe(FunctionTypeTest::firstFunctionType)
+          )
+        );
+    }
+
+    @Test
+    void functionTypeInRefinement() {
+        rewriteRun(
+          scala(
+            """
+            val x: (A => B) { def foo: Int } = ???
+            """,
+            spec -> spec.afterRecipe(FunctionTypeTest::firstFunctionType)
+          )
+        );
+    }
+
+    @Test
+    void functionTypeInGiven() {
+        rewriteRun(
+          scala(
+            """
+            given (A => B) = ???
+            """,
+            spec -> spec.afterRecipe(FunctionTypeTest::firstFunctionType)
+          )
+        );
+    }
+
     private static S.FunctionType firstFunctionType(J tree) {
         AtomicReference<S.FunctionType> ref = new AtomicReference<>();
         new ScalaIsoVisitor<Integer>() {
