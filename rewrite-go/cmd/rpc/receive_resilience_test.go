@@ -21,23 +21,51 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"path/filepath"
 	"testing"
 	"github.com/stretchr/testify/require"
 )
+
+func frame(t *testing.T, msg map[string]any) []byte {
+	t.Helper()
+	body, err := json.Marshal(msg)
+	require.NoError(t, err, "marshal message")
+	return append([]byte(fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))), body...)
+}
 
 // frameReverseGetObjectReply renders one Content-Length framed JSON-RPC
 // response carrying `result` — the shape Java sends back when Go issues a
 // reverse GetObject during Print/Visit.
 func frameReverseGetObjectReply(t *testing.T, result any) []byte {
 	t.Helper()
-	body, err := json.Marshal(map[string]any{
+	return frame(t, map[string]any{
 		"jsonrpc": "2.0",
 		"id":      "go-GetObject",
 		"result":  result,
 	})
-	require.NoError(t, err, "marshal reply")
-	return append([]byte(fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))), body...)
+}
+
+// frameReverseRequest renders a request Java initiates, as opposed to a reply to Go's.
+func frameReverseRequest(t *testing.T, method string) []byte {
+	t.Helper()
+	return frame(t, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "java-1",
+		"method":  method,
+		"params":  map[string]any{},
+	})
+}
+
+// newResilienceTestServer returns a server with its log captured, since the
+// receive paths report desync by logging.
+func newResilienceTestServer(t *testing.T) (*server, *bytes.Buffer) {
+	t.Helper()
+	s := newServer(serverConfig{logFile: filepath.Join(t.TempDir(), "server.log")})
+	t.Cleanup(s.closeMetrics)
+	var logs bytes.Buffer
+	s.logger = log.New(&logs, "", 0)
+	return s, &logs
 }
 
 // TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs reproduces the
@@ -51,9 +79,7 @@ func frameReverseGetObjectReply(t *testing.T, result any) []byte {
 // only on Reset), so discarding Go's would make Java's bare {ref:N} look-ups
 // fail with "received reference to unknown object: N".
 func TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs(t *testing.T) {
-	dir := t.TempDir()
-	s := newServer(serverConfig{logFile: filepath.Join(dir, "server.log")})
-	t.Cleanup(s.closeMetrics)
+	s, logs := newResilienceTestServer(t)
 
 	// Java's two scripted replies on the reverse GetObject stream:
 	//  1) a bare reference to an object Go never received -> panics mid-receive
@@ -113,4 +139,24 @@ func TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs(t *testing.T) {
 	if s.reverseRemoteObjects[id] != "package main\n" {
 		t.Errorf("transfer 2: baseline should be repopulated, got %#v", s.reverseRemoteObjects[id])
 	}
+	require.NotContains(t, logs.String(), "Expected the prefetched GetObject page",
+		"draining Java's own reply is the ordinary case and must not be reported as a desync")
+}
+
+func TestDrainPageReportsAMessageThatIsNotTheGetObjectReply(t *testing.T) {
+	s, logs := newResilienceTestServer(t)
+
+	// A bare ref to an object Go never received panics mid-receive, so the
+	// deferred drain runs against whatever comes next — here a Visit request
+	// Java initiated rather than the page Go prefetched.
+	stream := append(
+		frameReverseGetObjectReply(t, []map[string]any{{"state": "ADD", "ref": 7}}),
+		frameReverseRequest(t, "Visit")...,
+	)
+	s.reader = bufio.NewReader(bytes.NewReader(stream))
+	s.writer = &bytes.Buffer{}
+
+	require.Panics(t, func() { s.getObjectFromJava("tree-X", "") })
+	require.Contains(t, logs.String(), "Expected the prefetched GetObject page, got a Visit request",
+		"a swallowed request drops Java's call and leaves the page for a later one to misread")
 }

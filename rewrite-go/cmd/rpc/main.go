@@ -1097,8 +1097,13 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 	drainPage := func() {
 		if outstanding {
 			outstanding = false
-			if _, err := s.readMessage(); err != nil {
+			msg, err := s.readMessage()
+			if err != nil {
 				s.logger.Printf("Error draining prefetched page: %v", err)
+			} else if msg.Method != "" {
+				// A message carrying a method is a request Java initiated, so the page
+				// is still queued behind it for the next read to take as its own reply.
+				s.logger.Printf("Expected the prefetched GetObject page, got a %s request", msg.Method)
 			}
 		}
 	}
