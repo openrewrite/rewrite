@@ -27,8 +27,11 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongUnaryOperator;
 
 import static java.util.stream.Collectors.toList;
 
@@ -53,28 +56,35 @@ class GoRpcThroughputTest {
     }
 
     /**
-     * Summed across threads because a send runs on a traversal thread. Both counters
-     * are cumulative per thread, so the difference of two readings is the work between.
+     * Kept per thread because a send runs on a traversal thread, and the live set changes
+     * within a phase: totalling first would let a thread that exits mid-phase subtract the
+     * baseline it contributed. Both counters are cumulative per thread.
      */
-    static long cpuNanos() {
+    static Map<Long, Long> cpuNanos() {
         ThreadMXBean t = ManagementFactory.getThreadMXBean();
-        long total = 0;
-        for (long id : t.getAllThreadIds()) {
-            long c = t.getThreadCpuTime(id);
-            if (c > 0) {
-                total += c;
-            }
-        }
-        return total;
+        return byThread(t.getAllThreadIds(), t::getThreadCpuTime);
     }
 
-    static long allocated() {
-        long total = 0;
-        for (long id : ManagementFactory.getThreadMXBean().getAllThreadIds()) {
-            long b = ALLOC.getThreadAllocatedBytes(id);
-            if (b > 0) {
-                total += b;
+    static Map<Long, Long> allocated() {
+        return byThread(ManagementFactory.getThreadMXBean().getAllThreadIds(), ALLOC::getThreadAllocatedBytes);
+    }
+
+    static Map<Long, Long> byThread(long[] ids, LongUnaryOperator counter) {
+        Map<Long, Long> reading = new HashMap<>();
+        for (long id : ids) {
+            long c = counter.applyAsLong(id);
+            if (c > 0) {
+                reading.put(id, c);
             }
+        }
+        return reading;
+    }
+
+    /** Work a thread did between the two readings; one absent from the first started inside them. */
+    static long since(Map<Long, Long> start, Map<Long, Long> end) {
+        long total = 0;
+        for (Map.Entry<Long, Long> e : end.entrySet()) {
+            total += e.getValue() - start.getOrDefault(e.getKey(), 0L);
         }
         return total;
     }
@@ -108,7 +118,8 @@ class GoRpcThroughputTest {
     }
 
     List<SourceFile> parse(Path project, List<String> exclusions, String label) {
-        long cpu = cpuNanos(), alloc = allocated(), nanos = System.nanoTime();
+        Map<Long, Long> cpu = cpuNanos(), alloc = allocated();
+        long nanos = System.nanoTime();
         List<SourceFile> files = GoRewriteRpc.getOrStart()
                 .parseProject(project, exclusions, new InMemoryExecutionContext(Throwable::printStackTrace))
                 .collect(toList());
@@ -121,7 +132,8 @@ class GoRpcThroughputTest {
         // the peer fetch it back, which is what exercises its receive path.
         GoRewriteRpc.getOrStart().reset();
 
-        long cpu = cpuNanos(), alloc = allocated(), nanos = System.nanoTime();
+        Map<Long, Long> cpu = cpuNanos(), alloc = allocated();
+        long nanos = System.nanoTime();
         long chars = 0;
         for (SourceFile f : files) {
             chars += GoRewriteRpc.getOrStart().print(f).length();
@@ -129,12 +141,12 @@ class GoRpcThroughputTest {
         report("PRINT", label, files.size(), nanos, cpu, alloc, chars);
     }
 
-    static void report(String phase, String label, int files, long startNanos, long startCpu, long startAlloc, long chars) {
+    static void report(String phase, String label, int files, long startNanos, Map<Long, Long> startCpu, Map<Long, Long> startAlloc, long chars) {
         System.out.printf("%s  %-10s %4d files  wall %,6d ms  jvmCpu %,6d ms  %,15d bytes%s%n",
                 phase, label, files,
                 (System.nanoTime() - startNanos) / 1_000_000,
-                (cpuNanos() - startCpu) / 1_000_000,
-                allocated() - startAlloc,
+                since(startCpu, cpuNanos()) / 1_000_000,
+                since(startAlloc, allocated()),
                 chars == 0 ? "" : String.format("  %,d chars", chars));
     }
 }
