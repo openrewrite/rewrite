@@ -1205,9 +1205,12 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			return v
 		})
 
-		// Consume the END_OF_OBJECT sentinel if present
-		if len(q.PeekBatch()) > 0 && q.PeekBatch()[0].State == rpc.EndOfObject {
-			q.Take()
+		// Taking the marker pulls the page still in flight — there is one whenever the
+		// last page did not end in END_OF_OBJECT — so a failure the peer reported on it
+		// reaches the recover above. Java's RewriteRpc.getObject and JS's rewrite-rpc.ts
+		// take the marker inside their failure scope for the same reason.
+		if msg := q.Take(); msg.State != rpc.EndOfObject {
+			panic(fmt.Errorf("GetObject %s: expected END_OF_OBJECT, got %v", id, msg.State))
 		}
 	}()
 

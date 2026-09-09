@@ -104,6 +104,32 @@ func TestGetObjectFromJavaSurfacesRemoteError(t *testing.T) {
 	require.Contains(t, logs.String(), remoteTrace, "the peer's frames belong in the log")
 }
 
+// TestErrorOnAPrefetchedPageFailsTheTransfer pins the page requested ahead. The object
+// is already complete when the error arrives, so nothing else forces that page to be
+// read, and draining it would leave the peer's failure unreported.
+func TestErrorOnAPrefetchedPageFailsTheTransfer(t *testing.T) {
+	s, _ := newResilienceTestServer(t)
+
+	const remoteMessage = "Internal error: Failed to send object tree-X: java.lang.NullPointerException"
+	// Page 1 completes the value but does not close the transfer, so Go asks for a
+	// page 2 that carries END_OF_OBJECT — and Java fails while producing it.
+	stream := append(
+		frameReverseGetObjectReply(t, []map[string]any{{"state": "ADD", "value": "package main\n"}}),
+		frameReverseGetObjectError(t, remoteMessage, "")...,
+	)
+	s.reader = bufio.NewReader(bytes.NewReader(stream))
+	s.writer = &bytes.Buffer{}
+
+	recovered := func() (r any) {
+		defer func() { r = recover() }()
+		s.getObjectFromJava("tree-X", "")
+		return nil
+	}()
+
+	require.NotNil(t, recovered, "expected the error page to fail the transfer")
+	require.Contains(t, fmt.Sprint(recovered), remoteMessage)
+}
+
 // TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs reproduces the
 // receive-stream cascade and pins down the containment contract.
 //
