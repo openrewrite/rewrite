@@ -203,10 +203,10 @@ def get_canonical_fqn(imp: Import) -> Optional[str]:
 
 
 def referenced_names(ident: Identifier) -> Tuple[str, ...]:
-    """The names ``ident`` looks up. A quoted identifier is a forward reference
-    holding a whole expression, so its names come from parsing it; a string that
-    is not an expression names nothing."""
-    if ident.markers.find_first(Quoted) is None:
+    """The names ``ident`` looks up. A quoted identifier is a forward reference, naming
+    one symbol where it spells one; text the parser kept whole names whatever parsing it
+    finds, and text that is not an expression names nothing."""
+    if ident.markers.find_first(Quoted) is None or ident.simple_name.isidentifier():
         return (ident.simple_name,)
     try:
         reference = ast.parse(ident.simple_name.strip(), mode='eval')
