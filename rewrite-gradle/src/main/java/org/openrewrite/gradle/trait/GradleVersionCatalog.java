@@ -39,8 +39,6 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.gradle.trait.GradleTraitMatcher.asChainedInvocation;
-import static org.openrewrite.gradle.trait.GradleTraitMatcher.literalArgument;
 
 /**
  * A single named catalog declared inside a Gradle
@@ -306,6 +304,37 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
             return new GradleVersionCatalog(new Cursor(cursor.getParent(), newTree), catalogName);
         }
         return this;
+    }
+
+    /**
+     * @return {@code true} if the cursor's tree is itself a statement in an enclosing block,
+     * rather than a nested expression such as the receiver of a chained method call.
+     */
+    private static boolean isTopLevelStatement(Cursor cursor) {
+        Cursor parent = cursor.getParentTreeCursor();
+        if (parent.getValue() instanceof J.Return) {
+            // Groovy closures implicitly return their last expression through a synthetic Return
+            parent = parent.getParentTreeCursor();
+        }
+        return !parent.isRoot() && parent.getValue() instanceof J.Block;
+    }
+
+    private static J.@Nullable MethodInvocation asChainedInvocation(J.MethodInvocation m) {
+        return m.getSelect() instanceof J.MethodInvocation ? (J.MethodInvocation) m.getSelect() : null;
+    }
+
+    /**
+     * @return the string value of {@code m}'s argument at {@code index}, or {@code null} if
+     * there's no such argument or it isn't a string literal.
+     */
+    private static @Nullable String literalArgument(J.MethodInvocation m, int index) {
+        if (index < m.getArguments().size()) {
+            Expression argument = m.getArguments().get(index);
+            if (argument instanceof J.Literal && ((J.Literal) argument).getValue() instanceof String) {
+                return (String) ((J.Literal) argument).getValue();
+            }
+        }
+        return null;
     }
 
     /**
