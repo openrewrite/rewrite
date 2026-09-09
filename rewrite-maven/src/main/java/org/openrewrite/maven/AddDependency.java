@@ -132,7 +132,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     String familyPattern;
 
     @Option(displayName = "Accept transitive",
-            description = "Default false. If enabled, the dependency will not be added if it is already on the classpath as a transitive dependency.",
+            description = "Default false. If enabled, the dependency will not be added when it is already on the " +
+                          "classpath as a transitive dependency. Where `version` is a range, the version already on " +
+                          "the classpath has to fall inside it; an exact version or a `latest.*` selector is satisfied " +
+                          "by any version already present.",
             example = "true",
             required = false)
     @Nullable
