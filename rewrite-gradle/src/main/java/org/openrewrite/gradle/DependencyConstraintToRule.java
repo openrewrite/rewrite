@@ -29,9 +29,6 @@ import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -41,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.gradle.GradleParser.requireParsed;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -337,85 +333,31 @@ public class DependencyConstraintToRule extends Recipe {
                 if (alreadyExists) {
                     return sourceFile;
                 }
-                // Prefer to insert before the dependencies block for readability
-                if (sourceFile instanceof G.CompilationUnit) {
-                    G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
-                    int insertionIndex = 0;
-                    while (insertionIndex < cu.getStatements().size()) {
-                        Statement s = cu.getStatements().get(insertionIndex);
-                        if (s instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) s)) {
-                            break;
-                        }
-                        insertionIndex++;
-                    }
-                    J.MethodInvocation m = GradleParser.builder()
-                            .build()
-                            .parse(ctx,
-                                    "configurations.all {\n" +
-                                            "    resolutionStrategy.eachDependency { details ->\n" +
-                                            "    }\n" +
-                                            "}")
-                            .map(requireParsed(G.CompilationUnit.class))
-                            .map(G.CompilationUnit::getStatements)
-                            .map(it -> it.get(0))
-                            .map(J.MethodInvocation.class::cast)
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"))
-                            .withPrefix(Space.format("\n"));
-                    List<Statement> newStatements = ListUtils.insert(cu.getStatements(), m, insertionIndex);
-                    if (insertionIndex == 0) {
-                        newStatements = ListUtils.map(newStatements, (i, stat) ->
-                                i == 1 && stat.getPrefix().getWhitespace().isEmpty()
-                                        ? stat.withPrefix(stat.getPrefix().withWhitespace("\n\n"))
-                                        : stat);
-                    }
-                    return cu.withStatements(newStatements);
-                } else {
-                    K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
-                    assert cu != null;
-                    J.Block block = (J.Block) cu.getStatements().get(0);
-                    int insertionIndex = 0;
-                    while (insertionIndex < block.getStatements().size()) {
-                        Statement s = block.getStatements().get(insertionIndex);
-                        if (s instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) s).getSimpleName())) {
-                            break;
-                        }
-                        insertionIndex++;
-                    }
-                    J.MethodInvocation m = GradleParser.builder()
-                            .build()
-                            .parseInputs(singletonList(
-                                    new Parser.Input(
-                                            Paths.get("build.gradle.kts"),
-                                            () -> new ByteArrayInputStream(
-                                                    ("\n" +
-                                                            "configurations.all {\n" +
-                                                            "    resolutionStrategy.eachDependency { details ->\n" +
-                                                            "    }\n" +
-                                                            "}").getBytes(StandardCharsets.UTF_8)))
-                            ), null, ctx)
-                            .map(requireParsed(K.CompilationUnit.class))
-                            .map(k -> (J.Block) k.getStatements().get(0))
-                            .map(J.Block::getStatements)
-                            .map(it -> it.get(0))
-                            .map(J.MethodInvocation.class::cast)
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
-                    final int finalInsertionIndex = insertionIndex;
-                    return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
-                        if (arg == block) {
-                            List<Statement> newStatements = ListUtils.insert(block.getStatements(), m, finalInsertionIndex);
-                            if (finalInsertionIndex == 0) {
-                                newStatements = ListUtils.map(newStatements, (i, stat) ->
-                                        i == 1 && stat.getPrefix().getWhitespace().isEmpty()
-                                                ? stat.withPrefix(stat.getPrefix().withWhitespace("\n\n"))
-                                                : stat);
-                            }
-                            return block.withStatements(newStatements);
-                        }
-                        return arg;
-                    }));
+                boolean isKotlinDsl = sourceFile instanceof K.CompilationUnit;
+                List<Statement> statements = isKotlinDsl ?
+                        ((J.Block) ((K.CompilationUnit) sourceFile).getStatements().get(0)).getStatements() :
+                        ((G.CompilationUnit) sourceFile).getStatements();
+                if (statements.isEmpty()) {
+                    return sourceFile;
                 }
+                // Prefer to insert before the dependencies block for readability
+                Statement anchor = null;
+                for (Statement s : statements) {
+                    if (s instanceof J.MethodInvocation && isDependenciesBlock((J.MethodInvocation) s, isKotlinDsl)) {
+                        anchor = s;
+                        break;
+                    }
+                }
+                String snippet = "configurations.all {\n" +
+                        "    resolutionStrategy.eachDependency { details ->\n" +
+                        "    }\n" +
+                        "}";
+                JavaTemplate eachDependency = isKotlinDsl ?
+                        KotlinTemplate.builder(snippet).build() :
+                        GroovyTemplate.builder(snippet).build();
+                return eachDependency.apply(new Cursor(getCursor(), sourceFile), anchor == null ?
+                        statements.get(statements.size() - 1).getCoordinates().after() :
+                        anchor.getCoordinates().before());
             }
             return super.visit(tree, ctx);
         }
@@ -430,6 +372,11 @@ public class DependencyConstraintToRule extends Recipe {
             }
             return m;
         }
+    }
+
+    // The Kotlin DSL has no type attribution to match against, so it goes by name
+    private static boolean isDependenciesBlock(J.MethodInvocation m, boolean isKotlinDsl) {
+        return isKotlinDsl ? "dependencies".equals(m.getSimpleName()) : DEPENDENCIES_DSL_MATCHER.matches(m);
     }
 
     private static boolean isEmptyDependenciesBlock(J.MethodInvocation m) {
