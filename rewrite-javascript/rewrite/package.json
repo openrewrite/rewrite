@@ -79,7 +79,7 @@
     "picomatch": "^4.0.4",
     "semver": "^7.7.4",
     "tmp-promise": "^3.0.3",
-    "typescript": "^5.8.3",
+    "typescript": "^6.0.3",
     "vscode-jsonrpc": "^8.2.1",
     "yaml": "^2.9.0"
   },

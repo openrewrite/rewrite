@@ -93,7 +93,7 @@ public class JavaRewriteRpc {
                 marketplaceCsv = Paths.get(arg.substring("--marketplace=".length()));
             } else if (arg.startsWith("--log-file=")) {
                 logFile = Paths.get(arg.substring("--log-file=".length()));
-            } else if (arg.equals("--trace")) {
+            } else if ("--trace".equals(arg)) {
                 trace = true;
             }
         }

@@ -27,7 +27,6 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;

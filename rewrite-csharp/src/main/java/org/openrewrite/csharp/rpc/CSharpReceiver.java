@@ -28,7 +28,6 @@ import org.openrewrite.rpc.RpcReceiveQueue;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -307,9 +306,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withAccessors(q.receive(propertyDeclaration.getAccessors(), el -> (J.Block) visitNonNull(el, q)));
         propertyDeclaration = propertyDeclaration
                 .getPadding().withExpressionBody(q.receive(propertyDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)));
-        propertyDeclaration = propertyDeclaration
+        return propertyDeclaration
                 .getPadding().withInitializer(q.receive(propertyDeclaration.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
-        return propertyDeclaration;
     }
 
     @Override

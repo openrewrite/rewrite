@@ -119,7 +119,7 @@ public class SimpleIndexClient {
 
     private static @Nullable String contentType(HttpSender.Response response) {
         for (Map.Entry<String, List<String>> header : response.getHeaders().entrySet()) {
-            if (header.getKey() != null && "content-type".equalsIgnoreCase(header.getKey()) &&
+            if ("content-type".equalsIgnoreCase(header.getKey()) &&
                     !header.getValue().isEmpty()) {
                 return header.getValue().get(0);
             }

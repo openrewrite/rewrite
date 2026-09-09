@@ -106,6 +106,10 @@ def test_builtin_function_type_attribution():
                 else:
                     if method.method_type.name != 'len':
                         errors.append(f"method_type.name is '{method.method_type.name}', expected 'len'")
+                    dt = method.method_type.declaring_type
+                    # `builtins len(..)` is the pattern a MethodMatcher matches this call with
+                    if dt is None or dt._fully_qualified_name != 'builtins':
+                        errors.append(f"declaring_type is '{dt}', expected 'builtins'")
                     if method.method_type._return_type is None:
                         errors.append("method_type.return_type is None")
                     elif method.method_type._return_type != JavaType.Primitive.Int:
@@ -120,6 +124,29 @@ def test_builtin_function_type_attribution():
         after_recipe=check_types,
     ))
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+def test_constructor_pattern_matches_a_construction():
+    from rewrite.python import MethodMatcher
+
+    matched = []
+
+    def check_types(source_file):
+        matcher = MethodMatcher.create('str <constructor>(..)')
+
+        class TypeChecker(PythonVisitor):
+            def visit_method_invocation(self, method, p):
+                matched.append(matcher.matches(method))
+                return method
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        'x = str(1)',
+        after_recipe=check_types,
+    ))
+    assert matched == [True]
 
 
 def test_string_method_type_attribution():
@@ -304,15 +331,10 @@ def test_bare_function_declaring_type_has_module():
                     errors.append("MethodInvocation.method_type is None for join()")
                 else:
                     dt = method.method_type.declaring_type
-                    if dt is None:
-                        errors.append("method_type.declaring_type is None for join()")
-                    elif not hasattr(dt, '_fully_qualified_name') or (
-                        'posixpath' not in dt._fully_qualified_name and
-                        'ntpath' not in dt._fully_qualified_name
-                    ):
+                    if getattr(dt, '_fully_qualified_name', None) != 'os.path':
                         errors.append(
-                            f"declaring_type fqn is '{getattr(dt, '_fully_qualified_name', '?')}', "
-                            f"expected to contain 'posixpath' or 'ntpath' (os.path module)"
+                            f"declaring_type is '{getattr(dt, '_fully_qualified_name', dt)}', "
+                            f"expected 'os.path', the module the source imported from"
                         )
                 return method
 

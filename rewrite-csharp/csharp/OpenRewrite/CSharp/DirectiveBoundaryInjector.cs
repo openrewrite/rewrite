@@ -55,7 +55,7 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
         var indices = FindDirectiveIndices(block.End);
         if (indices.Count > 0)
         {
-            var marker = new DirectiveBoundaryMarker(Guid.NewGuid(), indices);
+            var marker = new DirectiveBoundaryMarker(Tree.RandomId(), indices);
             block = block.WithMarkers(block.Markers.Add(marker));
         }
 
@@ -69,7 +69,7 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
         var indices = FindDirectiveIndices(compilationUnit.Eof);
         if (indices.Count > 0)
         {
-            var marker = new DirectiveBoundaryMarker(Guid.NewGuid(), indices);
+            var marker = new DirectiveBoundaryMarker(Tree.RandomId(), indices);
             compilationUnit = compilationUnit.WithMarkers(compilationUnit.Markers.Add(marker));
         }
 
@@ -82,9 +82,9 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
         if (indices.Count == 0)
             return node;
 
-        var marker = new DirectiveBoundaryMarker(Guid.NewGuid(), indices);
+        var marker = new DirectiveBoundaryMarker(Tree.RandomId(), indices);
         var newMarkers = node.Markers.Add(marker);
-        return SetMarkers(node, newMarkers);
+        return J.SetMarkers(node, newMarkers);
     }
 
     private static List<int> FindDirectiveIndices(Space space)
@@ -102,15 +102,5 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
             }
         }
         return indices;
-    }
-
-    /// <summary>
-    /// Uses reflection to call WithMarkers on any concrete J type,
-    /// following the pattern established by <see cref="SearchResult.Found{T}"/>.
-    /// </summary>
-    private static J SetMarkers(J node, Markers markers)
-    {
-        var withMarkers = node.GetType().GetMethod("WithMarkers", [typeof(Markers)]);
-        return withMarkers != null ? (J)withMarkers.Invoke(node, [markers])! : node;
     }
 }

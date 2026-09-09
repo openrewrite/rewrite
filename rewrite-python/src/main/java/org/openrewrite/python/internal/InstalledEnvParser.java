@@ -97,6 +97,30 @@ public final class InstalledEnvParser {
     }
 
     /**
+     * Whether {@code env} still holds the packages it was installed with: site-packages carries at
+     * least one {@code *.dist-info}, and each has the METADATA every wheel is required to write.
+     * An env emptied out from under a cache still presents the directory skeleton it was built with.
+     */
+    public static boolean isIntact(Path env) {
+        Path sitePackages = findSitePackages(env);
+        if (sitePackages == null) {
+            return false;
+        }
+        boolean any = false;
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(sitePackages, "*.dist-info")) {
+            for (Path distInfo : ds) {
+                if (!Files.isRegularFile(distInfo.resolve("METADATA"))) {
+                    return false;
+                }
+                any = true;
+            }
+        } catch (IOException e) {
+            return false;
+        }
+        return any;
+    }
+
+    /**
      * Link transitive dependencies by reading each package's {@code dist-info/METADATA}
      * ({@code Requires-Dist} entries) from {@code sitePackages}, building the graph via
      * {@link PythonResolutionLinker#buildGraph}. Packages are matched to dist-info

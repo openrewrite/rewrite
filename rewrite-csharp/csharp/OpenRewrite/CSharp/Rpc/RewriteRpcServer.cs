@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -79,7 +80,12 @@ public class RewriteRpcServer
     /// <summary>
     /// Referentially deduplicated objects and their ref IDs.
     /// </summary>
-    private readonly ConcurrentDictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
+    /// <summary>One in-flight transfer per object id, mirroring Java's inProgressGetRpcObjects.</summary>
+    private readonly ConcurrentDictionary<string, Lazy<Channel<List<RpcObjectData>>>> _inProgressGetObject = new();
+
+    internal int BatchSize = 1000;
+
+    private readonly RpcRefs _localRefs = new();
 
     /// <summary>
     /// Refs received from the remote process (Java) for deduplication.
@@ -87,7 +93,7 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<int, object> _remoteRefs = new();
 
     /// <summary>
-    /// Ref high-water per source file (send-side _localRefs count, receive-side max _remoteRefs
+    /// Ref high-water per source file (send-side highest id issued, receive-side max _remoteRefs
     /// key), captured before first visit so <see cref="Evict"/> rolls back exactly its refs.
     /// </summary>
     private readonly ConcurrentDictionary<string, (int LocalRefs, int RemoteRefsMax)> _refCheckpoints = new();
@@ -334,7 +340,7 @@ public class RewriteRpcServer
             {
                 response.Items.Add(new ParseSolutionResponseItem
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Tree.RandomId().ToString(),
                     SourceFileType = "org.openrewrite.quark.Quark",
                     SourcePath = relPath
                 });
@@ -434,7 +440,7 @@ public class RewriteRpcServer
             var types = AssemblyTypeEnumerator.Enumerate(own, references);
 
             data = new List<RpcObjectData>();
-            var sendRefs = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+            var sendRefs = new RpcRefs();
             var q = new RpcSendQueue(1024, batch => data.AddRange(batch), sendRefs,
                 "org.openrewrite.java.tree.JavaType$Class", false);
             var sender = new OpenRewrite.Java.Rpc.JavaSender();
@@ -521,67 +527,88 @@ public class RewriteRpcServer
     }
 
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
-    public Task<List<RpcObjectData>> GetObject(GetObjectRequest request)
+    public async Task<List<RpcObjectData>> GetObject(GetObjectRequest request)
     {
         var after = _localObjects.GetValueOrDefault(request.Id);
 
         if (after == null)
         {
             Log.Debug("RPC GetObject: {Id} not found, returning DELETE", request.Id);
-            return Task.FromResult(new List<RpcObjectData>
+            return new List<RpcObjectData>
             {
                 new() { State = DELETE },
                 new() { State = END_OF_OBJECT }
-            });
+            };
         }
 
         // ExecutionContext is sent as a typed shell with no data,
         // matching the JavaScript pattern (empty codec).
         if (after is ExecutionContext)
         {
-            return Task.FromResult(new List<RpcObjectData>
+            return new List<RpcObjectData>
             {
                 new() { State = ADD, ValueType = "org.openrewrite.InMemoryExecutionContext" },
                 new() { State = END_OF_OBJECT }
-            });
+            };
         }
 
-        var before = _remoteObjects.GetValueOrDefault(request.Id);
-        var sw = Stopwatch.StartNew();
+        var pages = _inProgressGetObject.GetOrAdd(request.Id, id =>
+            new Lazy<Channel<List<RpcObjectData>>>(() => StartTransfer(id, after, request.SourceFileType))).Value;
 
-        // Accumulate all RPC data into a single list
-        var allData = new List<RpcObjectData>();
-        var sendQueue = new RpcSendQueue(
-            1024,
-            batch => allData.AddRange(batch),
-            _localRefs,
-            request.SourceFileType,
-            false,
-            TreeCodec.Instance
-        );
-
-        try
+        var page = await pages.Reader.ReadAsync();
+        if (page.Count > 0 && page[^1].State == END_OF_OBJECT)
         {
-            sendQueue.Send(after, before, null);
+            _inProgressGetObject.TryRemove(request.Id, out _);
         }
-        catch (Exception ex)
+        return page;
+    }
+
+    /// <summary>
+    /// Serializes one object into a bounded channel a page at a time. The capacity of one stalls
+    /// the producer until the remote takes the previous page, which bounds what is held to two
+    /// pages and lets the remote fetch one while this side fills the next.
+    /// </summary>
+    private Channel<List<RpcObjectData>> StartTransfer(string id, object after, string? sourceFileType)
+    {
+        var pages = Channel.CreateBounded<List<RpcObjectData>>(1);
+        var before = _remoteObjects.GetValueOrDefault(id);
+        var refHighWater = _localRefs.HighWater;
+
+        // On the thread pool because the drain blocks whenever the channel is full, and the
+        // thread that has to drain it is the one serving the next GetObject.
+        _ = Task.Run(() =>
         {
-            Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
-                request.Id, after.GetType().Name, ex.GetType().Name, ex.Message);
-            throw new InvalidOperationException(
-                $"Failed to send object {request.Id} (type: {after.GetType().Name}): {ex.Message}\n{ex.StackTrace}", ex);
-        }
-        sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
-        sendQueue.Flush();
-
-        // Update our understanding of remote's state
-        _remoteObjects[request.Id] = after;
-
-        sw.Stop();
-        Log.Debug("RPC GetObject: {Id} sent {ItemCount} items ({ElapsedMs}ms)",
-            request.Id, allData.Count, sw.Elapsed.TotalMilliseconds.ToString("F0"));
-
-        return Task.FromResult(allData);
+            var sendQueue = new RpcSendQueue(
+                BatchSize,
+                page => pages.Writer.WriteAsync(page).AsTask().GetAwaiter().GetResult(),
+                _localRefs,
+                sourceFileType,
+                false,
+                TreeCodec.Instance
+            );
+            try
+            {
+                sendQueue.Send(after, before, null);
+                _remoteObjects[id] = after;
+            }
+            catch (Exception ex)
+            {
+                // The remote holds a partial tree, so drop the baseline and the refs this exchange
+                // issued; the next request then sends a whole object rather than a delta against a
+                // baseline the remote never finished receiving.
+                _remoteObjects.TryRemove(id, out _);
+                _localRefs.RollbackTo(refHighWater);
+                Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
+                    id, after.GetType().Name, ex.GetType().Name, ex.Message);
+            }
+            finally
+            {
+                sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
+                sendQueue.Flush();
+                pages.Writer.Complete();
+            }
+        });
+        return pages;
     }
 
     [JsonRpcMethod("Print", UseSingleObjectParameterDeserialization = true)]
@@ -629,12 +656,30 @@ public class RewriteRpcServer
     {
         var localObject = _localObjects.GetValueOrDefault(id);
 
+        Task<List<RpcObjectData>> RequestPage() =>
+            _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
+                "GetObject",
+                new GetObjectRequest { Id = id, SourceFileType = sourceFileType });
+
+        // The following page is requested before this one is handed to the queue, so the
+        // remote serializes it while this side deserializes what it already has.
+        Task<List<RpcObjectData>>? nextPage = null;
         var q = new RpcReceiveQueue(
             _remoteRefs,
-            () => _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
-                "GetObject",
-                new GetObjectRequest { Id = id, SourceFileType = sourceFileType })
-                .GetAwaiter().GetResult(),
+            () =>
+            {
+                var pending = nextPage;
+                nextPage = null;
+                var page = (pending ?? RequestPage()).GetAwaiter().GetResult();
+                // A page ending in END_OF_OBJECT has no successor; the remote drops its
+                // transfer state when it sends that marker, so asking again would restart
+                // the transfer rather than return nothing.
+                if (page.Count > 0 && page[^1].State != END_OF_OBJECT)
+                {
+                    nextPage = RequestPage();
+                }
+                return page;
+            },
             sourceFileType,
             TreeCodec.Instance
         );
@@ -643,29 +688,54 @@ public class RewriteRpcServer
         try
         {
             remoteObject = q.Receive(localObject, (Func<object, object>?)null);
+
+            // Inside the try so that a missing end marker unwinds the same way a failed
+            // receive does: a page is in flight here whenever the last one did not end in
+            // END_OF_OBJECT, which is the condition this rejects.
+            var endMarker = q.Take();
+            if (endMarker.State != END_OF_OBJECT)
+            {
+                // Collect remaining items for debugging
+                var remaining = new System.Text.StringBuilder();
+                remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
+                // Only what is already buffered: pulling here would ask the remote for a page of a
+                // transfer it has finished, starting a fresh one that nothing will drain.
+                for (int i = 1; i < 20 && q.Buffered > 0; i++)
+                {
+                    try
+                    {
+                        var next = q.Take();
+                        remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
+                        if (next.State == END_OF_OBJECT) break;
+                    }
+                    catch { break; }
+                }
+                throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+            }
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException(
-                $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
-        }
-        var endMarker = q.Take();
-        if (endMarker.State != END_OF_OBJECT)
-        {
-            // Collect remaining items for debugging
-            var remaining = new System.Text.StringBuilder();
-            remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
-            for (int i = 1; i < 20; i++)
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            _remoteObjects.TryRemove(id, out _);
+            var pending = nextPage;
+            nextPage = null;
+            if (pending != null)
             {
+                // Awaited rather than abandoned so the remote's serialization of it is
+                // finished before the next request; the response itself is correlated by
+                // id, so an unawaited one is dropped rather than misdelivered.
                 try
                 {
-                    var next = q.Take();
-                    remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
-                    if (next.State == END_OF_OBJECT) break;
+                    pending.GetAwaiter().GetResult();
                 }
-                catch { break; }
+                catch
+                {
+                    // the original failure is the one worth reporting
+                }
             }
-            throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+            throw new InvalidOperationException(
+                $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
         }
 
         if (remoteObject != null)
@@ -726,10 +796,11 @@ public class RewriteRpcServer
     {
         var beforeCount = _marketplace.AllRecipes().Count;
         string? version = null;          // requested version, as supplied by the caller (never mutated)
-        string? resolvedVersion = null;  // concrete version NuGet resolved it to (null off the NuGet path)
+        string? resolvedVersion = null;  // concrete version NuGet resolved it to (null for a loose assembly)
+        string? publishDir = null;       // the bundle's publish output (null for a loose assembly)
 
         // SystemTextJsonFormatter deserializes the object-typed Recipes payload to a JsonElement:
-        // a JSON string is a local assembly path; a JSON object describes a NuGet package.
+        // a JSON string is a local path; a JSON object describes a NuGet package.
         var recipesString = request.Recipes switch
         {
             string s => s,
@@ -740,63 +811,58 @@ public class RewriteRpcServer
             ? (JsonElement?)obj
             : null;
 
+        string packageName;
         if (recipesString != null)
         {
-            // Local assembly path
-            var absolutePath = Path.GetFullPath(recipesString);
-            var context = new PluginLoadContext(absolutePath);
-            var assembly = context.LoadFromAssemblyPath(absolutePath);
-            CheckVersionCompatibility(assembly);
-            ActivateAssembly(assembly, recipesString);
+            packageName = recipesString;
         }
         else if (recipesObject is { } packageObj)
         {
-            var packageName = (packageObj.TryGetProperty("packageName", out var pn) ? pn.GetString() : null)
-                              ?? throw new ArgumentException("Missing packageName in recipes object");
+            packageName = (packageObj.TryGetProperty("packageName", out var pn) ? pn.GetString() : null)
+                          ?? throw new ArgumentException("Missing packageName in recipes object");
             version = packageObj.TryGetProperty("version", out var v) ? v.GetString() : null;
-
-            if (File.Exists(packageName))
-            {
-                var absolutePath = Path.GetFullPath(packageName);
-                var context = new PluginLoadContext(absolutePath);
-                var assembly = context.LoadFromAssemblyPath(absolutePath);
-                CheckVersionCompatibility(assembly);
-                ActivateAssembly(assembly, packageName);
-            }
-            else
-            {
-                // NuGet install reads as a three-stage pipeline: restore the bundle (which also
-                // resolves the concrete version), publish it into the resolved-version dir, then
-                // load the plugin assemblies. The requested version may be a concrete pin or a
-                // floating/unspecified spec — restore resolves either uniformly.
-                var (stagingCsproj, resolved) = RestoreBundle(packageName, version);
-                resolvedVersion = resolved;
-                var publishDir = PublishBundle(stagingCsproj, resolved);
-                var assemblies = LoadPlugin(publishDir);
-                var ownAssemblyNames = OwnAssemblyNames(packageName, resolved);
-                if (ownAssemblyNames.Count == 0)
-                {
-                    Log.Warning("No own assemblies found for {Package} {Version} (lib folder missing/empty); no recipes activated", packageName, resolved);
-                }
-                foreach (var assembly in assemblies)
-                {
-                    CheckVersionCompatibility(assembly);
-                    if (ownAssemblyNames.Contains(assembly.GetName().Name))
-                    {
-                        ActivateAssembly(assembly, packageName);
-                    }
-                }
-            }
         }
         else
         {
             throw new ArgumentException($"Unexpected recipes type: {request.Recipes?.GetType().Name ?? "null"}");
         }
 
+        if (File.Exists(packageName))
+        {
+            // Local assembly path
+            var absolutePath = Path.GetFullPath(packageName);
+            var context = new PluginLoadContext(absolutePath);
+            var assembly = context.LoadFromAssemblyPath(absolutePath);
+            CheckVersionCompatibility(assembly);
+            ActivateAssembly(assembly, packageName);
+        }
+        else if (Directory.Exists(packageName))
+        {
+            // The publish output of an earlier NuGet install, handed back by the host
+            publishDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(packageName));
+            resolvedVersion = ActivateBundle(publishDir, packageName).Version;
+        }
+        else if (recipesString != null)
+        {
+            throw new FileNotFoundException("Recipe assembly or publish directory not found", packageName);
+        }
+        else
+        {
+            // NuGet install reads as a three-stage pipeline: restore the bundle (which also
+            // resolves the concrete version), publish it into the resolved-version dir, then
+            // activate the publish output. The requested version may be a concrete pin or a
+            // floating/unspecified spec — restore resolves either uniformly.
+            var (stagingCsproj, resolved) = RestoreBundle(packageName, version);
+            resolvedVersion = resolved;
+            publishDir = PublishBundle(stagingCsproj, resolved);
+            ActivateBundle(publishDir, packageName);
+        }
+
         return Task.FromResult(new InstallRecipesResponse
         {
             RecipesInstalled = _marketplace.AllRecipes().Count - beforeCount,
-            Version = resolvedVersion ?? version
+            Version = resolvedVersion ?? version,
+            PublishDir = publishDir
         });
     }
 
@@ -896,36 +962,6 @@ public class RewriteRpcServer
         return csprojPath;
     }
 
-    private static HashSet<string> OwnAssemblyNames(string packageName, string? version, string? packagesRoot = null)
-    {
-        // The package's own runtime assemblies are those shipped in its lib/<tfm> folder
-        // in the global packages cache (the directly-contributed boundary). All other
-        // published DLLs are transitive dependencies and must not be activated.
-        packagesRoot ??= Environment.GetEnvironmentVariable("NUGET_PACKAGES")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
-        // NuGet's v3 global-packages layout lowercases both the package id and the (normalized)
-        // version in the folder path, so match that or the lib dir won't be found on a
-        // case-sensitive filesystem (Linux).
-        var libDir = Path.Combine(packagesRoot, packageName.ToLowerInvariant(), (version ?? "").ToLowerInvariant(), "lib");
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (Directory.Exists(libDir))
-        {
-            foreach (var dll in Directory.GetFiles(libDir, "*.dll", SearchOption.AllDirectories))
-            {
-                names.Add(Path.GetFileNameWithoutExtension(dll));
-            }
-        }
-        return names;
-    }
-
-    /// <summary>
-    /// Test seam for <see cref="OwnAssemblyNames"/>: exposes the private helper
-    /// with an explicit packages root so unit tests can use a synthetic temp directory
-    /// without a real NuGet install.
-    /// </summary>
-    internal static HashSet<string> OwnAssemblyNamesForTest(string packageName, string? version, string packagesRoot)
-        => OwnAssemblyNames(packageName, version, packagesRoot);
-
     /// <summary>
     /// Produces the recipe project's <c>nuget.config</c> with the local development
     /// feed present. When <paramref name="existingConfigXml"/> is null/empty, creates a
@@ -1006,7 +1042,7 @@ public class RewriteRpcServer
     {
         var stagingCsproj = EnsureRecipesProject(packageName, ".staging");
         var addArgs = $"add \"{stagingCsproj}\" package {packageName}";
-        if (requestedVersion != null)
+        if (!string.IsNullOrWhiteSpace(requestedVersion))
             addArgs += $" --version {requestedVersion}";
         RunDotnet(addArgs);
 
@@ -1036,28 +1072,43 @@ public class RewriteRpcServer
     }
 
     /// <summary>
-    /// Load stage: load the recipe-bearing assemblies from a publish output directory into an
-    /// isolated <see cref="PluginLoadContext"/>. Because the NuGet package name may not match the
-    /// assembly name, we scan all non-host DLLs in the publish output for
-    /// <see cref="IRecipeActivator"/> implementations.
+    /// Activate stage: load a publish output directory (see <see cref="PublishBundle"/>) and
+    /// activate the recipes of the bundle package's own assemblies — never those of its
+    /// transitive dependencies. The directory carries everything this needs, so a host can hand
+    /// an <see cref="InstallRecipesResponse.PublishDir"/> back to a later server instance and
+    /// have the bundle loaded again without a registry.
+    /// </summary>
+    private PublishedBundle ActivateBundle(string publishDir, string origin)
+    {
+        var bundle = PublishedBundle.Read(publishDir);
+        if (bundle.OwnAssemblyNames.Count == 0)
+        {
+            Log.Warning("No own assemblies found for {Package} {Version} in {PublishDir}; no recipes activated",
+                bundle.PackageName, bundle.Version, publishDir);
+        }
+        foreach (var assembly in LoadPlugin(publishDir))
+        {
+            CheckVersionCompatibility(assembly);
+            if (bundle.OwnAssemblyNames.Contains(assembly.GetName().Name!))
+            {
+                ActivateAssembly(assembly, origin);
+            }
+        }
+        return bundle;
+    }
+
+    /// <summary>
+    /// Load the assemblies of a publish output directory into an isolated
+    /// <see cref="PluginLoadContext"/>, anchored on the staging project's <c>Recipes.dll</c> so
+    /// that transitive dependencies resolve through <c>Recipes.deps.json</c>.
     /// </summary>
     private List<Assembly> LoadPlugin(string publishDir)
     {
-        // Use the Recipes.deps.json (from the staging project) for the dependency resolver
-        var depsJson = Path.Combine(publishDir, "Recipes.deps.json");
-        if (!File.Exists(depsJson))
-        {
-            Log.Warning("No .deps.json found in publish output at {PublishDir}", publishDir);
-        }
-
-        // The staging project's main DLL is the anchor for AssemblyDependencyResolver
         var anchorDll = Path.Combine(publishDir, "Recipes.dll");
         if (!File.Exists(anchorDll))
         {
-            // Fallback: pick any DLL that has a matching .deps.json
-            anchorDll = Directory.GetFiles(publishDir, "*.dll").FirstOrDefault()
-                        ?? throw new InvalidOperationException(
-                            $"No DLLs found in publish output at {publishDir}");
+            throw new InvalidOperationException(
+                $"{publishDir} is not a recipe bundle publish directory: no Recipes.dll");
         }
 
         var context = new PluginLoadContext(anchorDll);
@@ -1196,7 +1247,7 @@ public class RewriteRpcServer
             // this marketplace, so a miss means the host owns this recipe: answer with delegatesTo
             // so the host resolves the id locally (the Java recipe is on its classpath) rather than
             // failing with "Recipe not found".
-            var delegateId = Guid.NewGuid().ToString();
+            var delegateId = Tree.RandomId().ToString();
             return Task.FromResult(new PrepareRecipeResponse
             {
                 Id = delegateId,
@@ -1257,7 +1308,7 @@ public class RewriteRpcServer
             }
         }
 
-        var id = Guid.NewGuid().ToString();
+        var id = Tree.RandomId().ToString();
         _preparedRecipes[id] = recipe;
 
         var response = new PrepareRecipeResponse
@@ -1670,7 +1721,7 @@ public class RewriteRpcServer
         {
             metrics = new RpcMetricsWriter(metricsCsv, () =>
                 (server._localObjects.Count, server._remoteObjects.Count,
-                    server._localRefs.Count + server._remoteRefs.Count));
+                    server._localRefs.HighWater + server._remoteRefs.Count));
             handler = new MetricsMessageHandler(handler, metrics);
         }
 
@@ -1743,11 +1794,15 @@ public class RewriteRpcServer
     /// Returns the (possibly modified) tree.
     /// </summary>
     public Tree VisitOnRemote(string visitorName, string treeId, string? sourceFileType,
-        string? pId = null)
+        string? pId = null, Dictionary<string, object?>? visitorOptions = null)
     {
         var response = _jsonRpc!.InvokeWithParameterObjectAsync<VisitResponse>(
             "Visit",
-            new VisitRequest { VisitorName = visitorName, TreeId = treeId, SourceFileType = sourceFileType, PId = pId }
+            new VisitRequest
+            {
+                VisitorName = visitorName, TreeId = treeId, SourceFileType = sourceFileType,
+                PId = pId, VisitorOptions = visitorOptions
+            }
         ).GetAwaiter().GetResult();
 
         Log.Debug("RPC VisitOnRemote: {VisitorName} on {TreeId} => modified={Modified}",
@@ -1824,7 +1879,7 @@ public class RewriteRpcServer
                     remoteMax = key;
                 }
             }
-            return (_localRefs.Count, remoteMax);
+            return (_localRefs.HighWater, remoteMax);
         });
     }
 
@@ -1843,13 +1898,7 @@ public class RewriteRpcServer
         _remoteObjects.TryRemove(request.Id, out _);
         if (_refCheckpoints.TryRemove(request.Id, out var cp))
         {
-            foreach (var kv in _localRefs)
-            {
-                if (kv.Value > cp.LocalRefs)
-                {
-                    _localRefs.TryRemove(kv.Key, out _);
-                }
-            }
+            _localRefs.RollbackTo(cp.LocalRefs);
             foreach (var key in _remoteRefs.Keys)
             {
                 if (key > cp.RemoteRefsMax)
@@ -2296,6 +2345,13 @@ public class InstallRecipesResponse
 {
     public int RecipesInstalled { get; set; }
     public string? Version { get; set; }
+
+    /// <summary>
+    /// Where a NuGet bundle's publish output landed. Passing it back as the
+    /// <see cref="InstallRecipesRequest.Recipes"/> path of a later server instance loads the
+    /// bundle again without a registry. Null for a loose assembly.
+    /// </summary>
+    public string? PublishDir { get; set; }
 }
 
 public class PrepareRecipeRequest
@@ -2362,6 +2418,12 @@ public class VisitRequest
     public string? PId { get; set; }
     [JsonPropertyName("cursor")]
     public List<string>? CursorIds { get; set; }
+
+    /// <summary>
+    /// Constructor/property values for a visitor the peer instantiates by class name
+    /// (see Java's <c>PreparedRecipeCache.instantiateVisitor</c>).
+    /// </summary>
+    public Dictionary<string, object?>? VisitorOptions { get; set; }
 }
 
 public class VisitResponse

@@ -30,6 +30,18 @@ class AutoFormatVisitorTest implements RewriteTest {
         spec.recipe(new AutoFormat());
     }
 
+    @Test
+    void tupleDeclaration() {
+        rewriteRun(
+          groovy(
+            """
+              def parts = "org:lib:1.0".split(":")
+              def (group, artifact, version) = parts
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4531")
     @Test
     void preserveSpaceBeforeAsKeywordInCast() {
@@ -85,6 +97,24 @@ class AutoFormatVisitorTest implements RewriteTest {
 
               class Test {
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedClosureReturnValue() {
+        rewriteRun(
+          groovy(
+            """
+              if (convertTemplate == null)
+                  convertTemplate = inTypemap.find({ key, value -> (key instanceof Pattern && key.matcher(apiType).matches()) })?.value
+              """,
+            """
+              if (convertTemplate == null)
+                  convertTemplate = inTypemap.find {key, value ->
+                      (key instanceof Pattern && key.matcher(apiType).matches())
+                  }?.value
               """
           )
         );

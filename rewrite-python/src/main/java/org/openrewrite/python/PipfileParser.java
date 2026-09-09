@@ -21,9 +21,14 @@ import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -100,13 +105,13 @@ public class PipfileParser implements Parser {
                 doc.getSourcePath().toString(),
                 requiresPython,
                 null,
-                Collections.emptyList(),
+                emptyList(),
                 dependencies,
                 optionalDependencies,
-                Collections.emptyMap(),
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyList(),
+                emptyMap(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
                 PackageManager.Pipenv,
                 parseSourceIndexes(doc)
         );
@@ -155,7 +160,7 @@ public class PipfileParser implements Parser {
 
     private static List<Dependency> parseDependencyTable(Toml.@Nullable Table table) {
         if (table == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         List<Dependency> deps = new ArrayList<>();
         for (Toml value : table.getValues()) {

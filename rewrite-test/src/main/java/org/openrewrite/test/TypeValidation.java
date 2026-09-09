@@ -150,7 +150,22 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false, false, false);
+        return builder()
+                .classDeclarations(false)
+                .identifiers(false)
+                .methodDeclarations(false)
+                .variableDeclarations(false)
+                .methodInvocations(false)
+                .constructorInvocations(false)
+                .dependencyModel(false)
+                .cursorAcyclic(false)
+                .erroneous(false)
+                .unknown(false)
+                .immutableExecutionContext(false)
+                .immutableScanning(false)
+                .allowNonWhitespaceInWhitespace(true)
+                .parseAndPrintEquality(false)
+                .build();
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {

@@ -20,15 +20,17 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 )
 
 func TestParseOrderedColumnsPreservesOrder(t *testing.T) {
 	raw := json.RawMessage(`{"zeta":"1","alpha":"2","mike":"3"}`)
 	cols, err := parseOrderedColumns(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	want := []recipe.ColumnValue{
 		{Name: "zeta", Value: "1"},
 		{Name: "alpha", Value: "2"},
@@ -47,12 +49,8 @@ func TestParseOrderedColumnsPreservesOrder(t *testing.T) {
 func TestParseOrderedColumnsEmptyAndNull(t *testing.T) {
 	for _, raw := range []json.RawMessage{nil, json.RawMessage("null"), json.RawMessage("{}")} {
 		cols, err := parseOrderedColumns(raw)
-		if err != nil {
-			t.Fatalf("unexpected error for %q: %v", string(raw), err)
-		}
-		if len(cols) != 0 {
-			t.Errorf("expected no columns for %q, got %+v", string(raw), cols)
-		}
+		require.NoErrorf(t, err, "unexpected error for %q", string(raw))
+		assert.Lenf(t, cols, 0, "expected no columns for %q", string(raw))
 	}
 }
 
@@ -65,25 +63,19 @@ func TestToDataTableStoreKinds(t *testing.T) {
 		SuffixColumns: json.RawMessage(`{"organization":"acme"}`),
 	}
 	store, err := csv.toDataTableStore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if _, ok := store.(*recipe.CsvDataTableStore); !ok {
 		t.Fatalf("CSV kind: expected *CsvDataTableStore, got %T", store)
 	}
 
 	store, err = (noOpDataTableStore{}).toDataTableStore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if _, ok := store.(*recipe.InMemoryDataTableStore); !ok {
 		t.Fatalf("NOOP kind: expected *InMemoryDataTableStore, got %T", store)
 	}
 
 	store, err = (&csvDataTableStore{}).toDataTableStore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if _, ok := store.(*recipe.InMemoryDataTableStore); !ok {
 		t.Fatalf("under-specified CSV: expected *InMemoryDataTableStore, got %T", store)
 	}
@@ -92,21 +84,13 @@ func TestToDataTableStoreKinds(t *testing.T) {
 func TestParseSetDataTableStoreSelectsVariantByKind(t *testing.T) {
 	csv, err := parseSetDataTableStore(json.RawMessage(
 		`{"kind":"CSV","outputDir":"/tmp/dt","prefixColumns":{"repositoryOrigin":"acme"}}`))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	c, ok := csv.(*csvDataTableStore)
-	if !ok {
-		t.Fatalf("CSV: expected *csvDataTableStore, got %T", csv)
-	}
-	if c.OutputDir != "/tmp/dt" {
-		t.Errorf("OutputDir = %q, want /tmp/dt", c.OutputDir)
-	}
+	require.Truef(t, ok, "CSV: expected *csvDataTableStore, got %T", csv)
+	assert.Equalf(t, "/tmp/dt", c.OutputDir, "OutputDir = %q, want /tmp/dt", c.OutputDir)
 
 	noop, err := parseSetDataTableStore(json.RawMessage(`{"kind":"NOOP"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if _, ok := noop.(noOpDataTableStore); !ok {
 		t.Fatalf("NOOP: expected noOpDataTableStore, got %T", noop)
 	}
@@ -118,9 +102,7 @@ func TestHandleSetDataTableStoreInstallsConfiguredStore(t *testing.T) {
 
 	params, _ := json.Marshal(map[string]string{"kind": "CSV", "outputDir": dir})
 	result, rpcErr := s.handleSetDataTableStore(params)
-	if rpcErr != nil {
-		t.Fatalf("unexpected rpc error: %+v", rpcErr)
-	}
+	require.Nil(t, rpcErr, "unexpected rpc error")
 	if result != true {
 		t.Errorf("expected result true, got %v", result)
 	}
@@ -131,9 +113,7 @@ func TestHandleSetDataTableStoreInstallsConfiguredStore(t *testing.T) {
 	ctx := recipe.NewExecutionContext()
 	s.installDataTableStore(ctx)
 	installed, ok := ctx.GetMessage(recipe.DataTableStoreKey)
-	if !ok {
-		t.Fatal("expected a store installed on the ctx")
-	}
+	require.True(t, ok, "expected a store installed on the ctx")
 	if installed != s.configuredDataTableStore {
 		t.Errorf("installed store %p != configured store %p", installed, s.configuredDataTableStore)
 	}

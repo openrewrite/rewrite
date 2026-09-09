@@ -129,6 +129,17 @@ export const DEFAULT_EXCLUSIONS = [
 ];
 
 /**
+ * Exclusions that apply even to files git reports. Dependency trees and minified
+ * bundles are sometimes committed but are never a project's own source, whereas the
+ * remaining entries in {@link DEFAULT_EXCLUSIONS} are what a .gitignore already says.
+ */
+export const DEFAULT_TRACKED_EXCLUSIONS = [
+    "**/node_modules/**",
+    "**/*.min.js",
+    "**/*.bundle.js"
+];
+
+/**
  * Source file extensions for JavaScript/TypeScript.
  */
 const SOURCE_EXTENSIONS = new Set([
@@ -177,6 +188,7 @@ export class ProjectParser {
     private readonly projectPath: string;
     private readonly relativeTo: string;
     private readonly exclusions: string[];
+    private readonly gitExclusions: string[];
     private readonly ctx: ExecutionContext;
     private readonly useGit: boolean;
     private readonly onProgress?: ProjectParserOptions["onProgress"];
@@ -187,6 +199,7 @@ export class ProjectParser {
         this.projectPath = path.resolve(projectPath);
         this.relativeTo = options.relativeTo ? path.resolve(options.relativeTo) : this.projectPath;
         this.exclusions = options.exclusions ?? DEFAULT_EXCLUSIONS;
+        this.gitExclusions = options.exclusions ?? DEFAULT_TRACKED_EXCLUSIONS;
         this.ctx = options.ctx ?? new ExecutionContext();
         this.useGit = options.useGit ?? this.isGitRepository();
         this.onProgress = options.onProgress;
@@ -532,8 +545,14 @@ export class ProjectParser {
             }
         }
 
+        // A project inside an ignored directory is invisible to git; the walk is what
+        // discovers it.
+        if (files.length === 0) {
+            return this.discoverFilesWithWalk();
+        }
+
         // Filter by our exclusion patterns and accepted file types
-        return files.filter(file => this.isAcceptedFile(file));
+        return files.filter(file => this.isAcceptedFile(file, this.gitExclusions));
     }
 
     /**
@@ -580,13 +599,13 @@ export class ProjectParser {
     /**
      * Checks if a file should be accepted for parsing.
      */
-    private isAcceptedFile(filePath: string): boolean {
+    private isAcceptedFile(filePath: string, exclusions: string[] = this.exclusions): boolean {
         const basename = path.basename(filePath);
         const ext = path.extname(filePath).toLowerCase();
 
         // Check exclusion patterns with relative path
         const relativePath = path.relative(this.projectPath, filePath);
-        const isExcluded = picomatch(this.exclusions);
+        const isExcluded = picomatch(exclusions);
         if (isExcluded(relativePath)) {
             return false;
         }
@@ -645,10 +664,20 @@ export class ProjectParser {
     }
 
     /**
-     * Checks if the project is a git repository.
+     * Checks whether a git work tree encloses the project, which for a project below the
+     * repository root is an ancestor directory. A linked work tree or submodule has `.git`
+     * as a file, so presence rather than kind is what counts.
      */
     private isGitRepository(): boolean {
-        return fs.existsSync(path.join(this.projectPath, ".git"));
+        let dir = this.projectPath;
+        while (!fs.existsSync(path.join(dir, ".git"))) {
+            const parent = path.dirname(dir);
+            if (parent === dir) {
+                return false;
+            }
+            dir = parent;
+        }
+        return true;
     }
 
     /**

@@ -23,8 +23,7 @@ import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.*;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonMap;
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
@@ -145,7 +144,7 @@ class PnpmLockDiffTest {
 
         @Override
         public Set<String> versions(String name) {
-            return versionsByName.getOrDefault(name, Collections.emptySet());
+            return versionsByName.getOrDefault(name, emptySet());
         }
 
         @Override

@@ -37,6 +37,7 @@ import static java.util.stream.Collectors.toList;
 public class RpcRecipe extends ScanningRecipe<Integer> {
     @Getter
     private final transient RewriteRpc rpc;
+
     private transient @Nullable List<Recipe> recipeList;
 
     /**
@@ -45,8 +46,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     private final String remoteId;
 
     private final RecipeDescriptor descriptor;
+
     @Getter
     private final String editVisitor;
+
     /**
      * Composite of all editPreconditions resolved during PrepareRecipe. Exposed so that the
      * BatchVisit batching path in {@link org.openrewrite.scheduling.RecipeRunCycle} can
@@ -57,8 +60,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      */
     @Getter
     private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
+
     @Getter
     private final @Nullable String scanVisitor;
+
     @Getter
     private final @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
 

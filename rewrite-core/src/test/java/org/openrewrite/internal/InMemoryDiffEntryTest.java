@@ -408,7 +408,7 @@ class InMemoryDiffEntryTest {
         // "café" contains é (0xE9 in ISO-8859-1, 0xC3 0xA9 in UTF-8).
         // Without the fix, getDiff() would use the platform default charset (UTF-8 on
         // most dev machines) to decode ISO-8859-1 bytes, corrupting the output.
-        Charset iso88591 = Charset.forName("ISO-8859-1");
+        Charset iso88591 = StandardCharsets.ISO_8859_1;
         PlainText before = PlainTextParser.builder().build()
                 .parse("line1\ncafé résumé naïve\nline3\n").findFirst().get()
                 .withSourcePath(Paths.get("file.txt"))

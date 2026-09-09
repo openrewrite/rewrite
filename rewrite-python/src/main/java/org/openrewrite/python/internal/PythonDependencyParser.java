@@ -22,10 +22,15 @@ import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -92,7 +97,7 @@ public class PythonDependencyParser {
                 dependencyGroups,
                 constraintDependencies,
                 overrideDependencies,
-                Collections.emptyList(),
+                emptyList(),
                 packageManager,
                 null
         );
@@ -133,7 +138,7 @@ public class PythonDependencyParser {
 
     static List<Dependency> getDependencyList(Toml.@Nullable Table table, String key) {
         if (table == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         for (Toml value : table.getValues()) {
             if (value instanceof Toml.KeyValue) {
@@ -146,7 +151,7 @@ public class PythonDependencyParser {
                 }
             }
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 
     private static List<Dependency> parseDependencyArray(Toml.Array array) {
@@ -188,7 +193,7 @@ public class PythonDependencyParser {
             }
         }
 
-        return Collections.emptyMap();
+        return emptyMap();
     }
 
     /**
@@ -230,7 +235,7 @@ public class PythonDependencyParser {
     private static Map<String, List<Dependency>> getDependencyGroups(Map<String, Toml.Table> tables) {
         Toml.Table groupsTable = tables.get("dependency-groups");
         if (groupsTable == null) {
-            return Collections.emptyMap();
+            return emptyMap();
         }
         Map<String, List<Dependency>> result = new LinkedHashMap<>();
         for (Toml value : groupsTable.getValues()) {
@@ -289,7 +294,7 @@ public class PythonDependencyParser {
     private static List<Dependency> getPdmOverrides(Map<String, Toml.Table> tables) {
         Toml.Table pdmOverridesTable = tables.get("tool.pdm.overrides");
         if (pdmOverridesTable == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         List<Dependency> result = new ArrayList<>();
         for (Toml value : pdmOverridesTable.getValues()) {

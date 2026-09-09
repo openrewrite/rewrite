@@ -91,7 +91,7 @@ func (v *UsesTypeVisitor) treeUsesType(t java.Tree) bool {
 			return true
 		}
 		if fq, ok := jt.(java.FullyQualified); ok {
-			fqn := fq.GetFullyQualifiedName()
+			fqn := java.FQNOf(fq)
 			if fqn != "" && matchTypeGlob(v.pattern, fqn) {
 				found = true
 				return false

@@ -282,6 +282,11 @@ public class TypeUtils {
         } else if (value2 instanceof JavaType.Annotation.ArrayElementValue) {
             JavaType.Annotation.ArrayElementValue arrayValue1 = (JavaType.Annotation.ArrayElementValue) value1;
             JavaType.Annotation.ArrayElementValue arrayValue2 = (JavaType.Annotation.ArrayElementValue) value2;
+            // `@Foo({})` parses to an empty `constantValues`, while a peer can send an empty
+            // array as neither slot set. With no elements there is no distinction to draw.
+            if (isEmptyArray(arrayValue1) || isEmptyArray(arrayValue2)) {
+                return isEmptyArray(arrayValue1) && isEmptyArray(arrayValue2);
+            }
             if (arrayValue1.getConstantValues() != null) {
                 Object[] constantValues1 = arrayValue1.getConstantValues();
                 if (arrayValue2.getConstantValues() == null || arrayValue2.getConstantValues().length != constantValues1.length) {
@@ -310,6 +315,13 @@ public class TypeUtils {
             return isOfTypeAnnotationElement(value2, value1);
         }
         return false;
+    }
+
+    private static boolean isEmptyArray(JavaType.Annotation.ArrayElementValue value) {
+        Object[] constantValues = value.getConstantValues();
+        JavaType[] referenceValues = value.getReferenceValues();
+        return (constantValues == null || constantValues.length == 0) &&
+                (referenceValues == null || referenceValues.length == 0);
     }
 
     private static boolean isOfTypeCore(@Nullable JavaType to, @Nullable JavaType from, ComparisonContext context) {
@@ -403,11 +415,11 @@ public class TypeUtils {
         }
 
         JavaType.FullyQualified[] toFq = to.stream()
-                .map(e -> (JavaType.FullyQualified) e)
+                .map(JavaType.FullyQualified.class::cast)
                 .sorted(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName))
                 .toArray(JavaType.FullyQualified[]::new);
         JavaType.FullyQualified[] fromFq = from.stream()
-                .map(e -> (JavaType.FullyQualified) e)
+                .map(JavaType.FullyQualified.class::cast)
                 .sorted(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName))
                 .toArray(JavaType.FullyQualified[]::new);
         for (int i = 0; i < toFq.length; i++) {
@@ -1048,7 +1060,16 @@ public class TypeUtils {
                 .filter(m -> !m.getFlags().contains(Flag.Private))
                 .filter(m -> !m.getFlags().contains(Flag.Static))
                 // If access level is default then check if subclass package is the same from parent class
-                .filter(m -> m.getFlags().contains(Flag.Public) || m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
+                // A protected method is overridable from any package, but only by a class; an interface
+                // does not inherit the protected members of java.lang.Object (JLS 9.2).
+                .filter(m -> m.getFlags().contains(Flag.Public) ||
+                             (m.getFlags().contains(Flag.Protected) && !isInterface(dt)) ||
+                             m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
+    }
+
+    private static boolean isInterface(JavaType.FullyQualified type) {
+        return type.getKind() == JavaType.FullyQualified.Kind.Interface ||
+               type.getKind() == JavaType.FullyQualified.Kind.Annotation;
     }
 
     public static Optional<JavaType.Method> findDeclaredMethod(JavaType.@Nullable FullyQualified clazz, String name, List<JavaType> argumentTypes) {

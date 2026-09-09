@@ -50,6 +50,11 @@ public class XmlParser implements Parser {
             "jxb",
             "xjb",
             "jsp",
+            // WebSphere/Rational Application Developer object-relational mapping for CMP entity beans
+            "mapxmi",
+            "tblxmi",
+            "dbxmi",
+            "schxmi",
             // Datastage file formats that are all xml under the hood
             "det",
             "pjb",
@@ -139,8 +144,8 @@ public class XmlParser implements Parser {
             }
         }
         String fileName = path.getFileName().toString().toLowerCase();
-        return fileName.equals("nuget.config") ||
-                fileName.equals("packages.config") ||
+        return "nuget.config".equals(fileName) ||
+                "packages.config".equals(fileName) ||
                 // .NET Framework app/web config and their XDT transform variants
                 // (e.g. Web.Release.config, App.Debug.config)
                 ((fileName.startsWith("app.") || fileName.startsWith("web.")) && fileName.endsWith(".config"));

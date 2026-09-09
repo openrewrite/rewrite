@@ -324,10 +324,10 @@ export function detectIndent(doc: Json.Document): string {
 
     if (isObject(doc.value)) {
         if (doc.value.members && doc.value.members.length > 0) {
-            // Look at the prefix of the first member's key to detect indentation
+            // Look at the prefix of the first member to detect indentation
             const firstMemberRightPadded = doc.value.members[0];
             const firstMember = firstMemberRightPadded.element as Json.Member;
-            const prefix = firstMember.key.element.prefix.whitespace;
+            const prefix = firstMember.prefix.whitespace;
             // Extract just the spaces/tabs after the newline
             const match = prefix.match(/\n([ \t]+)/);
             if (match) {

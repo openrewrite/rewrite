@@ -19,14 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.tree.Xml;
-
-import java.util.Optional;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 
 @Value
 @EqualsAndHashCode(callSuper = false)

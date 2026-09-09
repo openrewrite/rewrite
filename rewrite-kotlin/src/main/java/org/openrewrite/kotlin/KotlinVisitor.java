@@ -170,6 +170,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
         f = f.withLeadingAnnotations(ListUtils.map(f.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         f = f.withModifiers(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p)));
+        f = f.withContextParameters(visitAndCast(f.getContextParameters(), p));
         f = f.withReceiver(visitRightPadded(f.getReceiver(), p));
         if (f.getPadding().getParameters() != null) {
             f = f.getPadding().withParameters(visitContainer(f.getPadding().getParameters(), KContainer.Location.FUNCTION_TYPE_PARAMETERS, p));
@@ -204,6 +205,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         K.MethodDeclaration m = methodDeclaration;
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
         m = m.withMethodDeclaration(visitAndCast(m.getMethodDeclaration(), p));
+        m = m.withContextParameters(visitAndCast(m.getContextParameters(), p));
         return m.withTypeConstraints(visitAndCast(m.getTypeConstraints(), p));
     }
 
@@ -229,6 +231,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
         pr = pr.getPadding().withVariableDeclarations(visitRightPadded(pr.getPadding().getVariableDeclarations(), p));
         pr = pr.getPadding().withReceiver(visitRightPadded(pr.getPadding().getReceiver(), p));
+        pr = pr.withBackingField(visitAndCast(pr.getBackingField(), p));
+        pr = pr.withContextParameters(visitAndCast(pr.getContextParameters(), p));
         return pr.withAccessors(visitContainer(pr.getAccessors(), p));
     }
 
@@ -321,6 +325,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else {
             k = (K.This) temp;
         }
+        k = k.withLabel(visitAndCast(k.getLabel(), p));
         return k.withType(visitType(k.getType(), p));
     }
 
@@ -391,6 +396,13 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return w.withType(visitType(w.getType(), p));
     }
 
+    public J visitContextParameters(K.ContextParameters contextParameters, P p) {
+        K.ContextParameters c = contextParameters;
+        c = c.withPrefix(visitSpace(c.getPrefix(), KSpace.Location.CONTEXT_PARAMETERS_PREFIX, p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        return c.withParameters(visitContainer(c.getParameters(), KContainer.Location.CONTEXT_PARAMETERS, p));
+    }
+
     public J visitWhenBranch(K.WhenBranch whenBranch, P p) {
         K.WhenBranch w = whenBranch;
         w = w.withPrefix(visitSpace(w.getPrefix(), KSpace.Location.WHEN_BRANCH_PREFIX, p));
@@ -402,6 +414,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             w = (K.WhenBranch) temp;
         }
         w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, p));
+        w = w.getPadding().withGuard(visitRightPadded(w.getPadding().getGuard(), p));
         return w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
     }
 

@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static java.util.Collections.singletonList;

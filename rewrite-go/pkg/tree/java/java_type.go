@@ -18,6 +18,8 @@ package java
 
 import "fmt"
 
+// JavaType is what the type checker made of a node. Every slot holding one is
+// optional — nil is the answer for a node no checker attributed.
 type JavaType interface {
 	isJavaType()
 }
@@ -188,6 +190,26 @@ func (*JavaTypeIntersection) isJavaType() {}
 type JavaTypeUnknown struct{}
 
 func (*JavaTypeUnknown) isJavaType() {}
+
+// GetFullyQualifiedName makes Unknown a FullyQualified, as it is in Java, so it
+// keeps its place in a supertype's interfaces or a type's annotations.
+func (*JavaTypeUnknown) GetFullyQualifiedName() string { return "<unknown>" }
+
+// IsUnknown reports whether attribution produced no type. Unknown names itself
+// so it can travel as a FullyQualified, but "<unknown>" is a placeholder: nothing
+// resolves against it and no pattern should match it.
+func IsUnknown(t JavaType) bool {
+	_, unknown := t.(*JavaTypeUnknown)
+	return unknown
+}
+
+// FQNOf is the name to match a type by, empty when there is none.
+func FQNOf(fq FullyQualified) string {
+	if fq == nil || IsUnknown(fq) {
+		return ""
+	}
+	return fq.GetFullyQualifiedName()
+}
 
 var UnknownType = &JavaTypeUnknown{}
 

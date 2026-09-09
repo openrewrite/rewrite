@@ -281,7 +281,7 @@ class BunLockDiffTest {
 
         @Override
         public Set<String> versions(String name) {
-            return versionsByName.getOrDefault(name, Collections.emptySet());
+            return versionsByName.getOrDefault(name, emptySet());
         }
 
         @Override

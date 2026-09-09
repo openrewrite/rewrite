@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JavaScriptParser, JS, prettierFormat} from "../../../src/javascript";
+import {JavaScriptParser, JS, prettierFormat, sourceFileCache} from "../../../src/javascript";
 import {WhitespaceReconciler} from "../../../src/javascript/format/whitespace-reconciler";
 import {TreePrinters} from "../../../src";
 
 describe('WhitespaceReconciler', () => {
-    const parser = new JavaScriptParser();
+    const parser = new JavaScriptParser({sourceFileCache});
 
     const parse = (code: string) =>
         parser.parseOne({sourcePath: 'test.ts', text: code}) as Promise<JS.CompilationUnit>;
@@ -114,7 +114,7 @@ describe('WhitespaceReconciler', () => {
 });
 
 describe('prettierFormat', () => {
-    const parser = new JavaScriptParser();
+    const parser = new JavaScriptParser({sourceFileCache});
 
     const parse = (code: string) =>
         parser.parseOne({sourcePath: 'test.ts', text: code}) as Promise<JS.CompilationUnit>;

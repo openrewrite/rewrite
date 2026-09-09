@@ -71,8 +71,7 @@ func (s *GoSender) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.
 	q.GetAndSend(cu, func(v any) any { return v.(*golang.CompilationUnit).SourcePath }, nil)
 	// charset - Go doesn't track this, send empty/default
 	q.GetAndSend(cu, func(_ any) any { return "UTF-8" }, nil)
-	// charsetBomMarked
-	q.GetAndSend(cu, func(_ any) any { return false }, nil)
+	q.GetAndSend(cu, func(v any) any { return v.(*golang.CompilationUnit).CharsetBomMarked }, nil)
 	// checksum
 	q.GetAndSend(cu, func(_ any) any { return nil }, nil)
 	// fileAttributes
@@ -150,6 +149,8 @@ func (s *GoSender) VisitGoUnary(u *golang.Unary, p any) java.J {
 	}, func(v any) { sendLeftPadded(s, v, q) })
 	q.GetAndSend(u, func(v any) any { return v.(*golang.Unary).Expression },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(u, func(v any) any { return AsRef(v.(*golang.Unary).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return u
 }
 
@@ -176,6 +177,8 @@ func (s *GoSender) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p a
 	}, func(v any) { sendLeftPadded(s, v, q) })
 	q.GetAndSend(a, func(v any) any { return v.(*golang.AssignmentOperation).Assignment },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(a, func(v any) any { return AsRef(v.(*golang.AssignmentOperation).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return a
 }
 
@@ -186,6 +189,8 @@ func (s *GoSender) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
 	q.GetAndSend(vr, func(v any) any { return v.(*golang.Variadic).Dots },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(vr, func(v any) any { return v.(*golang.Variadic).Postfix }, nil)
+	q.GetAndSend(vr, func(v any) any { return AsRef(v.(*golang.Variadic).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return vr
 }
 
@@ -202,6 +207,8 @@ func (s *GoSender) VisitComposite(c *golang.Composite, p any) java.J {
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(c, func(v any) any { return v.(*golang.Composite).Elements },
 		func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(c, func(v any) any { return AsRef(v.(*golang.Composite).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return c
 }
 
@@ -220,6 +227,8 @@ func (s *GoSender) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
 		func(v any) { sendRightPadded(s, v, q) })
 	q.GetAndSend(at, func(v any) any { return v.(*golang.ArrayType).ElementType },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(at, func(v any) any { return AsRef(v.(*golang.ArrayType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return at
 }
 
@@ -248,7 +257,27 @@ func (s *GoSender) VisitMapType(mt *golang.MapType, p any) java.J {
 		func(v any) { sendRightPadded(s, v, q) })
 	q.GetAndSend(mt, func(v any) any { return v.(*golang.MapType).Value },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(mt, func(v any) any { return AsRef(v.(*golang.MapType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return mt
+}
+
+func (s *GoSender) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(ta, func(v any) any { return v.(*golang.TypeAssertion).Left },
+		func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(ta, func(v any) any { return v.(*golang.TypeAssertion).AssertedType },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(ta, func(v any) any { return AsRef(v.(*golang.TypeAssertion).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
+	return ta
+}
+
+func (s *GoSender) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(es, func(v any) any { return v.(*golang.ExpressionStatement).Expression },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return es
 }
 
 func (s *GoSender) VisitStatementExpression(se *golang.StatementExpression, p any) java.J {
@@ -262,6 +291,8 @@ func (s *GoSender) VisitPointerType(pt *golang.PointerType, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(pt, func(v any) any { return v.(*golang.PointerType).Elem },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(pt, func(v any) any { return AsRef(v.(*golang.PointerType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return pt
 }
 
@@ -281,6 +312,8 @@ func (s *GoSender) VisitChannel(ch *golang.Channel, p any) java.J {
 	}, nil)
 	q.GetAndSend(ch, func(v any) any { return v.(*golang.Channel).Value },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(ch, func(v any) any { return AsRef(v.(*golang.Channel).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return ch
 }
 
@@ -290,6 +323,8 @@ func (s *GoSender) VisitFuncType(ft *golang.FuncType, p any) java.J {
 		func(v any) { sendContainer(s, v, q) })
 	q.GetAndSend(ft, func(v any) any { return v.(*golang.FuncType).ReturnType },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(ft, func(v any) any { return AsRef(v.(*golang.FuncType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return ft
 }
 
@@ -297,6 +332,8 @@ func (s *GoSender) VisitStructType(st *golang.StructType, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(st, func(v any) any { return v.(*golang.StructType).Body },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(st, func(v any) any { return AsRef(v.(*golang.StructType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return st
 }
 
@@ -304,6 +341,8 @@ func (s *GoSender) VisitInterfaceType(it *golang.InterfaceType, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(it, func(v any) any { return v.(*golang.InterfaceType).Body },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(it, func(v any) any { return AsRef(v.(*golang.InterfaceType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return it
 }
 
@@ -311,6 +350,8 @@ func (s *GoSender) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(tl, func(v any) any { return v.(*golang.TypeList).Types },
 		func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(tl, func(v any) any { return AsRef(v.(*golang.TypeList).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return tl
 }
 
@@ -327,6 +368,8 @@ func (s *GoSender) VisitUnion(u *golang.Union, p any) java.J {
 		},
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(u, func(v any) any { return AsRef(v.(*golang.Union).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return u
 }
 
@@ -510,11 +553,20 @@ func (s *GoSender) sendParseError(pe *java.ParseError, q *SendQueue) {
 	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).Text }, nil)
 }
 
+func (s *GoSender) VisitSelect(sel *golang.Select, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(sel, func(v any) any { return v.(*golang.Select).Body },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return sel
+}
+
 func (s *GoSender) VisitIndexList(il *golang.IndexList, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(il, func(v any) any { return v.(*golang.IndexList).Target },
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(il, func(v any) any { return v.(*golang.IndexList).Indices },
 		func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(il, func(v any) any { return AsRef(v.(*golang.IndexList).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return il
 }

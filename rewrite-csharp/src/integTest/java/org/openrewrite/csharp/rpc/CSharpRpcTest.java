@@ -1701,12 +1701,11 @@ class CSharpRpcTest implements RewriteTest {
                 }
             }
             """,
-          spec -> spec.beforeRecipe(cu -> {
+          spec -> spec.beforeRecipe(cu ->
               // Reset clears both sides' caches, forcing the next print to
               // re-send the tree from Java to C# via the full receiver path.
               // This exercises ControlParentheses<J> deserialization.
-              CSharpRewriteRpc.resetCurrent();
-          })
+              CSharpRewriteRpc.resetCurrent())
         ));
     }
 

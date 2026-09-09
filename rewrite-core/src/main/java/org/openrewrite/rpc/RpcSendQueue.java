@@ -22,6 +22,8 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.nCopies;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcObjectData.ADDED_LIST_ITEM;
 import static org.openrewrite.rpc.RpcObjectData.State.*;
@@ -151,15 +153,18 @@ public class RpcSendQueue {
         send(after, before, () -> {
             assert after != null : "A DELETE event should have been sent.";
 
-            Map<Object, Integer> beforeIdx = putListPositions(after, before, id);
+            int[] positions = putListPositions(after, before, id);
 
+            // Walked with an iterator rather than by index so a sequential-access list
+            // costs the same here as a random-access one; `positions` is already indexed.
+            int i = 0;
             for (T anAfter : after) {
-                Integer beforePos = beforeIdx.get(id.apply(anAfter));
+                int beforePos = positions == null ? ADDED_LIST_ITEM : positions[i++];
                 Runnable onChangeRun = onChange == null ? null : () -> onChange.accept(anAfter);
-                if (beforePos == null) {
+                if (beforePos == ADDED_LIST_ITEM) {
                     add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
                 } else {
-                    T aBefore = before == null ? null : before.get(beforePos);
+                    T aBefore = requireNonNull(before).get(beforePos);
                     if (aBefore == anAfter) {
                         put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
                     } else if (asRef || aBefore == null || anAfter.getClass() != aBefore.getClass()) {
@@ -174,20 +179,50 @@ public class RpcSendQueue {
         });
     }
 
-    private <T> Map<Object, Integer> putListPositions(List<T> after, @Nullable List<T> before, Function<? super T, ?> id) {
-        Map<Object, Integer> beforeIdx = new HashMap<>();
-        if (before != null) {
-            for (int i = 0; i < before.size(); i++) {
-                beforeIdx.put(id.apply(before.get(i)), i);
-            }
+    /**
+     * Emits the positions message and returns the same positions for the caller to walk,
+     * or null when every element is new.
+     */
+    private <T> int @Nullable [] putListPositions(List<T> after, @Nullable List<T> before, Function<? super T, ?> id) {
+        int afterSize = after.size();
+        if (before == null || before.isEmpty()) {
+            // Every element is an addition, so the positions are a constant that needs
+            // neither an index map nor a per-element array.
+            put(new RpcObjectData(CHANGE, null, afterSize == 0 ? emptyList() :
+                    nCopies(afterSize, ADDED_LIST_ITEM), null, trace));
+            return null;
         }
-        List<Integer> positions = new ArrayList<>();
-        for (T t : after) {
-            Integer beforePos = beforeIdx.get(id.apply(t));
-            positions.add(beforePos == null ? ADDED_LIST_ITEM : beforePos);
+
+        Map<Object, Integer> beforeIdx = new HashMap<>((int) (before.size() / 0.75f) + 1);
+        for (int i = 0; i < before.size(); i++) {
+            beforeIdx.put(id.apply(before.get(i)), i);
         }
-        put(new RpcObjectData(CHANGE, null, positions, null, trace));
-        return beforeIdx;
+        int[] positions = new int[afterSize];
+        for (int i = 0; i < afterSize; i++) {
+            Integer beforePos = beforeIdx.get(id.apply(after.get(i)));
+            positions[i] = beforePos == null ? ADDED_LIST_ITEM : beforePos;
+        }
+        put(new RpcObjectData(CHANGE, null, new BoxedIntList(positions), null, trace));
+        return positions;
+    }
+
+    /** Presents an {@code int[]} to the serializer without boxing it into a second collection. */
+    private static final class BoxedIntList extends AbstractList<Integer> implements RandomAccess {
+        private final int[] values;
+
+        BoxedIntList(int[] values) {
+            this.values = values;
+        }
+
+        @Override
+        public Integer get(int index) {
+            return values[index];
+        }
+
+        @Override
+        public int size() {
+            return values.length;
+        }
     }
 
     private void add(Object after, @Nullable Runnable onChange) {
@@ -245,7 +280,11 @@ public class RpcSendQueue {
         @Override
         protected @Nullable String computeValue(Class<?> afterType) {
             Package pkg = afterType.getPackage();
-            if (afterType.isPrimitive() || afterType.isArray() || (pkg != null && pkg.getName().startsWith("java.lang")) ||
+            String pkgName = pkg == null ? "" : pkg.getName();
+            if (afterType.isPrimitive() || afterType.isArray() || pkgName.startsWith("java.lang") ||
+                // JDK value types have no codec on either side, so a valueType only buys the
+                // receiver a bogus Objenesis instance it discards. Send them as scalars.
+                pkgName.startsWith("java.time") || pkgName.startsWith("java.math") ||
                 afterType.equals(UUID.class) || Iterable.class.isAssignableFrom(afterType) ||
                 Map.class.isAssignableFrom(afterType)) {
                 // A plain Map (like a Collection) is serialized structurally and needs no
@@ -261,7 +300,7 @@ public class RpcSendQueue {
             // If the class is a subtype of JavaType but in a different package,
             // return the superclass name instead
             Class<?> jt = getJavaTypeClass(afterType);
-            if (jt != null && pkg != null && !pkg.getName().equals(JAVA_TYPE_PACKAGE) && jt.isAssignableFrom(afterType)) {
+            if (jt != null && pkg != null && !JAVA_TYPE_PACKAGE.equals(pkg.getName()) && jt.isAssignableFrom(afterType)) {
                 Class<?> superclass = afterType.getSuperclass();
                 if (superclass != null && !Object.class.equals(superclass)) {
                     return superclass.getName();

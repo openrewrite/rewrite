@@ -21,6 +21,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -74,9 +76,7 @@ func TestCoerceToStatementRP_AcceptsExpressionVariant(t *testing.T) {
 	got := coerceToStatementRP(wire)
 
 	// then: the element survives, now typed as Statement
-	if got.Element == nil {
-		t.Fatal("Element nil after coerce")
-	}
+	require.NotNil(t, got.Element, "Element nil after coerce")
 	if got.Element.(*java.MethodInvocation) != mi {
 		t.Errorf("Element identity lost: want %p, got %p", mi, got.Element)
 	}

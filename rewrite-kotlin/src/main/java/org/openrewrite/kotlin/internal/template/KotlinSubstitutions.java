@@ -20,9 +20,8 @@ import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypedTree;
 
-import java.util.Collections;
-
 import static java.util.Collections.emptySet;
+import static java.util.Collections.nCopies;
 
 public class KotlinSubstitutions extends Substitutions {
     private final Object[] parameters;
@@ -51,7 +50,7 @@ public class KotlinSubstitutions extends Substitutions {
         if (starProjectRaw && kotlinType.indexOf('<') < 0) {
             int arity = genericArity(index);
             if (arity > 0) {
-                return kotlinType + "<" + String.join(", ", Collections.nCopies(arity, "*")) + ">";
+                return kotlinType + "<" + String.join(", ", nCopies(arity, "*")) + ">";
             }
         }
         return kotlinType;

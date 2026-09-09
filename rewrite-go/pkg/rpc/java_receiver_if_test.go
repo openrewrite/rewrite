@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -52,12 +54,8 @@ func TestJavaReceiverVisitIfUsesExistingElsePartAsReceiveBaseline(t *testing.T) 
 
 	got := NewGoReceiver().VisitIf(before, q).(*java.If)
 
-	if got.ElsePart == nil {
-		t.Fatal("ElsePart: got nil, want non-nil")
-	}
-	if !reflect.DeepEqual(got.ElsePart.Prefix, beforeElsePadding) {
-		t.Fatalf("ElsePart.Prefix: got %+v, want %+v", got.ElsePart.Prefix, beforeElsePadding)
-	}
+	require.NotNil(t, got.ElsePart, "ElsePart: got nil, want non-nil")
+	require.True(t, reflect.DeepEqual(got.ElsePart.Prefix, beforeElsePadding), "ElsePart.Prefix")
 	if got.ElsePart.Body.Element != beforeElseBody {
 		t.Fatalf("ElsePart.Body.Element: got %p, want existing body %p", got.ElsePart.Body.Element, beforeElseBody)
 	}

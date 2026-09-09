@@ -34,7 +34,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -96,12 +96,12 @@ public class RequirementsTxtParser implements Parser {
                     text.getSourcePath().toString(),
                     null,
                     null,
-                    Collections.emptyList(),
+                    emptyList(),
                     deps,
-                    Collections.emptyMap(),
-                    Collections.emptyMap(),
-                    Collections.emptyList(),
-                    Collections.emptyList(),
+                    emptyMap(),
+                    emptyMap(),
+                    emptyList(),
+                    emptyList(),
                     resolvedDeps,
                     PackageManager.Uv,
                     null
@@ -142,7 +142,7 @@ public class RequirementsTxtParser implements Parser {
      * are treated as direct so that client code traversing {@code getDependencies()} finds every package.
      */
     public static List<Dependency> dependenciesFromResolved(List<ResolvedDependency> resolved) {
-        return dependenciesFromResolved(resolved, Collections.emptySet());
+        return dependenciesFromResolved(resolved, emptySet());
     }
 
     public static List<Dependency> dependenciesFromResolved(List<ResolvedDependency> resolved,

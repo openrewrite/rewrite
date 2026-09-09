@@ -85,7 +85,7 @@ interface C {
 
 interface PT<T>
 
-internal interface Intersection<T> where T : KotlinTypeGoat.Extension<T>, T : Intersection<T> {
+interface Intersection<T> where T : KotlinTypeGoat.Extension<T>, T : Intersection<T> {
     val intersectionType: T
 }
 

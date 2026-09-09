@@ -34,8 +34,8 @@ import java.util.List;
 public class ParseProjectOptions {
 
     /**
-     * Glob patterns to exclude from parsing. When {@code null}, the parser's default exclusions
-     * ({@code __pycache__}, {@code .venv}, etc.) are used.
+     * Glob patterns matched against directory names, not paths. These extend the parser's built-in
+     * exclusions ({@code __pycache__}, {@code .venv}, etc.) rather than replacing them.
      */
     @Nullable
     List<String> exclusions;

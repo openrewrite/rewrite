@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.*;
 
@@ -89,7 +90,7 @@ class AddDependencyTest implements RewriteTest {
               List<String> pyprojectContents = run.getChangeset().getAllResults().stream()
                       .filter(r -> r.getAfter() != null && r.getAfter().getSourcePath().endsWith("pyproject.toml"))
                       .map(r -> r.getAfter().printAll())
-                      .collect(java.util.stream.Collectors.toList());
+                      .collect(toList());
               assertThat(pyprojectContents).isNotEmpty();
               String pyprojectContent = pyprojectContents.get(0);
               assertThat(pyprojectContent).contains("flask>=2.0");

@@ -148,6 +148,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.ContextParameters visitContextParameters(K.ContextParameters contextParameters, P p) {
+        return (K.ContextParameters) super.visitContextParameters(contextParameters, p);
+    }
+
+    @Override
     public K.WhenBranch visitWhenBranch(K.WhenBranch whenBranch, P p) {
         return (K.WhenBranch) super.visitWhenBranch(whenBranch, p);
     }

@@ -269,13 +269,14 @@ func containsGoMod(dir string) bool {
 	return err == nil
 }
 
-// goBuildContext pins GOOS/GOARCH/CgoEnabled so table content is deterministic
-// across build machines; captures the linux/amd64 view.
+// goBuildContext captures the linux/amd64 gc view, pinned so that table
+// content is deterministic across build machines.
 func goBuildContext() build.Context {
 	ctx := build.Default
 	ctx.GOOS = "linux"
 	ctx.GOARCH = "amd64"
 	ctx.CgoEnabled = false
+	ctx.Compiler = "gc"
 	return ctx
 }
 
@@ -337,10 +338,12 @@ type referenceImporter struct {
 
 func newReferenceImporter(refs []string) *referenceImporter {
 	ri := &referenceImporter{
-		modDirs:  map[string]string{},
-		cache:    map[string]*types.Package{},
-		fset:     token.NewFileSet(),
-		def:      importer.Default(),
+		modDirs: map[string]string{},
+		cache:   map[string]*types.Package{},
+		fset:    token.NewFileSet(),
+		// Wrapped for the panic recovery alone: a dependency's type table has no
+		// tree to carry the failures the wrapper records.
+		def:      newResilientImporter(importer.Default()),
 		buildCtx: goBuildContext(),
 	}
 	for _, dir := range refs {

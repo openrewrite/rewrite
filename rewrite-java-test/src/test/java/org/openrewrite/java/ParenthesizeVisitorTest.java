@@ -175,6 +175,32 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
+    void ternaryAsConditionOrCastOperand() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method(boolean x, boolean y, boolean z) {
+                      boolean a = (x ? y : z) ? y : z;
+                      Object b = (Object) (x ? y : z);
+                      boolean c = (x ? y : z);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method(boolean x, boolean y, boolean z) {
+                      boolean a = (x ? y : z) ? y : z;
+                      Object b = (Object) (x ? y : z);
+                      boolean c = x ? y : z;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void instanceofExpressions() {
         rewriteRun(
           java(

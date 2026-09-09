@@ -29,8 +29,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Extracts resolved-dependency information from pdm.lock for overlay onto the
@@ -45,12 +46,12 @@ public class PdmLockParser {
     public static List<ResolvedDependency> findAndParse(Path pyprojectDir, @Nullable Path boundary) {
         Path lockFile = UvLockParser.findLockFile(pyprojectDir, boundary, "pdm.lock");
         if (lockFile == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         try {
             return parse(new String(Files.readAllBytes(lockFile), StandardCharsets.UTF_8));
         } catch (IOException e) {
-            return Collections.emptyList();
+            return emptyList();
         }
     }
 
@@ -59,7 +60,7 @@ public class PdmLockParser {
         try {
             lock = PdmLockReader.parse(content);
         } catch (PdmLockFormatException e) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>(lock.getPackages().size());

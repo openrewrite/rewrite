@@ -529,16 +529,10 @@ func (r *JavaReceiver) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *sw // shallow copy to avoid mutating remoteObjects baseline
 	sw = &c
-	// selector - Java sends ControlParentheses, extract inner Expression for Tag
-	if cpResult := q.Receive(nil, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
-		if cp, ok := cpResult.(*java.ControlParentheses); ok {
-			if _, isEmpty := cp.Tree.Element.(*java.Empty); !isEmpty {
-				sw.Tag = &java.RightPadded[java.Expression]{
-					Element: cp.Tree.Element,
-					After:   cp.Tree.After,
-				}
-			}
-		}
+	// selector - a ControlParentheses matching J.Switch; pass the existing one as
+	// the baseline so a changed selector keeps its unchanged children (mirroring VisitIf).
+	if cpResult := q.Receive(sw.Selector, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
+		sw.Selector = cpResult.(*java.ControlParentheses)
 	}
 	sw.Body = receiveValue(q, sw.Body, func(e *java.Block) any { return r.Visit(e, q) })
 	return sw
@@ -641,6 +635,23 @@ func (r *JavaReceiver) VisitParentheses(parens *java.Parentheses, p any) java.J 
 		parens.Tree = coerceToExpressionRP(result)
 	}
 	return parens
+}
+
+func (r *JavaReceiver) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ptt // shallow copy to avoid mutating remoteObjects baseline
+	ptt = &c
+	// annotations
+	if after := receiveTypedList(q, ptt.Annotations,
+		func(v any) any { return r.Visit(v.(java.Tree), q) },
+		func(v any) *java.Annotation { return v.(*java.Annotation) }); after != nil {
+		ptt.Annotations = after
+	}
+	// parenthesizedType
+	if result := q.Receive(ptt.Type, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
+		ptt.Type = result.(*java.Parentheses)
+	}
+	return ptt
 }
 
 func (r *JavaReceiver) VisitTypeCast(tc *java.TypeCast, p any) java.J {

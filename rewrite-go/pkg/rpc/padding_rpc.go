@@ -166,13 +166,30 @@ func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 // receiveContainerTyped.
 func receiveLeftPaddedEnum[T any](r Receiver, q *ReceiveQueue, before java.LeftPadded[T], parse func(string) T) java.LeftPadded[T] {
 	result := q.Receive(before, func(v any) any {
-		beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, v)
+		beforeSpace, elem, markers := receiveLeftPaddedEnumParts(q, v)
 		return coerceLeftPaddedEnum(beforeSpace, elem, markers, parse)
 	})
 	if result == nil {
 		return before
 	}
 	return result.(java.LeftPadded[T])
+}
+
+// receiveLeftPaddedEnumParts deserializes the three wire fields of an enum-valued
+// JLeftPadded. Unlike receiveLeftPaddedParts it receives the element with a nil
+// closure: enum elements are codec-less scalars, so a CHANGE inlines the new value
+// on the wire (e.g. "NotEqual"), which Receive returns directly for coerceLeftPaddedEnum
+// to parse. A recursion closure would instead make Receive hand back the pre-change
+// `before` element, silently dropping operator mutations.
+func receiveLeftPaddedEnumParts(q *ReceiveQueue, before any) (java.Space, any, java.Markers) {
+	beforeSpace := q.Receive(leftPaddedBefore(before), func(v any) any {
+		return receiveSpace(v.(java.Space), q)
+	})
+	elem := q.Receive(leftPaddedElement(before), nil)
+	markers := q.Receive(leftPaddedMarkers(before), func(v any) any {
+		return receiveMarkersCodec(q, v.(java.Markers))
+	})
+	return beforeSpace.(java.Space), elem, markers.(java.Markers)
 }
 
 // coerceLeftPaddedEnum builds a LeftPadded[T] for an enum slot. The element is either

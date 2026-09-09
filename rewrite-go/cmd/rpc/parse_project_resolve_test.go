@@ -22,6 +22,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
@@ -43,9 +47,7 @@ func TestParseProjectResolvesModuleGraph(t *testing.T) {
 
 	relativeTo := projectDir
 	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 
 	// when
 	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
@@ -61,12 +63,8 @@ func TestParseProjectResolvesModuleGraph(t *testing.T) {
 			main = &mrr.ResolvedDependencies[i]
 		}
 	}
-	if main == nil {
-		t.Fatalf("main module missing from resolved build list: %+v", mrr.ResolvedDependencies)
-	}
-	if !main.Main {
-		t.Errorf("main module should have Main=true: %+v", main)
-	}
+	require.NotNilf(t, main, "main module missing from resolved build list: %+v", mrr.ResolvedDependencies)
+	assert.True(t, main.Main, "main module should have Main=true")
 
 	var sawStdlib, sawMainPkg bool
 	for _, p := range mrr.PackageModules {
@@ -77,12 +75,8 @@ func TestParseProjectResolvesModuleGraph(t *testing.T) {
 			sawMainPkg = true
 		}
 	}
-	if !sawStdlib {
-		t.Errorf("expected stdlib package fmt (Standard) in PackageModules: %+v", mrr.PackageModules)
-	}
-	if !sawMainPkg {
-		t.Errorf("expected the main package mapped to its module in PackageModules: %+v", mrr.PackageModules)
-	}
+	assert.Truef(t, sawStdlib, "expected stdlib package fmt (Standard) in PackageModules: %+v", mrr.PackageModules)
+	assert.Truef(t, sawMainPkg, "expected the main package mapped to its module in PackageModules: %+v", mrr.PackageModules)
 }
 
 func TestParseProjectResolvesTestOnlyDependency(t *testing.T) {
@@ -105,9 +99,7 @@ func TestParseProjectResolvesTestOnlyDependency(t *testing.T) {
 
 	relativeTo := projectDir
 	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 
 	// when
 	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
@@ -123,9 +115,7 @@ func TestParseProjectResolvesTestOnlyDependency(t *testing.T) {
 			sawTestDep = true
 		}
 	}
-	if !sawTestDep {
-		t.Errorf("expected test-only dependency example.com/bar in PackageModules: %+v", mrr.PackageModules)
-	}
+	assert.Truef(t, sawTestDep, "expected test-only dependency example.com/bar in PackageModules: %+v", mrr.PackageModules)
 }
 
 func findGoResolutionResult(t *testing.T, s *server) golang.GoResolutionResult {

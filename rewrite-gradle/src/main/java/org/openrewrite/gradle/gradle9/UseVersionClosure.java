@@ -29,7 +29,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 
-import java.util.Collections;
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -75,7 +75,7 @@ public class UseVersionClosure extends Recipe {
                     // inside closures may be wrapped in J.Return, so the indentation is on the wrapper)
                     return template
                             .withPrefix(((J) s).getPrefix())
-                            .withArguments(Collections.singletonList(
+                            .withArguments(singletonList(
                                     templateLambda.withBody(templateBody.withStatements(originalBody.getStatements()).withEnd(originalBody.getEnd()))));
                 }));
             }

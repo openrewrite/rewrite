@@ -28,13 +28,13 @@
  *    visitor to use matchSequence logic instead of strict length comparison when variadic
  *    captures are present, similar to how method invocations are handled.
  */
-import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript, sourceFileCache} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {Cursor} from "../../../src";
 
 describe('variadic pattern matching in containers', () => {
-    const parser = new JavaScriptParser();
+    const parser = new JavaScriptParser({sourceFileCache});
     const parseCache = new Map<string, any>();
 
     async function parse(code: string) {

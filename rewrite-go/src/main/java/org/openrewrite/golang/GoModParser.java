@@ -150,7 +150,14 @@ public class GoModParser implements Parser {
     }
 
     static @Nullable GoResolutionResult parseMarker(PlainText doc) {
-        String content = doc.getText();
+        return parseMarker(doc.getText(), doc.getSourcePath());
+    }
+
+    /**
+     * The {@code sourcePath} names the go.mod on the returned marker and locates the sibling
+     * go.sum whose hashes enrich it; a path that is not on disk contributes none.
+     */
+    static @Nullable GoResolutionResult parseMarker(@Nullable String content, Path sourcePath) {
         if (content == null || content.isEmpty()) {
             return null;
         }
@@ -173,7 +180,7 @@ public class GoModParser implements Parser {
             }
 
             // Close block on trailing ')'
-            if (block != BlockState.NONE && line.trim().equals(")")) {
+            if (block != BlockState.NONE && ")".equals(line.trim())) {
                 block = BlockState.NONE;
                 continue;
             }
@@ -221,14 +228,14 @@ public class GoModParser implements Parser {
             return null;
         }
 
-        List<ResolvedDependency> resolved = parseSumSibling(doc.getSourcePath());
+        List<ResolvedDependency> resolved = parseSumSibling(sourcePath);
 
         return new GoResolutionResult(
                 Tree.randomId(),
                 modulePath,
                 goVersion,
                 toolchain,
-                doc.getSourcePath().toString(),
+                sourcePath.toString(),
                 requires,
                 replaces,
                 excludes,

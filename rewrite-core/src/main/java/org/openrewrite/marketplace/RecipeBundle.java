@@ -15,33 +15,32 @@
  */
 package org.openrewrite.marketplace;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.request.RpcRequest;
 
-@Data
-@AllArgsConstructor
+@Value
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class RecipeBundle implements RpcRequest {
-    String packageEcosystem;
-    String packageName;
+    @EqualsAndHashCode.Include @Nullable String packageEcosystem;
+    @EqualsAndHashCode.Include @Nullable String packageName;
 
     /**
      * May be a dynamic constraint like LATEST or 0.2.0-SNAPSHOT, resolved in a way that is
      * {@link RecipeBundleResolver} specific. Null when no constraint was requested.
      */
-    @Nullable String requestedVersion;
+    @With @Nullable String requestedVersion;
 
-    @Nullable String version;
+    @With @Nullable String version;
     @Nullable String team;
 
     /**
-     * This may seem a bit backwards here, but the intent is for resolution to be repeatable.
-     * Only when version is null do we resolve the requested version. That resolved version
-     * will then be set on version so that subsequent installations of the same bundle result
-     * in a repeatable outcome.
+     * The version to resolve with: an already-resolved version wins over the requested
+     * constraint, which is what makes a repeat install of the same bundle repeatable.
      */
-    public @Nullable String getVersion() {
+    public @Nullable String getEffectiveVersion() {
         return version == null ? requestedVersion : version;
     }
 

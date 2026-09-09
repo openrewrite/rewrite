@@ -36,9 +36,9 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -499,9 +499,9 @@ class GeneratesCompilationUnitMissingTypes extends ScanningRecipe<AtomicBoolean>
           .map(cu -> (J.CompilationUnit) cu)
           .map(cu -> cu.withClasses(cu.getClasses().stream()
             .map(c -> c.withType(null))
-            .collect(Collectors.toList())))
+            .collect(toList())))
           .map(cu -> (SourceFile) cu.withSourcePath(Path.of("A.java")))
-          .collect(Collectors.toList());
+          .collect(toList());
     }
 }
 

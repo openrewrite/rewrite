@@ -40,6 +40,9 @@ import org.openrewrite.toml.tree.Toml;
 
 import java.util.*;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
+
 /**
  * Regenerates pdm.lock natively from an edited pyproject.toml. Scope (v1) mirrors the poetry engine:
  * an in-place version change of one or more direct dependencies that resolve to a leaf package (no
@@ -198,7 +201,7 @@ public final class PdmLockEngine {
             // Tolerate orphans that already existed under the original declarations; only fail loud
             // on packages this edit orphaned (a removal or closure-shrinking change).
             Set<String> tolerated = originalDeclared == null ?
-                    Collections.emptySet() : orphansUnder(originalDeclared.keySet(), byName);
+                    emptySet() : orphansUnder(originalDeclared.keySet(), byName);
             requireNoOrphans(declared.keySet(), byName, tolerated);
 
             for (Change change : changes) {
@@ -503,7 +506,7 @@ public final class PdmLockEngine {
 
         @SuppressWarnings("unchecked")
         private static Map<String, Object> asMap(@Nullable Object value) {
-            return value instanceof Map ? (Map<String, Object>) value : Collections.emptyMap();
+            return value instanceof Map ? (Map<String, Object>) value : emptyMap();
         }
     }
 

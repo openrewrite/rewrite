@@ -27,10 +27,11 @@ import org.openrewrite.toml.tree.Toml;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PyProjectTomlParserTest {
@@ -68,10 +69,10 @@ class PyProjectTomlParserTest {
           pyprojectToml
         );
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           null,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         assertThat(parsed.get(0)).isInstanceOf(Toml.Document.class);
@@ -134,10 +135,10 @@ class PyProjectTomlParserTest {
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           tempDir,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -176,10 +177,10 @@ class PyProjectTomlParserTest {
           pyprojectToml
         );
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           null,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -210,10 +211,10 @@ class PyProjectTomlParserTest {
           pyprojectToml
         );
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           null,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -241,13 +242,13 @@ class PyProjectTomlParserTest {
         Files.createDirectories(sitePackages.resolve("click-8.1.7.dist-info"));
         Files.createDirectories(sitePackages.resolve("colorama-0.4.6.dist-info"));
 
-        PyProjectTomlParser parser = new PyProjectTomlParser(Collections.emptyMap(), venv);
+        PyProjectTomlParser parser = new PyProjectTomlParser(emptyMap(), venv);
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           tempDir,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -278,10 +279,10 @@ class PyProjectTomlParserTest {
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           tempDir,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -305,10 +306,10 @@ class PyProjectTomlParserTest {
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           tempDir,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -334,10 +335,10 @@ class PyProjectTomlParserTest {
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           tempDir,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);

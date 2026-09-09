@@ -26,7 +26,6 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -36,6 +35,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.sort;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
 
 /**
@@ -374,7 +375,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             return snapshot;
         }
         Set<String> keep = edit.getNewDependencies() == null ?
-                Collections.emptySet() : edit.getNewDependencies().keySet();
+                emptySet() : edit.getNewDependencies().keySet();
         String newKey = edit.getName() + "@" + edit.getNewVersion();
         List<Yaml.Mapping.Entry> scopes = new ArrayList<>();
         for (Yaml.Mapping.Entry scopeEntry : ((Yaml.Mapping) snapshot.getValue()).getEntries()) {
@@ -597,7 +598,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         if (wt != null && wt.getPeerDependencies() != null) {
             body.append("\n    peerDependencies:");
             List<String> peerNames = new ArrayList<>(wt.getPeerDependencies().keySet());
-            Collections.sort(peerNames);
+            sort(peerNames);
             for (String peerName : peerNames) {
                 body.append("\n      ").append(yamlToken(peerName)).append(": ")
                         .append(yamlToken(wt.getPeerDependencies().get(peerName)));
@@ -618,7 +619,7 @@ public final class PnpmLockPatcher implements LockPatcher {
         }
         if (deps != null && !deps.isEmpty()) {
             List<String> names = new ArrayList<>(deps.keySet());
-            Collections.sort(names);
+            sort(names);
             body.append("\n    dependencies:");
             for (String dep : names) {
                 // A closure sibling added in the same edit set resolves through it; anything else carries the

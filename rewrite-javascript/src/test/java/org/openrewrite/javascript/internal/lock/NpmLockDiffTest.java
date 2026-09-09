@@ -21,8 +21,7 @@ import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.*;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonMap;
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
@@ -146,6 +145,81 @@ class NpmLockDiffTest {
     }
 
     @Test
+    void preservesDuplicateNestedPlacements() {
+        // a and c each need shared@1, but the top-level slot holds shared@2, so npm nests a private shared@1 under
+        // each requirer. The same version at two paths is pinned and preserved: an unchanged closure yields no edits.
+        FakeRegistry registry = new FakeRegistry()
+                .add("a", "1.0.0", singletonMap("shared", "^1.0.0"))
+                .add("c", "1.0.0", singletonMap("shared", "^1.0.0"))
+                .add("shared", "1.0.0", emptyMap())
+                .add("shared", "2.0.0", emptyMap());
+        String lock = "{\n" +
+                "  \"name\": \"t\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"requires\": true,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\n" +
+                "      \"name\": \"t\",\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"dependencies\": {\n" +
+                "        \"a\": \"^1.0.0\",\n" +
+                "        \"c\": \"^1.0.0\",\n" +
+                "        \"shared\": \"^2.0.0\"\n" +
+                "      }\n" +
+                "    },\n" +
+                "    \"node_modules/a\": {\"version\": \"1.0.0\"},\n" +
+                "    \"node_modules/a/node_modules/shared\": {\"version\": \"1.0.0\"},\n" +
+                "    \"node_modules/c\": {\"version\": \"1.0.0\"},\n" +
+                "    \"node_modules/c/node_modules/shared\": {\"version\": \"1.0.0\"},\n" +
+                "    \"node_modules/shared\": {\"version\": \"2.0.0\"}\n" +
+                "  }\n" +
+                "}\n";
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
+                "{\"name\":\"t\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\",\"c\":\"^1.0.0\",\"shared\":\"^2.0.0\"}}"));
+        assertThat(NpmLockDiff.diff(graph, lock)).isEmpty();
+    }
+
+    @Test
+    void duplicatePlacementThatChangesDefers() {
+        // shared@1 is placed under both a and c, but the lock marks those copies dev while the resolution has them
+        // prod: a single edit cannot rewrite both copies in step, so it fails loud rather than patch one.
+        FakeRegistry registry = new FakeRegistry()
+                .add("a", "1.0.0", singletonMap("shared", "^1.0.0"))
+                .add("c", "1.0.0", singletonMap("shared", "^1.0.0"))
+                .add("shared", "1.0.0", emptyMap())
+                .add("shared", "2.0.0", emptyMap());
+        String lock = "{\n" +
+                "  \"name\": \"t\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"requires\": true,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\n" +
+                "      \"name\": \"t\",\n" +
+                "      \"version\": \"1.0.0\",\n" +
+                "      \"dependencies\": {\n" +
+                "        \"a\": \"^1.0.0\",\n" +
+                "        \"c\": \"^1.0.0\",\n" +
+                "        \"shared\": \"^2.0.0\"\n" +
+                "      }\n" +
+                "    },\n" +
+                "    \"node_modules/a\": {\"version\": \"1.0.0\"},\n" +
+                "    \"node_modules/a/node_modules/shared\": {\"version\": \"1.0.0\", \"dev\": true},\n" +
+                "    \"node_modules/c\": {\"version\": \"1.0.0\"},\n" +
+                "    \"node_modules/c/node_modules/shared\": {\"version\": \"1.0.0\", \"dev\": true},\n" +
+                "    \"node_modules/shared\": {\"version\": \"2.0.0\"}\n" +
+                "  }\n" +
+                "}\n";
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
+                "{\"name\":\"t\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\",\"c\":\"^1.0.0\",\"shared\":\"^2.0.0\"}}"));
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() -> NpmLockDiff.diff(graph, lock))
+                .withMessageContaining("installed at multiple places and changed");
+    }
+
+    @Test
     void freshForkMemberWithAutoInstalledPeerDefers() {
         // A fresh fork member's peer provider must be dependency-reached and top-level; an auto-installed
         // provider reshapes the layout, so the fork defers.
@@ -163,15 +237,16 @@ class NpmLockDiffTest {
     }
 
     @Test
-    void freshAliasEntryDefers() {
-        // An in-place alias bump patches fine (the entry keeps its name field), but a brand-new alias entry
-        // needs a serialization the patcher does not have yet.
+    void freshAliasEntryAdds() {
+        // A brand-new alias entry (myb aliasing b) adds at its own slot, carrying b as the entry's name field.
         FakeRegistry registry = new FakeRegistry().add("b", "1.0.0", emptyMap());
 
-        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
-                diff(registry, "{\"name\":\"t\",\"version\":\"1.0.0\"," +
-                        "\"dependencies\":{\"myb\":\"npm:b@^1.0.0\"}}"))
-                .withMessageContaining("alias");
+        List<PackageEdit> edits = diff(registry, "{\"name\":\"t\",\"version\":\"1.0.0\"," +
+                "\"dependencies\":{\"myb\":\"npm:b@^1.0.0\"}}");
+
+        PackageEdit edit = editFor(edits, "myb", "1.0.0");
+        assertThat(edit.getKind()).isEqualTo(PackageEdit.Kind.ADD);
+        assertThat(edit.getAliasName()).isEqualTo("b");
     }
 
     @Test
@@ -227,7 +302,7 @@ class NpmLockDiffTest {
 
         @Override
         public Set<String> versions(String name) {
-            return versionsByName.getOrDefault(name, Collections.emptySet());
+            return versionsByName.getOrDefault(name, emptySet());
         }
 
         @Override

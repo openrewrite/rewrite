@@ -283,3 +283,37 @@ def test_param_identifier_field_type():
         after_recipe=check_types,
     ))
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+def test_type_name_identifier_has_no_field_type():
+    """Mirrors J.Identifier.fieldType, which Java populates only from a VarSymbol."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_identifier(self, ident, p):
+                if ident.simple_name in ('Deque', 'int') and ident.field_type is not None:
+                    errors.append(
+                        f"type name '{ident.simple_name}' has field_type "
+                        f"{ident.field_type}, expected None")
+                elif ident.simple_name in ('q', 'local') and ident.field_type is None:
+                    errors.append(f"variable '{ident.simple_name}' has field_type=None")
+                return ident
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        """\
+        from typing import Deque
+
+
+        def f(q: Deque[int]) -> Deque[int]:
+            local: Deque[int] = q
+            return local
+        """,
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)

@@ -255,8 +255,7 @@ class JsoncParserReader {
                 markers: emptyMarkers
             } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>);
         } else {
-            // Parse members
-            // Put back the trivia by prepending it to the key's prefix
+            // Trivia consumed while probing for '}' belongs to the first member's prefix
             let pendingTrivia = afterOpen;
 
             while (true) {
@@ -467,10 +466,10 @@ class JsoncParserReader {
     }
 
     private parseMember(pendingTrivia: string): Json.Member {
-        const keyPrefix = pendingTrivia + this.consumeTrivia();
+        const memberPrefix = pendingTrivia + this.consumeTrivia();
         const key = this.parseKey({
             id: randomId(),
-            prefix: space(keyPrefix),
+            prefix: emptySpace,
             markers: emptyMarkers
         });
 
@@ -485,7 +484,7 @@ class JsoncParserReader {
         return {
             kind: Json.Kind.Member,
             id: randomId(),
-            prefix: emptySpace,
+            prefix: space(memberPrefix),
             markers: emptyMarkers,
             key: {
                 kind: Json.Kind.RightPadded,

@@ -27,8 +27,8 @@ import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
@@ -225,7 +225,7 @@ class AttributeValueTest implements RewriteTest {
           spec -> spec.recipe(describeAttribute("@com.x.Example", "exclude",
             v -> v.getKind() + ":array=" + v.isArray() + ":asLiteral=" + v.asLiteral().isPresent() + ":" + v.getElements().stream()
               .map(e -> e.getKind() + "/" + e.isClassLiteral("com.x.A") + "/" + e.getName())
-              .collect(Collectors.joining(",")))),
+              .collect(joining(",")))),
           java(
             """
               package com.x;
@@ -464,7 +464,7 @@ class AttributeValueTest implements RewriteTest {
           spec -> spec.recipe(describeAttribute("@Example", "tags",
             v -> v.getKind() + ":" + v.getElements().stream()
               .map(e -> e.getKind() + "/" + e.getConstantValue())
-              .collect(Collectors.joining(",")) +
+              .collect(joining(",")) +
               ":asLiteral=" + v.asLiteral().isPresent())),
           java(
             """
@@ -892,7 +892,7 @@ class AttributeValueTest implements RewriteTest {
           spec -> spec.recipe(describeAttribute("@Example", "tags",
             v -> v.getElements().stream()
               .map(e -> e.getKind() + "/" + e.getConstantValue() + "/" + e.getName())
-              .collect(Collectors.joining(",")))),
+              .collect(joining(",")))),
           java(
             """
               class Constants {
@@ -928,7 +928,7 @@ class AttributeValueTest implements RewriteTest {
           spec -> spec.recipe(describeAttribute("@Example", "value",
             v -> v.getElements().stream()
               .map(e -> e.getKind() + "/" + e.getConstantValue() + "/" + e.getName())
-              .collect(Collectors.joining(",")))),
+              .collect(joining(",")))),
           java(
             """
               class Constants {

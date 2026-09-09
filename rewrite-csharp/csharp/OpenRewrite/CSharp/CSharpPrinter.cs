@@ -1144,6 +1144,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(accessor, p);
 
+        foreach (var attrList in accessor.AttributeLists)
+        {
+            Visit(attrList, p);
+        }
+
         // Print modifiers
         foreach (var mod in accessor.Modifiers)
         {
@@ -1321,8 +1326,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
 
         // Print name
-        VisitSpace(classDecl.Name.Prefix, p);
-        p.Append(classDecl.Name.SimpleName);
+        Visit(classDecl.Name, p);
 
         // Print type parameters (generics) — only print <attrs variance name, ...>
         if (classDecl.TypeParameters != null)

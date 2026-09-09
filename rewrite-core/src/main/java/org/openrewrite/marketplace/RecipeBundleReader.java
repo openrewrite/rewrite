@@ -29,6 +29,7 @@ public interface RecipeBundleReader extends AutoCloseable {
 
     Recipe prepare(RecipeListing listing, Map<String, Object> options);
 
+    @Override
     default void close() throws Exception {
         // no-op
     }

@@ -15,18 +15,21 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.tree.Plugin;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.toList;
 
@@ -49,6 +52,10 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     .map(property -> "/project/properties/" + property)
                     .map(XPathMatcher::new).collect(toList());
 
+    private static final List<String> COMPILER_LEVEL_CONFIGURATION = Arrays.asList("source", "target", "release");
+
+    private static final Pattern PROPERTY_REFERENCE = Pattern.compile("\\$\\{([^${}]+)}");
+
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",
             example = "11")
@@ -65,11 +72,15 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                " * `maven.compiler.target`\n" +
                " * `maven.compiler.release`\n" +
                " * `release.version`\n\n" +
+               "Properties of any other name are updated too when the `maven-compiler-plugin` `source`, `target` or `release` " +
+               "configuration of this pom, or of a pom it inherits from, resolves to them.\n\n" +
                "If none of these properties are in use and the maven compiler plugin is not otherwise configured, adds the `maven.compiler.release` property.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
+            final Set<String> compilerLevelProperties = new LinkedHashSet<>();
+
             boolean compilerPluginConfiguredExplicitly;
 
             @Override
@@ -77,12 +88,14 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 // Update properties already defined in the current pom
                 Xml.Document d = super.visitDocument(document, ctx);
 
+                Collection<String> javaVersionProperties = javaVersionProperties();
+
                 // Return early if the parent is within the current repository, as properties defined there will be updated
                 if (getResolutionResult().parentPomIsProjectPom()) {
                     // Unless this pom redefines a property itself, as that value shadows whatever the parent defines
                     Map<String, String> requestedProperties = getResolutionResult().getPom().getRequested().getProperties();
                     Map<String, String> resolvedProperties = getResolutionResult().getPom().getProperties();
-                    for (String property : JAVA_VERSION_PROPERTIES) {
+                    for (String property : javaVersionProperties) {
                         String propertyValue = resolvedProperties.get(property);
                         if (requestedProperties.containsKey(property) && propertyValue != null) {
                             try {
@@ -102,7 +115,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 // Otherwise override remote parent's properties locally
                 Map<String, String> currentProperties = getResolutionResult().getPom().getProperties();
                 boolean foundProperty = false;
-                for (String property : JAVA_VERSION_PROPERTIES) {
+                for (String property : javaVersionProperties) {
                     String propertyValue = currentProperties.get(property);
                     if (propertyValue != null) {
                         foundProperty = true;
@@ -137,14 +150,47 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
                     t.getChild("configuration").ifPresent(compilerPluginConfig -> {
-                        if (compilerPluginConfig.getChildValue("source").isPresent() ||
-                            compilerPluginConfig.getChildValue("target").isPresent() ||
-                            compilerPluginConfig.getChildValue("release").isPresent()) {
-                            compilerPluginConfiguredExplicitly = true;
+                        for (String configuration : COMPILER_LEVEL_CONFIGURATION) {
+                            Optional<String> compilerLevel = compilerPluginConfig.getChildValue(configuration);
+                            if (compilerLevel.isPresent()) {
+                                compilerPluginConfiguredExplicitly = true;
+                                addCompilerLevelProperty(compilerLevel.get(), compilerLevelProperties);
+                            }
                         }
                     });
                 }
                 return t;
+            }
+
+            // Whatever the compiler plugin routes its level through is a Java version property, regardless of its name
+            private Collection<String> javaVersionProperties() {
+                Set<String> properties = new LinkedHashSet<>(JAVA_VERSION_PROPERTIES);
+                properties.addAll(compilerLevelProperties);
+                ResolvedPom pom = getResolutionResult().getPom();
+                addCompilerLevelProperties(pom.getPlugins(), properties);
+                addCompilerLevelProperties(pom.getPluginManagement(), properties);
+                return properties;
+            }
+
+            private void addCompilerLevelProperties(List<Plugin> plugins, Set<String> properties) {
+                for (Plugin plugin : plugins) {
+                    if ("org.apache.maven.plugins".equals(plugin.getGroupId()) &&
+                        "maven-compiler-plugin".equals(plugin.getArtifactId())) {
+                        JsonNode configuration = plugin.getConfiguration();
+                        if (configuration != null) {
+                            for (String name : COMPILER_LEVEL_CONFIGURATION) {
+                                addCompilerLevelProperty(configuration.path(name).asText(""), properties);
+                            }
+                        }
+                    }
+                }
+            }
+
+            private void addCompilerLevelProperty(String compilerLevel, Set<String> properties) {
+                Matcher propertyReference = PROPERTY_REFERENCE.matcher(compilerLevel.trim());
+                if (propertyReference.matches()) {
+                    properties.add(propertyReference.group(1));
+                }
             }
         };
     }

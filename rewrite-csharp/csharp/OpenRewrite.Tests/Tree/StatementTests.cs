@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
+using OpenRewrite.Java;
 using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.Tree;
@@ -248,6 +250,45 @@ public class ForLoopTests : RewriteTest
                 """
             )
         );
+    }
+
+    [Fact]
+    public void InfiniteForHasEmptyInitConditionAndUpdate()
+    {
+        // given
+        var cu = new CSharpParser().Parse(
+            """
+            class Foo {
+                void Bar() {
+                    for (;;) { }
+                }
+            }
+            """);
+
+        // when
+        var finder = new ForLoopFinder();
+        finder.Cursor = new OpenRewrite.Core.Cursor(null, OpenRewrite.Core.Cursor.ROOT_VALUE);
+        finder.Visit(cu, 0);
+        var control = finder.Found!.LoopControl;
+
+        // then
+        Assert.NotNull(finder.Found);
+        Assert.Single(control.Init);
+        Assert.IsType<Empty>(control.Init[0].Element);
+        Assert.IsType<Empty>(control.Condition.Element);
+        Assert.Single(control.Update);
+        Assert.IsType<Empty>(control.Update[0].Element);
+    }
+
+    private class ForLoopFinder : CSharpVisitor<int>
+    {
+        public ForLoop? Found { get; private set; }
+
+        public override J VisitForLoop(ForLoop forLoop, int p)
+        {
+            Found ??= forLoop;
+            return base.VisitForLoop(forLoop, p);
+        }
     }
 }
 

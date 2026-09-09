@@ -31,9 +31,10 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.semver.LatestRelease;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import static java.util.Collections.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -83,14 +84,14 @@ public class SyncGradleExtPropertiesWithBom extends Recipe {
                 List<MavenRepository> repos = sf != null
                         ? sf.getMarkers().findFirst(GradleProject.class)
                         .map(GradleProject::getMavenRepositories)
-                        .orElse(Collections.singletonList(MavenRepository.MAVEN_CENTRAL))
-                        : Collections.singletonList(MavenRepository.MAVEN_CENTRAL);
+                        .orElse(singletonList(MavenRepository.MAVEN_CENTRAL))
+                        : singletonList(MavenRepository.MAVEN_CENTRAL);
                 try {
                     MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                     Pom bom = mpd.download(new GroupArtifactVersion(groupId, artifactId, version), null, null, repos);
-                    bomProperties = bom.resolve(Collections.emptyList(), mpd, repos, ctx).getProperties();
+                    bomProperties = bom.resolve(emptyList(), mpd, repos, ctx).getProperties();
                 } catch (MavenDownloadingException e) {
-                    bomProperties = Collections.emptyMap();
+                    bomProperties = emptyMap();
                 }
                 return bomProperties;
             }

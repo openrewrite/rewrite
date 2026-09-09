@@ -36,6 +36,9 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+
 /**
  * Shared utilities for npm dependency recipes operating on package.json files
  * and their associated lock files.
@@ -64,7 +67,7 @@ public class PackageJsonHelper {
         NodeResolutionResult marker = rootPackageJson.getMarkers()
                 .findFirst(NodeResolutionResult.class).orElse(null);
         if (marker == null || marker.getWorkspacePackagePaths() == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         Path base = rootPackageJson.getSourcePath().getParent();
         List<Path> members = new ArrayList<>();
@@ -95,7 +98,7 @@ public class PackageJsonHelper {
     public static Json.Document reparseJson(Json.Document original, String newContent) {
         JsonParser parser = new JsonParser();
         Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
-        Optional<SourceFile> parsed = parser.parseInputs(Collections.singletonList(input), null,
+        Optional<SourceFile> parsed = parser.parseInputs(singletonList(input), null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)).findFirst();
         if (parsed.isPresent() && parsed.get() instanceof Json.Document) {
             Json.Document doc = (Json.Document) parsed.get();
@@ -107,7 +110,7 @@ public class PackageJsonHelper {
     public static Yaml.Documents reparseYaml(Yaml.Documents original, String newContent) {
         YamlParser parser = new YamlParser();
         Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
-        Optional<SourceFile> parsed = parser.parseInputs(Collections.singletonList(input), null,
+        Optional<SourceFile> parsed = parser.parseInputs(singletonList(input), null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)).findFirst();
         if (parsed.isPresent() && parsed.get() instanceof Yaml.Documents) {
             Yaml.Documents docs = (Yaml.Documents) parsed.get();
@@ -174,7 +177,7 @@ public class PackageJsonHelper {
                                               List<Dependency> previous) {
         Json.JsonObject scope = findObjectMember(root, scopeName);
         if (scope == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         Map<String, Dependency> previousByName = new LinkedHashMap<>();
         if (previous != null) {
@@ -314,14 +317,14 @@ public class PackageJsonHelper {
 
             // New member owns its leading indent; its after carries the scope's closing-brace whitespace.
             Json.Member depMember = makeMember(name, makeStringLiteral(version),
-                    Space.build("\n" + innerIndent, Collections.emptyList()));
+                    Space.build("\n" + innerIndent, emptyList()));
             JsonRightPadded<Json> depRP = JsonRightPadded.build((Json) depMember)
-                    .withAfter(Space.build("\n" + outerIndent, Collections.emptyList()));
+                    .withAfter(Space.build("\n" + outerIndent, emptyList()));
 
             Json.JsonObject scopeObj = new Json.JsonObject(
                     Tree.randomId(), Space.SINGLE_SPACE,
                     org.openrewrite.marker.Markers.EMPTY,
-                    Collections.singletonList(depRP));
+                    singletonList(depRP));
 
             // The new scope member at root level: prefix will be set by appendMember.
             Json.Member newScopeMember = makeMember(scope, scopeObj, Space.EMPTY);
@@ -345,10 +348,10 @@ public class PackageJsonHelper {
             String outerIndent = detectIndentUnit(root);
             String innerIndent = outerIndent + outerIndent;
             Json.Member depMember = makeMember(name, makeStringLiteral(version),
-                    Space.build("\n" + innerIndent, Collections.emptyList()));
+                    Space.build("\n" + innerIndent, emptyList()));
             JsonRightPadded<Json> depRP = JsonRightPadded.build((Json) depMember)
-                    .withAfter(Space.build("\n" + outerIndent, Collections.emptyList()));
-            updatedScope = existingScope.getPadding().withMembers(Collections.singletonList(depRP));
+                    .withAfter(Space.build("\n" + outerIndent, emptyList()));
+            updatedScope = existingScope.getPadding().withMembers(singletonList(depRP));
         } else {
             Json.Member newDep = makeMember(name, makeStringLiteral(version), Space.EMPTY);
             updatedScope = appendMember(existingScope, newDep);

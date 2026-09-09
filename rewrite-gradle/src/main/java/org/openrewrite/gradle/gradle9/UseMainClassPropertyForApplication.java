@@ -26,9 +26,9 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.tree.K;
 
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.singletonList;
 import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
 
 @Value
@@ -110,7 +110,7 @@ public class UseMainClassPropertyForApplication extends Recipe {
                 boolean isKotlinDsl = sourceFile instanceof K.CompilationUnit;
                 if (isKotlinDsl) {
                     Statement statement = GradleParser.builder().build()
-                            .parseInputs(Collections.singletonList(
+                            .parseInputs(singletonList(
                                     Parser.Input.fromString(Paths.get("build.gradle.kts"), snippet)), null, ctx)
                             .map(requireParsed(K.CompilationUnit.class))
                             .findFirst()

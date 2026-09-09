@@ -23,7 +23,12 @@ import * as path from "path";
 
 export class Parse {
     constructor(private readonly inputs: ParserInput[],
-                private readonly relativeTo?: string) {
+                private readonly relativeTo?: string,
+                /**
+                 * Parser options from the peer. Keys this handler does not recognize are ignored, and a
+                 * peer that sends none gets the parser's own defaults.
+                 */
+                private readonly options?: { [key: string]: string }) {
     }
 
     /**
@@ -58,7 +63,7 @@ export class Parse {
                         : "javascript";
 
                     const parser = Parsers.createParser(parserType, {
-                        ctx: new ExecutionContext(),
+                        ctx: new ExecutionContext({...request.options}),
                         relativeTo: request.relativeTo
                     })!;
 

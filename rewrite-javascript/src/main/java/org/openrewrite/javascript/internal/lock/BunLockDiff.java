@@ -27,6 +27,8 @@ import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.*;
 
+import static java.util.Collections.*;
+
 /**
  * Diffs a freshly resolved {@link ResolutionGraph} against the existing {@code bun.lock} (JSONC) and expresses
  * the difference as {@link PackageEdit}s for {@link BunLockPatcher} — so untouched entries keep their bytes and
@@ -98,7 +100,7 @@ final class BunLockDiff {
         for (Map.Entry<String, List<String>> e : graphSlots.entrySet()) {
             String slot = e.getKey();
             List<String> nodeKeys = new ArrayList<>(e.getValue());
-            List<String> lockKeys = new ArrayList<>(lock.keysBySlot.getOrDefault(slot, Collections.emptyList()));
+            List<String> lockKeys = new ArrayList<>(lock.keysBySlot.getOrDefault(slot, emptyList()));
 
             String declared = root.getResolved().get(slot);
             if (declared != null && lockKeys.remove(slot)) {
@@ -311,7 +313,7 @@ final class BunLockDiff {
     /** How a moved entry's dependency edge set changed: drops orphan-prune, gains graft fresh subtrees. */
     private static EdgeDelta edgeDelta(Tuple entry, VersionManifest m) {
         Set<String> oldEdges = fieldKeys(entry.metadata.get("dependencies"));
-        Set<String> newEdges = m.getDependencies() == null ? Collections.emptySet() : m.getDependencies().keySet();
+        Set<String> newEdges = m.getDependencies() == null ? emptySet() : m.getDependencies().keySet();
         return new EdgeDelta(!oldEdges.containsAll(newEdges), !newEdges.containsAll(oldEdges));
     }
 
@@ -355,7 +357,7 @@ final class BunLockDiff {
      */
     private static void requireMetadataCarriesOver(String slot, Tuple entry, VersionManifest m) {
         Map<String, String> oldPeers = stringMap(entry.metadata.get("peerDependencies"));
-        Map<String, String> newPeers = m.getPeerDependencies() == null ? Collections.emptyMap() : m.getPeerDependencies();
+        Map<String, String> newPeers = m.getPeerDependencies() == null ? emptyMap() : m.getPeerDependencies();
         if (!oldPeers.equals(newPeers)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, slot,
                     slot + " changed its peerDependencies on upgrade (not yet patched)");
@@ -534,7 +536,7 @@ final class BunLockDiff {
     }
 
     private static void requireNoRootPeers(ResolutionGraph.Importer root) {
-        if (!root.getDeclared().getOrDefault("peerDependencies", Collections.emptyMap()).isEmpty()) {
+        if (!root.getDeclared().getOrDefault("peerDependencies", emptyMap()).isEmpty()) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                     "the manifest declares peerDependencies (bun workspace peer scopes are not yet patched)");
         }
@@ -605,7 +607,7 @@ final class BunLockDiff {
     /** The scope the root importer declares {@code name} in, or {@code null} for a transitive. */
     private static @Nullable String manifestScope(ResolutionGraph.Importer root, String name) {
         for (String scope : DECLARED_SCOPES) {
-            if (root.getDeclared().getOrDefault(scope, Collections.emptyMap()).containsKey(name)) {
+            if (root.getDeclared().getOrDefault(scope, emptyMap()).containsKey(name)) {
                 return scope;
             }
         }
@@ -629,7 +631,7 @@ final class BunLockDiff {
 
     private static Set<String> fieldKeys(@Nullable JsonNode obj) {
         if (obj == null || !obj.isObject()) {
-            return Collections.emptySet();
+            return emptySet();
         }
         Set<String> keys = new LinkedHashSet<>();
         obj.fieldNames().forEachRemaining(keys::add);
@@ -638,7 +640,7 @@ final class BunLockDiff {
 
     private static Map<String, String> stringMap(@Nullable JsonNode obj) {
         if (obj == null || !obj.isObject()) {
-            return Collections.emptyMap();
+            return emptyMap();
         }
         Map<String, String> map = new LinkedHashMap<>();
         obj.fields().forEachRemaining(f -> map.put(f.getKey(), f.getValue().asText()));

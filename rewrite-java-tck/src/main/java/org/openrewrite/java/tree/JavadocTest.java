@@ -3172,5 +3172,46 @@ class JavadocTest implements RewriteTest {
               )
             );
         }
+
+        @Test
+        void tripleSlashEndingInBackslash() {
+            rewriteRun(
+              java(
+                """
+                  /// Trailing backslash \\
+                  class Test {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void bannerCommentEndingInBackslashes() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                  \t////Section\\\\\\\\
+                  \tvoid first() {}
+
+                  \t///////////Section\\\\\\\\\\\\\\
+                  \tvoid second() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashWithNonEscapingBackslash() {
+            rewriteRun(
+              java(
+                """
+                  ///a\\b
+                  class Test {}
+                  """
+              )
+            );
+        }
     }
 }

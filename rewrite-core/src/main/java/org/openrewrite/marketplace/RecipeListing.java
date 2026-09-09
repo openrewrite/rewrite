@@ -15,7 +15,9 @@
  */
 package org.openrewrite.marketplace;
 
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.NlsRewrite;
 import org.openrewrite.Recipe;

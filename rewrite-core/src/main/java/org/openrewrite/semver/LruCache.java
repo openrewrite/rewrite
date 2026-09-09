@@ -15,9 +15,10 @@
  */
 package org.openrewrite.semver;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
+import static java.util.Collections.synchronizedMap;
 
 /**
  * Factory for the bounded, access-order LRU maps used to memoize the pure (but regex-heavy) results
@@ -35,7 +36,7 @@ final class LruCache {
     }
 
     static <K, V> Map<K, V> bounded(int maxSize) {
-        return Collections.synchronizedMap(new LinkedHashMap<K, V>(256, 0.75f, true) {
+        return synchronizedMap(new LinkedHashMap<K, V>(256, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
                 return size() > maxSize;

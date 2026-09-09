@@ -33,7 +33,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;

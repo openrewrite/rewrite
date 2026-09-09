@@ -21,6 +21,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
@@ -92,12 +96,8 @@ func TestParameterizedTypeRoundTrip_TypeParametersNoChange(t *testing.T) {
 	got := roundTripNodeWithBefore(t, after, before, seed).(*java.ParameterizedType)
 
 	// then: TypeParameters stays a *Container[Expression] with its element intact.
-	if got.TypeParameters == nil {
-		t.Fatal("TypeParameters: got nil, want non-nil *Container[Expression]")
-	}
-	if len(got.TypeParameters.Elements) != 1 {
-		t.Fatalf("TypeParameters.Elements: got %d, want 1", len(got.TypeParameters.Elements))
-	}
+	require.NotNil(t, got.TypeParameters, "TypeParameters: got nil, want non-nil *Container[Expression]")
+	require.Len(t, got.TypeParameters.Elements, 1, "TypeParameters.Elements")
 	if id, ok := got.TypeParameters.Elements[0].Element.(*java.Identifier); !ok || id.Name != "string" {
 		t.Errorf("TypeParameters[0]: got %+v, want Identifier{string}", got.TypeParameters.Elements[0].Element)
 	}
@@ -119,12 +119,8 @@ func TestParameterizedTypeRoundTrip_TypeParametersChange(t *testing.T) {
 
 	got := roundTripNode(t, before, seed).(*java.ParameterizedType)
 
-	if got.TypeParameters == nil {
-		t.Fatal("TypeParameters: got nil, want non-nil")
-	}
-	if len(got.TypeParameters.Elements) != 1 {
-		t.Fatalf("TypeParameters.Elements: got %d, want 1", len(got.TypeParameters.Elements))
-	}
+	require.NotNil(t, got.TypeParameters, "TypeParameters: got nil, want non-nil")
+	require.Len(t, got.TypeParameters.Elements, 1, "TypeParameters.Elements")
 	if id, ok := got.TypeParameters.Elements[0].Element.(*java.Identifier); !ok || id.Name != "int" {
 		t.Errorf("TypeParameters[0]: got %+v, want Identifier{int}", got.TypeParameters.Elements[0].Element)
 	}
@@ -137,9 +133,7 @@ func TestParameterizedTypeRoundTrip_NilTypeParameters(t *testing.T) {
 	seed := &java.ParameterizedType{ID: ptID}
 
 	got := roundTripNode(t, before, seed).(*java.ParameterizedType)
-	if got.TypeParameters != nil {
-		t.Errorf("TypeParameters: got %+v, want nil", got.TypeParameters)
-	}
+	assert.Nilf(t, got.TypeParameters, "TypeParameters: got %+v, want nil", got.TypeParameters)
 }
 
 func TestCompositeRoundTrip_ElementsNoChange(t *testing.T) {
@@ -169,9 +163,7 @@ func TestCompositeRoundTrip_ElementsNoChange(t *testing.T) {
 
 	got := roundTripNodeWithBefore(t, after, before, seed).(*golang.Composite)
 
-	if len(got.Elements.Elements) != 1 {
-		t.Fatalf("Elements: got %d, want 1", len(got.Elements.Elements))
-	}
+	require.Len(t, got.Elements.Elements, 1, "Elements")
 	if id, ok := got.Elements.Elements[0].Element.(*java.Identifier); !ok || id.Name != "a" {
 		t.Errorf("Elements[0]: got %+v, want Identifier{a}", got.Elements.Elements[0].Element)
 	}

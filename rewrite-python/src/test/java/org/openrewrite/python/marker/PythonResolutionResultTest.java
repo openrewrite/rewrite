@@ -20,8 +20,12 @@ import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 
@@ -41,13 +45,13 @@ class PythonResolutionResultTest {
           "pyproject.toml",
           ">=3.10",
           null,
-          Collections.emptyList(),
-          Collections.emptyList(),
-          Collections.emptyMap(),
-          Collections.emptyMap(),
-          Collections.emptyList(),
-          Collections.emptyList(),
-          Collections.singletonList(requests),
+          emptyList(),
+          emptyList(),
+          emptyMap(),
+          emptyMap(),
+          emptyList(),
+          emptyList(),
+          singletonList(requests),
           null,
           null
         );
@@ -70,13 +74,13 @@ class PythonResolutionResultTest {
           "pyproject.toml",
           null,
           null,
-          Collections.emptyList(),
-          Collections.emptyList(),
-          Collections.emptyMap(),
-          Collections.emptyMap(),
-          Collections.emptyList(),
-          Collections.emptyList(),
-          Collections.singletonList(dep),
+          emptyList(),
+          emptyList(),
+          emptyMap(),
+          emptyMap(),
+          emptyList(),
+          emptyList(),
+          singletonList(dep),
           null,
           null
         );
@@ -104,11 +108,11 @@ class PythonResolutionResultTest {
           new Dependency("click", ">=8.0", null, null, null));
 
         Map<String, List<Dependency>> optDeps = new LinkedHashMap<>();
-        optDeps.put("dev", Collections.singletonList(
+        optDeps.put("dev", singletonList(
           new Dependency("pytest", ">=7.0", null, null, null)));
 
         Map<String, List<Dependency>> depGroups = new LinkedHashMap<>();
-        depGroups.put("test", Collections.singletonList(
+        depGroups.put("test", singletonList(
           new Dependency("coverage", ">=7.0", null, null, null)));
 
         PythonResolutionResult marker = new PythonResolutionResult(
@@ -124,9 +128,9 @@ class PythonResolutionResultTest {
           deps,
           optDeps,
           depGroups,
-          Collections.emptyList(),
-          Collections.emptyList(),
-          Collections.emptyList(),
+          emptyList(),
+          emptyList(),
+          emptyList(),
           PackageManager.Uv,
           null
         );

@@ -18,8 +18,9 @@ package org.openrewrite.javascript.internal.lock;
 import lombok.Getter;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 
-import java.util.Collections;
 import java.util.Map;
+
+import static java.util.Collections.unmodifiableMap;
 
 /**
  * One resolved package instance in a {@link ResolutionGraph}: its registry {@link VersionManifest} (name,
@@ -56,7 +57,7 @@ public final class ResolvedNode {
     public ResolvedNode(VersionManifest manifest, Map<String, String> resolvedEdges,
                         boolean dev, boolean optional, boolean devOptional) {
         this.manifest = manifest;
-        this.resolvedEdges = Collections.unmodifiableMap(resolvedEdges);
+        this.resolvedEdges = unmodifiableMap(resolvedEdges);
         this.dev = dev;
         this.optional = optional;
         this.devOptional = devOptional;

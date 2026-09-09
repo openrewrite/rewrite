@@ -28,11 +28,12 @@ import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+
+import static java.util.Collections.singleton;
 
 /**
  * Remove a dependency from a Python project. Supports {@code pyproject.toml}
@@ -249,7 +250,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 if (ps.modifiedDepsFile != null) {
                     return;
                 }
-                Set<String> removals = Collections.singleton(packageName);
+                Set<String> removals = singleton(packageName);
                 Function<PythonDependencyFile, PythonDependencyFile> editFn =
                         t -> t.withRemovedDependencies(removals, scope, groupName);
                 PyProjectHelper.EditAndRegenerateResult r =

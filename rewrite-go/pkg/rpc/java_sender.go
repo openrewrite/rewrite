@@ -19,7 +19,6 @@ package rpc
 import (
 	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -397,22 +396,9 @@ func (s *JavaSender) VisitForEachControl(fc *java.ForEachControl, p any) java.J 
 
 func (s *JavaSender) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*SendQueue)
-	// selector - wrap tag in ControlParentheses for Java's J.Switch model
-	q.GetAndSend(sw, func(v any) any {
-		tag := v.(*java.Switch).Tag
-		var inner java.Expression
-		if tag != nil {
-			inner = tag.Element
-		} else {
-			// Tagless switch: use Empty as the expression
-			inner = &java.Empty{ID: uuid.New()}
-		}
-		return &java.ControlParentheses{
-			ID:      uuid.New(),
-			Markers: java.Markers{ID: uuid.New()},
-			Tree:    java.RightPadded[java.Expression]{Element: inner, After: java.EmptySpace},
-		}
-	}, func(v any) { s.Visit(v.(java.Tree), q) })
+	// selector - already a ControlParentheses, matching J.Switch
+	q.GetAndSend(sw, func(v any) any { return v.(*java.Switch).Selector },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// cases (Block)
 	q.GetAndSend(sw, func(v any) any { return v.(*java.Switch).Body },
 		func(v any) { s.Visit(v.(java.Tree), q) })
@@ -608,8 +594,9 @@ func (s *JavaSender) VisitArrayType(at *java.ArrayType, p any) java.J {
 	// dimension (left-padded)
 	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).Dimension },
 		func(v any) { sendLeftPadded(s, v, q) })
-	// type
-	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).Type }, nil)
+	// type (as ref)
+	q.GetAndSend(at, func(v any) any { return AsRef(v.(*java.ArrayType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return at
 }
 
@@ -652,6 +639,29 @@ func (s *JavaSender) VisitParentheses(parens *java.Parentheses, p any) java.J {
 	q.GetAndSend(parens, func(v any) any { return v.(*java.Parentheses).Tree },
 		func(v any) { sendRightPadded(s, v, q) })
 	return parens
+}
+
+func (s *JavaSender) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, p any) java.J {
+	q := p.(*SendQueue)
+	// annotations (list)
+	q.GetAndSendList(ptt,
+		func(v any) []any {
+			annots := v.(*java.ParenthesizedTypeTree).Annotations
+			if annots == nil {
+				return nil
+			}
+			result := make([]any, len(annots))
+			for i, a := range annots {
+				result[i] = a
+			}
+			return result
+		},
+		func(v any) any { return extractID(v) },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	// parenthesizedType
+	q.GetAndSend(ptt, func(v any) any { return v.(*java.ParenthesizedTypeTree).Type },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return ptt
 }
 
 func (s *JavaSender) VisitTypeCast(tc *java.TypeCast, p any) java.J {

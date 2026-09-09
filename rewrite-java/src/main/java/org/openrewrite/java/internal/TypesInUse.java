@@ -30,7 +30,6 @@ import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -40,6 +39,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static java.util.Collections.emptySet;
 import static java.util.Collections.newSetFromMap;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -125,7 +125,7 @@ public class TypesInUse {
                                 Set<JavaType.Method> declaredMethods,
                                 Set<JavaType.Method> usedMethods,
                                 Set<JavaType.Variable> variables) {
-        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables, Collections.emptySet());
+        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables, emptySet());
     }
 
     /**

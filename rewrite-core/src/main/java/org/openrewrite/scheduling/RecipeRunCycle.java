@@ -339,8 +339,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
      */
     private static class BatchState {
         @Nullable RewriteRpc rpc;
+
         final List<BatchVisit.BatchVisitItem> items = new ArrayList<>();
         final List<List<Recipe>> recipeStacks = new ArrayList<>();
+
         @Nullable SourceFile originalBeforeBatch;
 
         void clear() {
@@ -660,7 +662,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             for (Map.Entry<UUID, String> entry : newSearchResultDescriptions.entrySet()) {
                 UUID id = entry.getKey();
                 String creator = attributionMap.get(id);
-                if (creator == null) continue;
+                if (creator == null) {
+                    continue;
+                }
 
                 String fence = "{{" + id + "}}";
                 int start = fenced.indexOf(fence);

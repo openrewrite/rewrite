@@ -28,12 +28,13 @@ import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Stream;
+
+import static java.util.Collections.singletonMap;
 
 /**
  * Parser for Python source files.
@@ -80,7 +81,7 @@ public class PythonParser implements Parser {
         if (!smallFiles.isEmpty()) {
             PythonValidator<Integer> validator = new PythonValidator<>();
             Map<String, String> options = languageLevel != null
-                    ? Collections.singletonMap("languageLevel", languageLevel.version())
+                    ? singletonMap("languageLevel", languageLevel.version())
                     : null;
             smallFileStream = PythonRewriteRpc.getOrStart().parse(smallFiles, relativeTo, this,
                     Py.CompilationUnit.class.getName(), ctx, options).map(source -> {

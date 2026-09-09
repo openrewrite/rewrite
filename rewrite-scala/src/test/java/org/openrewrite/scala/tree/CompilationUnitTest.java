@@ -520,4 +520,77 @@ class CompilationUnitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void packageThenAnnotatedClass() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar
+            @scala.annotation.meta.field
+            case class ConfigProperty(key: String, defaultValue: Object = null) extends scala.annotation.Annotation
+            """
+          )
+        );
+    }
+
+    @Test
+    void packageThenAnnotatedObject() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar
+            @deprecated
+            object Logging
+            """
+          )
+        );
+    }
+
+    @Test
+    void packageThenAnnotatedVal() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar
+            @deprecated
+            val x = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void packageThenBlankLineThenAnnotatedClass() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar
+
+            @deprecated
+            class Logging
+            """
+          )
+        );
+    }
+
+    @Test
+    void docCommentOnAnnotatedClassBelongsToTheClass() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar
+            /** A trait. */
+            @deprecated
+            trait Logging
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration logging = (J.ClassDeclaration) cu.getStatements().get(0);
+                assertThat(logging.getComments()).hasSize(1);
+                assertThat(logging.getPrefix().getWhitespace()).isEqualTo("\n");
+                assertThat(logging.getLeadingAnnotations().get(0).getPrefix().getWhitespace()).isEmpty();
+            })
+          )
+        );
+    }
+
 }

@@ -20,6 +20,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -49,9 +53,7 @@ func TestParseProjectParsesTestFiles(t *testing.T) {
 
 	relativeTo := projectDir
 	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
+	require.NoError(t, err, "marshal params")
 
 	// when
 	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
@@ -75,9 +77,7 @@ func TestParseProjectParsesTestFiles(t *testing.T) {
 	// holds if the file was type-checked as its own `foo_test` package rather
 	// than lumped in with the co-located `package foo` sources.
 	blackBox := cusByPath["foo/foo_test.go"]
-	if blackBox == nil {
-		t.Fatal("black-box test CU missing; cannot check attribution")
-	}
+	require.NotNil(t, blackBox, "black-box test CU missing; cannot check attribution")
 	var attributed bool
 	visitor.Walk(blackBox, func(tr java.Tree) bool {
 		if mi, ok := tr.(*java.MethodInvocation); ok && mi.Name != nil &&
@@ -87,7 +87,5 @@ func TestParseProjectParsesTestFiles(t *testing.T) {
 		}
 		return true
 	})
-	if !attributed {
-		t.Error("expected helper() in the black-box test package to be type-attributed")
-	}
+	assert.True(t, attributed, "expected helper() in the black-box test package to be type-attributed")
 }

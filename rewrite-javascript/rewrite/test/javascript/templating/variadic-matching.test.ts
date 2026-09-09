@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, JS, pattern} from "../../../src/javascript";
+import {capture, JavaScriptParser, JS, pattern, sourceFileCache} from "../../../src/javascript";
 
 describe('variadic pattern matching against real code', () => {
-    const parser = new JavaScriptParser();
+    const parser = new JavaScriptParser({sourceFileCache});
     const parseCache = new Map<string, any>();
 
     async function parseExpr(code: string) {

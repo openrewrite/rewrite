@@ -39,6 +39,27 @@ type GenericMarker struct {
 
 func (m GenericMarker) ID() uuid.UUID { return m.Ident }
 
+// RecipeThatMadeChanges is one frame of a RecipesThatMadeChanges stack: how the recipe is
+// named, how it was configured, and what it is worth.
+type RecipeThatMadeChanges struct {
+	Name         string
+	DisplayName  *string
+	InstanceName *string
+	// Options are configured option values. Go never interprets them, so they stay in
+	// whatever shape the wire delivered.
+	Options                            any
+	EstimatedEffortPerOccurrenceMillis *int64
+}
+
+// RecipesThatMadeChanges records which recipe stacks changed a source file. Go holds the
+// stacks without interpreting them, so a marker served to this peer returns to the host intact.
+type RecipesThatMadeChanges struct {
+	Ident   uuid.UUID
+	Recipes [][]RecipeThatMadeChanges
+}
+
+func (m RecipesThatMadeChanges) ID() uuid.UUID { return m.Ident }
+
 type SearchResultMarker struct {
 	Ident       uuid.UUID
 	Description string
@@ -164,4 +185,15 @@ func MarkupInfo(markers Markers, message string) Markers {
 // MarkupError attaches an error-level Markup marker to the given Markers.
 func MarkupError(markers Markers, message string) Markers {
 	return AddMarker(markers, NewMarkup(MarkupErrorLevel, message, ""))
+}
+
+const markupWarnJavaType = "org.openrewrite.marker.Markup$Warn"
+
+func AddMarkupWarn(markers Markers, message, detail string) Markers {
+	id := uuid.New()
+	data := map[string]any{"id": id.String(), "message": message}
+	if detail != "" {
+		data["detail"] = detail
+	}
+	return AddMarker(markers, GenericMarker{Ident: id, JavaType: markupWarnJavaType, Data: data})
 }

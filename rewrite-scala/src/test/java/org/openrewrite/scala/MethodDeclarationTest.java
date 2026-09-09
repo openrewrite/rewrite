@@ -17,8 +17,12 @@ package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.marker.MethodBodyEqualsPrefix;
+import org.openrewrite.scala.marker.OmitBraces;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class MethodDeclarationTest implements RewriteTest {
@@ -770,6 +774,66 @@ class MethodDeclarationTest implements RewriteTest {
                 }
                 """
             )
+        );
+    }
+
+    @Test
+    void auxiliaryConstructorWithExpressionBody() {
+        rewriteRun(
+          scala(
+            """
+              class A(a: Int) {
+                def this() = this(0)
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration a = (J.ClassDeclaration) cu.getStatements().get(0);
+                J.MethodDeclaration constructor = (J.MethodDeclaration) a.getBody().getStatements().get(0);
+                assertThat(constructor.getSimpleName()).isEqualTo("this");
+                assertThat(constructor.getMarkers().findFirst(MethodBodyEqualsPrefix.class))
+                  .get().extracting(m -> m.getPrefix().getWhitespace()).isEqualTo(" ");
+
+                J.Block body = constructor.getBody();
+                assertThat(body).isNotNull();
+                assertThat(body.getMarkers().findFirst(OmitBraces.class)).isPresent();
+                assertThat(body.getPrefix().getWhitespace()).isEqualTo(" ");
+                // Dotty closes the body with a `()` literal the source does not contain
+                assertThat(body.getStatements()).singleElement()
+                  .isInstanceOfSatisfying(J.MethodInvocation.class, selfInvocation -> {
+                      assertThat(selfInvocation.getSimpleName()).isEqualTo("this");
+                      assertThat(selfInvocation.getArguments()).singleElement()
+                        .isInstanceOfSatisfying(J.Literal.class, arg -> assertThat(arg.getValue()).isEqualTo(0));
+                  });
+            })
+          )
+        );
+    }
+
+    @Test
+    void auxiliaryConstructorWithBlockBody() {
+        rewriteRun(
+          scala(
+            """
+              class A(a: Int) {
+                def this() = {
+                  this(0)
+                  println("init")
+                }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration a = (J.ClassDeclaration) cu.getStatements().get(0);
+                J.MethodDeclaration constructor = (J.MethodDeclaration) a.getBody().getStatements().get(0);
+
+                J.Block body = constructor.getBody();
+                assertThat(body).isNotNull();
+                assertThat(body.getMarkers().findFirst(OmitBraces.class)).isEmpty();
+                assertThat(body.getEnd().getWhitespace()).isEqualTo("\n  ");
+                assertThat(body.getStatements()).hasSize(2);
+                assertThat(((J.MethodInvocation) body.getStatements().get(0)).getSimpleName()).isEqualTo("this");
+                assertThat(body.getStatements().get(1)).isInstanceOf(J.MethodInvocation.class);
+            })
+          )
         );
     }
 

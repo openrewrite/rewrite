@@ -16,6 +16,8 @@
 package org.openrewrite.docker.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.docker.table.EolDockerImages;
 import org.openrewrite.test.RecipeSpec;
@@ -205,62 +207,17 @@ class FindEndOfLifeImagesTest implements RewriteTest {
         );
     }
 
-    @Test
-    void currentDebianNotFlagged() {
+    // Every tag here has to be one eol-images.yaml does not list; a release reaching EOL is added to
+    // that file, at which point it belongs among the flagged cases above and a newer tag replaces it.
+    @ParameterizedTest
+    @ValueSource(strings = {"debian:trixie", "ubuntu:24.04", "alpine:3.21", "python:3.12", "node:22"})
+    void currentImageNotFlagged(String image) {
         rewriteRun(
           docker(
             """
-              FROM debian:trixie
-              RUN apt-get update
-              """
-          )
-        );
-    }
-
-    @Test
-    void currentUbuntuNotFlagged() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:24.04
-              RUN apt-get update
-              """
-          )
-        );
-    }
-
-    @Test
-    void currentAlpineNotFlagged() {
-        rewriteRun(
-          docker(
-            """
-              FROM alpine:3.21
-              RUN apk update
-              """
-          )
-        );
-    }
-
-    @Test
-    void currentPythonNotFlagged() {
-        rewriteRun(
-          docker(
-            """
-              FROM python:3.12
-              RUN pip install flask
-              """
-          )
-        );
-    }
-
-    @Test
-    void currentNodeNotFlagged() {
-        rewriteRun(
-          docker(
-            """
-              FROM node:22
-              RUN npm install
-              """
+              FROM %s
+              RUN echo building
+              """.formatted(image)
           )
         );
     }
@@ -331,15 +288,15 @@ class FindEndOfLifeImagesTest implements RewriteTest {
           ),
           docker(
             """
-              FROM golang:1.25 AS builder
-              RUN go build -o app .
+              FROM debian:trixie AS builder
+              RUN ./build.sh
 
               FROM debian:buster
               COPY --from=builder /app /app
               """,
             """
-              FROM golang:1.25 AS builder
-              RUN go build -o app .
+              FROM debian:trixie AS builder
+              RUN ./build.sh
 
               ~~(EOL: debian:buster (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:buster
               COPY --from=builder /app /app

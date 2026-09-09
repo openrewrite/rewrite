@@ -67,7 +67,6 @@ public class AutoFormatVisitor<P> extends GolangVisitor<P> {
         // 3. Fix indentation (tabs at correct depth)
         t = new TabsAndIndentsVisitor<P>(stopAfter).visitNonNull(t, p, cursor.fork());
         // 4. Strip trailing whitespace
-        t = new RemoveTrailingWhitespaceVisitor<P>(stopAfter).visitNonNull(t, p, cursor.fork());
-        return t;
+        return new RemoveTrailingWhitespaceVisitor<P>(stopAfter).visitNonNull(t, p, cursor.fork());
     }
 }

@@ -34,7 +34,8 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.version;
-import static org.openrewrite.style.LineWrapSetting.*;
+import static org.openrewrite.style.LineWrapSetting.ChopIfTooLong;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 
 class WrapRecordComponentsTest implements RewriteTest {
 

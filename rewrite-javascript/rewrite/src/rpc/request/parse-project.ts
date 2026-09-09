@@ -55,7 +55,11 @@ export class ParseProject {
          * If not specified, paths are relative to projectPath.
          * Use this when parsing a subdirectory but wanting paths relative to the repository root.
          */
-        private readonly relativeTo?: string
+        private readonly relativeTo?: string,
+        /**
+         * Parser options, as on the `Parse` request.
+         */
+        private readonly options?: { [key: string]: string }
     ) {}
 
     static handle(
@@ -72,21 +76,20 @@ export class ParseProject {
                     context.target = request.projectPath;
 
                     // Dynamic import to break circular dependency
-                    const {DEFAULT_EXCLUSIONS, ProjectParser} = await import("../../javascript/index.js");
+                    const {ProjectParser} = await import("../../javascript/index.js");
 
                     const projectPath = path.resolve(request.projectPath);
                     setLastParsedProject(projectPath);
-                    const exclusions = request.exclusions ?? DEFAULT_EXCLUSIONS;
                     // Use relativeTo if specified, otherwise default to projectPath
                     const relativeTo = request.relativeTo ? path.resolve(request.relativeTo) : projectPath;
 
-                    // Use ProjectParser for file discovery and Prettier detection
-                    const projectParser = new ProjectParser(projectPath, {exclusions});
+                    // Undefined when unset, so the parser can match exclusions to its discovery mode.
+                    const projectParser = new ProjectParser(projectPath, {exclusions: request.exclusions});
                     const discovered = await projectParser.discoverFiles();
                     const prettierLoader = await projectParser.createPrettierLoader();
 
                     const resultItems: ParseProjectResponseItem[] = [];
-                    const ctx = new ExecutionContext();
+                    const ctx = new ExecutionContext({...request.options});
 
                     // Parse package.json files (these get NodeResolutionResult markers)
                     if (discovered.packageJsonFiles.length > 0) {

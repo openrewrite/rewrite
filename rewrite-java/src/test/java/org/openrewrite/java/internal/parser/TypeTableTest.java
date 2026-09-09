@@ -57,6 +57,7 @@ import java.util.zip.GZIPInputStream;
 
 import static io.micrometer.core.instrument.util.DoubleFormat.decimalOrNan;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.internal.parser.TypeTable.VERIFY_CLASS_WRITING;
@@ -764,7 +765,7 @@ class TypeTableTest implements RewriteTest {
             // Verify the generated classes exist
             try (JarFile jar = new JarFile(classesDir.toFile())) {
                 java.util.Set<String> entries = jar.stream().map(JarEntry::getName)
-                  .collect(java.util.stream.Collectors.toSet());
+                  .collect(toSet());
                 assertThat(entries)
                   .contains("test/annotations/Transactional.class")
                   .contains("test/annotations/NotNull.class")
