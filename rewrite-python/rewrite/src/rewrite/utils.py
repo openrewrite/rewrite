@@ -8,7 +8,7 @@ T = TypeVar('T')
 
 
 @dataclass_transform(frozen_default=True, eq_default=False)
-def lst_dataclass(cls):
+def lst_dataclass(cls: type[T]) -> type[T]:
     """An LST node: read-only to a type checker, ordinary to the interpreter.
 
     `frozen=True` would put every field of every node through
@@ -20,7 +20,7 @@ def lst_dataclass(cls):
 
 
 @dataclass_transform(frozen_default=True)
-def lst_value_dataclass(cls):
+def lst_value_dataclass(cls: type[T]) -> type[T]:
     """An LST node compared by value, otherwise as `lst_dataclass`.
 
     Whitespace and comments carry no id, so `prefix == Space.EMPTY` and the
