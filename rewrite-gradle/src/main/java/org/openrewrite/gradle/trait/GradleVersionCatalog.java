@@ -63,9 +63,9 @@ import static org.openrewrite.Tree.randomId;
  * bumping just {@code spring-boot-starter-web} to {@code 3.5.16} can't reuse
  * {@code springBootVersion} (since {@code spring-boot-starter-webflux} still needs
  * {@code 3.5.15}), so it's given its own {@code version('3.5.16')} and {@code springBootVersion}
- * is left alone. If {@code spring-boot-starter-webflux} is later also bumped to {@code 3.5.16} --
- * even by a wholly separate call -- the two agree again, and this catalog puts them back onto
- * the shared reference: {@code springBootVersion} itself becomes {@code version('3.5.16')}, and
+ * is left alone. If {@code spring-boot-starter-webflux} is later also bumped to {@code 3.5.16},
+ * the two agree again, and this catalog puts them back onto the shared reference:
+ * {@code springBootVersion} itself becomes {@code version('3.5.16')}, and
  * both libraries go back to {@code versionRef('springBootVersion')}.
  */
 @EqualsAndHashCode(of = {"cursor", "catalogName"})
