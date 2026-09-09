@@ -132,8 +132,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 for (int i = 0; i < gen.size(); i++) {
                     Statement s = gen.get(i);
                     if (anchorBeginsLine) {
-                        gen.set(i, autoFormat(i == 0 ?
-                                s.withPrefix(anchor.getPrefix().withComments(emptyList())) : s, p, parent));
+                        gen.set(i, autoFormat(i == 0 ? s.withPrefix(lineBreakBefore(anchor)) : s, p, parent));
                     } else {
                         gen.set(i, autoFormat(s, p, parent).withPrefix(leadingPrefix(anchor, i)));
                     }
@@ -147,6 +146,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     default:
                         return gen;
                 }
+            }
+
+            /**
+             * A blank line above the anchor separates it from what precedes and stays with it, so a statement
+             * joining the anchor's line gets a single break at the same indent rather than that separation again.
+             */
+            private Space lineBreakBefore(Statement anchor) {
+                String whitespace = anchor.getPrefix().getWhitespace();
+                return Space.format("\n" + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
             }
 
             private Space leadingPrefix(Statement anchor, int i) {
