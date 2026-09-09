@@ -520,6 +520,20 @@ class TestRemoveImportUsageScoping:
                 )
             )
 
+    def test_keep_import_referenced_in_a_type_alias_type_parameter(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'typing', 'Deque'),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from typing import Deque
+
+                    type Queues[U: Deque[int]] = dict[str, U]
+                    """,
+                )
+            )
+
     def test_keep_import_referenced_in_function_body(self, arm):
         for type_attribution in (False, True):
             spec = RecipeSpec(recipe=self._remove(arm, 'os.path', 'join'),
