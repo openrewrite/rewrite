@@ -267,24 +267,23 @@ export class RewriteRpc {
         let remoteObject: P;
         try {
             remoteObject = await q.receive<P>(before as P);
+            const takenEof = q.take();
+            const eof = takenEof instanceof Promise ? await takenEof : takenEof;
+            if (eof.state !== RpcObjectState.END_OF_OBJECT) {
+                RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
+                throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
+            }
         } catch (e) {
             // Reset our tracking of the remote state so the next interaction
             // forces a full object sync (ADD) instead of a delta (CHANGE).
             this.remoteObjects.delete(id);
             if (nextPage) {
-                // The remote has advanced past this page; leaving it would hand it to
-                // whichever request asks next.
+                // At most one page is ever requested ahead; settling it leaves no request
+                // outstanding on an object this side has stopped receiving.
                 await nextPage.catch(() => {
                 });
             }
             throw e;
-        }
-
-        const takenEof = q.take();
-        const eof = takenEof instanceof Promise ? await takenEof : takenEof;
-        if (eof.state !== RpcObjectState.END_OF_OBJECT) {
-            RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
-            throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
         }
 
         this.remoteObjects.set(id, remoteObject);
