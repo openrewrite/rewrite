@@ -2734,11 +2734,10 @@ class _StdinBuffer:
             if remaining <= 0:
                 return False
             if os.name == 'nt':
-                # Windows: select() doesn't support pipes, so the read runs on a thread.
-                # It takes from the pipe whether or not this call is still waiting, so the
-                # thread and its chunk belong to the buffer: a read that outruns its
-                # deadline is collected by a later call rather than dropped, which would
-                # take those bytes out of the stream and desynchronize every read after.
+                # Windows: select() doesn't support pipes, so a thread does the read. It
+                # takes from the pipe whether or not this call is still waiting for it, so
+                # the thread and its chunk belong to the buffer -- a later _fill collects
+                # what an in-flight read returned, keeping those bytes in the stream.
                 if self._pending_read is None:
                     self._pending_chunk = []
                     pending = self._pending_chunk

@@ -203,9 +203,6 @@ def test_an_unknown_keyword_is_refused_by_both_field_setters():
 
     ident = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
 
-    # A misspelled field is the caller's bug either way: filling a node the receive
-    # queue solely owns reaches assign_fields, and every other write goes through
-    # replace_if_changed. Dropping it silently leaves the field at its placeholder.
     with pytest.raises(TypeError, match="simple_nmae"):
         assign_fields(ident, simple_nmae="y")
 

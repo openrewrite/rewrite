@@ -260,7 +260,7 @@ def test_the_process_exits_eight_on_a_corrupt_frame(tmp_path):
 
 
 def test_a_read_outrunning_its_deadline_is_collected_by_the_next_fill(monkeypatch):
-    """Exercises the Windows branch on any platform; `select` is what Unix uses instead."""
+    # The thread-and-join branch a pipe gets on Windows, driven here on any platform.
     monkeypatch.setattr(server.os, 'name', 'nt')
     read_fd, write_fd = os.pipe()
     buf = server._StdinBuffer()

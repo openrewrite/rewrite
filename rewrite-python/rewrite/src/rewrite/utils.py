@@ -122,11 +122,7 @@ def assign_fields(obj: T, **kwargs) -> T:
 def replace_if_changed(obj: T, **kwargs) -> T:
     """Replace fields on a dataclass, returning the original if nothing changed.
 
-    Handles the convention where properties use public names (e.g., 'prefix')
-    but dataclass fields use private names (e.g., '_prefix').
-
-    Also handles Python keyword conflicts where parameters use trailing underscore
-    (e.g., 'from_' maps to field '_from').
+    Keywords are named as `_FIELD_FOR_KWARG` describes.
 
     This is critical for performance - visitor traversals call replace() on every
     node, and returning the same object when nothing changes avoids unnecessary
