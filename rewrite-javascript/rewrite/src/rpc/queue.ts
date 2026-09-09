@@ -210,15 +210,16 @@ export class RpcSendQueue {
                 throw new Error("A DELETE event should have been sent.");
             }
 
-            const beforeIdx = this.putListPositions(after, before, id);
+            const positions = this.putListPositions(after, before, id);
 
-            for (const anAfter of after) {
-                const beforePos = beforeIdx.get(id(anAfter));
+            for (let i = 0; i < after.length; i++) {
+                const anAfter = after[i];
+                const beforePos = positions === undefined ? -1 : positions[i];
                 const onChangeRun = onChange ? () => onChange(anAfter) : undefined;
-                if (beforePos === undefined) {
+                if (beforePos === -1) {
                     await this.add(anAfter, onChangeRun);
                 } else {
-                    const aBefore = before?.[beforePos];
+                    const aBefore = before![beforePos];
                     if (aBefore === anAfter) {
                         this.put({state: RpcObjectState.NO_CHANGE});
                     } else if (anAfter !== undefined && (isRef(anAfter) || this.typesAreDifferent(anAfter, aBefore))) {
@@ -237,14 +238,22 @@ export class RpcSendQueue {
         });
     }
 
+    /**
+     * Emits the positions message and returns the same positions for the caller to walk,
+     * or undefined when every element is new.
+     */
     private putListPositions<T>(after: T[],
                                 before: T[] | undefined,
-                                id: (value: T) => any): Map<any, number> {
+                                id: (value: T) => any): number[] | undefined {
+        if (!before || before.length === 0) {
+            // Every element is an addition, so the positions are a constant that needs
+            // neither an index map nor a key computed per element.
+            this.put({state: RpcObjectState.CHANGE, value: new Array(after.length).fill(-1)});
+            return undefined;
+        }
         const beforeIdx = new Map<any, number>();
-        if (before) {
-            for (let i = 0; i < before.length; i++) {
-                beforeIdx.set(id(before[i]), i);
-            }
+        for (let i = 0; i < before.length; i++) {
+            beforeIdx.set(id(before[i]), i);
         }
         const positions: number[] = [];
         for (const t of after) {
@@ -252,7 +261,7 @@ export class RpcSendQueue {
             positions.push(beforePos === undefined ? -1 : beforePos);
         }
         this.put({state: RpcObjectState.CHANGE, value: positions});
-        return beforeIdx;
+        return positions;
     }
 
     private async add(after: any, onChange: (() => Promise<any>) | undefined): Promise<void> {
@@ -309,6 +318,8 @@ export class RpcSendQueue {
 
 export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
+    private batchIndex = 0;
+    private sinceYield = 0;
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly sourceFileType: string | undefined,
@@ -317,11 +328,39 @@ export class RpcReceiveQueue {
                 private readonly trace: boolean) {
     }
 
-    async take(): Promise<RpcObjectData> {
-        if (this.batch.length === 0) {
-            this.batch = await this.pull();
+    /**
+     * Returns a value rather than a promise for all but the message that refills the
+     * batch or yields, so the common path costs neither a promise nor an async frame.
+     * @internal
+     */
+    take(): RpcObjectData | Promise<RpcObjectData> {
+        if (this.batchIndex < this.batch.length && ++this.sinceYield < 256) {
+            // An index keeps draining a batch linear; Array.shift() copies the remaining
+            // elements on every call, which is quadratic over the batch.
+            return this.batch[this.batchIndex++]!;
         }
-        return this.batch.shift()!;
+        return this.takeSlow();
+    }
+
+    private async takeSlow(): Promise<RpcObjectData> {
+        if (this.batchIndex >= this.batch.length) {
+            // Every object the sender emits is terminated by END_OF_OBJECT, so a refill
+            // after one means the receiver asked for a field the sender never sent.
+            if (this.batch[this.batchIndex - 1]?.state === RpcObjectState.END_OF_OBJECT) {
+                throw new Error("Read past END_OF_OBJECT: the sender and receiver disagree on this object's shape.");
+            }
+            this.batch = await this.pull();
+            this.batchIndex = 0;
+        }
+        // Awaiting a resolved value only queues a microtask, and Node drains those
+        // before it polls the socket, so without an occasional macrotask a page
+        // requested ahead is never delivered. 256 is where delivery balances the
+        // cost of scheduling.
+        if (this.sinceYield >= 256) {
+            this.sinceYield = 0;
+            await new Promise(resolve => setImmediate(resolve));
+        }
+        return this.batch[this.batchIndex++]!;
     }
 
     receiveMarkers(markers?: Markers): Promise<Markers> {
@@ -342,63 +381,74 @@ export class RpcReceiveQueue {
         before: T | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T> {
-        return saveTrace(this.trace, async () => {
-            const message = await this.take();
-            RpcObjectData.logTrace(message, this.trace, this.logger);
-            let ref: number | undefined;
-            switch (message.state) {
-                case RpcObjectState.NO_CHANGE:
-                    return before!;
-                case RpcObjectState.DELETE:
-                    return undefined as T;
-                case RpcObjectState.ADD:
-                    ref = message.ref;
-                    if (ref !== undefined && message.valueType === undefined && message.value === undefined) {
-                        // This is a pure reference to an existing object
-                        if (this.refs.has(ref)) {
-                            return this.refs.get(ref);
-                        } else {
-                            throw new Error(`Received a reference to an object that was not previously sent: ${ref}`);
-                        }
+        // Tracing is a debugging feature, and the closure is allocated on every
+        // call to decide not to use it; this runs once per field of every tree.
+        if (this.trace) {
+            return saveTrace(true, () => this.receiveImpl(before, onChange));
+        }
+        return this.receiveImpl(before, onChange);
+    }
+
+    private async receiveImpl<T extends any | undefined>(
+        before: T | undefined,
+        onChange?: (before: T) => T | Promise<T | undefined> | undefined
+    ): Promise<T> {
+        const taken = this.take();
+        const message = taken instanceof Promise ? await taken : taken;
+        RpcObjectData.logTrace(message, this.trace, this.logger);
+        let ref: number | undefined;
+        switch (message.state) {
+            case RpcObjectState.NO_CHANGE:
+                return before!;
+            case RpcObjectState.DELETE:
+                return undefined as T;
+            case RpcObjectState.ADD:
+                ref = message.ref;
+                if (ref !== undefined && message.valueType === undefined && message.value === undefined) {
+                    // This is a pure reference to an existing object
+                    if (this.refs.has(ref)) {
+                        return this.refs.get(ref);
                     } else {
-                        // This is either a new object or a forward declaration with ref
-                        before = message.valueType === undefined ?
-                            message.value :
-                            this.newObj(message.valueType);
-                        if (ref !== undefined) {
-                            // For an object like JavaType that we will mutate in place rather than using
-                            // immutable updates because of its cyclic nature, the before instance will ultimately
-                            // be the same as the after instance below.
-                            this.refs.set(ref, before);
-                        }
+                        throw new Error(`Received a reference to an object that was not previously sent: ${ref}`);
                     }
-                // Intentional fall-through...
-                case RpcObjectState.CHANGE:
-                    let after;
-                    let codec;
-                    if (onChange) {
-                        after = await onChange(before!);
-                    } else if ((codec = RpcCodecs.forInstance(before, this.sourceFileType))) {
-                        after = await codec.rpcReceive(before, this);
-                    } else if (message.value !== undefined) {
-                        after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
-                    } else if (message.state === RpcObjectState.ADD && message.valueType) {
-                        throw new Error(
-                            `No RPC codec registered on the TypeScript side for '${message.valueType}'. ` +
-                            `The Java side has a codec and sent property messages that will not be consumed, ` +
-                            `causing RPC queue desynchronization.`
-                        );
-                    } else {
-                        after = before;
-                    }
+                } else {
+                    // This is either a new object or a forward declaration with ref
+                    before = message.valueType === undefined ?
+                        message.value :
+                        this.newObj(message.valueType);
                     if (ref !== undefined) {
-                        this.refs.set(ref, after);
+                        // For an object like JavaType that we will mutate in place rather than using
+                        // immutable updates because of its cyclic nature, the before instance will ultimately
+                        // be the same as the after instance below.
+                        this.refs.set(ref, before);
                     }
-                    return after;
-                default:
-                    throw new Error(`Unknown state type ${message.state}`);
-            }
-        });
+                }
+            // Intentional fall-through...
+            case RpcObjectState.CHANGE:
+                let after;
+                let codec;
+                if (onChange) {
+                    after = await onChange(before!);
+                } else if ((codec = RpcCodecs.forInstance(before, this.sourceFileType))) {
+                    after = await codec.rpcReceive(before, this);
+                } else if (message.value !== undefined) {
+                    after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
+                } else if (message.state === RpcObjectState.ADD && message.valueType) {
+                    throw new Error(
+                        `No RPC codec registered on the TypeScript side for '${message.valueType}'. ` +
+                        `The Java side has a codec and sent property messages that will not be consumed, ` +
+                        `causing RPC queue desynchronization.`
+                    );
+                } else {
+                    after = before;
+                }
+                if (ref !== undefined) {
+                    this.refs.set(ref, after);
+                }
+                return after;
+            default:
+                throw new Error(`Unknown state type ${message.state}`);
+        }
     }
 
     /**
@@ -416,36 +466,48 @@ export class RpcReceiveQueue {
         before: T[] | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T[] | undefined> {
-        return saveTrace(this.trace, async () => {
-            const message = await this.take();
-            RpcObjectData.logTrace(message, this.trace, this.logger);
-            switch (message.state) {
-                case RpcObjectState.NO_CHANGE:
-                    return before;
-                case RpcObjectState.DELETE:
-                    return undefined;
-                case RpcObjectState.ADD:
-                    before = [];
-                // Intentional fall-through...
-                case RpcObjectState.CHANGE:
-                    // The next message should be a CHANGE with a list of positions
-                    const d = await this.take();
-                    const positions = d.value as number[];
-                    if (!positions) {
-                        throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
-                    }
-                    const after: T[] = new Array(positions.length);
-                    for (let i = 0; i < positions.length; i++) {
-                        const beforeIdx = positions[i];
-                        const b: T = await (beforeIdx >= 0 ? before![beforeIdx] as T : undefined) as T;
-                        let received: Promise<T> = this.receive<T>(b, onChange);
-                        after[i] = await received;
-                    }
-                    return after;
-                default:
-                    throw new Error(`${message.state} is not supported for lists.`);
-            }
-        });
+        // Tracing is a debugging feature, and the closure is allocated on every
+        // call to decide not to use it; this runs once per field of every tree.
+        if (this.trace) {
+            return saveTrace(true, () => this.receiveListImpl(before, onChange));
+        }
+        return this.receiveListImpl(before, onChange);
+    }
+
+    private async receiveListImpl<T>(
+        before: T[] | undefined,
+        onChange?: (before: T) => T | Promise<T | undefined> | undefined
+    ): Promise<T[] | undefined> {
+        const taken = this.take();
+        const message = taken instanceof Promise ? await taken : taken;
+        RpcObjectData.logTrace(message, this.trace, this.logger);
+        switch (message.state) {
+            case RpcObjectState.NO_CHANGE:
+                return before;
+            case RpcObjectState.DELETE:
+                return undefined;
+            case RpcObjectState.ADD:
+                before = [];
+            // Intentional fall-through...
+            case RpcObjectState.CHANGE:
+                // The next message should be a CHANGE with a list of positions
+                const takenD = this.take();
+                const d = takenD instanceof Promise ? await takenD : takenD;
+                const positions = d.value as number[];
+                if (!positions) {
+                    throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
+                }
+                const after: T[] = new Array(positions.length);
+                for (let i = 0; i < positions.length; i++) {
+                    const beforeIdx = positions[i];
+                    const b: T = await (beforeIdx >= 0 ? before![beforeIdx] as T : undefined) as T;
+                    let received: Promise<T> = this.receive<T>(b, onChange);
+                    after[i] = await received;
+                }
+                return after;
+            default:
+                throw new Error(`${message.state} is not supported for lists.`);
+        }
     }
 
     private newObj<T>(type: string): T {
