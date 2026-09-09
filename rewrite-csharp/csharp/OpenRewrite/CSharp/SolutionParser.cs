@@ -41,20 +41,53 @@ internal static class SolutionRestore
     /// .NET Framework build assets that are not present on non-Windows machines. They are
     /// restored as NuGet packages and handed to MSBuildWorkspace as MSBuild properties so
     /// legacy projects can be evaluated: <c>VSToolsPath</c> resolves the web-application
-    /// targets import and <c>TargetFrameworkRootPath</c> resolves the reference assemblies.
+    /// targets import and <c>TargetFrameworkRootPath</c> /
+    /// <c>TargetFrameworkFallbackSearchPaths</c> resolve the reference assemblies.
     /// </summary>
     private const string WebTargetsPackage = "MSBuild.Microsoft.VisualStudio.Web_WebApplication.Targets";
     private const string WebTargetsVersion = "12.0.2";
-    private const string ReferenceAssembliesPackage = "Microsoft.NETFramework.ReferenceAssemblies.net48";
     private const string ReferenceAssembliesVersion = "1.0.3";
 
-    private static NetFrameworkBuildAssets? _buildAssets;
+    /// <summary>
+    /// Directories to search for pre-provisioned .NET Framework reference assemblies before
+    /// restoring them from NuGet, separated by <c>;</c>. Each entry is a
+    /// <c>TargetFrameworkRootPath</c>, i.e. a directory containing
+    /// <c>.NETFramework/&lt;version&gt;</c> subdirectories. Set this on machines with no access
+    /// to the reference-assembly packages.
+    /// </summary>
+    public const string ReferenceAssembliesEnvironmentVariable = "REWRITE_DOTNET_REFERENCE_ASSEMBLIES";
 
     /// <summary>
-    /// MSBuild property values pointing at restored .NET Framework build assets. A value is
-    /// null when the corresponding package could not be restored.
+    /// The .NET Framework versions that ship as <c>Microsoft.NETFramework.ReferenceAssemblies.*</c>
+    /// packages, keyed by MSBuild <c>TargetFrameworkVersion</c>.
     /// </summary>
-    internal record NetFrameworkBuildAssets(string? VSToolsPath, string? TargetFrameworkRootPath);
+    private static readonly IReadOnlyDictionary<string, string> ReferenceAssemblyPackages =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["v2.0"] = "net20", ["v3.5"] = "net35", ["v4.0"] = "net40", ["v4.0.3"] = "net403",
+            ["v4.5"] = "net45", ["v4.5.1"] = "net451", ["v4.5.2"] = "net452", ["v4.6"] = "net46",
+            ["v4.6.1"] = "net461", ["v4.6.2"] = "net462", ["v4.7"] = "net47", ["v4.7.1"] = "net471",
+            ["v4.7.2"] = "net472", ["v4.8"] = "net48", ["v4.8.1"] = "net481",
+        };
+
+    private static string? _vsToolsPath;
+    private static bool _vsToolsPathResolved;
+
+    // Reference-assembly root per TargetFrameworkVersion; a null value records a version whose
+    // package could not be provisioned, so it is only attempted once per process.
+    private static readonly Dictionary<string, string?> ReferenceAssemblyRoots =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// MSBuild property values pointing at .NET Framework build assets.
+    /// <see cref="VSToolsPath"/> is null when the web-application targets could not be restored,
+    /// and <see cref="MissingVersions"/> lists the target framework versions whose reference
+    /// assemblies are unavailable — those projects evaluate without type attestation.
+    /// </summary>
+    internal record NetFrameworkBuildAssets(
+        string? VSToolsPath,
+        IReadOnlyList<string> ReferenceAssemblyRoots,
+        IReadOnlyList<string> MissingVersions);
 
     /// <summary>
     /// Restores a solution/project in-process: PackageReference projects via restore-graph
@@ -150,44 +183,106 @@ internal static class SolutionRestore
     }
 
     /// <summary>
-    /// Restores the .NET Framework reference assemblies and web-application targets as NuGet
-    /// packages into a stable per-machine cache directory (flat, version-less layout), so
-    /// MSBuildWorkspace can evaluate legacy projects on non-Windows machines. The result is
-    /// cached for the process lifetime.
+    /// Provisions the reference assemblies for the given .NET Framework target versions plus the
+    /// web-application targets, so MSBuildWorkspace can evaluate legacy projects on machines
+    /// without a .NET Framework targeting pack. Each version is looked for in
+    /// <see cref="ReferenceAssembliesEnvironmentVariable"/>, then in the NuGet global package
+    /// cache, and is only downloaded when neither has it. Results are cached for the process
+    /// lifetime.
     /// </summary>
-    public static async Task<NetFrameworkBuildAssets> RestoreNetFrameworkBuildAssetsAsync(CancellationToken ct)
+    public static async Task<NetFrameworkBuildAssets> RestoreNetFrameworkBuildAssetsAsync(
+        IEnumerable<string> frameworkVersions, CancellationToken ct)
     {
-        if (_buildAssets != null)
-            return _buildAssets;
-
         await Gate.WaitAsync(ct);
         try
         {
-            if (_buildAssets != null)
-                return _buildAssets;
-
             var cacheDir = Path.Combine(Path.GetTempPath(), "openrewrite-netfx-build-assets");
-            var vsToolsPath = Path.Combine(cacheDir, WebTargetsPackage, "tools", "VSToolsPath");
-            var targetFrameworkRootPath = Path.Combine(cacheDir, ReferenceAssembliesPackage, "build");
 
-            if (!Directory.Exists(vsToolsPath))
-                await NuGetResolver.InstallPackageAsync(
-                    WebTargetsPackage, WebTargetsVersion, cacheDir, excludeVersion: true, ct);
-            if (!Directory.Exists(targetFrameworkRootPath))
-                await NuGetResolver.InstallPackageAsync(
-                    ReferenceAssembliesPackage, ReferenceAssembliesVersion, cacheDir, excludeVersion: true, ct);
+            if (!_vsToolsPathResolved)
+            {
+                var vsToolsPath = Path.Combine(cacheDir, WebTargetsPackage, "tools", "VSToolsPath");
+                if (!Directory.Exists(vsToolsPath))
+                    await NuGetResolver.InstallPackageAsync(
+                        WebTargetsPackage, WebTargetsVersion, cacheDir, excludeVersion: true, ct);
+                _vsToolsPath = Directory.Exists(vsToolsPath) ? vsToolsPath : null;
+                _vsToolsPathResolved = true;
+            }
 
-            _buildAssets = new NetFrameworkBuildAssets(
-                Directory.Exists(vsToolsPath) ? vsToolsPath : null,
-                Directory.Exists(targetFrameworkRootPath) ? targetFrameworkRootPath : null);
-            Log.Debug("netfx build assets — VSToolsPath={VSToolsPath}, TargetFrameworkRootPath={TargetFrameworkRootPath}",
-                _buildAssets.VSToolsPath ?? "(missing)", _buildAssets.TargetFrameworkRootPath ?? "(missing)");
-            return _buildAssets;
+            var roots = new List<string>();
+            var missing = new List<string>();
+            foreach (var version in frameworkVersions)
+            {
+                if (!ReferenceAssemblyRoots.TryGetValue(version, out var root))
+                {
+                    root = await ResolveReferenceAssemblyRootAsync(version, cacheDir, ct);
+                    ReferenceAssemblyRoots[version] = root;
+                }
+
+                if (root == null)
+                    missing.Add(version);
+                else if (!roots.Contains(root, StringComparer.OrdinalIgnoreCase))
+                    roots.Add(root);
+            }
+
+            Log.Debug("netfx build assets — VSToolsPath={VSToolsPath}, reference assembly roots=[{Roots}], missing=[{Missing}]",
+                _vsToolsPath ?? "(missing)", string.Join(";", roots), string.Join(";", missing));
+            return new NetFrameworkBuildAssets(_vsToolsPath, roots, missing);
         }
         finally
         {
             Gate.Release();
         }
+    }
+
+    /// <summary>
+    /// Locates a <c>TargetFrameworkRootPath</c> holding the reference assemblies for a single
+    /// <c>TargetFrameworkVersion</c>, restoring the matching NuGet package when necessary.
+    /// </summary>
+    private static async Task<string?> ResolveReferenceAssemblyRootAsync(
+        string version, string cacheDir, CancellationToken ct)
+    {
+        foreach (var configured in PreProvisionedReferenceAssemblyRoots())
+        {
+            if (Directory.Exists(Path.Combine(configured, ".NETFramework", version)))
+                return configured;
+        }
+
+        if (!ReferenceAssemblyPackages.TryGetValue(version, out var moniker))
+        {
+            Log.Debug("netfx build assets: no reference assembly package exists for {Version}", version);
+            return null;
+        }
+
+        var packageId = "Microsoft.NETFramework.ReferenceAssemblies." + moniker;
+        foreach (var cacheRoot in SolutionParser.NuGetCacheRoots)
+        {
+            var packageDir = Path.Combine(cacheRoot, packageId.ToLowerInvariant());
+            if (!Directory.Exists(packageDir))
+                continue;
+            foreach (var installed in Directory.EnumerateDirectories(packageDir))
+            {
+                var cached = Path.Combine(installed, "build");
+                if (Directory.Exists(Path.Combine(cached, ".NETFramework", version)))
+                    return cached;
+            }
+        }
+
+        var buildDir = Path.Combine(cacheDir, packageId, "build");
+        if (!Directory.Exists(buildDir))
+            await NuGetResolver.InstallPackageAsync(
+                packageId, ReferenceAssembliesVersion, cacheDir, excludeVersion: true, ct);
+
+        return Directory.Exists(Path.Combine(buildDir, ".NETFramework", version)) ? buildDir : null;
+    }
+
+    private static IEnumerable<string> PreProvisionedReferenceAssemblyRoots()
+    {
+        var configured = Environment.GetEnvironmentVariable(ReferenceAssembliesEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(configured))
+            yield break;
+
+        foreach (var entry in configured.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            yield return entry;
     }
 }
 
@@ -226,20 +321,37 @@ public class SolutionParser
         // A solution can mix SDK-style and non-SDK projects, so both paths may run.
         var hasPackagesConfig = HasPackagesConfig(path);
 
-        // MSBuild properties handed to MSBuildWorkspace (and restore-graph evaluation). For
-        // legacy (non-SDK) projects these point MSBuild at the .NET Framework reference
-        // assemblies and web-application targets that are not present on non-Windows machines.
-        // Gated on non-SDK project presence (not packages.config): a converted project that
-        // uses PackageReference in a classic csproj still needs them to evaluate/compile.
+        // MSBuild properties handed to MSBuildWorkspace (and restore-graph evaluation). They
+        // point MSBuild at the .NET Framework reference assemblies and web-application targets
+        // that are not present on non-Windows machines. Every .NET Framework target version in
+        // the tree is provisioned, whether it is declared by a classic project
+        // (TargetFrameworkVersion) or an SDK-style one (a net4x/net3x/net2x TargetFramework):
+        // without its own reference assemblies a project resolves no references at all, not
+        // even mscorlib, and its sources are parsed without type attestation.
         var msbuildProperties = new Dictionary<string, string>();
+        var frameworkVersions = DetectNetFrameworkVersions(path);
 
-        if (hasPackagesConfig || HasNonSdkProject(path))
+        if (hasPackagesConfig || frameworkVersions.Count > 0)
         {
-            var buildAssets = await SolutionRestore.RestoreNetFrameworkBuildAssetsAsync(ct);
+            var buildAssets = await SolutionRestore.RestoreNetFrameworkBuildAssetsAsync(frameworkVersions, ct);
             if (buildAssets.VSToolsPath != null)
                 msbuildProperties["VSToolsPath"] = buildAssets.VSToolsPath;
-            if (buildAssets.TargetFrameworkRootPath != null)
-                msbuildProperties["TargetFrameworkRootPath"] = buildAssets.TargetFrameworkRootPath;
+            if (buildAssets.ReferenceAssemblyRoots.Count > 0)
+            {
+                // TargetFrameworkRootPath holds one root; the fallback search paths cover the
+                // rest, so a solution mixing target framework versions resolves all of them.
+                msbuildProperties["TargetFrameworkRootPath"] = buildAssets.ReferenceAssemblyRoots[0];
+                msbuildProperties["TargetFrameworkFallbackSearchPaths"] =
+                    string.Join(";", buildAssets.ReferenceAssemblyRoots);
+            }
+            if (buildAssets.MissingVersions.Count > 0)
+                Log.Warning(
+                    "Reference assemblies for .NETFramework {Versions} are unavailable, so those projects " +
+                    "are parsed without type attestation. Make the " +
+                    "Microsoft.NETFramework.ReferenceAssemblies.* packages restorable, or point {EnvVar} " +
+                    "at a directory containing .NETFramework/<version> reference assemblies.",
+                    string.Join(", ", buildAssets.MissingVersions),
+                    SolutionRestore.ReferenceAssembliesEnvironmentVariable);
         }
 
         _restoredLockFiles = await SolutionRestore.RunAsync(path, hasPackagesConfig, msbuildProperties, ct);
@@ -577,7 +689,7 @@ public class SolutionParser
         return true;
     }
 
-    private static readonly string[] NuGetCacheRoots = BuildNuGetCacheRoots();
+    internal static readonly string[] NuGetCacheRoots = BuildNuGetCacheRoots();
 
     private static string[] BuildNuGetCacheRoots()
     {
@@ -654,25 +766,47 @@ public class SolutionParser
     }
 
     /// <summary>
-    /// Returns true if the solution/project directory tree contains a classic (non-SDK-style)
-    /// project file — one whose root Project element has no Sdk attribute. Such projects need
-    /// the .NET Framework build assets to evaluate on non-Windows machines, whether or not
-    /// they still use packages.config.
+    /// The MSBuild <c>TargetFrameworkVersion</c> values (highest first) that projects in the
+    /// solution/project directory tree target, for classic projects declaring
+    /// <c>TargetFrameworkVersion</c> and SDK-style ones declaring a .NET Framework
+    /// <c>TargetFramework(s)</c> moniker alike. Empty when nothing targets .NET Framework.
     /// </summary>
-    private static bool HasNonSdkProject(string path)
+    internal static IReadOnlyList<string> DetectNetFrameworkVersions(string path)
     {
+        var versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
             var dir = Path.GetDirectoryName(Path.GetFullPath(path));
             if (dir == null)
-                return false;
-            foreach (var projectFile in Directory.EnumerateFiles(dir, "*.csproj", SearchOption.AllDirectories))
+                return Array.Empty<string>();
+            foreach (var projectFile in Directory.EnumerateFiles(dir, "*.*proj", SearchOption.AllDirectories))
             {
                 try
                 {
                     var root = XDocument.Load(projectFile).Root;
-                    if (root != null && root.Attribute("Sdk") == null)
-                        return true;
+                    if (root == null)
+                        continue;
+
+                    // Classic projects carry the MSBuild namespace and SDK-style ones do not, so
+                    // elements are matched on local name.
+                    var properties = root.Elements()
+                        .Where(e => e.Name.LocalName == "PropertyGroup")
+                        .Elements()
+                        .ToList();
+
+                    foreach (var property in properties.Where(e => e.Name.LocalName == "TargetFrameworkVersion"))
+                        AddVersion(versions, NormalizeFrameworkVersion(property.Value));
+
+                    foreach (var property in properties.Where(e =>
+                                 e.Name.LocalName is "TargetFramework" or "TargetFrameworks"))
+                    foreach (var moniker in property.Value.Split(';',
+                                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        AddVersion(versions, FrameworkVersionOfMoniker(moniker));
+
+                    // A classic project that declares no target framework gets the MSBuild default.
+                    if (root.Attribute("Sdk") == null && !properties.Any(e =>
+                            e.Name.LocalName is "TargetFrameworkVersion" or "TargetFramework" or "TargetFrameworks"))
+                        AddVersion(versions, "v4.0");
                 }
                 catch
                 {
@@ -682,10 +816,42 @@ public class SolutionParser
         }
         catch (Exception ex)
         {
-            Log.Debug("HasNonSdkProject: failed for {Path} ({ExType}: {ExMessage}), assuming none",
+            Log.Debug("DetectNetFrameworkVersions: failed for {Path} ({ExType}: {ExMessage}), assuming none",
                 path, ex.GetType().Name, ex.Message);
         }
-        return false;
+
+        return versions
+            .OrderByDescending(v => Version.TryParse(v.TrimStart('v'), out var parsed) ? parsed : new Version(0, 0))
+            .ToList();
+    }
+
+    private static void AddVersion(ISet<string> versions, string? version)
+    {
+        if (version != null)
+            versions.Add(version);
+    }
+
+    /// <summary>Normalizes a declared <c>TargetFrameworkVersion</c> such as <c>4.8</c> to <c>v4.8</c>.</summary>
+    private static string? NormalizeFrameworkVersion(string value)
+    {
+        var trimmed = value.Trim().TrimStart('v', 'V');
+        return Version.TryParse(trimmed.Contains('.') ? trimmed : trimmed + ".0", out _) ? "v" + trimmed : null;
+    }
+
+    /// <summary>
+    /// The <c>TargetFrameworkVersion</c> a .NET Framework moniker maps to (<c>net472</c> is
+    /// <c>v4.7.2</c>), or null for the moniker of any other framework.
+    /// </summary>
+    private static string? FrameworkVersionOfMoniker(string moniker)
+    {
+        var trimmed = moniker.Trim();
+        if (!trimmed.StartsWith("net", StringComparison.OrdinalIgnoreCase))
+            return null;
+        var digits = trimmed[3..];
+        // net5.0 and later are .NET (Core); .NET Framework monikers are bare digits.
+        if (digits.Length is < 2 or > 3 || !digits.All(char.IsAsciiDigit))
+            return null;
+        return "v" + string.Join('.', digits.Select(d => d.ToString()));
     }
 
     /// <summary>
