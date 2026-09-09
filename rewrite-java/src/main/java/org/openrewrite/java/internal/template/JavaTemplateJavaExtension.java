@@ -303,6 +303,35 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             }
 
             @Override
+            public J visitIf(J.If iff, Integer p) {
+                if (loc == ELSE_PREFIX && isScope(iff)) {
+                    List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(
+                            new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
+                            substitutions.getTypeVariables(), loc, mode));
+                    if (gen.size() != 1) {
+                        throw new IllegalArgumentException("Expected a template that would generate exactly one " +
+                                                           "statement to become an else branch, but generated " + gen.size() +
+                                                           ". Template:\n" + substitutedTemplate);
+                    }
+                    Statement branch = gen.get(0);
+                    J.If.Else existing = iff.getElsePart();
+                    if (existing != null) {
+                        // Keep the chain: what this `if` used to fall through to now hangs off the new branch
+                        if (!(branch instanceof J.If)) {
+                            throw new IllegalArgumentException("Adding an else branch to an `if` that already has " +
+                                                               "one requires a template that produces an `if`, so that " +
+                                                               "the existing branch has somewhere to hang. Template:\n" + substitutedTemplate);
+                        }
+                        branch = ((J.If) branch).withElsePart(existing);
+                    }
+                    J.If.Else elsePart = new J.If.Else(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                            JRightPadded.build(branch.withPrefix(Space.SINGLE_SPACE)));
+                    return autoFormat(iff.withElsePart(elsePart), p, getCursor().getParentOrThrow());
+                }
+                return super.visitIf(iff, p);
+            }
+
+            @Override
             public J visitIdentifier(J.Identifier ident, Integer p) {
                 // ONLY for backwards compatibility, otherwise the same as expression replacement
                 if (loc == IDENTIFIER_PREFIX && isScope(ident)) {
