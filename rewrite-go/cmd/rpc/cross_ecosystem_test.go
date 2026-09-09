@@ -35,7 +35,7 @@ type goDelegatingRecipe struct{ recipe.Base }
 
 func (*goDelegatingRecipe) Name() string           { return "org.openrewrite.go.test.Delegating" }
 func (*goDelegatingRecipe) DisplayName() string    { return "Delegating" }
-func (*goDelegatingRecipe) Description() string     { return "Delegates to a Java recipe." }
+func (*goDelegatingRecipe) Description() string    { return "Delegates to a Java recipe." }
 func (*goDelegatingRecipe) JavaRecipeName() string { return "org.openrewrite.java.ChangeType" }
 func (*goDelegatingRecipe) JavaOptions() map[string]any {
 	return map[string]any{
@@ -48,9 +48,13 @@ func (*goDelegatingRecipe) JavaOptions() map[string]any {
 // cross-ecosystem case the host's whole-tree path resolves from the prepared recipeList.
 type goCompositeWithJavaChild struct{ recipe.Base }
 
-func (*goCompositeWithJavaChild) Name() string        { return "org.openrewrite.go.test.CompositeWithJavaChild" }
+func (*goCompositeWithJavaChild) Name() string {
+	return "org.openrewrite.go.test.CompositeWithJavaChild"
+}
 func (*goCompositeWithJavaChild) DisplayName() string { return "Composite with Java child" }
-func (*goCompositeWithJavaChild) Description() string { return "A composite whose child delegates to a Java recipe." }
+func (*goCompositeWithJavaChild) Description() string {
+	return "A composite whose child delegates to a Java recipe."
+}
 func (*goCompositeWithJavaChild) RecipeList() []recipe.Recipe {
 	return []recipe.Recipe{&goDelegatingRecipe{}}
 }
