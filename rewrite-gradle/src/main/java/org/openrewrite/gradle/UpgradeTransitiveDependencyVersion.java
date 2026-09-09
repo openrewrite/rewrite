@@ -774,7 +774,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                         return arg;
                                     }
                                     J.Block body = (J.Block) lambda.getBody();
-                                    return lambda.withBody(body.withEnd(Space.format("\n")));
+                                    return lambda.withBody(body);
                                 })))
                                 .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
                                 .withPrefix(Space.format("\n\n"));
