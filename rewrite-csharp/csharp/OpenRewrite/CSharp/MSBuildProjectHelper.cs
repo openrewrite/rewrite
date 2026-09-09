@@ -21,6 +21,8 @@ using OpenRewrite.Xml;
 using Serilog;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
+using OpenRewrite.Core;
+
 namespace OpenRewrite.CSharp;
 
 /// <summary>
@@ -107,11 +109,11 @@ public static class MSBuildProjectHelper
         var sdk = doc.Root.GetAttributeValue("Sdk");
 
         if (rootDir == null)
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return new MSBuildProject(Tree.RandomId(), sdk);
 
         var projectPath = Path.GetFullPath(Path.Combine(rootDir, doc.SourcePath));
         if (!File.Exists(projectPath))
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return new MSBuildProject(Tree.RandomId(), sdk);
 
         try
         {
@@ -119,7 +121,7 @@ public static class MSBuildProjectHelper
                 .ResolveProjectLockFileAsync(projectPath, null, CancellationToken.None)
                 .GetAwaiter().GetResult();
             if (lockFile == null)
-                return new MSBuildProject(Guid.NewGuid(), sdk);
+                return new MSBuildProject(Tree.RandomId(), sdk);
 
             var projectDir = Path.GetDirectoryName(projectPath)!;
             return CreateFromLockFile(sdk, lockFile, projectDir,
@@ -128,7 +130,7 @@ public static class MSBuildProjectHelper
         catch (Exception ex)
         {
             Log.Debug("Failed to resolve lock file for {Path}: {Error}", projectPath, ex.Message);
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return new MSBuildProject(Tree.RandomId(), sdk);
         }
     }
 
@@ -333,7 +335,7 @@ public static class MSBuildProjectHelper
         var packageSources = ReadPackageSourcesFromTree(projectDir);
 
         return new MSBuildProject(
-            Guid.NewGuid(),
+            Tree.RandomId(),
             sdk,
             new Dictionary<string, PropertyValue>(),
             packageSources,
@@ -513,7 +515,7 @@ public static class MSBuildProjectHelper
         string? tempDir = null;
         try
         {
-            tempDir = Path.Combine(Path.GetTempPath(), "openrewrite-dotnet-" + Guid.NewGuid().ToString("N")[..8]);
+            tempDir = Path.Combine(Path.GetTempPath(), "openrewrite-dotnet-" + Tree.RandomId().ToString("N")[..8]);
             Directory.CreateDirectory(tempDir);
 
             // Materialize all captured build files from the repository context

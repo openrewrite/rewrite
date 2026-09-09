@@ -334,7 +334,7 @@ public class RewriteRpcServer
             {
                 response.Items.Add(new ParseSolutionResponseItem
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Tree.RandomId().ToString(),
                     SourceFileType = "org.openrewrite.quark.Quark",
                     SourcePath = relPath
                 });
@@ -1177,7 +1177,7 @@ public class RewriteRpcServer
             // this marketplace, so a miss means the host owns this recipe: answer with delegatesTo
             // so the host resolves the id locally (the Java recipe is on its classpath) rather than
             // failing with "Recipe not found".
-            var delegateId = Guid.NewGuid().ToString();
+            var delegateId = Tree.RandomId().ToString();
             return Task.FromResult(new PrepareRecipeResponse
             {
                 Id = delegateId,
@@ -1238,7 +1238,7 @@ public class RewriteRpcServer
             }
         }
 
-        var id = Guid.NewGuid().ToString();
+        var id = Tree.RandomId().ToString();
         _preparedRecipes[id] = recipe;
 
         var response = new PrepareRecipeResponse

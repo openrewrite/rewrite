@@ -650,7 +650,7 @@ public class SolutionParser
             Log.Debug("Failed to read project metadata from {ProjectPath}: {Error}", projectPath, ex.Message);
         }
 
-        return new DotNetProject(Guid.NewGuid(), projectName, tfms, sdk);
+        return new DotNetProject(Tree.RandomId(), projectName, tfms, sdk);
     }
 
     /// <summary>
