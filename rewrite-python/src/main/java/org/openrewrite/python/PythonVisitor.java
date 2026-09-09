@@ -303,6 +303,7 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         typeAlias = (Py.TypeAlias) tempStatement;
         typeAlias = typeAlias.withMarkers(visitMarkers(typeAlias.getMarkers(), p));
         typeAlias = typeAlias.withName(visitAndCast(typeAlias.getName(), p));
+        typeAlias = typeAlias.getPadding().withTypeParameters(visitContainer(typeAlias.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         typeAlias = typeAlias.getPadding().withValue(visitLeftPadded(typeAlias.getPadding().getValue(), PyLeftPadded.Location.TYPE_ALIAS_VALUE, p));
         return typeAlias.getPadding().withValue(typeAlias.getPadding().getValue().withElement(visitTypeNameIfNameTree(typeAlias.getPadding().getValue().getElement(), p)));
     }
