@@ -235,7 +235,7 @@ func newServer(cfg serverConfig) *server {
 		remoteObjects:           make(map[string]any),
 		localRefs:               rpc.NewReferenceMap(),
 		inProgressGetObjects:    make(map[string]*getObjectTransfer),
-		pendingDependencyTypes:       make(map[string][]rpc.RpcObjectData),
+		pendingDependencyTypes:  make(map[string][]rpc.RpcObjectData),
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		reverseTypePool:         make(map[string]java.JavaType),
@@ -435,8 +435,26 @@ func (s *server) writeMessage(resp *jsonRPCResponse) error {
 	if err != nil {
 		return err
 	}
-	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
-	_, err = s.writer.Write(append([]byte(header), body...))
+	return s.writeFramed(body)
+}
+
+// Frame buffers are pooled rather than held on the server: a framed write is
+// reachable from the request loop and from a transfer goroutine, so a shared
+// scratch buffer would race.
+var framePool = sync.Pool{New: func() any { b := make([]byte, 0, 1<<16); return &b }}
+
+// Writes one Content-Length framed message in a single Write. The frame is
+// assembled in a pooled buffer, so the payload is not copied into a freshly
+// allocated one, and the header does not cost a second write.
+func (s *server) writeFramed(body []byte) error {
+	bp := framePool.Get().(*[]byte)
+	b := append((*bp)[:0], "Content-Length: "...)
+	b = strconv.AppendInt(b, int64(len(body)), 10)
+	b = append(b, '\r', '\n', '\r', '\n')
+	b = append(b, body...)
+	_, err := s.writer.Write(b)
+	*bp = b
+	framePool.Put(bp)
 	return err
 }
 
@@ -1058,7 +1076,7 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 
 	strIntern := make(map[string]string)
 
-	fetchBatch := func() []rpc.RpcObjectData {
+	requestPage := func() error {
 		reqParams := getObjectRequest{ID: id, SourceFileType: sourceFileType}
 		paramsJSON, _ := json.Marshal(reqParams)
 		rpcReq := map[string]any{
@@ -1068,12 +1086,47 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			"params":  json.RawMessage(paramsJSON),
 		}
 		body, _ := json.Marshal(rpcReq)
-		header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
-		s.writer.Write(append([]byte(header), body...))
+		return s.writeFramed(body)
+	}
 
-		// Failures panic: the receive queue indexes whatever this returns, so an empty
-		// batch would surface as "index out of range" naming nothing. The recover in
-		// the caller turns a panic into one clear error.
+	// The request for the next page goes out before the current one is handed back,
+	// so Java serializes it while Go is still deserializing what it already has.
+	// At most one request is outstanding, and drainPage below consumes it before
+	// this call returns -- an unread response would otherwise be read as the reply
+	// to whatever request comes next.
+	outstanding := false
+	drainPage := func() {
+		if !outstanding {
+			return
+		}
+		outstanding = false
+		// A message carrying a method is a request Java initiated, which Go cannot
+		// answer from here; it is read past so the page behind it still arrives.
+		for {
+			msg, err := s.readMessage()
+			if err != nil {
+				s.logger.Printf("Error draining prefetched page: %v", err)
+				return
+			}
+			if msg.Method == "" {
+				return
+			}
+			s.logger.Printf("Expected the prefetched GetObject page, got a %s request", msg.Method)
+		}
+	}
+
+	fetchBatch := func() []rpc.RpcObjectData {
+		if !outstanding {
+			if err := requestPage(); err != nil {
+				s.logger.Printf("Error requesting object page: %v", err)
+				return nil
+			}
+		}
+		outstanding = false
+
+		// A reply that cannot be turned into a batch panics: the receive queue indexes
+		// whatever this returns, so an empty batch would surface as "index out of range"
+		// naming nothing. The recover in the caller turns a panic into one clear error.
 		resp, err := s.readMessage()
 		if err != nil {
 			panic(fmt.Errorf("GetObject %s: reading the reply failed: %w", id, err))
@@ -1099,6 +1152,15 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		if err != nil {
 			panic(fmt.Errorf("GetObject %s: decoding the reply failed: %w", id, err))
 		}
+		// END_OF_OBJECT closes the transfer, so a page carrying it has no successor
+		// to ask for; asking anyway would restart the transfer on the Java side.
+		if len(batch) > 0 && batch[len(batch)-1].State != rpc.EndOfObject {
+			if err = requestPage(); err != nil {
+				s.logger.Printf("Error requesting next object page: %v", err)
+			} else {
+				outstanding = true
+			}
+		}
 		return batch
 	}
 
@@ -1108,6 +1170,8 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 
 	var obj any
 	func() {
+		// Registered first so it runs last, after the recover below re-panics.
+		defer drainPage()
 		// A panic mid-receive leaves Go's per-id baseline diverged from Java's:
 		// Java records remoteObjects[id] when it generates the diff, so its next
 		// send would be a CHANGE delta against a baseline Go never finished
