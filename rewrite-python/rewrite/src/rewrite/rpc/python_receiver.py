@@ -87,8 +87,7 @@ class PythonRpcReceiver:
         # wrapped child: the sender skips them here and sends them via the child's preVisit.
         if isinstance(tree, J):
             if isinstance(tree, (ExpressionStatement, StatementExpression)):
-                new_id = q.receive(tree._id)
-                tree = tree.replace(_id=id_to_int(new_id)) if new_id is not tree._id else tree
+                tree = q.apply(tree, _id=q.receive(tree._id))
             else:
                 tree = self._pre_visit(tree, q)
 
