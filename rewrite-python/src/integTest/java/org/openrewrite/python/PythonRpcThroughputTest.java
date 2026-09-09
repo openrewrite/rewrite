@@ -28,7 +28,9 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.stream.Collectors.toList;
@@ -54,28 +56,42 @@ class PythonRpcThroughputTest {
     }
 
     /**
-     * Summed across threads because a send runs on a traversal thread. Both counters
-     * are cumulative per thread, so the difference of two readings is the work between.
+     * Per thread, because a send runs on a traversal thread and both counters are
+     * cumulative per thread. Kept as a snapshot so {@link #since} can tell a thread
+     * that started mid-phase from one that was already running.
      */
-    static long cpuNanos() {
+    static Map<Long, Long> cpuNanos() {
         ThreadMXBean t = ManagementFactory.getThreadMXBean();
-        long total = 0;
+        Map<Long, Long> byThread = new HashMap<>();
         for (long id : t.getAllThreadIds()) {
             long c = t.getThreadCpuTime(id);
             if (c > 0) {
-                total += c;
+                byThread.put(id, c);
             }
         }
-        return total;
+        return byThread;
     }
 
-    static long allocated() {
-        long total = 0;
+    static Map<Long, Long> allocated() {
+        Map<Long, Long> byThread = new HashMap<>();
         for (long id : ManagementFactory.getThreadMXBean().getAllThreadIds()) {
             long b = ALLOC.getThreadAllocatedBytes(id);
             if (b > 0) {
-                total += b;
+                byThread.put(id, b);
             }
+        }
+        return byThread;
+    }
+
+    /**
+     * Work recorded against the threads alive at the end, counting one that started
+     * in between from zero. A thread that exits mid-phase takes its own total with
+     * it: the counters are unreadable once it is gone, so this is a lower bound.
+     */
+    static long since(Map<Long, Long> before, Map<Long, Long> after) {
+        long total = 0;
+        for (Map.Entry<Long, Long> e : after.entrySet()) {
+            total += e.getValue() - before.getOrDefault(e.getKey(), 0L);
         }
         return total;
     }
@@ -112,7 +128,8 @@ class PythonRpcThroughputTest {
     }
 
     List<SourceFile> parse(Path project, List<String> exclusions, String label) {
-        long cpu = cpuNanos(), alloc = allocated(), nanos = System.nanoTime();
+        Map<Long, Long> cpu = cpuNanos(), alloc = allocated();
+        long nanos = System.nanoTime();
         List<SourceFile> files = PythonRewriteRpc.getOrStart()
                 .parseProject(project, exclusions, new InMemoryExecutionContext(Throwable::printStackTrace))
                 .collect(toList());
@@ -125,7 +142,8 @@ class PythonRpcThroughputTest {
         // the peer fetch it back, which is what exercises its receive path.
         PythonRewriteRpc.getOrStart().reset();
 
-        long cpu = cpuNanos(), alloc = allocated(), nanos = System.nanoTime();
+        Map<Long, Long> cpu = cpuNanos(), alloc = allocated();
+        long nanos = System.nanoTime();
         long chars = 0;
         for (SourceFile f : files) {
             chars += PythonRewriteRpc.getOrStart().print(f).length();
@@ -133,12 +151,13 @@ class PythonRpcThroughputTest {
         report("PRINT", label, files.size(), nanos, cpu, alloc, chars);
     }
 
-    static void report(String phase, String label, int files, long startNanos, long startCpu, long startAlloc, long chars) {
+    static void report(String phase, String label, int files, long startNanos,
+                       Map<Long, Long> startCpu, Map<Long, Long> startAlloc, long chars) {
         System.out.printf("%s  %-10s %4d files  wall %,6d ms  jvmCpu %,6d ms  %,15d bytes%s%n",
                 phase, label, files,
                 (System.nanoTime() - startNanos) / 1_000_000,
-                (cpuNanos() - startCpu) / 1_000_000,
-                allocated() - startAlloc,
+                since(startCpu, cpuNanos()) / 1_000_000,
+                since(startAlloc, allocated()),
                 chars == 0 ? "" : String.format("  %,d chars", chars));
     }
 }
