@@ -61,6 +61,7 @@ type jsonRPCRequest struct {
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params"`
 	Result  json.RawMessage `json:"result"` // present in responses
+	Error   *rpcError       `json:"error"`  // present in error responses
 }
 
 type jsonRPCResponse struct {
@@ -1123,10 +1124,20 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		}
 		outstanding = false
 
+		// A reply that cannot be turned into a batch panics: the receive queue indexes
+		// whatever this returns, so an empty batch would surface as "index out of range"
+		// naming nothing. The recover in the caller turns a panic into one clear error.
 		resp, err := s.readMessage()
 		if err != nil {
-			s.logger.Printf("Error reading bidirectional response: %v", err)
-			return nil
+			panic(fmt.Errorf("GetObject %s: reading the reply failed: %w", id, err))
+		}
+
+		if resp.Error != nil {
+			if resp.Error.Data != "" {
+				// The peer's own frames go to the log; the message travels back to it.
+				s.logger.Printf("GetObject %s failed on the peer:\n%s", id, resp.Error.Data)
+			}
+			panic(fmt.Errorf("GetObject %s failed on the peer: %s", id, resp.Error.Message))
 		}
 
 		resultData := resp.Result
@@ -1134,14 +1145,12 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			resultData = resp.Params
 		}
 		if resultData == nil {
-			s.logger.Printf("No result data in bidirectional response")
-			return nil
+			panic(fmt.Errorf("GetObject %s: reply carried no result", id))
 		}
 
 		batch, err := rpc.DecodeBatch(resultData, strIntern)
 		if err != nil {
-			s.logger.Printf("Error parsing response result: %v", err)
-			return nil
+			panic(fmt.Errorf("GetObject %s: decoding the reply failed: %w", id, err))
 		}
 		// END_OF_OBJECT closes the transfer, so a page carrying it has no successor
 		// to ask for; asking anyway would restart the transfer on the Java side.
@@ -1196,9 +1205,12 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			return v
 		})
 
-		// Consume the END_OF_OBJECT sentinel if present
-		if len(q.PeekBatch()) > 0 && q.PeekBatch()[0].State == rpc.EndOfObject {
-			q.Take()
+		// Taking the marker pulls the page still in flight — there is one whenever the
+		// last page did not end in END_OF_OBJECT — so a failure the peer reported on it
+		// reaches the recover above. Java's RewriteRpc.getObject and JS's rewrite-rpc.ts
+		// take the marker inside their failure scope for the same reason.
+		if msg := q.Take(); msg.State != rpc.EndOfObject {
+			panic(fmt.Errorf("GetObject %s: expected END_OF_OBJECT, got %v", id, msg.State))
 		}
 	}()
 

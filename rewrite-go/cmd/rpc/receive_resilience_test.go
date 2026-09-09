@@ -69,6 +69,67 @@ func newResilienceTestServer(t *testing.T) (*server, *bytes.Buffer) {
 	return s, &logs
 }
 
+// frameReverseGetObjectError is frameReverseGetObjectReply's error twin — the
+// shape Java sends when its own traversal fails partway through the reply.
+func frameReverseGetObjectError(t *testing.T, message, data string) []byte {
+	t.Helper()
+	return frame(t, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "go-GetObject",
+		"error":   map[string]any{"code": -32603, "message": message, "data": data},
+	})
+}
+
+// TestGetObjectFromJavaSurfacesRemoteError pins that an error response to a
+// reverse GetObject fails the receive with the peer's message, and puts the
+// peer's frames in the log.
+func TestGetObjectFromJavaSurfacesRemoteError(t *testing.T) {
+	s, logs := newResilienceTestServer(t)
+
+	const remoteMessage = "Internal error: Failed to send object tree-X " +
+		"(type: org.openrewrite.text.PlainText): java.lang.NullPointerException"
+	const remoteTrace = "\tat org.openrewrite.text.PlainTextRpcCodec.rpcSend(PlainTextRpcCodec.java:44)"
+	s.reader = bufio.NewReader(bytes.NewReader(frameReverseGetObjectError(t, remoteMessage, remoteTrace)))
+	s.writer = &bytes.Buffer{}
+
+	recovered := func() (r any) {
+		defer func() { r = recover() }()
+		s.getObjectFromJava("tree-X", "")
+		return nil
+	}()
+
+	require.NotNil(t, recovered, "expected the error response to fail the receive")
+	require.Contains(t, fmt.Sprint(recovered), remoteMessage)
+
+	require.Contains(t, logs.String(), remoteTrace, "the peer's frames belong in the log")
+}
+
+// TestErrorOnAPrefetchedPageFailsTheTransfer pins the page requested ahead. The object
+// is already complete when the error arrives, so nothing else forces that page to be
+// read, and draining it would leave the peer's failure unreported.
+func TestErrorOnAPrefetchedPageFailsTheTransfer(t *testing.T) {
+	s, _ := newResilienceTestServer(t)
+
+	const remoteMessage = "Internal error: Failed to send object tree-X: java.lang.NullPointerException"
+	// Page 1 completes the value but does not close the transfer, so Go asks for a
+	// page 2 that carries END_OF_OBJECT — and Java fails while producing it.
+	stream := append(
+		frameReverseGetObjectReply(t, []map[string]any{{"state": "ADD", "value": "package main\n"}}),
+		frameReverseGetObjectError(t, remoteMessage, "")...,
+	)
+	s.reader = bufio.NewReader(bytes.NewReader(stream))
+	s.writer = &bytes.Buffer{}
+
+	recovered := func() (r any) {
+		defer func() { r = recover() }()
+		s.getObjectFromJava("tree-X", "")
+		return nil
+	}()
+
+	require.NotNil(t, recovered, "expected the error page to fail the transfer")
+	require.Contains(t, fmt.Sprint(recovered), remoteMessage)
+}
+
 // TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs reproduces the
 // receive-stream cascade and pins down the containment contract.
 //
