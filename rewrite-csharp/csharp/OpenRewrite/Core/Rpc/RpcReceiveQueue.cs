@@ -20,6 +20,8 @@ using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
 
+using OpenRewrite.Core;
+
 namespace OpenRewrite.Core.Rpc;
 
 /// <summary>
@@ -314,7 +316,7 @@ public class RpcReceiveQueue
             else if (typeof(Marker).IsAssignableFrom(typeof(T)))
             {
                 // Unknown marker type from Java — use UnknownMarker as fallback
-                return (T)(object)new UnknownMarker(Guid.NewGuid());
+                return (T)(object)new UnknownMarker(Tree.RandomId());
             }
             else
             {
@@ -346,7 +348,7 @@ public class RpcReceiveQueue
         if (type.IsInterface || type.IsAbstract)
         {
             if (typeof(Marker).IsAssignableFrom(type))
-                return (T)(object)new UnknownMarker(Guid.NewGuid());
+                return (T)(object)new UnknownMarker(Tree.RandomId());
             throw new InvalidOperationException(
                 $"Cannot instantiate interface/abstract type: {type.FullName} (from {javaTypeName})");
         }
@@ -415,10 +417,10 @@ public class RpcReceiveQueue
             {
                 var id = je.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String
                     ? Guid.Parse(idProp.GetString()!)
-                    : Guid.NewGuid();
+                    : Tree.RandomId();
                 return (T)(object)new UnknownMarker(id);
             }
-            return (T)(object)new UnknownMarker(Guid.NewGuid());
+            return (T)(object)new UnknownMarker(Tree.RandomId());
         }
 
         if (value is JsonElement jeNormal)

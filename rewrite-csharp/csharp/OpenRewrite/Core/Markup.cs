@@ -46,25 +46,25 @@ public abstract class Markup(Guid id, string message, string? detail) : Marker, 
     /// Adds an Error markup marker to the given tree node.
     /// </summary>
     public static T CreateError<T>(T tree, string message, string? detail = null) where T : J
-        => AddMarker(tree, new Error(Guid.NewGuid(), message, detail));
+        => AddMarker(tree, new Error(Tree.RandomId(), message, detail));
 
     /// <summary>
     /// Adds a Warn markup marker to the given tree node.
     /// </summary>
     public static T CreateWarn<T>(T tree, string message, string? detail = null) where T : J
-        => AddMarker(tree, new Warn(Guid.NewGuid(), message, detail));
+        => AddMarker(tree, new Warn(Tree.RandomId(), message, detail));
 
     /// <summary>
     /// Adds an Info markup marker to the given tree node.
     /// </summary>
     public static T CreateInfo<T>(T tree, string message, string? detail = null) where T : J
-        => AddMarker(tree, new Info(Guid.NewGuid(), message, detail));
+        => AddMarker(tree, new Info(Tree.RandomId(), message, detail));
 
     /// <summary>
     /// Adds a Debug markup marker to the given tree node.
     /// </summary>
     public static T CreateDebug<T>(T tree, string message, string? detail = null) where T : J
-        => AddMarker(tree, new Debug(Guid.NewGuid(), message, detail));
+        => AddMarker(tree, new Debug(Tree.RandomId(), message, detail));
 
     public sealed class Error(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Error>
     {
