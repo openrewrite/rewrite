@@ -15,12 +15,15 @@
 """Shared utility functions for Python import handling."""
 
 import ast
-from typing import Iterator, Optional, Sequence, Tuple
+from typing import Iterator, Optional, Sequence, Set, Tuple
 
 from rewrite.java.support_types import JavaType, JRightPadded, Space, Statement
-from rewrite.java.tree import Block, Empty, FieldAccess, Identifier, If, Import
+from rewrite.java.tree import (Assignment, AssignmentOperation, Block, Empty, FieldAccess,
+                               Identifier, If, Import, Literal, MethodInvocation)
 from rewrite.markers import Markers
 from rewrite.python.markers import Quoted
+from rewrite.python.tree import (CollectionLiteral, ExpressionStatement, StatementExpression,
+                                 TypeHintedExpression)
 
 
 def unconditional_body(if_: If) -> Optional[Block]:
@@ -44,6 +47,62 @@ def module_scope_blocks(statements: Sequence[Statement]) -> Iterator[Block]:
         if body is not None:
             yield body
             yield from module_scope_blocks(body.statements)
+
+
+def _unwrap(expr):
+    """The expression under the statement and annotation wrappers, so that
+    `__all__: list = [...]` reaches the same identifier as `__all__ = [...]`."""
+    while isinstance(expr, (ExpressionStatement, StatementExpression, TypeHintedExpression)):
+        expr = expr.expression
+    return expr
+
+
+def _exported_entries(value) -> Optional[Set[str]]:
+    """The strings a list or tuple literal holds, or None for any other value or
+    any entry that is not a string literal."""
+    if not isinstance(value, CollectionLiteral) or value.kind not in (
+            CollectionLiteral.Kind.LIST, CollectionLiteral.Kind.TUPLE):
+        return None
+    names: Set[str] = set()
+    for element in value.elements:
+        if not isinstance(element, Literal) or not isinstance(element.value, str):
+            return None
+        names.add(element.value)
+    return names
+
+
+def _binds_all(expr) -> bool:
+    """True when ``expr`` names ``__all__``."""
+    target = _unwrap(expr)
+    return isinstance(target, Identifier) and target.simple_name == '__all__'
+
+
+def module_exported_names(cu) -> Optional[Set[str]]:
+    """The names a module re-exports through a module-scope ``__all__``, empty when it
+    declares none, None once one is written in a shape whose entries cannot be read.
+
+    `type_mapping._module_all_names` is the same rule over `ast`; keep the two in step.
+    That one classifies a public surface and may skip an entry, while an entry missed
+    here would drop an import the module still needs, so anything unreadable is None.
+    """
+    statements = list(cu.statements)
+    for block in module_scope_blocks(cu.statements):
+        statements.extend(block.statements)
+
+    names: Set[str] = set()
+    for stmt in statements:
+        stmt = _unwrap(stmt)
+        if isinstance(stmt, (Assignment, AssignmentOperation)):
+            if not _binds_all(stmt.variable):
+                continue
+            entries = _exported_entries(stmt.assignment)
+            if entries is None:
+                return None
+            names.update(entries)
+        elif isinstance(stmt, MethodInvocation) and _binds_all(stmt.select):
+            # `__all__.extend(...)` and `.append(...)` put the entries beyond a literal read.
+            return None
+    return names
 
 
 def get_qualid_name(qualid) -> str:

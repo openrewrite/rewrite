@@ -22,8 +22,8 @@ from rewrite.java.support_types import JContainer, JRightPadded, Statement
 from rewrite.java.tree import Identifier, If, Import, Space
 from rewrite.python.binding_utils import is_reference
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
-                                         get_canonical_fqn, referenced_names,
-                                         unconditional_body)
+                                         get_canonical_fqn, module_exported_names,
+                                         referenced_names, unconditional_body)
 from rewrite.python.scope_utils import LocalBindings
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
@@ -97,7 +97,14 @@ class RemoveImport(PythonVisitor):
         self._cu: Optional[CompilationUnit] = None
 
     def visit_compilation_unit(self, cu: CompilationUnit, p) -> J:
-        self._used = self._collect_used_identifiers(cu) if self.only_if_unused else None
+        if self.only_if_unused:
+            exported = module_exported_names(cu)
+            if exported is None:
+                # An `__all__` this cannot read may re-export any import in the file.
+                return cu
+            self._used = self._collect_used_identifiers(cu) | exported
+        else:
+            self._used = None
         self._cu = cu
         return self._remove_import(cu)
 

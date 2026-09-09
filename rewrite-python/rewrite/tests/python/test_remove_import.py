@@ -863,3 +863,64 @@ class TestRemoveImportStringAnnotations:
                 """,
             )
         )
+
+
+class TestRemoveImportAllReExports:
+    """A name listed in `__all__` is re-exported, so the module still needs its
+    import even where nothing else reads the name."""
+
+    @pytest.mark.parametrize('all_form', ['["List"]', '("List",)'])
+    def test_re_exported_name_keeps_its_import(self, arm, all_form):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import List
+
+                __all__ = {all_form}
+                """,
+            )
+        )
+
+    def test_augmented_all_keeps_its_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import List
+
+                __all__ = []
+                __all__ += ["List"]
+                """,
+            )
+        )
+
+    def test_unrelated_export_does_not_keep_an_unrelated_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'Any')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any, List
+
+                __all__ = ["List"]
+                """,
+                """\
+                from typing import List
+
+                __all__ = ["List"]
+                """,
+            )
+        )
+
+    def test_unreadable_all_keeps_the_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import List
+
+                __all__ = []
+                __all__.extend(["List"])
+                """,
+            )
+        )
