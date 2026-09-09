@@ -891,3 +891,93 @@ class TestRemoveImportStringAnnotations:
                 """,
             )
         )
+
+
+class TestRemoveImportAllReExports:
+    """A name listed in `__all__` is re-exported, so the module still needs its
+    import even where nothing else reads the name."""
+
+    @pytest.mark.parametrize('all_form', ['["List"]', '("List",)'])
+    def test_re_exported_name_keeps_its_import(self, arm, all_form):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import List
+
+                __all__ = {all_form}
+                """,
+            )
+        )
+
+    def test_augmented_all_keeps_its_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any, List
+
+                __all__ = ["Any"]
+                __all__ += ["List"]
+                """,
+            )
+        )
+
+    @pytest.mark.parametrize('unreadable_all', [
+        pytest.param('__all__ = ["Any"]\n__all__.extend(["List"])', id='extend'),
+        pytest.param('if True:\n    __all__ = ["List"]\nelse:\n    __all__ = []', id='if_else'),
+    ])
+    def test_unreadable_all_keeps_the_import(self, arm, unreadable_all):
+        body = unreadable_all.replace('\n', '\n                ')
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Any, List
+
+                {body}
+                """,
+            )
+        )
+
+    def test_unrelated_export_does_not_keep_an_unrelated_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'Any')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any, List
+
+                __all__ = ["List"]
+                """,
+                """\
+                from typing import List
+
+                __all__ = ["List"]
+                """,
+            )
+        )
+
+    @pytest.mark.parametrize('readable_all', [
+        pytest.param('__all__ = []', id='empty'),
+        pytest.param('__all__ = _x = ["Any"]', id='chained'),
+        pytest.param('__all__ = ["Any"]\n__all__.sort()', id='sort'),
+        pytest.param('__all__ = []\n__all__ += ["Any"]', id='augmented'),
+        pytest.param('if True:\n    __all__ = ["Any"]', id='nested_if'),
+    ])
+    def test_readable_all_leaves_unrelated_imports_removable(self, arm, readable_all):
+        body = readable_all.replace('\n', '\n                ')
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Any, List
+
+                {body}
+                """,
+                f"""\
+                from typing import Any
+
+                {body}
+                """,
+            )
+        )
