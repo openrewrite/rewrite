@@ -131,7 +131,11 @@ class CSharpRpcThroughputTest {
 
     @Test
     void parseThenPrintOwnSources() {
-        List<SourceFile> files = parse(solution(), "parse");
+        List<SourceFile> files = parse(solution(), "parse 0");
+        for (int p = 1; p < 4; p++) {
+            CSharpRewriteRpc.getOrStart().reset();
+            files = parse(solution(), "parse " + p);
+        }
         // Each cycle resets and refetches the same trees, so the early ones are warmup and the
         // rest are repetitions within one process, which is what makes a single run comparable.
         for (int cycle = 0; cycle < 12; cycle++) {
