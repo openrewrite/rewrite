@@ -56,9 +56,9 @@ public sealed class ParseError(
     public static ParseError Build(string sourcePath, string source, Exception ex)
     {
         var marker = ParseExceptionResult.Build("CSharpParser", ex);
-        var markers = new Markers(Guid.NewGuid(), new List<Marker> { marker });
+        var markers = new Markers(Tree.RandomId(), new List<Marker> { marker });
         return new ParseError(
-            Guid.NewGuid(),
+            Tree.RandomId(),
             markers,
             sourcePath,
             "UTF-8",
