@@ -217,6 +217,14 @@ class MethodCall(Expression):
     __slots__ = ()
 
 
+def _fully_qualified_repr(self) -> str:
+    """A type's identity, not its graph: `object` is reachable from nearly every
+    method signature, so expanding fields re-prints everything reachable at every
+    position it occupies. Assigned in each subclass body because `dataclass`
+    generates a `__repr__` unless the body defines one."""
+    return f"{type(self).__qualname__}({self.fully_qualified_name!r})"
+
+
 class JavaType(ABC):
     class FullyQualified:
         __slots__ = ()
@@ -239,6 +247,11 @@ class JavaType(ABC):
     class Unknown(FullyQualified):
         __slots__ = ()
 
+        # Carries no name to render, and a heap address would make the repr of every
+        # node holding one differ run to run.
+        def __repr__(self) -> str:
+            return 'JavaType.Unknown()'
+
     # Identity equality, as for the other `lst_dataclass` types here: a type graph is
     # cyclic through members and methods, and Java compares these on name and type
     # parameters alone.
@@ -257,6 +270,8 @@ class JavaType(ABC):
         _members: Optional[List[JavaType.Variable]] = None
         _methods: Optional[List[JavaType.Method]] = None
 
+        __repr__ = _fully_qualified_repr
+
         def __post_init__(self):
             if self._kind is None:
                 self._kind = JavaType.FullyQualified.Kind.Class
@@ -272,6 +287,8 @@ class JavaType(ABC):
     class Parameterized(FullyQualified):
         _type: Optional[JavaType.FullyQualified] = None
         _type_parameters: Optional[List[JavaType]] = None
+
+        __repr__ = _fully_qualified_repr
 
         @property
         def type(self) -> JavaType.FullyQualified:
@@ -302,6 +319,8 @@ class JavaType(ABC):
     class Annotation(FullyQualified):
         _type: Optional[JavaType.FullyQualified] = None
         _values: Optional[List[JavaType.Annotation.ElementValue]] = None
+
+        __repr__ = _fully_qualified_repr
 
         @property
         def type(self) -> JavaType.FullyQualified:
