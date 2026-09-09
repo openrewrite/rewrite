@@ -671,7 +671,9 @@ public class RewriteRpcServer
                 // Collect remaining items for debugging
                 var remaining = new System.Text.StringBuilder();
                 remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
-                for (int i = 1; i < 20; i++)
+                // Only what is already buffered: pulling here would ask the remote for a page of a
+                // transfer it has finished, starting a fresh one that nothing will drain.
+                for (int i = 1; i < 20 && q.Buffered > 0; i++)
                 {
                     try
                     {
@@ -1692,7 +1694,7 @@ public class RewriteRpcServer
         {
             metrics = new RpcMetricsWriter(metricsCsv, () =>
                 (server._localObjects.Count, server._remoteObjects.Count,
-                    server._localRefs.Count + server._remoteRefs.Count));
+                    server._localRefs.HighWater + server._remoteRefs.Count));
             handler = new MetricsMessageHandler(handler, metrics);
         }
 

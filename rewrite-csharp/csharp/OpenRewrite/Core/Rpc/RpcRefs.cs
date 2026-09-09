@@ -35,7 +35,12 @@ public sealed class RpcRefs : IDictionary<object, int>
 
     public int NextId() => Interlocked.Increment(ref _lastId);
 
-    /// <summary>Drops every ref issued after <paramref name="highWater"/> and reissues from there.</summary>
+    /// <summary>
+    /// Drops every ref issued after <paramref name="highWater"/>. The counter keeps climbing, so
+    /// an id names one object for the life of the connection: a send running concurrently with
+    /// this has its entry dropped and re-sends the object whole, rather than having its id handed
+    /// to a different object while the remote still holds the binding.
+    /// </summary>
     public void RollbackTo(int highWater)
     {
         foreach (var kv in _ids)
@@ -45,7 +50,6 @@ public sealed class RpcRefs : IDictionary<object, int>
                 _ids.TryRemove(kv.Key, out _);
             }
         }
-        Interlocked.Exchange(ref _lastId, highWater);
     }
 
     public bool TryGetValue(object key, out int value) => _ids.TryGetValue(key, out value);

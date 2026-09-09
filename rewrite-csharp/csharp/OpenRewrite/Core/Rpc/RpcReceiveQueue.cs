@@ -70,6 +70,10 @@ public class RpcReceiveQueue
         _treeCodec = treeCodec;
     }
 
+    /// <summary>Messages already pulled and not yet taken, which a caller can drain without asking
+    /// the remote for another page.</summary>
+    internal int Buffered => _batch.Count;
+
     public RpcObjectData Take()
     {
         if (_batch.Count == 0 && _pull != null)

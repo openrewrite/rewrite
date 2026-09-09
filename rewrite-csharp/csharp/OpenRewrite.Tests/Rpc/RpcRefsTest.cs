@@ -38,7 +38,7 @@ public class RpcRefsTest
     }
 
     [Fact]
-    public void RollbackDropsLaterRefsAndReissuesFromTheMark()
+    public void RollbackDropsLaterRefsWithoutReusingTheirIds()
     {
         var refs = new RpcRefs();
         var kept = new object();
@@ -53,7 +53,8 @@ public class RpcRefsTest
         Assert.False(refs.ContainsKey(evicted));
         Assert.Equal(1, refs[kept]);
 
-        // Reissuing from the mark is what keeps a later checkpoint's mark meaningful.
-        Assert.Equal(2, refs.NextId());
+        // Not 2: an id names one object for the life of the connection, so a send running
+        // concurrently with the rollback cannot have its id handed to a different object.
+        Assert.Equal(3, refs.NextId());
     }
 }
