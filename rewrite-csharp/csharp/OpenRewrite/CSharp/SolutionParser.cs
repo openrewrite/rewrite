@@ -91,6 +91,9 @@ internal static class SolutionRestore
             var lockFiles = new Dictionary<string, LockFile>(StringComparer.OrdinalIgnoreCase);
             var rootDir = Path.GetDirectoryName(key) ?? ".";
 
+            using var sourceFailures = NuGetSourceFailures.Begin(
+                Path.GetFileName(path), NuGetResolver.EnabledSourceUrls(rootDir));
+
             if (hasPackagesConfig)
             {
                 // Materialize the solution-local packages/ folder for legacy HintPaths.
@@ -167,6 +170,8 @@ internal static class SolutionRestore
                 return _buildAssets;
 
             var cacheDir = Path.Combine(Path.GetTempPath(), "openrewrite-netfx-build-assets");
+            using var sourceFailures = NuGetSourceFailures.Begin(
+                "the .NET Framework build assets", NuGetResolver.EnabledSourceUrls(cacheDir));
             var vsToolsPath = Path.Combine(cacheDir, WebTargetsPackage, "tools", "VSToolsPath");
             var targetFrameworkRootPath = Path.Combine(cacheDir, ReferenceAssembliesPackage, "build");
 
@@ -267,11 +272,21 @@ public class SolutionParser
         var diags = workspace.Diagnostics;
         if (diags.Count > 0)
         {
-            Log.Debug("MSBuildWorkspace: {DiagCount} diagnostics", diags.Count);
-            foreach (var d in diags.Take(10))
-                Log.Debug("  MSBuild diagnostic {Kind}: {Message}", d.Kind, d.Message);
-            if (diags.Count > 10)
-                Log.Debug("  ... and {Remaining} more diagnostics", diags.Count - 10);
+            var grouped = new Dictionary<string, (int Count, WorkspaceDiagnosticKind Kind, string Message)>(
+                StringComparer.Ordinal);
+            foreach (var d in diags)
+            {
+                var key = NuGetSourceFailures.Collapse(d.Message ?? string.Empty, null, null, null);
+                grouped[key] = grouped.TryGetValue(key, out var seen)
+                    ? (seen.Count + 1, seen.Kind, seen.Message)
+                    : (1, d.Kind, d.Message ?? string.Empty);
+            }
+            Log.Debug("MSBuildWorkspace: {DiagCount} diagnostics ({DistinctCount} distinct)",
+                diags.Count, grouped.Count);
+            foreach (var g in grouped.Values.OrderByDescending(g => g.Count).Take(10))
+                Log.Debug("  MSBuild diagnostic {Kind} x{Count}: {Message}", g.Kind, g.Count, g.Message);
+            if (grouped.Count > 10)
+                Log.Debug("  ... and {Remaining} more distinct diagnostics", grouped.Count - 10);
         }
 
         var projectCount = solution.Projects.Count();

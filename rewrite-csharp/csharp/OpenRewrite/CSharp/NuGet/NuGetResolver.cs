@@ -77,8 +77,12 @@ public static class NuGetResolver
     {
         public static readonly SerilogNuGetLogger Instance = new();
 
-        public override void Log(ILogMessage message) =>
+        public override void Log(ILogMessage message)
+        {
+            if (NuGetSourceFailures.TryRecord(message))
+                return;
             Serilog.Log.Debug("NuGet: {Message}", message.Message);
+        }
 
         public override Task LogAsync(ILogMessage message)
         {
@@ -91,6 +95,28 @@ public static class NuGetResolver
 
     public static ISettings LoadSettings(string startDirectory) =>
         Settings.LoadDefaultSettings(startDirectory, null, new XPlatMachineWideSetting());
+
+    /// <summary>
+    /// The enabled package source URLs configured for <paramref name="startDirectory"/>, used to
+    /// attribute a failing resource URL back to the feed it came from. Empty when settings
+    /// cannot be read — grouping then falls back to the URL authority.
+    /// </summary>
+    public static IReadOnlyList<string> EnabledSourceUrls(string startDirectory)
+    {
+        try
+        {
+            return SettingsUtility.GetEnabledSources(LoadSettings(startDirectory))
+                .Select(s => s.Source)
+                .Where(s => !string.IsNullOrEmpty(s))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("NuGetResolver: failed to read package sources from {Dir}: {Error}",
+                startDirectory, ex.Message);
+            return [];
+        }
+    }
 
     #region Restore graph generation (PackageReference projects)
 
@@ -574,13 +600,20 @@ public static class NuGetResolver
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    Log.Debug("NuGetResolver: {Package} not available from {Source}: {Error}",
-                        identity, repository.PackageSource.Source, ex.Message);
+                    if (!NuGetSourceFailures.TryRecordSourceFailure(
+                            repository.PackageSource.Source, identity.Id, ex.Message))
+                    {
+                        Log.Debug("NuGetResolver: {Package} not available from {Source}: {Error}",
+                            identity, repository.PackageSource.Source, ex.Message);
+                    }
                 }
             }
 
             if (!installed)
+            {
+                NuGetSourceFailures.RecordUnresolved(identity.Id);
                 Log.Debug("NuGetResolver: failed to install {Package} from any source", identity);
+            }
         }
     }
 
@@ -599,6 +632,8 @@ public static class NuGetResolver
         CancellationToken ct)
     {
         var projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))!;
+        using var sourceFailures = NuGetSourceFailures.Begin(
+            Path.GetFileName(projectPath), EnabledSourceUrls(projectDir));
         var packagesConfig = Path.Combine(projectDir, "packages.config");
         if (File.Exists(packagesConfig))
         {
