@@ -328,8 +328,11 @@ export class RpcReceiveQueue {
                 private readonly trace: boolean) {
     }
 
-    // Returns a value rather than a promise for all but the message that refills the
-    // batch or yields, so the common path costs neither a promise nor an async frame.
+    /**
+     * Returns a value rather than a promise for all but the message that refills the
+     * batch or yields, so the common path costs neither a promise nor an async frame.
+     * @internal
+     */
     take(): RpcObjectData | Promise<RpcObjectData> {
         if (this.batchIndex < this.batch.length && ++this.sinceYield < 256) {
             // An index keeps draining a batch linear; Array.shift() copies the remaining
@@ -341,6 +344,11 @@ export class RpcReceiveQueue {
 
     private async takeSlow(): Promise<RpcObjectData> {
         if (this.batchIndex >= this.batch.length) {
+            // Every object the sender emits is terminated by END_OF_OBJECT, so a refill
+            // after one means the receiver asked for a field the sender never sent.
+            if (this.batch[this.batchIndex - 1]?.state === RpcObjectState.END_OF_OBJECT) {
+                throw new Error("Read past END_OF_OBJECT: the sender and receiver disagree on this object's shape.");
+            }
             this.batch = await this.pull();
             this.batchIndex = 0;
         }

@@ -54,6 +54,15 @@ describe("RPC queues", () => {
         ]);
     });
 
+    test("reading past END_OF_OBJECT fails rather than re-serving the batch", async () => {
+        const batch = await sendList(["A"], []);
+        const q = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+
+        await q.receiveList<string>(undefined);
+        expect((await q.take()).state).toBe(RpcObjectState.END_OF_OBJECT);
+        await expect(q.take()).rejects.toThrow(/past END_OF_OBJECT/);
+    });
+
     test("asRef doesn't create a new instance", () => {
         const space = {kind: Json.Kind.Space, comments: [], whitespace: "\n"};
 
