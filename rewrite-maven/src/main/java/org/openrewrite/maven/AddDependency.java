@@ -30,7 +30,8 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.Scope;
-import org.openrewrite.semver.*;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -133,9 +134,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Accept transitive",
             description = "Default false. If enabled, the dependency will not be added when it is already on the " +
-                          "classpath as a transitive dependency. Where `version` is a range, the version already on " +
-                          "the classpath has to fall inside it; an exact version or a `latest.*` selector is satisfied " +
-                          "by any version already present.",
+                          "classpath as a transitive dependency at a version that satisfies `version`.",
             example = "true",
             required = false)
     @Nullable
@@ -312,16 +311,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             return true;
         }
         VersionComparator versionComparator = validated.getValue();
-        return versionComparator == null || !isRange(versionComparator) ||
-               versionComparator.isValid(d.getVersion(), d.getVersion());
-    }
-
-    private static boolean isRange(VersionComparator versionComparator) {
-        // exact and latest.* are deliberately excluded: neither states a constraint
-        return versionComparator instanceof XRange ||
-               versionComparator instanceof TildeRange ||
-               versionComparator instanceof CaretRange ||
-               versionComparator instanceof HyphenRange ||
-               versionComparator instanceof SetRange;
+        return versionComparator == null || versionComparator.isValid(d.getVersion(), d.getVersion());
     }
 }

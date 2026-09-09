@@ -393,7 +393,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void doNotAddBecauseAlreadyTransitiveNoCompileScope() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.10.3", null, true)),
+          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.7.1", null, true)),
           mavenProject(
             "project",
             srcTestJava(
@@ -538,6 +538,49 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
+    @Test
+    void addWhenTransitiveVersionIsNotTheRequestedExactVersion() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.validation:jakarta.validation-api:3.0.2", null, "compile", true)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>6.2.5.Final</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.validation</groupId>
+                          <artifactId>jakarta.validation-api</artifactId>
+                          <version>3.0.2</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>6.2.5.Final</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"compile", "provided", "test"})
     @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
@@ -566,7 +609,7 @@ class AddDependencyTest implements RewriteTest {
     @ParameterizedTest
     @ValueSource(strings = {"compile", "provided", "test"})
     @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
-    void doNotAddForLatestReleaseWhateverTheTransitiveVersion(String scope) {
+    void doNotAddWhenTransitiveVersionSatisfiesLatestRelease(String scope) {
         rewriteRun(
           spec -> spec.recipe(addDependency("jakarta.validation:jakarta.validation-api:latest.release", null, scope, true)),
           pomXml(
@@ -1672,7 +1715,7 @@ class AddDependencyTest implements RewriteTest {
               )
             )
             .recipes(
-              new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
+              new AddDependency("org.checkerframework", "checker-qual", "3.12.0",
                 null, null, null, "main.java.checkerframework..*", null, null, null, null,
                 true),
               new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
@@ -1744,7 +1787,7 @@ class AddDependencyTest implements RewriteTest {
                           <dependency>
                               <groupId>org.checkerframework</groupId>
                               <artifactId>checker-qual</artifactId>
-                              <version>3.44.0</version>
+                              <version>3.12.0</version>
                           </dependency>
                           <dependency>
                               <groupId>com.google.guava</groupId>
@@ -1774,7 +1817,7 @@ class AddDependencyTest implements RewriteTest {
               )
             )
             .recipes(
-              new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
+              new AddDependency("org.checkerframework", "checker-qual", "3.12.0",
                 null, null, null, "main.java.checkerframework..*", null, null, null, null,
                 true),
               new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
