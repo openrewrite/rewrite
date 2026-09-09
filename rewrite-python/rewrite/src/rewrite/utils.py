@@ -1,9 +1,37 @@
 import os
-from dataclasses import fields as _dataclass_fields, is_dataclass as _is_dataclass, replace as dataclass_replace
-from typing import Any, Callable, Dict, TypeVar, List, Tuple, Union, cast
+from random import Random
+from dataclasses import dataclass, fields as _dataclass_fields, is_dataclass as _is_dataclass, replace as dataclass_replace
+from typing import Any, Callable, Dict, TypeVar, List, Tuple, Union, cast, dataclass_transform
 from uuid import UUID
 
 T = TypeVar('T')
+
+
+@dataclass_transform(frozen_default=True, eq_default=False)
+def lst_dataclass(cls: type[T]) -> type[T]:
+    """An LST node: read-only to a type checker, ordinary to the interpreter.
+
+    `frozen=True` would put every field of every node through
+    `object.__setattr__`, which costs about five times a plain assignment. The
+    read-only contract is the type checker's to keep, as it is for the Java and
+    TypeScript models, neither of which enforces it at runtime either.
+    """
+    return dataclass(eq=False, slots=True)(cls)
+
+
+@dataclass_transform(frozen_default=True)
+def lst_value_dataclass(cls: type[T]) -> type[T]:
+    """An LST node compared by value, otherwise as `lst_dataclass`.
+
+    Whitespace and comments carry no id, so `prefix == Space.EMPTY` and the
+    like have to compare fields.
+    """
+    built = dataclass(slots=True)(cls)
+    # `dataclass` drops __hash__ wherever it generates __eq__ without freezing, so
+    # the hash these nodes' equality implies is put back explicitly.
+    names = tuple(f.name for f in _dataclass_fields(built) if f.compare)
+    built.__hash__ = lambda self: hash(tuple(getattr(self, n) for n in names))
+    return built
 
 # Per-class cache of init-field names. `dataclasses.replace` re-walks
 # `__dataclass_fields__` on every call to fill in missing fields via getattr;
@@ -29,14 +57,72 @@ def _is_changed(old, new) -> bool:
     return True  # different identity → changed
 
 
+_MUTABLE_CACHE: Dict[type, bool] = {}
+
+
+def _accepts_assignment(cls: type) -> bool:
+    mutable = _MUTABLE_CACHE.get(cls)
+    if mutable is None:
+        mutable = _is_dataclass(cls) and not cls.__dataclass_params__.frozen  # type: ignore[attr-defined]
+        _MUTABLE_CACHE[cls] = mutable
+    return mutable
+
+
+def _init_fields(cls: type) -> Tuple[str, ...]:
+    init_fields = _INIT_FIELDS_CACHE.get(cls)
+    if init_fields is None:
+        init_fields = tuple(f.name for f in _dataclass_fields(cls) if f.init)
+        _INIT_FIELDS_CACHE[cls] = init_fields
+    return init_fields
+
+
+# Per-class map from a keyword accepted by `replace_if_changed`/`assign_fields` to
+# the field it sets. Properties are public (`prefix`) where fields are private
+# (`_prefix`), and a field colliding with a keyword is spelled with a trailing
+# underscore (`from_` for `_from`); all three reach the same field.
+_FIELD_FOR_KWARG: Dict[type, Dict[str, str]] = {}
+
+
+def _field_for_kwarg(cls: type) -> Dict[str, str]:
+    mapping = _FIELD_FOR_KWARG.get(cls)
+    if mapping is None:
+        mapping = {}
+        for field in _init_fields(cls):
+            mapping[field] = field
+            if field.startswith('_'):
+                public = field[1:]
+                mapping.setdefault(public, field)
+                mapping.setdefault(public + '_', field)
+        _FIELD_FOR_KWARG[cls] = mapping
+    return mapping
+
+
+def _resolve_field(cls: type, key: str) -> str:
+    field = _field_for_kwarg(cls).get(key)
+    if field is None:
+        raise TypeError(f"{cls.__name__} has no field for keyword '{key}'")
+    return field
+
+
+def assign_fields(obj: T, **kwargs) -> T:
+    """Set fields on an object the caller solely owns, mapping names as
+    `replace_if_changed` does."""
+    cls = type(obj)
+    if not _accepts_assignment(cls):
+        return replace_if_changed(obj, **kwargs)
+
+    for key, value in kwargs.items():
+        field = _resolve_field(cls, key)
+        if field == '_id':
+            value = id_to_int(value)
+        setattr(obj, field, value)
+    return obj
+
+
 def replace_if_changed(obj: T, **kwargs) -> T:
     """Replace fields on a dataclass, returning the original if nothing changed.
 
-    Handles the convention where properties use public names (e.g., 'prefix')
-    but dataclass fields use private names (e.g., '_prefix').
-
-    Also handles Python keyword conflicts where parameters use trailing underscore
-    (e.g., 'from_' maps to field '_from').
+    Keywords are named as `_FIELD_FOR_KWARG` describes.
 
     This is critical for performance - visitor traversals call replace() on every
     node, and returning the same object when nothing changes avoids unnecessary
@@ -53,37 +139,22 @@ def replace_if_changed(obj: T, **kwargs) -> T:
         return obj
 
     cls = type(obj)
-    init_fields = _INIT_FIELDS_CACHE.get(cls)
-    if init_fields is None:
-        if not _is_dataclass(cls):
-            # Non-dataclass fallback path — should never hit on the LST hot path,
-            # but preserves the original semantics.
-            return cast(T, dataclass_replace(cast(Any, obj), **kwargs))
-        init_fields = tuple(f.name for f in _dataclass_fields(cls) if f.init)
-        _INIT_FIELDS_CACHE[cls] = init_fields
+    if cls not in _INIT_FIELDS_CACHE and not _is_dataclass(cls):
+        # Non-dataclass fallback path — should never hit on the LST hot path,
+        # but preserves the original semantics.
+        return cast(T, dataclass_replace(cast(Any, obj), **kwargs))
+    init_fields = _init_fields(cls)
 
-    # Map public property names to private field names and check for changes
     mapped_kwargs: Dict[str, Any] = {}
     changed = False
     for key, value in kwargs.items():
-        if not key.startswith('_'):
-            # Handle Python keyword conflicts: from_ -> _from
-            private_key = f'_{key.rstrip("_")}'
-            if private_key in init_fields:
-                if private_key == '_id':
-                    # Ids are stored as a 128-bit int; normalise UUID/str callers.
-                    value = id_to_int(value)
-                mapped_kwargs[private_key] = value
-                # Use 'or' for short-circuit evaluation - skips check once changed is True
-                changed = changed or _is_changed(getattr(obj, private_key), value)
-            else:
-                mapped_kwargs[key] = value
-                changed = changed or _is_changed(getattr(obj, key), value)
-        else:
-            if key == '_id':
-                value = id_to_int(value)
-            mapped_kwargs[key] = value
-            changed = changed or _is_changed(getattr(obj, key), value)
+        field = _resolve_field(cls, key)
+        if field == '_id':
+            # Ids are stored as a 128-bit int; normalise UUID/str callers.
+            value = id_to_int(value)
+        mapped_kwargs[field] = value
+        # Use 'or' for short-circuit evaluation - skips check once changed is True
+        changed = changed or _is_changed(getattr(obj, field), value)
 
     if not changed:
         return obj
@@ -99,16 +170,21 @@ def replace_if_changed(obj: T, **kwargs) -> T:
     return cls(**new_kwargs)
 
 
+# Ids come from a generator of our own, not the `random` module's shared one: an
+# id is the list-diff key, so a `random.seed()` call anywhere in the process, or a
+# fork, must not make two trees draw the same sequence.
+_ids = Random()
+if hasattr(os, 'register_at_fork'):
+    os.register_at_fork(after_in_child=_ids.seed)
+
+
 def random_id() -> int:
-    # LST/marker ids are stored internally as a 128-bit int (the UUID's own
-    # representation) to avoid the ~64-byte-per-id `uuid.UUID` wrapper. The public
-    # `.id` properties reconstruct a `UUID` lazily, so the API is unchanged.
-    #
-    # Equivalent to `uuid4().int` but without allocating/discarding a UUID object:
-    # `os.urandom(16)` is the same cryptographic source `uuid4()` uses, and we read
-    # the 128-bit value directly (skipping the v4 version/variant bit-twiddle, which
-    # is irrelevant for an opaque identity).
-    return int.from_bytes(os.urandom(16), 'big')
+    # Ids are stored as a 128-bit int (the UUID's own representation) to avoid the
+    # ~64-byte `uuid.UUID` wrapper; the `.id` properties rebuild a UUID lazily, so
+    # the API is unchanged. The value comes from userspace because an id names a
+    # node and carries no secret, while the kernel's costs a syscall per id and a
+    # tree has one per node -- Java draws these from ThreadLocalRandom.
+    return _ids.getrandbits(128)
 
 
 def id_to_str(value: int) -> str:

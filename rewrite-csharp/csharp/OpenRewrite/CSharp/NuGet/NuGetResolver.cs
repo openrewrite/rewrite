@@ -32,6 +32,8 @@ using NuGet.Versioning;
 using Serilog;
 using ILogger = NuGet.Common.ILogger;
 
+using OpenRewrite.Core;
+
 namespace OpenRewrite.CSharp.NuGet;
 
 /// <summary>
@@ -202,7 +204,7 @@ public static class NuGetResolver
         IDictionary<string, string>? extraGlobalProperties)
     {
         var outputPath = Path.Combine(Path.GetTempPath(),
-            "openrewrite-dg-" + Guid.NewGuid().ToString("N")[..8] + ".json");
+            "openrewrite-dg-" + Tree.RandomId().ToString("N")[..8] + ".json");
         try
         {
             var globalProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -422,7 +424,7 @@ public static class NuGetResolver
                     ProjectUniqueName = projectPath,
                     ProjectStyle = ProjectStyle.PackageReference,
                     OutputPath = Path.Combine(Path.GetTempPath(),
-                        "openrewrite-pcrestore-" + Guid.NewGuid().ToString("N")[..8]),
+                        "openrewrite-pcrestore-" + Tree.RandomId().ToString("N")[..8]),
                     OriginalTargetFrameworks = new List<string> { alias },
                     ConfigFilePaths = settings.GetConfigFilePaths(),
                     PackagesPath = SettingsUtility.GetGlobalPackagesFolder(settings),

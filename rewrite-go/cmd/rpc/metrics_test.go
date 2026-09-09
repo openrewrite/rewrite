@@ -26,8 +26,9 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // newTestServer wires a server pointed at a temp metrics CSV. Cleanup is

@@ -17,7 +17,8 @@
 from typing import List
 
 from rewrite import Cursor
-from rewrite.java.tree import ClassDeclaration, Identifier, MethodDeclaration, MethodInvocation
+from rewrite.java.tree import (ClassDeclaration, Identifier, MethodDeclaration, MethodInvocation,
+                               TypeParameter)
 from rewrite.python.scope_utils import LocalBindings, Scope, scope_of
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
@@ -90,7 +91,7 @@ def test_is_bound_answers_for_a_local_alone_so_a_module_import_stays_attributabl
     assert bindings.is_bound(reachable, 'json') is False
 
 
-def test_a_defs_decorators_and_parameter_defaults_belong_to_the_enclosing_scope():
+def test_a_defs_decorators_annotations_and_parameter_defaults_belong_to_the_enclosing_scope():
     default = _scope_at_anchor("""
         def outer():
             def f(p=anchor()):
@@ -106,6 +107,13 @@ def test_a_defs_decorators_and_parameter_defaults_belong_to_the_enclosing_scope(
                 pass
         """)
     assert decorator.declares('p') is False
+
+    annotation = _scope_at_anchor("""
+        def outer():
+            def f(p: anchor()):
+                pass
+        """)
+    assert annotation.declares('p') is False
 
 
 def test_a_class_body_is_reachable_from_directly_within_it_and_nowhere_else():
@@ -271,3 +279,101 @@ def test_a_cursor_on_a_scope_node_sits_outside_it_except_the_module():
         """, after_recipe=lambda sf: Peek().visit(sf, None)))
 
     assert answers == {'comprehension': False, 'lambda': False, 'module': True}
+
+
+def test_a_type_parameter_reaches_the_annotations_and_bounds_of_the_declaration_carrying_it():
+    # Only the type parameter list spells `List`, so PEP 695's annotation scope is the one
+    # thing that can put it in scope at these positions.
+    assert _scope_at_anchor("""
+        def f[List: int](x: anchor()) -> List:
+            pass
+        """).declares('List') is True
+
+    assert _scope_at_anchor("""
+        def f[List: int](x: List) -> anchor():
+            pass
+        """).declares('List') is True
+
+    assert _scope_at_anchor("""
+        def f[List, T: anchor()]():
+            pass
+        """).declares('List') is True
+
+    assert _scope_at_anchor("""
+        def f[List]():
+            anchor()
+        """).declares('List') is True
+
+
+def test_a_type_parameter_is_bound_where_its_own_name_stands():
+    found: List[Cursor] = []
+
+    class Finder(PythonVisitor):
+        def visit_identifier(self, ident: Identifier, p):
+            parent = self.cursor.parent.value
+            if isinstance(parent, TypeParameter) and parent.name is ident:
+                found.append(self.cursor)
+            return super().visit_identifier(ident, p)
+
+    RecipeSpec(type_attribution=False).rewrite_run(python("""
+        from typing import List
+        def f[List: int]() -> List:
+            pass
+        """, after_recipe=lambda sf: Finder().visit(sf, None)))
+    assert len(found) == 1
+    # A rename following the import must not rewrite the type parameter's own declaration.
+    assert LocalBindings().is_bound(found[0], 'List') is True
+
+
+def test_a_declarations_decorators_and_parameter_defaults_stay_outside_its_type_parameters():
+    # CPython evaluates these before the annotation scope exists: `def f[T](x=T)` is a NameError.
+    assert _scope_at_anchor("""
+        def f[List](p=anchor()):
+            pass
+        """).declares('List') is False
+
+    assert _scope_at_anchor("""
+        @deco(anchor())
+        def f[List]():
+            pass
+        """).declares('List') is False
+
+    assert _scope_at_anchor("""
+        @deco(anchor())
+        class C[List]:
+            pass
+        """).declares('List') is False
+
+
+def test_a_classs_type_parameters_reach_where_its_body_bindings_do_not():
+    assert _scope_at_anchor("""
+        class C[List](anchor()):
+            pass
+        """).declares('List') is True
+
+    assert _scope_at_anchor("""
+        class C[List]:
+            anchor()
+        """).declares('List') is True
+
+    # The annotation scope is not the class body: a nested function reads a type parameter as
+    # a closure variable, while a class-body binding is out of its reach.
+    assert _scope_at_anchor("""
+        class C[List]:
+            def m(self):
+                anchor()
+        """).declares('List') is True
+
+
+def test_a_type_alias_binds_its_name_and_its_type_parameters_reach_its_value():
+    assert _scope_at_anchor("""
+        type X[List] = anchor()
+        """).declares('List') is True
+
+    shadowed = _cursor_at_anchor("""
+        from typing import List
+        def f():
+            type List = int
+            anchor()
+        """)
+    assert LocalBindings().is_bound(shadowed, 'List') is True

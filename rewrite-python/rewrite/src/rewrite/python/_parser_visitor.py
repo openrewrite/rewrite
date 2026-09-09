@@ -1554,15 +1554,15 @@ class ParserVisitor(ast.NodeVisitor):
                 bounds = JContainer(
                     self.__source_before(':'),
                     [
-                        self.__pad_right(self.__convert(node.bound), self.__source_before('=')),
-                        self.__pad_right(self.__convert(default), Space.EMPTY),
+                        self.__pad_right(self.__convert_type(node.bound), self.__source_before('=')),
+                        self.__pad_right(self.__convert_type(default), Space.EMPTY),
                     ],
                     Markers.EMPTY
                 )
             else:
                 bounds = JContainer(
                     self.__source_before(':'),
-                    [self.__pad_right(self.__convert(node.bound), Space.EMPTY)],
+                    [self.__pad_right(self.__convert_type(node.bound), Space.EMPTY)],
                     Markers.EMPTY
                 )
         elif default:
@@ -1570,7 +1570,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self.__source_before('='),
                 [
                     self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY),
-                    self.__pad_right(self.__convert(default), Space.EMPTY),
+                    self.__pad_right(self.__convert_type(default), Space.EMPTY),
                 ],
                 Markers.EMPTY
             )
@@ -1604,7 +1604,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self.__source_before('='),
                 [
                     self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY),
-                    self.__pad_right(self.__convert(default), Space.EMPTY),
+                    self.__pad_right(self.__convert_type(default), Space.EMPTY),
                 ],
                 Markers.EMPTY
             )
@@ -1638,7 +1638,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self.__source_before('='),
                 [
                     self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY),
-                    self.__pad_right(self.__convert(default), Space.EMPTY),
+                    self.__pad_right(self.__convert_type(default), Space.EMPTY),
                 ],
                 Markers.EMPTY
             )

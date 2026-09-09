@@ -127,22 +127,12 @@ def _next_request_id() -> int:
         return _request_id_counter
 
 
-def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
-    """Send a JSON-RPC request to Java and wait for the response.
+def _issue_request(method: str, params: dict) -> Any:
+    """Write a request and register its id, without waiting for the reply.
 
-    This enables bidirectional communication - Python can request
-    objects from Java while processing an incoming request.
-
-    Args:
-        method: The RPC method name
-        params: The request parameters
-        timeout_seconds: Maximum time to wait for response (default 30s)
-
-    Returns:
-        The result from the RPC response
-
-    Raises:
-        RuntimeError: If request times out or fails
+    Separating the write from the wait lets a caller keep a request in flight
+    while it works; :func:`_await_response` collects it. A reply arriving for
+    another registered id is stashed by that function rather than discarded.
     """
     request_id = _next_request_id()
 
@@ -160,6 +150,11 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     write_message(request)
 
     _awaiting_ids.add(request_id)
+    return request_id
+
+
+def _await_response(request_id: Any, method: str, timeout_seconds: float = 30.0) -> Any:
+    """Wait for the reply to a request :func:`_issue_request` already wrote."""
     try:
         while True:
             response = _pending_responses.pop(request_id, None)
@@ -197,6 +192,26 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     finally:
         _awaiting_ids.discard(request_id)
         _pending_responses.pop(request_id, None)
+
+
+def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
+    """Send a JSON-RPC request to Java and wait for the response.
+
+    This enables bidirectional communication - Python can request
+    objects from Java while processing an incoming request.
+
+    Args:
+        method: The RPC method name
+        params: The request parameters
+        timeout_seconds: Maximum time to wait for response (default 30s)
+
+    Returns:
+        The result from the RPC response
+
+    Raises:
+        RuntimeError: If request times out or fails
+    """
+    return _await_response(_issue_request(method, params), method, timeout_seconds)
 
 
 def _require_tree(tree: Any, source_file_type: Optional[str]) -> Any:
@@ -241,6 +256,12 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     # Track whether we've received the complete object
     received_end = False
+    # Id of a page asked for and not yet collected, so the peer serializes it while
+    # this side turns the previous one into a tree. Only the stdio transport can
+    # hold one: a client that replaces send_request writes and waits in one call,
+    # with no seam to issue against, so there the pages are fetched on demand.
+    pending_page = None
+    can_prefetch = getattr(send_request, '_java_rpc_original', None) is None
 
     def pull_batch() -> List[Dict[str, Any]]:
         """Pull the next batch of RpcObjectData from Java.
@@ -254,16 +275,18 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
         after receive() completes (line 474), and we do the same by tracking received_end.
         """
-        nonlocal received_end
+        nonlocal received_end, pending_page
 
-        if received_end:
+        if pending_page is not None:
+            page_id, pending_page = pending_page, None
+            batch = _await_response(page_id, 'GetObject')
+        elif received_end:
             return []
-
-        # Request the next batch from Java
-        batch = send_request('GetObject', {
-            'id': obj_id,
-            'sourceFileType': source_file_type
-        })
+        else:
+            batch = send_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type
+            })
 
         if not batch:
             received_end = True
@@ -275,6 +298,13 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         if batch[-1].get('state') == 'END_OF_OBJECT':
             received_end = True
             batch = batch[:-1]  # Remove END_OF_OBJECT from the batch
+        elif can_prefetch:
+            # A batch ending in END_OF_OBJECT has no successor: the peer drops its
+            # transfer state on that marker, so asking again would restart it.
+            pending_page = _issue_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type
+            })
 
         return batch
 
@@ -301,6 +331,15 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         # Reset our tracking of the remote state so the next interaction
         # forces a full object sync (ADD) instead of a delta (CHANGE).
         remote_objects.pop(obj_id, None)
+        if pending_page is not None:
+            # A page was requested ahead and is still owed a reply. Collecting it
+            # retires the request, so no id is left registered and at most one page
+            # is ever in flight.
+            try:
+                _await_response(pending_page, 'GetObject')
+            except Exception:
+                pass
+            pending_page = None
         raise
 
     if obj is not None:
@@ -2642,12 +2681,19 @@ class _StdinBuffer:
     instance is shared by read_message() and read_message_with_timeout().
     """
 
-    _CHUNK_SIZE = 8192
+    # A response body is read whole, and a page of tree data runs to hundreds of
+    # kilobytes, so each read should take as much as the pipe will give. A pipe
+    # returns at most its own capacity per read, and os.read allocates what it is
+    # asked for before shrinking to what arrived, so an over-large request costs
+    # only the unused difference.
+    _CHUNK_SIZE = 65536
 
     def __init__(self):
         self._fd: Optional[int] = None
         self._buf = bytearray()
         self.at_eof = False
+        self._pending_read: Optional[threading.Thread] = None
+        self._pending_chunk: list = []
 
     def _get_fd(self) -> int:
         fd = self._fd
@@ -2689,22 +2735,28 @@ class _StdinBuffer:
             if remaining <= 0:
                 return False
             if os.name == 'nt':
-                # Windows: select() doesn't support pipes, use a thread
-                result: list = []
+                # Windows: select() doesn't support pipes, so a thread does the read. It
+                # takes from the pipe whether or not this call is still waiting for it, so
+                # the thread and its chunk belong to the buffer -- a later _fill collects
+                # what an in-flight read returned, keeping those bytes in the stream.
+                if self._pending_read is None:
+                    self._pending_chunk = []
+                    pending = self._pending_chunk
 
-                def _read():
-                    try:
-                        data = os.read(self._get_fd(), self._CHUNK_SIZE)
-                        result.append(data)
-                    except OSError:
-                        result.append(b'')
+                    def _read():
+                        try:
+                            pending.append(os.read(self._get_fd(), self._CHUNK_SIZE))
+                        except OSError:
+                            pending.append(b'')
 
-                t = threading.Thread(target=_read, daemon=True)
-                t.start()
-                t.join(timeout=remaining)
-                if not result:
+                    self._pending_read = threading.Thread(target=_read, daemon=True)
+                    self._pending_read.start()
+
+                self._pending_read.join(timeout=remaining)
+                if self._pending_read.is_alive():
                     return False
-                chunk = result[0]
+                self._pending_read = None
+                chunk = self._pending_chunk[0] if self._pending_chunk else b''
             else:
                 readable, _, _ = select.select([self._get_fd()], [], [], remaining)
                 if not readable:

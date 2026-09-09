@@ -135,7 +135,10 @@ def _module_scope_statements(body: Sequence[ast.stmt]) -> Iterator[ast.stmt]:
 
 def _module_all_names(tree: ast.Module) -> Optional[Set[str]]:
     """The names ``__all__`` declares via top-level literal list/tuple assignments
-    (plain, annotated, or augmented), or None when the module has no such ``__all__``."""
+    (plain, annotated, or augmented), or None when the module has no such ``__all__``.
+
+    `import_utils.module_exported_names` answers the same question over the LST, for
+    `RemoveImport`, but conservatively: an `__all__` it cannot fully read gives None."""
     names: Optional[Set[str]] = None
     for stmt in tree.body:
         if isinstance(stmt, ast.Assign):
