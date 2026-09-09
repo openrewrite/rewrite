@@ -17,6 +17,7 @@
 package format
 
 import (
+	"go/build"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -160,7 +161,11 @@ func TestSubtreeIndentMatchesWholeFileOnStdlib(t *testing.T) {
 			if err != nil {
 				t.Skip(err)
 			}
-			assertSubtreeIndentMatches(t, filepath.Base(rel), string(content))
+			src := string(content)
+			if !parser.MatchBuildContext(build.Default, filepath.Base(rel), src) {
+				t.Skipf("%s is excluded from the build under this toolchain", rel)
+			}
+			assertSubtreeIndentMatches(t, filepath.Base(rel), src)
 		})
 	}
 }
