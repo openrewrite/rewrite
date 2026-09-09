@@ -20,12 +20,15 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyParser;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 
@@ -38,6 +41,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.gradle.GradleParser.requireParsed;
@@ -281,56 +285,50 @@ public class DependencyConstraintToRule extends Recipe {
         public J.If visitIf(J.If iff, ExecutionContext ctx) {
             J.If anIf = super.visitIf(iff, ctx);
             if (predicateRelatesToGav(anIf, groupArtifactVersionBecause)) {
-                // The predicate of the if condition will already contain the relevant variable name
-                AtomicReference<String> variableName = new AtomicReference<>();
+                // The predicate of the if condition will already contain the relevant variable
+                AtomicReference<J.Identifier> variable = new AtomicReference<>();
                 new JavaIsoVisitor<Integer>() {
                     @Override
                     public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
                         // Comparison will involve "<variable name>.requested.group"
                         J.FieldAccess field = super.visitFieldAccess(fieldAccess, integer);
                         if (field.getTarget() instanceof J.Identifier) {
-                            variableName.set(((J.Identifier) field.getTarget()).getSimpleName());
+                            variable.set((J.Identifier) field.getTarget());
                         }
                         return fieldAccess;
                     }
                 }.visit(anIf.getIfCondition(), 0);
-                List<Statement> newStatements;
-                if (!isKotlinDsl) {
-                    @Language("groovy")
-                    String snippet = variableName + ".useVersion('" + groupArtifactVersionBecause.getVersion() + "')\n";
-                    if (groupArtifactVersionBecause.getBecause() != null) {
-                        snippet += variableName + ".because('" + groupArtifactVersionBecause.getBecause() + "')\n";
-                    }
-                    newStatements = GroovyParser.builder()
-                            .build()
-                            .parse(ctx, snippet)
-                            .map(requireParsed(G.CompilationUnit.class))
-                            .map(G.CompilationUnit::getStatements)
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalStateException("Unable to produce a new block statement"));
-                } else {
-                    @Language("kotlin")
-                    String snippet = variableName + ".useVersion(\"" + groupArtifactVersionBecause.getVersion() + "\")\n";
-                    if (groupArtifactVersionBecause.getBecause() != null) {
-                        snippet += variableName + ".because(\"" + groupArtifactVersionBecause.getBecause() + "\")\n";
-                    }
-                    newStatements = KotlinParser.builder()
-                            .isKotlinScript(true)
-                            .build()
-                            .parse(ctx, snippet)
-                            .map(requireParsed(K.CompilationUnit.class))
-                            .map(cu -> (J.Block) cu.getStatements().get(0))
-                            .map(J.Block::getStatements)
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalStateException("Unable to produce a new block statement"));
+                if (variable.get() == null) {
+                    return anIf;
                 }
-                J.Block block = (J.Block) anIf.getThenPart();
-                block = block.withStatements(newStatements);
-                block = autoFormat(block, ctx, getCursor());
-                anIf = anIf.withThenPart(block);
+
+                // The variable comes from the tree and the version and reason from the recipe's options, so all
+                // three travel as parameters rather than as text
+                StringBuilder rule = new StringBuilder("#{any()}.useVersion(#{any(String)})");
+                List<Object> values = new ArrayList<>();
+                values.add(variable.get().withPrefix(Space.EMPTY));
+                values.add(stringLiteral(groupArtifactVersionBecause.getVersion(), isKotlinDsl));
+                if (groupArtifactVersionBecause.getBecause() != null) {
+                    rule.append("\n#{any()}.because(#{any(String)})");
+                    values.add(variable.get().withPrefix(Space.EMPTY));
+                    values.add(stringLiteral(groupArtifactVersionBecause.getBecause(), isKotlinDsl));
+                }
+
+                J.Block block = ((J.Block) anIf.getThenPart()).withStatements(emptyList());
+                JavaTemplate template = isKotlinDsl ?
+                        KotlinTemplate.builder(rule.toString()).build() :
+                        GroovyTemplate.builder(rule.toString()).build();
+                anIf = anIf.withThenPart(template.apply(new Cursor(getCursor(), block),
+                        block.getCoordinates().lastStatement(), values.toArray()));
             }
             return anIf;
         }
+    }
+
+    // A value, not a construct: the quoting is the recipe's own, so there is nothing for a parser to tell us
+    private static J.Literal stringLiteral(String value, boolean kotlinDsl) {
+        String quote = kotlinDsl ? "\"" : "'";
+        return new J.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY, value, quote + value + quote, null, JavaType.Primitive.String);
     }
 
     static class MaybeAddEachDependency extends JavaIsoVisitor<ExecutionContext> {
