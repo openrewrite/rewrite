@@ -199,6 +199,7 @@ class PythonVisitorCompletenessTest {
       "d = {**a, **b}\n",
       // type alias (3.12)
       "type Alias = int\n",
+      "type Alias[\n    T: int,\n] = list[T]\n",
       // no trailing newline
       "x = 1",
       "def f():\n    pass",

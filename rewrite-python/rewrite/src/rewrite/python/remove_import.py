@@ -22,8 +22,8 @@ from rewrite.java.support_types import JContainer, JRightPadded, Statement
 from rewrite.java.tree import Identifier, If, Import, Space
 from rewrite.python.binding_utils import is_reference
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
-                                         get_canonical_fqn, referenced_names,
-                                         unconditional_body)
+                                         get_canonical_fqn, module_binding_name,
+                                         referenced_names, unconditional_body)
 from rewrite.python.scope_utils import LocalBindings
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
@@ -230,7 +230,7 @@ class RemoveImport(PythonVisitor):
         if self.name is not None:
             return imp
         name = get_qualid_name(imp.qualid)
-        if name == self.module and self._is_removable(imp, self.module.split('.')[-1]):
+        if name == self.module and self._is_removable(imp, module_binding_name(self.module)):
             return None
         return imp
 
@@ -259,7 +259,7 @@ class RemoveImport(PythonVisitor):
             for padded_imp in multi.padding.names.padding.elements:
                 name = get_qualid_name(padded_imp.element.qualid)
                 if name != self.module or not self._is_removable(
-                        padded_imp.element, name.split('.')[-1]):
+                        padded_imp.element, module_binding_name(name)):
                     new_padded.append(padded_imp)
 
         return self._prune_names(multi, new_padded)

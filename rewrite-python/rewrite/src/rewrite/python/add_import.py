@@ -26,7 +26,8 @@ from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Literal, S
 from rewrite.markers import Markers
 from rewrite.python.binding_utils import is_reference
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
-                                         get_canonical_fqn, pad_right, referenced_names)
+                                         get_canonical_fqn, module_binding_name, pad_right,
+                                         referenced_names)
 from rewrite.python.tree import CompilationUnit, ExpressionStatement, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
@@ -202,7 +203,7 @@ class AddImport(PythonVisitor):
 
     def _is_referenced(self, cu: CompilationUnit) -> bool:
         """Check if the identifier we're importing is actually used."""
-        target_name = self.alias or self.name or self.module.split('.')[-1]
+        target_name = self.alias or self.name or module_binding_name(self.module)
 
         class ReferenceChecker(PythonVisitor):
             def __init__(self):

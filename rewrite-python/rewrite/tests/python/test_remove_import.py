@@ -520,6 +520,20 @@ class TestRemoveImportUsageScoping:
                 )
             )
 
+    def test_keep_import_referenced_in_a_type_alias_type_parameter(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'typing', 'Deque'),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from typing import Deque
+
+                    type Queues[U: Deque[int]] = dict[str, U]
+                    """,
+                )
+            )
+
     def test_keep_import_referenced_in_function_body(self, arm):
         for type_attribution in (False, True):
             spec = RecipeSpec(recipe=self._remove(arm, 'os.path', 'join'),
@@ -553,6 +567,20 @@ class TestRemoveImportUsageScoping:
 
                     def uses():
                         return join("a", "b")
+                    """,
+                )
+            )
+
+    def test_keep_a_dotted_module_import_referenced_through_its_root(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'os.path', None),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    import os.path
+
+                    x = os.path.join("a", "b")
                     """,
                 )
             )
