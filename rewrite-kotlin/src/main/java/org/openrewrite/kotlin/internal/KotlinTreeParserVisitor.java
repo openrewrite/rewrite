@@ -123,7 +123,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 randomId(),
                 deepPrefix(expression),
                 Markers.EMPTY,
-                padRight(expression.getExpression().accept(this, data), prefix(rPar))
+                padRight(convertToExpression(expression.getExpression().accept(this, data)), prefix(rPar))
         );
     }
 

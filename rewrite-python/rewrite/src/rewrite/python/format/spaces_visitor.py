@@ -5,7 +5,7 @@ from rewrite import Tree, list_map
 from rewrite.java import (J, Assignment, JLeftPadded, AssignmentOperation, MemberReference, MethodInvocation,
                            MethodDeclaration, Empty, ArrayAccess, Space, If, Block, ClassDeclaration,
                            VariableDeclarations, JRightPadded, Import, ParameterizedType, Parentheses, Try,
-                           ControlParentheses, TrailingComma)
+                           ControlParentheses, TrailingComma, TypeParameter)
 from rewrite.python import (PythonVisitor, SpacesStyle, Binary, ChainedAssignment, Slice, CollectionLiteral,
                              DictLiteral, KeyValue, TypeHint, MultiImport, ExpressionTypeTree,
                              ComprehensionExpression, NamedArgument)
@@ -479,9 +479,10 @@ class SpacesVisitor(PythonVisitor):
 
     def visit_expression_type_tree(self, expr_tree: ExpressionTypeTree, p: P) -> J:
         ett = cast(ExpressionTypeTree, super().visit_expression_type_tree(expr_tree, p))
-        # Don't remove space when inside ClassDeclaration (handled by visit_class_declaration)
+        # Under these parents the wrapper's prefix is meaningful source space, so clearing it
+        # would join the type to the punctuation before it.
         parent = self.cursor.parent_tree_cursor()
-        if not (parent and isinstance(parent.value, ClassDeclaration)):
+        if not (parent and isinstance(parent.value, (ClassDeclaration, TypeParameter))):
             ett = space_before(ett, False)
         return ett
 

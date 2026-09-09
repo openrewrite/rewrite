@@ -253,6 +253,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitPropertyAssignment(JS.PropertyAssignment propertyAssignment, RpcSendQueue q) {
+        q.getAndSendList(propertyAssignment, JS.PropertyAssignment::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSend(propertyAssignment, el -> el.getPadding().getName(), el -> visitRightPadded(el, q));
         q.getAndSend(propertyAssignment, JS.PropertyAssignment::getAssigmentToken);
         q.getAndSend(propertyAssignment, JS.PropertyAssignment::getInitializer, el -> visit(el, q));

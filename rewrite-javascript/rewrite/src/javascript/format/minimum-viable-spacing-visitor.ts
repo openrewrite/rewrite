@@ -86,9 +86,10 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         // e.g., "class DataTable<Row>" not "class DataTable <Row>"
         // Note: body.prefix spacing (space before '{') is handled by SpacesVisitor, not here.
 
-        if (c.extends && c.extends.before.whitespace === "") {
+        if (c.extends) {
             c = produce(c, draft => {
                 this.ensureSpace(draft.extends!.before);
+                this.ensureSpace(draft.extends!.element.prefix);
             });
         }
 
@@ -156,10 +157,9 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
         const ret = await super.visitNewClass(newClass, p) as J.NewClass;
         return produce(ret, draft => {
-            if (draft.class) {
-                if (draft.class.kind == J.Kind.Identifier) {
-                    this.ensureSpace((draft.class as Draft<J.Identifier>).prefix);
-                }
+            // a parenthesized class expression separates itself from `new`
+            if (draft.class && draft.class.kind !== J.Kind.Parentheses) {
+                this.ensureSpace((draft.class as Draft<J>).prefix);
             }
         });
     }
@@ -232,18 +232,207 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         return ret;
     }
 
+    protected async visitAlias(alias: JS.Alias, p: P): Promise<J | undefined> {
+        const ret = await super.visitAlias(alias, p) as JS.Alias;
+        return produce(ret, draft => {
+            this.ensureSpace(draft.propertyName.after);
+            this.ensureSpace(draft.alias.prefix);
+        });
+    }
+
+    protected async visitAs(as_: JS.As, p: P): Promise<J | undefined> {
+        const ret = await super.visitAs(as_, p) as JS.As;
+        return produce(ret, draft => {
+            this.ensureSpace(draft.left.after);
+            this.ensureSpace(draft.right.prefix);
+        });
+    }
+
+    protected async visitBinaryExtensions(jsBinary: JS.Binary, p: P): Promise<J | undefined> {
+        const ret = await super.visitBinaryExtensions(jsBinary, p) as JS.Binary;
+        // `in` is the only word operator here; the rest are punctuators that need no separation
+        if (ret.operator.element !== JS.Binary.Type.In) {
+            return ret;
+        }
+        return produce(ret, draft => {
+            this.ensureSpace(draft.operator.before);
+            this.ensureSpace(draft.right.prefix);
+        });
+    }
+
+    protected async visitBreak(breakNode: J.Break, p: P): Promise<J | undefined> {
+        const ret = await super.visitBreak(breakNode, p) as J.Break;
+        return ret.label ? produce(ret, draft => {
+            this.ensureSpace(draft.label!.prefix);
+        }) : ret;
+    }
 
     protected async visitCase(caseNode: J.Case, p: P): Promise<J | undefined> {
-        const c = await super.visitCase(caseNode, p) as J.Case;
+        let c = await super.visitCase(caseNode, p) as J.Case;
+
+        // `default` prints without the `case` keyword, so its label needs no separator
+        const first = c.caseLabels.elements[0]?.element;
+        if (first && (first.kind !== J.Kind.Identifier || (first as J.Identifier).simpleName !== "default")) {
+            c = produce(c, draft => {
+                this.ensureSpace(draft.caseLabels.before);
+            });
+        }
 
         if (c.guard && c.caseLabels.elements.length > 0 && c.caseLabels.elements[c.caseLabels.elements.length - 1].after.whitespace === "") {
-            return produce(c, draft => {
+            c = produce(c, draft => {
                 const last = draft.caseLabels.elements.length - 1;
                 draft.caseLabels.elements[last].after.whitespace = " ";
             });
         }
 
         return c;
+    }
+
+    protected async visitContinue(continueNode: J.Continue, p: P): Promise<J | undefined> {
+        const ret = await super.visitContinue(continueNode, p) as J.Continue;
+        return ret.label ? produce(ret, draft => {
+            this.ensureSpace(draft.label!.prefix);
+        }) : ret;
+    }
+
+    protected async visitDelete(delete_: JS.Delete, p: P): Promise<J | undefined> {
+        const ret = await super.visitDelete(delete_, p) as JS.Delete;
+        return produce(ret, draft => {
+            this.ensureSpace(draft.expression.prefix);
+        });
+    }
+
+    protected async visitExportAssignment(exportAssignment: JS.ExportAssignment, p: P): Promise<J | undefined> {
+        const ret = await super.visitExportAssignment(exportAssignment, p) as JS.ExportAssignment;
+        if (ret.exportEquals) {
+            return ret;
+        }
+        return produce(ret, draft => {
+            this.ensureSpace(draft.expression.before);
+            this.ensureSpace(draft.expression.element.prefix);
+        });
+    }
+
+    protected async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, p: P): Promise<J | undefined> {
+        const ret = await super.visitExportDeclaration(exportDeclaration, p) as JS.ExportDeclaration;
+        return produce(ret, draft => {
+            if (draft.typeOnly.element) {
+                this.ensureSpace(draft.typeOnly.before);
+            }
+            // a namespace re-export ends its clause with the alias, unlike `}` or a bare `*`
+            if (draft.moduleSpecifier && draft.exportClause?.kind === JS.Kind.Alias) {
+                this.ensureSpace(draft.moduleSpecifier.before);
+            }
+        });
+    }
+
+    protected async visitForInLoop(forInLoop: JS.ForInLoop, p: P): Promise<J | undefined> {
+        const ret = await super.visitForInLoop(forInLoop, p) as JS.ForInLoop;
+        return produce(ret, draft => {
+            this.ensureSpace(draft.control.variable.after);
+            this.ensureSpace(draft.control.iterable.element.prefix);
+        });
+    }
+
+    protected async visitForOfLoop(forOfLoop: JS.ForOfLoop, p: P): Promise<J | undefined> {
+        const ret = await super.visitForOfLoop(forOfLoop, p) as JS.ForOfLoop;
+        return produce(ret, draft => {
+            this.ensureSpace(draft.loop.control.variable.after);
+            this.ensureSpace(draft.loop.control.iterable.element.prefix);
+        });
+    }
+
+    protected async visitImportClause(importClause: JS.ImportClause, p: P): Promise<J | undefined> {
+        const ret = await super.visitImportClause(importClause, p) as JS.ImportClause;
+        return produce(ret, draft => {
+            // named bindings open with a punctuator, which separates itself from `import` and `type`
+            if (draft.typeOnly || draft.name) {
+                this.ensureSpace(draft.prefix);
+            }
+            if (draft.typeOnly && draft.name) {
+                this.ensureSpace(draft.name.element.prefix);
+            }
+        });
+    }
+
+    protected async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
+        const ret = await super.visitImportDeclaration(jsImport, p) as JS.Import;
+        // `from` prints only with a clause, and not at all in the `= require(...)` form; `}` separates
+        // named imports from it, and the specifier after it is always a string literal
+        const bindings = ret.importClause?.namedBindings;
+        if (!ret.importClause || !ret.moduleSpecifier || bindings?.kind === JS.Kind.NamedImports) {
+            return ret;
+        }
+        return produce(ret, draft => {
+            this.ensureSpace(draft.moduleSpecifier!.before);
+        });
+    }
+
+    protected async visitInstanceOf(instanceOf: J.InstanceOf, p: P): Promise<J | undefined> {
+        const ret = await super.visitInstanceOf(instanceOf, p) as J.InstanceOf;
+        return produce(ret, draft => {
+            this.ensureSpace(draft.expression.after);
+            this.ensureSpace(draft.class.prefix);
+        });
+    }
+
+    protected async visitSatisfiesExpression(satisfies: JS.SatisfiesExpression, p: P): Promise<J | undefined> {
+        const ret = await super.visitSatisfiesExpression(satisfies, p) as JS.SatisfiesExpression;
+        return produce(ret, draft => {
+            this.ensureSpace(draft.satisfiesType.before);
+            this.ensureSpace(draft.satisfiesType.element.prefix);
+        });
+    }
+
+    protected async visitScopedVariableDeclarations(scoped: JS.ScopedVariableDeclarations, p: P): Promise<J | undefined> {
+        const ret = await super.visitScopedVariableDeclarations(scoped, p) as JS.ScopedVariableDeclarations;
+        if (ret.modifiers.length === 0 || ret.variables.length === 0) {
+            return ret;
+        }
+        return produce(ret, draft => {
+            for (let i = 1; i < draft.modifiers.length; i++) {
+                this.ensureSpace(draft.modifiers[i].prefix);
+            }
+            this.ensureSpace(draft.variables[0].element.prefix);
+        });
+    }
+
+    protected async visitTypeOperator(typeOperator: JS.TypeOperator, p: P): Promise<J | undefined> {
+        const ret = await super.visitTypeOperator(typeOperator, p) as JS.TypeOperator;
+        return produce(ret, draft => {
+            this.ensureSpace(draft.expression.before);
+        });
+    }
+
+    protected async visitTypePredicate(typePredicate: JS.TypePredicate, p: P): Promise<J | undefined> {
+        const ret = await super.visitTypePredicate(typePredicate, p) as JS.TypePredicate;
+        return produce(ret, draft => {
+            if (draft.asserts.element) {
+                this.ensureSpace(draft.parameterName.prefix);
+            }
+            if (draft.expression) {
+                this.ensureSpace(draft.expression.before);
+                this.ensureSpace(draft.expression.element.prefix);
+            }
+        });
+    }
+
+    protected async visitVoid(void_: JS.Void, p: P): Promise<J | undefined> {
+        const ret = await super.visitVoid(void_, p) as JS.Void;
+        return produce(ret, draft => {
+            this.ensureSpace(draft.expression.prefix);
+        });
+    }
+
+    protected async visitYield(aYield: J.Yield, p: P): Promise<J | undefined> {
+        const ret = await super.visitYield(aYield, p) as J.Yield;
+        // `yield*` separates itself from the value
+        if (!ret.value || findMarker(ret, JS.Markers.DelegatedYield)) {
+            return ret;
+        }
+        return produce(ret, draft => {
+            this.ensureSpace(draft.value!.prefix);
+        });
     }
 
     private ensureSpace(spaceDraft: Draft<J.Space>) {

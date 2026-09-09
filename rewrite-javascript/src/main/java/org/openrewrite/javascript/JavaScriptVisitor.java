@@ -418,6 +418,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             pa = (JS.PropertyAssignment) temp;
         }
+        pa = pa.withModifiers(ListUtils.map(pa.getModifiers(), e -> (J.Modifier) visit(e, p)));
         pa = pa.getPadding().withName(requireNonNull(visitRightPadded(pa.getPadding().getName(), JsRightPadded.Location.PROPERTY_ASSIGNMENT_NAME, p)));
         return pa.withInitializer(visitAndCast(pa.getInitializer(), p));
     }

@@ -32,13 +32,20 @@ export * from "./tree-debug";
 export * from "./project-parser";
 
 export type {Scope} from "./scope";
-export {scopeOf, namesDeclaredIn, bindingNames} from "./scope";
+// `cursorOf` is deliberately absent: a visitor of one's own reaches `this.cursor` directly, and
+// the free functions that have no visitor to reach it through are already in this list.
+export {
+    scopeOf, namesDeclaredIn, namesDeclaredWithin, namesUsedIn, namesReferencedWithin, bindingNames, deconflict,
+    isValueReference, declarationsOf, compilationUnitOf, walk
+} from "./scope";
 export type {QuoteChar, AddImportOptions} from "./add-import";
 export {ImportStyle, moduleNameOf, AddImport} from "./add-import";
 // AMD mechanics `recipes-ui5` builds on directly, beyond the `maybeBind` surface below.
-export type {AmdBlock} from "./amd";
+export type {AmdBlock, AmdCalleeOptions} from "./amd";
 export {
-    DEFAULT_AMD_CALLEES, amdBlockOf, dependencyNames, parameterNames, withDependency, withoutDependencyAt,
+    DEFAULT_AMD_CALLEES, amdBlockOf, enclosingAmdBlock, present, elementsOf, parametersOf, identifierOf,
+    dependencyNames, parameterNames, bodyOf, references, namesUsed, lastSegment, derivedBindingName,
+    withDependency, withUnboundDependency, withoutDependencyAt,
     RemoveAmdDependency, removeNewlyUnusedAmdBindings
 } from "./amd";
 export type {MaybeBindOptions, MaybeUnbindOptions, MaybeRebindOptions, ModuleBindings} from "./binding";

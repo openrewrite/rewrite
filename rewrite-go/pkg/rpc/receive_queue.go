@@ -334,6 +334,16 @@ func receiveTypedList[T any](q *ReceiveQueue, before []T, onChange func(any) any
 				after[i] = before[pos]
 				continue
 			}
+			if !hasBefore && q.peek().State == NoChange {
+				// The sender diffed the edited tree against a baseline it believes
+				// this side holds and shipped this element as NO_CHANGE — but our
+				// baseline has nothing at this position, so its content never came
+				// over the wire and cannot be reconstructed. Fail with the cause
+				// named rather than letting the zero element nil-deref downstream in
+				// coerceToStatementRP/coerceToExpressionRP (openrewrite/rewrite#8424).
+				q.Take()
+				panic(fmt.Sprintf("RPC baseline desync: NO_CHANGE list element at position %d has no baseline (before holds %d element(s)); the sender diffed against a tree this receiver never received", pos, len(before)))
+			}
 			var beforeItem any
 			if hasBefore {
 				beforeItem = before[pos]

@@ -27,6 +27,7 @@ from rewrite.python.type_utils import (
     is_object,
     is_of_class_type,
     is_of_type,
+    is_of_type_with_name,
     is_string,
 )
 
@@ -291,8 +292,10 @@ class TestIsAssignableToFqn:
         assert not is_assignable_to("zoo.Cat", DOG)
 
     def test_object_fallback_when_no_supertype(self):
-        # A class with no _supertype attribute is still assignable to object
+        # A class with no _supertype attribute is still assignable to object,
+        # under any of the model's spellings of the root
         assert is_assignable_to("object", _cls("loose.Thing"))
+        assert is_assignable_to("java.lang.Object", _cls("loose.Thing"))
 
     def test_not_object_when_no_supertype(self):
         assert not is_assignable_to("other.Thing", _cls("loose.Thing"))
@@ -373,3 +376,33 @@ class TestIsAssignableToType:
 
     def test_none(self):
         assert not is_assignable_to(DOG, None)
+
+
+# ---------------------------------------------------------------------------
+# is_of_type_with_name
+# ---------------------------------------------------------------------------
+
+class TestIsOfTypeWithName:
+    def test_hierarchy_walked_only_with_overrides(self):
+        assert is_of_type_with_name(DOG, False, lambda n: n == "zoo.Dog")
+        assert not is_of_type_with_name(DOG, False, lambda n: n == "zoo.Animal")
+        assert is_of_type_with_name(DOG, True, lambda n: n == "zoo.Animal")
+        assert is_of_type_with_name(DOG, True, lambda n: n == "typing.Comparable")
+
+    def test_object_root_matches_any_type(self):
+        thing = _cls("loose.Thing")
+        assert is_of_type_with_name(thing, True, lambda n: n == "object")
+        assert not is_of_type_with_name(thing, True, lambda n: n == "java.lang.Object")
+
+    def test_parameterized_walks_the_wrapped_types_hierarchy(self):
+        assert is_of_type_with_name(_param(DOG, [ANIMAL]), True, lambda n: n == "zoo.Animal")
+
+    def test_cyclic_hierarchy_terminates(self):
+        a, b = _cls("m.A"), _cls("m.B")
+        a._supertype = b
+        b._supertype = a
+
+        assert not is_of_type_with_name(a, True, lambda n: n == "zoo.Cat")
+
+    def test_not_fully_qualified(self):
+        assert not is_of_type_with_name(JavaType.Unknown(), True, lambda n: True)

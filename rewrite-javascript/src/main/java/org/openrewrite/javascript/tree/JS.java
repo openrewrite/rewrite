@@ -2390,6 +2390,9 @@ public interface JS extends J {
         @With
         Markers markers;
 
+        @With
+        List<J.Modifier> modifiers;
+
         JRightPadded<Expression> name;
 
         public Expression getName() {
@@ -2415,7 +2418,7 @@ public interface JS extends J {
         @SuppressWarnings("unchecked")
         @Override
         public PropertyAssignment withType(@Nullable JavaType type) {
-            return initializer == null || initializer.getType() == type ? this : new PropertyAssignment(id, prefix, markers, name, assigmentToken, initializer.withType(type));
+            return initializer == null || initializer.getType() == type ? this : new PropertyAssignment(id, prefix, markers, modifiers, name, assigmentToken, initializer.withType(type));
         }
 
         @Override
@@ -2459,7 +2462,7 @@ public interface JS extends J {
             }
 
             public PropertyAssignment withName(JRightPadded<Expression> target) {
-                return t.name == target ? t : new PropertyAssignment(t.id, t.prefix, t.markers, target, t.assigmentToken, t.initializer);
+                return t.name == target ? t : new PropertyAssignment(t.id, t.prefix, t.markers, t.modifiers, target, t.assigmentToken, t.initializer);
             }
         }
     }

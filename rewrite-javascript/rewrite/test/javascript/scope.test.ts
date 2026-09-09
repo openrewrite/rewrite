@@ -18,12 +18,17 @@ import {
     JavaScriptParser,
     JavaScriptVisitor,
     JS,
+    isValueReference,
     namesDeclaredIn,
+    namesDeclaredWithin,
     Scope,
     scopeOf,
-    sourceFileCache
+    sourceFileCache,
+    walk
 } from "../../src/javascript";
+import {namesUsedWithin} from "../../src/javascript/scope";
 import {J} from "../../src/java";
+import {Cursor} from "../../src/tree";
 
 const parser = new JavaScriptParser({sourceFileCache});
 
@@ -31,13 +36,13 @@ async function parse(source: string, sourcePath = 'test.ts'): Promise<JS.Compila
     return (await parser.parse({text: source, sourcePath}).next()).value as JS.CompilationUnit;
 }
 
-/** The scope where the source calls `anchor()`. */
-async function scopeAtAnchor(source: string, sourcePath?: string): Promise<Scope> {
-    const found: Scope[] = [];
+/** The position where the source calls `anchor()`. */
+async function cursorAtAnchor(source: string, sourcePath?: string): Promise<Cursor> {
+    const found: Cursor[] = [];
     await new class extends JavaScriptVisitor<undefined> {
         override async visitMethodInvocation(method: J.MethodInvocation, p: undefined): Promise<J | undefined> {
             if ((method.name as J.Identifier)?.simpleName === 'anchor') {
-                found.push(scopeOf(this.cursor));
+                found.push(this.cursor);
             }
             return super.visitMethodInvocation(method, p);
         }
@@ -46,8 +51,19 @@ async function scopeAtAnchor(source: string, sourcePath?: string): Promise<Scope
     return found[0];
 }
 
+async function scopeAtAnchor(source: string, sourcePath?: string): Promise<Scope> {
+    return scopeOf(await cursorAtAnchor(source, sourcePath));
+}
+
 async function namesAtAnchor(source: string, sourcePath?: string): Promise<string[]> {
-    return [...(await scopeAtAnchor(source, sourcePath)).names()].sort();
+    const names = new Set<string>();
+    scopeOf(await cursorAtAnchor(source, sourcePath)).walk(scope => {
+        for (const name of scope.names()) {
+            names.add(name);
+        }
+        return true;
+    });
+    return [...names].sort();
 }
 
 describe('scopeOf', () => {
@@ -163,10 +179,14 @@ describe('scopeOf', () => {
         expect(names).toEqual(['inner', 'outer']);
     });
 
-    test('a function expression binds the name it gives itself, and only there', async () => {
+    test('a function or class expression binds the name it gives itself, and only there', async () => {
         expect(await namesAtAnchor(`const f = function named() { anchor(); };`)).toContain('named');
 
         expect(await namesAtAnchor(`function f() { (function named() {})(); anchor(); }`)).not.toContain('named');
+
+        expect(await namesAtAnchor(`const C = class Named { m() { anchor(); } };`)).toContain('Named');
+
+        expect(await namesAtAnchor(`const C = class Named {}; anchor();`)).not.toContain('Named');
     });
 
     test('a scope reaches through the JSX between it and the cursor', async () => {
@@ -196,6 +216,43 @@ describe('scopeOf', () => {
         expect(scope.declares('param')).toBe(true);
         expect(scope.declares('absent')).toBe(false);
     });
+
+    test('declaringScope names the innermost scope binding a name, not merely one that does', async () => {
+        const shadowed = await scopeAtAnchor(
+            `import B from 'a/B';\nfunction inner() { { var B = 1; } anchor(); }`);
+        // A `var` reaches the whole function, so the function binds it, not the block holding it.
+        expect(shadowed.declaringScope('B')?.kind).toBe(J.Kind.MethodDeclaration);
+        expect(shadowed.declaringScope('absent')).toBeUndefined();
+
+        const reachable = await scopeAtAnchor(`import B from 'a/B';\nfunction inner() { anchor(); }`);
+        expect(reachable.declaringScope('B')?.kind).toBe(JS.Kind.CompilationUnit);
+    });
+
+    test('a var belongs to the function it sits in, a let to the block', async () => {
+        const hoisting = await scopeAtAnchor(`function f(p) { var p = 1; anchor(); }`);
+        expect(hoisting.declaringScope('p')?.kind).toBe(J.Kind.MethodDeclaration);
+
+        const blockScoped = await scopeAtAnchor(`function f(p) { let p = 1; anchor(); }`);
+        expect(blockScoped.declaringScope('p')?.kind).toBe(J.Kind.Block);
+    });
+});
+
+describe('Scope', () => {
+    test('each scope binds its own names, out to the compilation unit', async () => {
+        const bound: string[][] = [];
+        (await scopeAtAnchor('const top = 1;\nfunction fn(param) { const local = 2; anchor(); }'))
+            .walk(scope => (bound.push([...scope.names()].sort()), true));
+
+        expect(bound).toEqual([['local'], ['param'], ['fn', 'top']]);
+    });
+
+    test('walking outward visits the innermost scope first and stops where the caller says', async () => {
+        const visited: string[][] = [];
+        (await scopeAtAnchor('const top = 1;\nfunction fn(param) { const local = 2; anchor(); }'))
+            .walk(scope => (visited.push([...scope.names()]), visited.length < 2));
+
+        expect(visited).toEqual([['local'], ['param']]);
+    });
 });
 
 describe('namesDeclaredIn', () => {
@@ -220,5 +277,88 @@ describe('namesDeclaredIn', () => {
                 field = (bound) => bound;
             }
         `))].sort()).toEqual(['K', 'bound', 'local', 'param']);
+    });
+
+    test('a type parameter is a name that shadows, so the file declares it', async () => {
+        expect([...namesDeclaredIn(await parse(`
+            import {Node} from 'm';
+            function sortKeys<Bound extends Node>(node: Bound) {}
+            class Holder<Owned> {}
+        `))].sort()).toEqual(['Bound', 'Holder', 'Node', 'Owned', 'node', 'sortKeys'].sort());
+    });
+});
+
+describe('namesUsedWithin', () => {
+    test('a subtree spells what it reads, not only what it declares', async () => {
+        const fn = (await parse('const outer = 1;\nfunction fn() { return ambient(outer); }')).statements[1].element;
+
+        expect([...namesUsedWithin(fn)].sort()).toEqual(['ambient', 'fn', 'outer']);
+        expect([...namesDeclaredWithin(fn)].sort()).toEqual(['fn']);
+    });
+
+    test('a subtree that is absent holds no names', async () => {
+        // What a caller reaches these with: a method declared without a body.
+        expect([namesUsedWithin(undefined).size, namesDeclaredWithin(undefined).size]).toEqual([0, 0]);
+    });
+});
+
+describe('walk', () => {
+    test('visits LST nodes only, so a cyclic type graph never traps it', async () => {
+        // A method returning its own class makes the type graph cyclic; the LST it hangs off is not.
+        const cu = await parse('class A { m(): A { return this; } }\nconst a = new A(); a.m().m();');
+        const offTree: unknown[] = [];
+        const seen = new Set<unknown>();
+        let visited = 0;
+        walk(cu, node => {
+            visited++;
+            seen.add(node);
+            // Padding carries markers but no id, and a JavaType carries neither.
+            if (!('id' in node && 'markers' in node)) {
+                offTree.push(node.kind);
+            }
+            return true;
+        });
+
+        expect(offTree).toEqual([]);
+        expect(visited).toBe(seen.size);
+        expect(seen.size).toBeGreaterThan(10);
+    });
+});
+
+/** What `isValueReference` answers for each occurrence of `target` in `source`. */
+async function targetsReference(source: string, sourcePath?: string): Promise<boolean[]> {
+    const answers: boolean[] = [];
+    await new class extends JavaScriptVisitor<undefined> {
+        override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
+            if (identifier.simpleName === 'target') {
+                answers.push(isValueReference(this.cursor, identifier));
+            }
+            return identifier;
+        }
+    }().visit(await parse(source, sourcePath), undefined);
+    expect(answers.length).toBeGreaterThan(0);
+    return answers;
+}
+
+describe('isValueReference', () => {
+    test('a name its parent introduces, or one from a namespace of its own, is not a reference', async () => {
+        for (const source of ['const o = {target: 1};', 'o.target;', 'target: while (c) { break target; }']) {
+            expect(await targetsReference(source)).not.toContain(true);
+        }
+
+        expect(await targetsReference('<E target="v"/>;', 'test.tsx')).not.toContain(true);
+    });
+
+    test('a read, and the callee of a call selecting nothing, are references', async () => {
+        for (const source of ['use(target);', 'target();']) {
+            expect(await targetsReference(source)).not.toContain(false);
+        }
+    });
+
+    test('position is all it reads, so a binding import and a type both answer as a reference', async () => {
+        // A caller that must tell these apart adds the test itself, as AddImport's rename does.
+        for (const source of ["import {target} from 'm';", 'let v: target;']) {
+            expect(await targetsReference(source)).not.toContain(false);
+        }
     });
 });
