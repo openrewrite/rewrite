@@ -18,17 +18,20 @@ package org.openrewrite.gradle.trait;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.gradle.marker.GradleVersionCatalogVersionReferences;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.trait.Trait;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,17 +39,18 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.internal.StringUtils.matchesGlob;
+import static org.openrewrite.gradle.trait.GradleTraitMatcher.asChainedInvocation;
+import static org.openrewrite.gradle.trait.GradleTraitMatcher.literalArgument;
 
 /**
- * Represents a single named catalog declared inside a Gradle
+ * A single named catalog declared inside a Gradle
  * {@code dependencyResolutionManagement { versionCatalogs { ... } } } block, e.g. the
  * Groovy {@code libs { ... } } closure or the Kotlin {@code create("libs") { ... } } call.
  * <p>
- * Works against the raw {@code version(...)}/{@code library(...)} DSL calls rather than
- * type-attributed method signatures, since Gradle's Groovy/Kotlin DSL closures for
- * user-defined catalogs are not reliably type-attributed to
- * {@code org.gradle.api.initialization.dsl.VersionCatalogBuilder} during parsing.
+ * {@link #getVersion(GroupArtifact)} reads a library's current version, following
+ * {@code versionRef(...)} indirection where needed. {@link #withVersion(GroupArtifact, String)}
+ * rewrites it, automatically detaching from or re-attaching to a shared {@code versionRef(...)}
+ * as needed to keep the catalog's version-sharing structure consistent.
  */
 @EqualsAndHashCode(of = {"cursor", "catalogName"})
 @ToString(of = {"cursor", "catalogName"})
@@ -56,7 +60,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     @Getter
     String catalogName;
 
-    private @Nullable Map<GroupArtifact, VersionCatalogLibrary> cachedLibrariesByGroupArtifact;
+    private @Nullable Map<GroupArtifact, Library> cachedLibrariesByGroupArtifact;
     private @Nullable Map<String, String> cachedVersionValuesByAlias;
 
     public GradleVersionCatalog(Cursor cursor, String catalogName) {
@@ -65,11 +69,15 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * @return every {@code library(...)} declaration with a resolvable group:artifact, keyed by
-     * it, in declaration order. Where two aliases declare the same group:artifact, the first one
-     * encountered wins.
+     * @return the group:artifact of every {@code library(...)} declaration in this catalog with
+     * a resolvable group:artifact, in declaration order. A library whose group:artifact can't be
+     * resolved (malformed coordinates) is never included.
      */
-    public Map<GroupArtifact, VersionCatalogLibrary> getLibraries() {
+    public Set<GroupArtifact> getGroupArtifacts() {
+        return getLibraries().keySet();
+    }
+
+    private Map<GroupArtifact, Library> getLibraries() {
         collectLibrariesAndVersions();
         return cachedLibrariesByGroupArtifact;
     }
@@ -81,10 +89,10 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
 
     private void collectLibrariesAndVersions() {
         if (cachedLibrariesByGroupArtifact == null) {
-            Map<GroupArtifact, VersionCatalogLibrary> librariesByGroupArtifact = new LinkedHashMap<>();
+            Map<GroupArtifact, Library> librariesByGroupArtifact = new LinkedHashMap<>();
             Map<String, String> versionValuesByAlias = new LinkedHashMap<>();
-            VersionCatalogLibrary.Matcher libraryMatcher = new VersionCatalogLibrary.Matcher();
-            VersionCatalogVersion.Matcher versionMatcher = new VersionCatalogVersion.Matcher();
+            Library.Matcher libraryMatcher = new Library.Matcher();
+            Version.Matcher versionMatcher = new Version.Matcher();
             new JavaIsoVisitor<ExecutionContext>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -118,7 +126,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
         Map<String, String> versionValuesByAlias = getVersionDeclarations();
 
         Map<String, List<GroupArtifact>> groupArtifactsByRefAlias = new LinkedHashMap<>();
-        for (VersionCatalogLibrary library : getLibraries().values()) {
+        for (Library library : getLibraries().values()) {
             String versionRefAlias = library.getVersionRefAlias();
             if (versionRefAlias != null) {
                 groupArtifactsByRefAlias.computeIfAbsent(versionRefAlias, k -> new ArrayList<>()).add(library.getGroupArtifact());
@@ -145,7 +153,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
      * indirection, or {@code null} if there is no such library or it has no resolvable version.
      */
     public @Nullable String getVersion(GroupArtifact ga) {
-        VersionCatalogLibrary library = getLibraries().get(ga);
+        Library library = getLibraries().get(ga);
         if (library != null) {
             String inlineVersion = library.getInlineVersion();
             if (inlineVersion != null) {
@@ -169,7 +177,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
      * can be chained by threading the returned catalog from one to the next.
      */
     public GradleVersionCatalog withVersion(GroupArtifact ga, String newVersion) {
-        VersionCatalogLibrary library = getLibraries().get(ga);
+        Library library = getLibraries().get(ga);
         if (library != null) {
             String inlineVersion = library.getInlineVersion();
             if (inlineVersion != null) {
@@ -192,7 +200,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     private GradleVersionCatalog withLibraryVersion(GroupArtifact ga, String newVersion) {
-        VersionCatalogLibrary.Matcher libraryMatcher = new VersionCatalogLibrary.Matcher();
+        Library.Matcher libraryMatcher = new Library.Matcher();
         J newTree = new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -207,7 +215,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     private GradleVersionCatalog withDetachedLibraryVersion(GroupArtifact ga, String newVersion) {
-        VersionCatalogLibrary.Matcher libraryMatcher = new VersionCatalogLibrary.Matcher();
+        Library.Matcher libraryMatcher = new Library.Matcher();
         J newTree = new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -235,12 +243,12 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
                 marker == null ? null : marker.getSharedReferencesByAlias().get(refAlias);
         if (sharedReference != null) {
             List<GroupArtifact> groupMembers = sharedReference.getGroupArtifacts();
-            Map<GroupArtifact, VersionCatalogLibrary> librariesByGroupArtifact = getLibraries();
+            Map<GroupArtifact, Library> librariesByGroupArtifact = getLibraries();
             Map<String, String> versionValuesByAlias = getVersionDeclarations();
 
             Set<@Nullable String> resolvedVersions = new LinkedHashSet<>();
             for (GroupArtifact groupMember : groupMembers) {
-                VersionCatalogLibrary library = librariesByGroupArtifact.get(groupMember);
+                Library library = librariesByGroupArtifact.get(groupMember);
                 String resolvedVersion = library == null ? null : library.getInlineVersion();
                 if (resolvedVersion == null && library != null) {
                     String currentRefAlias = library.getVersionRefAlias();
@@ -264,7 +272,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     private GradleVersionCatalog withVersionDeclarationValue(String alias, String newVersion) {
-        VersionCatalogVersion.Matcher versionMatcher = new VersionCatalogVersion.Matcher();
+        Version.Matcher versionMatcher = new Version.Matcher();
         J newTree = new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -279,7 +287,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     private GradleVersionCatalog withLibraryReattachedToVersionRef(GroupArtifact ga, String refAlias) {
-        VersionCatalogLibrary.Matcher libraryMatcher = new VersionCatalogLibrary.Matcher();
+        Library.Matcher libraryMatcher = new Library.Matcher();
         J newTree = new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -300,15 +308,229 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
         return this;
     }
 
-    public static class Matcher extends GradleTraitMatcher<GradleVersionCatalog> {
-        @Nullable
-        private String catalogNamePattern;
+    /**
+     * A single {@code library(...)} declaration, in any of its forms: three-argument
+     * {@code library(alias, group, artifact)}, optionally terminated by {@code .version(...)},
+     * {@code .versionRef(...)}, or {@code .withoutVersion()}; or the single coordinate-string
+     * {@code library(alias, "group:artifact:version")} form.
+     */
+    @Value
+    private static class Library implements Trait<J.MethodInvocation> {
+        Cursor cursor;
 
-        public Matcher catalogName(@Nullable String catalogNamePattern) {
-            this.catalogNamePattern = catalogNamePattern;
+        private @Nullable String getAlias() {
+            return literalArgument(libraryCall(), 0);
+        }
+
+        private @Nullable GroupArtifact getGroupArtifact() {
+            J.MethodInvocation library = libraryCall();
+            if (library.getArguments().size() == 3) {
+                String groupId = literalArgument(library, 1);
+                String artifactId = literalArgument(library, 2);
+                return groupId == null || artifactId == null ? null : new GroupArtifact(groupId, artifactId);
+            }
+            if (library.getArguments().size() == 2) {
+                String groupArtifactVersion = literalArgument(library, 1);
+                String[] parts = groupArtifactVersion == null ? null : groupArtifactVersion.split(":");
+                return parts != null && parts.length == 3 ? new GroupArtifact(parts[0], parts[1]) : null;
+            }
+            return null;
+        }
+
+        /**
+         * @return the alias of the shared {@code version(...)} declaration this library resolves
+         * its version through, or {@code null} if it's declared inline or not at all.
+         */
+        private @Nullable String getVersionRefAlias() {
+            J.MethodInvocation outer = getTree();
+            return "versionRef".equals(outer.getSimpleName()) && outer.getArguments().size() == 1 ?
+                    literalArgument(outer, 0) : null;
+        }
+
+        /**
+         * @return the inline version literal, whether chained as {@code .version(...)} or
+         * embedded in a single coordinate string, or {@code null} if the version comes via
+         * {@code versionRef(...)} or isn't declared at all.
+         */
+        private @Nullable String getInlineVersion() {
+            J.MethodInvocation outer = getTree();
+            if ("version".equals(outer.getSimpleName()) && outer.getArguments().size() == 1 && outer.getSelect() instanceof J.MethodInvocation) {
+                return literalArgument(outer, 0);
+            }
+            if ("library".equals(outer.getSimpleName()) && outer.getArguments().size() == 2) {
+                String groupArtifactVersion = literalArgument(outer, 1);
+                String[] parts = groupArtifactVersion == null ? null : groupArtifactVersion.split(":");
+                return parts != null && parts.length == 3 ? parts[2] : null;
+            }
+            return null;
+        }
+
+        /**
+         * @return a copy with its inline version literal rewritten to {@code newVersion}, or this
+         * library unchanged if it has no inline version to rewrite.
+         */
+        private Library withVersion(String newVersion) {
+            J.MethodInvocation outer = getTree();
+            if ("version".equals(outer.getSimpleName()) && outer.getArguments().size() == 1 && outer.getSelect() instanceof J.MethodInvocation) {
+                return withArgumentLiteral(outer, 0, newVersion);
+            }
+            if ("library".equals(outer.getSimpleName()) && outer.getArguments().size() == 2) {
+                String groupArtifactVersion = literalArgument(outer, 1);
+                String[] parts = groupArtifactVersion == null ? null : groupArtifactVersion.split(":");
+                if (parts != null && parts.length == 3) {
+                    return withArgumentLiteral(outer, 1, parts[0] + ":" + parts[1] + ":" + newVersion);
+                }
+            }
             return this;
         }
 
+        private Library withArgumentLiteral(J.MethodInvocation outer, int argIndex, String newValue) {
+            Expression argument = outer.getArguments().get(argIndex);
+            if (argument instanceof J.Literal) {
+                J.Literal oldLiteral = (J.Literal) argument;
+                String quote = oldLiteral.getValueSource() == null ? "'" : oldLiteral.getValueSource().substring(0, 1);
+                J.Literal newLiteral = oldLiteral.withValue(newValue).withValueSource(quote + newValue + quote);
+                List<Expression> newArguments = new ArrayList<>(outer.getArguments());
+                newArguments.set(argIndex, newLiteral);
+                return new Library(new Cursor(cursor.getParent(), outer.withArguments(newArguments)));
+            }
+            return this;
+        }
+
+        /**
+         * @return a copy with its chained {@code .versionRef(...)} call replaced by
+         * {@code .version(newVersion)}, or this library unchanged if it isn't on a
+         * {@code versionRef(...)} chain.
+         */
+        private Library detachToVersion(String newVersion) {
+            J.MethodInvocation outer = getTree();
+            if ("versionRef".equals(outer.getSimpleName()) && outer.getArguments().size() == 1) {
+                return withRenamedChainedCall(outer, "version", newVersion);
+            }
+            return this;
+        }
+
+        /**
+         * @return a copy with its chained {@code .version(...)} call replaced by
+         * {@code .versionRef(alias)}, or this library unchanged if it has no chained
+         * {@code .version(...)} call to rewrite.
+         */
+        private Library reattachToVersionRef(String alias) {
+            J.MethodInvocation outer = getTree();
+            if ("version".equals(outer.getSimpleName()) && outer.getArguments().size() == 1 && outer.getSelect() instanceof J.MethodInvocation) {
+                return withRenamedChainedCall(outer, "versionRef", alias);
+            }
+            return this;
+        }
+
+        private Library withRenamedChainedCall(J.MethodInvocation outer, String methodName, String newArgumentValue) {
+            Expression argument = outer.getArguments().get(0);
+            if (!(argument instanceof J.Literal)) {
+                return this;
+            }
+            J.Literal oldLiteral = (J.Literal) argument;
+            String quote = oldLiteral.getValueSource() == null ? "'" : oldLiteral.getValueSource().substring(0, 1);
+            J.Literal newLiteral = oldLiteral.withValue(newArgumentValue).withValueSource(quote + newArgumentValue + quote);
+            J.MethodInvocation newOuter = outer.withName(outer.getName().withSimpleName(methodName))
+                    .withArguments(Collections.singletonList(newLiteral));
+            return new Library(new Cursor(cursor.getParent(), newOuter));
+        }
+
+        private J.MethodInvocation libraryCall() {
+            J.MethodInvocation outer = getTree();
+            J.MethodInvocation chained = asChainedInvocation(outer);
+            return chained != null && "library".equals(chained.getSimpleName()) ? chained : outer;
+        }
+
+        private static class Matcher extends GradleTraitMatcher<Library> {
+            @Override
+            protected @Nullable Library test(Cursor cursor) {
+                Object value = cursor.getValue();
+                if (value instanceof J.MethodInvocation && isTopLevelStatement(cursor) && withinBlock(cursor, "versionCatalogs")) {
+
+                    J.MethodInvocation outer = (J.MethodInvocation) value;
+                    String versionRefAlias = null;
+                    String inlineVersion = null;
+                    boolean withoutVersion = false;
+
+                    if ("versionRef".equals(outer.getSimpleName()) && outer.getArguments().size() == 1) {
+                        versionRefAlias = literalArgument(outer, 0);
+                        outer = asChainedInvocation(outer);
+                    } else if ("version".equals(outer.getSimpleName()) && outer.getArguments().size() == 1) {
+                        inlineVersion = literalArgument(outer, 0);
+                        outer = asChainedInvocation(outer);
+                    } else if ("withoutVersion".equals(outer.getSimpleName()) && outer.getArguments().isEmpty()) {
+                        withoutVersion = true;
+                        outer = asChainedInvocation(outer);
+                    }
+
+                    if (outer != null && "library".equals(outer.getSimpleName()) && literalArgument(outer, 0) != null) {
+                        if (outer.getArguments().size() == 3) {
+                            if (literalArgument(outer, 1) != null && literalArgument(outer, 2) != null) {
+                                return new Library(cursor);
+                            }
+                        } else if (outer.getArguments().size() == 2 && versionRefAlias == null && inlineVersion == null && !withoutVersion) {
+                            String groupArtifactVersion = literalArgument(outer, 1);
+                            String[] parts = groupArtifactVersion == null ? null : groupArtifactVersion.split(":");
+                            if (parts != null && parts.length == 3) {
+                                return new Library(cursor);
+                            }
+                        }
+                    }
+
+                }
+                return null;
+            }
+        }
+    }
+
+    /**
+     * A single {@code version(alias, value)} declaration -- what a library's
+     * {@code versionRef(...)} points at.
+     */
+    @Value
+    private static class Version implements Trait<J.MethodInvocation> {
+        Cursor cursor;
+
+        private @Nullable String getAlias() {
+            return literalArgument(getTree(), 0);
+        }
+
+        private @Nullable String getVersion() {
+            return literalArgument(getTree(), 1);
+        }
+
+        private Version withVersion(String newVersion) {
+            J.MethodInvocation outer = getTree();
+            Expression argument = outer.getArguments().get(1);
+            if (!(argument instanceof J.Literal)) {
+                return this;
+            }
+            J.Literal oldLiteral = (J.Literal) argument;
+            String quote = oldLiteral.getValueSource() == null ? "'" : oldLiteral.getValueSource().substring(0, 1);
+            J.Literal newLiteral = oldLiteral.withValue(newVersion).withValueSource(quote + newVersion + quote);
+            List<Expression> newArguments = new ArrayList<>(outer.getArguments());
+            newArguments.set(1, newLiteral);
+            return new Version(new Cursor(cursor.getParent(), outer.withArguments(newArguments)));
+        }
+
+        private static class Matcher extends GradleTraitMatcher<Version> {
+            @Override
+            protected @Nullable Version test(Cursor cursor) {
+                Object value = cursor.getValue();
+                if (value instanceof J.MethodInvocation) {
+                    J.MethodInvocation m = (J.MethodInvocation) value;
+                    if ("version".equals(m.getSimpleName()) && m.getArguments().size() == 2 && m.getSelect() == null &&
+                        isTopLevelStatement(cursor) && withinBlock(cursor, "versionCatalogs")) {
+                        return new Version(cursor);
+                    }
+                }
+                return null;
+            }
+        }
+    }
+
+    public static class Matcher extends GradleTraitMatcher<GradleVersionCatalog> {
         @Override
         protected @Nullable GradleVersionCatalog test(Cursor cursor) {
             Object value = cursor.getValue();
@@ -324,7 +546,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
                         catalogName = m.getSimpleName();
                     }
 
-                    if (catalogName != null && (catalogNamePattern == null || matchesGlob(catalogName, catalogNamePattern))) {
+                    if (catalogName != null) {
                         return new GradleVersionCatalog(cursor, catalogName);
                     }
                 }

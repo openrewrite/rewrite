@@ -28,13 +28,16 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 /**
- * A snapshot of which libraries declared in a
- * {@code org.openrewrite.gradle.trait.GradleVersionCatalog} originally shared each
- * {@code versionRef(...)} declaration, taken before any recipe mutates the catalog.
+ * Implementation detail of {@code org.openrewrite.gradle.trait.GradleVersionCatalog} -- not
+ * intended to be consulted by anything else. Public only because a {@link Marker} has to be.
  * <p>
- * Attached to the version catalog's own root AST node, so downstream recipes can tell whether
- * two separately-requested version bumps actually target the same underlying
+ * A snapshot of which libraries originally shared each {@code versionRef(...)} declaration,
+ * taken before any recipe mutates the catalog, so {@code GradleVersionCatalog} can later tell
+ * whether two separately-requested version bumps actually target the same underlying
  * {@code version(...)} declaration.
+ * <p>
+ * Attached to the version catalog's own root AST node so it survives from one recipe run to the
+ * next.
  */
 @Value
 @With

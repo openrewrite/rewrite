@@ -761,7 +761,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     .orElse(null);
             if (catalog != null) {
                 DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings);
-                for (GroupArtifact ga : catalog.getLibraries().keySet()) {
+                for (GroupArtifact ga : catalog.getGroupArtifacts()) {
                     if (dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
                         String currentVersion = catalog.getVersion(ga);
                         if (currentVersion != null) {
