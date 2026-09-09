@@ -187,7 +187,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
      * Rewrites the version of the library matching {@code ga} to {@code newVersion}. An inline
      * version has its literal rewritten directly; a {@code versionRef(...)} is tentatively
      * detached to an inline literal, then checked for convergence with the rest of its original
-     * sharing group -- see {@link #reconciledAfterDetaching(String)}.
+     * sharing group -- see {@link #withSharedReferenceRestored(String)}.
      * <p>
      * The library is re-located by {@code ga} against the current tree on every call, so calls
      * can be chained by threading the returned catalog from one to the next.
@@ -207,7 +207,7 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
                     if (currentValue == null || !currentValue.equals(newVersion)) {
                         return withOriginalVersionReferencesMarker()
                                 .withDetachedLibraryVersion(ga, newVersion)
-                                .reconciledAfterDetaching(versionRefAlias);
+                                .withSharedReferenceRestored(versionRefAlias);
                     }
                 }
             }
@@ -246,12 +246,27 @@ public class GradleVersionCatalog implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * Collapses a sharing group back onto {@code refAlias} when every library that originally
-     * shared it (per the {@link GradleVersionCatalogVersionReferences} marker) has since
-     * converged on one version. Otherwise the tentative detach stands, leaving {@code refAlias}
-     * and any members still pointing at it alone.
+     * If every library that originally shared {@code refAlias} (per the
+     * {@link GradleVersionCatalogVersionReferences} marker) has independently ended up on the
+     * same version, restores the shared reference so they all point at it again. Otherwise
+     * leaves the catalog unchanged.
+     * <p>
+     * For example, if the marker recorded {@code spring-boot-starter-web} and
+     * {@code spring-boot-starter-webflux} as having shared {@code springBootVersion}, and this
+     * catalog currently has:
+     * <pre>
+     * version('springBootVersion', '3.5.15')
+     * library('springBootStarterWeb', 'org.springframework.boot', 'spring-boot-starter-web').version('3.5.16')
+     * library('springBootStarterWebflux', 'org.springframework.boot', 'spring-boot-starter-webflux').version('3.5.16')
+     * </pre>
+     * -- both libraries have separately ended up on {@code 3.5.16} -- this restores it to:
+     * <pre>
+     * version('springBootVersion', '3.5.16')
+     * library('springBootStarterWeb', 'org.springframework.boot', 'spring-boot-starter-web').versionRef('springBootVersion')
+     * library('springBootStarterWebflux', 'org.springframework.boot', 'spring-boot-starter-webflux').versionRef('springBootVersion')
+     * </pre>
      */
-    private GradleVersionCatalog reconciledAfterDetaching(String refAlias) {
+    private GradleVersionCatalog withSharedReferenceRestored(String refAlias) {
         GradleVersionCatalogVersionReferences marker = getTree().getMarkers()
                 .findFirst(GradleVersionCatalogVersionReferences.class)
                 .orElse(null);
