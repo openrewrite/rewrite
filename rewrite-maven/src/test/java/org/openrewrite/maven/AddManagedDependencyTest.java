@@ -302,6 +302,55 @@ class AddManagedDependencyTest implements RewriteTest {
     }
 
     @Test
+    void fabricatesAncientVersionWhenTargetOnlyExistsInNonCompileScope() {
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("com.tngtech.archunit", "archunit", "latest.patch", null,
+            null, null, null, null, null, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.tngtech.archunit</groupId>
+                    <artifactId>archunit-junit5</artifactId>
+                    <version>1.3.0</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.tngtech.archunit</groupId>
+                      <artifactId>archunit</artifactId>
+                      <version>1.3.2</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.tngtech.archunit</groupId>
+                    <artifactId>archunit-junit5</artifactId>
+                    <version>1.3.0</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotAddManagedDependencyIfTransitiveVersionIsTheSameAsRequested() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.18.0", null,

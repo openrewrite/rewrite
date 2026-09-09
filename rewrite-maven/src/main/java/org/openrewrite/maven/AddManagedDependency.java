@@ -248,8 +248,11 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
                         try {
                             // The version of the dependency currently in use (if any) might influence the version comparator
-                            // For example, "latest.patch" gives very different results depending on the version in use
-                            String currentVersion = getResolutionResult().findDependencies(convertedGroup, convertedArtifact, Scope.fromName(scope)).stream()
+                            // For example, "latest.patch" gives very different results depending on the version in use.
+                            // `scope` here is the *new* managed dependency's tag scope, not a filter for where to look
+                            // for the current version, so only apply it when explicitly set; otherwise search all scopes
+                            // rather than defaulting to Compile via Scope.fromName(null).
+                            String currentVersion = getResolutionResult().findDependencies(convertedGroup, convertedArtifact, scope == null ? null : Scope.fromName(scope)).stream()
                                     .map(ResolvedDependency::getVersion)
                                     .findFirst()
                                     .orElse(existingManagedDependencyVersion());
