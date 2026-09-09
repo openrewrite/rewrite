@@ -41,12 +41,17 @@ const resolveTimeout = 120 * time.Second
 // marker coupling, no mutation of go.mod/go.sum (readonly + -e).
 //
 // It degrades gracefully: any hard toolchain/network failure returns an error
-// so the caller can keep today's go.sum-only behavior. Partial output from an
-// untidy module (surfaced via -e) is kept rather than discarded.
-func ResolveModuleGraph(moduleDir string) (mods []golang.GoResolvedDependency, pkgs []golang.GoPackageModule, err error) {
+// so the caller can keep today's go.sum-only behavior.
+//
+// The returned incomplete flag reports that `go list -deps` could not fully
+// resolve every imported package (e.g. a private module the toolchain could not
+// fetch). When it is set the package->module map is untrustworthy — a still-used
+// import may be missing from it — so callers must not use it to drive require
+// removal, or they will drop a required module and break the build.
+func ResolveModuleGraph(moduleDir string) (mods []golang.GoResolvedDependency, pkgs []golang.GoPackageModule, incomplete bool, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			mods, pkgs, err = nil, nil, fmt.Errorf("resolve panicked: %v", r)
+			mods, pkgs, incomplete, err = nil, nil, false, fmt.Errorf("resolve panicked: %v", r)
 		}
 	}()
 
@@ -54,15 +59,15 @@ func ResolveModuleGraph(moduleDir string) (mods []golang.GoResolvedDependency, p
 	// failure here propagates and the caller falls back to go.sum-only.
 	mods, err = goListModules(moduleDir)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	// Graph edges and the package map are best-effort: a partial build list is
 	// still useful, so sub-failures are swallowed rather than discarding mods.
 	if edges, gerr := goModGraph(moduleDir); gerr == nil {
 		attachEdges(mods, edges)
 	}
-	pkgs, _ = goListPackages(moduleDir)
-	return mods, pkgs, nil
+	pkgs, incomplete, _ = goListPackages(moduleDir)
+	return mods, pkgs, incomplete, nil
 }
 
 // goModule is the subset of `go list -m -json` / `go list -deps -json` output we consume.
@@ -78,7 +83,13 @@ type goModule struct {
 type goPackage struct {
 	ImportPath string
 	Standard   bool
+	Incomplete bool // go list -e: this package or one of its deps failed to resolve
+	Error      *goPackageError
 	Module     *goModule
+}
+
+type goPackageError struct {
+	Err string
 }
 
 func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
@@ -114,31 +125,47 @@ func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
 	return out, nil
 }
 
-func goListPackages(dir string) ([]golang.GoPackageModule, error) {
-	stdout, err := runGo(dir, "list", "-mod=readonly", "-e", "-deps", "-test", "-json", "./...")
-	if err != nil && len(stdout) == 0 {
-		return nil, err
+func goListPackages(dir string) ([]golang.GoPackageModule, bool, error) {
+	stdout, runErr := runGo(dir, "list", "-mod=readonly", "-e", "-deps", "-test", "-json", "./...")
+	if runErr != nil && len(stdout) == 0 {
+		return nil, false, runErr
 	}
-	var out []golang.GoPackageModule
+	pkgs, incomplete, err := parseGoListPackages(stdout)
+	// A non-empty stdout past a process-level error means `-e` recovered partial
+	// output: usable, but by definition something did not resolve — don't trust it.
+	if runErr != nil {
+		incomplete = true
+	}
+	return pkgs, incomplete, err
+}
+
+// parseGoListPackages decodes the `go list -e -deps -json ./...` stream into the
+// import-path -> module map. incomplete is true when any package (or one of its
+// transitive deps) failed to resolve, which `go list -e` surfaces via the
+// per-package Error/Incomplete fields instead of a process-level failure.
+func parseGoListPackages(stdout []byte) (pkgs []golang.GoPackageModule, incomplete bool, err error) {
 	dec := json.NewDecoder(bytes.NewReader(stdout))
 	for {
 		var p goPackage
 		if derr := dec.Decode(&p); derr == io.EOF {
 			break
 		} else if derr != nil {
-			return out, fmt.Errorf("go list -deps decode: %w", derr)
+			return pkgs, true, fmt.Errorf("go list -deps decode: %w", derr)
 		}
 		if p.ImportPath == "" {
 			continue
+		}
+		if p.Error != nil || p.Incomplete {
+			incomplete = true
 		}
 		pm := golang.GoPackageModule{ImportPath: p.ImportPath, Standard: p.Standard}
 		if p.Module != nil {
 			pm.ModulePath = p.Module.Path
 			pm.Version = p.Module.Version
 		}
-		out = append(out, pm)
+		pkgs = append(pkgs, pm)
 	}
-	return out, nil
+	return pkgs, incomplete, nil
 }
 
 type moduleEdge struct {

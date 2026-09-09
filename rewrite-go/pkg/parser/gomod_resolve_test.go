@@ -106,8 +106,9 @@ func TestResolveModuleGraphStdlibOnly(t *testing.T) {
 	writeFile(t, dir, "main.go", "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println(\"hi\") }\n")
 
 	// when
-	mods, pkgs, err := ResolveModuleGraph(dir)
+	mods, pkgs, incomplete, err := ResolveModuleGraph(dir)
 	require.NoError(t, err, "resolve failed")
+	assert.False(t, incomplete, "stdlib-only module should resolve completely")
 
 	// then: the build list contains the main module
 	var main *golang.GoResolvedDependency
@@ -131,6 +132,52 @@ func TestResolveModuleGraphStdlibOnly(t *testing.T) {
 	}
 	assert.Truef(t, sawStdlib, "expected stdlib package fmt with Standard=true in %+v", pkgs)
 	assert.Truef(t, sawMain, "expected the main package mapped to its module in %+v", pkgs)
+}
+
+// TestParseGoListPackagesComplete: a fully-resolved stream maps every import to
+// its module and is not flagged incomplete.
+func TestParseGoListPackagesComplete(t *testing.T) {
+	// given: `go list -e -deps -json ./...` output where everything resolved
+	stream := `
+{"ImportPath":"fmt","Standard":true}
+{"ImportPath":"github.com/cof-primary/otter-actuation/app","Module":{"Path":"github.com/cof-primary/otter-actuation"}}
+{"ImportPath":"github.com/cof-primary/go-shared-libraries/gotel","Module":{"Path":"github.com/cof-primary/go-shared-libraries","Version":"v1.2.0"}}
+`
+
+	// when
+	pkgs, incomplete, err := parseGoListPackages([]byte(stream))
+
+	// then
+	require.NoError(t, err)
+	assert.False(t, incomplete, "no package errored, so resolution is complete")
+	assert.Len(t, pkgs, 3)
+	var sawShared bool
+	for _, p := range pkgs {
+		if p.ImportPath == "github.com/cof-primary/go-shared-libraries/gotel" {
+			sawShared = p.ModulePath == "github.com/cof-primary/go-shared-libraries" && p.Version == "v1.2.0"
+		}
+	}
+	assert.True(t, sawShared, "used import should map to its providing module")
+}
+
+// TestParseGoListPackagesIncomplete reproduces #3118: a private module the
+// toolchain cannot fetch. `go list -e` keeps going, but the importing package is
+// flagged Incomplete and the unresolvable package carries an Error with no
+// Module. Without the incomplete signal its require looks unused and gets dropped.
+func TestParseGoListPackagesIncomplete(t *testing.T) {
+	// given: the used module (go-shared-libraries) failed to resolve
+	stream := `
+{"ImportPath":"fmt","Standard":true}
+{"ImportPath":"github.com/cof-primary/otter-actuation/app","Module":{"Path":"github.com/cof-primary/otter-actuation"},"Incomplete":true,"Error":{"Err":"no required module provides package github.com/cof-primary/go-shared-libraries/cof/cofsecrets"}}
+{"ImportPath":"github.com/cof-primary/go-shared-libraries/cof/cofsecrets","Error":{"Err":"no required module provides package github.com/cof-primary/go-shared-libraries/cof/cofsecrets"},"Incomplete":true}
+`
+
+	// when
+	_, incomplete, err := parseGoListPackages([]byte(stream))
+
+	// then: the map cannot be trusted for require removal
+	require.NoError(t, err)
+	assert.True(t, incomplete, "an unresolvable imported package must flag the map incomplete")
 }
 
 func writeFile(t *testing.T, dir, name, content string) {

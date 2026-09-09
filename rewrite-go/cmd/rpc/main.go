@@ -2575,12 +2575,19 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		// the go.sum-only result (never fail the parse).
 		moduleDir := filepath.Dir(modPath)
 		var buildList []golang.GoResolvedDependency
-		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
+		if resolved, pkgs, incomplete, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
 			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
 		} else {
 			buildList = resolved
 			mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, resolved)
-			mrr.PackageModules = pkgs
+			// A partial package->module map omits the modules that failed to resolve, so a
+			// still-used require would look unused. Withhold it and let require-removal
+			// no-op (its gate is len(PackageModules)==0) rather than break the build.
+			if incomplete {
+				s.logger.Printf("ParseProject: incomplete module resolution for %s; withholding package->module map to avoid unsafe require removal", moduleDir)
+			} else {
+				mrr.PackageModules = pkgs
+			}
 		}
 		mods[filepath.Dir(modPath)] = &modCtx{
 			dir:       filepath.Dir(modPath),
