@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -79,6 +80,11 @@ public class RewriteRpcServer
     /// <summary>
     /// Referentially deduplicated objects and their ref IDs.
     /// </summary>
+    /// <summary>One in-flight transfer per object id, mirroring Java's inProgressGetRpcObjects.</summary>
+    private readonly ConcurrentDictionary<string, Lazy<Channel<List<RpcObjectData>>>> _inProgressGetObject = new();
+
+    internal int BatchSize = 1000;
+
     private readonly RpcRefs _localRefs = new();
 
     /// <summary>
@@ -521,67 +527,88 @@ public class RewriteRpcServer
     }
 
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
-    public Task<List<RpcObjectData>> GetObject(GetObjectRequest request)
+    public async Task<List<RpcObjectData>> GetObject(GetObjectRequest request)
     {
         var after = _localObjects.GetValueOrDefault(request.Id);
 
         if (after == null)
         {
             Log.Debug("RPC GetObject: {Id} not found, returning DELETE", request.Id);
-            return Task.FromResult(new List<RpcObjectData>
+            return new List<RpcObjectData>
             {
                 new() { State = DELETE },
                 new() { State = END_OF_OBJECT }
-            });
+            };
         }
 
         // ExecutionContext is sent as a typed shell with no data,
         // matching the JavaScript pattern (empty codec).
         if (after is ExecutionContext)
         {
-            return Task.FromResult(new List<RpcObjectData>
+            return new List<RpcObjectData>
             {
                 new() { State = ADD, ValueType = "org.openrewrite.InMemoryExecutionContext" },
                 new() { State = END_OF_OBJECT }
-            });
+            };
         }
 
-        var before = _remoteObjects.GetValueOrDefault(request.Id);
-        var sw = Stopwatch.StartNew();
+        var pages = _inProgressGetObject.GetOrAdd(request.Id, id =>
+            new Lazy<Channel<List<RpcObjectData>>>(() => StartTransfer(id, after, request.SourceFileType))).Value;
 
-        // Accumulate all RPC data into a single list
-        var allData = new List<RpcObjectData>();
-        var sendQueue = new RpcSendQueue(
-            1024,
-            batch => allData.AddRange(batch),
-            _localRefs,
-            request.SourceFileType,
-            false,
-            TreeCodec.Instance
-        );
-
-        try
+        var page = await pages.Reader.ReadAsync();
+        if (page.Count > 0 && page[^1].State == END_OF_OBJECT)
         {
-            sendQueue.Send(after, before, null);
+            _inProgressGetObject.TryRemove(request.Id, out _);
         }
-        catch (Exception ex)
+        return page;
+    }
+
+    /// <summary>
+    /// Serializes one object into a bounded channel a page at a time. The capacity of one stalls
+    /// the producer until the remote takes the previous page, which bounds what is held to two
+    /// pages and lets the remote fetch one while this side fills the next.
+    /// </summary>
+    private Channel<List<RpcObjectData>> StartTransfer(string id, object after, string? sourceFileType)
+    {
+        var pages = Channel.CreateBounded<List<RpcObjectData>>(1);
+        var before = _remoteObjects.GetValueOrDefault(id);
+        var refHighWater = _localRefs.HighWater;
+
+        // On the thread pool because the drain blocks whenever the channel is full, and the
+        // thread that has to drain it is the one serving the next GetObject.
+        _ = Task.Run(() =>
         {
-            Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
-                request.Id, after.GetType().Name, ex.GetType().Name, ex.Message);
-            throw new InvalidOperationException(
-                $"Failed to send object {request.Id} (type: {after.GetType().Name}): {ex.Message}\n{ex.StackTrace}", ex);
-        }
-        sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
-        sendQueue.Flush();
-
-        // Update our understanding of remote's state
-        _remoteObjects[request.Id] = after;
-
-        sw.Stop();
-        Log.Debug("RPC GetObject: {Id} sent {ItemCount} items ({ElapsedMs}ms)",
-            request.Id, allData.Count, sw.Elapsed.TotalMilliseconds.ToString("F0"));
-
-        return Task.FromResult(allData);
+            var sendQueue = new RpcSendQueue(
+                BatchSize,
+                page => pages.Writer.WriteAsync(page).AsTask().GetAwaiter().GetResult(),
+                _localRefs,
+                sourceFileType,
+                false,
+                TreeCodec.Instance
+            );
+            try
+            {
+                sendQueue.Send(after, before, null);
+                _remoteObjects[id] = after;
+            }
+            catch (Exception ex)
+            {
+                // The remote holds a partial tree, so drop the baseline and the refs this exchange
+                // issued; the next request then sends a whole object rather than a delta against a
+                // baseline the remote never finished receiving.
+                _remoteObjects.TryRemove(id, out _);
+                _localRefs.RollbackTo(refHighWater);
+                Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
+                    id, after.GetType().Name, ex.GetType().Name, ex.Message);
+            }
+            finally
+            {
+                sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
+                sendQueue.Flush();
+                pages.Writer.Complete();
+            }
+        });
+        return pages;
     }
 
     [JsonRpcMethod("Print", UseSingleObjectParameterDeserialization = true)]
