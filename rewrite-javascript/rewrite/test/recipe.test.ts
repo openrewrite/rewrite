@@ -61,6 +61,7 @@ describe("recipes", () => {
                     displayName: "Text",
                     name: "text",
                     required: true,
+                    type: "String",
                     value: undefined
                 }
             ],
