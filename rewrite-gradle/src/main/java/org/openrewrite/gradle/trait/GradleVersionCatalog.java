@@ -45,10 +45,28 @@ import static org.openrewrite.Tree.randomId;
  * {@code dependencyResolutionManagement { versionCatalogs { ... } } } block, e.g. the
  * Groovy {@code libs { ... } } closure or the Kotlin {@code create("libs") { ... } } call.
  * <p>
- * {@link #getVersion(GroupArtifact)} reads a library's current version, following
- * {@code versionRef(...)} indirection where needed. {@link #withVersion(GroupArtifact, String)}
- * rewrites it, automatically detaching from or re-attaching to a shared {@code versionRef(...)}
- * as needed to keep the catalog's version-sharing structure consistent.
+ * {@link #getVersion(GroupArtifact)} looks up a library's current version by group:artifact,
+ * following a {@code versionRef(...)} to the shared {@code version(...)} declaration it points
+ * at, if any. {@link #withVersion(GroupArtifact, String)} changes a library's version, always
+ * trying to preserve as much of the catalog's existing version-sharing structure as possible,
+ * regardless of the order in which changes are made. A library is moved off a shared symbolic
+ * version onto its own inline version only when keeping it would make the version assignment
+ * inconsistent -- and moved back onto the shared symbolic version again as soon as it becomes
+ * consistent, even if that only happens later, as a side effect of some other, unrelated change.
+ * <p>
+ * For example, given:
+ * <pre>
+ * version('springBootVersion', '3.5.15')
+ * library('springBootStarterWeb', 'org.springframework.boot', 'spring-boot-starter-web').versionRef('springBootVersion')
+ * library('springBootStarterWebflux', 'org.springframework.boot', 'spring-boot-starter-webflux').versionRef('springBootVersion')
+ * </pre>
+ * bumping just {@code spring-boot-starter-web} to {@code 3.5.16} can't reuse
+ * {@code springBootVersion} (since {@code spring-boot-starter-webflux} still needs
+ * {@code 3.5.15}), so it's given its own {@code version('3.5.16')} and {@code springBootVersion}
+ * is left alone. If {@code spring-boot-starter-webflux} is later also bumped to {@code 3.5.16} --
+ * even by a wholly separate call -- the two agree again, and this catalog puts them back onto
+ * the shared reference: {@code springBootVersion} itself becomes {@code version('3.5.16')}, and
+ * both libraries go back to {@code versionRef('springBootVersion')}.
  */
 @EqualsAndHashCode(of = {"cursor", "catalogName"})
 @ToString(of = {"cursor", "catalogName"})
