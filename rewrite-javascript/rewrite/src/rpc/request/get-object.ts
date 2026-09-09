@@ -32,7 +32,7 @@ export class GetObject {
         trace: () => boolean,
         metricsCsv?: string,
     ): void {
-        const pendingData = new Map<string, { data: RpcObjectData[], offset: number }>();
+        const pendingData = new Map<string, { data: (RpcObjectData | undefined)[], offset: number }>();
 
         connection.onRequest(
             new rpc.RequestType<GetObject, any, Error>("GetObject"),
@@ -83,9 +83,13 @@ export class GetObject {
                     }
 
                     // Advancing an offset keeps paging linear; removing the head copies the
-                    // remaining elements on every page.
-                    const batch = pending.data.slice(pending.offset, pending.offset + batchSize);
-                    pending.offset += batch.length;
+                    // remaining elements on every page. The whole object is materialized as
+                    // messages up front, so a sent page stays reachable through its slots
+                    // until they are cleared.
+                    const end = Math.min(pending.offset + batchSize, pending.data.length);
+                    const batch = pending.data.slice(pending.offset, end);
+                    pending.data.fill(undefined, pending.offset, end);
+                    pending.offset = end;
 
                     // If we've sent all data, remove from pending
                     if (pending.offset >= pending.data.length) {
