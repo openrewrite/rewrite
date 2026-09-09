@@ -785,6 +785,11 @@ public interface JavaType {
         public interface ElementValue {
             JavaType getElement();
 
+            /**
+             * Null when the element's value is itself null, which the Java language forbids but
+             * peers such as C# permit ({@code [Foo(null)]}).
+             */
+            @Nullable
             Object getValue();
         }
 
@@ -807,8 +812,7 @@ public interface JavaType {
             }
 
             @Override
-            public Object getValue() {
-                //noinspection DataFlowIssue
+            public @Nullable Object getValue() {
                 return constantValue != null ? constantValue : referenceValue;
             }
         }
@@ -833,8 +837,10 @@ public interface JavaType {
             }
 
             public List<?> getValues() {
-                //noinspection DataFlowIssue
-                return Arrays.asList(constantValues != null ? constantValues : referenceValues);
+                // Neither array is set when the argument was a null array literal, which C#
+                // allows (`[Foo(null)]`) and sends over RPC.
+                Object[] values = constantValues != null ? constantValues : referenceValues;
+                return values == null ? emptyList() : Arrays.asList(values);
             }
         }
 

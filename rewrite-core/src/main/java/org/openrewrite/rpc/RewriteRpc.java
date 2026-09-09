@@ -45,6 +45,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -728,24 +729,51 @@ public class RewriteRpc {
         // (e.g., via a Java-side recipe) since the remote doesn't know about those changes.
         Object before = remoteObjects.get(id);
 
+        GetObject request = new GetObject(id, sourceFileType);
+        AtomicReference<CompletableFuture<JsonRpcSuccess>> nextPage = new AtomicReference<>();
         RpcReceiveQueue q = new RpcReceiveQueue(
                 remoteRefs,
-                () -> send("GetObject", new GetObject(id, sourceFileType), GetObjectResponse.class),
+                () -> {
+                    CompletableFuture<JsonRpcSuccess> pending = nextPage.getAndSet(null);
+                    GetObjectResponse page = await(pending == null ? request("GetObject", request) : pending,
+                            GetObjectResponse.class);
+                    // The following page is requested before this one is handed over, so the
+                    // remote serializes it while this one is being deserialized. A page ending
+                    // in END_OF_OBJECT has no successor, and asking for one would restart the
+                    // transfer rather than return nothing.
+                    if (!page.isEmpty() && page.get(page.size() - 1).getState() != END_OF_OBJECT) {
+                        nextPage.set(request("GetObject", request));
+                    }
+                    return page;
+                },
                 sourceFileType,
                 log.get()
         );
         Object remoteObject;
         try {
             remoteObject = q.receive(before, null);
+            // Inside the try so that a missing end marker unwinds the same way a failed
+            // receive does: a page is in flight here whenever the last one did not end in
+            // END_OF_OBJECT, which is the condition this rejects.
+            RpcObjectData endMarker = q.take();
+            if (endMarker.getState() != END_OF_OBJECT) {
+                throw new IllegalStateException("Expected END_OF_OBJECT but got: " + endMarker);
+            }
         } catch (Exception e) {
             // Reset our tracking of the remote state so the next interaction
             // forces a full object sync (ADD) instead of a delta (CHANGE).
             remoteObjects.remove(id);
+            CompletableFuture<JsonRpcSuccess> pending = nextPage.getAndSet(null);
+            if (pending != null) {
+                // Awaited rather than abandoned so the remote's serialization of it is
+                // finished before the next request; the response itself is correlated by
+                // id, so an unawaited one is dropped rather than misdelivered.
+                try {
+                    await(pending, GetObjectResponse.class);
+                } catch (Exception ignored) {
+                }
+            }
             throw e;
-        }
-        RpcObjectData endMarker = q.take();
-        if (endMarker.getState() != END_OF_OBJECT) {
-            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + endMarker);
         }
 
         //noinspection ConstantValue
@@ -760,20 +788,36 @@ public class RewriteRpc {
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
+        return await(request(method, body), responseType);
+    }
+
+    /**
+     * Puts a request on the wire without waiting for it, so a caller can have the next
+     * one in flight while it works through the current response. Requests carry distinct
+     * ids and their futures complete independently, so several may be outstanding.
+     */
+    private CompletableFuture<JsonRpcSuccess> request(String method, @Nullable RpcRequest body) {
+        checkLiveness();
+        return jsonRpc.send(JsonRpcRequest.newRequest(method, body));
+    }
+
+    private <P> P await(CompletableFuture<JsonRpcSuccess> future, Class<P> responseType) {
         checkLiveness();
         try {
 
-            // Send the request and get the future
-            CompletableFuture<JsonRpcSuccess> future = jsonRpc.send(JsonRpcRequest.newRequest(method, body));
-
             // future.get(timeout) from a FJP worker triggers ManagedBlocker compensation,
-            // which spawns helper threads that can leak per-thread RewriteRpc state.
-            long pollIntervalMs = 1;
+            // which spawns helper threads that can leak per-thread RewriteRpc state. So the
+            // completion unparks this thread instead: a response arrives in a few hundred
+            // microseconds, while Thread.sleep cannot wait for less than about a millisecond
+            // before Java 21 -- long enough to dominate a request that is otherwise idle.
+            Thread waiter = Thread.currentThread();
+            boolean unparkRegistered = false;
+
             long livenessIntervalNanos = TimeUnit.MILLISECONDS.toNanos(500);
             long startNanos = System.nanoTime();
             long deadlineNanos = startNanos + TimeUnit.MILLISECONDS.toNanos(timeout.toMillis());
             long lastLivenessNanos = startNanos;
-            while (System.nanoTime() < deadlineNanos) {
+            while (true) {
                 JsonRpcSuccess result = future.getNow(null);
                 if (result != null) {
                     return result.getResult(responseType);
@@ -781,7 +825,23 @@ public class RewriteRpc {
                 if (future.isCompletedExceptionally()) {
                     return future.get().getResult(responseType);
                 }
-                Thread.sleep(pollIntervalMs);
+                if (!unparkRegistered) {
+                    // Registered only once the response is known not to be here yet: on an
+                    // already-completed future this runs inline, and the permit it grants
+                    // would outlive this call and release someone else's park.
+                    future.whenComplete((r, t) -> LockSupport.unpark(waiter));
+                    unparkRegistered = true;
+                }
+                long parkUntilNanos = System.nanoTime();
+                if (parkUntilNanos >= deadlineNanos) {
+                    break;
+                }
+                // Bounded so liveness is still checked on its own cadence, and because a
+                // park may return spuriously; the loop re-reads the future either way.
+                LockSupport.parkNanos(Math.min(livenessIntervalNanos, deadlineNanos - parkUntilNanos));
+                if (Thread.interrupted()) {
+                    throw new InterruptedException();
+                }
                 long nowNanos = System.nanoTime();
                 if (nowNanos - lastLivenessNanos >= livenessIntervalNanos) {
                     checkLiveness();
