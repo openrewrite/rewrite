@@ -2545,6 +2545,9 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		// versions of the same module, only one of which is on disk.
 		buildList []golang.GoResolvedDependency
 		goProject golang.GoProject // lightweight per-CU marker; one shared instance per module
+		// unresolved lists imports that resolved to no module; when non-empty the
+		// package->module map was withheld and a warning is attached to the go.mod.
+		unresolved []string
 	}
 	mods := make(map[string]*modCtx, len(disc.goMods))
 	for _, modPath := range disc.goMods {
@@ -2575,7 +2578,8 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		// the go.sum-only result (never fail the parse).
 		moduleDir := filepath.Dir(modPath)
 		var buildList []golang.GoResolvedDependency
-		if resolved, pkgs, incomplete, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
+		var unresolved []string
+		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
 			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
 		} else {
 			buildList = resolved
@@ -2583,17 +2587,19 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			// A partial package->module map omits the modules that failed to resolve, so a
 			// still-used require would look unused. Withhold it and let require-removal
 			// no-op (its gate is len(PackageModules)==0) rather than break the build.
-			if incomplete {
-				s.logger.Printf("ParseProject: incomplete module resolution for %s; withholding package->module map to avoid unsafe require removal", moduleDir)
+			if pkgs.Incomplete {
+				unresolved = pkgs.Unresolved
+				s.logger.Printf("ParseProject: incomplete module resolution for %s; withholding package->module map to avoid unsafe require removal (unresolved imports: %v)", moduleDir, pkgs.Unresolved)
 			} else {
-				mrr.PackageModules = pkgs
+				mrr.PackageModules = pkgs.Packages
 			}
 		}
 		mods[filepath.Dir(modPath)] = &modCtx{
-			dir:       filepath.Dir(modPath),
-			mrr:       mrr,
-			buildList: buildList,
-			goProject: golang.NewGoProject(mrr.ModulePath, mrr.ModulePath),
+			dir:        filepath.Dir(modPath),
+			mrr:        mrr,
+			buildList:  buildList,
+			goProject:  golang.NewGoProject(mrr.ModulePath, mrr.ModulePath),
+			unresolved: unresolved,
 		}
 	}
 
@@ -2860,6 +2866,11 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
 			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr, m.goProject)
+			if len(m.unresolved) > 0 {
+				gm.Markers = java.AddMarkupWarn(gm.Markers,
+					"Go module resolution was incomplete, so unused-require removal was skipped to avoid dropping a still-used dependency. Re-run once the modules below can be resolved.",
+					"unresolved imports: "+strings.Join(m.unresolved, ", "))
+			}
 		}
 		id := gm.Ident.String()
 		s.localObjects[id] = gm
