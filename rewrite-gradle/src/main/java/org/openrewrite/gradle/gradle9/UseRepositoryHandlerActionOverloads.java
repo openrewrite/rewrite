@@ -25,7 +25,6 @@ import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -36,7 +35,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.Tree.randomId;
 
 public class UseRepositoryHandlerActionOverloads extends Recipe {
 
@@ -85,8 +83,7 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
                         action.append("    dirs ");
                         for (int i = 0; i < dirs.size(); i++) {
                             action.append(i == 0 ? "#{any()}" : ", #{any()}");
-                            Expression dir = unprefixed(dirs.get(i));
-                            values.add(i == 0 || i == dirs.size() - 1 ? commandSyntax(dir) : dir);
+                            values.add(unprefixed(dirs.get(i)));
                         }
                         action.append('\n');
                     } else {
@@ -143,12 +140,6 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
             // The template's own spacing separates the arguments, so a value arrives without the one it had in the map
             private Expression unprefixed(Expression value) {
                 return value.withPrefix(Space.EMPTY);
-            }
-
-            // A placeholder reaches the parser as `__P__.<T>p()`, which Groovy will not take as a command-syntax
-            // argument, so the notation has to come from the marker the printer reads rather than the template text
-            private Expression commandSyntax(Expression value) {
-                return value.withMarkers(value.getMarkers().addIfAbsent(new OmitParentheses(randomId())));
             }
         });
     }
