@@ -179,6 +179,21 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_only_if_referenced_adds_a_dotted_module_read_through_its_root(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'os.path', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                x = os.path.join('a', 'b')
+                """,
+                """
+                import os.path
+                x = os.path.join('a', 'b')
+                """,
+            )
+        )
+
     @pytest.mark.parametrize('annotation_position, source', [
         ('variable', 'm: "Dict[Any, Any]" = {}'),
         ('parameter', 'def f(m: "Dict[Any, Any]") -> None: ...'),
