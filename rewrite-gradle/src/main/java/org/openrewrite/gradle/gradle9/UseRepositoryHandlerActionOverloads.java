@@ -20,21 +20,23 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.Space;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.StringJoiner;
+
+import static java.util.Collections.singletonList;
+import static org.openrewrite.Tree.randomId;
 
 public class UseRepositoryHandlerActionOverloads extends Recipe {
 
@@ -53,8 +55,6 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
         // The Map overloads only exist in the Groovy DSL, so GroovyVisitor skipping Kotlin scripts is the scoping this wants.
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
 
-            private @Nullable GradleParser parser;
-
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
@@ -68,15 +68,36 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
                 if (entries == null) {
                     return m;
                 }
-                List<String> configuration = new ArrayList<>(entries.size());
+
+                // Only the map entry values come from the source, and they travel as parameters. Everything in the
+                // template text is the recipe's own, including the repository name, which the guard above pins to
+                // one of two literals.
+                StringBuilder action = new StringBuilder(m.getSimpleName()).append(" {\n");
+                List<Expression> values = new ArrayList<>();
                 for (G.MapEntry entry : entries) {
-                    String statement = toConfigurationStatement(m.getSimpleName(), entry);
-                    if (statement == null) {
+                    String key = keyName(entry);
+                    if ("name".equals(key)) {
+                        action.append("    name = #{any()}\n");
+                        values.add(unprefixed(entry.getValue()));
+                    } else if ("dirs".equals(key) && "flatDir".equals(m.getSimpleName())) {
+                        // A list becomes varargs, so the template grows a placeholder per element
+                        List<Expression> dirs = elementsOf(entry.getValue());
+                        action.append("    dirs ");
+                        for (int i = 0; i < dirs.size(); i++) {
+                            action.append(i == 0 ? "#{any()}" : ", #{any()}");
+                            Expression dir = unprefixed(dirs.get(i));
+                            values.add(i == 0 || i == dirs.size() - 1 ? commandSyntax(dir) : dir);
+                        }
+                        action.append('\n');
+                    } else {
                         return m;
                     }
-                    configuration.add(statement);
                 }
-                return buildActionInvocation(m, configuration, ctx);
+                action.append('}');
+
+                return GroovyTemplate.builder(action.toString())
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace(), values.toArray());
             }
 
             private boolean isInsideRepositoriesBlock() {
@@ -105,17 +126,6 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
                 return entries;
             }
 
-            private @Nullable String toConfigurationStatement(String repository, G.MapEntry entry) {
-                String key = keyName(entry);
-                if ("name".equals(key)) {
-                    return "name = " + sourceOf(entry.getValue());
-                }
-                if ("dirs".equals(key) && "flatDir".equals(repository)) {
-                    return "dirs " + spreadListIntoVarargs(entry.getValue());
-                }
-                return null;
-            }
-
             private @Nullable String keyName(G.MapEntry entry) {
                 if (entry.getKey() instanceof J.Literal && ((J.Literal) entry.getKey()).getType() == JavaType.Primitive.String) {
                     return (String) ((J.Literal) entry.getKey()).getValue();
@@ -126,55 +136,19 @@ public class UseRepositoryHandlerActionOverloads extends Recipe {
                 return null;
             }
 
-            private String spreadListIntoVarargs(Expression value) {
-                if (value instanceof G.ListLiteral) {
-                    StringJoiner arguments = new StringJoiner(", ");
-                    for (Expression element : ((G.ListLiteral) value).getElements()) {
-                        arguments.add(sourceOf(element));
-                    }
-                    return arguments.toString();
-                }
-                return sourceOf(value);
+            private List<Expression> elementsOf(Expression value) {
+                return value instanceof G.ListLiteral ? ((G.ListLiteral) value).getElements() : singletonList(value);
             }
 
-            private String sourceOf(Expression expression) {
-                return expression.printTrimmed(getCursor());
+            // The template's own spacing separates the arguments, so a value arrives without the one it had in the map
+            private Expression unprefixed(Expression value) {
+                return value.withPrefix(Space.EMPTY);
             }
 
-            private J buildActionInvocation(J.MethodInvocation original, List<String> configuration, ExecutionContext ctx) {
-                String indent = indentOfEnclosingLine();
-                StringBuilder snippet = new StringBuilder(original.getSimpleName()).append(" {\n");
-                for (String statement : configuration) {
-                    snippet.append(indent).append("    ").append(statement).append('\n');
-                }
-                snippet.append(indent).append("}\n");
-
-                if (parser == null) {
-                    parser = GradleParser.builder().build();
-                }
-                SourceFile parsed = parser.parse(ctx, snippet.toString()).findFirst().orElse(null);
-                if (!(parsed instanceof G.CompilationUnit) || ((G.CompilationUnit) parsed).getStatements().isEmpty()) {
-                    return original;
-                }
-                Statement replacement = ((G.CompilationUnit) parsed).getStatements().get(0);
-                return replacement.withPrefix(original.getPrefix());
-            }
-
-            private String indentOfEnclosingLine() {
-                for (Iterator<Object> path = getCursor().getPath(); path.hasNext(); ) {
-                    Object value = path.next();
-                    if (value instanceof J.Block || value instanceof G.CompilationUnit) {
-                        break;
-                    }
-                    if (value instanceof J) {
-                        String whitespace = ((J) value).getPrefix().getWhitespace();
-                        int lastNewline = whitespace.lastIndexOf('\n');
-                        if (lastNewline != -1) {
-                            return whitespace.substring(lastNewline + 1);
-                        }
-                    }
-                }
-                return "";
+            // A placeholder reaches the parser as `__P__.<T>p()`, which Groovy will not take as a command-syntax
+            // argument, so the notation has to come from the marker the printer reads rather than the template text
+            private Expression commandSyntax(Expression value) {
+                return value.withMarkers(value.getMarkers().addIfAbsent(new OmitParentheses(randomId())));
             }
         });
     }
