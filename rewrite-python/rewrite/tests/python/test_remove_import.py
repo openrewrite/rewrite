@@ -915,10 +915,27 @@ class TestRemoveImportAllReExports:
         spec.rewrite_run(
             python(
                 """\
-                from typing import List
+                from typing import Any, List
 
-                __all__ = []
+                __all__ = ["Any"]
                 __all__ += ["List"]
+                """,
+            )
+        )
+
+    @pytest.mark.parametrize('unreadable_all', [
+        pytest.param('__all__ = ["Any"]\n__all__.extend(["List"])', id='extend'),
+        pytest.param('if True:\n    __all__ = ["List"]\nelse:\n    __all__ = []', id='if_else'),
+    ])
+    def test_unreadable_all_keeps_the_import(self, arm, unreadable_all):
+        body = unreadable_all.replace('\n', '\n                ')
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Any, List
+
+                {body}
                 """,
             )
         )
@@ -940,15 +957,27 @@ class TestRemoveImportAllReExports:
             )
         )
 
-    def test_unreadable_all_keeps_the_import(self, arm):
+    @pytest.mark.parametrize('readable_all', [
+        pytest.param('__all__ = []', id='empty'),
+        pytest.param('__all__ = _x = ["Any"]', id='chained'),
+        pytest.param('__all__ = ["Any"]\n__all__.sort()', id='sort'),
+        pytest.param('__all__ = []\n__all__ += ["Any"]', id='augmented'),
+        pytest.param('if True:\n    __all__ = ["Any"]', id='nested_if'),
+    ])
+    def test_readable_all_leaves_unrelated_imports_removable(self, arm, readable_all):
+        body = readable_all.replace('\n', '\n                ')
         spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
         spec.rewrite_run(
             python(
-                """\
-                from typing import List
+                f"""\
+                from typing import Any, List
 
-                __all__ = []
-                __all__.extend(["List"])
+                {body}
+                """,
+                f"""\
+                from typing import Any
+
+                {body}
                 """,
             )
         )
