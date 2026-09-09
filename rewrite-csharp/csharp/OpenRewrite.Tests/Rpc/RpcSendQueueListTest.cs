@@ -83,7 +83,7 @@ public class RpcSendQueueListTest
     {
         var batch = new List<RpcObjectData>();
         var sq = new RpcSendQueue(1000, b => batch.AddRange(b),
-            new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);
+            new RpcRefs(), null, false);
 
         sq.SendList(after, before, x => x, null, false);
         sq.Flush();
@@ -94,7 +94,7 @@ public class RpcSendQueueListTest
     {
         var batches = new Queue<List<RpcObjectData>>();
         var sq = new RpcSendQueue(1, batches.Enqueue,
-            new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);
+            new RpcRefs(), null, false);
         var rq = new RpcReceiveQueue(new Dictionary<int, object>(), batches.Dequeue, null);
 
         sq.SendList(after, before, x => x, null, false);

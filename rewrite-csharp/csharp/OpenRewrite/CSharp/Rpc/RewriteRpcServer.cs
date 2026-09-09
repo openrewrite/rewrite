@@ -79,7 +79,7 @@ public class RewriteRpcServer
     /// <summary>
     /// Referentially deduplicated objects and their ref IDs.
     /// </summary>
-    private readonly ConcurrentDictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
+    private readonly RpcRefs _localRefs = new();
 
     /// <summary>
     /// Refs received from the remote process (Java) for deduplication.
@@ -87,7 +87,7 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<int, object> _remoteRefs = new();
 
     /// <summary>
-    /// Ref high-water per source file (send-side _localRefs count, receive-side max _remoteRefs
+    /// Ref high-water per source file (send-side highest id issued, receive-side max _remoteRefs
     /// key), captured before first visit so <see cref="Evict"/> rolls back exactly its refs.
     /// </summary>
     private readonly ConcurrentDictionary<string, (int LocalRefs, int RemoteRefsMax)> _refCheckpoints = new();
@@ -434,7 +434,7 @@ public class RewriteRpcServer
             var types = AssemblyTypeEnumerator.Enumerate(own, references);
 
             data = new List<RpcObjectData>();
-            var sendRefs = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+            var sendRefs = new RpcRefs();
             var q = new RpcSendQueue(1024, batch => data.AddRange(batch), sendRefs,
                 "org.openrewrite.java.tree.JavaType$Class", false);
             var sender = new OpenRewrite.Java.Rpc.JavaSender();
@@ -1850,7 +1850,7 @@ public class RewriteRpcServer
                     remoteMax = key;
                 }
             }
-            return (_localRefs.Count, remoteMax);
+            return (_localRefs.HighWater, remoteMax);
         });
     }
 
@@ -1869,13 +1869,7 @@ public class RewriteRpcServer
         _remoteObjects.TryRemove(request.Id, out _);
         if (_refCheckpoints.TryRemove(request.Id, out var cp))
         {
-            foreach (var kv in _localRefs)
-            {
-                if (kv.Value > cp.LocalRefs)
-                {
-                    _localRefs.TryRemove(kv.Key, out _);
-                }
-            }
+            _localRefs.RollbackTo(cp.LocalRefs);
             foreach (var key in _remoteRefs.Keys)
             {
                 if (key > cp.RemoteRefsMax)

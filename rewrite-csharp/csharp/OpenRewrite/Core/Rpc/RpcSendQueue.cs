@@ -42,7 +42,7 @@ public class RpcSendQueue
     private readonly int _batchSize;
     private readonly List<RpcObjectData> _batch;
     private readonly Action<List<RpcObjectData>> _drain;
-    private readonly IDictionary<object, int> _refs;
+    private readonly RpcRefs _refs;
     private readonly string? _sourceFileType;
     private readonly bool _trace;
     private readonly IRpcCodec? _treeCodec;
@@ -50,7 +50,7 @@ public class RpcSendQueue
     private object? _before;
 
     public RpcSendQueue(int batchSize, Action<List<RpcObjectData>> drain,
-                        IDictionary<object, int> refs, string? sourceFileType, bool trace,
+                        RpcRefs refs, string? sourceFileType, bool trace,
                         IRpcCodec? treeCodec = null)
     {
         _batchSize = batchSize;
@@ -283,7 +283,7 @@ public class RpcSendQueue
                 Put(new RpcObjectData { State = ADD, Ref = existingRef });
                 return;
             }
-            refValue = _refs.Count + 1;
+            refValue = _refs.NextId();
             _refs[afterVal] = refValue.Value;
         }
 
