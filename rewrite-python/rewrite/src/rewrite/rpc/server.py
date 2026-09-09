@@ -332,8 +332,9 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         # forces a full object sync (ADD) instead of a delta (CHANGE).
         remote_objects.pop(obj_id, None)
         if pending_page is not None:
-            # The peer has advanced past this page; leaving it unread would hand
-            # it to whichever call reads next.
+            # A page was requested ahead and is still owed a reply. Collecting it
+            # retires the request, so no id is left registered and at most one page
+            # is ever in flight.
             try:
                 _await_response(pending_page, 'GetObject')
             except Exception:
