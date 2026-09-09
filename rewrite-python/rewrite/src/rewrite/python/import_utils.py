@@ -142,6 +142,12 @@ def get_alias_name(imp: Import) -> Optional[str]:
     return None
 
 
+def module_binding_name(module: str) -> str:
+    """The name ``import <module>`` binds: its root package, since ``import os.path``
+    binds ``os`` and that is what a reference through the module reads."""
+    return module.split('.')[0]
+
+
 def get_canonical_fqn(imp: Import) -> Optional[str]:
     """The fully qualified name of the symbol ``imp`` binds, at the module defining it,
     read off the qualid's own type, or None when unattributed."""
