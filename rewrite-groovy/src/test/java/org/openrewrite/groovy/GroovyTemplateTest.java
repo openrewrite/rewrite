@@ -18,6 +18,7 @@ package org.openrewrite.groovy;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -89,6 +90,40 @@ class GroovyTemplateTest implements RewriteTest {
 
                   @SuppressWarnings("all")
                   def method() {}
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceArgumentsOfExplicitConstructorInvocation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("super".equals(method.getSimpleName()) && method.getMethodType() != null && method.getArguments().size() == 1) {
+                      return JavaTemplate.builder("message, null")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replaceArguments());
+                  }
+                  return method;
+              }
+          })),
+          groovy(
+            """
+              @groovy.transform.CompileStatic
+              class A extends RuntimeException {
+                  A(String message) {
+                      super(message)
+                  }
+              }
+              """,
+            """
+              @groovy.transform.CompileStatic
+              class A extends RuntimeException {
+                  A(String message) {
+                      super(message, null)
+                  }
               }
               """
           ));

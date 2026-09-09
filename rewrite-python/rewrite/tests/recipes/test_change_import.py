@@ -901,6 +901,25 @@ class TestChangeImportPythonScopeRules:
             """,
         )
 
+    def test_a_class_attribute_re_exporting_the_import_reads_it_on_the_right(self):
+        """`clock = clock` binds `C.clock` from the module's `clock`."""
+        self._run(
+            """\
+            from time import clock
+
+
+            class C:
+                clock = clock
+            """,
+            """\
+            from time import perf_counter
+
+
+            class C:
+                clock = perf_counter
+            """,
+        )
+
     def test_member_and_keyword_positions_name_something_else(self):
         self._run(
             """\
@@ -920,6 +939,29 @@ class TestChangeImportPythonScopeRules:
                 resp.clock()
                 poll(clock=1)
                 return item.payload.clock, perf_counter()
+            """,
+        )
+
+    def test_a_match_class_keyword_pattern_names_an_attribute(self):
+        """``Point(clock=v)`` matches ``Point``'s attribute and binds only ``v``."""
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(p):
+                match p:
+                    case Point(clock=v):
+                        return clock(), v
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(p):
+                match p:
+                    case Point(clock=v):
+                        return perf_counter(), v
             """,
         )
 

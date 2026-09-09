@@ -853,7 +853,9 @@ class ParserVisitor(ast.NodeVisitor):
                 Markers.EMPTY,
                 self.__convert_name(node.arg),
                 self.__pad_left(self.__source_before('='), self.__convert(node.value)),
-                self._type_mapping.type(node)
+                # A keyword argument is an expression whose type is its value's;
+                # ty attributes the value, not the `ast.keyword` wrapping it.
+                self._type_mapping.type(node.value)
             )
         prefix = self.__whitespace()
         if self.__skip('**'):
@@ -1417,24 +1419,22 @@ class ParserVisitor(ast.NodeVisitor):
                 children.append(converted)
             # Process keyword patterns
             for i, kwd in enumerate(node.kwd_attrs):
-                kwd_var = j.VariableDeclarations(
+                kwd_pattern = py.MatchCase.Pattern(
                     random_id(),
                     self.__whitespace(),
                     Markers.EMPTY,
-                    _EMPTY_LIST, _EMPTY_LIST, None, None, _EMPTY_LIST,
-                    [
-                        self.__pad_right(j.VariableDeclarations.NamedVariable(
-                            random_id(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            cast(j.Identifier, self.__convert_name(kwd)),
-                            _EMPTY_LIST,
-                            self.__pad_left(self.__source_before('='), self.__convert_match_pattern(node.kwd_patterns[i])),
-                            None
-                        ), Space.EMPTY)
-                    ]
+                    py.MatchCase.Pattern.Kind.KEYWORD,
+                    JContainer(
+                        Space.EMPTY,
+                        [
+                            self.__pad_right(self.__convert_name(kwd), self.__source_before('=')),
+                            self.__pad_right(self.__convert_match_pattern(node.kwd_patterns[i]), Space.EMPTY),
+                        ],
+                        Markers.EMPTY
+                    ),
+                    None
                 )
-                converted = self.__pad_list_element(kwd_var, last=i == len(node.kwd_attrs) - 1,
+                converted = self.__pad_list_element(kwd_pattern, last=i == len(node.kwd_attrs) - 1,
                                                     end_delim=')')
                 children.append(converted)
         else:

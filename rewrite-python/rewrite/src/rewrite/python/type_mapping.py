@@ -91,7 +91,7 @@ _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
 }
 
 # Reverse mapping from JavaType.Primitive to Python type name
-_PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
+PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
     JavaType.Primitive.String: 'str',
     JavaType.Primitive.Int: 'int',
     JavaType.Primitive.Double: 'float',
@@ -1533,6 +1533,12 @@ class PythonTypeMapping:
             # `module_type` leaves a class to its own FQN.
             return self._class_reference(constructed)
 
+        # A method is owned by the class that declares it, so `match_overrides` walks
+        # up from an override. Mirrors Java, where this is `MethodSymbol.owner`.
+        declared_by = self._declaring_class_of_callee(node)
+        if declared_by is not None:
+            return declared_by
+
         # The callee names what is called; a receiver names only the module a call was
         # reached through, which differs for a re-exported function. A value receiver
         # owns its calls, so it is read below instead: `"x".upper()` is `str`'s.
@@ -1566,6 +1572,17 @@ class PythonTypeMapping:
                 resolved = self._get_call_return_type(receiver)
                 if resolved is not None:
                     return resolved
+                # ty types a call it matches to no overload `Unknown`, so a
+                # construction is known by the class it names. That is the receiver's
+                # own class, as for a `self` receiver, so an inherited member needs
+                # `match_overrides`.
+                constructed = self._constructed_class(receiver)
+                if constructed is not None:
+                    reference = self._class_reference(constructed)
+                    # `super()` builds a proxy, never the class declaring what is
+                    # called on it; `_declaring_class_of_callee` names that class.
+                    if reference.fully_qualified_name != 'super':
+                        return reference
 
             # Try to look up receiver type in ty-types index
             type_id = self._lookup_type_id(receiver)
@@ -1583,6 +1600,25 @@ class PythonTypeMapping:
 
         inferred = self._infer_declaring_type_from_ast(node)
         return inferred if inferred is not None else _UNKNOWN
+
+    def _declaring_class_of_callee(self, node: ast.Call) -> Optional[JavaType.FullyQualified]:
+        """The class ty resolved the callee to through the MRO.
+
+        None for a module-level function or a builtin bound method; the
+        receiver's own type names those.
+        """
+        if not isinstance(node.func, ast.Attribute):
+            return None
+        callee = self._descriptor_of(node.func)
+        if callee.get('kind') != 'boundMethod':
+            return None
+        declaring_id = callee.get('declaringClassId')
+        return None if declaring_id is None else self._resolve_declaring_type(declaring_id)
+
+    def _descriptor_of(self, node: ast.expr) -> Dict[str, Any]:
+        """The TypeDescriptor ty gave a node, empty when it typed the node as nothing."""
+        type_id = self._lookup_type_id(node)
+        return (self._type_registry.get(type_id) or {}) if type_id is not None else {}
 
     def _names_a_module(self, node: ast.expr) -> bool:
         type_id = self._lookup_type_id(node)
@@ -1708,6 +1744,13 @@ class PythonTypeMapping:
             if descriptor.get('className'):
                 return self._class_reference(descriptor)
 
+        elif kind == 'typeVar':
+            # `self` is a `Self` typevar bound to its class, `cls` a `type[Self]`
+            # arriving through `subclassOf`, so the bound is what owns the call.
+            upper_bound_id = descriptor.get('upperBound')
+            if upper_bound_id is not None:
+                return self._resolve_declaring_type(upper_bound_id)
+
         return None
 
     def _get_call_return_type(self, call_node: ast.Call) -> Optional[JavaType.FullyQualified]:
@@ -1727,7 +1770,7 @@ class PythonTypeMapping:
                 return java_type._type if isinstance(java_type._type, JavaType.FullyQualified) else java_type
             if isinstance(java_type, JavaType.Primitive):
                 return self._create_class_type(
-                    _PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower())
+                    PRIMITIVE_TO_PYTHON.get(java_type, java_type.name.lower())
                 )
         return None
 

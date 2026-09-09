@@ -27,9 +27,9 @@ from rewrite.java.support_types import J, Statement
 from rewrite.java.tree import (Assignment, Case, FieldAccess, ForEachLoop, Identifier, If,
                                Import, MethodInvocation, Parentheses)
 from rewrite.python.import_utils import get_alias_name, unconditional_body
-from rewrite.python.scope_utils import scope_of
+from rewrite.python.scope_utils import captures, scope_of
 from rewrite.python.tree import (ChainedAssignment, CollectionLiteral, ComprehensionExpression,
-                                 CompilationUnit, ExpressionStatement, MultiImport,
+                                 CompilationUnit, ExpressionStatement, MatchCase, MultiImport,
                                  NamedArgument, Star, TypeHintedExpression, VariableScope)
 from rewrite.visitor import TreeVisitor
 
@@ -111,10 +111,11 @@ class ImportBindings:
         return None if declaring is not None and not isinstance(declaring, CompilationUnit) else binding
 
 
-def import_bindings(source: Union[TreeVisitor[Any, Any], CompilationUnit,
+def import_bindings(source: Union[TreeVisitor[Any, Any], Cursor, CompilationUnit,
                                   Iterable[Statement]]) -> ImportBindings:
-    """The bindings the imports of ``source`` introduce: a visitor answers for the file it is
-    visiting and scans it once, a compilation unit or statement list scans on every call.
+    """The bindings the imports of ``source`` introduce: a visitor or a cursor answers for the
+    file being visited and scans it once, a compilation unit or statement list scans on every
+    call.
 
     A scan descends into an ``if`` that has no ``else`` and into no ``try`` whatever it catches,
     so a fallback import's shim is never taken for the module — see :attr:`Binding.guarded`.
@@ -123,6 +124,8 @@ def import_bindings(source: Union[TreeVisitor[Any, Any], CompilationUnit,
         return ImportBindings(_scan(source.statements, guarded=False))
     if isinstance(source, TreeVisitor):
         return _cached(source.cursor)
+    if isinstance(source, Cursor):
+        return _cached(source)
     return ImportBindings(_scan(source, guarded=False))
 
 
@@ -177,6 +180,9 @@ def _resolves(node: J, parent: Optional[J]) -> bool:
     if isinstance(parent, (FieldAccess, NamedArgument)):
         # An attribute belongs to its target and a keyword argument to the callee's signature.
         return parent.name is not node
+    if isinstance(parent, MatchCase.Pattern) and parent.kind is MatchCase.Pattern.Kind.KEYWORD:
+        # A class pattern's `attr=p` names an attribute of the class it matches.
+        return parent.children[0] is not node
     return True
 
 
@@ -197,10 +203,11 @@ def _is_target(parent: Optional[J], node: J) -> bool:
     if isinstance(parent, ComprehensionExpression):
         # A clause holds its target directly, so the comprehension is the node above the name.
         return any(clause.iterator_variable is node for clause in parent.clauses)
-    # A bare `case json:` label captures, and so binds. Every structured pattern is a
-    # `Py.MatchCase` instead, whose captures are left as reads: safe for a census, and a
-    # rename has to guard them itself.
-    return isinstance(parent, Case) and any(label is node for label in parent.case_labels)
+    if isinstance(parent, Case):
+        return any(capture is node for label in parent.case_labels for capture in captures(label))
+    # A pattern nested in another holds its own cursor, so the case above it is out of reach.
+    return (isinstance(parent, (MatchCase, MatchCase.Pattern))
+            and any(capture is node for capture in captures(parent)))
 
 
 def _enclosing_nodes(cursor: Cursor, ident: Identifier) -> Iterator[J]:

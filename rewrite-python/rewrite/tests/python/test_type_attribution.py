@@ -879,6 +879,29 @@ class TestDeclaringTypeWithTyTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    def test_construction_receiver_declaring_type_when_ty_untypes_the_call(self):
+        """A construction ty leaves untyped still yields a declaring type."""
+        source = """
+            import array
+
+            class Subclass(array.array):
+                pass
+
+            Subclass().tobytes()
+        """
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[2].value  # Subclass().tobytes()
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            # `array.array` has no zero-argument overload, so ty resolves no
+            # member on the construction.
+            declaring = result._declaring_type
+            assert declaring._fully_qualified_name == f'{_SOURCE_MODULE}.Subclass'
+            assert declaring._supertype._fully_qualified_name == 'array.array'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
     def test_user_defined_class_method(self):
         """Method call on a user-defined class instance."""
         source = '''
@@ -2428,7 +2451,8 @@ class TestDeclaringTypeUnification:
             mt = mapping.method_invocation_type(call)
             assert mt is not None
             assert mt._declaring_type is not None
-            assert mt._declaring_type.fully_qualified_name == 'os.PathLike'
+            # `register` is declared on the metaclass.
+            assert mt._declaring_type.fully_qualified_name == 'abc.ABCMeta'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -2667,6 +2691,104 @@ class TestSupertypeChainResolution:
             assert grand.fully_qualified_name == 'basemod.Base'
         finally:
             _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestInheritedCallDeclaringType:
+    """Attribution of a call to a method the receiver's class does not override."""
+
+    SRC = '''
+        import threading
+
+        class Worker(threading.Thread):
+            def run(self):
+                pass
+
+        w = Worker()
+        w.getName()
+        w.run()
+    '''
+
+    def test_an_inherited_call_names_the_declaring_class(self):
+        cu, tmpdir, client = _parse_with_types({'m.py': self.SRC})
+        try:
+            declaring = {c.name.simple_name: c.method_type.declaring_type
+                         for c in _collect_method_invocations(cu)}
+
+            assert _fqn(declaring['getName']) == 'threading.Thread', \
+                f"inherited without override: got {declaring['getName']!r}"
+
+            assert _fqn(declaring['run']) == 'm.Worker', \
+                f"overridden, so the subclass declares it: got {declaring['run']!r}"
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestSelfReceiverDeclaringType:
+    """A call through ``self`` or ``cls`` resolves to a class, not to ``Unknown``,
+    which ``MethodMatcher`` and ``UsesMethod`` cannot gate on."""
+
+    SRC = '''
+        class Base:
+            def greet(self):
+                return "hi"
+
+            @classmethod
+            def build(cls):
+                return cls()
+
+        class Child(Base):
+            def go(self):
+                self.greet()
+
+            @classmethod
+            def make(cls):
+                return cls.build()
+    '''
+
+    def test_self_and_cls_receivers_resolve_to_the_declaring_class(self):
+        cu, tmpdir, client = _parse_with_types({'m.py': self.SRC})
+        try:
+            declaring = {c.name.simple_name: c.method_type.declaring_type
+                         for c in _collect_method_invocations(cu)}
+
+            assert _fqn(declaring['greet']) == 'm.Base', \
+                f"self-rooted call: got {declaring['greet']!r}"
+
+            assert _fqn(declaring['build']) == 'm.Base', \
+                f"cls-rooted call: got {declaring['build']!r}"
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestSuperReceiverDeclaringType:
+    """A `super()`-rooted call is owned by the class declaring what it resolves to."""
+
+    SRC = '''
+        class A:
+            def f(self) -> int:
+                return 1
+
+        class B(A):
+            pass
+
+        class C(B):
+            def f(self) -> str:
+                return "s"
+
+            def go(self):
+                super().f()
+    '''
+
+    def test_super_takes_the_declaring_class_not_the_pivot(self):
+        mapping, tree, tmpdir, client = _make_mapping(self.SRC)
+        try:
+            super_f = tree.body[2].body[1].body[0].value
+            assert _fqn(mapping._get_declaring_type(super_f)) == 'test.A'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
 
 
 class TestSubprocessEnvironment:
@@ -4061,7 +4183,8 @@ def _fqn(java_type) -> Optional[str]:
     if isinstance(java_type, JavaType.Parameterized):
         java_type = java_type._type
     return (java_type.fully_qualified_name
-            if isinstance(java_type, JavaType.FullyQualified) else None)
+            if isinstance(java_type, JavaType.FullyQualified)
+            and not isinstance(java_type, JavaType.Unknown) else None)
 
 
 def _fqn_params(case: FqnCase):

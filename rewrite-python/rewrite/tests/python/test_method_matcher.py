@@ -14,12 +14,11 @@
 
 """Tests for the MethodMatcher utility."""
 
+from typing import List
+
 import pytest
 
-from typing import List
 from rewrite.java.tree import MethodInvocation
-from rewrite.python.visitor import PythonVisitor
-from rewrite.test import RecipeSpec, python
 from rewrite.python import MethodMatcher
 from rewrite.python.method_matcher import (
     PatternTypeMatcher,
@@ -28,6 +27,8 @@ from rewrite.python.method_matcher import (
     PatternMethodNameMatcher,
     WildcardMethodNameMatcher,
 )
+from rewrite.python.visitor import PythonVisitor
+from rewrite.test import RecipeSpec, python
 
 
 class TestMethodMatcherPatternParsing:
@@ -198,6 +199,7 @@ WORKER_SOURCE = (
     "\n"
     "w = Worker()\n"
     "w.getName()\n"
+    "w.run()\n"
 )
 
 
@@ -230,14 +232,14 @@ def worker_cu():
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-def _get_name_invocation(cu):
+def _worker_invocation(cu, name):
     from rewrite.python.visitor import PythonVisitor
 
     found = []
 
     class _Collector(PythonVisitor):
         def visit_method_invocation(self, mi, p):
-            if mi.name.simple_name == "getName":
+            if mi.name.simple_name == name:
                 found.append(mi)
             return super().visit_method_invocation(mi, p)
 
@@ -249,22 +251,22 @@ def _get_name_invocation(cu):
 class TestMatchOverrides:
     """Matching a method declared on a supertype of the call's declaring type."""
 
-    def test_base_type_pattern_matched_only_with_the_flag(self, worker_cu):
-        invocation = _get_name_invocation(worker_cu)
-
-        # The call is attributed to the subclass, so an exact base-type
-        # match cannot work.
-        assert invocation.method_type.declaring_type.fully_qualified_name == "m.Worker"
-
-        assert not MethodMatcher.create("threading.Thread getName(..)").matches(invocation)
+    def test_the_flag_is_needed_only_for_a_real_override(self, worker_cu):
+        overridden = _worker_invocation(worker_cu, "run")
+        assert overridden.method_type.declaring_type.fully_qualified_name == "m.Worker"
+        assert not MethodMatcher.create("threading.Thread run(..)").matches(overridden)
         assert MethodMatcher.create(
-            "threading.Thread getName(..)", match_overrides=True
-        ).matches(invocation)
+            "threading.Thread run(..)", match_overrides=True
+        ).matches(overridden)
+
+        # Inherited without an override, so the base type is already the declaring one.
+        inherited = _worker_invocation(worker_cu, "getName")
+        assert MethodMatcher.create("threading.Thread getName(..)").matches(inherited)
 
     def test_unrelated_supertype_still_rejected(self, worker_cu):
         assert not MethodMatcher.create(
-            "queue.Queue getName(..)", match_overrides=True
-        ).matches(_get_name_invocation(worker_cu))
+            "queue.Queue run(..)", match_overrides=True
+        ).matches(_worker_invocation(worker_cu, "run"))
 
     def test_preconditions_forward_the_flag(self, worker_cu):
         from rewrite import InMemoryExecutionContext
@@ -275,14 +277,14 @@ class TestMatchOverrides:
             visited = recipe_ref.local_visitor.visit(worker_cu, InMemoryExecutionContext())
             return visited.markers.find_first(SearchResult) is not None
 
-        pattern = "threading.Thread getName(..)"
+        pattern = "threading.Thread run(..)"
         assert not selects(uses_method(pattern))
         assert selects(uses_method(pattern, match_overrides=True))
         assert selects(find_methods(pattern, match_overrides=True))
 
 
-def _invocation(source: str, name: str) -> MethodInvocation:
-    """The single call named ``name`` in ``source``, parsed without type attribution."""
+def _invocation(source: str, name: str, type_attribution: bool = False) -> MethodInvocation:
+    """The single call named ``name`` in ``source``."""
     found: List[MethodInvocation] = []
 
     class Finder(PythonVisitor):
@@ -291,7 +293,7 @@ def _invocation(source: str, name: str) -> MethodInvocation:
                 found.append(method)
             return super().visit_method_invocation(method, p)
 
-    RecipeSpec(type_attribution=False).rewrite_run(
+    RecipeSpec(type_attribution=type_attribution).rewrite_run(
         python(source, after_recipe=lambda sf: Finder().visit(sf, None)))
     assert len(found) == 1
     return found[0]
@@ -348,3 +350,41 @@ class TestMatchUnknownTypes:
         mi = _invocation("Assert.assertTrue(foo.bar())", "assertTrue")
         assert MethodMatcher.create("org.junit.Assert assertTrue(bool)").matches(
             mi, match_unknown_types=True)
+
+    def test_a_known_argument_type_is_still_checked(self):
+        mi = _invocation("Assert.assertTrue(foo.bar(), 'message')", "assertTrue")
+        assert MethodMatcher.create("org.junit.Assert assertTrue(*, str)").matches(
+            mi, match_unknown_types=True)
+
+        assert not MethodMatcher.create("org.junit.Assert assertTrue(*, int)").matches(
+            mi, match_unknown_types=True)
+
+class TestArgumentTypeMatching:
+    """Argument matching against a parsed call."""
+
+    def test_a_zero_argument_call_matches_an_empty_argument_pattern(self):
+        mi = _invocation("import m\nm.g()\n", "g")
+        assert MethodMatcher.create("m g()").matches(mi)
+        assert not MethodMatcher.create("m g(*)").matches(mi)
+        # The Java host matches the same call through JavaType.Method, counting
+        # parameter types; both peers have to see zero for one pattern to serve both.
+        assert not mi.method_type.parameter_types
+
+    def test_a_primitive_argument_matches_its_python_spelling(self):
+        mi = _invocation("import m\nm.f('s', 1, 1.5, True, None)\n", "f")
+        assert MethodMatcher.create("m f(str, int, float, bool, None)").matches(mi)
+        assert not MethodMatcher.create("m f(str, int, float, bool, str)").matches(mi)
+
+    def test_a_wildcard_argument_accepts_an_argument_with_no_type(self):
+        mi = _invocation("import m\nm.f(g(), 'message')\n", "f")
+        assert MethodMatcher.create("m f(*, str)").matches(mi)
+
+    def test_a_typed_pattern_matches_a_keyword_argument(self):
+        mi = _invocation("import m\nm.f(x=1)\n", "f")
+        assert MethodMatcher.create("m f(int)").matches(mi)
+
+    def test_an_argument_type_pattern_may_contain_wildcards(self):
+        mi = _invocation("import datetime\nimport m\nm.f(datetime.datetime.now())\n",
+                         "f", type_attribution=True)
+        assert MethodMatcher.create("m f(datetime.*)").matches(mi)
+        assert not MethodMatcher.create("m f(json.*)").matches(mi)
