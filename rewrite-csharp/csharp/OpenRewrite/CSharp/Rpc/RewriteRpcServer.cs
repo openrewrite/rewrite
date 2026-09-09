@@ -629,12 +629,30 @@ public class RewriteRpcServer
     {
         var localObject = _localObjects.GetValueOrDefault(id);
 
+        Task<List<RpcObjectData>> RequestPage() =>
+            _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
+                "GetObject",
+                new GetObjectRequest { Id = id, SourceFileType = sourceFileType });
+
+        // The following page is requested before this one is handed to the queue, so the
+        // remote serializes it while this side deserializes what it already has.
+        Task<List<RpcObjectData>>? nextPage = null;
         var q = new RpcReceiveQueue(
             _remoteRefs,
-            () => _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
-                "GetObject",
-                new GetObjectRequest { Id = id, SourceFileType = sourceFileType })
-                .GetAwaiter().GetResult(),
+            () =>
+            {
+                var pending = nextPage;
+                nextPage = null;
+                var page = (pending ?? RequestPage()).GetAwaiter().GetResult();
+                // A page ending in END_OF_OBJECT has no successor; the remote drops its
+                // transfer state when it sends that marker, so asking again would restart
+                // the transfer rather than return nothing.
+                if (page.Count > 0 && page[^1].State != END_OF_OBJECT)
+                {
+                    nextPage = RequestPage();
+                }
+                return page;
+            },
             sourceFileType,
             TreeCodec.Instance
         );
@@ -643,29 +661,52 @@ public class RewriteRpcServer
         try
         {
             remoteObject = q.Receive(localObject, (Func<object, object>?)null);
+
+            // Inside the try so that a missing end marker unwinds the same way a failed
+            // receive does: a page is in flight here whenever the last one did not end in
+            // END_OF_OBJECT, which is the condition this rejects.
+            var endMarker = q.Take();
+            if (endMarker.State != END_OF_OBJECT)
+            {
+                // Collect remaining items for debugging
+                var remaining = new System.Text.StringBuilder();
+                remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
+                for (int i = 1; i < 20; i++)
+                {
+                    try
+                    {
+                        var next = q.Take();
+                        remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
+                        if (next.State == END_OF_OBJECT) break;
+                    }
+                    catch { break; }
+                }
+                throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+            }
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException(
-                $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
-        }
-        var endMarker = q.Take();
-        if (endMarker.State != END_OF_OBJECT)
-        {
-            // Collect remaining items for debugging
-            var remaining = new System.Text.StringBuilder();
-            remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
-            for (int i = 1; i < 20; i++)
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            _remoteObjects.TryRemove(id, out _);
+            var pending = nextPage;
+            nextPage = null;
+            if (pending != null)
             {
+                // Awaited rather than abandoned so the remote's serialization of it is
+                // finished before the next request; the response itself is correlated by
+                // id, so an unawaited one is dropped rather than misdelivered.
                 try
                 {
-                    var next = q.Take();
-                    remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
-                    if (next.State == END_OF_OBJECT) break;
+                    pending.GetAwaiter().GetResult();
                 }
-                catch { break; }
+                catch
+                {
+                    // the original failure is the one worth reporting
+                }
             }
-            throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+            throw new InvalidOperationException(
+                $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
         }
 
         if (remoteObject != null)
