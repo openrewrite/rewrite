@@ -68,6 +68,42 @@ def _accepts_assignment(cls: type) -> bool:
     return mutable
 
 
+def _init_fields(cls: type) -> Tuple[str, ...]:
+    init_fields = _INIT_FIELDS_CACHE.get(cls)
+    if init_fields is None:
+        init_fields = tuple(f.name for f in _dataclass_fields(cls) if f.init)
+        _INIT_FIELDS_CACHE[cls] = init_fields
+    return init_fields
+
+
+# Per-class map from a keyword accepted by `replace_if_changed`/`assign_fields` to
+# the field it sets. Properties are public (`prefix`) where fields are private
+# (`_prefix`), and a field colliding with a keyword is spelled with a trailing
+# underscore (`from_` for `_from`); all three reach the same field.
+_FIELD_FOR_KWARG: Dict[type, Dict[str, str]] = {}
+
+
+def _field_for_kwarg(cls: type) -> Dict[str, str]:
+    mapping = _FIELD_FOR_KWARG.get(cls)
+    if mapping is None:
+        mapping = {}
+        for field in _init_fields(cls):
+            mapping[field] = field
+            if field.startswith('_'):
+                public = field[1:]
+                mapping.setdefault(public, field)
+                mapping.setdefault(public + '_', field)
+        _FIELD_FOR_KWARG[cls] = mapping
+    return mapping
+
+
+def _resolve_field(cls: type, key: str) -> str:
+    field = _field_for_kwarg(cls).get(key)
+    if field is None:
+        raise TypeError(f"{cls.__name__} has no field for keyword '{key}'")
+    return field
+
+
 def assign_fields(obj: T, **kwargs) -> T:
     """Set fields on an object the caller solely owns, mapping names as
     `replace_if_changed` does."""
@@ -75,21 +111,11 @@ def assign_fields(obj: T, **kwargs) -> T:
     if not _accepts_assignment(cls):
         return replace_if_changed(obj, **kwargs)
 
-    init_fields = _INIT_FIELDS_CACHE.get(cls)
-    if init_fields is None:
-        init_fields = tuple(f.name for f in _dataclass_fields(cls) if f.init)
-        _INIT_FIELDS_CACHE[cls] = init_fields
-
     for key, value in kwargs.items():
-        if key.startswith('_'):
-            private_key = key
-        else:
-            private_key = f'_{key.rstrip("_")}'
-            if private_key not in init_fields:
-                private_key = key
-        if private_key == '_id':
+        field = _resolve_field(cls, key)
+        if field == '_id':
             value = id_to_int(value)
-        setattr(obj, private_key, value)
+        setattr(obj, field, value)
     return obj
 
 
@@ -117,37 +143,22 @@ def replace_if_changed(obj: T, **kwargs) -> T:
         return obj
 
     cls = type(obj)
-    init_fields = _INIT_FIELDS_CACHE.get(cls)
-    if init_fields is None:
-        if not _is_dataclass(cls):
-            # Non-dataclass fallback path — should never hit on the LST hot path,
-            # but preserves the original semantics.
-            return cast(T, dataclass_replace(cast(Any, obj), **kwargs))
-        init_fields = tuple(f.name for f in _dataclass_fields(cls) if f.init)
-        _INIT_FIELDS_CACHE[cls] = init_fields
+    if cls not in _INIT_FIELDS_CACHE and not _is_dataclass(cls):
+        # Non-dataclass fallback path — should never hit on the LST hot path,
+        # but preserves the original semantics.
+        return cast(T, dataclass_replace(cast(Any, obj), **kwargs))
+    init_fields = _init_fields(cls)
 
-    # Map public property names to private field names and check for changes
     mapped_kwargs: Dict[str, Any] = {}
     changed = False
     for key, value in kwargs.items():
-        if not key.startswith('_'):
-            # Handle Python keyword conflicts: from_ -> _from
-            private_key = f'_{key.rstrip("_")}'
-            if private_key in init_fields:
-                if private_key == '_id':
-                    # Ids are stored as a 128-bit int; normalise UUID/str callers.
-                    value = id_to_int(value)
-                mapped_kwargs[private_key] = value
-                # Use 'or' for short-circuit evaluation - skips check once changed is True
-                changed = changed or _is_changed(getattr(obj, private_key), value)
-            else:
-                mapped_kwargs[key] = value
-                changed = changed or _is_changed(getattr(obj, key), value)
-        else:
-            if key == '_id':
-                value = id_to_int(value)
-            mapped_kwargs[key] = value
-            changed = changed or _is_changed(getattr(obj, key), value)
+        field = _resolve_field(cls, key)
+        if field == '_id':
+            # Ids are stored as a 128-bit int; normalise UUID/str callers.
+            value = id_to_int(value)
+        mapped_kwargs[field] = value
+        # Use 'or' for short-circuit evaluation - skips check once changed is True
+        changed = changed or _is_changed(getattr(obj, field), value)
 
     if not changed:
         return obj
