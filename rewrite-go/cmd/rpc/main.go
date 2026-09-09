@@ -1095,16 +1095,22 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 	// to whatever request comes next.
 	outstanding := false
 	drainPage := func() {
-		if outstanding {
-			outstanding = false
+		if !outstanding {
+			return
+		}
+		outstanding = false
+		// A message carrying a method is a request Java initiated, which Go cannot
+		// answer from here; it is read past so the page behind it still arrives.
+		for {
 			msg, err := s.readMessage()
 			if err != nil {
 				s.logger.Printf("Error draining prefetched page: %v", err)
-			} else if msg.Method != "" {
-				// A message carrying a method is a request Java initiated, so the page
-				// is still queued behind it for the next read to take as its own reply.
-				s.logger.Printf("Expected the prefetched GetObject page, got a %s request", msg.Method)
+				return
 			}
+			if msg.Method == "" {
+				return
+			}
+			s.logger.Printf("Expected the prefetched GetObject page, got a %s request", msg.Method)
 		}
 	}
 
@@ -1140,7 +1146,9 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		// END_OF_OBJECT closes the transfer, so a page carrying it has no successor
 		// to ask for; asking anyway would restart the transfer on the Java side.
 		if len(batch) > 0 && batch[len(batch)-1].State != rpc.EndOfObject {
-			if err = requestPage(); err == nil {
+			if err = requestPage(); err != nil {
+				s.logger.Printf("Error requesting next object page: %v", err)
+			} else {
 				outstanding = true
 			}
 		}

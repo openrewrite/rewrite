@@ -144,20 +144,32 @@ func TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs(t *testing.T) {
 		"draining Java's own reply is the ordinary case and must not be reported as a desync")
 }
 
-func TestDrainPageReportsAMessageThatIsNotTheGetObjectReply(t *testing.T) {
+func TestDrainPageReadsPastARequestToReachTheGetObjectReply(t *testing.T) {
 	s, logs := newResilienceTestServer(t)
 
 	// A bare ref to an object Go never received panics mid-receive, so the
 	// deferred drain runs against whatever comes next — here a Visit request
-	// Java initiated rather than the page Go prefetched.
+	// Java initiated ahead of the page Go prefetched.
 	stream := append(
 		frameReverseGetObjectReply(t, []map[string]any{{"state": "ADD", "ref": 7}}),
-		frameReverseRequest(t, "Visit")...,
+		append(
+			frameReverseRequest(t, "Visit"),
+			append(
+				frameReverseGetObjectReply(t, []map[string]any{{"state": "END_OF_OBJECT"}}),
+				frameReverseGetObjectReply(t, []map[string]any{
+					{"state": "ADD", "value": "package main\n"},
+					{"state": "END_OF_OBJECT"},
+				})...,
+			)...,
+		)...,
 	)
 	s.reader = bufio.NewReader(bytes.NewReader(stream))
 	s.writer = &bytes.Buffer{}
 
-	require.Panics(t, func() { s.getObjectFromJava("tree-X", "") })
-	require.Contains(t, logs.String(), "Expected the prefetched GetObject page, got a Visit request",
-		"a swallowed request drops Java's call and leaves the page for a later one to misread")
+	const id = "tree-X"
+	require.Panics(t, func() { s.getObjectFromJava(id, "") })
+	require.Contains(t, logs.String(), "Expected the prefetched GetObject page, got a Visit request")
+
+	// The drain having consumed the page, the next transfer reads its own reply.
+	require.Equal(t, "package main\n", s.getObjectFromJava(id, ""))
 }

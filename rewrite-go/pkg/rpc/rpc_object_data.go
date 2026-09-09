@@ -87,13 +87,6 @@ func wireNumber(v any) any {
 	return json.Number(s)
 }
 
-type wireObjectData struct {
-	State     string  `json:"state"`
-	ValueType *string `json:"valueType"`
-	Value     any     `json:"value"`
-	Ref       *int    `json:"ref"`
-}
-
 func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
@@ -236,27 +229,6 @@ func decodeTokenValue(dec *json.Decoder, tbl map[string]string) (any, error) {
 		return decodeNumber(v), nil
 	default:
 		return v, nil
-	}
-}
-
-func decodeValue(v any, tbl map[string]string) any {
-	switch x := v.(type) {
-	case string:
-		return internString(x, tbl)
-	case json.Number:
-		return decodeNumber(x)
-	case []any:
-		for i := range x {
-			x[i] = decodeValue(x[i], tbl)
-		}
-		return x
-	case map[string]any:
-		for k, val := range x {
-			x[k] = decodeValue(val, tbl)
-		}
-		return x
-	default:
-		return v
 	}
 }
 

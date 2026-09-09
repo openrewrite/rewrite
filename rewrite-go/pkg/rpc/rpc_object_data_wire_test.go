@@ -54,7 +54,6 @@ func TestRpcObjectDataWireFormat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := json.Marshal(tc.in)
 			require.NoError(t, err)
-			require.JSONEq(t, tc.want, string(got))
 			require.Equal(t, tc.want, string(got), "byte-for-byte, not just semantically")
 		})
 	}
