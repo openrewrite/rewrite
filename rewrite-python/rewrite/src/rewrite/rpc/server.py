@@ -2680,11 +2680,11 @@ class _StdinBuffer:
     instance is shared by read_message() and read_message_with_timeout().
     """
 
-    # A response body is read whole and a page of tree data runs to hundreds of
-    # kilobytes, so a small chunk costs a read and a select() for each 8 KB of it.
-    # A pipe hands back at most its own capacity per read, and os.read allocates
-    # what it is asked for before shrinking to what arrived, so asking for more
-    # than that only wastes the difference.
+    # A response body is read whole, and a page of tree data runs to hundreds of
+    # kilobytes, so each read should take as much as the pipe will give. A pipe
+    # returns at most its own capacity per read, and os.read allocates what it is
+    # asked for before shrinking to what arrived, so an over-large request costs
+    # only the unused difference.
     _CHUNK_SIZE = 65536
 
     def __init__(self):

@@ -239,8 +239,9 @@ class JavaType(ABC):
     class Unknown(FullyQualified):
         __slots__ = ()
 
-    # Identity equality, unlike the siblings below: a type graph is cyclic through
-    # members and methods, and Java compares these on name and type parameters alone.
+    # Identity equality, as for the other `lst_dataclass` types here: a type graph is
+    # cyclic through members and methods, and Java compares these on name and type
+    # parameters alone.
     @lst_dataclass
     class Class(FullyQualified):
         _flags_bit_map: int = 0
