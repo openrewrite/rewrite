@@ -557,6 +557,20 @@ class TestRemoveImportUsageScoping:
                 )
             )
 
+    def test_keep_a_dotted_module_import_referenced_through_its_root(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'os.path', None),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    import os.path
+
+                    x = os.path.join("a", "b")
+                    """,
+                )
+            )
+
     def test_remove_import_shadowed_in_every_function(self, arm):
         for type_attribution in (False, True):
             spec = RecipeSpec(recipe=self._remove(arm, 'os.path', 'join'),
