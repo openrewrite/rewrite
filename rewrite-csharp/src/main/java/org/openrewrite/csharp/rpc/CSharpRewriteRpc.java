@@ -15,6 +15,7 @@
  */
 package org.openrewrite.csharp.rpc;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -54,6 +55,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -70,11 +72,22 @@ public class CSharpRewriteRpc extends RewriteRpc {
     private final Map<String, String> commandEnv;
     private final RewriteRpcProcess process;
 
+    @Getter(AccessLevel.NONE)
+    private final AtomicLong restoreTimeMs = new AtomicLong();
+
     CSharpRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers, String command, Map<String, String> commandEnv) {
         super(process.getRpcClient(), marketplace, resolvers);
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;
+    }
+
+    /**
+     * Total milliseconds this engine has spent restoring NuGet dependencies across every
+     * {@link #parseSolution} call.
+     */
+    public long getRestoreTimeMs() {
+        return restoreTimeMs.get();
     }
 
     public static @Nullable CSharpRewriteRpc get() {
@@ -150,6 +163,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
                     response = send("ParseSolution", new ParseSolution(path, rootDir, options), ParseSolutionResponse.class);
+                    restoreTimeMs.addAndGet(response.getRestoreTimeMs());
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.getItems().size()));
                 }
 

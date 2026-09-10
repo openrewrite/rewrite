@@ -288,9 +288,13 @@ public class RewriteRpcServer
             };
         }
 
+        var restoreMsBefore = SolutionRestore.TotalRestoreMs;
         var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
 
-        var response = new ParseSolutionResponse();
+        var response = new ParseSolutionResponse
+        {
+            RestoreTimeMs = SolutionRestore.TotalRestoreMs - restoreMsBefore,
+        };
         var seenProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var projectList = solution.Projects.Where(p => p.FilePath != null).ToList();
         Log.Debug("RPC ParseSolution: {ProjectCount} projects to parse", projectList.Count);
@@ -2152,6 +2156,9 @@ public class DependencyRequest
 public class ParseSolutionResponse
 {
     public List<ParseSolutionResponseItem> Items { get; set; } = new();
+
+    /// <summary>Milliseconds spent restoring NuGet dependencies for this entry path.</summary>
+    public long RestoreTimeMs { get; set; }
 }
 
 public class ParseSolutionResponseItem

@@ -27,6 +27,7 @@ import java.util.List;
  */
 class ParseSolutionResponse {
     private List<Item> items = new ArrayList<>();
+    private long restoreTimeMs;
 
     public List<Item> getItems() {
         return items;
@@ -34,6 +35,14 @@ class ParseSolutionResponse {
 
     public void setItems(List<Item> items) {
         this.items = items;
+    }
+
+    public long getRestoreTimeMs() {
+        return restoreTimeMs;
+    }
+
+    public void setRestoreTimeMs(long restoreTimeMs) {
+        this.restoreTimeMs = restoreTimeMs;
     }
 
     /**
