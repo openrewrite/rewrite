@@ -16,10 +16,8 @@
 package org.openrewrite.gradle;
 
 import lombok.*;
-import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -27,14 +25,10 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -44,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.gradle.GradleParser.requireParsed;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -197,64 +190,50 @@ public class DependencyConstraintToRule extends Recipe {
             if (!(maybeClosure instanceof J.Lambda) || !(((J.Lambda) maybeClosure).getBody() instanceof J.Block)) {
                 return m;
             }
-            J.Lambda closure = (J.Lambda) maybeClosure;
-            J.Block closureBody = (J.Block) closure.getBody();
+            J.Block closureBody = (J.Block) ((J.Lambda) maybeClosure).getBody();
             J rawParam = ((J.Lambda) maybeClosure).getParameters().getParameters().get(0);
             if (!(rawParam instanceof J.VariableDeclarations)) {
                 return m;
             }
-            String p = ((J.VariableDeclarations) rawParam).getVariables().get(0).getSimpleName();
-            J.If newIf;
-            if (!isKotlinDsl) {
-                @SuppressWarnings("GroovyEmptyStatementBody") @Language("groovy")
-                String snippet = "Object " + p + " = null\n" +
-                        "if (" + p + ".requested.group == '" + groupArtifactVersion.getGroupId() + "' && " +
-                        p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
-                newIf = GroovyParser.builder().build()
-                        .parse(ctx, snippet)
-                        .map(requireParsed(G.CompilationUnit.class))
-                        .map(cu -> cu.getStatements().get(1))
-                        .map(J.If.class::cast)
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException("Unable to produce a new if statement"));
-            } else {
-                String snippet = "var " + p + ": Any = null\n" +
-                        "if (" + p + ".requested.group == \"" + groupArtifactVersion.getGroupId() + "\" && " +
-                        p + ".requested.name == \"" + groupArtifactVersion.getArtifactId() + "\") {\n}";
-                newIf = KotlinParser.builder().isKotlinScript(true).build()
-                        .parse(ctx, snippet)
-                        .map(requireParsed(K.CompilationUnit.class))
-                        .map(cu -> (J.Block) cu.getStatements().get(0))
-                        .map(block -> (J.If) block.getStatements().get(1))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException("Unable to produce a new if statement"));
-            }
-            if (containsAnyIfStatement) {
-                m = (J.MethodInvocation) new JavaIsoVisitor<Integer>() {
-                    boolean inserted;
+            J.Identifier p = ((J.VariableDeclarations) rawParam).getVariables().get(0).getName();
 
-                    @Override
-                    public J.If visitIf(J.If iff, Integer integer) {
-                        J.If anIf = super.visitIf(iff, integer);
-                        J.If.Else currentElse = anIf.getElsePart();
-                        if (!inserted && (currentElse == null || currentElse.getBody() instanceof J.Block)) {
-                            inserted = true;
-                            J.If.Else newElsePart = new J.If.Else(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
-                                    JRightPadded.build(newIf
-                                            .withPrefix(Space.SINGLE_SPACE)
-                                            .withElsePart(currentElse)));
-                            anIf = autoFormat(anIf.withElsePart(newElsePart), 0, requireNonNull(getCursor().getParent()));
-                        }
-                        return anIf;
-                    }
-                }.visitNonNull(m, 0, requireNonNull(getCursor().getParent()));
-            } else {
-                J.Block newBody = autoFormat(closureBody.withStatements(ListUtils.concat(newIf, closureBody.getStatements())), ctx, getCursor());
-                m = m.withArguments(singletonList(closure.withBody(newBody)));
+            // The closure parameter comes from the tree and the coordinates from the recipe's options, so the
+            // predicate is assembled from parameters and needs no declaration of `p` to parse against
+            String predicate = "if (#{any()}.requested.group == #{any(String)} && #{any()}.requested.name == #{any(String)}) {\n}";
+            JavaTemplate branch = isKotlinDsl ?
+                    KotlinTemplate.builder(predicate).build() :
+                    GroovyTemplate.builder(predicate).build();
+            Object[] values = {
+                    p.withPrefix(Space.EMPTY),
+                    stringLiteral(groupArtifactVersion.getGroupId(), isKotlinDsl),
+                    p.withPrefix(Space.EMPTY),
+                    stringLiteral(groupArtifactVersion.getArtifactId(), isKotlinDsl)
+            };
+
+            Cursor scope = new Cursor(getCursor().getParentOrThrow(), m);
+            if (containsAnyIfStatement) {
+                J.If endOfChain = endOfChain(m);
+                return endOfChain == null ? m :
+                        branch.apply(scope, endOfChain.getCoordinates().addElseBranch(), values);
             }
-            return m;
+            return branch.apply(scope, closureBody.getCoordinates().firstStatement(), values);
         }
 
+        // The innermost `if` of a chain, which is the one a new branch hangs off
+        private static J.@Nullable If endOfChain(J.MethodInvocation m) {
+            AtomicReference<J.If> end = new AtomicReference<>();
+            new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.If visitIf(J.If iff, Integer p) {
+                    super.visitIf(iff, p);
+                    if (end.get() == null && (iff.getElsePart() == null || iff.getElsePart().getBody() instanceof J.Block)) {
+                        end.set(iff);
+                    }
+                    return iff;
+                }
+            }.visit(m, 0);
+            return end.get();
+        }
 
         @Override
         public J.If visitIf(J.If iff, ExecutionContext ctx) {
@@ -354,95 +333,31 @@ public class DependencyConstraintToRule extends Recipe {
                 if (alreadyExists) {
                     return sourceFile;
                 }
-                // Prefer to insert before the dependencies block for readability
-                if (sourceFile instanceof G.CompilationUnit) {
-                    G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
-                    int insertionIndex = 0;
-                    while (insertionIndex < cu.getStatements().size()) {
-                        Statement s = cu.getStatements().get(insertionIndex);
-                        if (s instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) s)) {
-                            break;
-                        }
-                        insertionIndex++;
-                    }
-                    J.MethodInvocation m = GradleParser.builder()
-                            .build()
-                            .parse(ctx,
-                                    "configurations.all {\n" +
-                                            "    resolutionStrategy.eachDependency { details ->\n" +
-                                            "    }\n" +
-                                            "}")
-                            .map(requireParsed(G.CompilationUnit.class))
-                            .map(G.CompilationUnit::getStatements)
-                            .map(it -> it.get(0))
-                            .map(J.MethodInvocation.class::cast)
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"))
-                            .withPrefix(Space.format("\n"));
-                    List<Statement> newStatements = ListUtils.insert(cu.getStatements(), m, insertionIndex);
-                    if (insertionIndex == 0) {
-                        newStatements = ListUtils.map(newStatements, (i, stat) ->
-                                i == 1 && stat.getPrefix().getWhitespace().isEmpty()
-                                        ? stat.withPrefix(stat.getPrefix().withWhitespace("\n\n"))
-                                        : stat);
-                    }
-                    return cu.withStatements(newStatements);
-                } else {
-                    K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
-                    assert cu != null;
-                    J.Block block = (J.Block) cu.getStatements().get(0);
-                    int insertionIndex = 0;
-                    while (insertionIndex < block.getStatements().size()) {
-                        Statement s = block.getStatements().get(insertionIndex);
-                        if (s instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) s).getSimpleName())) {
-                            break;
-                        }
-                        insertionIndex++;
-                    }
-                    J.MethodInvocation m = GradleParser.builder()
-                            .build()
-                            .parseInputs(singletonList(
-                                    new Parser.Input(
-                                            Paths.get("build.gradle.kts"),
-                                            () -> new ByteArrayInputStream(
-                                                    ("\n" +
-                                                            "configurations.all {\n" +
-                                                            "    resolutionStrategy.eachDependency { details ->}\n" +
-                                                            "}").getBytes(StandardCharsets.UTF_8)))
-                            ), null, ctx)
-                            .map(requireParsed(K.CompilationUnit.class))
-                            .map(k -> (J.Block) k.getStatements().get(0))
-                            .map(J.Block::getStatements)
-                            .map(it -> it.get(0))
-                            .map(J.MethodInvocation.class::cast)
-                            .findFirst()
-                            .map(m2 -> m2.withArguments(ListUtils.mapFirst(m2.getArguments(), arg -> {
-                                J.Lambda lambda1 = (J.Lambda) arg;
-                                J.Block block1 = (J.Block) lambda1.getBody();
-                                return lambda1.withBody(block1.withStatements(ListUtils.mapFirst(block1.getStatements(), arg2 -> {
-                                    J.MethodInvocation m3 = (J.MethodInvocation) arg2;
-                                    return m3.withArguments(ListUtils.mapFirst(m3.getArguments(), arg3 -> {
-                                        J.Lambda lambda2 = (J.Lambda) arg3;
-                                        return lambda2.withBody(((J.Block) lambda2.getBody()).withEnd(Space.format("\n")));
-                                    }));
-                                })));
-                            })))
-                            .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
-                    final int finalInsertionIndex = insertionIndex;
-                    return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
-                        if (arg == block) {
-                            List<Statement> newStatements = ListUtils.insert(block.getStatements(), m, finalInsertionIndex);
-                            if (finalInsertionIndex == 0) {
-                                newStatements = ListUtils.map(newStatements, (i, stat) ->
-                                        i == 1 && stat.getPrefix().getWhitespace().isEmpty()
-                                                ? stat.withPrefix(stat.getPrefix().withWhitespace("\n\n"))
-                                                : stat);
-                            }
-                            return block.withStatements(newStatements);
-                        }
-                        return arg;
-                    }));
+                boolean isKotlinDsl = sourceFile instanceof K.CompilationUnit;
+                List<Statement> statements = isKotlinDsl ?
+                        ((J.Block) ((K.CompilationUnit) sourceFile).getStatements().get(0)).getStatements() :
+                        ((G.CompilationUnit) sourceFile).getStatements();
+                if (statements.isEmpty()) {
+                    return sourceFile;
                 }
+                // Prefer to insert before the dependencies block for readability
+                Statement anchor = null;
+                for (Statement s : statements) {
+                    if (s instanceof J.MethodInvocation && isDependenciesBlock((J.MethodInvocation) s, isKotlinDsl)) {
+                        anchor = s;
+                        break;
+                    }
+                }
+                String snippet = "configurations.all {\n" +
+                        "    resolutionStrategy.eachDependency { details ->\n" +
+                        "    }\n" +
+                        "}";
+                JavaTemplate eachDependency = isKotlinDsl ?
+                        KotlinTemplate.builder(snippet).build() :
+                        GroovyTemplate.builder(snippet).build();
+                return eachDependency.apply(new Cursor(getCursor(), sourceFile), anchor == null ?
+                        statements.get(statements.size() - 1).getCoordinates().after() :
+                        anchor.getCoordinates().before());
             }
             return super.visit(tree, ctx);
         }
@@ -457,6 +372,11 @@ public class DependencyConstraintToRule extends Recipe {
             }
             return m;
         }
+    }
+
+    // The Kotlin DSL has no type attribution to match against, so it goes by name
+    private static boolean isDependenciesBlock(J.MethodInvocation m, boolean isKotlinDsl) {
+        return isKotlinDsl ? "dependencies".equals(m.getSimpleName()) : DEPENDENCIES_DSL_MATCHER.matches(m);
     }
 
     private static boolean isEmptyDependenciesBlock(J.MethodInvocation m) {

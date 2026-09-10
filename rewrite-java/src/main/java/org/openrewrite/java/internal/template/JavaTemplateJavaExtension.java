@@ -132,8 +132,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 for (int i = 0; i < gen.size(); i++) {
                     Statement s = gen.get(i);
                     if (anchorBeginsLine) {
-                        gen.set(i, autoFormat(i == 0 ?
-                                s.withPrefix(anchor.getPrefix().withComments(emptyList())) : s, p, parent));
+                        gen.set(i, autoFormat(i == 0 ? s.withPrefix(lineBreakBefore(anchor)) : s, p, parent));
                     } else {
                         gen.set(i, autoFormat(s, p, parent).withPrefix(leadingPrefix(anchor, i)));
                     }
@@ -147,6 +146,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     default:
                         return gen;
                 }
+            }
+
+            /**
+             * A blank line above the anchor separates it from what precedes and stays with it, so a statement
+             * joining the anchor's line gets a single break at the same indent rather than that separation again.
+             */
+            private Space lineBreakBefore(Statement anchor) {
+                String whitespace = anchor.getPrefix().getWhitespace();
+                return Space.format("\n" + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
             }
 
             private Space leadingPrefix(Statement anchor, int i) {
@@ -300,6 +308,35 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             .withPrefix(fa.getPrefix()), p);
                 }
                 return super.visitFieldAccess(fa, p);
+            }
+
+            @Override
+            public J visitIf(J.If iff, Integer p) {
+                if (loc == ELSE_PREFIX && isScope(iff)) {
+                    List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(
+                            new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
+                            substitutions.getTypeVariables(), loc, mode));
+                    if (gen.size() != 1) {
+                        throw new IllegalArgumentException("Expected a template that would generate exactly one " +
+                                                           "statement to become an else branch, but generated " + gen.size() +
+                                                           ". Template:\n" + substitutedTemplate);
+                    }
+                    Statement branch = gen.get(0);
+                    J.If.Else existing = iff.getElsePart();
+                    if (existing != null) {
+                        // Keep the chain: what this `if` used to fall through to now hangs off the new branch
+                        if (!(branch instanceof J.If)) {
+                            throw new IllegalArgumentException("Adding an else branch to an `if` that already has " +
+                                                               "one requires a template that produces an `if`, so that " +
+                                                               "the existing branch has somewhere to hang. Template:\n" + substitutedTemplate);
+                        }
+                        branch = ((J.If) branch).withElsePart(existing);
+                    }
+                    J.If.Else elsePart = new J.If.Else(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                            JRightPadded.build(branch.withPrefix(Space.SINGLE_SPACE)));
+                    return autoFormat(iff.withElsePart(elsePart), p, getCursor().getParentOrThrow());
+                }
+                return super.visitIf(iff, p);
             }
 
             @Override

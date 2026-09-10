@@ -766,4 +766,144 @@ class JavaTemplateTest8Test implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addElseBranchToAnIfThatHasNone() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  if (iff.getElsePart() != null) {
+                      return iff;
+                  }
+                  return JavaTemplate.apply("if (true) {\n}", getCursor(), iff.getCoordinates().addElseBranch());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else if (true) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchExtendsAnExistingChain() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  // Only the head of the chain, and only while it still falls through to a plain else
+                  if (getCursor().getParentTreeCursor().getValue() instanceof J.If.Else ||
+                      iff.getElsePart() == null || !(iff.getElsePart().getBody() instanceof J.Block)) {
+                      return super.visitIf(iff, ctx);
+                  }
+                  return JavaTemplate.apply("if (true) {\n}", getCursor(), iff.getCoordinates().addElseBranch());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else {
+                          System.out.println(n);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else if (true) {
+                      } else {
+                          System.out.println(n);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchWithABlockMakesAPlainElse() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  if (iff.getElsePart() != null) {
+                      return iff;
+                  }
+                  return JavaTemplate.apply("{\n    System.out.println(\"fallthrough\");\n}", getCursor(),
+                    iff.getCoordinates().addElseBranch());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else {
+                          System.out.println("fallthrough");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchRejectsANonIfWhenAnElseAlreadyExists() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else {
+                      }
+                  }
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.If visitIf(J.If iff, Integer p) {
+                return JavaTemplate.apply("{\n}", getCursor(), iff.getCoordinates().addElseBranch());
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("requires a template that produces an `if`");
+    }
+
 }

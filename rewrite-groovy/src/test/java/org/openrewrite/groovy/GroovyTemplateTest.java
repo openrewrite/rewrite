@@ -79,6 +79,22 @@ class GroovyTemplateTest implements RewriteTest {
         });
     }
 
+    // Anchors on the second statement, which a blank line separates from the first
+    private static Recipe insertBeforeSecondTopLevelStatement() {
+        return toRecipe(() -> new GroovyVisitor<>() {
+            @Override
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
+                if (c.getStatements().size() != 2) {
+                    return c;
+                }
+                return GroovyTemplate.builder("ext['x'] = 'y'")
+                  .build()
+                  .apply(updateCursor(c), c.getStatements().get(1).getCoordinates().before());
+            }
+        });
+    }
+
     @DocumentExample
     @Test
     void replaceContextFreeStatement() {
@@ -406,6 +422,31 @@ class GroovyTemplateTest implements RewriteTest {
               ext['x'] = 'y'
               plugins {
                   id 'java'
+              }
+              """
+          ));
+    }
+
+    @Test
+    void insertBeforeTopLevelScriptStatementLeavesItsBlankLineAlone() {
+        rewriteRun(
+          spec -> spec.recipe(insertBeforeSecondTopLevelStatement()),
+          groovy(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              dependencies {
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              ext['x'] = 'y'
+
+              dependencies {
               }
               """
           ));
