@@ -1445,6 +1445,222 @@ class RecipePluginRewriteTest : RewriteTest {
         )
     }
 
+    @Test
+    fun `overload narrowing — Math_abs(Double) leaves the Int and Long overloads alone`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseKotlinMathAbs = recipe(
+                    displayName = "Use kotlin.math.abs",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { x: Double -> Math.abs(x) } to { x -> kotlin.math.abs(x) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseKotlinMathAbs",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                fun d(x: Double): Double = Math.abs(x)
+                fun i(x: Int): Int = Math.abs(x)
+                fun l(x: Long): Long = Math.abs(x)
+                fun f(x: Float): Float = Math.abs(x)
+                """.trimIndent(),
+                """
+                fun d(x: Double): Double = kotlin.math.abs(x)
+                fun i(x: Int): Int = Math.abs(x)
+                fun l(x: Long): Long = Math.abs(x)
+                fun f(x: Float): Float = Math.abs(x)
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `overload narrowing — Math_round(Double) does not emit a Long where the Float overload returns Int`() {
+        // `Math.round(double)` returns `Long`, `Math.round(float)` returns `Int`,
+        // so matching both leaves a `Long` assigned to an `Int`.
+        val r = loadCompiledRecipe(
+            source = """
+                import kotlin.math.roundToLong
+                import org.openrewrite.recipe
+                val UseRoundToLong = recipe(
+                    displayName = "Use roundToLong",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { x: Double -> Math.round(x) } to { x -> x.roundToLong() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseRoundToLong",
+        )
+        rewriteRun(
+            // The after-template is parsed against a JDK-only classpath, so the
+            // `kotlin.math` extension it emits can't be attributed.
+            { spec ->
+                spec.recipe(r)
+                    .typeValidationOptions(TypeValidation.builder().methodInvocations(false).build())
+            },
+            kotlin(
+                """
+                import kotlin.math.roundToLong
+
+                fun d(x: Double): Long = Math.round(x)
+                fun f(x: Float): Int = Math.round(x)
+                """.trimIndent(),
+                """
+                import kotlin.math.roundToLong
+
+                fun d(x: Double): Long = x.roundToLong()
+                fun f(x: Float): Int = Math.round(x)
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `overload narrowing on a Kotlin-declared callee — reference param still matches`() {
+        // `KotlinTypeMapping` only remaps builtins to their JVM FQN for
+        // Java-declared methods, so this callee's `String` parameter reads
+        // `kotlin.String`; a `java.lang.String` token would stop matching it.
+        val r = loadCompiledRecipe(
+            source = """
+                package demo
+                import org.openrewrite.recipe
+                class Greeter {
+                    fun greet(name: String): String = name
+                    fun greet(times: Int): String = times.toString()
+                    fun hello(name: String): String = name
+                }
+                val UseHello = recipe(
+                    displayName = "Use hello",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { g: Greeter, name: String -> g.greet(name) } to { g, name -> g.hello(name) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseHello",
+            packageName = "demo",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r).typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()) },
+            kotlin(
+                """
+                package demo
+                class Greeter {
+                    fun greet(name: String): String = name
+                    fun greet(times: Int): String = times.toString()
+                    fun hello(name: String): String = name
+                }
+                fun byName(g: Greeter): String = g.greet("x")
+                fun byCount(g: Greeter): String = g.greet(2)
+                """.trimIndent(),
+                """
+                package demo
+                class Greeter {
+                    fun greet(name: String): String = name
+                    fun greet(times: Int): String = times.toString()
+                    fun hello(name: String): String = name
+                }
+                fun byName(g: Greeter): String = g.hello("x")
+                fun byCount(g: Greeter): String = g.greet(2)
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `typed params keep the kotlin-recipe-starter recipes firing`() {
+        // The other side of parameter typing: `sumBy`'s `(Int) -> Int` selector
+        // must stay `*` or the recipe stops matching, while naming
+        // `Character.isWhitespace`'s `char` is what spares the `(int)` overload.
+        val r = loadCompiledRecipe(
+            source = """
+                @file:Suppress("DEPRECATION", "DEPRECATION_ERROR")
+                import org.openrewrite.recipe
+                import org.openrewrite.recipes
+                val UseUppercase = recipe(
+                    displayName = "Use uppercase()",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { s: String -> s.toUpperCase() } to { s -> s.uppercase() }
+                    }
+                }
+                val UseCharCode = recipe(
+                    displayName = "Use Char.code",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { c: Char -> c.toInt() } to { c -> c.code }
+                    }
+                }
+                val UseSumOf = recipe(
+                    displayName = "Use sumOf",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: Iterable<Int>, selector: (Int) -> Int -> xs.sumBy(selector) } to { xs, selector -> xs.sumOf(selector) }
+                    }
+                }
+                val UseKotlinMathMax = recipe(
+                    displayName = "Use kotlin.math.max",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { a: Double, b: Double -> Math.max(a, b) } to { a, b -> kotlin.math.max(a, b) }
+                    }
+                }
+                val UseIsWhitespace = recipe(
+                    displayName = "Use Char.isWhitespace",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { c: Char -> Character.isWhitespace(c) } to { c -> c.isWhitespace() }
+                    }
+                }
+                val UseModernKotlinApis = recipes(
+                    displayName = "Use modern Kotlin stdlib APIs",
+                    description = "...",
+                    UseUppercase,
+                    UseCharCode,
+                    UseSumOf,
+                    UseKotlinMathMax,
+                    UseIsWhitespace,
+                )
+            """.trimIndent(),
+            propertyName = "UseModernKotlinApis",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                fun shout(s: String): String = s.toUpperCase()
+                fun codePoint(c: Char): Int = c.toInt()
+                fun total(xs: List<Int>): Int = xs.sumBy { it * 2 }
+                fun bigger(a: Double, b: Double): Double = Math.max(a, b)
+                fun blank(c: Char): Boolean = Character.isWhitespace(c)
+                fun blankAt(cp: Int): Boolean = Character.isWhitespace(cp)
+                """.trimIndent(),
+                """
+                fun shout(s: String): String = s.uppercase()
+                fun codePoint(c: Char): Int = c.code
+                fun total(xs: List<Int>): Int = xs.sumOf { it * 2 }
+                fun bigger(a: Double, b: Double): Double = kotlin.math.max(a, b)
+                fun blank(c: Char): Boolean = c.isWhitespace()
+                fun blankAt(cp: Int): Boolean = Character.isWhitespace(cp)
+                """.trimIndent(),
+            ),
+        )
+    }
+
     private fun loadCompiledRecipe(source: String, propertyName: String, packageName: String = ""): Recipe {
         val result = RecipePluginCompileFixture.compile(source)
         check(result.exitOk()) { "compile failed:\n${result.messages}" }
