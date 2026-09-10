@@ -144,6 +144,30 @@ public class PythonRewriteRpc extends RewriteRpc {
     }
 
     /**
+     * Parser options forwarded to the Python server with every parse request, carrying
+     * this context's {@link ExecutionContext#REQUIRE_PRINT_EQUALS_INPUT} setting.
+     */
+    public static Map<String, String> parseOptions(ExecutionContext ctx) {
+        return parseOptions(ctx, null);
+    }
+
+    /**
+     * The same options, plus the per-parse language version a {@link PythonParser} carries.
+     *
+     * @param languageLevel The version string to parse with, or {@code null} to leave the
+     *                      server on its own default.
+     */
+    public static Map<String, String> parseOptions(ExecutionContext ctx, @Nullable String languageLevel) {
+        Map<String, String> options = new HashMap<>();
+        options.put(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                String.valueOf(ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)));
+        if (languageLevel != null) {
+            options.put("languageLevel", languageLevel);
+        }
+        return options;
+    }
+
+    /**
      * Parses an entire Python project directory.
      * Discovers and parses all relevant source files.
      *
@@ -218,7 +242,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath, parseOptions(ctx)), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 

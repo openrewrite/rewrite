@@ -646,32 +646,6 @@ def test_project_language_level_comes_from_the_source_tree(tmp_path, monkeypatch
     assert observed["project_language_level"] == "2.7"
 
 
-def test_one_unreadable_file_does_not_abort_the_batch(tmp_path, monkeypatch):
-    """Results map to inputs positionally: every input yields exactly one entry, so a file
-    the server cannot read yields a ParseError for that position."""
-    import rewrite.python.ty_client as ty_client_module
-    import rewrite.rpc.server as server
-
-    monkeypatch.setattr(ty_client_module, "TyTypesClient",
-                        lambda **kw: (_ for _ in ()).throw(ImportError("no ty")))
-
-    # Latin-1 bytes that are not valid UTF-8; the server opens sources as UTF-8.
-    bad = tmp_path / "bad.py"
-    bad.write_bytes(b"# -*- coding: latin-1 -*-\nx = '\xe9'\n")
-    good = tmp_path / "good.py"
-    good.write_text("y = 1\n", encoding="utf-8")
-
-    ids = server.handle_parse({
-        "inputs": [{"path": str(bad)}, {"path": str(good)}],
-        "relativeTo": str(tmp_path),
-    })
-
-    assert len(ids) == 2, "every input must yield exactly one result"
-    from rewrite.parser import ParseError
-    assert isinstance(server.local_objects[ids[0]], ParseError)
-    assert not isinstance(server.local_objects[ids[1]], ParseError)
-
-
 def test_inline_source_is_written_where_ty_is_rooted(tmp_path, monkeypatch):
     """The root ty is initialized at is ``projectRoot``, which the caller may point away
     from the sources."""

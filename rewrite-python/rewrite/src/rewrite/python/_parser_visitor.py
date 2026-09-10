@@ -170,9 +170,10 @@ class ParserVisitor(ast.NodeVisitor):
             source, file_path, ty_client,
             source_lines=source_lines, line_byte_offsets=line_byte_offsets)
 
-        # Normalize line endings for the tokenizer (it rejects mixed \r\n and \n),
-        # but keep the original source for whitespace extraction
-        tokenizer_source = source.replace('\r\n', '\n') if '\r\n' in source else source
+        # The tokenizer wants a single line-ending spelling (it rejects a mix), so it
+        # gets \n throughout while the original source keeps the spelling that
+        # whitespace extraction reproduces. The row/col scans below step over all three.
+        tokenizer_source = source.replace('\r\n', '\n').replace('\r', '\n') if '\r' in source else source
         self._tokens, self._paren_pairs = self._build_tokens(
             tokenize(BytesIO(tokenizer_source.encode('utf-8')).readline)
         )
@@ -215,7 +216,7 @@ class ParserVisitor(ast.NodeVisitor):
                     col = 0
                     scan += 2
                     continue
-                elif self._source[scan] == '\n':
+                elif self._source[scan] in ('\n', '\r'):
                     row += 1
                     col = 0
                 else:
@@ -264,7 +265,7 @@ class ParserVisitor(ast.NodeVisitor):
                     col = 0
                     scan_end += 2
                     continue
-                elif self._source[scan_end] == '\n':
+                elif self._source[scan_end] in ('\n', '\r'):
                     row += 1
                     col = 0
                 else:
@@ -1758,7 +1759,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             name,
             type_parameters,
-            self.__pad_left(self.__source_before('='), self.__convert(node.value)),
+            self.__pad_left(self.__source_before('='), self.__convert_type(node.value)),
             self._type_mapping.type(node)
         )
 

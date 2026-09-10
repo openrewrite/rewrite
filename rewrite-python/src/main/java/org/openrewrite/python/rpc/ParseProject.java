@@ -21,6 +21,7 @@ import org.openrewrite.rpc.request.RpcRequest;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 /**
  * RPC request to parse an entire Python project.
@@ -60,4 +61,11 @@ class ParseProject implements RpcRequest {
      */
     @Nullable
     Path dependencyPath;
+
+    /**
+     * Parser options the server interprets by key, ignoring the ones it does not
+     * recognize. A peer that sends none gets the server's own defaults.
+     */
+    @Nullable
+    Map<String, String> options;
 }

@@ -8,7 +8,7 @@ from rewrite.java import (J, Assignment, JLeftPadded, AssignmentOperation, Membe
                            ControlParentheses, TrailingComma, TypeParameter)
 from rewrite.python import (PythonVisitor, SpacesStyle, Binary, ChainedAssignment, Slice, CollectionLiteral,
                              DictLiteral, KeyValue, TypeHint, MultiImport, ExpressionTypeTree,
-                             ComprehensionExpression, NamedArgument)
+                             ComprehensionExpression, NamedArgument, TypeAlias)
 from rewrite.visitor import P, Cursor
 
 J2 = TypeVar('J2', bound=J)
@@ -482,7 +482,7 @@ class SpacesVisitor(PythonVisitor):
         # Under these parents the wrapper's prefix is meaningful source space, so clearing it
         # would join the type to the punctuation before it.
         parent = self.cursor.parent_tree_cursor()
-        if not (parent and isinstance(parent.value, (ClassDeclaration, TypeParameter))):
+        if not (parent and isinstance(parent.value, (ClassDeclaration, TypeParameter, TypeAlias))):
             ett = space_before(ett, False)
         return ett
 

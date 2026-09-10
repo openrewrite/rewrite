@@ -44,8 +44,11 @@ except ImportError:  # not available on Windows
     resource = None
 
 from rewrite.discovery import RecipeAttribution, RecipeName, _normalize_package_name
+from rewrite.execution import ExecutionContext
 from rewrite.python._version_detect import (
     detect_from_project, detect_from_source, requested_python_version, ty_python_version)
+from rewrite.python.printer import PythonPrinter
+from rewrite.result import Result
 from rewrite.rpc.reference import ReferenceMap
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
@@ -356,20 +359,36 @@ def generate_id() -> str:
     return str(uuid4())
 
 
+def _source_path(path: str, relative_to: Optional[str]) -> Path:
+    """The path an LST carries: relative to the project root when it sits under it."""
+    source_path = Path(path)
+    if relative_to is not None:
+        try:
+            source_path = source_path.relative_to(relative_to)
+        except ValueError:
+            pass  # path is not under relative_to, keep absolute
+    return source_path
+
+
 def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None,
                       language_level: Optional[str] = None,
-                      project_language_level: Optional[str] = None) -> dict:
+                      project_language_level: Optional[str] = None,
+                      check_print: bool = True) -> dict:
     """Parse a Python file and return its LST."""
-    with open(path, 'r', encoding='utf-8') as f:
+    # newline='' disables universal-newline translation, so the LST holds the
+    # file's own line endings and prints back byte-identically.
+    with open(path, 'r', encoding='utf-8', newline='') as f:
         source = f.read()
     return parse_python_source(source, path, relative_to, ty_client,
                                language_level=language_level,
-                               project_language_level=project_language_level)
+                               project_language_level=project_language_level,
+                               check_print=check_print)
 
 
 def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None,
                         language_level: Optional[str] = None,
-                        project_language_level: Optional[str] = None) -> dict:
+                        project_language_level: Optional[str] = None,
+                        check_print: bool = True) -> dict:
     """Parse Python source code and return its LST.
 
     The parser used depends on the effective language version, resolved in
@@ -394,13 +413,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
         or _python_version
     )
 
-    # Compute the source_path that will be stored on the LST
-    source_path = Path(path)
-    if relative_to is not None:
-        try:
-            source_path = source_path.relative_to(relative_to)
-        except ValueError:
-            pass  # path is not under relative_to, keep absolute
+    source_path = _source_path(path, relative_to)
 
     try:
         from rewrite import Markers
@@ -430,6 +443,15 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             cu = ParserVisitor(source, path, ty_client).visit(tree)
 
         cu = cu.replace(source_path=source_path, markers=Markers.EMPTY)
+
+        if check_print:
+            printed = PythonPrinter().print(cu)
+            if printed != source:
+                return _create_parse_error(
+                    str(source_path),
+                    f"{source_path} is not print idempotent. \n"
+                    f"{Result.diff(source, printed, source_path)}",
+                    source)
 
         # Store and return
         obj_id = str(cu.id)
@@ -487,24 +509,6 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
-def _input_path(input_item) -> str:
-    """The path an input names, whichever of the accepted input shapes it arrived in."""
-    if isinstance(input_item, str):
-        return input_item
-    return (input_item.get('path') or input_item.get('sourcePath')
-            or input_item.get('relativePath') or '<unknown>')
-
-
-def _relative_path_str(path: str, relative_to: Optional[str]) -> str:
-    """``path`` as the LST records it, matching what ``parse_python_source`` stores."""
-    if relative_to is None:
-        return path
-    try:
-        return str(Path(path).relative_to(relative_to))
-    except ValueError:
-        return path
-
-
 # Files larger than this are recorded as Quarks rather than parsed into an AST.
 # Matches the 1 MB cap in the JVM JavaScriptParser and the other RPC engines.
 MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024
@@ -517,12 +521,7 @@ def _create_quark(path: str, relative_to: Optional[str]) -> dict:
     from ``sourcePath`` locally, so no content crosses the wire.
     """
     from rewrite import random_id
-    source_path = Path(path)
-    if relative_to is not None:
-        try:
-            source_path = source_path.relative_to(relative_to)
-        except ValueError:
-            pass  # path is not under relative_to, keep absolute
+    source_path = _source_path(path, relative_to)
     return {
         'id': str(random_id()),
         'sourceFileType': 'org.openrewrite.quark.Quark',
@@ -562,6 +561,18 @@ def _infer_project_root(inputs: list) -> Optional[str]:
 _last_dependency_path: Optional[str] = None
 
 
+def _require_print_equals_input(options: dict) -> bool:
+    """Whether parse results must print back to their input, which they must
+    unless the client says otherwise. Option maps are loosely typed across
+    peers, so both the string and the bool form count."""
+    value = options.get(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() not in ('false', '0', 'no', 'off')
+    return True
+
+
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
     import tempfile
@@ -577,6 +588,7 @@ def handle_parse(params: dict) -> List[str]:
     # Absent for older clients; absent or unknown keys are silently ignored.
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    check_print = _require_print_equals_input(options)
     # Path to a virtual environment with the project's dependencies installed,
     # provisioned and forwarded by the caller (the CLI build step in production;
     # a test/template helper in-repo). Points ty-types at the deps so supertypes
@@ -622,19 +634,35 @@ def handle_parse(params: dict) -> List[str]:
         ty_client = None  # ty-types not available
 
     try:
-        for i, input_item in enumerate(inputs):
+        for input_item in inputs:
+            # The client pairs this list to its input list by position, so every
+            # input owes the batch one result — a file too broken to read included.
+            path = '<unknown>'
+            source = ''
             try:
                 if isinstance(input_item, str):
-                    result = parse_python_file(input_item, relative_to, ty_client,
+                    path = input_item
+                    result = parse_python_file(path, relative_to, ty_client,
                                                language_level=language_level,
-                                               project_language_level=project_language_level)
-                elif 'path' in input_item:
-                    result = parse_python_file(input_item['path'], relative_to, ty_client,
+                                               project_language_level=project_language_level,
+                                               check_print=check_print)
+                elif input_item.get('text') is None and input_item.get('source') is None:
+                    # An input carrying no text names a file the peer reads itself.
+                    named = (input_item.get('path') or input_item.get('sourcePath') or
+                             input_item.get('relativePath'))
+                    if named is None:
+                        raise ValueError('input carries neither source text nor a path')
+                    path = named
+                    result = parse_python_file(path, relative_to, ty_client,
                                                language_level=language_level,
-                                               project_language_level=project_language_level)
-                elif 'text' in input_item or 'source' in input_item:
-                    source = input_item.get('text') if 'text' in input_item else input_item.get('source')
-                    path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
+                                               project_language_level=project_language_level,
+                                               check_print=check_print)
+                else:
+                    source = input_item.get('text')
+                    if source is None:
+                        source = input_item.get('source')
+                    path = (input_item.get('sourcePath') or input_item.get('path') or
+                            input_item.get('relativePath', '<unknown>'))
                     # ty analyses files from disk and resolves only what lies under the
                     # root it was initialized at, so materialize the source there. Passing
                     # that same root as the relativization base keeps the LST's source path
@@ -643,25 +671,21 @@ def handle_parse(params: dict) -> List[str]:
                     if base_dir and not os.path.isabs(path):
                         disk_path = os.path.join(base_dir, path)
                         os.makedirs(os.path.dirname(disk_path), exist_ok=True)
-                        with open(disk_path, 'w', encoding='utf-8') as f:
+                        # ty must read the same bytes the LST was built from.
+                        with open(disk_path, 'w', encoding='utf-8', newline='') as f:
                             f.write(source)
                         result = parse_python_source(source, disk_path, base_dir, ty_client,
                                                      language_level=language_level,
-                                                     project_language_level=project_language_level)
+                                                     project_language_level=project_language_level,
+                                                     check_print=check_print)
                     else:
                         result = parse_python_source(source, path, relative_to, ty_client,
                                                      language_level=language_level,
-                                                     project_language_level=project_language_level)
-                else:
-                    logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
-                    continue
+                                                     project_language_level=project_language_level,
+                                                     check_print=check_print)
             except Exception as e:
-                # Reading a source can fail before parse_python_source's own error handling
-                # is reached — an undecodable byte, a file that has since vanished. Results
-                # map to inputs by position, so every input yields exactly one id: a failure
-                # becomes a ParseError for that position.
-                logger.error(f"Error parsing {_input_path(input_item)}: {e}")
-                result = _create_parse_error(_relative_path_str(_input_path(input_item), relative_to), str(e))
+                logger.exception(f"Error parsing {path}: {e}")
+                result = _create_parse_error(str(_source_path(path, relative_to)), str(e), source)
             results.append(result['id'])
     finally:
         if ty_client is not None:
@@ -710,6 +734,7 @@ def handle_parse_project(params: dict) -> List[dict]:
     # Per-request explicit override (mirror of the Parse RPC options carrier).
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    check_print = _require_print_equals_input(options)
     # Caller-provisioned dependency environment for ty-types (see handle_parse).
     dependency_path = params.get('dependencyPath')
     if dependency_path:
@@ -746,10 +771,13 @@ def handle_parse_project(params: dict) -> List[dict]:
             try:
                 result = parse_python_file(path, relative_to, ty_client,
                                            language_level=language_level,
-                                           project_language_level=project_language_level)
+                                           project_language_level=project_language_level,
+                                           check_print=check_print)
                 results.append(result)
             except Exception as e:
-                logger.error(f"Error parsing {path}: {e}")
+                logger.exception(f"Error parsing {path}: {e}")
+                # Every file the walk finds is accounted for in the response.
+                results.append(_create_parse_error(str(_source_path(path, relative_to)), str(e)))
     finally:
         if ty_client is not None:
             ty_client.shutdown()
