@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
+import static java.lang.ProcessBuilder.Redirect.DISCARD;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -192,6 +193,29 @@ class RewriteRpcProcessTest {
         } finally {
             wedged.descendants().forEach(ProcessHandle::destroyForcibly);
             wedged.destroyForcibly();
+            peerProcess.destroyForcibly();
+        }
+    }
+
+    /**
+     * Taking the EOF path is what lets a peer flush its metrics and logs and remove its
+     * temp directories before exiting.
+     */
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void shutdownLetsAPeerExitOnStdinEof() throws Exception {
+        Process peerProcess = new ProcessBuilder("cat").redirectOutput(DISCARD).start();
+        RewriteRpcProcess peer = peerWrapping(peerProcess);
+        try {
+            peer.shutdown();
+
+            assertThat(peerProcess.isAlive())
+                    .as("shutdown() should have waited for the peer's own exit")
+                    .isFalse();
+            assertThat(peerProcess.exitValue())
+                    .as("exit status should be the peer's own, not 128+SIGKILL")
+                    .isZero();
+        } finally {
             peerProcess.destroyForcibly();
         }
     }
