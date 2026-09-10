@@ -68,7 +68,7 @@ class PythonRewriteRpcParseTest {
 
         ExecutionContext ctx = new InMemoryExecutionContext();
         List<SourceFile> parsed = PythonRewriteRpc.getOrStart()
-          .parse(List.of(base, derived), root, null, ctx)
+          .parse(List.of(base, derived), ParseOptions.builder().relativeTo(root).build(), ctx)
           .collect(toList());
 
         assertThat(parsed).hasSize(2);

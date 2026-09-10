@@ -335,50 +335,9 @@ public class PythonRewriteRpc extends RewriteRpc {
      * {@code .py} files of a single build target) while cross-package first-party imports still
      * resolve against the monorepo root, without parsing the rest of the tree.
      *
-     * @param inputs         The files to parse.
-     * @param relativeTo     Both the root {@code ty} is initialized at and the base source paths are
-     *                       made relative to. When those need to differ, use
-     *                       {@link #parse(List, ParseOptions, ExecutionContext)}.
-     * @param dependencyPath Optional path to a virtual environment with the project's dependencies
-     *                       installed, so supertypes reaching into third-party packages resolve.
-     *                       The caller provisions it; the parser never provisions dependencies itself.
-     * @param ctx            Execution context for parsing.
-     * @return Stream of parsed source files, in the same order as {@code inputs}.
-     */
-    public Stream<SourceFile> parse(List<Path> inputs, @Nullable Path relativeTo,
-                                    @Nullable Path dependencyPath, ExecutionContext ctx) {
-        return parse(inputs, relativeTo, dependencyPath, null, ctx);
-    }
-
-    /**
-     * Parses an explicit list of Python files, forwarding per-parse options to the server.
-     *
-     * @param inputs         The files to parse.
-     * @param relativeTo     Root {@code ty} is initialized at and relativization base; see
-     *                       {@link #parse(List, Path, Path, ExecutionContext)}.
-     * @param dependencyPath Optional dependency environment for third-party type resolution; see
-     *                       {@link #parse(List, Path, Path, ExecutionContext)}.
-     * @param options        Optional, parser-specific options (e.g. {@code {"languageLevel": "2.7"}}).
-     *                       Keys the server does not recognize are silently ignored.
-     * @param ctx            Execution context for parsing.
-     * @return Stream of parsed source files, in the same order as {@code inputs}.
-     */
-    public Stream<SourceFile> parse(List<Path> inputs, @Nullable Path relativeTo,
-                                    @Nullable Path dependencyPath, @Nullable Map<String, String> options,
-                                    ExecutionContext ctx) {
-        return parse(inputs, ParseOptions.builder()
-                .relativeTo(relativeTo)
-                .dependencyPath(dependencyPath)
-                .options(options)
-                .build(), ctx);
-    }
-
-    /**
-     * Parses an explicit list of Python files.
-     *
      * @param inputs  The files to parse.
-     * @param options Where {@code ty} is rooted, what source paths are relative to, and the
-     *                dependency environment; see {@link ParseOptions}.
+     * @param options Where {@code ty} is rooted, what source paths are relative to, the dependency
+     *                environment, and any per-parse options; see {@link ParseOptions}.
      * @param ctx     Execution context for parsing.
      * @return Stream of parsed source files, in the same order as {@code inputs}.
      */
