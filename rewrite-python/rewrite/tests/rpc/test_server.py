@@ -670,3 +670,48 @@ def test_one_unreadable_file_does_not_abort_the_batch(tmp_path, monkeypatch):
     from rewrite.parser import ParseError
     assert isinstance(server.local_objects[ids[0]], ParseError)
     assert not isinstance(server.local_objects[ids[1]], ParseError)
+
+
+def test_inline_source_is_written_where_ty_is_rooted(tmp_path, monkeypatch):
+    """The root ty is initialized at is ``projectRoot``, which the caller may point away
+    from the sources."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    ty_root = tmp_path / "cfg"
+    ty_root.mkdir()
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            observed["ty_root"] = project_root
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    def fake_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **_):
+        observed["path"] = path
+        observed["relative_to"] = relative_to
+        return {"id": "inline"}
+
+    monkeypatch.setattr(server, "parse_python_source", fake_parse_python_source)
+
+    server.handle_parse({
+        "inputs": [{"text": "x = 1\n", "sourcePath": "pkg/a.py"}],
+        "relativeTo": str(sources),
+        "projectRoot": str(ty_root),
+    })
+
+    assert (ty_root / "pkg" / "a.py").read_text(encoding="utf-8") == "x = 1\n"
+    assert observed["path"] == str(ty_root / "pkg" / "a.py")
+    # The base passed alongside it keeps the reported source path the caller's own.
+    assert observed["relative_to"] == observed["ty_root"]

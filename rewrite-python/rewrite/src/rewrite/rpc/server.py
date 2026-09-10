@@ -606,19 +606,18 @@ def handle_parse(params: dict) -> List[str]:
     # Create a ty-types client for this parse batch
     ty_client = None
     tmpdir = None
+    ty_root = project_root
     try:
         from rewrite.python.ty_client import TyTypesClient
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
         ty_client = TyTypesClient(virtual_env=dependency_path,
                                   python_version=ty_version)
-        if project_root:
-            ty_client.initialize(project_root)
-        else:
-            # For inline text inputs without a project root, create a temp directory
-            # so ty-types can still provide type attribution
+        if not ty_root:
+            # A scratch root gives inline text inputs somewhere on disk that ty can see.
             tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
-            ty_client.initialize(tmpdir)
+            ty_root = tmpdir
+        ty_client.initialize(ty_root)
     except (ImportError, RuntimeError):
         ty_client = None  # ty-types not available
 
@@ -636,10 +635,11 @@ def handle_parse(params: dict) -> List[str]:
                 elif 'text' in input_item or 'source' in input_item:
                     source = input_item.get('text') if 'text' in input_item else input_item.get('source')
                     path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-                    # For relative paths, write the source under the project root
-                    # (tmpdir or relative_to) so ty-types can resolve imports from
-                    # the project's .venv and dependencies.
-                    base_dir = tmpdir or relative_to
+                    # ty analyses files from disk and resolves only what lies under the
+                    # root it was initialized at, so materialize the source there. Passing
+                    # that same root as the relativization base keeps the LST's source path
+                    # equal to the caller's own.
+                    base_dir = ty_root
                     if base_dir and not os.path.isabs(path):
                         disk_path = os.path.join(base_dir, path)
                         os.makedirs(os.path.dirname(disk_path), exist_ok=True)
