@@ -52,14 +52,21 @@ def test_a_file_keeps_its_own_line_endings(tmp_path, newline):
     assert PythonPrinter().print(_parse(path)) == source
 
 
-def test_an_unreadable_file_costs_only_its_own_slot(crlf_file):
+def test_every_input_gets_a_slot_whatever_is_wrong_with_it(crlf_file):
     ids = handle_parse({"inputs": [{"sourcePath": str(crlf_file)},
-                                   {"sourcePath": str(crlf_file.parent / "gone.py")}],
+                                   {"sourcePath": str(crlf_file.parent / "gone.py")},
+                                   {"sourcePath": None}],
                         "relativeTo": str(crlf_file.parent)})
 
-    assert len(ids) == 2
+    assert len(ids) == 3
     assert PythonPrinter().print(local_objects[ids[0]]) == CRLF_SOURCE
+
+    # An error result carries the same project-relative path a parsed one would.
     assert isinstance(local_objects[ids[1]], ParseError)
+    assert str(local_objects[ids[1]].source_path) == "gone.py"
+
+    assert isinstance(local_objects[ids[2]], ParseError)
+    assert str(local_objects[ids[2]].source_path) == "<unknown>"
 
 
 def test_parse_that_loses_source_becomes_a_parse_error(crlf_file, monkeypatch):
@@ -73,6 +80,16 @@ def test_the_print_check_is_off_when_the_client_says_so(crlf_file, monkeypatch):
     monkeypatch.setattr(server, "PythonPrinter", _LosingPrinter)
     options = {"org.openrewrite.requirePrintEqualsInput": "false"}
     assert not isinstance(_parse(crlf_file, options), ParseError)
+
+
+def test_a_project_parse_reports_a_file_it_cannot_read(crlf_file):
+    # Latin-1 bytes the UTF-8 read rejects.
+    (crlf_file.parent / "bad.py").write_bytes(b"x = '\xe9'\n")
+
+    parsed = {item["sourcePath"]: item["sourceFileType"].rsplit(".", 1)[-1]
+              for item in handle_parse_project({"projectPath": str(crlf_file.parent)})}
+
+    assert parsed == {"crlf.py": "Py$CompilationUnit", "bad.py": "ParseError"}
 
 
 def test_a_project_parse_honours_the_print_check_option(crlf_file, monkeypatch):

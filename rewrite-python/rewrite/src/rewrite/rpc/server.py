@@ -359,6 +359,17 @@ def generate_id() -> str:
     return str(uuid4())
 
 
+def _source_path(path: str, relative_to: Optional[str]) -> Path:
+    """The path an LST carries: relative to the project root when it sits under it."""
+    source_path = Path(path)
+    if relative_to is not None:
+        try:
+            source_path = source_path.relative_to(relative_to)
+        except ValueError:
+            pass  # path is not under relative_to, keep absolute
+    return source_path
+
+
 def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None,
                       language_level: Optional[str] = None,
                       project_language_level: Optional[str] = None,
@@ -402,13 +413,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
         or _python_version
     )
 
-    # Compute the source_path that will be stored on the LST
-    source_path = Path(path)
-    if relative_to is not None:
-        try:
-            source_path = source_path.relative_to(relative_to)
-        except ValueError:
-            pass  # path is not under relative_to, keep absolute
+    source_path = _source_path(path, relative_to)
 
     try:
         from rewrite import Markers
@@ -516,12 +521,7 @@ def _create_quark(path: str, relative_to: Optional[str]) -> dict:
     from ``sourcePath`` locally, so no content crosses the wire.
     """
     from rewrite import random_id
-    source_path = Path(path)
-    if relative_to is not None:
-        try:
-            source_path = source_path.relative_to(relative_to)
-        except ValueError:
-            pass  # path is not under relative_to, keep absolute
+    source_path = _source_path(path, relative_to)
     return {
         'id': str(random_id()),
         'sourceFileType': 'org.openrewrite.quark.Quark',
@@ -630,6 +630,7 @@ def handle_parse(params: dict) -> List[str]:
             # The client pairs this list to its input list by position, so every
             # input owes the batch one result — a file too broken to read included.
             path = '<unknown>'
+            source = ''
             try:
                 if isinstance(input_item, str):
                     path = input_item
@@ -639,10 +640,11 @@ def handle_parse(params: dict) -> List[str]:
                                                check_print=check_print)
                 elif input_item.get('text') is None and input_item.get('source') is None:
                     # An input carrying no text names a file the peer reads itself.
-                    path = (input_item.get('path') or input_item.get('sourcePath') or
-                            input_item.get('relativePath'))
-                    if path is None:
+                    named = (input_item.get('path') or input_item.get('sourcePath') or
+                             input_item.get('relativePath'))
+                    if named is None:
                         raise ValueError('input carries neither source text nor a path')
+                    path = named
                     result = parse_python_file(path, relative_to, ty_client,
                                                language_level=language_level,
                                                project_language_level=project_language_level,
@@ -674,7 +676,7 @@ def handle_parse(params: dict) -> List[str]:
                                                      check_print=check_print)
             except Exception as e:
                 logger.exception(f"Error parsing {path}: {e}")
-                result = _create_parse_error(str(path), str(e))
+                result = _create_parse_error(str(_source_path(path, relative_to)), str(e), source)
             results.append(result['id'])
     finally:
         if ty_client is not None:
@@ -764,7 +766,9 @@ def handle_parse_project(params: dict) -> List[dict]:
                                            check_print=check_print)
                 results.append(result)
             except Exception as e:
-                logger.error(f"Error parsing {path}: {e}")
+                logger.exception(f"Error parsing {path}: {e}")
+                # Every file the walk finds is accounted for in the response.
+                results.append(_create_parse_error(str(_source_path(path, relative_to)), str(e)))
     finally:
         if ty_client is not None:
             ty_client.shutdown()

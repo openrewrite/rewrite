@@ -82,8 +82,9 @@ def detect_from_source(source: str) -> Optional[str]:
         source = source[1:]
 
     # Inspect only the first two lines — these are the only places PEP-263
-    # and shebang declarations are recognized by Python itself.
-    lines = source.split("\n", 2)[:2]
+    # and shebang declarations are recognized by Python itself. Any of the three
+    # line endings ends a line, so a file using \r throughout has more than one.
+    lines = source.replace("\r\n", "\n").replace("\r", "\n").split("\n", 2)[:2]
 
     for line in lines:
         m = _MAGIC_COMMENT_RE.search(line)
