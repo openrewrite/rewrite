@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
 using NuGet.Frameworks;
@@ -1442,10 +1445,17 @@ public class RewriteRpcServer
         foreach (var (key, value) in options)
         {
             var prop = recipeType.GetProperty(key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-            if (prop != null && prop.CanWrite)
+            if (prop == null || !prop.CanWrite)
             {
-                prop.SetValue(recipe, ConvertOptionValue(value, prop.PropertyType));
+                continue;
             }
+            var converted = ConvertOptionValue(value, prop.PropertyType);
+            if (converted == null && prop.PropertyType.IsValueType &&
+                Nullable.GetUnderlyingType(prop.PropertyType) == null)
+            {
+                continue;
+            }
+            prop.SetValue(recipe, converted);
         }
         return recipe;
     }
@@ -1462,7 +1472,7 @@ public class RewriteRpcServer
     {
         if (value is JsonElement element)
         {
-            return element.Deserialize(targetType, RpcJson.Options);
+            return ConvertOptionElement(element, targetType);
         }
         if (value is null || targetType.IsInstanceOfType(value))
         {
@@ -1470,6 +1480,95 @@ public class RewriteRpcServer
         }
         var conversionType = Nullable.GetUnderlyingType(targetType) ?? targetType;
         return Convert.ChangeType(value, conversionType);
+    }
+
+    private static object? ConvertOptionElement(JsonElement element, Type targetType)
+    {
+        var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
+        if (element.ValueKind == JsonValueKind.Null || element.ValueKind == JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            var text = element.GetString()!;
+            if (underlying != typeof(string) && string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+            if (TryCoerceFromString(text, underlying, out var coerced))
+            {
+                return coerced;
+            }
+        }
+        else if (underlying == typeof(string))
+        {
+            return element.ValueKind == JsonValueKind.Object || element.ValueKind == JsonValueKind.Array
+                ? element.Deserialize(targetType, RpcJson.Options)
+                : element.GetRawText();
+        }
+
+        return element.Deserialize(targetType, RpcJson.Options);
+    }
+
+    private static readonly HashSet<Type> NumericOptionTypes =
+    [
+        typeof(sbyte), typeof(byte), typeof(short), typeof(ushort), typeof(int), typeof(uint),
+        typeof(long), typeof(ulong), typeof(float), typeof(double), typeof(decimal)
+    ];
+
+    private static bool TryCoerceFromString(string text, Type targetType, out object? result)
+    {
+        result = null;
+        if (targetType == typeof(bool))
+        {
+            var trimmed = text.Trim();
+            if (bool.TryParse(trimmed, out var flag))
+            {
+                result = flag;
+                return true;
+            }
+            if (trimmed == "1" || trimmed == "0")
+            {
+                result = trimmed == "1";
+                return true;
+            }
+            return false;
+        }
+        if (NumericOptionTypes.Contains(targetType))
+        {
+            try
+            {
+                result = Convert.ChangeType(text.Trim(), targetType, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception e) when (e is FormatException or OverflowException)
+            {
+                return false;
+            }
+        }
+        if (targetType != typeof(string) && typeof(IEnumerable).IsAssignableFrom(targetType))
+        {
+            var elementType = targetType.IsArray
+                ? targetType.GetElementType()!
+                : targetType.GetInterfaces()
+                    .Concat([targetType])
+                    .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                    ?.GetGenericArguments()[0];
+            if (elementType == typeof(string))
+            {
+                var items = new JsonArray();
+                foreach (var part in text.Split(','))
+                {
+                    items.Add(JsonValue.Create(part));
+                }
+                result = items.Deserialize(targetType, RpcJson.Options);
+                return true;
+            }
+        }
+        return false;
     }
 
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
