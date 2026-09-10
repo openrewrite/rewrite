@@ -36,7 +36,7 @@ public sealed class SearchResult(Guid id, string? description) : Marker, IRpcCod
     /// </summary>
     public static T Found<T>(T tree, string? description = null) where T : Tree
     {
-        var newMarkers = tree.Markers.Add(new SearchResult(Guid.NewGuid(), description));
+        var newMarkers = tree.Markers.Add(new SearchResult(Tree.RandomId(), description));
         if (tree is J j)
             return (T)J.SetMarkers(j, newMarkers);
 

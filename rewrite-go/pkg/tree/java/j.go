@@ -925,9 +925,9 @@ func (n *ForEachControl) WithMarkers(markers Markers) *ForEachControl {
 // and the case block. Go's optional init clause (`switch x := f(); x {}`) has no
 // slot here — it lives on a wrapping golang.StatementWithInit instead.
 type Switch struct {
-	ID      uuid.UUID
-	Prefix  Space
-	Markers Markers
+	ID       uuid.UUID
+	Prefix   Space
+	Markers  Markers
 	Selector *ControlParentheses // selector expression (matching J.Switch); Go has no parens, so the wrapper carries no whitespace and the inner element holds the tag. Tree.Element is an Empty for a tagless `switch {}`. Tree.After = space before {
 	Body     *Block              // contains Case statements
 }

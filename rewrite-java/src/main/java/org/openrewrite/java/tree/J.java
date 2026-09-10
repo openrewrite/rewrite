@@ -2750,8 +2750,8 @@ public interface J extends Tree {
 
         @Override
         @Transient
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
+        public CoordinateBuilder.If getCoordinates() {
+            return new CoordinateBuilder.If(this);
         }
 
         @ToString

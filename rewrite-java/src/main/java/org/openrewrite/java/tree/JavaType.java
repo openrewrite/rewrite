@@ -785,6 +785,11 @@ public interface JavaType {
         public interface ElementValue {
             JavaType getElement();
 
+            /**
+             * Null when the element's value is itself null, which the Java language forbids but
+             * peers such as C# permit ({@code [Foo(null)]}).
+             */
+            @Nullable
             Object getValue();
         }
 
@@ -807,8 +812,7 @@ public interface JavaType {
             }
 
             @Override
-            public Object getValue() {
-                //noinspection DataFlowIssue
+            public @Nullable Object getValue() {
                 return constantValue != null ? constantValue : referenceValue;
             }
         }

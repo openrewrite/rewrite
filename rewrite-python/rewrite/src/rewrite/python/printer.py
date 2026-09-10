@@ -115,6 +115,19 @@ class PrintOutputCapture:
         return None
 
 
+def _quotes_around(tree: Union[Py, J]) -> Optional[str]:
+    """The quotes to print around ``tree``, or None when its own text carries them.
+
+    A literal's ``value_source`` holds its delimiters, so there the marker records the
+    style and nothing more.
+    """
+    quoted = tree.markers.find_first(Quoted)
+    if quoted is None:
+        return None
+    from rewrite.java import tree as j
+    return None if isinstance(tree, j.Literal) else quoted.style.quote
+
+
 class PythonPrinter:
     """
     Python printer for generating source code from LST.
@@ -269,9 +282,18 @@ class PythonPrinter:
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
             ))
 
+        if markers.markers:
+            quotes = _quotes_around(tree)
+            if quotes:
+                p.append(quotes)
+
     def _after_syntax(self, tree: Union[Py, J], p: PrintOutputCapture) -> None:
         """Handle marker printing after syntax."""
         markers = tree.markers
+        if markers.markers:
+            quotes = _quotes_around(tree)
+            if quotes:
+                p.append(quotes)
         for marker in markers.markers:
             p.append(p.get_marker_printer().after_syntax(
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
@@ -1028,9 +1050,18 @@ class PythonJavaPrinter:
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
             ))
 
+        if markers.markers:
+            quotes = _quotes_around(tree)
+            if quotes:
+                p.append(quotes)
+
     def _after_syntax(self, tree: J, p: PrintOutputCapture) -> None:
         """Handle marker printing after syntax."""
         markers = tree.markers
+        if markers.markers:
+            quotes = _quotes_around(tree)
+            if quotes:
+                p.append(quotes)
         for marker in markers.markers:
             p.append(p.get_marker_printer().after_syntax(
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
@@ -1470,12 +1501,7 @@ class PythonJavaPrinter:
     def visit_identifier(self, ident: 'j.Identifier', p: PrintOutputCapture) -> J:
         """Visit an identifier."""
         self._before_syntax(ident, p)
-        quoted = ident.markers.find_first(Quoted)
-        if quoted:
-            p.append(quoted.style.quote)
         p.append(ident.simple_name)
-        if quoted:
-            p.append(quoted.style.quote)
         self._after_syntax(ident, p)
         return ident
 

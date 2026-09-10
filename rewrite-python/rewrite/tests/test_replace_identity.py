@@ -195,3 +195,16 @@ class TestReplacePerformanceContract:
             "This is critical for performance - a visitor pass over 10,000 nodes should not "
             "allocate 10,000 new objects if nothing changes."
         )
+
+
+def test_an_unknown_keyword_is_refused_by_both_field_setters():
+    from rewrite.java.tree import Identifier
+    from rewrite.utils import assign_fields, replace_if_changed
+
+    ident = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+
+    with pytest.raises(TypeError, match="simple_nmae"):
+        assign_fields(ident, simple_nmae="y")
+
+    with pytest.raises(TypeError, match="simple_nmae"):
+        replace_if_changed(ident, simple_nmae="y")

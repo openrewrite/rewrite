@@ -44,8 +44,11 @@ except ImportError:  # not available on Windows
     resource = None
 
 from rewrite.discovery import RecipeAttribution, RecipeName, _normalize_package_name
+from rewrite.execution import ExecutionContext
 from rewrite.python._version_detect import (
     detect_from_project, detect_from_source, requested_python_version, ty_python_version)
+from rewrite.python.printer import PythonPrinter
+from rewrite.result import Result
 from rewrite.rpc.reference import ReferenceMap
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
@@ -127,22 +130,12 @@ def _next_request_id() -> int:
         return _request_id_counter
 
 
-def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
-    """Send a JSON-RPC request to Java and wait for the response.
+def _issue_request(method: str, params: dict) -> Any:
+    """Write a request and register its id, without waiting for the reply.
 
-    This enables bidirectional communication - Python can request
-    objects from Java while processing an incoming request.
-
-    Args:
-        method: The RPC method name
-        params: The request parameters
-        timeout_seconds: Maximum time to wait for response (default 30s)
-
-    Returns:
-        The result from the RPC response
-
-    Raises:
-        RuntimeError: If request times out or fails
+    Separating the write from the wait lets a caller keep a request in flight
+    while it works; :func:`_await_response` collects it. A reply arriving for
+    another registered id is stashed by that function rather than discarded.
     """
     request_id = _next_request_id()
 
@@ -160,6 +153,11 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     write_message(request)
 
     _awaiting_ids.add(request_id)
+    return request_id
+
+
+def _await_response(request_id: Any, method: str, timeout_seconds: float = 30.0) -> Any:
+    """Wait for the reply to a request :func:`_issue_request` already wrote."""
     try:
         while True:
             response = _pending_responses.pop(request_id, None)
@@ -197,6 +195,26 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     finally:
         _awaiting_ids.discard(request_id)
         _pending_responses.pop(request_id, None)
+
+
+def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
+    """Send a JSON-RPC request to Java and wait for the response.
+
+    This enables bidirectional communication - Python can request
+    objects from Java while processing an incoming request.
+
+    Args:
+        method: The RPC method name
+        params: The request parameters
+        timeout_seconds: Maximum time to wait for response (default 30s)
+
+    Returns:
+        The result from the RPC response
+
+    Raises:
+        RuntimeError: If request times out or fails
+    """
+    return _await_response(_issue_request(method, params), method, timeout_seconds)
 
 
 def _require_tree(tree: Any, source_file_type: Optional[str]) -> Any:
@@ -241,6 +259,12 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     # Track whether we've received the complete object
     received_end = False
+    # Id of a page asked for and not yet collected, so the peer serializes it while
+    # this side turns the previous one into a tree. Only the stdio transport can
+    # hold one: a client that replaces send_request writes and waits in one call,
+    # with no seam to issue against, so there the pages are fetched on demand.
+    pending_page = None
+    can_prefetch = getattr(send_request, '_java_rpc_original', None) is None
 
     def pull_batch() -> List[Dict[str, Any]]:
         """Pull the next batch of RpcObjectData from Java.
@@ -254,16 +278,18 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
         after receive() completes (line 474), and we do the same by tracking received_end.
         """
-        nonlocal received_end
+        nonlocal received_end, pending_page
 
-        if received_end:
+        if pending_page is not None:
+            page_id, pending_page = pending_page, None
+            batch = _await_response(page_id, 'GetObject')
+        elif received_end:
             return []
-
-        # Request the next batch from Java
-        batch = send_request('GetObject', {
-            'id': obj_id,
-            'sourceFileType': source_file_type
-        })
+        else:
+            batch = send_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type
+            })
 
         if not batch:
             received_end = True
@@ -275,6 +301,13 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         if batch[-1].get('state') == 'END_OF_OBJECT':
             received_end = True
             batch = batch[:-1]  # Remove END_OF_OBJECT from the batch
+        elif can_prefetch:
+            # A batch ending in END_OF_OBJECT has no successor: the peer drops its
+            # transfer state on that marker, so asking again would restart it.
+            pending_page = _issue_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type
+            })
 
         return batch
 
@@ -301,6 +334,15 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         # Reset our tracking of the remote state so the next interaction
         # forces a full object sync (ADD) instead of a delta (CHANGE).
         remote_objects.pop(obj_id, None)
+        if pending_page is not None:
+            # A page was requested ahead and is still owed a reply. Collecting it
+            # retires the request, so no id is left registered and at most one page
+            # is ever in flight.
+            try:
+                _await_response(pending_page, 'GetObject')
+            except Exception:
+                pass
+            pending_page = None
         raise
 
     if obj is not None:
@@ -317,20 +359,36 @@ def generate_id() -> str:
     return str(uuid4())
 
 
+def _source_path(path: str, relative_to: Optional[str]) -> Path:
+    """The path an LST carries: relative to the project root when it sits under it."""
+    source_path = Path(path)
+    if relative_to is not None:
+        try:
+            source_path = source_path.relative_to(relative_to)
+        except ValueError:
+            pass  # path is not under relative_to, keep absolute
+    return source_path
+
+
 def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None,
                       language_level: Optional[str] = None,
-                      project_language_level: Optional[str] = None) -> dict:
+                      project_language_level: Optional[str] = None,
+                      check_print: bool = True) -> dict:
     """Parse a Python file and return its LST."""
-    with open(path, 'r', encoding='utf-8') as f:
+    # newline='' disables universal-newline translation, so the LST holds the
+    # file's own line endings and prints back byte-identically.
+    with open(path, 'r', encoding='utf-8', newline='') as f:
         source = f.read()
     return parse_python_source(source, path, relative_to, ty_client,
                                language_level=language_level,
-                               project_language_level=project_language_level)
+                               project_language_level=project_language_level,
+                               check_print=check_print)
 
 
 def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None,
                         language_level: Optional[str] = None,
-                        project_language_level: Optional[str] = None) -> dict:
+                        project_language_level: Optional[str] = None,
+                        check_print: bool = True) -> dict:
     """Parse Python source code and return its LST.
 
     The parser used depends on the effective language version, resolved in
@@ -355,13 +413,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
         or _python_version
     )
 
-    # Compute the source_path that will be stored on the LST
-    source_path = Path(path)
-    if relative_to is not None:
-        try:
-            source_path = source_path.relative_to(relative_to)
-        except ValueError:
-            pass  # path is not under relative_to, keep absolute
+    source_path = _source_path(path, relative_to)
 
     try:
         from rewrite import Markers
@@ -391,6 +443,15 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             cu = ParserVisitor(source, path, ty_client).visit(tree)
 
         cu = cu.replace(source_path=source_path, markers=Markers.EMPTY)
+
+        if check_print:
+            printed = PythonPrinter().print(cu)
+            if printed != source:
+                return _create_parse_error(
+                    str(source_path),
+                    f"{source_path} is not print idempotent. \n"
+                    f"{Result.diff(source, printed, source_path)}",
+                    source)
 
         # Store and return
         obj_id = str(cu.id)
@@ -460,12 +521,7 @@ def _create_quark(path: str, relative_to: Optional[str]) -> dict:
     from ``sourcePath`` locally, so no content crosses the wire.
     """
     from rewrite import random_id
-    source_path = Path(path)
-    if relative_to is not None:
-        try:
-            source_path = source_path.relative_to(relative_to)
-        except ValueError:
-            pass  # path is not under relative_to, keep absolute
+    source_path = _source_path(path, relative_to)
     return {
         'id': str(random_id()),
         'sourceFileType': 'org.openrewrite.quark.Quark',
@@ -505,6 +561,18 @@ def _infer_project_root(inputs: list) -> Optional[str]:
 _last_dependency_path: Optional[str] = None
 
 
+def _require_print_equals_input(options: dict) -> bool:
+    """Whether parse results must print back to their input, which they must
+    unless the client says otherwise. Option maps are loosely typed across
+    peers, so both the string and the bool form count."""
+    value = options.get(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() not in ('false', '0', 'no', 'off')
+    return True
+
+
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
     import tempfile
@@ -516,6 +584,7 @@ def handle_parse(params: dict) -> List[str]:
     # Absent for older clients; absent or unknown keys are silently ignored.
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    check_print = _require_print_equals_input(options)
     # Path to a virtual environment with the project's dependencies installed,
     # provisioned and forwarded by the caller (the CLI build step in production;
     # a test/template helper in-repo). Points ty-types at the deps so supertypes
@@ -557,37 +626,57 @@ def handle_parse(params: dict) -> List[str]:
         ty_client = None  # ty-types not available
 
     try:
-        for i, input_item in enumerate(inputs):
-            if isinstance(input_item, str):
-                result = parse_python_file(input_item, relative_to, ty_client,
-                                           language_level=language_level,
-                                           project_language_level=project_language_level)
-            elif 'path' in input_item:
-                result = parse_python_file(input_item['path'], relative_to, ty_client,
-                                           language_level=language_level,
-                                           project_language_level=project_language_level)
-            elif 'text' in input_item or 'source' in input_item:
-                source = input_item.get('text') if 'text' in input_item else input_item.get('source')
-                path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-                # For relative paths, write the source under the project root
-                # (tmpdir or relative_to) so ty-types can resolve imports from
-                # the project's .venv and dependencies.
-                base_dir = tmpdir or relative_to
-                if base_dir and not os.path.isabs(path):
-                    disk_path = os.path.join(base_dir, path)
-                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
-                    with open(disk_path, 'w', encoding='utf-8') as f:
-                        f.write(source)
-                    result = parse_python_source(source, disk_path, base_dir, ty_client,
-                                                 language_level=language_level,
-                                                 project_language_level=project_language_level)
+        for input_item in inputs:
+            # The client pairs this list to its input list by position, so every
+            # input owes the batch one result — a file too broken to read included.
+            path = '<unknown>'
+            source = ''
+            try:
+                if isinstance(input_item, str):
+                    path = input_item
+                    result = parse_python_file(path, relative_to, ty_client,
+                                               language_level=language_level,
+                                               project_language_level=project_language_level,
+                                               check_print=check_print)
+                elif input_item.get('text') is None and input_item.get('source') is None:
+                    # An input carrying no text names a file the peer reads itself.
+                    named = (input_item.get('path') or input_item.get('sourcePath') or
+                             input_item.get('relativePath'))
+                    if named is None:
+                        raise ValueError('input carries neither source text nor a path')
+                    path = named
+                    result = parse_python_file(path, relative_to, ty_client,
+                                               language_level=language_level,
+                                               project_language_level=project_language_level,
+                                               check_print=check_print)
                 else:
-                    result = parse_python_source(source, path, relative_to, ty_client,
-                                                 language_level=language_level,
-                                                 project_language_level=project_language_level)
-            else:
-                logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
-                continue
+                    source = input_item.get('text')
+                    if source is None:
+                        source = input_item.get('source')
+                    path = (input_item.get('sourcePath') or input_item.get('path') or
+                            input_item.get('relativePath', '<unknown>'))
+                    # For relative paths, write the source under the project root
+                    # (tmpdir or relative_to) so ty-types can resolve imports from
+                    # the project's .venv and dependencies.
+                    base_dir = tmpdir or relative_to
+                    if base_dir and not os.path.isabs(path):
+                        disk_path = os.path.join(base_dir, path)
+                        os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                        # ty must read the same bytes the LST was built from.
+                        with open(disk_path, 'w', encoding='utf-8', newline='') as f:
+                            f.write(source)
+                        result = parse_python_source(source, disk_path, base_dir, ty_client,
+                                                     language_level=language_level,
+                                                     project_language_level=project_language_level,
+                                                     check_print=check_print)
+                    else:
+                        result = parse_python_source(source, path, relative_to, ty_client,
+                                                     language_level=language_level,
+                                                     project_language_level=project_language_level,
+                                                     check_print=check_print)
+            except Exception as e:
+                logger.exception(f"Error parsing {path}: {e}")
+                result = _create_parse_error(str(_source_path(path, relative_to)), str(e), source)
             results.append(result['id'])
     finally:
         if ty_client is not None:
@@ -636,6 +725,7 @@ def handle_parse_project(params: dict) -> List[dict]:
     # Per-request explicit override (mirror of the Parse RPC options carrier).
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    check_print = _require_print_equals_input(options)
     # Caller-provisioned dependency environment for ty-types (see handle_parse).
     dependency_path = params.get('dependencyPath')
     if dependency_path:
@@ -672,10 +762,13 @@ def handle_parse_project(params: dict) -> List[dict]:
             try:
                 result = parse_python_file(path, relative_to, ty_client,
                                            language_level=language_level,
-                                           project_language_level=project_language_level)
+                                           project_language_level=project_language_level,
+                                           check_print=check_print)
                 results.append(result)
             except Exception as e:
-                logger.error(f"Error parsing {path}: {e}")
+                logger.exception(f"Error parsing {path}: {e}")
+                # Every file the walk finds is accounted for in the response.
+                results.append(_create_parse_error(str(_source_path(path, relative_to)), str(e)))
     finally:
         if ty_client is not None:
             ty_client.shutdown()
@@ -2642,12 +2735,19 @@ class _StdinBuffer:
     instance is shared by read_message() and read_message_with_timeout().
     """
 
-    _CHUNK_SIZE = 8192
+    # A response body is read whole, and a page of tree data runs to hundreds of
+    # kilobytes, so each read should take as much as the pipe will give. A pipe
+    # returns at most its own capacity per read, and os.read allocates what it is
+    # asked for before shrinking to what arrived, so an over-large request costs
+    # only the unused difference.
+    _CHUNK_SIZE = 65536
 
     def __init__(self):
         self._fd: Optional[int] = None
         self._buf = bytearray()
         self.at_eof = False
+        self._pending_read: Optional[threading.Thread] = None
+        self._pending_chunk: list = []
 
     def _get_fd(self) -> int:
         fd = self._fd
@@ -2689,22 +2789,28 @@ class _StdinBuffer:
             if remaining <= 0:
                 return False
             if os.name == 'nt':
-                # Windows: select() doesn't support pipes, use a thread
-                result: list = []
+                # Windows: select() doesn't support pipes, so a thread does the read. It
+                # takes from the pipe whether or not this call is still waiting for it, so
+                # the thread and its chunk belong to the buffer -- a later _fill collects
+                # what an in-flight read returned, keeping those bytes in the stream.
+                if self._pending_read is None:
+                    self._pending_chunk = []
+                    pending = self._pending_chunk
 
-                def _read():
-                    try:
-                        data = os.read(self._get_fd(), self._CHUNK_SIZE)
-                        result.append(data)
-                    except OSError:
-                        result.append(b'')
+                    def _read():
+                        try:
+                            pending.append(os.read(self._get_fd(), self._CHUNK_SIZE))
+                        except OSError:
+                            pending.append(b'')
 
-                t = threading.Thread(target=_read, daemon=True)
-                t.start()
-                t.join(timeout=remaining)
-                if not result:
+                    self._pending_read = threading.Thread(target=_read, daemon=True)
+                    self._pending_read.start()
+
+                self._pending_read.join(timeout=remaining)
+                if self._pending_read.is_alive():
                     return False
-                chunk = result[0]
+                self._pending_read = None
+                chunk = self._pending_chunk[0] if self._pending_chunk else b''
             else:
                 readable, _, _ = select.select([self._get_fd()], [], [], remaining)
                 if not readable:

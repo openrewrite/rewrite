@@ -32,6 +32,8 @@ using NuGet.Versioning;
 using Serilog;
 using ILogger = NuGet.Common.ILogger;
 
+using OpenRewrite.Core;
+
 namespace OpenRewrite.CSharp.NuGet;
 
 /// <summary>
@@ -181,6 +183,21 @@ public static class NuGetResolver
         }
     }
 
+    /// <summary>
+    /// Sets <c>EnableWindowsTargeting=true</c> on non-Windows hosts, where the SDK otherwise
+    /// fails every project with a Windows target platform (<c>net10.0-windows</c>, WPF/WinForms)
+    /// with <c>NETSDK1100</c>. Analysis never runs the produced binaries, so cross-targeting is
+    /// always safe here. Skipped when the variable is set in the environment: MSBuild already
+    /// seeds that as a property and an explicit choice must win over this default.
+    /// </summary>
+    public static void ApplyWindowsTargetingDefault(IDictionary<string, string> properties)
+    {
+        if (OperatingSystem.IsWindows() ||
+            !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("EnableWindowsTargeting")))
+            return;
+        properties["EnableWindowsTargeting"] = "true";
+    }
+
     // Serialize graph generation: concurrent SDK msbuild processes contend on obj/ and
     // the NuGet http cache without adding throughput for our one-at-a-time callers.
     private static readonly object BuildGate = new();
@@ -202,7 +219,7 @@ public static class NuGetResolver
         IDictionary<string, string>? extraGlobalProperties)
     {
         var outputPath = Path.Combine(Path.GetTempPath(),
-            "openrewrite-dg-" + Guid.NewGuid().ToString("N")[..8] + ".json");
+            "openrewrite-dg-" + Tree.RandomId().ToString("N")[..8] + ".json");
         try
         {
             var globalProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -217,6 +234,7 @@ public static class NuGetResolver
                 // Avoid restore-time package imports polluting evaluation
                 ["ExcludeRestorePackageImports"] = "true",
             };
+            ApplyWindowsTargetingDefault(globalProps);
             if (extraGlobalProperties != null)
             {
                 foreach (var (k, v) in extraGlobalProperties)
@@ -422,7 +440,7 @@ public static class NuGetResolver
                     ProjectUniqueName = projectPath,
                     ProjectStyle = ProjectStyle.PackageReference,
                     OutputPath = Path.Combine(Path.GetTempPath(),
-                        "openrewrite-pcrestore-" + Guid.NewGuid().ToString("N")[..8]),
+                        "openrewrite-pcrestore-" + Tree.RandomId().ToString("N")[..8]),
                     OriginalTargetFrameworks = new List<string> { alias },
                     ConfigFilePaths = settings.GetConfigFilePaths(),
                     PackagesPath = SettingsUtility.GetGlobalPackagesFolder(settings),

@@ -242,6 +242,11 @@ public class SolutionParser
                 msbuildProperties["TargetFrameworkRootPath"] = buildAssets.TargetFrameworkRootPath;
         }
 
+        // Windows-targeted projects (net*-windows with WPF/WinForms or a Windows SDK version)
+        // otherwise fail evaluation with NETSDK1100 on Linux/macOS, and one failing project
+        // reference takes the reference metadata of everything that depends on it with it.
+        NuGetResolver.ApplyWindowsTargetingDefault(msbuildProperties);
+
         _restoredLockFiles = await SolutionRestore.RunAsync(path, hasPackagesConfig, msbuildProperties, ct);
 
         var sw = Stopwatch.StartNew();
@@ -650,7 +655,7 @@ public class SolutionParser
             Log.Debug("Failed to read project metadata from {ProjectPath}: {Error}", projectPath, ex.Message);
         }
 
-        return new DotNetProject(Guid.NewGuid(), projectName, tfms, sdk);
+        return new DotNetProject(Tree.RandomId(), projectName, tfms, sdk);
     }
 
     /// <summary>

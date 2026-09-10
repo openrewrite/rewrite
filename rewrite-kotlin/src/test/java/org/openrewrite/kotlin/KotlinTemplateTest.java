@@ -21,6 +21,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
@@ -45,6 +46,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlinScript;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"NullableProblems", "LombokKotlinCompilerPlugin", "SimplifyBooleanWithConstants", "DataFlowIssue", "SequencedCollectionMethodCanBeUsed", "UnusedExpression", "RedundantSemicolon", "RedundantExplicitType", "UnusedReceiverParameter"})
@@ -1654,5 +1656,53 @@ class KotlinTemplateTest implements RewriteTest {
             "fun test(@Suppress(\"x\") n: Int? = null, vararg rest: Int) {}"
           )
         );
+    }
+
+    // A Kotlin script wraps its statements in a block whose first statement starts at column 0
+    private static Recipe insertAtTopLevel(boolean before) {
+        return toRecipe(() -> new KotlinVisitor<>() {
+            @Override
+            public J visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                K.CompilationUnit c = (K.CompilationUnit) super.visitCompilationUnit(cu, ctx);
+                J.Block block = (J.Block) c.getStatements().get(0);
+                if (block.getStatements().size() != 1) {
+                    return c;
+                }
+                Statement only = block.getStatements().get(0);
+                return KotlinTemplate.builder("val y = 2")
+                  .build()
+                  .apply(updateCursor(c), before ? only.getCoordinates().before() : only.getCoordinates().after());
+            }
+        });
+    }
+
+    @Test
+    void insertAfterTopLevelScriptStatement() {
+        rewriteRun(
+          spec -> spec.recipe(insertAtTopLevel(false)).typeValidationOptions(TypeValidation.none()),
+          kotlinScript(
+            """
+              val x = 1
+              """,
+            spec -> spec.after(a -> """
+              val x = 1
+              val y = 2
+              """)
+          ));
+    }
+
+    @Test
+    void insertBeforeTopLevelScriptStatement() {
+        rewriteRun(
+          spec -> spec.recipe(insertAtTopLevel(true)).typeValidationOptions(TypeValidation.none()),
+          kotlinScript(
+            """
+              val x = 1
+              """,
+            spec -> spec.after(a -> """
+              val y = 2
+              val x = 1
+              """)
+          ));
     }
 }

@@ -135,7 +135,10 @@ def _module_scope_statements(body: Sequence[ast.stmt]) -> Iterator[ast.stmt]:
 
 def _module_all_names(tree: ast.Module) -> Optional[Set[str]]:
     """The names ``__all__`` declares via top-level literal list/tuple assignments
-    (plain, annotated, or augmented), or None when the module has no such ``__all__``."""
+    (plain, annotated, or augmented), or None when the module has no such ``__all__``.
+
+    `import_utils.module_exported_names` answers the same question over the LST, for
+    `RemoveImport`, but conservatively: an `__all__` it cannot fully read gives None."""
     names: Optional[Set[str]] = None
     for stmt in tree.body:
         if isinstance(stmt, ast.Assign):
@@ -915,6 +918,16 @@ class PythonTypeMapping:
             return self._resolve_type(type_id)
 
         return None
+
+    def string_annotation_type(self, node: ast.Constant) -> Optional[JavaType]:
+        """The type a string in a type slot denotes, rather than ``str``.
+
+        ty resolves the annotation and reports the result on the string literal's own
+        range, which :meth:`type` never reaches because a constant short-circuits to
+        the type of its own value.
+        """
+        type_id = self._lookup_type_id(node)
+        return self._resolve_type(type_id) if type_id is not None else None
 
     def _constant_type(self, node: ast.Constant) -> Optional[JavaType]:
         """Get the type for a constant/literal node."""

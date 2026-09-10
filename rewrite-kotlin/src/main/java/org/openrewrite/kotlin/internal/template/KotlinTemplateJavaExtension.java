@@ -176,6 +176,12 @@ public class KotlinTemplateJavaExtension extends JavaTemplateJavaExtension {
                         ListUtils.map(gen, (i, s) -> autoFormat(s, p, parent))));
             }
             if (loc == Space.Location.STATEMENT_PREFIX) {
+                // A Kotlin script keeps its statements in a block, so the insertion point is not among the
+                // file's own. Returning here regardless would both skip the shared source-file handling and
+                // stop the traversal before it reached the block that does hold the anchor.
+                if (cu.getStatements().stream().noneMatch(s -> s.isScope(insertionPoint))) {
+                    return null;
+                }
                 return cu.withStatements(ListUtils.flatMap(cu.getStatements(), statement -> {
                     if (!isScope(statement)) {
                         return statement;
