@@ -1759,7 +1759,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             name,
             type_parameters,
-            self.__pad_left(self.__source_before('='), self.__convert(node.value)),
+            self.__pad_left(self.__source_before('='), self.__convert_type(node.value)),
             self._type_mapping.type(node)
         )
 
