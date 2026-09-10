@@ -226,6 +226,21 @@ public static class NuGetResolver
         }
     }
 
+    /// <summary>
+    /// Sets <c>EnableWindowsTargeting=true</c> on non-Windows hosts, where the SDK otherwise
+    /// fails every project with a Windows target platform (<c>net10.0-windows</c>, WPF/WinForms)
+    /// with <c>NETSDK1100</c>. Analysis never runs the produced binaries, so cross-targeting is
+    /// always safe here. Skipped when the variable is set in the environment: MSBuild already
+    /// seeds that as a property and an explicit choice must win over this default.
+    /// </summary>
+    public static void ApplyWindowsTargetingDefault(IDictionary<string, string> properties)
+    {
+        if (OperatingSystem.IsWindows() ||
+            !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("EnableWindowsTargeting")))
+            return;
+        properties["EnableWindowsTargeting"] = "true";
+    }
+
     // Serialize graph generation: concurrent SDK msbuild processes contend on obj/ and
     // the NuGet http cache without adding throughput for our one-at-a-time callers.
     private static readonly object BuildGate = new();
@@ -327,6 +342,7 @@ public static class NuGetResolver
                 // Avoid restore-time package imports polluting evaluation
                 ["ExcludeRestorePackageImports"] = "true",
             };
+            ApplyWindowsTargetingDefault(globalProps);
             if (extraGlobalProperties != null)
             {
                 foreach (var (k, v) in extraGlobalProperties)
