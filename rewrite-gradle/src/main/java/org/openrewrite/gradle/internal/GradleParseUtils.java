@@ -16,17 +16,54 @@
 package org.openrewrite.gradle.internal;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.tree.ParseError;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
+
+import static java.util.Collections.singleton;
 
 public final class GradleParseUtils {
     private GradleParseUtils() {
+    }
+
+    /**
+     * Parse a constant Gradle snippet as a build script, so that a recipe adding code gets a tree the parser
+     * produced rather than one it assembled by hand, which is how printing and formatting stay correct.
+     * The result is cached on the execution context, as GradleParser is slow enough that reparsing the same
+     * snippet for every source file is noticeable.
+     */
+    public static Optional<JavaSourceFile> parseSnippet(String snippet, boolean isKotlinDsl, ExecutionContext ctx) {
+        //noinspection unchecked
+        Map<String, Optional<JavaSourceFile>> cache = (Map<String, Optional<JavaSourceFile>>) ctx.getMessages()
+                .computeIfAbsent(GradleParseUtils.class.getName() + ".snippetCache", k -> new HashMap<String, Optional<JavaSourceFile>>());
+        return cache.computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(singleton(
+                        new Parser.Input(
+                                Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
+                                () -> new ByteArrayInputStream(snippet.getBytes(StandardCharsets.UTF_8))
+                        )), null, ctx)
+                .findFirst()
+                .map(maybeCu -> {
+                    maybeCu.getMarkers()
+                            .findFirst(ParseExceptionResult.class)
+                            .ifPresent(per -> {
+                                throw new IllegalStateException("Encountered exception " + per.getExceptionType() + " with message " + per.getMessage() + " on snippet:\n" + snippet);
+                            });
+                    return (JavaSourceFile) maybeCu;
+                }));
     }
 
     /**
