@@ -15,9 +15,10 @@
  */
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Microsoft.Build.Construction;
+using Microsoft.Build.Evaluation;
+using Microsoft.Build.Execution;
 using NuGet.Commands;
 using NuGet.Common;
 using NuGet.Configuration;
@@ -36,6 +37,104 @@ using ILogger = NuGet.Common.ILogger;
 using OpenRewrite.Core;
 
 namespace OpenRewrite.CSharp.NuGet;
+
+/// <summary>
+/// Points in-process MSBuild at the .NET SDK by setting <c>MSBUILD_EXE_PATH</c>, which is all the
+/// engine needs to resolve <c>Microsoft.NET.Sdk</c> and the rest of the SDK's targets. Child
+/// <c>dotnet</c> processes must not inherit it — see <see cref="ScrubFrom"/>.
+/// <para>
+/// <c>MSBuildLocator.Register*</c> is NOT needed with current MSBuild libraries and must not be
+/// reintroduced. Reference <c>Microsoft.Build</c>, <c>Microsoft.Build.Tasks.Core</c> and
+/// <c>Microsoft.Build.Utilities.Core</c>, and name the SDK here.
+/// </para>
+/// </summary>
+internal static class MSBuildEnvironment
+{
+    private static readonly object Lock = new();
+    private static bool _configured;
+
+    private static bool _ownsVariable;
+
+    public static void Ensure()
+    {
+        lock (Lock)
+        {
+            if (_configured)
+                return;
+            _configured = true;
+
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MSBUILD_EXE_PATH")))
+                return;
+
+            var msbuild = FindSdkMSBuild();
+            if (msbuild == null)
+            {
+                Log.Debug("MSBuildEnvironment: no .NET SDK found; MSBuild evaluation may fail");
+                return;
+            }
+
+            _ownsVariable = true;
+            Environment.SetEnvironmentVariable("MSBUILD_EXE_PATH", msbuild);
+            Log.Debug("MSBuildEnvironment: MSBUILD_EXE_PATH={Path}", msbuild);
+        }
+    }
+
+    /// <summary>
+    /// Removes the variable this class set from a child process's environment. A child
+    /// <c>dotnet</c> initializes its own MSBuild and fails with "The type initializer for
+    /// 'Microsoft.Build.Execution.BuildParameters' threw an exception" if it inherits ours.
+    /// </summary>
+    public static void ScrubFrom(System.Diagnostics.ProcessStartInfo psi)
+    {
+        if (_ownsVariable)
+            psi.Environment.Remove("MSBUILD_EXE_PATH");
+    }
+
+    private static string? FindSdkMSBuild()
+    {
+        foreach (var root in CandidateDotnetRoots())
+        {
+            var sdkRoot = Path.Combine(root, "sdk");
+            if (!Directory.Exists(sdkRoot))
+                continue;
+            var best = Directory.EnumerateDirectories(sdkRoot)
+                .Select(d => (Dir: d, File: Path.Combine(d, "MSBuild.dll")))
+                .Where(x => File.Exists(x.File))
+                .OrderByDescending(x => ParseVersion(Path.GetFileName(x.Dir)))
+                .Select(x => x.File)
+                .FirstOrDefault();
+            if (best != null)
+                return best;
+        }
+        return null;
+    }
+
+    private static IEnumerable<string> CandidateDotnetRoots()
+    {
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+        if (!string.IsNullOrEmpty(host) && File.Exists(host))
+            yield return Path.GetDirectoryName(host)!;
+
+        var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        if (!string.IsNullOrEmpty(dotnetRoot))
+            yield return dotnetRoot;
+
+        var runtime = Path.GetDirectoryName(typeof(object).Assembly.Location);
+        if (runtime != null)
+        {
+            var shared = Path.GetDirectoryName(Path.GetDirectoryName(runtime));
+            var root = shared == null ? null : Path.GetDirectoryName(shared);
+            if (root != null)
+                yield return root;
+        }
+    }
+
+    private static Version ParseVersion(string name)
+    {
+        var core = name.Split('-')[0];
+        return Version.TryParse(core, out var v) ? v : new Version(0, 0);
+    }
+}
 
 /// <summary>
 /// In-process NuGet engine replacing all child-process package operations
@@ -85,6 +184,45 @@ public static class NuGetResolver
         {
             Log(message);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class SerilogMSBuildLogger : Microsoft.Build.Framework.ILogger
+    {
+        private readonly SortedSet<string> _errorCodes = new(StringComparer.OrdinalIgnoreCase);
+
+        public string? FailureSignature
+        {
+            get
+            {
+                lock (_errorCodes)
+                    return _errorCodes.Count > 0 ? string.Join(",", _errorCodes) : null;
+            }
+        }
+
+        public Microsoft.Build.Framework.LoggerVerbosity Verbosity { get; set; } =
+            Microsoft.Build.Framework.LoggerVerbosity.Quiet;
+
+        public string? Parameters { get; set; }
+
+        public void Initialize(Microsoft.Build.Framework.IEventSource eventSource)
+        {
+            eventSource.ErrorRaised += (_, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Code))
+                {
+                    lock (_errorCodes)
+                        _errorCodes.Add(e.Code);
+                }
+                Log.Debug("MSBuild error {Code} at {File}({Line}): {Message}",
+                    e.Code, e.File, e.LineNumber, e.Message);
+            };
+            eventSource.WarningRaised += (_, e) =>
+                Log.Debug("MSBuild warning {Code}: {Message}", e.Code, e.Message);
+        }
+
+        public void Shutdown()
+        {
         }
     }
 
@@ -241,11 +379,7 @@ public static class NuGetResolver
         properties["EnableWindowsTargeting"] = "true";
     }
 
-    // Serialize graph generation: concurrent SDK msbuild processes contend on obj/ and
-    // the NuGet http cache without adding throughput for our one-at-a-time callers.
     private static readonly object BuildGate = new();
-
-    private static readonly TimeSpan GraphGenTimeout = TimeSpan.FromMinutes(5);
 
     private const int RootFailureThreshold = 3;
 
@@ -325,6 +459,7 @@ public static class NuGetResolver
         out string? failureSignature)
     {
         failureSignature = null;
+        MSBuildEnvironment.Ensure();
         EvaluationCounts.AddOrUpdate(projectPath, 1, (_, n) => n + 1);
         var outputPath = Path.Combine(Path.GetTempPath(),
             "openrewrite-dg-" + Tree.RandomId().ToString("N")[..8] + ".json");
@@ -349,49 +484,31 @@ public static class NuGetResolver
                     globalProps[k] = v;
             }
 
-            var psi = new ProcessStartInfo("dotnet")
-            {
-                WorkingDirectory = Path.GetDirectoryName(projectPath) ?? ".",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            psi.ArgumentList.Add("msbuild");
-            psi.ArgumentList.Add(projectPath);
-            psi.ArgumentList.Add("-t:GenerateRestoreGraphFile");
-            psi.ArgumentList.Add("-nologo");
-            psi.ArgumentList.Add("-v:quiet");
-            psi.ArgumentList.Add("-nodeReuse:false");
-            foreach (var (k, v) in globalProps)
-                psi.ArgumentList.Add($"-p:{k}={v}");
-
+            var buildLogger = new SerilogMSBuildLogger();
             lock (BuildGate)
             {
-                using var process = Process.Start(psi);
-                if (process == null)
+                using var projectCollection = new ProjectCollection(globalProps);
+                var parameters = new BuildParameters(projectCollection)
                 {
-                    Log.Debug("NuGetResolver: failed to start dotnet msbuild for {Project}", projectPath);
-                    failureSignature = "process-start-failed";
-                    return null;
-                }
-
-                // Read both streams before waiting to avoid pipe-buffer deadlock.
-                var stdoutTask = process.StandardOutput.ReadToEndAsync();
-                var stderrTask = process.StandardError.ReadToEndAsync();
-                if (!process.WaitForExit((int)GraphGenTimeout.TotalMilliseconds))
+                    DisableInProcNode = false,
+                    EnableNodeReuse = false,
+                    MaxNodeCount = 1,
+                    Loggers = new Microsoft.Build.Framework.ILogger[] { buildLogger },
+                };
+                var requestData = new BuildRequestData(
+                    projectPath,
+                    globalProps,
+                    null,
+                    new[] { "GenerateRestoreGraphFile" },
+                    null);
+                var result = BuildManager.DefaultBuildManager.Build(parameters, requestData);
+                if (result.OverallResult != BuildResultCode.Success || !File.Exists(outputPath))
                 {
-                    try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
-                    Log.Debug("NuGetResolver: GenerateRestoreGraphFile timed out for {Project}", projectPath);
-                    failureSignature = "timeout";
-                    return null;
-                }
-
-                if (process.ExitCode != 0 || !File.Exists(outputPath))
-                {
-                    Log.Debug("NuGetResolver: GenerateRestoreGraphFile failed for {Project} (exit {Exit}):\n{Out}\n{Err}",
-                        projectPath, process.ExitCode, stdoutTask.Result.Trim(), stderrTask.Result.Trim());
-                    failureSignature = FailureSignature(stdoutTask.Result, stderrTask.Result, process.ExitCode);
+                    Log.Debug("NuGetResolver: GenerateRestoreGraphFile failed for {Project}: {Exception}",
+                        projectPath, result.Exception?.Message);
+                    failureSignature = buildLogger.FailureSignature
+                                       ?? result.Exception?.GetType().Name
+                                       ?? "build-failed";
                     return null;
                 }
             }
@@ -411,19 +528,6 @@ public static class NuGetResolver
         }
     }
 
-    private static string FailureSignature(string stdout, string stderr, int exitCode)
-    {
-        var codes = DiagnosticCode
-            .Matches(stdout + "\n" + stderr)
-            .Select(m => m.Value)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(c => c, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        return codes.Count > 0 ? string.Join(",", codes) : "exit-" + exitCode;
-    }
-
-    private static readonly Regex DiagnosticCode =
-        new(@"\b(?:MSB|NU|CS)\d{3,4}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     #endregion
 

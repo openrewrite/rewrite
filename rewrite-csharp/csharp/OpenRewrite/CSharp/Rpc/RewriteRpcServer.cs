@@ -30,6 +30,7 @@ using StreamJsonRpc;
 using StreamJsonRpc.Protocol;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
+using OpenRewrite.CSharp.NuGet;
 
 namespace OpenRewrite.CSharp.Rpc;
 
@@ -1022,6 +1023,7 @@ public class RewriteRpcServer
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        MSBuildEnvironment.ScrubFrom(psi);
 
         using var process = System.Diagnostics.Process.Start(psi)
                             ?? throw new InvalidOperationException("Failed to start dotnet process");
