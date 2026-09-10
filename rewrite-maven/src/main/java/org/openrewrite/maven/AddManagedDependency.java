@@ -247,12 +247,15 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                     if (versionValidation.isValid()) {
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
                         try {
-                            // The version of the dependency currently in use (if any) might influence the version comparator
+                            // The version of the dependency currently in use (if any) might influence the version comparator.
                             // For example, "latest.patch" gives very different results depending on the version in use.
-                            // `scope` here is the *new* managed dependency's tag scope, not a filter for where to look
-                            // for the current version, so only apply it when explicitly set; otherwise search all scopes
-                            // rather than defaulting to Compile via Scope.fromName(null).
-                            String currentVersion = getResolutionResult().findDependencies(convertedGroup, convertedArtifact, scope == null ? null : Scope.fromName(scope)).stream()
+                            // `scope` is not a dependency search scope: it's what scope to tag the *new* managed
+                            // dependency entry with, and has no bearing on which scope(s) the dependency is actually
+                            // used in elsewhere in the project. Filtering this lookup by Scope.fromName(scope) would be
+                            // wrong even for a resolvable scope value - e.g. tagging a new entry "provided" doesn't
+                            // mean the dependency's real current usage is provided-scoped too, it could be compile,
+                            // test, etc. So search across all scopes here, regardless of `scope`.
+                            String currentVersion = getResolutionResult().findDependencies(convertedGroup, convertedArtifact, null).stream()
                                     .map(ResolvedDependency::getVersion)
                                     .findFirst()
                                     .orElse(existingManagedDependencyVersion());
