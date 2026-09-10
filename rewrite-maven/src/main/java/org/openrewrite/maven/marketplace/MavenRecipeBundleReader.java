@@ -16,7 +16,6 @@
 package org.openrewrite.maven.marketplace;
 
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.ClasspathScanningLoader;
@@ -31,6 +30,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -40,10 +40,10 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
-@RequiredArgsConstructor
 public class MavenRecipeBundleReader implements RecipeBundleReader {
     private static final Map<ResolvedGroupArtifactVersion, Lock> DEPENDENCY_LOCKS = new ConcurrentHashMap<>();
 
@@ -52,10 +52,38 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private final MavenArtifactDownloader downloader;
     private final RecipeClassLoaderFactory classLoaderFactory;
 
+    /**
+     * Lets a declarative recipe in this bundle name a recipe contributed by another package
+     * ecosystem, which has no class on this bundle's classpath to find. Null when the caller has no
+     * marketplace to resolve against, in which case only classpath names resolve.
+     */
+    private final @Nullable RecipeMarketplace marketplace;
+
+    private final Collection<RecipeBundleResolver> resolvers;
+
     private transient @Nullable Environment environment;
     transient @Nullable Path recipeJar;
     transient @Nullable List<Path> classpath;
     private transient @Nullable RecipeClassLoader classLoader;
+
+    public MavenRecipeBundleReader(RecipeBundle bundle, MavenResolutionResult mrr,
+                                   MavenArtifactDownloader downloader,
+                                   RecipeClassLoaderFactory classLoaderFactory) {
+        this(bundle, mrr, downloader, classLoaderFactory, null, emptyList());
+    }
+
+    public MavenRecipeBundleReader(RecipeBundle bundle, MavenResolutionResult mrr,
+                                   MavenArtifactDownloader downloader,
+                                   RecipeClassLoaderFactory classLoaderFactory,
+                                   @Nullable RecipeMarketplace marketplace,
+                                   Collection<RecipeBundleResolver> resolvers) {
+        this.bundle = bundle;
+        this.mrr = mrr;
+        this.downloader = downloader;
+        this.classLoaderFactory = classLoaderFactory;
+        this.marketplace = marketplace;
+        this.resolvers = resolvers;
+    }
 
     @Override
     public RecipeMarketplace read() {
@@ -138,9 +166,19 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
 
     private Environment environment() {
         if (environment == null) {
-            environment = Environment.builder()
-                    .load(new ClasspathScanningLoader(new Properties(), classLoader()))
-                    .build();
+            if (marketplace == null) {
+                environment = Environment.builder()
+                        .load(new ClasspathScanningLoader(new Properties(), classLoader()))
+                        .build();
+            } else {
+                // Loaded twice: the scanning loader answers configured entries, the environment bare names.
+                MarketplaceRecipeLoader marketplaceRecipeLoader = new MarketplaceRecipeLoader(
+                        marketplace, resolvers, bundle.getPackageEcosystem());
+                environment = Environment.builder()
+                        .load(new ClasspathScanningLoader(new Properties(), classLoader(), marketplaceRecipeLoader))
+                        .load(marketplaceRecipeLoader)
+                        .build();
+            }
         }
         return environment;
     }

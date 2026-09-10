@@ -27,19 +27,43 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
+import java.util.Collection;
 import java.util.Optional;
+
+import static java.util.Collections.emptyList;
 
 public class MavenRecipeBundleResolver implements RecipeBundleResolver {
     private final ExecutionContext ctx;
     private final MavenArtifactDownloader downloader;
     private final RecipeClassLoaderFactory classLoaderFactory;
 
+    /**
+     * Lets a JAR-borne declarative recipe name recipes from other package ecosystems. Null resolves
+     * {@code recipeList} entries off the bundle's classpath only, as before.
+     */
+    private final @Nullable RecipeMarketplace marketplace;
+
+    /**
+     * Held by reference rather than copied: callers assemble the resolver list one ecosystem at a
+     * time, and this resolver is typically built before the rest of it exists.
+     */
+    private final Collection<RecipeBundleResolver> resolvers;
+
     private transient @Nullable MavenRecipeBundleReader reader;
 
     public MavenRecipeBundleResolver(ExecutionContext ctx, MavenArtifactDownloader downloader, RecipeClassLoaderFactory classLoaderFactory) {
+        this(ctx, downloader, classLoaderFactory, null, emptyList());
+    }
+
+    public MavenRecipeBundleResolver(ExecutionContext ctx, MavenArtifactDownloader downloader,
+                                     RecipeClassLoaderFactory classLoaderFactory,
+                                     @Nullable RecipeMarketplace marketplace,
+                                     Collection<RecipeBundleResolver> resolvers) {
         this.ctx = ctx;
         this.downloader = downloader;
         this.classLoaderFactory = classLoaderFactory;
+        this.marketplace = marketplace;
+        this.resolvers = resolvers;
     }
 
     @Override
@@ -63,7 +87,8 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
                                 .findFirst().orElseThrow(() -> new IllegalStateException("Failed to find direct dependency for " + gav));
                         RecipeBundle resolved = bundle.withVersion(resolvedDependency.getDatedSnapshotVersion() == null ?
                                 resolvedDependency.getVersion() : resolvedDependency.getDatedSnapshotVersion());
-                        reader = new MavenRecipeBundleReader(resolved, mrr, downloader, classLoaderFactory);
+                        reader = new MavenRecipeBundleReader(resolved, mrr, downloader, classLoaderFactory,
+                                marketplace, resolvers);
                         return (RecipeBundleReader) reader;
                     })
                     .orElseGet(() -> new ThrowingRecipeBundleReader(bundle, new IllegalStateException("Unable to resolve recipe " + gav)));
