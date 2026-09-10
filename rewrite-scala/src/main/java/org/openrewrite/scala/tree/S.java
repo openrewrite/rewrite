@@ -254,19 +254,11 @@ public interface S extends J {
         @Override
         public <S, T extends S> T service(Class<S> service) {
             String serviceName = service.getName();
-            try {
-                Class<S> serviceClass;
-                if (ScalaAutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = service;
-                } else if (AutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaAutoFormatService.class.getName());
-                } else {
-                    return JavaSourceFile.super.service(service);
-                }
-                return (T) serviceClass.getConstructor().newInstance();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            if (AutoFormatService.class.getName().equals(serviceName) ||
+                ScalaAutoFormatService.class.getName().equals(serviceName)) {
+                return (T) new ScalaAutoFormatService();
             }
+            return JavaSourceFile.super.service(service);
         }
 
         @Override
