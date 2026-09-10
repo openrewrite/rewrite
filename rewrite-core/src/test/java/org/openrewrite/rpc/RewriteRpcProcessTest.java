@@ -20,7 +20,9 @@ import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
@@ -29,6 +31,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -209,12 +212,47 @@ class RewriteRpcProcessTest {
         try {
             peer.shutdown();
 
-            assertThat(peerProcess.isAlive())
-                    .as("shutdown() should have waited for the peer's own exit")
-                    .isFalse();
+            // A force-kill is asynchronous, so the exit status only settles once the peer has gone.
+            await(() -> peerProcess.isAlive() ? null : Boolean.TRUE);
             assertThat(peerProcess.exitValue())
                     .as("exit status should be the peer's own, not 128+SIGKILL")
                     .isZero();
+        } finally {
+            peerProcess.destroyForcibly();
+        }
+    }
+
+    /**
+     * A wedged peer leaves the RPC writer holding the monitor that {@code close()} needs,
+     * so severing stdin must not be what the shutdown thread waits on.
+     */
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void shutdownIsBoundedWhenAWriterHoldsAWedgedPeersStdin() throws Exception {
+        Process peerProcess = new ProcessBuilder("sh", "-c", "sleep 300").start();
+        RewriteRpcProcess peer = peerWrapping(peerProcess);
+        OutputStream stdin = peerProcess.getOutputStream();
+        CountDownLatch holdingMonitor = new CountDownLatch(1);
+        Thread writer = new Thread(() -> {
+            //noinspection SynchronizationOnLocalVariableOrMethodParameter
+            synchronized (stdin) { // the monitor HeaderDelimitedMessageHandler.send() holds
+                holdingMonitor.countDown();
+                try {
+                    // Outruns the pipe buffer, so this blocks until the peer is killed.
+                    stdin.write(new byte[8 * 1024 * 1024]);
+                    stdin.flush();
+                } catch (IOException ignored) {
+                }
+            }
+        }, "rpc-writer");
+        writer.setDaemon(true);
+        writer.start();
+        assertThat(holdingMonitor.await(10, TimeUnit.SECONDS)).isTrue();
+        try {
+            assertTimeoutPreemptively(Duration.ofSeconds(30), peer::shutdown);
+
+            await(() -> peerProcess.isAlive() ? null : Boolean.TRUE);
+            assertThat(peerProcess.isAlive()).isFalse();
         } finally {
             peerProcess.destroyForcibly();
         }

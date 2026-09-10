@@ -296,17 +296,19 @@ public class RewriteRpcProcess extends Thread {
         }
         // EOF on stdin is every peer's exit signal, and taking it lets them flush metrics
         // and logs and remove their temp dirs. SIGTERM would not do: of the four peers only
-        // the JS one installs a handler. The wait is bounded so a wedged peer still dies.
-        if (process != null) {
+        // the JS one installs a handler.
+        Process p = process;
+        if (p != null) {
+            // Closing stdin needs the monitor that HeaderDelimitedMessageHandler holds across
+            // a send, so against a peer that stopped draining it blocks until the kill below
+            // releases the writer. Only the exit is waited on, which keeps that wait bounded.
+            severStdin(p);
             try {
-                process.getOutputStream().close();
-                if (!process.waitFor(GRACEFUL_EXIT_MILLIS, TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly();
+                if (!p.waitFor(GRACEFUL_EXIT_MILLIS, TimeUnit.MILLISECONDS)) {
+                    p.destroyForcibly();
                 }
-            } catch (IOException e) {
-                process.destroyForcibly();
             } catch (InterruptedException e) {
-                process.destroyForcibly();
+                p.destroyForcibly();
                 Thread.currentThread().interrupt();
             }
         }
@@ -321,6 +323,19 @@ public class RewriteRpcProcess extends Thread {
             }
             stderrDrainThread = null;
         }
+    }
+
+    /** Signals the peer to exit by closing its stdin, on a daemon thread that may never return. */
+    private static void severStdin(Process p) {
+        Thread closer = new Thread(() -> {
+            try {
+                p.getOutputStream().close();
+            } catch (IOException ignored) {
+                // The peer is going away regardless; the caller force-kills on timeout.
+            }
+        }, "rpc-stdin-close");
+        closer.setDaemon(true);
+        closer.start();
     }
 
     /** The peer's descendants as {@code ProcessHandle}s, empty on Java 8 or if unobtainable. */

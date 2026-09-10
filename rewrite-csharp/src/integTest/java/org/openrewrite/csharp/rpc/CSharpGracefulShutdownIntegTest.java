@@ -41,7 +41,11 @@ class CSharpGracefulShutdownIntegTest {
     void serverExitsCleanlyWhenStdinCloses(@TempDir Path tempDir) throws Exception {
         // --metrics-csv is what wraps the message handler, and only the wrapper has to
         // forward the buffer-release callback; without the flag nothing is under test.
-        Process server = new ProcessBuilder("dotnet", locateTool().toString(),
+        Process server = new ProcessBuilder("dotnet", "run",
+          "--project", locateToolProject().toString(),
+          "--framework", "net10.0",
+          // An implicit build would stream MSBuild output into the JSON-RPC pipe.
+          "--no-build",
           "--metrics-csv=" + tempDir.resolve("metrics.csv"))
           .redirectError(ProcessBuilder.Redirect.DISCARD)
           .start();
@@ -63,16 +67,16 @@ class CSharpGracefulShutdownIntegTest {
         }
     }
 
-    /** The tool assembly produced by the {@code csharpBuild} Gradle task this suite depends on. */
-    private static Path locateTool() {
+    /** The server project, built by the {@code csharpBuild} Gradle task this suite depends on. */
+    private static Path locateToolProject() {
         Path base = Paths.get(System.getProperty("user.dir"));
         for (Path csharpDir : new Path[]{base.resolve("csharp"), base.resolve("rewrite-csharp/csharp")}) {
-            Path tool = csharpDir.resolve("OpenRewrite.Tool/bin/Debug/net10.0/OpenRewrite.Tool.dll");
-            if (Files.exists(tool)) {
-                return tool.toAbsolutePath().normalize();
+            Path csproj = csharpDir.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
+            if (Files.exists(csproj)) {
+                return csproj.toAbsolutePath().normalize();
             }
         }
-        throw new IllegalStateException("Could not find OpenRewrite.Tool.dll; run the csharpBuild task");
+        throw new IllegalStateException("Could not find the C# Rewrite project");
     }
 
     /** Sends a parameterless JSON-RPC request and drains the reply off the header-delimited stream. */
