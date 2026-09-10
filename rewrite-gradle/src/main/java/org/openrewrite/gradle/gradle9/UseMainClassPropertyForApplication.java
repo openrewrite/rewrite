@@ -29,7 +29,7 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+import static org.openrewrite.gradle.GradleParser.requireParsed;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -104,6 +104,8 @@ public class UseMainClassPropertyForApplication extends Recipe {
                 return parseApplicationBlock(ctx, valueSource, multiVariable.getPrefix());
             }
 
+            // Parsed rather than templated: a template replacement of a Kotlin script statement comes back indented
+            // one level too far, since the block a script's statements sit in is not an indentation level
             private J parseApplicationBlock(ExecutionContext ctx, String valueSource, Space prefix) {
                 String snippet = "application {\n    mainClass = " + valueSource + "\n}";
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);

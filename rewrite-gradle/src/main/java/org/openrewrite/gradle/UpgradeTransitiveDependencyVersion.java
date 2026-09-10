@@ -21,7 +21,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.GradleParseUtils;
 import org.openrewrite.gradle.internal.SpringBomProperty;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -53,6 +52,9 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -60,8 +62,8 @@ import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Preconditions.not;
+import static org.openrewrite.gradle.GradleParser.requireParsed;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKey;
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
 @Incubating(since = "8.18.0")
@@ -119,8 +121,30 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     @Nullable
     List<String> onlyForConfigurations;
 
+    /**
+     * Parse a constant Gradle snippet as a build script, so that a recipe adding code gets a tree the parser
+     * produced rather than one it assembled by hand, which is how printing and formatting stay correct.
+     * The result is cached on the execution context, as GradleParser is slow enough that reparsing the same
+     * snippet for every source file is noticeable.
+     */
     private static Optional<JavaSourceFile> parseAsGradle(String snippet, boolean isKotlinDsl, ExecutionContext ctx) {
-        return GradleParseUtils.parseSnippet(snippet, isKotlinDsl, ctx);
+        //noinspection unchecked
+        Map<String, Optional<JavaSourceFile>> cache = (Map<String, Optional<JavaSourceFile>>) ctx.getMessages()
+                .computeIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<String, Optional<JavaSourceFile>>());
+        return cache.computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(singleton(
+                        new Parser.Input(
+                                Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
+                                () -> new ByteArrayInputStream(s.getBytes(StandardCharsets.UTF_8))
+                        )), null, ctx)
+                .findFirst()
+                .map(maybeCu -> {
+                    maybeCu.getMarkers()
+                            .findFirst(ParseExceptionResult.class)
+                            .ifPresent(per -> {
+                                throw new IllegalStateException("Encountered exception " + per.getExceptionType() + " with message " + per.getMessage() + " on snippet:\n" + s);
+                            });
+                    return (JavaSourceFile) maybeCu;
+                }));
     }
 
     String displayName = "Upgrade transitive Gradle dependencies";

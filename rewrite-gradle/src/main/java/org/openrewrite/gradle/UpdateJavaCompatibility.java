@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -109,10 +110,10 @@ public class UpdateJavaCompatibility extends Recipe {
                 if (visited instanceof G.CompilationUnit) {
                     G.CompilationUnit c = (G.CompilationUnit) visited;
                     if (!sourceCompatibilityFound) {
-                        c = addGroovyCompatibilityType(c, "source", ctx);
+                        c = addGroovyCompatibilityType(c, "source", getCursor());
                     }
                     if (!targetCompatibilityFound) {
-                        c = addGroovyCompatibilityType(c, "target", ctx);
+                        c = addGroovyCompatibilityType(c, "target", getCursor());
                     }
                     return c;
                 } else if (visited instanceof K.CompilationUnit) {
@@ -189,18 +190,19 @@ public class UpdateJavaCompatibility extends Recipe {
         return names;
     }
 
-    private G.CompilationUnit addGroovyCompatibilityType(G.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
-        if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
-            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build()
-                    .parse(ctx, targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
-            c = c.withStatements(ListUtils.concatAll(c.getStatements(),
-                    ListUtils.mapFirst(sourceFile.getStatements(), s -> s.withPrefix(Space.format("\n")))));
+    private G.CompilationUnit addGroovyCompatibilityType(G.CompilationUnit c, String targetCompatibilityType, Cursor scope) {
+        if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing) &&
+                !c.getStatements().isEmpty()) {
+            Statement last = c.getStatements().get(c.getStatements().size() - 1);
+            return GroovyTemplate.builder(targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
+                    .build()
+                    .apply(new Cursor(scope, c), last.getCoordinates().after());
         }
         return c;
     }
 
+    // Parsed rather than templated: a template insertion into a Kotlin script comes back indented one level too
+    // far, since the block a script's statements sit in is not an indentation level
     private K.CompilationUnit addKotlinCompatibilityType(K.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
         if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
             J withExistingJavaMethod = maybeAddToExistingJavaMethod(c, targetCompatibilityType, ctx);
