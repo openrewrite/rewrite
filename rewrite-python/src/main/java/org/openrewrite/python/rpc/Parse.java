@@ -42,11 +42,18 @@ class Parse implements RpcRequest {
     List<Input> inputs;
 
     /**
-     * Project root that {@code ty} is initialized at, so imports resolve relative to it.
-     * When {@code null}, the server infers a root from the input paths.
+     * Path that returned source paths are made relative to. When {@code null}, the server infers
+     * one from the input paths.
      */
     @Nullable
     Path relativeTo;
+
+    /**
+     * Root that {@code ty} is initialized at, so imports resolve relative to it and its
+     * {@code ty.toml} is found. When {@code null}, the server falls back to {@link #relativeTo}.
+     */
+    @Nullable
+    Path projectRoot;
 
     /**
      * Optional path to a virtual environment with the project's dependencies installed.

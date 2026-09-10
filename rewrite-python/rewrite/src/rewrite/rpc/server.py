@@ -551,6 +551,10 @@ def handle_parse(params: dict) -> List[str]:
 
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
+    # Where ty is rooted, and so where it finds its `ty.toml`. Separate from
+    # `relative_to`: relativizing a source path against a config directory the
+    # sources are not under silently leaves that path absolute.
+    project_root = params.get('projectRoot')
     # Per-parse options forwarded from the client (e.g. {"languageLevel": "2.7"}).
     # Absent for older clients; absent or unknown keys are silently ignored.
     options = params.get('options') or {}
@@ -569,11 +573,13 @@ def handle_parse(params: dict) -> List[str]:
     # If no relativeTo provided, try to infer from absolute input paths
     if not relative_to:
         relative_to = _infer_project_root(inputs)
+    if not project_root:
+        project_root = relative_to
 
     # Resolve project-level language version once per request; per-file
     # detection (shebang / magic comment) can still override this inside
-    # parse_python_source.
-    project_language_level = detect_from_project(relative_to) if relative_to else None
+    # parse_python_source. Read from the project root, where the manifests sit.
+    project_language_level = detect_from_project(project_root) if project_root else None
     ty_version = ty_python_version(language_level, project_language_level)
 
     # Create a ty-types client for this parse batch
@@ -585,8 +591,8 @@ def handle_parse(params: dict) -> List[str]:
         # so supertypes reaching into third-party packages resolve.
         ty_client = TyTypesClient(virtual_env=dependency_path,
                                   python_version=ty_version)
-        if relative_to:
-            ty_client.initialize(relative_to)
+        if project_root:
+            ty_client.initialize(project_root)
         else:
             # For inline text inputs without a project root, create a temp directory
             # so ty-types can still provide type attribution

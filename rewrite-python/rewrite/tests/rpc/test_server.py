@@ -555,3 +555,48 @@ def test_hub_release_rewinds_send_refs_in_lockstep_with_the_child():
     # So the next file reuses the same ref numbers rather than continuing past them.
     server._hub_send_checkpoint.setdefault((bundle, second), refs.snapshot())
     assert server._hub_send_checkpoint[(bundle, second)] == 0
+
+
+def test_project_root_roots_ty_independently_of_relative_to(tmp_path, monkeypatch):
+    """``projectRoot`` is where ty is rooted; ``relativeTo`` is the base source
+    paths are made relative to. A caller whose generated ``ty.toml`` sits outside
+    its source tree needs the two pointed at different directories."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    (sources / "a.py").write_text("x = 1\n", encoding="utf-8")
+    config_root = tmp_path / "cfg"
+    config_root.mkdir()
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            observed["ty_root"] = project_root
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    def fake_parse_python_file(path, relative_to=None, ty_client=None, **_):
+        observed["relative_to"] = relative_to
+        return {"id": "parsed"}
+
+    monkeypatch.setattr(server, "parse_python_file", fake_parse_python_file)
+
+    result = server.handle_parse({
+        "inputs": [{"path": str(sources / "a.py")}],
+        "relativeTo": str(sources),
+        "projectRoot": str(config_root),
+    })
+
+    assert result == ["parsed"]
+    assert observed["ty_root"] == str(config_root)
+    assert observed["relative_to"] == str(sources)

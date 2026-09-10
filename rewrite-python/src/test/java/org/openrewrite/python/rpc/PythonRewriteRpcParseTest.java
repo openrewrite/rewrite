@@ -101,6 +101,66 @@ class PythonRewriteRpcParseTest {
     }
 
     /**
+     * A caller whose generated {@code ty.toml} sits outside the tree its sources are in needs
+     * {@code ty} rooted at the config while paths stay relative to the sources. Here {@code Helper}
+     * is reachable only through that config's {@code extra-paths}, and no source sits under it.
+     */
+    @Test
+    void projectRootRootsTyIndependentlyOfRelativeTo(@TempDir Path root) throws Exception {
+        Path sources = Files.createDirectories(root.resolve("src"));
+        Path lib = Files.createDirectories(root.resolve("lib"));
+        Path config = Files.createDirectories(root.resolve("cfg"));
+
+        Files.writeString(lib.resolve("helper.py"),
+          """
+            class Helper:
+                def assist(self):
+                    return 1
+            """);
+        Path app = sources.resolve("app.py");
+        Files.writeString(app,
+          """
+            from helper import Helper
+
+
+            class App(Helper):
+                def go(self):
+                    return self.assist()
+            """);
+        Files.writeString(config.resolve("ty.toml"),
+          "[environment]\nextra-paths = [\"" + lib.toAbsolutePath() + "\"]\n");
+
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        List<SourceFile> parsed = PythonRewriteRpc.getOrStart()
+          .parse(List.of(app), ParseOptions.builder()
+            .relativeTo(sources)
+            .projectRoot(config)
+            .build(), ctx)
+          .collect(toList());
+
+        assertThat(parsed).hasSize(1);
+        assertThat(parsed.get(0)).isInstanceOf(Py.CompilationUnit.class);
+        assertThat(parsed.get(0).getSourcePath())
+          .as("source paths are made relative to `relativeTo`, not to `projectRoot`")
+          .isEqualTo(Path.of("app.py"));
+
+        List<JavaType> selfTypes = new ArrayList<>();
+        new PythonIsoVisitor<Integer>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                if ("self".equals(identifier.getSimpleName()) && identifier.getType() != null) {
+                    selfTypes.add(identifier.getType());
+                }
+                return super.visitIdentifier(identifier, p);
+            }
+        }.visit(parsed.get(0), 0);
+
+        assertThat(selfTypes)
+          .as("`Helper` resolves only through the `extra-paths` of the `ty.toml` at `projectRoot`")
+          .anySatisfy(t -> assertThat(hasSupertypeSimpleName(t, "Helper")).isTrue());
+    }
+
+    /**
      * Walks the supertype/interface graph of {@code type} looking for a class whose
      * simple name (last dot-separated segment) equals {@code simpleName}, unwrapping
      * generic type variables (e.g. the {@code Self} bound on a {@code self} receiver)
