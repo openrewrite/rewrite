@@ -626,47 +626,55 @@ def handle_parse(params: dict) -> List[str]:
         ty_client = None  # ty-types not available
 
     try:
-        for i, input_item in enumerate(inputs):
-            if isinstance(input_item, str):
-                result = parse_python_file(input_item, relative_to, ty_client,
-                                           language_level=language_level,
-                                           project_language_level=project_language_level,
-                                           check_print=check_print)
-            elif input_item.get('text') is None and input_item.get('source') is None:
-                # An input carrying no text names a file the peer reads itself.
-                path = (input_item.get('path') or input_item.get('sourcePath') or
-                        input_item.get('relativePath'))
-                if path is None:
-                    logger.warning(f"  [{i}] input has neither source text nor a path")
-                    continue
-                result = parse_python_file(path, relative_to, ty_client,
-                                           language_level=language_level,
-                                           project_language_level=project_language_level,
-                                           check_print=check_print)
-            else:
-                source = input_item.get('text')
-                if source is None:
-                    source = input_item.get('source')
-                path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-                # For relative paths, write the source under the project root
-                # (tmpdir or relative_to) so ty-types can resolve imports from
-                # the project's .venv and dependencies.
-                base_dir = tmpdir or relative_to
-                if base_dir and not os.path.isabs(path):
-                    disk_path = os.path.join(base_dir, path)
-                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
-                    # ty must read the same bytes the LST was built from.
-                    with open(disk_path, 'w', encoding='utf-8', newline='') as f:
-                        f.write(source)
-                    result = parse_python_source(source, disk_path, base_dir, ty_client,
-                                                 language_level=language_level,
-                                                 project_language_level=project_language_level,
-                                                 check_print=check_print)
+        for input_item in inputs:
+            # The client pairs this list to its input list by position, so every
+            # input owes the batch one result — a file too broken to read included.
+            path = '<unknown>'
+            try:
+                if isinstance(input_item, str):
+                    path = input_item
+                    result = parse_python_file(path, relative_to, ty_client,
+                                               language_level=language_level,
+                                               project_language_level=project_language_level,
+                                               check_print=check_print)
+                elif input_item.get('text') is None and input_item.get('source') is None:
+                    # An input carrying no text names a file the peer reads itself.
+                    path = (input_item.get('path') or input_item.get('sourcePath') or
+                            input_item.get('relativePath'))
+                    if path is None:
+                        raise ValueError('input carries neither source text nor a path')
+                    result = parse_python_file(path, relative_to, ty_client,
+                                               language_level=language_level,
+                                               project_language_level=project_language_level,
+                                               check_print=check_print)
                 else:
-                    result = parse_python_source(source, path, relative_to, ty_client,
-                                                 language_level=language_level,
-                                                 project_language_level=project_language_level,
-                                                 check_print=check_print)
+                    source = input_item.get('text')
+                    if source is None:
+                        source = input_item.get('source')
+                    path = (input_item.get('sourcePath') or input_item.get('path') or
+                            input_item.get('relativePath', '<unknown>'))
+                    # For relative paths, write the source under the project root
+                    # (tmpdir or relative_to) so ty-types can resolve imports from
+                    # the project's .venv and dependencies.
+                    base_dir = tmpdir or relative_to
+                    if base_dir and not os.path.isabs(path):
+                        disk_path = os.path.join(base_dir, path)
+                        os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                        # ty must read the same bytes the LST was built from.
+                        with open(disk_path, 'w', encoding='utf-8', newline='') as f:
+                            f.write(source)
+                        result = parse_python_source(source, disk_path, base_dir, ty_client,
+                                                     language_level=language_level,
+                                                     project_language_level=project_language_level,
+                                                     check_print=check_print)
+                    else:
+                        result = parse_python_source(source, path, relative_to, ty_client,
+                                                     language_level=language_level,
+                                                     project_language_level=project_language_level,
+                                                     check_print=check_print)
+            except Exception as e:
+                logger.exception(f"Error parsing {path}: {e}")
+                result = _create_parse_error(str(path), str(e))
             results.append(result['id'])
     finally:
         if ty_client is not None:

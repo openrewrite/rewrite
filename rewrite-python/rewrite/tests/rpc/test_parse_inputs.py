@@ -22,7 +22,7 @@ import pytest
 from rewrite.parser import ParseError
 from rewrite.python.printer import PythonPrinter
 from rewrite.rpc import server
-from rewrite.rpc.server import handle_parse, local_objects
+from rewrite.rpc.server import handle_parse, handle_parse_project, local_objects
 
 CRLF_SOURCE = "import sys\r\n\r\n\r\ndef greet(name):\r\n    # a comment\r\n    print(name)\r\n"
 
@@ -43,8 +43,23 @@ def _parse(path, options=None):
     return local_objects[ids[0]]
 
 
-def test_file_input_is_read_from_disk_preserving_crlf(crlf_file):
-    assert PythonPrinter().print(_parse(crlf_file)) == CRLF_SOURCE
+@pytest.mark.parametrize("newline", ["\r\n", "\r"], ids=["crlf", "cr"])
+def test_a_file_keeps_its_own_line_endings(tmp_path, newline):
+    source = CRLF_SOURCE.replace("\r\n", newline)
+    path = tmp_path / "endings.py"
+    path.write_bytes(source.encode("utf-8"))
+
+    assert PythonPrinter().print(_parse(path)) == source
+
+
+def test_an_unreadable_file_costs_only_its_own_slot(crlf_file):
+    ids = handle_parse({"inputs": [{"sourcePath": str(crlf_file)},
+                                   {"sourcePath": str(crlf_file.parent / "gone.py")}],
+                        "relativeTo": str(crlf_file.parent)})
+
+    assert len(ids) == 2
+    assert PythonPrinter().print(local_objects[ids[0]]) == CRLF_SOURCE
+    assert isinstance(local_objects[ids[1]], ParseError)
 
 
 def test_parse_that_loses_source_becomes_a_parse_error(crlf_file, monkeypatch):
@@ -58,6 +73,20 @@ def test_the_print_check_is_off_when_the_client_says_so(crlf_file, monkeypatch):
     monkeypatch.setattr(server, "PythonPrinter", _LosingPrinter)
     options = {"org.openrewrite.requirePrintEqualsInput": "false"}
     assert not isinstance(_parse(crlf_file, options), ParseError)
+
+
+def test_a_project_parse_honours_the_print_check_option(crlf_file, monkeypatch):
+    monkeypatch.setattr(server, "PythonPrinter", _LosingPrinter)
+
+    def types(options):
+        return [item["sourceFileType"]
+                for item in handle_parse_project({"projectPath": str(crlf_file.parent),
+                                                  "options": options})]
+
+    assert types({}) == ["org.openrewrite.tree.ParseError"]
+
+    assert types({"org.openrewrite.requirePrintEqualsInput": "false"}) == [
+        "org.openrewrite.python.tree.Py$CompilationUnit"]
 
 
 class _LosingPrinter:
