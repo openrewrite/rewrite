@@ -401,7 +401,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                             Tree.randomId(),
                             new Markers(Tree.randomId(), Collections.singletonList(
                                     ParseExceptionResult.build(PythonParser.class, e, null))),
-                            input,
+                            relativizeToBase(input, options.getRelativeTo()),
                             null,
                             StandardCharsets.UTF_8.name(),
                             false,
@@ -448,6 +448,17 @@ public class PythonRewriteRpc extends RewriteRpc {
         if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
         }
+    }
+
+    /**
+     * The path a failed input is reported under: the same relativization the server applies to the
+     * files it did return, so every source path in a batch is expressed the same way.
+     */
+    private static Path relativizeToBase(Path input, @Nullable Path relativeTo) {
+        if (relativeTo != null && input.startsWith(relativeTo)) {
+            return relativeTo.relativize(input);
+        }
+        return input;
     }
 
     private @Nullable PythonResolutionResult createSetupPyMarker(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {

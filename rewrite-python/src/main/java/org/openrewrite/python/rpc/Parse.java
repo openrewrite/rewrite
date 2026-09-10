@@ -37,7 +37,9 @@ import java.util.Map;
 class Parse implements RpcRequest {
 
     /**
-     * The files to parse, each identified by its (absolute or {@link #relativeTo}-relative) path.
+     * The files to parse. Paths should be absolute: the server opens each one as given, so a
+     * relative path resolves against the RPC process's working directory rather than
+     * {@link #relativeTo}.
      */
     List<Input> inputs;
 

@@ -487,6 +487,24 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
+def _input_path(input_item) -> str:
+    """The path an input names, whichever of the accepted input shapes it arrived in."""
+    if isinstance(input_item, str):
+        return input_item
+    return (input_item.get('path') or input_item.get('sourcePath')
+            or input_item.get('relativePath') or '<unknown>')
+
+
+def _relative_path_str(path: str, relative_to: Optional[str]) -> str:
+    """``path`` as the LST records it, matching what ``parse_python_source`` stores."""
+    if relative_to is None:
+        return path
+    try:
+        return str(Path(path).relative_to(relative_to))
+    except ValueError:
+        return path
+
+
 # Files larger than this are recorded as Quarks rather than parsed into an AST.
 # Matches the 1 MB cap in the JVM JavaScriptParser and the other RPC engines.
 MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024
@@ -578,8 +596,11 @@ def handle_parse(params: dict) -> List[str]:
 
     # Resolve project-level language version once per request; per-file
     # detection (shebang / magic comment) can still override this inside
-    # parse_python_source. Read from the project root, where the manifests sit.
-    project_language_level = detect_from_project(project_root) if project_root else None
+    # parse_python_source. The manifests declaring it sit with the sources, which
+    # `project_root` need not contain — it may hold only a ty config.
+    project_language_level = detect_from_project(relative_to) if relative_to else None
+    if project_language_level is None and project_root and project_root != relative_to:
+        project_language_level = detect_from_project(project_root)
     ty_version = ty_python_version(language_level, project_language_level)
 
     # Create a ty-types client for this parse batch
@@ -603,36 +624,44 @@ def handle_parse(params: dict) -> List[str]:
 
     try:
         for i, input_item in enumerate(inputs):
-            if isinstance(input_item, str):
-                result = parse_python_file(input_item, relative_to, ty_client,
-                                           language_level=language_level,
-                                           project_language_level=project_language_level)
-            elif 'path' in input_item:
-                result = parse_python_file(input_item['path'], relative_to, ty_client,
-                                           language_level=language_level,
-                                           project_language_level=project_language_level)
-            elif 'text' in input_item or 'source' in input_item:
-                source = input_item.get('text') if 'text' in input_item else input_item.get('source')
-                path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-                # For relative paths, write the source under the project root
-                # (tmpdir or relative_to) so ty-types can resolve imports from
-                # the project's .venv and dependencies.
-                base_dir = tmpdir or relative_to
-                if base_dir and not os.path.isabs(path):
-                    disk_path = os.path.join(base_dir, path)
-                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
-                    with open(disk_path, 'w', encoding='utf-8') as f:
-                        f.write(source)
-                    result = parse_python_source(source, disk_path, base_dir, ty_client,
-                                                 language_level=language_level,
-                                                 project_language_level=project_language_level)
+            try:
+                if isinstance(input_item, str):
+                    result = parse_python_file(input_item, relative_to, ty_client,
+                                               language_level=language_level,
+                                               project_language_level=project_language_level)
+                elif 'path' in input_item:
+                    result = parse_python_file(input_item['path'], relative_to, ty_client,
+                                               language_level=language_level,
+                                               project_language_level=project_language_level)
+                elif 'text' in input_item or 'source' in input_item:
+                    source = input_item.get('text') if 'text' in input_item else input_item.get('source')
+                    path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
+                    # For relative paths, write the source under the project root
+                    # (tmpdir or relative_to) so ty-types can resolve imports from
+                    # the project's .venv and dependencies.
+                    base_dir = tmpdir or relative_to
+                    if base_dir and not os.path.isabs(path):
+                        disk_path = os.path.join(base_dir, path)
+                        os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                        with open(disk_path, 'w', encoding='utf-8') as f:
+                            f.write(source)
+                        result = parse_python_source(source, disk_path, base_dir, ty_client,
+                                                     language_level=language_level,
+                                                     project_language_level=project_language_level)
+                    else:
+                        result = parse_python_source(source, path, relative_to, ty_client,
+                                                     language_level=language_level,
+                                                     project_language_level=project_language_level)
                 else:
-                    result = parse_python_source(source, path, relative_to, ty_client,
-                                                 language_level=language_level,
-                                                 project_language_level=project_language_level)
-            else:
-                logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
-                continue
+                    logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
+                    continue
+            except Exception as e:
+                # Reading a source can fail before parse_python_source's own error handling
+                # is reached — an undecodable byte, a file that has since vanished. Results
+                # map to inputs by position, so every input yields exactly one id: a failure
+                # becomes a ParseError for that position.
+                logger.error(f"Error parsing {_input_path(input_item)}: {e}")
+                result = _create_parse_error(_relative_path_str(_input_path(input_item), relative_to), str(e))
             results.append(result['id'])
     finally:
         if ty_client is not None:

@@ -600,3 +600,73 @@ def test_project_root_roots_ty_independently_of_relative_to(tmp_path, monkeypatc
     assert result == ["parsed"]
     assert observed["ty_root"] == str(config_root)
     assert observed["relative_to"] == str(sources)
+
+
+def test_project_language_level_comes_from_the_source_tree(tmp_path, monkeypatch):
+    """``projectRoot`` may hold only a generated ``ty.toml``; the manifests declaring the
+    project's Python version sit with the sources. That version also selects the py2 parser."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    (sources / "pyproject.toml").write_text(
+        '[project]\nname = "legacy"\nversion = "0.0.0"\nrequires-python = ">=2.7,<3"\n',
+        encoding="utf-8")
+    (sources / "app.py").write_text("print 'hello'\n", encoding="utf-8")
+    config_root = tmp_path / "cfg"
+    config_root.mkdir()
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            observed["ty_python_version"] = python_version
+
+        def initialize(self, project_root):
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    def fake_parse_python_file(path, relative_to=None, ty_client=None, **kw):
+        observed["project_language_level"] = kw.get("project_language_level")
+        return {"id": "parsed"}
+
+    monkeypatch.setattr(server, "parse_python_file", fake_parse_python_file)
+
+    server.handle_parse({
+        "inputs": [{"path": str(sources / "app.py")}],
+        "relativeTo": str(sources),
+        "projectRoot": str(config_root),
+    })
+
+    assert observed["project_language_level"] == "2.7"
+
+
+def test_one_unreadable_file_does_not_abort_the_batch(tmp_path, monkeypatch):
+    """Results map to inputs positionally: every input yields exactly one entry, so a file
+    the server cannot read yields a ParseError for that position."""
+    import rewrite.python.ty_client as ty_client_module
+    import rewrite.rpc.server as server
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient",
+                        lambda **kw: (_ for _ in ()).throw(ImportError("no ty")))
+
+    # Latin-1 bytes that are not valid UTF-8; the server opens sources as UTF-8.
+    bad = tmp_path / "bad.py"
+    bad.write_bytes(b"# -*- coding: latin-1 -*-\nx = '\xe9'\n")
+    good = tmp_path / "good.py"
+    good.write_text("y = 1\n", encoding="utf-8")
+
+    ids = server.handle_parse({
+        "inputs": [{"path": str(bad)}, {"path": str(good)}],
+        "relativeTo": str(tmp_path),
+    })
+
+    assert len(ids) == 2, "every input must yield exactly one result"
+    from rewrite.parser import ParseError
+    assert isinstance(server.local_objects[ids[0]], ParseError)
+    assert not isinstance(server.local_objects[ids[1]], ParseError)
