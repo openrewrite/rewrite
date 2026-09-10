@@ -715,3 +715,45 @@ def test_inline_source_is_written_where_ty_is_rooted(tmp_path, monkeypatch):
     assert observed["path"] == str(ty_root / "pkg" / "a.py")
     # The base passed alongside it keeps the reported source path the caller's own.
     assert observed["relative_to"] == observed["ty_root"]
+
+
+def test_consecutive_parses_each_use_their_own_project_root(tmp_path, monkeypatch):
+    """One peer serves many parse calls in sequence, each naming its own ``projectRoot``.
+    A ty client outliving a call would resolve later calls against the first one's config."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    (sources / "a.py").write_text("x = 1\n", encoding="utf-8")
+    roots = [tmp_path / "cfg-a", tmp_path / "cfg-b"]
+    for r in roots:
+        r.mkdir()
+
+    initialized = []
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            initialized.append(project_root)
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+    monkeypatch.setattr(server, "parse_python_file",
+                        lambda path, relative_to=None, ty_client=None, **kw: {"id": "parsed"})
+
+    for root in roots:
+        server.handle_parse({
+            "inputs": [{"path": str(sources / "a.py")}],
+            "relativeTo": str(sources),
+            "projectRoot": str(root),
+        })
+
+    assert initialized == [str(roots[0]), str(roots[1])], \
+        "each call roots ty at its own projectRoot; a client carried over unrooted " \
+        "would leave later calls resolving against the first call's config"
