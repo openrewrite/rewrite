@@ -112,9 +112,77 @@ class AutoFormatVisitorTest implements RewriteTest {
               """,
             """
               if (convertTemplate == null)
-                  convertTemplate = inTypemap.find { key, value ->
-                      (key instanceof Pattern && key.matcher(apiType).matches())
-                  }?.value
+                  convertTemplate = inTypemap.find { key, value -> (key instanceof Pattern && key.matcher(apiType).matches()) }?.value
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsSingleLineClosureOnOneLine() {
+        rewriteRun(
+          groovy(
+            """
+              develocity {
+              buildScan {
+              publishing.onlyIf { !it.buildResult.failures.empty }
+              }
+              }
+              """,
+            """
+              develocity {
+                  buildScan {
+                      publishing.onlyIf { !it.buildResult.failures.empty }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void stillWrapsAClosureTheAuthorWroteAcrossLines() {
+        rewriteRun(
+          groovy(
+            """
+              develocity {
+              buildScan {
+              publishing.onlyIf {
+              !it.buildResult.failures.empty
+              }
+              }
+              }
+              """,
+            """
+              develocity {
+                  buildScan {
+                      publishing.onlyIf {
+                          !it.buildResult.failures.empty
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapsAClosureWhoseStatementsSpanLines() {
+        rewriteRun(
+          groovy(
+            """
+              develocity {
+                  buildScan { publishing.enabled = true
+                      publishing.onlyIf { true } }
+              }
+              """,
+            """
+              develocity {
+                  buildScan {
+                      publishing.enabled = true
+                      publishing.onlyIf { true }
+                  }
+              }
               """
           )
         );

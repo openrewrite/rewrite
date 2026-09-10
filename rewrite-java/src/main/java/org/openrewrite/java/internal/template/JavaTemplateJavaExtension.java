@@ -518,7 +518,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     loc))
                             .withPrefix(method.getPrefix()), integer);
                 }
-                return maybeReplaceStatement(method, J.class, 0);
+                if (isScope(method)) {
+                    return maybeReplaceStatement(method, J.class, 0);
+                }
+                // Descend, so that a coordinate on something nested in the arguments is still reachable
+                return super.visitMethodInvocation(method, integer);
             }
 
             @Override

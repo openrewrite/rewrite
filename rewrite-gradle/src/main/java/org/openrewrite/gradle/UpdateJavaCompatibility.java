@@ -27,6 +27,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -119,10 +120,10 @@ public class UpdateJavaCompatibility extends Recipe {
                 } else if (visited instanceof K.CompilationUnit) {
                     K.CompilationUnit c = (K.CompilationUnit) visited;
                     if (!sourceCompatibilityFound) {
-                        c = addKotlinCompatibilityType(c, "source", ctx);
+                        c = addKotlinCompatibilityType(c, "source", getCursor(), ctx);
                     }
                     if (!targetCompatibilityFound) {
-                        c = addKotlinCompatibilityType(c, "target", ctx);
+                        c = addKotlinCompatibilityType(c, "target", getCursor(), ctx);
                     }
                     return c;
                 }
@@ -201,21 +202,28 @@ public class UpdateJavaCompatibility extends Recipe {
         return c;
     }
 
-    // Parsed rather than templated: a template insertion into a Kotlin script comes back indented one level too
-    // far, since the block a script's statements sit in is not an indentation level
-    private K.CompilationUnit addKotlinCompatibilityType(K.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
+    private K.CompilationUnit addKotlinCompatibilityType(K.CompilationUnit c, String targetCompatibilityType, Cursor scope, ExecutionContext ctx) {
         if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
             J withExistingJavaMethod = maybeAddToExistingJavaMethod(c, targetCompatibilityType, ctx);
             if (withExistingJavaMethod != c) {
                 return (K.CompilationUnit) withExistingJavaMethod;
             }
 
-            K.CompilationUnit sourceFile = (K.CompilationUnit) KotlinParser.builder()
-                    .isKotlinScript(true)
-                    .build().parse(ctx, "\n\njava {\n    " + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum) + "\n}")
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
-            c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+            List<Statement> statements = c.getStatements().get(0) instanceof J.Block ?
+                    ((J.Block) c.getStatements().get(0)).getStatements() : emptyList();
+            if (statements.isEmpty()) {
+                return c;
+            }
+            Statement last = statements.get(statements.size() - 1);
+            K.CompilationUnit updated = KotlinTemplate.builder("java {\n    " + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum) + "\n}")
+                    .build()
+                    .apply(new Cursor(scope, c), last.getCoordinates().after());
+            // Gradle scripts set their top-level blocks apart with a blank line, which a coordinate places but
+            // does not style
+            return updated.withStatements(ListUtils.mapFirst(updated.getStatements(), first -> first instanceof J.Block ?
+                    ((J.Block) first).withStatements(ListUtils.mapLast(((J.Block) first).getStatements(),
+                            s -> s.withPrefix(Space.format("\n\n")))) :
+                    first));
         }
         return c;
     }

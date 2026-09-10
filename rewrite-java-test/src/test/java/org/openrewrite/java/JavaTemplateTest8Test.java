@@ -22,9 +22,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -706,6 +708,7 @@ class JavaTemplateTest8Test implements RewriteTest {
             """
               class Test {
                   void test() {
+                      int n = 1;
                       System.out.println(hashCode());
                   }
               }
@@ -715,12 +718,14 @@ class JavaTemplateTest8Test implements RewriteTest {
           .findFirst()
           .orElseThrow();
 
+        // The coordinate names a statement that is not inside `scope`, so nothing can ever match it
         assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
                 if ("println".equals(method.getSimpleName())) {
-                    // The argument is nested inside `method`, which the template visitor never descends into
-                    return JavaTemplate.apply("0", getCursor(), method.getArguments().getFirst().getCoordinates().replace());
+                    J.MethodDeclaration enclosing = getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class);
+                    Statement sibling = requireNonNull(enclosing.getBody()).getStatements().getFirst();
+                    return JavaTemplate.apply("0", getCursor(), sibling.getCoordinates().replace());
                 }
                 return super.visitMethodInvocation(method, p);
             }
@@ -728,6 +733,37 @@ class JavaTemplateTest8Test implements RewriteTest {
           .rootCause()
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("JavaTemplate coordinates were never matched")
-          .hasMessageContaining(J.MethodInvocation.class.getName());
+          .hasMessageContaining(J.VariableDeclarations.class.getName());
+    }
+
+    @Test
+    void coordinatesNestedInArgumentsAreReachable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("println".equals(method.getSimpleName()) && method.getArguments().getFirst() instanceof J.MethodInvocation) {
+                      return JavaTemplate.apply("0", getCursor(), method.getArguments().getFirst().getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test() {
+                      System.out.println(hashCode());
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      System.out.println(0);
+                  }
+              }
+              """
+          )
+        );
     }
 }
