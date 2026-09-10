@@ -47,6 +47,21 @@ class GroovyTemplateTest implements RewriteTest {
         });
     }
 
+    // Replaces `placeholder(...)`, passing the placeholder's own arguments to the template as parameters
+    private static Recipe replacePlaceholderWithArguments(String template) {
+        return toRecipe(() -> new GroovyVisitor<>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                if (!"placeholder".equals(method.getSimpleName())) {
+                    return super.visitMethodInvocation(method, ctx);
+                }
+                return GroovyTemplate.builder(template)
+                  .build()
+                  .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().toArray());
+            }
+        });
+    }
+
     // A Groovy script holds its statements directly, so a coordinate on one can only be reached from the file
     private static Recipe insertAtTopLevel(boolean before) {
         return toRecipe(() -> new GroovyVisitor<>() {
@@ -391,6 +406,96 @@ class GroovyTemplateTest implements RewriteTest {
               ext['x'] = 'y'
               plugins {
                   id 'java'
+              }
+              """
+          ));
+    }
+
+    @Test
+    void commandSyntaxSurvivesASubstitutedArgument() {
+        rewriteRun(
+          spec -> spec.recipe(replacePlaceholderWithArguments(
+            """
+              flatDir {
+                  dirs #{any()}
+              }
+              """
+          )),
+          groovy(
+            """
+              placeholder('libs')
+              """,
+            """
+              flatDir {
+                  dirs 'libs'
+              }
+              """
+          ));
+    }
+
+    @Test
+    void commandSyntaxWithSeveralSubstitutedArguments() {
+        rewriteRun(
+          spec -> spec.recipe(replacePlaceholderWithArguments(
+            """
+              flatDir {
+                  dirs #{any()}, #{any()}, #{any()}
+              }
+              """
+          )),
+          groovy(
+            """
+              placeholder('libs', 'moreLibs', 'evenMoreLibs')
+              """,
+            """
+              flatDir {
+                  dirs 'libs', 'moreLibs', 'evenMoreLibs'
+              }
+              """
+          ));
+    }
+
+    @Test
+    void commandSyntaxAlongsideAParenthesizedCall() {
+        rewriteRun(
+          spec -> spec.recipe(replacePlaceholderWithArguments(
+            """
+              flatDir {
+                  dirs #{any()}
+                  println(#{any()})
+              }
+              """
+          )),
+          groovy(
+            """
+              placeholder('libs', 'done')
+              """,
+            """
+              flatDir {
+                  dirs 'libs'
+                  println('done')
+              }
+              """
+          ));
+    }
+
+    @Test
+    void parenthesesWrittenInTheTemplateAreKept() {
+        rewriteRun(
+          spec -> spec.recipe(replacePlaceholderWithArguments(
+            """
+              flatDir {
+                  dirs(#{any()})
+              }
+              """
+          )),
+          groovy(
+            """
+              placeholder('libs')
+              """,
+            """
+              flatDir {
+                  dirs('libs')
               }
               """
           ));
