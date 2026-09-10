@@ -358,7 +358,8 @@ class TemplateEngine:
         cls,
         result: J,
         cursor: 'Cursor',
-        coordinates: PythonCoordinates
+        coordinates: PythonCoordinates,
+        format: bool = True,
     ) -> J:
         """
         Apply coordinate-based adjustments to the result.
@@ -370,6 +371,7 @@ class TemplateEngine:
             result: The template result.
             cursor: Current cursor position.
             coordinates: Insertion coordinates.
+            format: As `Template.apply`.
 
         Returns:
             The adjusted result.
@@ -392,6 +394,9 @@ class TemplateEngine:
                 random_id(),
                 result,
             )
+
+        if not format:
+            return result
 
         # Auto-format the result
         try:

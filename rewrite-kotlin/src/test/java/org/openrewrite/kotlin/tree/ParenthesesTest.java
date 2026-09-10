@@ -17,11 +17,43 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.Issue;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ParenthesesTest implements RewriteTest {
+
+    @Test
+    void ifExpressionInParenthesesIsAnExpression() {
+        AtomicBoolean sawParenthesizedIf = new AtomicBoolean(false);
+        rewriteRun(
+          kotlin(
+            """
+              fun test(a: Int, b: Boolean) {
+                  if (a != (if (b) 15 else 16)) return
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens, Integer p) {
+                    J tree = parens.getTree();
+                    if (tree instanceof K.StatementExpression && ((K.StatementExpression) tree).getStatement() instanceof J.If) {
+                        sawParenthesizedIf.set(true);
+                    }
+                    assertThat(tree).isInstanceOf(Expression.class);
+                    return super.visitParentheses(parens, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+        assertThat(sawParenthesizedIf).isTrue();
+    }
 
     @Test
     void variableTypeInParentheses() {

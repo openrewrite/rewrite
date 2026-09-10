@@ -1057,6 +1057,7 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 		return &golang.TypeList{
 			ID:    uuid.New(),
 			Types: java.Container[java.Statement]{Before: before, Elements: elements, Markers: markers},
+			Type:  ctx.resultsType(results),
 		}
 	}
 
@@ -1438,6 +1439,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 				Variable:   lhs,
 				Operator:   java.LeftPadded[golang.AssignmentOperator]{Before: opPrefix, Element: golang.AssignAndNot},
 				Assignment: rhs,
+				Type:       ctx.assignedType(stmt.Lhs[0], stmt.Rhs[0]),
 			}
 		}
 		if op, ok := mapAssignmentOp(stmt.Tok); ok {
@@ -1452,6 +1454,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 				Variable:   lhs,
 				Operator:   java.LeftPadded[java.AssignmentOperator]{Before: opPrefix, Element: op},
 				Assignment: rhs,
+				Type:       ctx.assignedType(stmt.Lhs[0], stmt.Rhs[0]),
 			}
 		}
 	}
@@ -1656,6 +1659,20 @@ func controlParentheses(inner java.Expression) *java.ControlParentheses {
 	}
 }
 
+// switchSelector wraps a switch selector in a ControlParentheses (matching
+// J.Switch). The selector's leading space is hoisted onto the wrapper so it
+// lives on the outermost element (the selector's own prefix), matching Java's
+// `switch (x)` model; the printer emits only the inner element (Go has no parens).
+func switchSelector(inner java.Expression) *java.ControlParentheses {
+	prefix, hoisted := hoistLeftPrefix(inner)
+	return &java.ControlParentheses{
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Markers: java.Markers{ID: uuid.New()},
+		Tree:    java.RightPadded[java.Expression]{Element: hoisted},
+	}
+}
+
 // wrapWithInit wraps an inner if/switch in a golang.StatementWithInit when an
 // init clause is present, moving the keyword prefix onto the wrapper and
 // leaving the inner statement prefix-less. With no init it returns inner as-is.
@@ -1699,11 +1716,9 @@ func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) java.Statement {
 
 	init := ctx.mapInitClause(stmt.Init, stmt.Body.Lbrace)
 
-	var tag *java.RightPadded[java.Expression]
+	var selectorExpr java.Expression = &java.Empty{ID: uuid.New(), Markers: java.Markers{ID: uuid.New()}}
 	if stmt.Tag != nil {
-		tagExpr := ctx.mapExpr(stmt.Tag)
-		rp := java.RightPadded[java.Expression]{Element: tagExpr}
-		tag = &rp
+		selectorExpr = ctx.mapExpr(stmt.Tag)
 	}
 
 	body := ctx.mapBlockStmt(stmt.Body)
@@ -1713,10 +1728,10 @@ func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) java.Statement {
 		innerPrefix = java.EmptySpace
 	}
 	return wrapWithInit(prefix, init, &java.Switch{
-		ID:     uuid.New(),
-		Prefix: innerPrefix,
-		Tag:    tag,
-		Body:   body,
+		ID:       uuid.New(),
+		Prefix:   innerPrefix,
+		Selector: switchSelector(selectorExpr),
+		Body:     body,
 	})
 }
 
@@ -1857,22 +1872,19 @@ func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statem
 	init := ctx.mapInitClause(stmt.Init, stmt.Assign.Pos())
 
 	// The assign is `x.(type)` (ExprStmt) or `v := x.(type)` (AssignStmt)
-	var tag *java.RightPadded[java.Expression]
+	var selectorExpr java.Expression
 	switch a := stmt.Assign.(type) {
 	case *ast.ExprStmt:
 		// `x.(type)` — map the inner expression directly
-		expr := ctx.mapExpr(a.X)
-		if expr != nil {
-			rp := java.RightPadded[java.Expression]{Element: expr}
-			tag = &rp
-		}
+		selectorExpr = ctx.mapExpr(a.X)
 	case *ast.AssignStmt:
 		// `v := x.(type)` — map as assignment (which is also an Expression-like construct here)
-		assignStmt := ctx.mapAssignStmt(a)
-		if expr, ok := assignStmt.(java.Expression); ok {
-			rp := java.RightPadded[java.Expression]{Element: expr}
-			tag = &rp
+		if expr, ok := ctx.mapAssignStmt(a).(java.Expression); ok {
+			selectorExpr = expr
 		}
+	}
+	if selectorExpr == nil {
+		selectorExpr = &java.Empty{ID: uuid.New(), Markers: java.Markers{ID: uuid.New()}}
 	}
 
 	body := ctx.mapBlockStmt(stmt.Body)
@@ -1888,8 +1900,8 @@ func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statem
 			ID:      uuid.New(),
 			Entries: []java.Marker{golang.TypeSwitchGuard{Ident: uuid.New()}},
 		},
-		Tag:  tag,
-		Body: body,
+		Selector: switchSelector(selectorExpr),
+		Body:     body,
 	})
 }
 
@@ -2481,6 +2493,7 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 				Element: mapped,
 				Dots:    ellipsisPrefix,
 				Postfix: true,
+				Type:    ctx.valueTypeOf(arg),
 			}
 		}
 		after := java.EmptySpace
@@ -2919,6 +2932,7 @@ func (ctx *parseContext) mapPointerType(expr *ast.StarExpr) java.Expression {
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Elem:   elem,
+		Type:   ctx.valueTypeOf(expr),
 	}
 }
 
@@ -2982,7 +2996,7 @@ func (ctx *parseContext) mapUnionType(expr *ast.BinaryExpr) *golang.Union {
 	if len(terms) > 0 {
 		prefix, terms[0].Element = hoistLeftPrefix(terms[0].Element)
 	}
-	return &golang.Union{ID: uuid.New(), Prefix: prefix, Types: terms}
+	return &golang.Union{ID: uuid.New(), Prefix: prefix, Types: terms, Type: ctx.valueTypeOf(expr)}
 }
 
 func (ctx *parseContext) appendUnionTerms(expr ast.Expr, terms *[]java.RightPadded[java.Expression]) {
@@ -3040,6 +3054,7 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 			Prefix:      prefix,
 			Length:      java.RightPadded[java.Expression]{Element: length, After: closePrefix},
 			ElementType: elt,
+			Type:        ctx.valueTypeOf(expr),
 		}
 	}
 
@@ -3185,6 +3200,28 @@ func (ctx *parseContext) valueTypeOf(expr ast.Expr) java.JavaType {
 	return ctx.mapper.mapType(t)
 }
 
+// resultsType reads a result list's types off the syntax. A field declaring
+// several names contributes one result per name, the way go/types counts them.
+// A tuple naming one member it could not resolve would read as a type while
+// carrying a hole, so an unattributed member leaves the whole list unattributed.
+func (ctx *parseContext) resultsType(results *ast.FieldList) java.JavaType {
+	var types []java.JavaType
+	for _, field := range results.List {
+		n := len(field.Names)
+		if n == 0 {
+			n = 1
+		}
+		for i := 0; i < n; i++ {
+			t := ctx.valueTypeOf(field.Type)
+			if t == nil {
+				return nil
+			}
+			types = append(types, t)
+		}
+	}
+	return tupleType(types)
+}
+
 // mapIndexListExpr maps a multi-index expression like `Map[int, string]` (generic instantiation).
 func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
@@ -3214,6 +3251,7 @@ func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) java.Expressi
 		Prefix:  prefix,
 		Target:  target,
 		Indices: java.Container[java.Expression]{Before: lbrackPrefix, Elements: elements},
+		Type:    ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3401,6 +3439,7 @@ func (ctx *parseContext) mapMapType(expr *ast.MapType) java.Expression {
 		OpenBracket: lbrackPrefix,
 		Key:         java.RightPadded[java.Expression]{Element: key, After: rbrackPrefix},
 		Value:       value,
+		Type:        ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3461,6 +3500,7 @@ func (ctx *parseContext) mapChanType(expr *ast.ChanType) java.Expression {
 		Markers: markers,
 		Dir:     dir,
 		Value:   value,
+		Type:    ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3475,6 +3515,7 @@ func (ctx *parseContext) mapFuncType(expr *ast.FuncType) java.Expression {
 		Prefix:     prefix,
 		Parameters: params,
 		ReturnType: returnType,
+		Type:       ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3486,6 +3527,7 @@ func (ctx *parseContext) mapInterfaceType(expr *ast.InterfaceType) java.Expressi
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Body:   body,
+		Type:   ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3497,6 +3539,7 @@ func (ctx *parseContext) mapStructType(expr *ast.StructType) java.Expression {
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Body:   body,
+		Type:   ctx.valueTypeOf(expr),
 	}
 }
 
@@ -3675,7 +3718,7 @@ func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Spa
 	i := 0
 	for i < len(s.Comments) {
 		c := s.Comments[i]
-		if c.Kind != java.LineComment {
+		if c.Multiline {
 			break
 		}
 		name, sep, args, ok := parseDirective(c.Text)
@@ -3706,10 +3749,7 @@ func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Spa
 // like `nolint` aren't of the form `PREFIX:NAME` and are left as
 // regular comments.)
 func parseDirective(text string) (name, sep, args string, ok bool) {
-	if !strings.HasPrefix(text, "//") {
-		return "", "", "", false
-	}
-	inner := text[2:]
+	inner := text
 	colonIdx := strings.Index(inner, ":")
 	if colonIdx <= 0 {
 		return "", "", "", false
@@ -3888,7 +3928,9 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 	return &java.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
 }
 
-// mapEllipsis maps `...T` in function parameters (prefix variadic form).
+// mapEllipsis maps a `...`: a parameter's `...T`, which mapFieldListAsParams
+// unwraps into VariableDeclarations.Varargs, and the elided array length of
+// `[...]T{...}`, which is the form that survives as a golang.Variadic.
 func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) java.Expression {
 	prefix := ctx.prefix(expr.Ellipsis)
 	ctx.skip(3) // "..."
@@ -3899,6 +3941,7 @@ func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) java.Expression {
 		Element: elt,
 		Dots:    java.EmptySpace,
 		Postfix: false,
+		Type:    ctx.valueTypeOf(expr),
 	}
 }
 

@@ -65,7 +65,18 @@ public class GetObject implements RpcRequest {
         private final AtomicReference<PrintStream> log;
         private final Supplier<Boolean> traceGetObject;
 
-        private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
+        private final Map<String, Exchange> inProgressGetRpcObjects = new ConcurrentHashMap<>();
+
+        private static class Exchange {
+            final BlockingQueue<List<RpcObjectData>> batches = new ArrayBlockingQueue<>(1);
+
+            /**
+             * Written before {@code END_OF_OBJECT} is queued, and {@link #batches}
+             * orders that put against the take of the batch carrying it, so whoever
+             * takes the final batch sees this.
+             */
+            volatile @Nullable Throwable failure;
+        }
 
         @Override
         protected List<RpcObjectData> handle(GetObject request) throws Exception {
@@ -78,11 +89,11 @@ public class GetObject implements RpcRequest {
                 return deleted;
             }
 
-            BlockingQueue<List<RpcObjectData>> q = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
-                BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
+            Exchange exchange = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
+                Exchange e = new Exchange();
                 Object before = remoteObjects.get(id);
 
-                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, request.getSourceFileType(), traceGetObject.get());
+                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), e.batches::put, localRefs, request.getSourceFileType(), traceGetObject.get());
                 TREE_TRAVERSAL_POOL.submit(() -> {
                     // Snapshot the current ref count so we can roll back on failure.
                     // Ref IDs are assigned sequentially as localRefs.size() + 1,
@@ -96,6 +107,8 @@ public class GetObject implements RpcRequest {
                         // of this tree.
                         remoteObjects.put(id, after);
                     } catch (Throwable t) {
+                        e.failure = t;
+
                         // Reset our tracking of the remote state so the next interaction
                         // forces a full object sync (ADD) instead of a delta (CHANGE)
                         // against the stale, partially-sent baseline.
@@ -118,12 +131,21 @@ public class GetObject implements RpcRequest {
                     }
                     return 0;
                 });
-                return batch;
+                return e;
             });
 
-            List<RpcObjectData> batch = q.take();
+            List<RpcObjectData> batch = exchange.batches.take();
             if (batch.get(batch.size() - 1).getState() == END_OF_OBJECT) {
                 inProgressGetRpcObjects.remove(request.getId());
+                Throwable failure = exchange.failure;
+                if (failure != null) {
+                    // The JSON-RPC layer turns only an Exception into an error response, so
+                    // the wrapper is what keeps an Error from leaving the peer's request
+                    // unanswered until it times out.
+                    throw new IllegalStateException("Failed to send object " + request.getId() +
+                            (request.getSourceFileType() == null ? "" : " (type: " + request.getSourceFileType() + ")") +
+                            ": " + failure, failure);
+                }
             }
 
             return batch;

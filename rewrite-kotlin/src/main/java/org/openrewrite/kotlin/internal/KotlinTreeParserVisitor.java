@@ -123,7 +123,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 randomId(),
                 deepPrefix(expression),
                 Markers.EMPTY,
-                padRight(expression.getExpression().accept(this, data), prefix(rPar))
+                padRight(convertToExpression(expression.getExpression().accept(this, data)), prefix(rPar))
         );
     }
 
@@ -587,6 +587,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             J.Block body = (J.Block) requireNonNull(ktFunctionLiteral.getBodyExpression()).accept(this, data);
             body = body.withEnd(endFixAndSuffix(ktFunctionLiteral.getBodyExpression()));
+            if (body.getStatements().isEmpty()) {
+                // With no statement to own it, the body's whitespace is still what precedes the closing brace
+                body = body.withEnd(merge(body.getPrefix(), body.getEnd())).withPrefix(Space.EMPTY);
+            }
 
             return new J.Lambda(
                     randomId(),

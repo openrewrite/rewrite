@@ -26,11 +26,13 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.service.TemplateService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
 import org.openrewrite.kotlin.service.KotlinAutoFormatService;
 import org.openrewrite.kotlin.service.KotlinImportService;
+import org.openrewrite.kotlin.service.KotlinTemplateService;
 import org.openrewrite.marker.Markers;
 
 import java.beans.Transient;
@@ -355,6 +357,10 @@ public interface K extends J {
                     serviceClass = service;
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinAutoFormatService.class.getName());
+                } else if (KotlinTemplateService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (TemplateService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinTemplateService.class.getName());
                 } else {
                     return JavaSourceFile.super.service(service);
                 }
@@ -1586,8 +1592,8 @@ public interface K extends J {
 
         @Override
         public @Nullable JavaType getType() {
-            //noinspection DataFlowIssue
-            return expression.getExpression().getType();
+            Expression returnedExpression = expression.getExpression();
+            return returnedExpression == null ? null : returnedExpression.getType();
         }
 
         @Override

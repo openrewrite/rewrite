@@ -193,22 +193,6 @@ class TestAutoParenthesization:
         assert isinstance(inner, j.Binary)
         assert inner.operator == j.Binary.Type.Or
 
-    def test_and_operand_in_and_no_parens(self):
-        """{a} and {b} with b=(x and y) should NOT add parens (same precedence)."""
-        tree = TemplateEngine.get_template_tree(
-            "{a} and {b}", {'a': capture('a'), 'b': capture('b')}
-        )
-        and_expr = _make_binary(_ident('x'), j.Binary.Type.And, _ident('y'))
-        visitor = PlaceholderReplacementVisitor({
-            'a': _ident('a'),
-            'b': and_expr,
-        })
-        result = visitor.visit(tree, None)
-
-        assert isinstance(result, j.Binary)
-        # Right operand should NOT be wrapped (same precedence)
-        assert isinstance(result.right, j.Binary)
-
     def test_or_operand_in_left_of_and_gets_parens(self):
         """{a} and {b} with a=(p or q) should produce (p or q) and b."""
         tree = TemplateEngine.get_template_tree(

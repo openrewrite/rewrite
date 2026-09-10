@@ -214,6 +214,10 @@ public class CsprojParserTests
         var edge = Assert.Single(placeholder.Dependencies);
         Assert.Equal("Newtonsoft.Json", edge.Name);
         Assert.Equal("13.0.3", edge.ResolvedVersion); // edge links to the RESOLVED node
+        // The DECLARED range from the lock file is preserved alongside the resolved edge
+        var declaredRange = Assert.Single(placeholder.DependencyRanges);
+        Assert.Equal("Newtonsoft.Json", declaredRange.Key);
+        Assert.Equal("[13.0.1, )", declaredRange.Value);
 
         var newtonsoft = tf.ResolvedPackages.Single(p => p.Name == "Newtonsoft.Json");
         Assert.Equal(1, newtonsoft.Depth); // transitive
@@ -224,5 +228,6 @@ public class CsprojParserTests
         Assert.True(newtonsoft.HasInstallScripts);
         Assert.True(newtonsoft.HasXdtTransforms);
         Assert.True(newtonsoft.HasLegacyContentFolder);
+        Assert.Empty(newtonsoft.DependencyRanges);
     }
 }

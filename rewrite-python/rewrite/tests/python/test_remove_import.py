@@ -116,6 +116,45 @@ class TestMaybeRemoveImport:
             )
         )
 
+    def test_parenthesized_import_keeps_its_layout(self, arm):
+        """Every remaining name keeps the line break and indent it was written with,
+        whether or not the removed name was the first one."""
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'Any', only_if_unused=False))).rewrite_run(
+            python(
+                """\
+                from typing import (
+                    TYPE_CHECKING,
+                    Any,
+                    Dict,
+                )
+                """,
+                """\
+                from typing import (
+                    TYPE_CHECKING,
+                    Dict,
+                )
+                """,
+            )
+        )
+
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'TYPE_CHECKING', only_if_unused=False))).rewrite_run(
+            python(
+                """\
+                from typing import (
+                    TYPE_CHECKING,
+                    Any,
+                )
+                """,
+                """\
+                from typing import (
+                    Any,
+                )
+                """,
+            )
+        )
+
     def test_keep_import_when_used(self, arm):
         """Don't remove an import when the name is still used and only_if_unused=True."""
         spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'os.path', 'join')))
@@ -330,15 +369,15 @@ class TestMaybeRemoveImport:
 
 class TestCanonicalRemoveImport:
     """A requested (module, name) also matches an import by its canonical FQN
-    (``os.path.join`` is canonically ``posixpath.join``), not just by its
+    (``posixpath.join`` is canonically ``os.path.join``), not just by its
     written path."""
 
     def test_remove_reexported_function_by_canonical_fqn(self, arm):
         RecipeSpec(recipe=from_visitor(
-            _remove_import_visitor(arm, 'posixpath', 'join', only_if_unused=False))).rewrite_run(
+            _remove_import_visitor(arm, 'os.path', 'join', only_if_unused=False))).rewrite_run(
             python(
                 """
-                from os.path import join
+                from posixpath import join
                 x = 1
                 """,
                 """
@@ -363,14 +402,14 @@ class TestCanonicalRemoveImport:
 
     def test_canonical_removal_keeps_other_names(self, arm):
         RecipeSpec(recipe=from_visitor(
-            _remove_import_visitor(arm, 'posixpath', 'join', only_if_unused=False))).rewrite_run(
+            _remove_import_visitor(arm, 'os.path', 'join', only_if_unused=False))).rewrite_run(
             python(
                 """
-                from os.path import exists, join
+                from posixpath import exists, join
                 x = 1
                 """,
                 """
-                from os.path import exists
+                from posixpath import exists
                 x = 1
                 """,
             )
@@ -417,14 +456,52 @@ class TestCanonicalRemoveImport:
             )
         )
 
+    def test_whole_module_removal_spares_members_written_against_that_module(self, arm):
+        """`Optional` binds `Optional`, not the `typing` module, so a request for
+        the module leaves it alone however unused it is."""
+        RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', only_if_unused=False))).rewrite_run(
+            python(
+                """
+                from typing import Optional
+                x = 1
+                """,
+            )
+        )
+
 
 class TestRemoveImportUsageScoping:
-    """``only_if_unused`` counts every reference the enclosing scopes do not
-    rebind, including references that appear only in annotations."""
+    """``only_if_unused`` counts the references the code reads: not a name an enclosing
+    scope rebinds, nor one filling a slot that names a member, and including references
+    that appear only in annotations."""
 
     @staticmethod
     def _remove(arm, module, name):
         return from_visitor(_remove_import_visitor(arm, module, name))
+
+    def test_remove_import_a_member_name_merely_matches(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'json', None),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    import json
+
+
+                    def handle(resp, url, body, item):
+                        resp.json()
+                        post(url, json=body)
+                        return item.payload.json
+                    """,
+                    """\
+                    def handle(resp, url, body, item):
+                        resp.json()
+                        post(url, json=body)
+                        return item.payload.json
+                    """,
+                )
+            )
 
     def test_keep_import_referenced_in_function_annotations(self, arm):
         for type_attribution in (False, True):
@@ -439,6 +516,20 @@ class TestRemoveImportUsageScoping:
                     def f(q: Deque[int]) -> Deque[int]:
                         local: Deque[int] = q
                         return local
+                    """,
+                )
+            )
+
+    def test_keep_import_referenced_in_a_type_alias_type_parameter(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'typing', 'Deque'),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from typing import Deque
+
+                    type Queues[U: Deque[int]] = dict[str, U]
                     """,
                 )
             )
@@ -476,6 +567,20 @@ class TestRemoveImportUsageScoping:
 
                     def uses():
                         return join("a", "b")
+                    """,
+                )
+            )
+
+    def test_keep_a_dotted_module_import_referenced_through_its_root(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'os.path', None),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    import os.path
+
+                    x = os.path.join("a", "b")
                     """,
                 )
             )
@@ -568,4 +673,311 @@ class TestRemoveImportScopeRules:
                 clock = 1
                 return clock, x
             """
+        )
+
+
+class TestImportsInBlocks:
+    """Imports nested in a module-scope `if` body, where `if TYPE_CHECKING:` keeps them."""
+
+    def test_remove_nested_import_and_drop_emptied_block(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import List
+
+                x = 1
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                x = 1
+                """,
+            )
+        )
+
+    def test_keep_block_holding_other_imports(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import List
+                    from os.path import join
+
+                x = 1
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from os.path import join
+
+                x = 1
+                """,
+            )
+        )
+
+    def test_keep_import_when_emptying_would_lose_a_comment(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    # only needed for annotations
+                    from typing import List
+
+                x = 1
+                """
+            )
+        )
+
+    def test_keep_imports_when_a_later_removal_would_lose_a_comment(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                # header
+                from typing import List
+                # about the second one
+                from typing import List
+
+                x = 1
+                """
+            )
+        )
+
+    def test_keep_imports_when_the_next_statement_has_its_own_comment(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                # about the List import
+                from typing import List
+                # about x
+                x = 1
+                """
+            )
+        )
+
+    def test_keep_import_when_the_block_has_an_else(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import List
+                else:
+                    List = list
+
+                x = 1
+                """
+            )
+        )
+
+    def test_keep_import_shadowed_only_by_a_type_checking_binding(self, arm):
+        """The block binding does not exist at run time, so it shadows nothing."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+                from typing import List
+
+                if TYPE_CHECKING:
+                    from mymod import List
+
+                def f() -> List[int]:
+                    return List()
+                """
+            )
+        )
+
+    def test_keep_nested_import_that_is_still_used(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import List
+
+                def f(x: List[int]) -> None: ...
+                """
+            )
+        )
+
+
+class TestRemoveImportStringAnnotations:
+    """A string annotation is a forward reference, so the names inside it are
+    load-bearing: whatever resolves the annotation later needs their imports."""
+
+    @staticmethod
+    def _assert_type_hints_resolve(source_file):
+        """The output is only correct if the annotations it kept still resolve, which
+        a text assertion cannot show: dropping an import leaves valid Python."""
+        import types
+        import typing
+
+        module = types.ModuleType('after_recipe')
+        exec(source_file.print_all(), module.__dict__)
+        typing.get_type_hints(module)
+        for value in list(module.__dict__.values()):
+            if isinstance(value, types.FunctionType):
+                typing.get_type_hints(value)
+
+    @pytest.mark.parametrize('annotation_position, source', [
+        ('variable', 'm: "typing.Dict[Any, Any]" = {}'),
+        ('parameter', 'def f(m: "typing.Dict[Any, Any]") -> None: ...'),
+        ('return', 'def f() -> "typing.Dict[Any, Any]": ...'),
+    ])
+    def test_names_inside_a_compound_reference_keep_their_imports(self, arm, annotation_position, source):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                import typing
+                from typing import Any
+
+                {source}
+                """,
+                after_recipe=self._assert_type_hints_resolve,
+            )
+        )
+
+    def test_bare_reference_keeps_its_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'Any')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any
+
+                m: "Any" = None
+                """,
+            )
+        )
+
+    def test_name_absent_from_the_reference_is_still_removed(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'Optional')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any, Optional
+
+                m: "Dict[Any, Any]" = {}
+                """,
+                """\
+                from typing import Any
+
+                m: "Dict[Any, Any]" = {}
+                """,
+            )
+        )
+
+
+class TestRemoveImportAllReExports:
+    """A name listed in `__all__` is re-exported, so the module still needs its
+    import even where nothing else reads the name."""
+
+    @pytest.mark.parametrize('all_form', ['["List"]', '("List",)'])
+    def test_re_exported_name_keeps_its_import(self, arm, all_form):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import List
+
+                __all__ = {all_form}
+                """,
+            )
+        )
+
+    def test_augmented_all_keeps_its_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any, List
+
+                __all__ = ["Any"]
+                __all__ += ["List"]
+                """,
+            )
+        )
+
+    @pytest.mark.parametrize('unreadable_all', [
+        pytest.param('__all__ = ["Any"]\n__all__.extend(["List"])', id='extend'),
+        pytest.param('if True:\n    __all__ = ["List"]\nelse:\n    __all__ = []', id='if_else'),
+    ])
+    def test_unreadable_all_keeps_the_import(self, arm, unreadable_all):
+        body = unreadable_all.replace('\n', '\n                ')
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Any, List
+
+                {body}
+                """,
+            )
+        )
+
+    def test_unrelated_export_does_not_keep_an_unrelated_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'Any')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any, List
+
+                __all__ = ["List"]
+                """,
+                """\
+                from typing import List
+
+                __all__ = ["List"]
+                """,
+            )
+        )
+
+    @pytest.mark.parametrize('readable_all', [
+        pytest.param('__all__ = []', id='empty'),
+        pytest.param('__all__ = _x = ["Any"]', id='chained'),
+        pytest.param('__all__ = ["Any"]\n__all__.sort()', id='sort'),
+        pytest.param('__all__ = []\n__all__ += ["Any"]', id='augmented'),
+        pytest.param('if True:\n    __all__ = ["Any"]', id='nested_if'),
+    ])
+    def test_readable_all_leaves_unrelated_imports_removable(self, arm, readable_all):
+        body = readable_all.replace('\n', '\n                ')
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Any, List
+
+                {body}
+                """,
+                f"""\
+                from typing import Any
+
+                {body}
+                """,
+            )
         )

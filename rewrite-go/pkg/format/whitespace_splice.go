@@ -247,7 +247,7 @@ func spaceContentEqual(a, b java.Space) bool {
 	}
 	for i := range a.Comments {
 		x, y := a.Comments[i], b.Comments[i]
-		if x.Kind != y.Kind || x.Text != y.Text || x.Suffix != y.Suffix || x.Multiline != y.Multiline {
+		if x.Multiline != y.Multiline || x.Text != y.Text || x.Suffix != y.Suffix {
 			return false
 		}
 	}

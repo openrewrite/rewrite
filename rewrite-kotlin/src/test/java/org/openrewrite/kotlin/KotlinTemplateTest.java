@@ -21,27 +21,35 @@ import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.internal.template.KotlinTemplateStubs;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlinScript;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
+@SuppressWarnings({"NullableProblems", "LombokKotlinCompilerPlugin", "SimplifyBooleanWithConstants", "DataFlowIssue", "SequencedCollectionMethodCanBeUsed", "UnusedExpression", "RedundantSemicolon", "RedundantExplicitType", "UnusedReceiverParameter"})
 class KotlinTemplateTest implements RewriteTest {
 
     @DocumentExample
@@ -79,21 +87,21 @@ class KotlinTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
-              @Override
-              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  var m = (J.MethodDeclaration) super.visitMethodDeclaration(method, ctx);
-                  if (m.getSimpleName().equals("configure")) {
-                      List<Statement> statements = m.getBody().getStatements();
-                      if (statements.stream().noneMatch(s -> s.toString().contains("println"))) {
-                          return JavaTemplate.builder("println(\"added\")")
-                            .contextSensitive()
-                            .build()
-                            .apply(getCursor(), statements.get(statements.size() - 1).getCoordinates().after());
-                      }
-                  }
-                  return m;
-              }
-          })),
+                @Override
+                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    var m = (J.MethodDeclaration) super.visitMethodDeclaration(method, ctx);
+                    if (m.getSimpleName().equals("configure")) {
+                        List<Statement> statements = m.getBody().getStatements();
+                        if (statements.stream().noneMatch(s -> s.toString().contains("println"))) {
+                            return JavaTemplate.builder("println(\"added\")")
+                              .contextSensitive()
+                              .build()
+                              .apply(getCursor(), statements.get(statements.size() - 1).getCoordinates().after());
+                        }
+                    }
+                    return m;
+                }
+            })),
           kotlin(
             """
               class MyConfig {
@@ -117,7 +125,7 @@ class KotlinTemplateTest implements RewriteTest {
     void replaceExpressionStatementWithTemplate() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
                 public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                     J.Block b = super.visitBlock(block, ctx);
@@ -125,7 +133,7 @@ class KotlinTemplateTest implements RewriteTest {
                         if (!(s instanceof K.ExpressionStatement)) {
                             return s;
                         }
-                        return (J.MethodInvocation) JavaTemplate.builder("#{any()}.hashCode()")
+                        return JavaTemplate.builder("#{any()}.hashCode()")
                           .build()
                           .apply(new Cursor(getCursor(), s), s.getCoordinates().replace(), s);
                     }));
@@ -155,7 +163,7 @@ class KotlinTemplateTest implements RewriteTest {
         // template replacement to target it.
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
                 public J.Return visitReturn(J.Return aReturn, ExecutionContext ctx) {
                     J.Return r = super.visitReturn(aReturn, ctx);
@@ -212,16 +220,16 @@ class KotlinTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if ("foo".equals(method.getSimpleName())) {
-                      return KotlinTemplate.builder("bar()")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replace());
-                  }
-                  return super.visitMethodInvocation(method, ctx);
-              }
-          })),
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("foo".equals(method.getSimpleName())) {
+                        return KotlinTemplate.builder("bar()")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace());
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
           kotlin(
             """
               fun foo() {}
@@ -273,7 +281,7 @@ class KotlinTemplateTest implements RewriteTest {
               """,
             """
               import com.fasterxml.jackson.databind.ObjectMapper
-
+              
               class Test {
                   fun foo() {
                       val mapper = ObjectMapper()
@@ -292,7 +300,7 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (multiVariable.getVariables().size() == 1 &&
-                      "x".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                    "x".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
                       J initializer = multiVariable.getVariables().getFirst().getInitializer();
                       return KotlinTemplate.builder("println(#{any()})")
                         .doBeforeParseTemplate(capturedTemplate::append)
@@ -324,16 +332,16 @@ class KotlinTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if ("placeholder".equals(method.getSimpleName())) {
-                      return KotlinTemplate.builder("when (x) { 1 -> \"one\"; else -> \"other\" }")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replace());
-                  }
-                  return super.visitMethodInvocation(method, ctx);
-              }
-          })),
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("placeholder".equals(method.getSimpleName())) {
+                        return KotlinTemplate.builder("when (x) { 1 -> \"one\"; else -> \"other\" }")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace());
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
           kotlin(
             """
               fun placeholder(): String = ""
@@ -358,16 +366,16 @@ class KotlinTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if ("toUpperCase".equals(method.getSimpleName())) {
-                      return KotlinTemplate.builder("#{any(kotlin.String)}.uppercase()")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
-                  }
-                  return super.visitMethodInvocation(method, ctx);
-              }
-          })),
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("toUpperCase".equals(method.getSimpleName())) {
+                        return KotlinTemplate.builder("#{any(kotlin.String)}.uppercase()")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
           kotlin(
             """
               fun test() {
@@ -391,17 +399,17 @@ class KotlinTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if ("oldGreet".equals(method.getSimpleName())) {
-                      // Capture the first argument and re-emit it as a named argument to `greet`.
-                      return KotlinTemplate.builder("greet(name = #{any(kotlin.String)})")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
-                  }
-                  return super.visitMethodInvocation(method, ctx);
-              }
-          })),
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("oldGreet".equals(method.getSimpleName())) {
+                        // Capture the first argument and re-emit it as a named argument to `greet`.
+                        return KotlinTemplate.builder("greet(name = #{any(kotlin.String)})")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
           kotlin(
             """
               fun greet(name: String) {}
@@ -425,16 +433,16 @@ class KotlinTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if ("trim".equals(method.getSimpleName())) {
-                      return KotlinTemplate.builder("#{any(kotlin.String)}.uppercase()")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
-                  }
-                  return super.visitMethodInvocation(method, ctx);
-              }
-          })),
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("trim".equals(method.getSimpleName())) {
+                        return KotlinTemplate.builder("#{any(kotlin.String)}.uppercase()")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
           kotlin(
             """
               fun test() {
@@ -460,16 +468,16 @@ class KotlinTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if ("oldHelper".equals(method.getSimpleName())) {
-                      return KotlinTemplate.builder("#{any(kotlin.String)}.uppercase()")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
-                  }
-                  return super.visitMethodInvocation(method, ctx);
-              }
-          })),
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("oldHelper".equals(method.getSimpleName())) {
+                        return KotlinTemplate.builder("#{any(kotlin.String)}.uppercase()")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
           kotlin(
             """
               fun String.oldHelper(): String = this
@@ -491,17 +499,17 @@ class KotlinTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none())
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
-              @Override
-              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if (multiVariable.getVariables().size() == 1 &&
+                @Override
+                public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                    if (multiVariable.getVariables().size() == 1 &&
                       "old".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
-                      return KotlinTemplate.builder("val replaced = 42")
-                        .build()
-                        .apply(getCursor(), multiVariable.getCoordinates().replace());
-                  }
-                  return super.visitVariableDeclarations(multiVariable, ctx);
-              }
-          })),
+                        return KotlinTemplate.builder("val replaced = 42")
+                          .build()
+                          .apply(getCursor(), multiVariable.getCoordinates().replace());
+                    }
+                    return super.visitVariableDeclarations(multiVariable, ctx);
+                }
+            })),
           kotlin(
             """
               fun test() {
@@ -526,7 +534,7 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (multiVariable.getVariables().size() == 1 &&
-                      "x".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                    "x".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
                       J initializer = multiVariable.getVariables().getFirst().getInitializer();
                       return KotlinTemplate.builder("println(#{any()})")
                         .doBeforeParseTemplate(capturedTemplate::append)
@@ -563,8 +571,8 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                   if ("Suppress".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null &&
-                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                    annotation.getArguments() != null &&
+                    annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
                       return KotlinTemplate.builder("\"RedundantSuppression\"")
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replaceArguments());
@@ -597,7 +605,7 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                   if ("Suppress".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null && annotation.getArguments().size() == 1) {
+                    annotation.getArguments() != null && annotation.getArguments().size() == 1) {
                       return KotlinTemplate.builder("#{any()}, \"RedundantSuppression\"")
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replaceArguments(),
@@ -619,13 +627,13 @@ class KotlinTemplateTest implements RewriteTest {
                   companion object {
                       const val REASON = "UNCHECKED_CAST"
                   }
-
+              
                   enum class Status { ACTIVE, INACTIVE }
-
+              
                   init {
                       require(endpoint.isNotEmpty())
                   }
-
+              
                   @Suppress(REASON)
                   override fun fetch(): String = endpoint
               }
@@ -635,13 +643,13 @@ class KotlinTemplateTest implements RewriteTest {
                   companion object {
                       const val REASON = "UNCHECKED_CAST"
                   }
-
+              
                   enum class Status { ACTIVE, INACTIVE }
-
+              
                   init {
                       require(endpoint.isNotEmpty())
                   }
-
+              
                   @Suppress(REASON, "RedundantSuppression")
                   override fun fetch(): String = endpoint
               }
@@ -656,7 +664,7 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                   if ("Suppress".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null && annotation.getArguments().size() == 1) {
+                    annotation.getArguments() != null && annotation.getArguments().size() == 1) {
                       return KotlinTemplate.builder("#{any()}, \"RedundantSuppression\"")
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replaceArguments(),
@@ -692,10 +700,10 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                   if ("Retry".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null && !annotation.getArguments().isEmpty() &&
-                      annotation.getArguments().getFirst() instanceof J.Assignment assignment &&
-                      assignment.getVariable() instanceof J.Identifier attribute &&
-                      "include".equals(attribute.getSimpleName())) {
+                    annotation.getArguments() != null && !annotation.getArguments().isEmpty() &&
+                    annotation.getArguments().getFirst() instanceof J.Assignment assignment &&
+                    assignment.getVariable() instanceof J.Identifier attribute &&
+                    "include".equals(attribute.getSimpleName())) {
                       return KotlinTemplate.builder("includes = #{any()}")
                         .doBeforeParseTemplate(stubs::add)
                         .build()
@@ -708,7 +716,7 @@ class KotlinTemplateTest implements RewriteTest {
           kotlin(
             """
               import kotlin.reflect.KClass
-
+              
               annotation class Retry(
                   val include: Array<KClass<out Throwable>> = [],
                   val includes: Array<KClass<out Throwable>> = []
@@ -753,7 +761,7 @@ class KotlinTemplateTest implements RewriteTest {
           kotlin(
             """
               import kotlin.reflect.KClass
-
+              
               fun test(c: Comparator<in String>, k: KClass<*>) {
                   val x1 = c
                   val x2 = k
@@ -761,7 +769,7 @@ class KotlinTemplateTest implements RewriteTest {
               """,
             """
               import kotlin.reflect.KClass
-
+              
               fun test(c: Comparator<in String>, k: KClass<*>) {
                   println(c)
                   println(k)
@@ -779,8 +787,8 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                   if ("Suppress".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null &&
-                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                    annotation.getArguments() != null &&
+                    annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
                       return KotlinTemplate.builder("\"RedundantSuppression\"")
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replaceArguments());
@@ -811,8 +819,8 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                   if ("Suppress".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null &&
-                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                    annotation.getArguments() != null &&
+                    annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
                       return KotlinTemplate.builder("\"RedundantSuppression\"")
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replaceArguments());
@@ -839,8 +847,8 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                   if ("Suppress".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null &&
-                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                    annotation.getArguments() != null &&
+                    annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
                       return KotlinTemplate.builder("\"RedundantSuppression\"")
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replaceArguments());
@@ -869,8 +877,8 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                   if ("Suppress".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null &&
-                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                    annotation.getArguments() != null &&
+                    annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
                       return KotlinTemplate.builder("\"RedundantSuppression\"")
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replaceArguments());
@@ -907,8 +915,8 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                   if ("Suppress".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null &&
-                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                    annotation.getArguments() != null &&
+                    annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
                       return KotlinTemplate.builder("\"RedundantSuppression\"")
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replaceArguments());
@@ -945,8 +953,8 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                   if ("Suppress".equals(annotation.getSimpleName()) &&
-                      annotation.getArguments() != null &&
-                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                    annotation.getArguments() != null &&
+                    annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
                       return KotlinTemplate.builder("\"RedundantSuppression\"")
                         .build()
                         .apply(getCursor(), annotation.getCoordinates().replaceArguments());
@@ -1109,6 +1117,592 @@ class KotlinTemplateTest implements RewriteTest {
                   }
               }
               """
+          ));
+    }
+
+    @Test
+    void replaceMethodParameters() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    if ("foo".equals(method.getSimpleName()) && method.getParameters().get(0) instanceof J.Empty) {
+                        return KotlinTemplate.builder("s: String, n: Int")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replaceParameters());
+                    }
+                    return super.visitMethodDeclaration(method, ctx);
+                }
+            })),
+          kotlin(
+            "fun foo() {}",
+            "fun foo(s: String, n: Int) {}"
+          )
+        );
+    }
+
+    @Test
+    void replaceClassTypeParameters() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    if (classDecl.getTypeParameters() == null) {
+                        return KotlinTemplate.builder("T")
+                          .build()
+                          .apply(getCursor(), classDecl.getCoordinates().replaceTypeParameters());
+                    }
+                    return super.visitClassDeclaration(classDecl, ctx);
+                }
+            })),
+          kotlin(
+            "class A",
+            "class A<T>"
+          )
+        );
+    }
+
+    /**
+     * Kotlin declares a superclass in the same `:` list as its interfaces, so `replaceExtendsClause` addresses
+     * the first supertype rather than a separate `extends` slot.
+     */
+    @Test
+    void replaceExtendsClauseTargetsFirstSupertype() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    if ("A".equals(classDecl.getSimpleName()) && classDecl.getImplements() == null) {
+                        return KotlinTemplate.builder("Base")
+                          .build()
+                          .apply(getCursor(), classDecl.getCoordinates().replaceExtendsClause());
+                    }
+                    return super.visitClassDeclaration(classDecl, ctx);
+                }
+            })),
+          kotlin(
+            """
+              open class Base
+              class A
+              """,
+            """
+              open class Base
+              class A : Base
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceImplementsClause() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    if ("A".equals(classDecl.getSimpleName()) && classDecl.getImplements() == null) {
+                        return KotlinTemplate.builder("Marker")
+                          .build()
+                          .apply(getCursor(), classDecl.getCoordinates().replaceImplementsClause());
+                    }
+                    return super.visitClassDeclaration(classDecl, ctx);
+                }
+            })),
+          kotlin(
+            """
+              interface Marker
+              class A
+              """,
+            """
+              interface Marker
+              class A : Marker
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMethodBody() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    if ("foo".equals(method.getSimpleName()) && !method.printTrimmed(getCursor()).contains("replaced")) {
+                        return KotlinTemplate.builder("println(\"replaced\")")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replaceBody());
+                    }
+                    return super.visitMethodDeclaration(method, ctx);
+                }
+            })),
+          kotlin(
+            """
+              fun foo() {
+                  println("original")
+              }
+              """,
+            """
+              fun foo() {
+                  println("replaced")
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Kotlin holds top-level declarations directly on the compilation unit rather than in a `J.Block`, so
+     * replacing the file's first declaration exercises a path Java never reaches.
+     */
+    @Test
+    void replaceTopLevelFunctionDeclaration() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    if ("old".equals(method.getSimpleName())) {
+                        return KotlinTemplate.builder("fun renamed() { println(1) }")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace());
+                    }
+                    return super.visitMethodDeclaration(method, ctx);
+                }
+            })),
+          kotlin(
+            "fun old() { println(0) }",
+            """
+              fun renamed() {
+                  println(1)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceClassDeclaration() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    if ("A".equals(classDecl.getSimpleName())) {
+                        return KotlinTemplate.builder("class B")
+                          .build()
+                          .apply(getCursor(), classDecl.getCoordinates().replace());
+                    }
+                    return super.visitClassDeclaration(classDecl, ctx);
+                }
+            })),
+          kotlin(
+            "class A",
+            "class B"
+          )
+        );
+    }
+
+    /**
+     * A `where` clause wraps the declaration in a `K.ClassDeclaration`, so the stub extractors have to unwrap
+     * it rather than assuming a bare `J.ClassDeclaration`.
+     */
+    @Test
+    void replaceTypeParametersOnClassWithWhereClause() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    if ("A".equals(classDecl.getSimpleName()) && classDecl.getTypeParameters() != null &&
+                        classDecl.getTypeParameters().size() == 1) {
+                        return KotlinTemplate.builder("T, U")
+                          .build()
+                          .apply(getCursor(), classDecl.getCoordinates().replaceTypeParameters());
+                    }
+                    return super.visitClassDeclaration(classDecl, ctx);
+                }
+            })),
+          kotlin(
+            "class A<T> where T : Comparable<T>",
+            "class A<T, U> where T : Comparable<T>"
+          )
+        );
+    }
+
+    /**
+     * An extension function carries a synthetic first parameter for the receiver, which must not be mistaken
+     * for a declared parameter when replacing the parameter list.
+     */
+    @Test
+    void replaceParametersOnExtensionFunction() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    if ("foo".equals(method.getSimpleName()) && !method.printTrimmed(getCursor()).contains("n: Int")) {
+                        return KotlinTemplate.builder("n: Int")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replaceParameters());
+                    }
+                    return super.visitMethodDeclaration(method, ctx);
+                }
+            })),
+          kotlin(
+            "fun String.foo() {}",
+            "fun String.foo(n: Int) {}"
+          )
+        );
+    }
+
+    @Test
+    void replaceBodyOfExpressionBodiedFunction() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    if ("foo".equals(method.getSimpleName()) && !method.printTrimmed(getCursor()).contains("2")) {
+                        return KotlinTemplate.builder("return 2")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replaceBody());
+                    }
+                    return super.visitMethodDeclaration(method, ctx);
+                }
+            })),
+          kotlin(
+            "fun foo(): Int = 1",
+            """
+              fun foo(): Int {
+                  return 2
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Kotlin has no checked exceptions, so there is no `throws` clause for this coordinate to address. It
+     * should say so rather than failing deep in the parser on a Java stub.
+     */
+    @Test
+    void replaceThrowsReportsThatKotlinHasNoCheckedExceptions() {
+        assertThatExceptionOfType(UnsupportedOperationException.class)
+          .isThrownBy(() -> new KotlinTemplateStubs().checkedExceptions())
+          .withMessageContaining("no checked exceptions");
+    }
+
+    @Test
+    void replaceLambdaParameters() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                    if (!lambda.getParameters().getParameters().toString().contains("renamed")) {
+                        return KotlinTemplate.builder("renamed")
+                          .build()
+                          .apply(getCursor(), lambda.getParameters().getCoordinates().replace());
+                    }
+                    return super.visitLambda(lambda, ctx);
+                }
+            })),
+          kotlin(
+            """
+              fun test() {
+                  listOf(1).forEach { it -> println(it) }
+              }
+              """,
+            """
+              fun test() {
+                  listOf(1).forEach { renamed -> println(it) }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacePackageDeclaration() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitPackage(J.Package pkg, ExecutionContext ctx) {
+                    if (!pkg.printTrimmed(getCursor()).contains("b")) {
+                        return KotlinTemplate.builder("b")
+                          .build()
+                          .apply(getCursor(), pkg.getCoordinates().replace());
+                    }
+                    return super.visitPackage(pkg, ctx);
+                }
+            })),
+          kotlin(
+            """
+              package a
+
+              fun test() {}
+              """,
+            """
+              package b
+
+              fun test() {}
+              """
+          )
+        );
+    }
+
+    /**
+     * Declared generic types were previously discarded on the way from the builder to the substitutions, so a
+     * template parameter typed by one failed with "Unknown type T. Make sure all types are fully qualified."
+     */
+    @Test
+    void parameterTypedByDeclaredGenericType() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("placeholder".equals(method.getSimpleName())) {
+                        return KotlinTemplate.builder("println(#{any(T)})")
+                          .genericTypes("T")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          kotlin(
+            """
+              fun placeholder(v: Any): Any = v
+              fun <T> test(value: T) {
+                  val x = placeholder(value)
+              }
+              """,
+            """
+              fun placeholder(v: Any): Any = v
+              fun <T> test(value: T) {
+                  val x = println(value)
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * A bound on a declared generic reaches the stub's type parameter list as Kotlin's `T : Bound` syntax.
+     */
+    @Test
+    void boundedGenericTypeReachesTheStub() {
+        AtomicReference<String> stub = new AtomicReference<>();
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("placeholder".equals(method.getSimpleName())) {
+                        return KotlinTemplate.builder("println(#{any(T)})")
+                          .genericTypes("T extends java.lang.CharSequence")
+                          .doBeforeParseTemplate(stub::set)
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          kotlin(
+            """
+              fun placeholder(v: Any): Any = v
+              fun test(value: String) {
+                  val x = placeholder(value)
+              }
+              """,
+            """
+              fun placeholder(v: Any): Any = v
+              fun test(value: String) {
+                  val x = println(value)
+              }
+              """
+          )
+        );
+        assertThat(stub.get()).contains("class Template<T : java.lang.CharSequence>");
+    }
+
+    /**
+     * A context-free expression template is assigned to a synthetic binding whose declared type is the expected
+     * type the expression gets inferred against. `emptyList()` has no element type without one, so the default
+     * `Any` leaves it undefined and `bindType` is what makes it resolvable.
+     */
+    @Test
+    void bindTypeSuppliesTheExpectedTypeForInference() {
+        assertThat(applyEmptyList(null)).hasToString("kotlin.collections.List<{undefined}>");
+        assertThat(applyEmptyList("kotlin.collections.List<kotlin.String>"))
+          .hasToString("kotlin.collections.List<kotlin.String>");
+    }
+
+    /**
+     * Applies {@code emptyList()} over {@code placeholder()} and returns the inferred type of the result.
+     * Each call is its own run so that the bind types are compared independently of the context-free stub
+     * cache, which {@code JavaTemplateGenericsTest#bindTypeDiscriminatesCachedTemplates} covers separately.
+     */
+    private JavaType applyEmptyList(@Nullable String bindType) {
+        AtomicReference<JavaType> type = new AtomicReference<>();
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("placeholder".equals(method.getSimpleName())) {
+                        KotlinTemplate.Builder builder = KotlinTemplate.builder("emptyList()");
+                        if (bindType != null) {
+                            builder.bindType(bindType);
+                        }
+                        J result = builder.build().apply(getCursor(), method.getCoordinates().replace());
+                        type.set(((Expression) result).getType());
+                        return result;
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          kotlin(
+            """
+              fun placeholder(): Any = 1
+              fun test() {
+                  val x = placeholder()
+              }
+              """,
+            """
+              fun placeholder(): Any = 1
+              fun test() {
+                  val x = emptyList()
+              }
+              """
+          )
+        );
+        return type.get();
+    }
+
+    /** Type parameters on a function, as distinct from the class-level coordinate covered above. */
+    @Test
+    void replaceMethodTypeParameters() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    if ("test".equals(method.getSimpleName()) && method.getTypeParameters() == null) {
+                        return KotlinTemplate.builder("T")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replaceTypeParameters());
+                    }
+                    return super.visitMethodDeclaration(method, ctx);
+                }
+            })),
+          kotlin("fun test() {}", "fun <T> test() {}")
+        );
+    }
+
+    /** Annotating a class reaches a different dummy-scaffold branch than annotating a method. */
+    @Test
+    void addAnnotationToClass() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    if (classDecl.getLeadingAnnotations().isEmpty()) {
+                        return KotlinTemplate.builder("@Suppress(\"unused\")")
+                          .build()
+                          .apply(getCursor(), classDecl.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName)));
+                    }
+                    return super.visitClassDeclaration(classDecl, ctx);
+                }
+            })),
+          kotlin(
+            "class A",
+            """
+              @Suppress("unused")
+              class A
+              """
+          )
+        );
+    }
+
+    /**
+     * Parameter syntax with no Java counterpart — an annotation, a nullable type, a default value and
+     * {@code vararg} — all of which must survive the round trip through the parameter stub.
+     */
+    @Test
+    void replaceParametersWithKotlinOnlyParameterSyntax() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+                @Override
+                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    if ("test".equals(method.getSimpleName()) && method.getParameters().get(0) instanceof J.Empty) {
+                        return KotlinTemplate.builder("@Suppress(\"x\") n: Int? = null, vararg rest: Int")
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replaceParameters());
+                    }
+                    return super.visitMethodDeclaration(method, ctx);
+                }
+            })),
+          kotlin(
+            "fun test() {}",
+            "fun test(@Suppress(\"x\") n: Int? = null, vararg rest: Int) {}"
+          )
+        );
+    }
+
+    // A Kotlin script wraps its statements in a block whose first statement starts at column 0
+    private static Recipe insertAtTopLevel(boolean before) {
+        return toRecipe(() -> new KotlinVisitor<>() {
+            @Override
+            public J visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                K.CompilationUnit c = (K.CompilationUnit) super.visitCompilationUnit(cu, ctx);
+                J.Block block = (J.Block) c.getStatements().get(0);
+                if (block.getStatements().size() != 1) {
+                    return c;
+                }
+                Statement only = block.getStatements().get(0);
+                return KotlinTemplate.builder("val y = 2")
+                  .build()
+                  .apply(updateCursor(c), before ? only.getCoordinates().before() : only.getCoordinates().after());
+            }
+        });
+    }
+
+    @Test
+    void insertAfterTopLevelScriptStatement() {
+        rewriteRun(
+          spec -> spec.recipe(insertAtTopLevel(false)).typeValidationOptions(TypeValidation.none()),
+          kotlinScript(
+            """
+              val x = 1
+              """,
+            spec -> spec.after(a -> """
+              val x = 1
+              val y = 2
+              """)
+          ));
+    }
+
+    @Test
+    void insertBeforeTopLevelScriptStatement() {
+        rewriteRun(
+          spec -> spec.recipe(insertAtTopLevel(true)).typeValidationOptions(TypeValidation.none()),
+          kotlinScript(
+            """
+              val x = 1
+              """,
+            spec -> spec.after(a -> """
+              val y = 2
+              val x = 1
+              """)
           ));
     }
 }

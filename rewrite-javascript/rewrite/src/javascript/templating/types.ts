@@ -497,6 +497,12 @@ export interface TemplateOptions {
      * @example `{dependencies: {'@sapui5/types': '^1.120.0'}, types: ['@sapui5/types']}`
      */
     types?: string[];
+
+    /**
+     * @deprecated Name the module in {@link TemplateOptions.context} as the import it stands for:
+     * `bindings: {vi: {module: 'vitest', member: 'vi'}}` is `context: ["import {vi} from 'vitest';"]`.
+     */
+    bindings?: never;
 }
 
 /**

@@ -106,7 +106,7 @@ public class JavaTypeAnnotationRpcTest
 
         var data = new List<RpcObjectData>();
         var q = new RpcSendQueue(1024, batch => data.AddRange(batch),
-            new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);
+            new RpcRefs(), null, false);
 
         q.Send(after, before, () => new JavaSender().VisitType(after, q));
         q.Flush();
@@ -125,7 +125,7 @@ public class JavaTypeAnnotationRpcTest
     {
         var data = new List<RpcObjectData>();
         var q = new RpcSendQueue(1024, batch => data.AddRange(batch),
-            new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);
+            new RpcRefs(), null, false);
         q.Send(Reference.AsRef(after), before == null ? null : Reference.AsRef(before),
             () => new JavaSender().VisitType(after, q));
         q.Flush();

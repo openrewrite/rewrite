@@ -607,9 +607,12 @@ func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 			out.Append(";")
 		}
 	}
-	if sw.Tag != nil {
-		p.Visit(sw.Tag.Element, out)
-		p.visitSpace(sw.Tag.After, out)
+	// The selector is a ControlParentheses (matching J.Switch), but Go has no
+	// parens, so emit only its inner element (an Empty for a tagless `switch {}`).
+	if sw.Selector != nil {
+		p.visitSpace(sw.Selector.Prefix, out)
+		p.Visit(sw.Selector.Tree.Element, out)
+		p.visitSpace(sw.Selector.Tree.After, out)
 	}
 	p.Visit(sw.Body, out)
 	p.afterSyntax(sw.Markers, out)
@@ -1441,8 +1444,23 @@ func (p *GoPrinter) VisitEmpty(empty *java.Empty, param any) java.J {
 func (p *GoPrinter) visitSpace(space java.Space, out *PrintOutputCapture) {
 	out.Append(space.Whitespace)
 	for _, comment := range space.Comments {
-		out.Append(comment.Text)
+		printComment(comment, out)
 		out.Append(comment.Suffix)
+	}
+}
+
+// printComment emits a comment's source, re-adding the `//` or `/* */`
+// delimiters around its delimiter-free Text. Mirrors Java's
+// TextComment.printComment, which likewise reconstructs the delimiters from
+// the comment kind rather than storing them in the text.
+func printComment(comment java.Comment, out *PrintOutputCapture) {
+	if comment.Multiline {
+		out.Append("/*")
+		out.Append(comment.Text)
+		out.Append("*/")
+	} else {
+		out.Append("//")
+		out.Append(comment.Text)
 	}
 }
 

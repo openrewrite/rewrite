@@ -18,10 +18,14 @@ package diff
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func lines(from, to int) string {
@@ -116,6 +120,68 @@ func TestUnifiedTruncatesRunawayDiff(t *testing.T) {
 	out := Unified(before.String(), after.String(), "foo.go")
 	assert.Contains(t, out, "diff truncated")
 	assert.LessOrEqual(t, strings.Count(out, "\n"), maxDiffLines+5)
+	// Pins the cut with no context line to fall back to.
+	assert.Contains(t, out, fmt.Sprintf("@@ -1,%d +0,0 @@", maxDiffLines-1))
+}
+
+// interleaved renders count lines of which every fourth differs, so that
+// truncation lands inside a hunk that mixes context with changes.
+func interleaved(count int) (before, after string) {
+	var a, b strings.Builder
+	for i := 1; i <= count; i++ {
+		fmt.Fprintf(&a, "l%d\n", i)
+		if i%4 == 0 {
+			fmt.Fprintf(&b, "L%d\n", i)
+		} else {
+			fmt.Fprintf(&b, "l%d\n", i)
+		}
+	}
+	return a.String(), b.String()
+}
+
+func TestUnifiedTruncatedDiffStillApplies(t *testing.T) {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not on PATH")
+	}
+	before, after := interleaved(maxDiffLines * 2)
+	patch := Unified(before, after, "foo.go")
+	require.Contains(t, patch, "diff truncated")
+
+	dir := t.TempDir()
+	patchFile := filepath.Join(dir, "p.diff")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "foo.go"), []byte(before), 0o600))
+	require.NoError(t, os.WriteFile(patchFile, []byte(patch), 0o600))
+
+	cmd := exec.Command(git, "apply", "--check", patchFile)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	assert.NoError(t, err, "git apply rejected:\n"+string(out)+"\n"+patch)
+}
+
+func TestUnifiedTruncationKeepsChangesWhenAHunkHasNoInteriorContext(t *testing.T) {
+	var before, after strings.Builder
+	for i := 1; i <= maxDiffLines*3; i++ {
+		fmt.Fprintf(&before, "l%d\n", i)
+		if i > contextLines && i <= maxDiffLines*2 {
+			fmt.Fprintf(&after, "L%d\n", i)
+		} else {
+			fmt.Fprintf(&after, "l%d\n", i)
+		}
+	}
+
+	out := Unified(before.String(), after.String(), "foo.go")
+	require.Contains(t, out, "diff truncated")
+	// A cut reaching past the first change would show only leading context.
+	assert.Contains(t, out, fmt.Sprintf("-l%d", contextLines+1))
+}
+
+func TestUnifiedUnlimitedKeepsTheWholeDiff(t *testing.T) {
+	before, after := interleaved(maxDiffLines * 2)
+
+	out := Unified(before, after, "foo.go", Unlimited())
+	assert.NotContains(t, out, "diff truncated")
+	assert.Contains(t, out, fmt.Sprintf("@@ -1,%d +1,%d @@", maxDiffLines*2, maxDiffLines*2))
 }
 
 func TestUnifiedGiantInputsDoNotBuildFullTable(t *testing.T) {
