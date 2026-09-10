@@ -40,8 +40,10 @@ namespace OpenRewrite.CSharp.NuGet;
 
 /// <summary>
 /// Points in-process MSBuild at the .NET SDK by setting <c>MSBUILD_EXE_PATH</c>, which is all the
-/// engine needs to resolve <c>Microsoft.NET.Sdk</c> and the rest of the SDK's targets. Child
-/// <c>dotnet</c> processes must not inherit it — see <see cref="ScrubFrom"/>.
+/// engine needs to resolve <c>Microsoft.NET.Sdk</c> and the rest of the SDK's targets. The
+/// workload resolver is disabled alongside it: restore graphs never need workloads, and it fails
+/// the whole evaluation by calling <c>getcwd()</c> when the working directory has been removed.
+/// Child <c>dotnet</c> processes must not inherit either — see <see cref="ScrubFrom"/>.
 /// <para>
 /// <c>MSBuildLocator.Register*</c> is NOT needed with current MSBuild libraries and must not be
 /// reintroduced. Reference <c>Microsoft.Build</c>, <c>Microsoft.Build.Tasks.Core</c> and
@@ -52,8 +54,6 @@ internal static class MSBuildEnvironment
 {
     private static readonly object Lock = new();
     private static bool _configured;
-
-    private static bool _ownsVariable;
 
     public static void Ensure()
     {
@@ -73,21 +73,21 @@ internal static class MSBuildEnvironment
                 return;
             }
 
-            _ownsVariable = true;
             Environment.SetEnvironmentVariable("MSBUILD_EXE_PATH", msbuild);
+            Environment.SetEnvironmentVariable("MSBuildEnableWorkloadResolver", "false");
             Log.Debug("MSBuildEnvironment: MSBUILD_EXE_PATH={Path}", msbuild);
         }
     }
 
     /// <summary>
-    /// Removes the variable this class set from a child process's environment. A child
+    /// Removes the variables this class set from a child process's environment. A child
     /// <c>dotnet</c> initializes its own MSBuild and fails with "The type initializer for
     /// 'Microsoft.Build.Execution.BuildParameters' threw an exception" if it inherits ours.
     /// </summary>
     public static void ScrubFrom(System.Diagnostics.ProcessStartInfo psi)
     {
-        if (_ownsVariable)
-            psi.Environment.Remove("MSBUILD_EXE_PATH");
+        psi.Environment.Remove("MSBUILD_EXE_PATH");
+        psi.Environment.Remove("MSBuildEnableWorkloadResolver");
     }
 
     private static string? FindSdkMSBuild()
