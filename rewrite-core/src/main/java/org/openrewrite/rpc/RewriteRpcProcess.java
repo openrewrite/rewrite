@@ -76,6 +76,8 @@ public class RewriteRpcProcess extends Thread {
         PROCESS_HANDLE_DESTROY_FORCIBLY = destroyForcibly;
     }
 
+    private static final long GRACEFUL_EXIT_MILLIS = 200;
+
     private final String[] command;
 
     @Setter
@@ -292,9 +294,23 @@ public class RewriteRpcProcess extends Thread {
             }
             shutdownHook = null;
         }
-        // Force-kill the direct child; a wedged peer may not exit gracefully.
-        if (process != null) {
-            process.destroyForcibly();
+        // EOF on stdin is every peer's exit signal, and taking it lets them flush metrics
+        // and logs and remove their temp dirs. SIGTERM would not do: of the four peers only
+        // the JS one installs a handler.
+        Process p = process;
+        if (p != null) {
+            // Closing stdin needs the monitor that HeaderDelimitedMessageHandler holds across
+            // a send, so against a peer that stopped draining it blocks until the kill below
+            // releases the writer. Only the exit is waited on, which keeps that wait bounded.
+            severStdin(p);
+            try {
+                if (!p.waitFor(GRACEFUL_EXIT_MILLIS, TimeUnit.MILLISECONDS)) {
+                    p.destroyForcibly();
+                }
+            } catch (InterruptedException e) {
+                p.destroyForcibly();
+                Thread.currentThread().interrupt();
+            }
         }
         // Force-kill the descendants captured above; empty on Java 8 or a single-process peer.
         destroyDescendantsForcibly(descendants);
@@ -307,6 +323,19 @@ public class RewriteRpcProcess extends Thread {
             }
             stderrDrainThread = null;
         }
+    }
+
+    /** Signals the peer to exit by closing its stdin, on a daemon thread that may never return. */
+    private static void severStdin(Process p) {
+        Thread closer = new Thread(() -> {
+            try {
+                p.getOutputStream().close();
+            } catch (IOException ignored) {
+                // The peer is going away regardless; the caller force-kills on timeout.
+            }
+        }, "rpc-stdin-close");
+        closer.setDaemon(true);
+        closer.start();
     }
 
     /** The peer's descendants as {@code ProcessHandle}s, empty on Java 8 or if unobtainable. */

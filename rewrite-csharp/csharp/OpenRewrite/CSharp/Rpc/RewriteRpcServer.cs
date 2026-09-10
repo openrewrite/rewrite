@@ -31,6 +31,7 @@ using OpenRewrite.Java;
 using Serilog;
 using StreamJsonRpc;
 using StreamJsonRpc.Protocol;
+using StreamJsonRpc.Reflection;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -2156,7 +2157,7 @@ internal sealed class RpcMetricsWriter : IDisposable
 /// Wraps the message handler to record a metrics row when each inbound request's response is
 /// written. Notifications (Evict) get no response and aren't recorded; outbound requests are ignored.
 /// </summary>
-internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IDisposable
+internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IJsonRpcMessageBufferManager, IDisposable
 {
     private readonly IJsonRpcMessageHandler _inner;
     private readonly RpcMetricsWriter _metrics;
@@ -2171,6 +2172,13 @@ internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IDisposabl
     public bool CanRead => _inner.CanRead;
     public bool CanWrite => _inner.CanWrite;
     public IJsonRpcMessageFormatter Formatter => _inner.Formatter;
+
+    // JsonRpc looks for this interface on the outermost handler only, so a wrapper that
+    // omits it strands the callback that lets the inner handler advance past a consumed
+    // message: its read buffer then grows for the life of the connection, and the final
+    // read sees leftover bytes instead of the empty buffer that means a clean disconnect.
+    public void DeserializationComplete(JsonRpcMessage message) =>
+        (_inner as IJsonRpcMessageBufferManager)?.DeserializationComplete(message);
 
     public async ValueTask<JsonRpcMessage?> ReadAsync(CancellationToken cancellationToken)
     {
