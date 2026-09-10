@@ -19,7 +19,6 @@ import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
@@ -338,16 +337,6 @@ public interface JavaParser extends Parser {
         public B classpathFromResources(ExecutionContext ctx, String... classpath) {
             this.artifactNames = emptyList();
             this.classpath = dependenciesFromResources(ctx, classpath);
-            return (B) this;
-        }
-
-        /**
-         * @deprecated prefer {@link #classpath} and {@link #classpathFromResources(ExecutionContext, String...)}.
-         */
-        @Deprecated
-        @ToBeRemoved(after = "2025-12-31", reason = "Use classpath or classpathFromResources instead.")
-        public B classpath(byte[]... classpath) {
-            this.classBytesClasspath = Arrays.asList(classpath);
             return (B) this;
         }
 

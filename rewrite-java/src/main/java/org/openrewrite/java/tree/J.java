@@ -6234,32 +6234,7 @@ public interface J extends Tree {
         @Getter
         Space varargs;
 
-        @Deprecated
-        @ToBeRemoved(after = "2025-10-31")
-        public List<JLeftPadded<Space>> getDimensionsBeforeName() {
-            return emptyList();
-        }
-
-        @Deprecated
-        @ToBeRemoved(after = "2025-10-31")
-        public VariableDeclarations withDimensionsBeforeName(List<JLeftPadded<Space>> dimensionsBeforeName) {
-            return this;
-        }
-
         List<JRightPadded<NamedVariable>> variables;
-
-        @Deprecated
-        @ToBeRemoved(after = "2025-10-31")
-        public VariableDeclarations(UUID id, Space prefix, Markers markers, List<Annotation> leadingAnnotations, List<Modifier> modifiers, @Nullable TypeTree typeExpression, @Nullable Space varargs, @Nullable List<JLeftPadded<Space>> dimensionsBeforeName, List<JRightPadded<NamedVariable>> variables) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.leadingAnnotations = leadingAnnotations;
-            this.modifiers = modifiers;
-            this.typeExpression = typeExpression;
-            this.varargs = varargs;
-            this.variables = variables;
-        }
 
         public List<NamedVariable> getVariables() {
             return JRightPadded.getElements(variables);
