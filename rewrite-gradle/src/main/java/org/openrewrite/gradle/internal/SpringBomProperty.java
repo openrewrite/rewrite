@@ -17,20 +17,23 @@ package org.openrewrite.gradle.internal;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Tree;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.SpringDependencyManagementPlugin;
 import org.openrewrite.gradle.trait.ExtraProperty;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -40,8 +43,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.gradle.internal.GradleParseUtils.parseSnippet;
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+import static java.util.Collections.emptyList;
 
 /**
  * The Maven property through which a BOM imported by the {@code io.spring.dependency-management} plugin governs a
@@ -246,45 +248,58 @@ public class SpringBomProperty {
      * Inserts {@code ext['name'] = 'value'} (or {@code extra["name"] = "value"} for the Kotlin DSL) after the
      * {@code plugins} block, where the dependency management plugin reads it lazily when the BOM is resolved.
      */
-    public static JavaSourceFile addDeclaration(JavaSourceFile cu, String name, String value, ExecutionContext ctx) {
-        if (cu instanceof K.CompilationUnit) {
-            K.CompilationUnit k = (K.CompilationUnit) cu;
-            Statement declaration = parseSnippet("extra[\"" + name + "\"] = \"" + value + "\"", true, ctx)
-                    .map(requireParsed(K.CompilationUnit.class))
-                    .map(parsed -> ((J.Block) parsed.getStatements().get(0)).getStatements().get(0))
-                    .orElseThrow(() -> new IllegalStateException("Unable to parse extra property declaration"));
-            return k.withStatements(ListUtils.mapFirst(k.getStatements(), statement -> {
-                if (!(statement instanceof J.Block)) {
-                    return statement;
-                }
-                J.Block block = (J.Block) statement;
-                return block.withStatements(insertAfterPlugins(block.getStatements(), declaration));
-            }));
+    public static JavaSourceFile addDeclaration(Cursor scope, String name, String value) {
+        JavaSourceFile cu = scope.getValue();
+        JavaTemplate declaration = cu instanceof K.CompilationUnit ?
+                KotlinTemplate.builder("extra[\"" + name + "\"] = \"" + value + "\"").build() :
+                GroovyTemplate.builder("ext['" + name + "'] = '" + value + "'").build();
+
+        List<Statement> statements = topLevelStatements(cu);
+        int plugins = lastPluginsBlock(statements);
+        // A coordinate places the declaration but says nothing about spacing, and Gradle scripts set their
+        // top-level blocks apart with a blank line
+        if (plugins < 0) {
+            // Nothing to sit under, so lead the file and push what was first down past a blank line
+            return blankLineBefore(declaration.apply(scope, statements.get(0).getCoordinates().before()), 1);
         }
-        G.CompilationUnit g = (G.CompilationUnit) cu;
-        Statement declaration = parseSnippet("ext['" + name + "'] = '" + value + "'", false, ctx)
-                .map(requireParsed(G.CompilationUnit.class))
-                .map(parsed -> parsed.getStatements().get(0))
-                .orElseThrow(() -> new IllegalStateException("Unable to parse ext property declaration"));
-        return g.withStatements(insertAfterPlugins(g.getStatements(), declaration));
+        return blankLineBefore(declaration.apply(scope, statements.get(plugins).getCoordinates().after()), plugins + 1);
     }
 
-    private static List<Statement> insertAfterPlugins(List<Statement> statements, Statement declaration) {
-        declaration = declaration.withId(Tree.randomId());
-        int index = 0;
+    private static int lastPluginsBlock(List<Statement> statements) {
+        int index = -1;
         for (int i = 0; i < statements.size(); i++) {
             if (statements.get(i) instanceof J.MethodInvocation) {
                 String name = ((J.MethodInvocation) statements.get(i)).getSimpleName();
                 if ("plugins".equals(name) || "buildscript".equals(name)) {
-                    index = i + 1;
+                    index = i;
                 }
             }
         }
-        if (index > 0) {
-            return ListUtils.insert(statements, declaration.withPrefix(Space.format("\n\n")), index);
+        return index;
+    }
+
+    private static JavaSourceFile blankLineBefore(JavaSourceFile cu, int index) {
+        return withTopLevelStatements(cu, ListUtils.map(topLevelStatements(cu),
+                (i, statement) -> i == index ? statement.withPrefix(Space.format("\n\n")) : statement));
+    }
+
+    /**
+     * A Kotlin script wraps its statements in a block; a Groovy script holds them directly.
+     */
+    private static List<Statement> topLevelStatements(JavaSourceFile cu) {
+        if (cu instanceof K.CompilationUnit) {
+            Statement first = ((K.CompilationUnit) cu).getStatements().get(0);
+            return first instanceof J.Block ? ((J.Block) first).getStatements() : emptyList();
         }
-        // Take over the leading whitespace and comments so a license header stays first
-        Space first = Space.firstPrefix(statements);
-        return ListUtils.insert(Space.formatFirstPrefix(statements, Space.format("\n\n")), declaration.withPrefix(first), 0);
+        return ((G.CompilationUnit) cu).getStatements();
+    }
+
+    private static JavaSourceFile withTopLevelStatements(JavaSourceFile cu, List<Statement> statements) {
+        if (cu instanceof K.CompilationUnit) {
+            K.CompilationUnit k = (K.CompilationUnit) cu;
+            return k.withStatements(ListUtils.mapFirst(k.getStatements(), first -> first instanceof J.Block ?
+                    ((J.Block) first).withStatements(statements) : first));
+        }
+        return ((G.CompilationUnit) cu).withStatements(statements);
     }
 }

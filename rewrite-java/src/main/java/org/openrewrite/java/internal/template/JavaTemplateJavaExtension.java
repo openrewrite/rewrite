@@ -21,6 +21,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.service.SourceFileStatementService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -89,6 +90,75 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             }
 
             @Override
+            public @Nullable J preVisit(J tree, Integer p) {
+                if (loc == STATEMENT_PREFIX && mode != JavaCoordinates.Mode.REPLACEMENT && tree instanceof JavaSourceFile) {
+                    J spliced = insertIntoSourceFile((JavaSourceFile) tree, p);
+                    if (spliced != null) {
+                        stopAfterPreVisit();
+                        return spliced;
+                    }
+                }
+                return super.preVisit(tree, p);
+            }
+
+            /**
+             * A Groovy script has no block around its top-level statements, so the list the new statement joins can
+             * only be reached on the source file itself.
+             */
+            private @Nullable J insertIntoSourceFile(JavaSourceFile cu, Integer p) {
+                SourceFileStatementService statements = cu.service(SourceFileStatementService.class);
+                List<Statement> existing = statements.getStatements(cu);
+                if (existing.stream().noneMatch(s -> s.isScope(insertionPoint))) {
+                    return null;
+                }
+                return statements.withStatements(cu, ListUtils.flatMap(existing, statement -> {
+                    if (!isScope(statement)) {
+                        return statement;
+                    }
+                    return spliceAround(statement, unsubstitute(templateParser.parseBlockStatements(
+                            new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
+                            substitutions.getTypeVariables(), loc, mode)), p);
+                }));
+            }
+
+            /**
+             * Position generated statements around the one the coordinate anchors on. An anchor that does not begin
+             * its own line leads a script: it has no line break to hand over, and the block it may nominally sit in
+             * is not an indentation level, so its neighbours are placed rather than formatted.
+             */
+            private List<Statement> spliceAround(Statement anchor, List<Statement> gen, Integer p) {
+                boolean anchorBeginsLine = anchor.getPrefix().getWhitespace().contains("\n");
+                Cursor parent = getCursor();
+                for (int i = 0; i < gen.size(); i++) {
+                    Statement s = gen.get(i);
+                    if (anchorBeginsLine) {
+                        gen.set(i, autoFormat(i == 0 ?
+                                s.withPrefix(anchor.getPrefix().withComments(emptyList())) : s, p, parent));
+                    } else {
+                        gen.set(i, autoFormat(s, p, parent).withPrefix(leadingPrefix(anchor, i)));
+                    }
+                }
+                switch (mode) {
+                    case BEFORE:
+                        return ListUtils.concat(gen, anchorBeginsLine ? anchor :
+                                (Statement) anchor.withPrefix(Space.format("\n")));
+                    case AFTER:
+                        return ListUtils.concat(anchor, gen);
+                    default:
+                        return gen;
+                }
+            }
+
+            private Space leadingPrefix(Statement anchor, int i) {
+                if (i > 0 || mode == JavaCoordinates.Mode.AFTER) {
+                    return Space.format("\n");
+                }
+                // Displacing the leading statement takes over its comments too, so a license header stays on top
+                return mode == JavaCoordinates.Mode.BEFORE ? anchor.getPrefix() :
+                        anchor.getPrefix().withComments(emptyList());
+            }
+
+            @Override
             public J visitBlock(J.Block block, Integer p) {
                 switch (loc) {
                     case BLOCK_END: {
@@ -123,25 +193,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     case STATEMENT_PREFIX: {
                         return block.withStatements(ListUtils.flatMap(block.getStatements(), statement -> {
                             if (isScope(statement)) {
-                                List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(
+                                return spliceAround(statement, unsubstitute(templateParser.parseBlockStatements(
                                         new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
-                                        substitutions.getTypeVariables(), loc, mode));
-
-                                Cursor parent = getCursor();
-                                for (int i = 0; i < gen.size(); i++) {
-                                    Statement s = gen.get(i);
-                                    Statement formattedS = autoFormat(i == 0 ? s.withPrefix(statement.getPrefix().withComments(emptyList())) : s, p, parent);
-                                    gen.set(i, formattedS);
-                                }
-
-                                switch (mode) {
-                                    case REPLACEMENT:
-                                        return gen;
-                                    case BEFORE:
-                                        return ListUtils.concat(gen, statement);
-                                    case AFTER:
-                                        return ListUtils.concat(statement, gen);
-                                }
+                                        substitutions.getTypeVariables(), loc, mode)), p);
                             }
                             return statement;
                         }));

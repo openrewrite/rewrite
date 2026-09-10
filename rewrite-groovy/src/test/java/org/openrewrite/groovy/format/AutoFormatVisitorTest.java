@@ -112,7 +112,7 @@ class AutoFormatVisitorTest implements RewriteTest {
               """,
             """
               if (convertTemplate == null)
-                  convertTemplate = inTypemap.find {key, value ->
+                  convertTemplate = inTypemap.find { key, value ->
                       (key instanceof Pattern && key.matcher(apiType).matches())
                   }?.value
               """

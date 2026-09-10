@@ -830,7 +830,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
                 String version = safeUpdatedVersion(property, dependencyMatcher, acc, gradleProject, ctx);
                 if (version != null) {
-                    cu = SpringBomProperty.addDeclaration(cu, property, version, ctx);
+                    cu = SpringBomProperty.addDeclaration(new Cursor(getCursor(), cu), property, version);
                 }
             }
             return cu;
