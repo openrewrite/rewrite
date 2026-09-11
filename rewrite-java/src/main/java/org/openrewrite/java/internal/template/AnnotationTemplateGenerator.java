@@ -74,7 +74,7 @@ public class AnnotationTemplateGenerator {
                     J annotationParent = j instanceof J.Annotation && cursor.getParent() != null ? cursor.getParent().firstEnclosing(J.class) : null;
 
                     int level = 1;
-                    while (annotationParent instanceof J.NewArray || annotationParent instanceof J.Assignment || annotationParent instanceof J.Annotation) {
+                    while (isAnnotationWrapper(annotationParent)) {
                         level += 1;
                         if (cursor.getParent(level) == null) {
                             break;
@@ -95,6 +95,15 @@ public class AnnotationTemplateGenerator {
                     }
                     return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
+    }
+
+    /**
+     * Nodes that sit between an annotation and the element it annotates, and so must be looked through when
+     * deciding what to declare for the annotation to attach to. Languages with additional wrappers — Kotlin's
+     * use-site targets, for instance — override this.
+     */
+    protected boolean isAnnotationWrapper(@Nullable J j) {
+        return j instanceof J.NewArray || j instanceof J.Assignment || j instanceof J.Annotation;
     }
 
     protected void addDummyClass(Cursor cursor, StringBuilder after) {

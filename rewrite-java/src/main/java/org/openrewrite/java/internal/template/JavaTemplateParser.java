@@ -40,21 +40,12 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 public class JavaTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
 
     private static final String TEMPLATE_CACHE_MESSAGE_KEY = "__org.openrewrite.java.internal.template.JavaTemplateParser.cache__";
-
-    private static final String PACKAGE_STUB = "package #{}; class $Template {}";
-    private static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
-    private static final String LAMBDA_PARAMETER_STUB = "class $Template { { Object o = (#{}) -> {}; } }";
-    private static final String EXTENDS_STUB = "class $Template extends #{} {}";
-    private static final String IMPLEMENTS_STUB = "class $Template implements #{} {}";
-    private static final String THROWS_STUB = "abstract class $Template { abstract void $template() throws #{}; }";
-    private static final String TYPE_PARAMS_STUB = "class $Template<#{}> {}";
 
     @Language("java")
     private static final String SUBSTITUTED_ANNOTATION = "@java.lang.annotation.Documented public @interface SubAnnotation { int value(); }";
@@ -66,6 +57,7 @@ public class JavaTemplateParser {
     private final boolean contextSensitive;
     private final BlockStatementTemplateGenerator statementTemplateGenerator;
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
+    private final TemplateStubs templateStubs;
 
     public JavaTemplateParser(boolean contextSensitive, Parser.Builder parser, Consumer<String> onAfterVariableSubstitution,
                               Consumer<String> onBeforeParseTemplate, Set<String> imports, String bindType) {
@@ -81,6 +73,11 @@ public class JavaTemplateParser {
     }
 
     protected JavaTemplateParser(Parser.Builder parser, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean contextSensitive, BlockStatementTemplateGenerator statementTemplateGenerator, AnnotationTemplateGenerator annotationTemplateGenerator) {
+        this(parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports, contextSensitive,
+                statementTemplateGenerator, annotationTemplateGenerator, new JavaTemplateStubs());
+    }
+
+    protected JavaTemplateParser(Parser.Builder parser, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean contextSensitive, BlockStatementTemplateGenerator statementTemplateGenerator, AnnotationTemplateGenerator annotationTemplateGenerator, TemplateStubs templateStubs) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.onBeforeParseTemplate = onBeforeParseTemplate;
@@ -88,34 +85,41 @@ public class JavaTemplateParser {
         this.contextSensitive = contextSensitive;
         this.statementTemplateGenerator = statementTemplateGenerator;
         this.annotationTemplateGenerator = annotationTemplateGenerator;
+        this.templateStubs = templateStubs;
+    }
+
+    /**
+     * Wrap {@code template} in the language's stub for this coordinate, compile it, and read the templated
+     * elements back out. The stub and the extraction that pairs with it both come from {@link TemplateStubs},
+     * so a language that needs a differently shaped wrapper gets the matching extraction for free.
+     */
+    private <T extends J> List<T> parseStub(Cursor cursor, TemplateStubs.Stub<T> stub, String template) {
+        String substituted = substitute(stub.getCode(), template);
+        switch (stub.getImports()) {
+            case TEMPLATE:
+                substituted = addImports(substituted);
+                break;
+            case TEMPLATE_AND_ENCLOSING:
+                substituted = addImports(cursor, substituted);
+                break;
+            case NONE:
+                break;
+        }
+        String finalStub = substituted;
+        onBeforeParseTemplate.accept(finalStub);
+        return cache(cursor, finalStub, () -> stub.getExtract().apply(compileTemplate(cursor, finalStub)));
     }
 
     public List<Statement> parseParameters(Cursor cursor, String template) {
-        @Language("java") String stub = addImports(cursor, substitute(PARAMETER_STUB, template));
-        onBeforeParseTemplate.accept(stub);
-        return cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(cursor, stub);
-            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-            return m.getParameters();
-        });
+        return parseStub(cursor, templateStubs.parameters(), template);
     }
 
     public J.Lambda.Parameters parseLambdaParameters(Cursor cursor, String template) {
-        @Language("java") String stub = addImports(substitute(LAMBDA_PARAMETER_STUB, template));
-        onBeforeParseTemplate.accept(stub);
-
-        return (J.Lambda.Parameters) cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(cursor, stub);
-            J.Block b = (J.Block) cu.getClasses().get(0).getBody().getStatements().get(0);
-            J.VariableDeclarations v = (J.VariableDeclarations) b.getStatements().get(0);
-            J.Lambda l = (J.Lambda) v.getVariables().get(0).getInitializer();
-            assert l != null;
-            return singletonList(l.getParameters());
-        }).get(0);
+        return parseStub(cursor, templateStubs.lambdaParameters(), template).get(0);
     }
 
     public J parseExpression(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
-        List<J> result = cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), Expression.class, imports),
+        List<J> result = cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), Expression.class, imports, statementTemplateGenerator.getBindType(), parser.clone()),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
@@ -131,49 +135,19 @@ public class JavaTemplateParser {
     }
 
     public TypeTree parseExtends(Cursor cursor, String template) {
-        @Language("java") String stub = addImports(substitute(EXTENDS_STUB, template));
-        onBeforeParseTemplate.accept(stub);
-
-        return (TypeTree) cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(cursor, stub);
-            TypeTree anExtends = cu.getClasses().get(0).getExtends();
-            assert anExtends != null;
-            return singletonList(anExtends);
-        }).get(0);
+        return parseStub(cursor, templateStubs.anExtends(), template).get(0);
     }
 
     public List<TypeTree> parseImplements(Cursor cursor, String template) {
-        @Language("java") String stub = addImports(substitute(IMPLEMENTS_STUB, template));
-        onBeforeParseTemplate.accept(stub);
-        return cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(cursor, stub);
-            List<TypeTree> anImplements = cu.getClasses().get(0).getImplements();
-            assert anImplements != null;
-            return anImplements;
-        });
+        return parseStub(cursor, templateStubs.anImplements(), template);
     }
 
     public List<NameTree> parseThrows(Cursor cursor, String template) {
-        @Language("java") String stub = addImports(substitute(THROWS_STUB, template));
-        onBeforeParseTemplate.accept(stub);
-        return cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(cursor, stub);
-            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-            List<NameTree> aThrows = m.getThrows();
-            assert aThrows != null;
-            return aThrows;
-        });
+        return parseStub(cursor, templateStubs.checkedExceptions(), template);
     }
 
     public List<J.TypeParameter> parseTypeParameters(Cursor cursor, String template) {
-        @Language("java") String stub = addImports(substitute(TYPE_PARAMS_STUB, template));
-        onBeforeParseTemplate.accept(stub);
-        return cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(cursor, stub);
-            List<J.TypeParameter> tps = cu.getClasses().get(0).getTypeParameters();
-            assert tps != null;
-            return tps;
-        });
+        return parseStub(cursor, templateStubs.typeParameters(), template);
     }
 
     public <J2 extends J> List<J2> parseBlockStatements(Cursor cursor, Class<J2> expected,
@@ -182,7 +156,7 @@ public class JavaTemplateParser {
                                                         Space.Location location,
                                                         JavaCoordinates.Mode mode) {
         return cacheIfContextFree(cursor,
-                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), expected, imports),
+                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), expected, imports, statementTemplateGenerator.getBindType(), parser.clone()),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, mode),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
@@ -247,15 +221,7 @@ public class JavaTemplateParser {
     }
 
     public Expression parsePackage(Cursor cursor, String template) {
-        @Language("java") String stub = substitute(PACKAGE_STUB, template);
-        onBeforeParseTemplate.accept(stub);
-
-        return (Expression) cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(cursor, stub);
-            @SuppressWarnings("ConstantConditions") Expression expression = cu.getPackageDeclaration()
-                    .getExpression();
-            return singletonList(expression);
-        }).get(0);
+        return parseStub(cursor, templateStubs.packageDeclaration(), template).get(0);
     }
 
     private String substitute(String stub, String template) {
@@ -298,11 +264,7 @@ public class JavaTemplateParser {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-        JavaTypeFactory typeFactory = enclosingTypeFactory(cursor);
-        if (parser instanceof JavaParser.Builder && typeFactory != null) {
-            ((JavaParser.Builder<?, ?>) parser).typeFactory(typeFactory);
-        }
-        Parser jp = parser.build();
+        Parser jp = configuredParser(cursor).build();
         return getJavaSourceFile(stub, jp, ctx)
                 // In some specific and rare cases, the parser fails to parse what is a valid program. This has been
                 // investigated for several days to no avail, so the workaround is to retry parsing, which is known to
@@ -317,12 +279,25 @@ public class JavaTemplateParser {
     }
 
     /**
+     * The parser builder to compile a stub with, given the source file the template is being applied to.
+     * Languages whose builder does not extend {@link JavaParser.Builder} override this to hand the
+     * enclosing type factory to their own builder type.
+     */
+    protected Parser.Builder configuredParser(Cursor cursor) {
+        JavaTypeFactory typeFactory = enclosingTypeFactory(cursor);
+        if (parser instanceof JavaParser.Builder && typeFactory != null) {
+            ((JavaParser.Builder<?, ?>) parser).typeFactory(typeFactory);
+        }
+        return parser;
+    }
+
+    /**
      * Resolve the {@link JavaTypeFactory} that should back snippet parsing for templates
      * applied inside this cursor's enclosing source file. The factory is carried on the
      * file's {@link JavaSourceSet} marker when the source file's parser had one attached;
      * returns {@code null} otherwise and callers fall back to a fresh factory.
      */
-    private static @Nullable JavaTypeFactory enclosingTypeFactory(Cursor cursor) {
+    protected static @Nullable JavaTypeFactory enclosingTypeFactory(Cursor cursor) {
         return cursor.firstEnclosingOrThrow(SourceFile.class)
                 .getMarkers().findFirst(JavaSourceSet.class)
                 .map(JavaSourceSet::getTypeFactory)
@@ -397,5 +372,24 @@ public class JavaTemplateParser {
         List<String> typeVariables;
         Class<? extends J> expected;
         Set<String> imports;
+
+        /**
+         * Two templates identical but for their bind type generate different stubs and attribute differently,
+         * so omitting this silently serves the first one's tree to the second.
+         */
+        String bindType;
+
+        /**
+         * The cache is scoped to a source file, not to a language, and a Kotlin file can legitimately have both
+         * a {@code JavaTemplate} and a {@code KotlinTemplate} applied to it. Their stubs are different source in
+         * different languages, so without this a template of one kind can be served the other's tree — a
+         * {@code JavaTemplate} silently succeeding on text that is not valid Java.
+         * <p>
+         * Carries the builder itself, so parsers of the same language configured with different classpaths are
+         * distinguished too. A defensive clone is stored: the live builder mutates on first
+         * {@code build()} when it folds artifact names into the resolved classpath, which would otherwise
+         * change the hash of a key already in the map.
+         */
+        Parser.Builder parser;
     }
 }
