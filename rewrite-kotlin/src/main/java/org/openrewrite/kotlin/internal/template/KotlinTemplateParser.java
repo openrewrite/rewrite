@@ -15,9 +15,6 @@
  */
 package org.openrewrite.kotlin.internal.template;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Parser;
-import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.internal.template.AnnotationTemplateGenerator;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.kotlin.KotlinParser;
@@ -26,32 +23,15 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 public class KotlinTemplateParser extends JavaTemplateParser {
-
-    /**
-     * {@link KotlinParser.Builder} extends {@link org.openrewrite.Parser.Builder} rather than
-     * {@code JavaParser.Builder}, so the base implementation's type factory hand-off silently skips it and
-     * stubs compile without any type attribution.
-     */
-    @Override
-    protected Parser.Builder configuredParser(Cursor cursor) {
-        Parser.Builder builder = super.configuredParser(cursor);
-        JavaTypeFactory typeFactory = enclosingTypeFactory(cursor);
-        if (builder instanceof KotlinParser.Builder && typeFactory != null) {
-            ((KotlinParser.Builder) builder).typeFactory(typeFactory);
-        }
-        return builder;
-    }
-
-    public KotlinTemplateParser(boolean contextSensitive, KotlinParser.Builder parser, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate, Set<String> imports, String bindType) {
+    public KotlinTemplateParser(boolean contextSensitive, KotlinParser.Builder parser, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate, Set<String> imports) {
         super(
                 parser,
                 onAfterVariableSubstitution,
                 onBeforeParseTemplate,
                 imports,
                 contextSensitive,
-                new KotlinBlockStatementTemplateGenerator(imports, contextSensitive, bindType),
-                new KotlinAnnotationTemplateGenerator(imports),
-                new KotlinTemplateStubs()
+                new KotlinBlockStatementTemplateGenerator(imports, contextSensitive),
+                new KotlinAnnotationTemplateGenerator(imports)
         );
     }
 }

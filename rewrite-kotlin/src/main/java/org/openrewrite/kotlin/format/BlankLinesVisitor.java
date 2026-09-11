@@ -238,9 +238,6 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
                         if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
                             declMax = Math.max(declMax, minimumBlankLines_AroundMethodInInterface);
                             j = minimumLines(j, minimumBlankLines_AroundMethodInInterface);
-                        } else if (separatedFromPreviousMember(block, j)) {
-                            declMax = Math.max(declMax, minimumBlankLines_AfterDeclarationWithBody);
-                            j = minimumLines(j, minimumBlankLines_AfterDeclarationWithBody);
                         }
                     } else if (j instanceof J.Block) {
                         declMax = Math.max(declMax, minimumBlankLines_AroundInitializer);
@@ -260,20 +257,8 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
 
             int declMax = style.getKeepMaximum().getInDeclarations();
 
-            // A statement whose id is absent from the compilation unit is a detached replacement being
-            // formatted against the tree it is about to be spliced into (as JavaTemplate does). Its position
-            // is unknowable here and its prefix was already set deliberately by the caller, so adjusting it
-            // would prepend blank lines to what may well be the file's first declaration.
-            boolean partOfCompilationUnit = false;
-            for (Statement s : cu.getStatements()) {
-                if (s.isScope(j)) {
-                    partOfCompilationUnit = true;
-                    break;
-                }
-            }
-
             // don't adjust the first statement
-            if (partOfCompilationUnit && !cu.getStatements().iterator().next().isScope(j)) {
+            if (!cu.getStatements().isEmpty() && !cu.getStatements().iterator().next().isScope(j)) {
                 if (j instanceof J.VariableDeclarations) {
                     declMax = Math.max(declMax, minimumBlankLines_AroundField);
                     j = minimumLines(j, minimumBlankLines_AroundField);
@@ -294,43 +279,6 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
         return j;
     }
 
-    /**
-     * Whether a member should be preceded by a blank line because the member before it has a block body.
-     * Expression-bodied members are deliberately left compact, which is why this cannot simply separate every
-     * member the way the Java implementation does.
-     * <p>
-     * {@link #visitBlock} decides the same thing for a whole block, but from a running flag that only methods
-     * update, so an intervening property does not reset it and it separates members this does not. That path
-     * is unreachable when formatting is scoped to a single statement — as it is when a recipe formats a member
-     * it has just inserted — hence the second implementation here. {@code minimumLines} sets a floor, so a
-     * statement reached by both paths is unaffected by the overlap.
-     */
-    private static boolean separatedFromPreviousMember(J.Block block, Statement statement) {
-        List<Statement> statements = block.getStatements();
-        int index = -1;
-        for (int i = 0; i < statements.size(); i++) {
-            if (statements.get(i).isScope(statement)) {
-                index = i;
-                break;
-            }
-        }
-        if (index == 0 || statements.isEmpty()) {
-            return false;
-        }
-        // A statement absent from the block is being formatted ahead of being inserted, so its position is not
-        // yet knowable. Recipes append after the existing members, so the last one decides.
-        Statement previous = statements.get(index < 0 ? statements.size() - 1 : index - 1);
-        return hasBlockBody(previous);
-    }
-
-    private static boolean hasBlockBody(Statement statement) {
-        J.MethodDeclaration method = statement instanceof K.MethodDeclaration ?
-                ((K.MethodDeclaration) statement).getMethodDeclaration() :
-                statement instanceof J.MethodDeclaration ? (J.MethodDeclaration) statement : null;
-        return method != null && method.getBody() != null &&
-               !method.getBody().getMarkers().findFirst(SingleExpressionBlock.class).isPresent();
-    }
-
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
@@ -347,7 +295,11 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
                 if (previousWithBody.get()) {
                     m = minimumLines(m, minimumBlankLines_AfterDeclarationWithBody);
                 }
-                previousWithBody.set(hasBlockBody(statement));
+                if (m.getBody() != null && !m.getBody().getMarkers().findFirst(SingleExpressionBlock.class).isPresent()) {
+                    previousWithBody.set(true);
+                } else {
+                    previousWithBody.set(false);
+                }
                 if (!m.getPrefix().getComments().isEmpty()) {
                     m = minimumLines(m, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
                 }
