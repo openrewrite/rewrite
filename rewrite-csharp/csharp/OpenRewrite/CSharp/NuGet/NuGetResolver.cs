@@ -511,7 +511,7 @@ public static class NuGetResolver
                 };
                 var requestData = new BuildRequestData(
                     projectPath,
-                    globalProps,
+                    globalProps.ToDictionary(p => p.Key, p => (string?)p.Value, StringComparer.OrdinalIgnoreCase),
                     null,
                     new[] { "GenerateRestoreGraphFile" },
                     null);
