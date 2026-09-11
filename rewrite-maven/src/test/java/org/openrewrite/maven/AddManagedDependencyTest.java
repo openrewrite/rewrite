@@ -393,6 +393,66 @@ class AddManagedDependencyTest implements RewriteTest {
     }
 
     @Test
+    void currentVersionLookupIgnoresTagScopeRegardlessOfValueImport() {
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("com.tngtech.archunit", "archunit", "latest.patch", "import",
+              "pom", null, null, null, null, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.tngtech.archunit</groupId>
+                    <artifactId>archunit-junit5</artifactId>
+                    <version>1.3.0</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec2 -> spec2.after(actual -> {
+                Matcher matcher = Pattern.compile("<groupId>com\\.tngtech\\.archunit</groupId>\\s*" +
+                  "<artifactId>archunit</artifactId>\\s*<version>1\\.3\\.(\\d+)</version>").matcher(actual);
+                assertThat(matcher.find()).as("expected a managed com.tngtech.archunit:archunit version of the " +
+                  "form 1.3.x, but was:\n%s", actual).isTrue();
+                int patch = Integer.parseInt(matcher.group(1));
+                assertThat(patch).as("expected the managed archunit version's patch number to be >= 2 (i.e. " +
+                  "newer than the real current version 1.3.0), but was 1.3.%d:\n%s", patch, actual).isGreaterThanOrEqualTo(2);
+                return """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.tngtech.archunit</groupId>
+                          <artifactId>archunit</artifactId>
+                          <version>1.3.%d</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.tngtech.archunit</groupId>
+                        <artifactId>archunit-junit5</artifactId>
+                        <version>1.3.0</version>
+                        <scope>test</scope>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """.formatted(patch);
+            })
+          )
+        );
+    }
+
+    @Test
     void doesNotAddManagedDependencyIfTransitiveVersionIsTheSameAsRequested() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.18.0", null,

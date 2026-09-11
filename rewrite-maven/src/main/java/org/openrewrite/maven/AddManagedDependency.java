@@ -286,7 +286,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
             }
 
             private @Nullable String existingManagedDependencyVersion() {
-                return getResolutionResult().getPom().getDependencyManagement().stream()
+                String version = getResolutionResult().getPom().getDependencyManagement().stream()
                         .map(resolvedManagedDep -> {
                             if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
                                 return resolvedManagedDep.getGav().getVersion();
@@ -298,6 +298,20 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                             return null;
                         })
                         .filter(Objects::nonNull)
+                        .findFirst().orElse(null);
+                if (version != null) {
+                    return version;
+                }
+                // An already-added "import" entry whose target has no dependencyManagement of its own (e.g. a
+                // plain jar coordinate, rather than a real BOM) contributes nothing to the resolved dependency
+                // management above, so it can never be detected as already present that way - the resolved
+                // model only records imports via the managed dependencies they in turn contribute. Fall back to
+                // this pom's own raw (unexpanded) managed dependency declarations to detect that case, so the
+                // recipe doesn't keep re-adding an already-present import on every cycle.
+                return getResolutionResult().getPom().getRequested().getDependencyManagement().stream()
+                        .filter(ManagedDependency.Imported.class::isInstance)
+                        .filter(d -> Objects.equals(groupId, d.getGroupId()) && artifactId.equals(d.getArtifactId()))
+                        .map(ManagedDependency::getVersion)
                         .findFirst().orElse(null);
             }
         });
