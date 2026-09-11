@@ -919,6 +919,16 @@ class PythonTypeMapping:
 
         return None
 
+    def string_annotation_type(self, node: ast.Constant) -> Optional[JavaType]:
+        """The type a string in a type slot denotes, rather than ``str``.
+
+        ty resolves the annotation and reports the result on the string literal's own
+        range, which :meth:`type` never reaches because a constant short-circuits to
+        the type of its own value.
+        """
+        type_id = self._lookup_type_id(node)
+        return self._resolve_type(type_id) if type_id is not None else None
+
     def _constant_type(self, node: ast.Constant) -> Optional[JavaType]:
         """Get the type for a constant/literal node."""
         if isinstance(node.value, (str, bytes)):

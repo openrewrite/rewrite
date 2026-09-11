@@ -57,7 +57,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.ENFORCED_PLATFORM;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.PLATFORM;
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+import static org.openrewrite.gradle.GradleParser.requireParsed;
 
 @RequiredArgsConstructor
 public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {

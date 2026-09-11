@@ -1033,6 +1033,62 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    /**
+     * spring-boot-dependencies imports the log4j BOM at {@code ${log4j2.version}}, so overriding that project
+     * property is how Spring documents moving every log4j artifact, and no resolution rule is needed.
+     */
+    @Test
+    void overrideBomPropertyWhenSpringDependencyManagementPluginImportsBom() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
+            "org.apache.logging.log4j", "log4j-core", "2.17.1", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              ext['log4j2.version'] = '2.17.1'
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void useResolutionStrategyWithApplyFromWhenSpringDependencyManagementPluginIsPresent() {
         rewriteRun(
@@ -1171,7 +1227,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               repositories { mavenCentral() }
 
               dependencies {
-
                   constraints {
                       implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.0") {
                           because("CVE-2022-24329")

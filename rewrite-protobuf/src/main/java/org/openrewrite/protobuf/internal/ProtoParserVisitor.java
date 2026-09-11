@@ -69,6 +69,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
             Proto s = visit(statementTrees.get(i));
             statements.add(ProtoRightPadded.build(s).withAfter(
                     (s instanceof Proto.Empty ||
+                            s instanceof Proto.Extensions ||
                             s instanceof Proto.Field ||
                             s instanceof Proto.EnumField ||
                             s instanceof Proto.Import ||
@@ -111,9 +112,25 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         Proto.Identifier name = visitIdent(ctx.ident());
         return new Proto.EnumField(randomId(), name.getPrefix(), Markers.EMPTY,
                 ProtoRightPadded.build(name.withPrefix(Space.EMPTY)).withAfter(sourceBefore("=")),
-                mapConstant(ctx.IntegerLiteral()),
+                mapEnumNumber(ctx),
                 mapOptionList(ctx.optionList())
         );
+    }
+
+    /**
+     * A minus sign against the digits lexes as one {@code NumericLiteral}; separated from them by
+     * whitespace it lexes as {@code MINUS} plus {@code IntegerLiteral}, so the value's source spans
+     * the sign through the digits and the prefix holds only whitespace.
+     */
+    private Proto.Constant mapEnumNumber(Protobuf2Parser.EnumFieldContext ctx) {
+        if (ctx.MINUS() == null) {
+            return mapConstant(ctx.NumericLiteral() != null ? ctx.NumericLiteral() : ctx.IntegerLiteral());
+        }
+        Space prefix = sourceBefore("-");
+        int magnitudeStart = cursor;
+        Proto.Constant magnitude = mapConstant(ctx.IntegerLiteral());
+        return new Proto.Constant(randomId(), prefix, Markers.EMPTY,
+                -(Integer) magnitude.getValue(), "-" + source.substring(magnitudeStart, cursor));
     }
 
     @Override
@@ -129,6 +146,13 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
         return new Proto.Extend(randomId(), prefix, Markers.EMPTY, name,
                 new Proto.Block(randomId(), blockPrefix, Markers.EMPTY, statements, sourceBefore("}")));
+    }
+
+    @Override
+    public Proto.Extensions visitExtensions(Protobuf2Parser.ExtensionsContext ctx) {
+        Space prefix = sourceBefore("extensions");
+        return new Proto.Extensions(randomId(), prefix, Markers.EMPTY,
+                ProtoContainer.build(mapRanges(ctx.ranges())));
     }
 
     @Override
@@ -213,7 +237,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     @Override
     public Proto.Identifier visitIdent(Protobuf2Parser.IdentContext ctx) {
-        String name = ctx.Ident().getText();
+        String name = ctx.Ident() == null ? ctx.reservedWord().getText() : ctx.Ident().getText();
         return new Proto.Identifier(randomId(), sourceBefore(name), Markers.EMPTY, name);
     }
 
@@ -228,12 +252,16 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
                 mapOptionList(ctx.optionList()));
     }
 
-    private Proto.Constant mapConstant(TerminalNode integerLiteral) {
-        String number = integerLiteral.getText();
-        Integer numberValue = number.contains("x") ? Integer.parseInt(number, 16) :
-                number.startsWith("0") ? Integer.parseInt(number, 8) :
-                        Integer.parseInt(number);
-        return new Proto.Constant(randomId(), sourceBefore(number), Markers.EMPTY, numberValue, number);
+    private Proto.Constant mapConstant(TerminalNode numberLiteral) {
+        String number = numberLiteral.getText();
+        boolean negative = number.startsWith("-");
+        String magnitude = negative || number.startsWith("+") ? number.substring(1) : number;
+        boolean hex = magnitude.length() > 1 && (magnitude.charAt(1) == 'x' || magnitude.charAt(1) == 'X');
+        Integer numberValue = hex ? Integer.parseInt(magnitude.substring(2), 16) :
+                magnitude.startsWith("0") ? Integer.parseInt(magnitude, 8) :
+                        Integer.parseInt(magnitude);
+        return new Proto.Constant(randomId(), sourceBefore(number), Markers.EMPTY,
+                negative ? -numberValue : numberValue, number);
     }
 
     @Override
@@ -381,11 +409,30 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     @Override
     public Proto.Range visitRange(Protobuf2Parser.RangeContext ctx) {
         Proto.Constant from = mapConstant(ctx.IntegerLiteral(0));
-        TerminalNode to = ctx.IntegerLiteral(1);
+        TerminalNode max = ctx.MAX();
+        TerminalNode to = max != null ? max : ctx.IntegerLiteral(1);
         return new Proto.Range(randomId(), from.getPrefix(), Markers.EMPTY,
                 ProtoRightPadded.build(from.withPrefix(Space.EMPTY))
                         .withAfter(to != null ? sourceBefore("to") : Space.EMPTY),
-                to != null ? mapConstant(to) : null);
+                to == null ? null : max != null ? mapMax(max) : mapConstant(to));
+    }
+
+    /**
+     * The open end of a range is spelled {@code max}, so it is modelled as an identifier constant.
+     */
+    private Proto.Constant mapMax(TerminalNode max) {
+        String text = max.getText();
+        return new Proto.Constant(randomId(), sourceBefore(text), Markers.EMPTY, text, text);
+    }
+
+    private List<ProtoRightPadded<Proto>> mapRanges(Protobuf2Parser.RangesContext ctx) {
+        List<Protobuf2Parser.RangeContext> ranges = ctx.range();
+        List<ProtoRightPadded<Proto>> mapped = new ArrayList<>(ranges.size());
+        for (int i = 0; i < ranges.size(); i++) {
+            mapped.add(ProtoRightPadded.build((Proto) visitRange(ranges.get(i)))
+                    .withAfter(i == ranges.size() - 1 ? Space.EMPTY : sourceBefore(",")));
+        }
+        return mapped;
     }
 
     @Override
@@ -403,13 +450,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
                         .withAfter(i == stringLiterals.size() - 1 ? Space.EMPTY : sourceBefore(",")));
             }
         } else {
-            List<Protobuf2Parser.RangeContext> ranges = ctx.ranges().range();
-            reservations = new ArrayList<>(ranges.size());
-            for (int i = 0; i < ranges.size(); i++) {
-                Protobuf2Parser.RangeContext r = ranges.get(i);
-                reservations.add(ProtoRightPadded.build((Proto) visitRange(r))
-                        .withAfter(i == ranges.size() - 1 ? Space.EMPTY : sourceBefore(",")));
-            }
+            reservations = mapRanges(ctx.ranges());
         }
         return new Proto.Reserved(randomId(), prefix, Markers.EMPTY,
                 ProtoContainer.build(reservations));

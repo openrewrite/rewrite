@@ -1,5 +1,6 @@
 import ast
 import contextlib
+import keyword
 import dataclasses
 import sys
 import token
@@ -10,12 +11,14 @@ from tokenize import tokenize, TokenInfo
 from typing import Optional, TypeVar, cast, Callable, List, Tuple, Dict, Sequence, Union, Iterable, NamedTuple
 
 from rewrite import random_id, Markers
+from rewrite.utils import replace_if_changed
 from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType, J, Statement, Semicolon, TrailingComma, \
     NameTree, OmitParentheses, Expression, TypeTree, TypedTree, Comment
 from rewrite.java import tree as j
 from rewrite.java.support_types import TextComment
 from . import tree as py
 from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
+from .printer import PythonPrinter
 from .type_mapping import PythonTypeMapping, compute_source_line_data
 
 T = TypeVar('T')
@@ -59,6 +62,84 @@ class _ParenStackEntry(NamedTuple):
     open_paren_idx: int                    # Token index of the '(' itself
 
 
+class _EmbeddedTypeMapping:
+    """The types of a quoted annotation's body, read from the enclosing file's index.
+
+    A body position is the file position it was cut from, less the quote's own, so
+    every lookup restates its node's position before delegating. ty reports a quoted
+    annotation as one string node, so nothing matches until ty-types descends into the
+    body, whose nodes carry file offsets.
+    """
+
+    def __init__(self, enclosing: PythonTypeMapping, line_offset: int, col_offset: int):
+        self._enclosing = enclosing
+        self._line_offset = line_offset
+        self._col_offset = col_offset
+
+    def __getattr__(self, name: str):
+        delegate = getattr(self._enclosing, name)
+        if not callable(delegate):
+            return delegate
+
+        def in_file_positions(*args, **kwargs):
+            with self.__shifted(args[0] if args else None):
+                return delegate(*args, **kwargs)
+
+        return in_file_positions
+
+    @contextlib.contextmanager
+    def __shifted(self, node):
+        """``node`` and its descendants at their positions in the enclosing file.
+
+        A lookup for a call reads its callee's position too, so the whole subtree moves.
+        """
+        if not isinstance(node, ast.AST):
+            yield
+            return
+        moved = []
+        for descendant in ast.walk(node):
+            if getattr(descendant, 'lineno', None) is None:
+                continue
+            moved.append((descendant, descendant.lineno, descendant.col_offset,
+                          descendant.end_lineno, descendant.end_col_offset))
+            descendant.lineno, descendant.col_offset = \
+                self.__in_file(descendant.lineno, descendant.col_offset)
+            if descendant.end_lineno is not None:
+                descendant.end_lineno, descendant.end_col_offset = \
+                    self.__in_file(descendant.end_lineno, descendant.end_col_offset)
+        try:
+            yield
+        finally:
+            for descendant, line, col, end_line, end_col in moved:
+                (descendant.lineno, descendant.col_offset,
+                 descendant.end_lineno, descendant.end_col_offset) = line, col, end_line, end_col
+
+    def __in_file(self, line: int, col: int) -> Tuple[int, int]:
+        # Only the body's first line shares a line with the opening quote.
+        return line + self._line_offset, (col + self._col_offset) if line == 1 else col
+
+
+# The subscripts whose arguments from this index on are values rather than types, so a
+# string there names nothing. ``Annotated``'s first argument is still the annotated type.
+_VALUE_SUBSCRIPTS = {'Literal': 0, 'Annotated': 1}
+
+
+def _subscript_head(node) -> Optional[str]:
+    """The trailing name of a subscript's head, as spelled in the source."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _with_type(node: T, resolved: Optional[JavaType]) -> T:
+    """``node`` carrying ``resolved``, unless it has a type already or no slot for one."""
+    if getattr(node, 'type', None) is not None or not hasattr(node, '_type'):
+        return node
+    return replace_if_changed(node, _type=resolved)
+
+
 class ParserVisitor(ast.NodeVisitor):
     _source: str
     _parentheses_stack: List[_ParenStackEntry]
@@ -70,7 +151,8 @@ class ParserVisitor(ast.NodeVisitor):
     # UTF-8 BOM character
     _BOM = '\ufeff'
 
-    def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None):
+    def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None,
+                 type_mapping: Optional['_EmbeddedTypeMapping'] = None):
         super().__init__()
         # Detect and strip UTF-8 BOM if present
         if source.startswith(self._BOM):
@@ -84,13 +166,14 @@ class ParserVisitor(ast.NodeVisitor):
 
         # Single pass: compute lines, byte offsets, and byte-to-char mapping together
         source_lines, line_byte_offsets, self._byte_to_char = compute_source_line_data(source)
-        self._type_mapping = PythonTypeMapping(source, file_path, ty_client,
-                                               source_lines=source_lines,
-                                               line_byte_offsets=line_byte_offsets)
+        self._type_mapping = type_mapping if type_mapping is not None else PythonTypeMapping(
+            source, file_path, ty_client,
+            source_lines=source_lines, line_byte_offsets=line_byte_offsets)
 
-        # Normalize line endings for the tokenizer (it rejects mixed \r\n and \n),
-        # but keep the original source for whitespace extraction
-        tokenizer_source = source.replace('\r\n', '\n') if '\r\n' in source else source
+        # The tokenizer wants a single line-ending spelling (it rejects a mix), so it
+        # gets \n throughout while the original source keeps the spelling that
+        # whitespace extraction reproduces. The row/col scans below step over all three.
+        tokenizer_source = source.replace('\r\n', '\n').replace('\r', '\n') if '\r' in source else source
         self._tokens, self._paren_pairs = self._build_tokens(
             tokenize(BytesIO(tokenizer_source.encode('utf-8')).readline)
         )
@@ -133,7 +216,7 @@ class ParserVisitor(ast.NodeVisitor):
                     col = 0
                     scan += 2
                     continue
-                elif self._source[scan] == '\n':
+                elif self._source[scan] in ('\n', '\r'):
                     row += 1
                     col = 0
                 else:
@@ -182,7 +265,7 @@ class ParserVisitor(ast.NodeVisitor):
                     col = 0
                     scan_end += 2
                     continue
-                elif self._source[scan_end] == '\n':
+                elif self._source[scan_end] in ('\n', '\r'):
                     row += 1
                     col = 0
                 else:
@@ -1676,7 +1759,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             name,
             type_parameters,
-            self.__pad_left(self.__source_before('='), self.__convert(node.value)),
+            self.__pad_left(self.__source_before('='), self.__convert_type(node.value)),
             self._type_mapping.type(node)
         )
 
@@ -2923,6 +3006,48 @@ class ParserVisitor(ast.NodeVisitor):
                 converted_type
             )
 
+    def __structured_string_annotation(self, node: ast.Constant, body: str,
+                                       quote_style: Quoted.Style,
+                                       prefix: Space) -> Optional[TypeTree]:
+        """The type nodes a quoted annotation contains, or None to keep it flat text.
+
+        The body has to reproduce byte-identically to become structure, since a type
+        node has no slot for text it cannot print, such as padding inside the quotes.
+        """
+        try:
+            return self.__structure(node, body, quote_style, prefix)
+        except Exception:
+            # The body is text first and structure second: a gap anywhere in the attempt
+            # leaves the flat identifier rather than failing the file.
+            return None
+
+    def __structure(self, node: ast.Constant, body: str, quote_style: Quoted.Style,
+                    prefix: Space) -> Optional[TypeTree]:
+        # A body that is one plain name already models as the identifier the caller
+        # falls back to, so it does not need re-parsing. Keywords do not: `None` and
+        # `...` are types of their own.
+        if body.isidentifier() and not keyword.iskeyword(body):
+            return None
+        body_ast = ast.parse(body, mode='eval')
+        sub = ParserVisitor(body, type_mapping=_EmbeddedTypeMapping(
+            self._type_mapping, node.lineno - 1, node.col_offset + len(quote_style.quote)))
+        tree = sub.__convert_type(body_ast.body)
+        if not isinstance(tree, TypeTree):
+            return None
+        # `find_first` reads one Quoted marker per node, so a body that is itself a
+        # quoted string has nowhere to record both its own quotes and the outer ones.
+        if tree.markers.find_first(Quoted) is not None:
+            return None
+
+        tree = tree.replace(prefix=Space.EMPTY)
+        if PythonPrinter().print(tree) != body:
+            return None
+
+        tree = _with_type(tree, self._type_mapping.string_annotation_type(node))
+        return tree.replace(
+            prefix=prefix,
+            markers=Markers.build(random_id(), [Quoted(random_id(), quote_style)]))
+
     def __convert_type_mapper(self, node) -> Optional[TypeTree]:
         if isinstance(node, ast.Constant):
             if node.value is None or node.value is Ellipsis:
@@ -2990,13 +3115,24 @@ class ParserVisitor(ast.NodeVisitor):
                     # Non-string literal: use value_source to preserve case (e.g., 1J vs 1j)
                     name = source
 
+                if quote_style is not None:
+                    structured = self.__structured_string_annotation(
+                        node, name, quote_style, literal.prefix)
+                    if structured is not None:
+                        return structured
+
+                if quote_style is None:
+                    # A constant that is not a forward reference is the value it spells.
+                    return expression
+
                 return j.Identifier(
                     random_id(),
                     literal.prefix,
-                    Markers.build(random_id(), [Quoted(random_id(), quote_style)]) if quote_style else Markers.EMPTY,
+                    Markers.build(random_id(), [Quoted(random_id(), quote_style)]),
                     _EMPTY_LIST,
                     name,
-                    self._type_mapping.type(node),
+                    self._type_mapping.string_annotation_type(node)
+                    if quote_style else self._type_mapping.type(node),
                     None
                 )
         elif isinstance(node, ast.Subscript):
@@ -3016,6 +3152,7 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 slices = [node.slice]
 
+            values_from = _VALUE_SUBSCRIPTS.get(_subscript_head(node.value))
             return j.ParameterizedType(
                 random_id(),
                 prefix,
@@ -3023,9 +3160,11 @@ class ParserVisitor(ast.NodeVisitor):
                 converted_value,
                 JContainer(
                     bracket_prefix,
-                    [self.__pad_list_element(self.__convert_type(s), last=i == len(slices) - 1, end_delim=']') for
-                     i, s in
-                     enumerate(slices)],
+                    [self.__pad_list_element(
+                        self.__convert(s) if values_from is not None and i >= values_from
+                        else self.__convert_type(s),
+                        last=i == len(slices) - 1, end_delim=']')
+                     for i, s in enumerate(slices)],
                     Markers.EMPTY
                 ),
                 self._type_mapping.type(node)
@@ -3036,9 +3175,8 @@ class ParserVisitor(ast.NodeVisitor):
             if isinstance(node.op, ast.BitOr):
                 prefix = self.__whitespace()
                 # FIXME consider flattening nested unions
-                left = self.__pad_right(self.__convert_internal(node.left, self.__convert_type),
-                                        self.__source_before('|'))
-                right = self.__pad_right(self.__convert_internal(node.right, self.__convert_type), Space.EMPTY)
+                left = self.__pad_right(self.__convert_type(node.left), self.__source_before('|'))
+                right = self.__pad_right(self.__convert_type(node.right), Space.EMPTY)
                 return py.UnionType(
                     random_id(),
                     prefix,

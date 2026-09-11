@@ -23,6 +23,8 @@ import org.openrewrite.protobuf.tree.*;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
+
 public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
 
     public Proto visitBlock(Proto.Block block, P p) {
@@ -82,6 +84,13 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
         return e.getPadding().withExtension(visitRightPadded(e.getPadding().getExtension(), p));
+    }
+
+    public Proto visitExtensions(Proto.Extensions extensions, P p) {
+        Proto.Extensions e = extensions;
+        e = e.withPrefix(visitSpace(e.getPrefix(), p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        return e.getPadding().withRanges(requireNonNull(visitContainer(e.getPadding().getRanges(), p)));
     }
 
     public Proto visitField(Proto.Field field, P p) {

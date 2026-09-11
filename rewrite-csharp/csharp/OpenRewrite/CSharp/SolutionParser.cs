@@ -242,6 +242,11 @@ public class SolutionParser
                 msbuildProperties["TargetFrameworkRootPath"] = buildAssets.TargetFrameworkRootPath;
         }
 
+        // Windows-targeted projects (net*-windows with WPF/WinForms or a Windows SDK version)
+        // otherwise fail evaluation with NETSDK1100 on Linux/macOS, and one failing project
+        // reference takes the reference metadata of everything that depends on it with it.
+        NuGetResolver.ApplyWindowsTargetingDefault(msbuildProperties);
+
         _restoredLockFiles = await SolutionRestore.RunAsync(path, hasPackagesConfig, msbuildProperties, ct);
 
         var sw = Stopwatch.StartNew();

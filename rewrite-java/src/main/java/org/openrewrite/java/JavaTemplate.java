@@ -23,11 +23,13 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
+import org.openrewrite.java.internal.template.JavaTemplateLanguageExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.service.TemplateService;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.template.SourceTemplate;
 
@@ -124,7 +126,12 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
-        JavaTemplateJavaExtension extension = new JavaTemplateJavaExtension(templateParser, substitutions,
+        // Resolved from the target source file rather than from this template's own language, so that e.g. a
+        // Java snippet applied to a Kotlin file still gets Kotlin-shaped tree surgery.
+        JavaSourceFile sourceFile = scope.firstEnclosing(JavaSourceFile.class);
+        TemplateService templateService = sourceFile == null ?
+                new TemplateService() : sourceFile.service(TemplateService.class);
+        JavaTemplateLanguageExtension extension = templateService.languageExtension(templateParser, substitutions,
                 substitutedTemplate, coordinates, autoFormat);
 
         //noinspection ConstantConditions
@@ -205,7 +212,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         protected final String code;
         protected final Set<String> imports = new HashSet<>();
-        private final Set<String> genericTypes = new HashSet<>();
+        protected final Set<String> genericTypes = new HashSet<>();
 
         private boolean contextSensitive;
         private String bindType = "Object";

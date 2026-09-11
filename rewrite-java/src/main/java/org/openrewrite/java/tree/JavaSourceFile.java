@@ -81,6 +81,10 @@ public interface JavaSourceFile extends J, SourceFile {
                 return (T) new JavaCommentService();
             } else if (SourcePositionService.class.getName().equals(service.getName())) {
                 return (T) service.getConstructor().newInstance();
+            } else if (TemplateService.class.getName().equals(service.getName())) {
+                return (T) service.getConstructor().newInstance();
+            } else if (SourceFileStatementService.class.getName().equals(service.getName())) {
+                return (T) service.getConstructor().newInstance();
             } else {
                 throw new UnsupportedOperationException("Service " + service + " not supported");
             }
