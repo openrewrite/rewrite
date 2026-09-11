@@ -112,7 +112,9 @@ public class NetFrameworkAttestationTests : IDisposable
 
         var assets = await SolutionRestore.RestoreNetFrameworkBuildAssetsAsync(["v4.3"], CancellationToken.None);
 
-        Assert.Equal([root], assets.ReferenceAssemblyRoots);
+        // The root resolved for a requested version leads; roots merely available on the
+        // machine follow it.
+        Assert.Equal(root, assets.ReferenceAssemblyRoots[0]);
         Assert.Empty(assets.MissingVersions);
     }
 
@@ -121,8 +123,9 @@ public class NetFrameworkAttestationTests : IDisposable
     {
         var assets = await SolutionRestore.RestoreNetFrameworkBuildAssetsAsync(["v3.9"], CancellationToken.None);
 
-        Assert.Empty(assets.ReferenceAssemblyRoots);
         Assert.Equal(["v3.9"], assets.MissingVersions);
+        Assert.DoesNotContain(assets.ReferenceAssemblyRoots,
+            root => Directory.Exists(Path.Combine(root, ".NETFramework", "v3.9")));
     }
 
     [Theory]

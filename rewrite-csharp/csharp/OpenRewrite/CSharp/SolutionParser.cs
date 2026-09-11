@@ -17,6 +17,7 @@ using System.Diagnostics;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
+using NuGet.Frameworks;
 using NuGet.ProjectModel;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Format;
@@ -224,6 +225,14 @@ internal static class SolutionRestore
                     roots.Add(root);
             }
 
+            // Reference assemblies already on the machine cost nothing to offer and cover
+            // versions the project scan missed — a TargetFramework that only materializes once
+            // MSBuild has evaluated a condition or Directory.Build.props, say. MSBuild ignores
+            // a search path that does not hold the version a project asks for.
+            foreach (var root in AvailableReferenceAssemblyRoots())
+                if (!roots.Contains(root, StringComparer.OrdinalIgnoreCase))
+                    roots.Add(root);
+
             Log.Debug("netfx build assets — VSToolsPath={VSToolsPath}, reference assembly roots=[{Roots}], missing=[{Missing}]",
                 _vsToolsPath ?? "(missing)", string.Join(";", roots), string.Join(";", missing));
             return new NetFrameworkBuildAssets(_vsToolsPath, roots, missing);
@@ -283,6 +292,32 @@ internal static class SolutionRestore
 
         foreach (var entry in configured.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             yield return entry;
+    }
+
+    /// <summary>
+    /// Every reference assembly root already present on the machine: the pre-provisioned
+    /// directories and each <c>Microsoft.NETFramework.ReferenceAssemblies.*</c> package in the
+    /// NuGet global cache. Nothing is downloaded.
+    /// </summary>
+    private static IEnumerable<string> AvailableReferenceAssemblyRoots()
+    {
+        foreach (var configured in PreProvisionedReferenceAssemblyRoots())
+            if (Directory.Exists(Path.Combine(configured, ".NETFramework")))
+                yield return configured;
+
+        foreach (var cacheRoot in SolutionParser.NuGetCacheRoots)
+        {
+            if (!Directory.Exists(cacheRoot))
+                continue;
+            foreach (var packageDir in Directory.EnumerateDirectories(
+                         cacheRoot, "microsoft.netframework.referenceassemblies.*"))
+            foreach (var installed in Directory.EnumerateDirectories(packageDir))
+            {
+                var root = Path.Combine(installed, "build");
+                if (Directory.Exists(Path.Combine(root, ".NETFramework")))
+                    yield return root;
+            }
+        }
     }
 }
 
@@ -767,7 +802,7 @@ public class SolutionParser
 
     /// <summary>
     /// The MSBuild <c>TargetFrameworkVersion</c> values (highest first) that projects in the
-    /// solution/project directory tree target, for classic projects declaring
+    /// solution/project directory tree target — classic projects declaring
     /// <c>TargetFrameworkVersion</c> and SDK-style ones declaring a .NET Framework
     /// <c>TargetFramework(s)</c> moniker alike. Empty when nothing targets .NET Framework.
     /// </summary>
@@ -781,37 +816,16 @@ public class SolutionParser
                 return Array.Empty<string>();
             foreach (var projectFile in Directory.EnumerateFiles(dir, "*.*proj", SearchOption.AllDirectories))
             {
-                try
+                var frameworks = NuGetResolver.ReadTargetFrameworks(projectFile);
+                foreach (var framework in frameworks)
                 {
-                    var root = XDocument.Load(projectFile).Root;
-                    if (root == null)
-                        continue;
-
-                    // Classic projects carry the MSBuild namespace and SDK-style ones do not, so
-                    // elements are matched on local name.
-                    var properties = root.Elements()
-                        .Where(e => e.Name.LocalName == "PropertyGroup")
-                        .Elements()
-                        .ToList();
-
-                    foreach (var property in properties.Where(e => e.Name.LocalName == "TargetFrameworkVersion"))
-                        AddVersion(versions, NormalizeFrameworkVersion(property.Value));
-
-                    foreach (var property in properties.Where(e =>
-                                 e.Name.LocalName is "TargetFramework" or "TargetFrameworks"))
-                    foreach (var moniker in property.Value.Split(';',
-                                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                        AddVersion(versions, FrameworkVersionOfMoniker(moniker));
-
-                    // A classic project that declares no target framework gets the MSBuild default.
-                    if (root.Attribute("Sdk") == null && !properties.Any(e =>
-                            e.Name.LocalName is "TargetFrameworkVersion" or "TargetFramework" or "TargetFrameworks"))
-                        AddVersion(versions, "v4.0");
+                    if (framework.Framework == FrameworkConstants.FrameworkIdentifiers.Net)
+                        versions.Add(TargetFrameworkVersionOf(framework));
                 }
-                catch
-                {
-                    // Unparseable project file — ignore.
-                }
+
+                // MSBuild defaults a classic project that declares no version to v4.0.
+                if (frameworks.Count == 0 && IsClassicProject(projectFile))
+                    versions.Add("v4.0");
             }
         }
         catch (Exception ex)
@@ -820,38 +834,30 @@ public class SolutionParser
                 path, ex.GetType().Name, ex.Message);
         }
 
-        return versions
-            .OrderByDescending(v => Version.TryParse(v.TrimStart('v'), out var parsed) ? parsed : new Version(0, 0))
-            .ToList();
-    }
-
-    private static void AddVersion(ISet<string> versions, string? version)
-    {
-        if (version != null)
-            versions.Add(version);
-    }
-
-    /// <summary>Normalizes a declared <c>TargetFrameworkVersion</c> such as <c>4.8</c> to <c>v4.8</c>.</summary>
-    private static string? NormalizeFrameworkVersion(string value)
-    {
-        var trimmed = value.Trim().TrimStart('v', 'V');
-        return Version.TryParse(trimmed.Contains('.') ? trimmed : trimmed + ".0", out _) ? "v" + trimmed : null;
+        return versions.OrderByDescending(v => Version.Parse(v[1..])).ToList();
     }
 
     /// <summary>
-    /// The <c>TargetFrameworkVersion</c> a .NET Framework moniker maps to (<c>net472</c> is
-    /// <c>v4.7.2</c>), or null for the moniker of any other framework.
+    /// The MSBuild <c>TargetFrameworkVersion</c> spelling of a framework: <c>v4.7.2</c> rather
+    /// than the <c>4.7.2.0</c> a parsed moniker carries.
     /// </summary>
-    private static string? FrameworkVersionOfMoniker(string moniker)
+    private static string TargetFrameworkVersionOf(NuGetFramework framework)
     {
-        var trimmed = moniker.Trim();
-        if (!trimmed.StartsWith("net", StringComparison.OrdinalIgnoreCase))
-            return null;
-        var digits = trimmed[3..];
-        // net5.0 and later are .NET (Core); .NET Framework monikers are bare digits.
-        if (digits.Length is < 2 or > 3 || !digits.All(char.IsAsciiDigit))
-            return null;
-        return "v" + string.Join('.', digits.Select(d => d.ToString()));
+        var version = framework.Version;
+        var fieldCount = version.Revision > 0 ? 4 : version.Build > 0 ? 3 : 2;
+        return "v" + version.ToString(fieldCount);
+    }
+
+    private static bool IsClassicProject(string projectFile)
+    {
+        try
+        {
+            return XDocument.Load(projectFile).Root?.Attribute("Sdk") == null;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
