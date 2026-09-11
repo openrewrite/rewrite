@@ -190,6 +190,7 @@ public static class NuGetResolver
     private sealed class SerilogMSBuildLogger : Microsoft.Build.Framework.ILogger
     {
         private readonly SortedSet<string> _errorCodes = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> _errors = new();
 
         public string? FailureSignature
         {
@@ -197,6 +198,16 @@ public static class NuGetResolver
             {
                 lock (_errorCodes)
                     return _errorCodes.Count > 0 ? string.Join(",", _errorCodes) : null;
+            }
+        }
+
+        /// <summary>The distinct MSBuild errors raised, most useful first.</summary>
+        public IReadOnlyList<string> Errors
+        {
+            get
+            {
+                lock (_errorCodes)
+                    return _errors.ToList();
             }
         }
 
@@ -209,10 +220,13 @@ public static class NuGetResolver
         {
             eventSource.ErrorRaised += (_, e) =>
             {
-                if (!string.IsNullOrEmpty(e.Code))
+                lock (_errorCodes)
                 {
-                    lock (_errorCodes)
+                    if (!string.IsNullOrEmpty(e.Code))
                         _errorCodes.Add(e.Code);
+                    var text = string.IsNullOrEmpty(e.Code) ? e.Message : e.Code + ": " + e.Message;
+                    if (_errors.Count < 5 && !_errors.Contains(text))
+                        _errors.Add(text);
                 }
                 Log.Debug("MSBuild error {Code} at {File}({Line}): {Message}",
                     e.Code, e.File, e.LineNumber, e.Message);
@@ -504,8 +518,11 @@ public static class NuGetResolver
                 var result = BuildManager.DefaultBuildManager.Build(parameters, requestData);
                 if (result.OverallResult != BuildResultCode.Success || !File.Exists(outputPath))
                 {
-                    Log.Debug("NuGetResolver: GenerateRestoreGraphFile failed for {Project}: {Exception}",
-                        projectPath, result.Exception?.Message);
+                    Log.Warning("Restore graph generation failed for {Project}: {Errors}",
+                        projectPath,
+                        buildLogger.Errors.Count > 0
+                            ? string.Join(" | ", buildLogger.Errors)
+                            : result.Exception?.Message ?? "(no MSBuild error reported)");
                     failureSignature = buildLogger.FailureSignature
                                        ?? result.Exception?.GetType().Name
                                        ?? "build-failed";
