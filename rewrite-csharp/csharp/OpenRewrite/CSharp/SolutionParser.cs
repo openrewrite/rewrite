@@ -279,10 +279,37 @@ public class SolutionParser
                 Log.Debug("  ... and {Remaining} more diagnostics", diags.Count - 10);
         }
 
-        var projectCount = solution.Projects.Count();
-        var docCount = solution.Projects.Sum(p => p.Documents.Count());
-        Log.Debug("LoadAsync: loaded {ProjectCount} projects, {DocCount} documents", projectCount, docCount);
+        var projects = solution.Projects.ToList();
+        var docCount = projects.Sum(p => p.Documents.Count());
+        Log.Debug("LoadAsync: loaded {ProjectCount} projects, {DocCount} documents", projects.Count, docCount);
+
+        var unreferenced = projects.Where(p => !p.MetadataReferences.Any()).ToList();
+        if (unreferenced.Count > 0)
+            Log.Warning("{UnreferencedCount} of {ProjectCount} projects in {FileName} resolved no reference " +
+                        "metadata; their source parses without type attestation: {Projects}. Cause(s): {Reasons}",
+                unreferenced.Count, projects.Count, Path.GetFileName(path),
+                Summarize(unreferenced.Select(p => p.Name)),
+                Summarize(diags.Where(d => d.Kind == WorkspaceDiagnosticKind.Failure)
+                    .Select(FailureReason).Distinct(), limit: 3));
+
         return solution;
+    }
+
+    private static string Summarize(IEnumerable<string> items, int limit = 5)
+    {
+        var list = items.ToList();
+        if (list.Count == 0)
+            return "(none reported)";
+        return list.Count <= limit
+            ? string.Join("; ", list)
+            : string.Join("; ", list.Take(limit)) + $"; and {list.Count - limit} more";
+    }
+
+    private static string FailureReason(WorkspaceDiagnostic diagnostic)
+    {
+        const string marker = "with message: ";
+        var index = diagnostic.Message.IndexOf(marker, StringComparison.Ordinal);
+        return (index < 0 ? diagnostic.Message : diagnostic.Message[(index + marker.Length)..]).Trim();
     }
 
     /// <summary>
