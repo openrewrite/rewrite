@@ -74,8 +74,6 @@ internal static class SolutionRestore
     private static string? _vsToolsPath;
     private static bool _vsToolsPathResolved;
 
-    // Reference-assembly root per TargetFrameworkVersion; a null value records a version whose
-    // package could not be provisioned, so it is only attempted once per process.
     private static readonly Dictionary<string, string?> ReferenceAssemblyRoots =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -188,8 +186,10 @@ internal static class SolutionRestore
     /// web-application targets, so MSBuildWorkspace can evaluate legacy projects on machines
     /// without a .NET Framework targeting pack. Each version is looked for in
     /// <see cref="ReferenceAssembliesEnvironmentVariable"/>, then in the NuGet global package
-    /// cache, and is only downloaded when neither has it. Results are cached for the process
-    /// lifetime.
+    /// cache, and is only downloaded when neither has it. Roots already present on the machine
+    /// are returned as well, after the requested ones: they cost nothing and cover a version the
+    /// project scan cannot see, and MSBuild ignores a search path lacking the version a project
+    /// asks for. Results are cached for the process lifetime.
     /// </summary>
     public static async Task<NetFrameworkBuildAssets> RestoreNetFrameworkBuildAssetsAsync(
         IEnumerable<string> frameworkVersions, CancellationToken ct)
@@ -225,10 +225,6 @@ internal static class SolutionRestore
                     roots.Add(root);
             }
 
-            // Reference assemblies already on the machine cost nothing to offer and cover
-            // versions the project scan missed — a TargetFramework that only materializes once
-            // MSBuild has evaluated a condition or Directory.Build.props, say. MSBuild ignores
-            // a search path that does not hold the version a project asks for.
             foreach (var root in AvailableReferenceAssemblyRoots())
                 if (!roots.Contains(root, StringComparer.OrdinalIgnoreCase))
                     roots.Add(root);
@@ -358,11 +354,9 @@ public class SolutionParser
 
         // MSBuild properties handed to MSBuildWorkspace (and restore-graph evaluation). They
         // point MSBuild at the .NET Framework reference assemblies and web-application targets
-        // that are not present on non-Windows machines. Every .NET Framework target version in
-        // the tree is provisioned, whether it is declared by a classic project
-        // (TargetFrameworkVersion) or an SDK-style one (a net4x/net3x/net2x TargetFramework):
-        // without its own reference assemblies a project resolves no references at all, not
-        // even mscorlib, and its sources are parsed without type attestation.
+        // that are not present on non-Windows machines. A .NET Framework project without its
+        // own reference assemblies resolves nothing, not even mscorlib, and parses without
+        // type attestation.
         var msbuildProperties = new Dictionary<string, string>();
         var frameworkVersions = DetectNetFrameworkVersions(path);
 
@@ -373,8 +367,6 @@ public class SolutionParser
                 msbuildProperties["VSToolsPath"] = buildAssets.VSToolsPath;
             if (buildAssets.ReferenceAssemblyRoots.Count > 0)
             {
-                // TargetFrameworkRootPath holds one root; the fallback search paths cover the
-                // rest, so a solution mixing target framework versions resolves all of them.
                 msbuildProperties["TargetFrameworkRootPath"] = buildAssets.ReferenceAssemblyRoots[0];
                 msbuildProperties["TargetFrameworkFallbackSearchPaths"] =
                     string.Join(";", buildAssets.ReferenceAssemblyRoots);
@@ -808,6 +800,8 @@ public class SolutionParser
     /// </summary>
     internal static IReadOnlyList<string> DetectNetFrameworkVersions(string path)
     {
+        const string ClassicProjectDefaultVersion = "v4.0";
+
         var versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
@@ -823,9 +817,8 @@ public class SolutionParser
                         versions.Add(TargetFrameworkVersionOf(framework));
                 }
 
-                // MSBuild defaults a classic project that declares no version to v4.0.
                 if (frameworks.Count == 0 && IsClassicProject(projectFile))
-                    versions.Add("v4.0");
+                    versions.Add(ClassicProjectDefaultVersion);
             }
         }
         catch (Exception ex)

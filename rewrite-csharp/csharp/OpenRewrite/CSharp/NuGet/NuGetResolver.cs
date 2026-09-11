@@ -240,7 +240,7 @@ public static class NuGetResolver
             psi.ArgumentList.Add("-v:quiet");
             psi.ArgumentList.Add("-nodeReuse:false");
             foreach (var (k, v) in globalProps)
-                psi.ArgumentList.Add($"-p:{k}={v}");
+                psi.ArgumentList.Add($"-p:{k}={EscapeMSBuildPropertyValue(v)}");
 
             lock (BuildGate)
             {
@@ -612,6 +612,14 @@ public static class NuGetResolver
         var lockFiles = await RestoreAsync(dgSpec, commit: false, ct);
         return lockFiles.TryGetValue(Path.GetFullPath(projectPath), out var lockFile) ? lockFile : null;
     }
+
+    /// <summary>
+    /// Escapes an MSBuild property value for a command line. A <c>;</c> would otherwise end the
+    /// <c>-p:</c> switch and the remainder would be read as another switch
+    /// (<c>error MSB1006: Property is not valid</c>), which matters for list-valued properties
+    /// such as <c>TargetFrameworkFallbackSearchPaths</c>.
+    /// </summary>
+    private static string EscapeMSBuildPropertyValue(string value) => value.Replace(";", "%3B");
 
     /// <summary>
     /// Reads the target framework from a legacy csproj's <c>TargetFrameworkVersion</c>
