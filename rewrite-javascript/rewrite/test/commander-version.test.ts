@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
+import * as fs from "fs";
+import * as path from "path";
 import * as semver from "semver";
-import packageJson from "../package.json";
 
 describe("commander version", () => {
     test("declared range cannot resolve to 11 or later, so the RPC server stays runnable on Node 14", () => {
         // given
+        const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../package.json"), "utf8"));
         const range = packageJson.dependencies.commander;
 
         // when
