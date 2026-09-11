@@ -107,6 +107,15 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Proto visitExtensions(Proto.Extensions extensions, PrintOutputCapture<P> p) {
+        beforeSyntax(extensions, p);
+        p.append("extensions");
+        visitContainer("", extensions.getPadding().getRanges(), "", p);
+        afterSyntax(extensions, p);
+        return extensions;
+    }
+
+    @Override
     public Proto visitField(Proto.Field field, PrintOutputCapture<P> p) {
         beforeSyntax(field, p);
         visit(field.getLabel(), p);
@@ -383,6 +392,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
 
         Proto s = paddedStat.getElement();
         if (s instanceof Proto.Empty ||
+            s instanceof Proto.Extensions ||
             s instanceof Proto.Field ||
             s instanceof Proto.Import ||
             s instanceof Proto.MapField ||
