@@ -16,34 +16,38 @@
 package org.openrewrite.toml;
 
 import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
+import lombok.NoArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlRightPadded;
 import org.openrewrite.toml.tree.TomlType;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiFunction;
 
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Utilities for updating string-valued properties in TOML tables.
+ * Utilities for reading and updating string-valued properties in TOML tables.
  */
-@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class TomlTableValue {
 
     public static Toml.@Nullable KeyValue find(Toml.Table table, String key) {
-        for (Toml value : table.getValues()) {
-            if (!(value instanceof Toml.KeyValue)) {
-                continue;
-            }
-            Toml.KeyValue keyValue = (Toml.KeyValue) value;
-            if (keyValue.getKey() instanceof Toml.Identifier &&
+        return find(table.getValues(), key);
+    }
+
+    public static Toml.@Nullable KeyValue find(List<? extends Toml> values, String key) {
+        for (Toml value : values) {
+            if (value instanceof Toml.KeyValue) {
+                Toml.KeyValue keyValue = (Toml.KeyValue) value;
+                if (keyValue.getKey() instanceof Toml.Identifier &&
                     key.equals(((Toml.Identifier) keyValue.getKey()).getName())) {
-                return keyValue;
+                    return keyValue;
+                }
             }
         }
         return null;
@@ -70,65 +74,53 @@ public final class TomlTableValue {
     }
 
     /**
-     * Replaces an existing string-valued property while preserving its source formatting.
+     * Replaces an existing string-valued property, keeping its quote style.
      *
-     * @param table the inline table to update
-     * @param key   the property key
-     * @param value the replacement value
-     * @return the updated table
+     * @return the table unchanged if {@code key} is absent, not a string, or already {@code value}
      */
     public static Toml.Table withString(Toml.Table table, String key, String value) {
-        Toml.KeyValue matchingKeyValue = find(table, key);
-        if (matchingKeyValue == null || !(matchingKeyValue.getValue() instanceof Toml.Literal)) {
-            return table;
-        }
-        Toml.Literal literal = (Toml.Literal) matchingKeyValue.getValue();
-        if (!(literal.getValue() instanceof String)) {
-            return table;
-        }
-        return table.withValues(org.openrewrite.internal.ListUtils.map(table.getValues(), element -> {
-            if (element != matchingKeyValue) {
-                return element;
-            }
-            return matchingKeyValue.withValue(literal.withSource(quoted(literal, value)).withValue(value));
-        }));
+        return withStringProperty(table, key, (keyValue, literal) -> value.equals(literal.getValue()) ? keyValue :
+                keyValue.withValue(literal.withSource(quoted(literal, value)).withValue(value)));
+    }
+
+    /**
+     * Renames an existing string-valued property, keeping its place, padding and value.
+     *
+     * @return the table unchanged if {@code key} is absent or not a string
+     */
+    public static Toml.Table withKey(Toml.Table table, String key, String newKey) {
+        return withStringProperty(table, key, (keyValue, literal) -> {
+            Toml.Identifier identifier = (Toml.Identifier) keyValue.getKey();
+            return keyValue.withKey(new Toml.Identifier(identifier.getId(), identifier.getPrefix(), identifier.getMarkers(), newKey, newKey));
+        });
     }
 
     /**
      * Replaces an existing string-valued property or appends a new property when absent.
      * Existing comma and whitespace padding is preserved.
-     *
-     * @param table the inline table to update
-     * @param key   the property key
-     * @param value the replacement or new value
-     * @return the updated table
      */
     public static Toml.Table withStringOrAdd(Toml.Table table, String key, String value) {
         if (find(table, key) != null) {
             return withString(table, key, value);
         }
-
         Toml.Identifier identifier = new Toml.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, key, key);
-        Toml.Literal literal = new Toml.Literal(
-                randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+        Toml.Literal literal = new Toml.Literal(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
                 TomlType.Primitive.String, "\"" + value + "\"", value);
-        Toml.KeyValue keyValue = new Toml.KeyValue(
-                randomId(), Space.EMPTY, Markers.EMPTY,
+        Toml.KeyValue keyValue = new Toml.KeyValue(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
                 new TomlRightPadded<>(identifier, Space.SINGLE_SPACE, Markers.EMPTY), literal);
-
-        List<Toml> values = table.getValues();
-        List<TomlRightPadded<Toml>> paddedValues = new ArrayList<>(table.getPadding().getValues());
-        if (!paddedValues.isEmpty()) {
-            int lastValue = paddedValues.size() - 1;
-            paddedValues.set(lastValue, paddedValues.get(lastValue).withAfter(Space.EMPTY));
-            table = table.getPadding().withValues(paddedValues);
-        }
-        keyValue = keyValue.withPrefix(Space.SINGLE_SPACE);
-        table = table.withValues(org.openrewrite.internal.ListUtils.concat(values, keyValue));
-        paddedValues = new ArrayList<>(table.getPadding().getValues());
-        int lastValue = paddedValues.size() - 1;
-        paddedValues.set(lastValue, paddedValues.get(lastValue).withAfter(Space.SINGLE_SPACE));
-        return table.getPadding().withValues(paddedValues);
+        return table.getPadding().withValues(ListUtils.concat(
+                ListUtils.mapLast(table.getPadding().getValues(), padded -> padded.withAfter(Space.EMPTY)),
+                new TomlRightPadded<>(keyValue, Space.SINGLE_SPACE, Markers.EMPTY)));
     }
 
+    private static Toml.Table withStringProperty(Toml.Table table, String key,
+                                                 BiFunction<Toml.KeyValue, Toml.Literal, Toml.KeyValue> edit) {
+        Toml.KeyValue keyValue = find(table, key);
+        if (keyValue == null || !(keyValue.getValue() instanceof Toml.Literal) ||
+            !(((Toml.Literal) keyValue.getValue()).getValue() instanceof String)) {
+            return table;
+        }
+        Toml.KeyValue edited = edit.apply(keyValue, (Toml.Literal) keyValue.getValue());
+        return edited == keyValue ? table : table.withValues(ListUtils.map(table.getValues(), value -> value == keyValue ? edited : value));
+    }
 }

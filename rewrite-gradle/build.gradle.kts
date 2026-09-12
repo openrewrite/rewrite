@@ -71,14 +71,7 @@ dependencies {
         exclude("org.slf4j", "slf4j-nop")
     }
     testImplementation(project(":rewrite-gradle-tooling-model:model"))
-    "pluginLocalTestClasspath"(
-        project(
-            mapOf(
-                "path" to ":rewrite-gradle-tooling-model:model",
-                "configuration" to "pluginLocalTestClasspath"
-            )
-        )
-    )
+    "pluginLocalTestClasspath"(project(mapOf("path" to ":rewrite-gradle-tooling-model:model", "configuration" to "pluginLocalTestClasspath")))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
     testImplementation(localGroovy())
     testImplementation(gradleApi())

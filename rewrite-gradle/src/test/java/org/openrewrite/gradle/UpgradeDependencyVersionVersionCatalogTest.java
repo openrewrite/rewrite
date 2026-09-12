@@ -27,7 +27,7 @@ import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
 
     @Test
-    void sequentialRecipesTargetingBothSharersOnlyUpdateTheSharedVersionReference() {
+    void sequentialRecipesDetachAllButTheLastReferrer() {
         rewriteRun(
           spec -> spec.recipes(
             new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null),
@@ -50,7 +50,7 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
                   versionCatalogs {
                       libs {
                           version('widgetVersion', '2.0')
-                          library('widgetA', 'com.acme', 'widget-a').versionRef('widgetVersion')
+                          library('widgetA', 'com.acme', 'widget-a').version('2.0')
                           library('widgetB', 'com.acme', 'widget-b').versionRef('widgetVersion')
                       }
                   }
@@ -61,7 +61,7 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
     }
 
     @Test
-    void kotlinSequentialRecipesTargetingBothSharersOnlyUpdateTheSharedVersionReference() {
+    void kotlinSequentialRecipesDetachAllButTheLastReferrer() {
         rewriteRun(
           spec -> spec.recipes(
             new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null),
@@ -84,7 +84,7 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
                   versionCatalogs {
                       create("libs") {
                           version("widgetVersion", "2.0")
-                          library("widgetA", "com.acme", "widget-a").versionRef("widgetVersion")
+                          library("widgetA", "com.acme", "widget-a").version("2.0")
                           library("widgetB", "com.acme", "widget-b").versionRef("widgetVersion")
                       }
                   }
@@ -578,7 +578,7 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
                   versionCatalogs {
                       libs {
                           version('widgetVersion', '2.0')
-                          library('widgetA', 'com.acme', 'widget-a').versionRef('widgetVersion')
+                          library('widgetA', 'com.acme', 'widget-a').version('2.0')
                           library('widgetB', 'com.acme', 'widget-b').versionRef('widgetVersion')
                           library('widgetC', 'com.acme', 'widget-c').version { strictly('1.0') }
                       }

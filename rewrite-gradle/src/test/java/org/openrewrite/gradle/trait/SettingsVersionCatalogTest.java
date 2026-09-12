@@ -17,14 +17,13 @@ package org.openrewrite.gradle.trait;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.*;
 
-class GradleVersionCatalogTest implements RewriteTest {
+class SettingsVersionCatalogTest implements RewriteTest {
 
     @Nested
     class PublicApi {
@@ -32,7 +31,7 @@ class GradleVersionCatalogTest implements RewriteTest {
         void matchesInlineInSettingsGradle() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new GradleVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),
+                new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),
               settingsGradle(
                 """
                   dependencyResolutionManagement {
@@ -63,7 +62,7 @@ class GradleVersionCatalogTest implements RewriteTest {
             // Mirrors the `apply from: './gradle/versions.gradle'` pattern
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new GradleVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),
+                new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),
               buildGradle(
                 """
                   dependencyResolutionManagement {
@@ -94,7 +93,7 @@ class GradleVersionCatalogTest implements RewriteTest {
         void getVersionResolvesInlineVersion() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new GradleVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
+                new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
                   catalog.getVersion(new GroupArtifact("com.acme", "acme-core")))))),
               settingsGradle(
                 """
@@ -123,7 +122,7 @@ class GradleVersionCatalogTest implements RewriteTest {
         void getVersionResolvesThroughVersionRef() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new GradleVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
+                new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
                   catalog.getVersion(new GroupArtifact("com.acme", "acme-gadget")))))),
               settingsGradle(
                 """
@@ -154,7 +153,7 @@ class GradleVersionCatalogTest implements RewriteTest {
         void getVersionReturnsNullForLibraryWithoutVersion() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new GradleVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
+                new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
                   "version=" + catalog.getVersion(new GroupArtifact("com.acme", "acme-tool")))))),
               settingsGradle(
                 """
@@ -183,7 +182,7 @@ class GradleVersionCatalogTest implements RewriteTest {
         void getVersionReturnsNullWhenLibraryNotFound() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new GradleVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
+                new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
                   "version=" + catalog.getVersion(new GroupArtifact("com.acme", "does-not-exist")))))),
               settingsGradle(
                 """
@@ -212,7 +211,7 @@ class GradleVersionCatalogTest implements RewriteTest {
         void kotlinMatchesInlineInSettingsGradle() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                new GradleVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),
+                new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),
               settingsGradleKts(
                 """
                   dependencyResolutionManagement {
@@ -230,45 +229,6 @@ class GradleVersionCatalogTest implements RewriteTest {
                           /*~~>*/create("libs") {
                               version("lombokVersion", "1.18.30")
                               library("projectLombok", "org.projectlombok", "lombok").versionRef("lombokVersion")
-                          }
-                      }
-                  }
-                  """
-              )
-            );
-        }
-    }
-
-    @Nested
-    class InternalMechanics {
-        @Test
-        void capturesOriginalVersionReferencesOnCatalogRoot() {
-            // The marker only prints under verbose printing, as it must stay invisible in normal recipe output
-            rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() ->
-                        new GradleVersionCatalog.Matcher().asVisitor(catalog -> catalog.withOriginalVersionReferencesMarker().getTree())))
-                      .markerPrinter(PrintOutputCapture.MarkerPrinter.VERBOSE),
-              settingsGradle(
-                """
-                  dependencyResolutionManagement {
-                      versionCatalogs {
-                          libs {
-                              version('springBootVersion', '3.5.15')
-                              library('springBootStarterWeb', 'org.springframework.boot', 'spring-boot-starter-web').versionRef('springBootVersion')
-                              library('springBootStarterWebflux', 'org.springframework.boot', 'spring-boot-starter-webflux').versionRef('springBootVersion')
-                              library('acmeCoreLib', 'com.acme', 'acme-core').version('1.0.0')
-                          }
-                      }
-                  }
-                  """,
-                """
-                  dependencyResolutionManagement {
-                      versionCatalogs {
-                          /*~~(springBootVersion->3.5.15@[org.springframework.boot:spring-boot-starter-web, org.springframework.boot:spring-boot-starter-webflux])~~>*/libs {
-                              version('springBootVersion', '3.5.15')
-                              library('springBootStarterWeb', 'org.springframework.boot', 'spring-boot-starter-web').versionRef('springBootVersion')
-                              library('springBootStarterWebflux', 'org.springframework.boot', 'spring-boot-starter-webflux').versionRef('springBootVersion')
-                              library('acmeCoreLib', 'com.acme', 'acme-core').version('1.0.0')
                           }
                       }
                   }

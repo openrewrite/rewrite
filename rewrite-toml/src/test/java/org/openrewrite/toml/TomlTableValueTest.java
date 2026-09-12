@@ -29,8 +29,6 @@ class TomlTableValueTest {
         Toml.Table table = table("{ group = \"org.example\", name = \"library\", count = 2 }");
 
         assertThat(TomlTableValue.find(table, "name")).isNotNull();
-        assertThat(TomlTableValue.find(table, "missing")).isNull();
-        assertThat(TomlTableValue.find(table, "name")).isNotNull();
         assertThat(TomlTableValue.find(table, "count")).isNotNull();
         assertThat(TomlTableValue.find(table, "missing")).isNull();
         assertThat(TomlTableValue.getString(table, "name")).isEqualTo("library");

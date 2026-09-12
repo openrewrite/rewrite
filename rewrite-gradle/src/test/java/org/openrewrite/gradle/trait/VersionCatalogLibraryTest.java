@@ -23,12 +23,12 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.toml.Assertions.toml;
 
-class GradleVersionCatalogDependencyTest implements RewriteTest {
+class VersionCatalogLibraryTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(RewriteTest.toRecipe(() ->
-          new GradleVersionCatalogDependency.Matcher().asVisitor(dep ->
+          new VersionCatalogLibrary.Matcher().asVisitor(dep ->
             SearchResult.found(dep.getTree(), dep.getGroupId() + ":" + dep.getArtifactId() +
               (dep.getVersion() != null ? ":" + dep.getVersion() : "") +
               (dep.getVersionRef() != null ? " (ref=" + dep.getVersionRef() + ")" : "")))));
@@ -150,7 +150,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void filtersModuleNotationOnGroupAndArtifactPattern() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("com.google.*")
               .artifactPattern("guava")
               .asVisitor(dep -> SearchResult.found(dep.getTree(), dep.getGroupId() + ":" + dep.getArtifactId())))),
@@ -187,7 +187,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void filtersOnGroupPattern() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("com.google.*")
               .asVisitor(dep -> SearchResult.found(dep.getTree(), dep.getGroupId())))),
           toml(
@@ -210,7 +210,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void filtersOnArtifactPattern() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .artifactPattern("guava")
               .asVisitor(dep -> SearchResult.found(dep.getTree(), dep.getArtifactId())))),
           toml(
@@ -233,7 +233,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withVersionUpdatesStringNotation() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
               .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
@@ -255,7 +255,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withVersionAddsVersionToVersionlessStringNotation() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
               .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
@@ -277,7 +277,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withVersionUpdatesInlineTable() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
               .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
@@ -299,7 +299,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withVersionAddsVersionToVersionlessInlineTable() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
               .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
@@ -321,7 +321,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withVersionUpdatesModuleNotationTable() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
               .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
@@ -343,7 +343,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withVersionDoesNotModifyModuleNotationVersionRef() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
               .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
@@ -361,7 +361,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withVersionPreservesSingleQuotes() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
               .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
@@ -383,7 +383,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withVersionDoesNotModifyVersionRefEntry() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("com.google.guava")
               .artifactPattern("guava")
               .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
@@ -401,7 +401,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withInlineCoordinatesUpdatesGroupAndName() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> dep.withGroup("org.new").withName("new-artifact").getTree()))),
@@ -423,7 +423,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withInlineCoordinatesUpdatesModule() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> dep.withModule("org.new:new-artifact").getTree()))),
@@ -445,7 +445,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withGroupRefreshesModuleCoordinate() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> dep.withGroup("org.new").getTree()))),
@@ -467,12 +467,12 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withGroupThenWithModuleUsesUpdatedSemanticCoordinate() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> {
-                  GradleVersionCatalogDependency updated = dep.withGroup("org.new")
-                    .withModule("org.old:old-artifact");
+                  VersionCatalogLibrary updated = dep.withGroup("org.new")
+                    .withModule("org.old:new-artifact");
                   return SearchResult.found(updated.getTree(), updated.getGroupId() + ":" + updated.getArtifactId());
               }))),
           toml(
@@ -482,7 +482,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
               """,
             """
               [libraries]
-              ~~(org.old:old-artifact)~~>my-lib = { module = "org.old:old-artifact" }
+              ~~(org.old:new-artifact)~~>my-lib = { module = "org.old:new-artifact" }
               """,
             spec -> spec.path("gradle/libs.versions.toml")
           )
@@ -493,7 +493,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withNameRefreshesModuleCoordinate() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> dep.withName("new-artifact").getTree()))),
@@ -515,7 +515,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withInlineCoordinatesAddsVersionToModule() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> dep.withModule("org.new:new-artifact").withVersion("2.0").getTree()))),
@@ -537,7 +537,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withInlineCoordinatesAddsVersionWhenOverrideManagedVersion() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> dep.withGroup("org.new").withName("new-artifact").withVersion("2.0").getTree()))),
@@ -559,7 +559,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withStringCoordinatesDoesNotAddVersionWithoutOverrideManagedVersion() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> dep.withGroup("org.new").withName("new-artifact").getTree()))),
@@ -581,7 +581,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withStringCoordinatesAddsVersionWhenOverrideManagedVersion() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> dep.withGroup("org.new").withName("new-artifact").withVersion("2.0").getTree()))),
@@ -603,7 +603,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withModulePreservesRichVersionWhenAddingCoordinates() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> dep.withModule("org.new:new-artifact").withVersion("2.0").getTree()))),
@@ -625,7 +625,7 @@ class GradleVersionCatalogDependencyTest implements RewriteTest {
     void withModuleUpdatesCoordinatesWhilePreservingRichVersion() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            new GradleVersionCatalogDependency.Matcher()
+            new VersionCatalogLibrary.Matcher()
               .groupPattern("org.old")
               .artifactPattern("old-artifact")
               .asVisitor(dep -> dep.withModule("org.new:new-artifact").getTree()))),
