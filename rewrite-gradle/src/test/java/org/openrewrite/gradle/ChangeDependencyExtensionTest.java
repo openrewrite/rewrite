@@ -345,4 +345,31 @@ class ChangeDependencyExtensionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mapEntryExtensionWithAnEscapeSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "rewrite-core", "war", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              dependencies {
+                  api group: 'org.openrewrite', name: 'rewrite-core', ext: 'j\\u0061r'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              dependencies {
+                  api group: 'org.openrewrite', name: 'rewrite-core', ext: 'war'
+              }
+              """
+          )
+        );
+    }
 }
