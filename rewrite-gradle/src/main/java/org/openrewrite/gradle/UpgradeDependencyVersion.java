@@ -417,8 +417,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 // A catalog file has no marker and a settings script no GradleProject, so fall back to a scanned project's repositories
                 @Nullable GradleProject gradleProject = catalog.getCursor().firstEnclosingOrThrow(SourceFile.class).getMarkers()
                         .findFirst(GradleProject.class).orElseGet(acc.gradleProject::get);
-                DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
-                return catalog.withVersions(selectedVersions(catalog, dependencyMatcher, versionSelector, ctx)).getTree();
+                return upgradeCatalog(catalog, dependencyMatcher, new DependencyVersionSelector(metadataFailures, gradleProject, null), ctx);
             });
 
             @Override
@@ -520,13 +519,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     /**
-     * The version each library this recipe matches moves to, for those that move at all, however
-     * the catalog holding them is declared. A library whose new version can't be selected stays.
+     * Moves every library this recipe matches to its selected version, however the catalog holding
+     * them is declared. A library whose metadata can't be downloaded is left alone and warned about
+     * on the catalog, the exception naming the library.
      */
-    private Map<GroupArtifact, String> selectedVersions(VersionCatalog catalog, DependencyMatcher dependencyMatcher,
-                                                        DependencyVersionSelector versionSelector, ExecutionContext ctx) {
+    private Tree upgradeCatalog(VersionCatalog catalog, DependencyMatcher dependencyMatcher,
+                                DependencyVersionSelector versionSelector, ExecutionContext ctx) {
         Map<String, String> declarations = catalog.getVersionDeclarations();
         Map<GroupArtifact, String> selected = new LinkedHashMap<>();
+        List<MavenDownloadingException> failures = new ArrayList<>();
         for (Map.Entry<GroupArtifact, ? extends VersionCatalog.EntryVersion> library : catalog.getLibraryVersions().entrySet()) {
             GroupArtifact ga = library.getKey();
             String currentVersion = library.getValue().getResolvedVersion(declarations);
@@ -539,11 +540,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (selectedVersion != null && !selectedVersion.equals(currentVersion)) {
                     selected.put(ga, selectedVersion);
                 }
-            } catch (MavenDownloadingException ignored) {
-                // leave this library's version unchanged
+            } catch (MavenDownloadingException e) {
+                failures.add(e);
             }
         }
-        return selected;
+        Tree t = catalog.withVersions(selected).getTree();
+        // Warn once: a later cycle reports the same failure differently, which would never stabilize
+        if (!t.getMarkers().findFirst(Markup.Warn.class).isPresent()) {
+            for (MavenDownloadingException failure : failures) {
+                t = failure.warn(t);
+            }
+        }
+        return t;
     }
 
     @RequiredArgsConstructor

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
@@ -209,6 +210,41 @@ class UpgradeDependencyVersionTomlCatalogTest implements RewriteTest {
 
               dependencies {
                   implementation libs.guava
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void warnsAboutALibraryWhoseMetadataCannotBeDownloaded() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.x", null)),
+          settingsGradle(
+            """
+              rootProject.name = 'catalog-file'
+              """
+          ),
+          toml(
+            """
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = "1.0" }
+              """,
+            // which repositories were tried, and so the rest of the warning, varies by environment
+            spec -> spec.path("gradle/libs.versions.toml").after(actual -> {
+                assertThat(actual).startsWith("~~(com.acme:widget-a failed. Unable to download metadata.");
+                return actual;
+            })
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
               }
               """
           )
