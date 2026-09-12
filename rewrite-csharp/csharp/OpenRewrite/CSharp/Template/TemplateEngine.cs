@@ -59,6 +59,14 @@ internal static class TemplateEngine
 {
     private static readonly ConcurrentDictionary<string, J> GlobalCache = new();
 
+    private static readonly ConcurrentQueue<string> CacheInsertions = new();
+
+    private const int MaxCacheEntries = 4096;
+
+    private const string CanonicalPrefix = "__k";
+
+    internal static IEnumerable<string> CacheKeys => GlobalCache.Keys;
+
     /// <summary>
     /// Parse a template code string into an AST node using the default scaffold
     /// (auto-detects expression vs statement).
@@ -82,6 +90,34 @@ internal static class TemplateEngine
         IReadOnlyList<string> usings, IReadOnlyList<string> context,
         IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind)
     {
+        var canonical = CanonicalCaptureNames(code, captures);
+        if (canonical == null)
+        {
+            return ParseCached(code, captures, usings, context, dependencies, scaffoldKind);
+        }
+
+        var canonicalCaptures = new Dictionary<string, object>(captures.Count, StringComparer.Ordinal);
+        foreach (var kvp in captures)
+        {
+            canonicalCaptures[canonical[kvp.Key]] = kvp.Value;
+        }
+
+        var tree = ParseCached(RenamePlaceholders(code, canonical), canonicalCaptures,
+            usings, context, dependencies, scaffoldKind);
+
+        var spelled = new Dictionary<string, string>(canonical.Count, StringComparer.Ordinal);
+        foreach (var kvp in canonical)
+        {
+            spelled[kvp.Value] = kvp.Key;
+        }
+
+        return (J)new PlaceholderRenamer(spelled).Visit(tree, 0)!;
+    }
+
+    private static J ParseCached(string code, IReadOnlyDictionary<string, object> captures,
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind)
+    {
         // Compute preamble first — it affects the scaffold shape and must be part of the cache key
         var preamble = BuildScaffoldPreamble(captures);
         var cacheKey = BuildCacheKey(code, preamble, usings, context, dependencies, scaffoldKind);
@@ -89,8 +125,76 @@ internal static class TemplateEngine
             return cached;
 
         var result = ParseInternal(code, preamble, usings, context, dependencies, scaffoldKind);
-        GlobalCache.TryAdd(cacheKey, result);
+        if (GlobalCache.TryAdd(cacheKey, result))
+        {
+            CacheInsertions.Enqueue(cacheKey);
+            while (GlobalCache.Count > MaxCacheEntries && CacheInsertions.TryDequeue(out var oldest))
+            {
+                GlobalCache.TryRemove(oldest, out _);
+            }
+        }
         return result;
+    }
+
+    private static Dictionary<string, string>? CanonicalCaptureNames(
+        string code, IReadOnlyDictionary<string, object> captures)
+    {
+        if (captures.Count == 0)
+        {
+            return null;
+        }
+
+        var ordered = new List<string>(captures.Count);
+        foreach (var name in captures.Keys)
+        {
+            if (name.StartsWith(CanonicalPrefix, StringComparison.Ordinal))
+            {
+                return null;
+            }
+            ordered.Add(name);
+        }
+
+        ordered.Sort((left, right) =>
+        {
+            var byPosition = Appearance(left).CompareTo(Appearance(right));
+            return byPosition != 0 ? byPosition : string.CompareOrdinal(left, right);
+        });
+
+        var canonical = new Dictionary<string, string>(captures.Count, StringComparer.Ordinal);
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            canonical[ordered[i]] = CanonicalPrefix + i;
+        }
+        return canonical;
+
+        int Appearance(string name)
+        {
+            var at = code.IndexOf(Placeholder.ToPlaceholder(name), StringComparison.Ordinal);
+            return at < 0 ? int.MaxValue : at;
+        }
+    }
+
+    private static string RenamePlaceholders(string code, Dictionary<string, string> canonical)
+    {
+        foreach (var name in canonical.Keys.OrderByDescending(n => n.Length).ThenBy(n => n, StringComparer.Ordinal))
+        {
+            code = code.Replace(Placeholder.ToPlaceholder(name),
+                Placeholder.ToPlaceholder(canonical[name]), StringComparison.Ordinal);
+        }
+        return code;
+    }
+
+    private sealed class PlaceholderRenamer(IReadOnlyDictionary<string, string> spelled) : CSharpVisitor<int>
+    {
+        public override J VisitIdentifier(Identifier identifier, int p)
+        {
+            if (Placeholder.FromPlaceholder(identifier.SimpleName) is { } canonical &&
+                spelled.TryGetValue(canonical, out var name))
+            {
+                identifier = identifier.WithSimpleName(Placeholder.ToPlaceholder(name));
+            }
+            return base.VisitIdentifier(identifier, p);
+        }
     }
 
     private static J ParseInternal(string code, ScaffoldPreamble preamble,
