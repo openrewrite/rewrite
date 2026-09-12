@@ -37,6 +37,10 @@ internal static class SolutionRestore
     private static readonly Dictionary<string, IReadOnlyDictionary<string, LockFile>> Restored =
         new(StringComparer.OrdinalIgnoreCase);
 
+    private static long _totalRestoreMs;
+
+    internal static long TotalRestoreMs => Interlocked.Read(ref _totalRestoreMs);
+
     /// <summary>
     /// .NET Framework build assets that are not present on non-Windows machines. They are
     /// restored as NuGet packages and handed to MSBuildWorkspace as MSBuild properties so
@@ -91,8 +95,14 @@ internal static class SolutionRestore
             var lockFiles = new Dictionary<string, LockFile>(StringComparer.OrdinalIgnoreCase);
             var rootDir = Path.GetDirectoryName(key) ?? ".";
 
+            var totalStopwatch = Stopwatch.StartNew();
+            var graphMsBefore = NuGetResolver.GraphGenerationMs;
+            var restoreMsBefore = NuGetResolver.RestoreExecutionMs;
+            var packagesConfigStopwatch = new Stopwatch();
+
             if (hasPackagesConfig)
             {
+                packagesConfigStopwatch.Start();
                 // Materialize the solution-local packages/ folder for legacy HintPaths.
                 var packagesConfigs = Directory
                     .EnumerateFiles(rootDir, "packages.config", SearchOption.AllDirectories)
@@ -113,6 +123,7 @@ internal static class SolutionRestore
                             lockFiles[Path.GetFullPath(projectFile)] = lockFile;
                     }
                 }
+                packagesConfigStopwatch.Stop();
             }
 
             // In-process restore of PackageReference projects (replaces `dotnet restore`).
@@ -134,6 +145,18 @@ internal static class SolutionRestore
                             "continuing with degraded dependency attestation", path);
             }
             Log.Debug("<< in-process restore ({FileName}) ({Elapsed})", Path.GetFileName(path), sw.Elapsed);
+
+            totalStopwatch.Stop();
+            Interlocked.Add(ref _totalRestoreMs, (long)totalStopwatch.Elapsed.TotalMilliseconds);
+
+            Log.Information(
+                "restore {FileName}: {Total} ms total — packages.config {PackagesConfig} ms, " +
+                "graph generation {Graph} ms, resolve/download {Resolve} ms",
+                Path.GetFileName(path),
+                (long)totalStopwatch.Elapsed.TotalMilliseconds,
+                (long)packagesConfigStopwatch.Elapsed.TotalMilliseconds,
+                NuGetResolver.GraphGenerationMs - graphMsBefore,
+                NuGetResolver.RestoreExecutionMs - restoreMsBefore);
 
             var result = (IReadOnlyDictionary<string, LockFile>)lockFiles;
             lock (Restored)
@@ -279,10 +302,37 @@ public class SolutionParser
                 Log.Debug("  ... and {Remaining} more diagnostics", diags.Count - 10);
         }
 
-        var projectCount = solution.Projects.Count();
-        var docCount = solution.Projects.Sum(p => p.Documents.Count());
-        Log.Debug("LoadAsync: loaded {ProjectCount} projects, {DocCount} documents", projectCount, docCount);
+        var projects = solution.Projects.ToList();
+        var docCount = projects.Sum(p => p.Documents.Count());
+        Log.Debug("LoadAsync: loaded {ProjectCount} projects, {DocCount} documents", projects.Count, docCount);
+
+        var unreferenced = projects.Where(p => !p.MetadataReferences.Any()).ToList();
+        if (unreferenced.Count > 0)
+            Log.Warning("{UnreferencedCount} of {ProjectCount} projects in {FileName} resolved no reference " +
+                        "metadata; their source parses without type attestation: {Projects}. Cause(s): {Reasons}",
+                unreferenced.Count, projects.Count, Path.GetFileName(path),
+                Summarize(unreferenced.Select(p => p.Name)),
+                Summarize(diags.Where(d => d.Kind == WorkspaceDiagnosticKind.Failure)
+                    .Select(FailureReason).Distinct(), limit: 3));
+
         return solution;
+    }
+
+    private static string Summarize(IEnumerable<string> items, int limit = 5)
+    {
+        var list = items.ToList();
+        if (list.Count == 0)
+            return "(none reported)";
+        return list.Count <= limit
+            ? string.Join("; ", list)
+            : string.Join("; ", list.Take(limit)) + $"; and {list.Count - limit} more";
+    }
+
+    private static string FailureReason(WorkspaceDiagnostic diagnostic)
+    {
+        const string marker = "with message: ";
+        var index = diagnostic.Message.IndexOf(marker, StringComparison.Ordinal);
+        return (index < 0 ? diagnostic.Message : diagnostic.Message[(index + marker.Length)..]).Trim();
     }
 
     /// <summary>

@@ -17,6 +17,8 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Xml.Linq;
 using Microsoft.Build.Construction;
+using Microsoft.Build.Evaluation;
+using Microsoft.Build.Execution;
 using NuGet.Commands;
 using NuGet.Common;
 using NuGet.Configuration;
@@ -35,6 +37,104 @@ using ILogger = NuGet.Common.ILogger;
 using OpenRewrite.Core;
 
 namespace OpenRewrite.CSharp.NuGet;
+
+/// <summary>
+/// Points in-process MSBuild at the .NET SDK by setting <c>MSBUILD_EXE_PATH</c>, which is all the
+/// engine needs to resolve <c>Microsoft.NET.Sdk</c> and the rest of the SDK's targets. The
+/// workload resolver is disabled alongside it: restore graphs never need workloads, and it fails
+/// the whole evaluation by calling <c>getcwd()</c> when the working directory has been removed.
+/// Child <c>dotnet</c> processes must not inherit either — see <see cref="ScrubFrom"/>.
+/// <para>
+/// <c>MSBuildLocator.Register*</c> is NOT needed with current MSBuild libraries and must not be
+/// reintroduced. Reference <c>Microsoft.Build</c>, <c>Microsoft.Build.Tasks.Core</c> and
+/// <c>Microsoft.Build.Utilities.Core</c>, and name the SDK here.
+/// </para>
+/// </summary>
+internal static class MSBuildEnvironment
+{
+    private static readonly object Lock = new();
+    private static bool _configured;
+
+    public static void Ensure()
+    {
+        lock (Lock)
+        {
+            if (_configured)
+                return;
+            _configured = true;
+
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MSBUILD_EXE_PATH")))
+                return;
+
+            var msbuild = FindSdkMSBuild();
+            if (msbuild == null)
+            {
+                Log.Debug("MSBuildEnvironment: no .NET SDK found; MSBuild evaluation may fail");
+                return;
+            }
+
+            Environment.SetEnvironmentVariable("MSBUILD_EXE_PATH", msbuild);
+            Environment.SetEnvironmentVariable("MSBuildEnableWorkloadResolver", "false");
+            Log.Debug("MSBuildEnvironment: MSBUILD_EXE_PATH={Path}", msbuild);
+        }
+    }
+
+    /// <summary>
+    /// Removes the variables this class set from a child process's environment. A child
+    /// <c>dotnet</c> initializes its own MSBuild and fails with "The type initializer for
+    /// 'Microsoft.Build.Execution.BuildParameters' threw an exception" if it inherits ours.
+    /// </summary>
+    public static void ScrubFrom(System.Diagnostics.ProcessStartInfo psi)
+    {
+        psi.Environment.Remove("MSBUILD_EXE_PATH");
+        psi.Environment.Remove("MSBuildEnableWorkloadResolver");
+    }
+
+    private static string? FindSdkMSBuild()
+    {
+        foreach (var root in CandidateDotnetRoots())
+        {
+            var sdkRoot = Path.Combine(root, "sdk");
+            if (!Directory.Exists(sdkRoot))
+                continue;
+            var best = Directory.EnumerateDirectories(sdkRoot)
+                .Select(d => (Dir: d, File: Path.Combine(d, "MSBuild.dll")))
+                .Where(x => File.Exists(x.File))
+                .OrderByDescending(x => ParseVersion(Path.GetFileName(x.Dir)))
+                .Select(x => x.File)
+                .FirstOrDefault();
+            if (best != null)
+                return best;
+        }
+        return null;
+    }
+
+    private static IEnumerable<string> CandidateDotnetRoots()
+    {
+        var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+        if (!string.IsNullOrEmpty(host) && File.Exists(host))
+            yield return Path.GetDirectoryName(host)!;
+
+        var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        if (!string.IsNullOrEmpty(dotnetRoot))
+            yield return dotnetRoot;
+
+        var runtime = Path.GetDirectoryName(typeof(object).Assembly.Location);
+        if (runtime != null)
+        {
+            var shared = Path.GetDirectoryName(Path.GetDirectoryName(runtime));
+            var root = shared == null ? null : Path.GetDirectoryName(shared);
+            if (root != null)
+                yield return root;
+        }
+    }
+
+    private static Version ParseVersion(string name)
+    {
+        var core = name.Split('-')[0];
+        return Version.TryParse(core, out var v) ? v : new Version(0, 0);
+    }
+}
 
 /// <summary>
 /// In-process NuGet engine replacing all child-process package operations
@@ -87,6 +187,59 @@ public static class NuGetResolver
         }
     }
 
+    private sealed class SerilogMSBuildLogger : Microsoft.Build.Framework.ILogger
+    {
+        private readonly SortedSet<string> _errorCodes = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> _errors = new();
+
+        public string? FailureSignature
+        {
+            get
+            {
+                lock (_errorCodes)
+                    return _errorCodes.Count > 0 ? string.Join(",", _errorCodes) : null;
+            }
+        }
+
+        /// <summary>The distinct MSBuild errors raised, most useful first.</summary>
+        public IReadOnlyList<string> Errors
+        {
+            get
+            {
+                lock (_errorCodes)
+                    return _errors.ToList();
+            }
+        }
+
+        public Microsoft.Build.Framework.LoggerVerbosity Verbosity { get; set; } =
+            Microsoft.Build.Framework.LoggerVerbosity.Quiet;
+
+        public string? Parameters { get; set; }
+
+        public void Initialize(Microsoft.Build.Framework.IEventSource eventSource)
+        {
+            eventSource.ErrorRaised += (_, e) =>
+            {
+                lock (_errorCodes)
+                {
+                    if (!string.IsNullOrEmpty(e.Code))
+                        _errorCodes.Add(e.Code);
+                    var text = string.IsNullOrEmpty(e.Code) ? e.Message : e.Code + ": " + e.Message;
+                    if (_errors.Count < 5 && !_errors.Contains(text))
+                        _errors.Add(text);
+                }
+                Log.Debug("MSBuild error {Code} at {File}({Line}): {Message}",
+                    e.Code, e.File, e.LineNumber, e.Message);
+            };
+            eventSource.WarningRaised += (_, e) =>
+                Log.Debug("MSBuild warning {Code}: {Message}", e.Code, e.Message);
+        }
+
+        public void Shutdown()
+        {
+        }
+    }
+
     public static ILogger Logger => SerilogNuGetLogger.Instance;
 
     public static ISettings LoadSettings(string startDirectory) =>
@@ -95,28 +248,64 @@ public static class NuGetResolver
     #region Restore graph generation (PackageReference projects)
 
     /// <summary>
-    /// Produces the restore dependency graph for a solution or project by running the
-    /// <c>GenerateRestoreGraphFile</c> MSBuild target in-process for each project.
-    /// Returns null when no project produced a graph (e.g. all projects are packages.config-only).
+    /// Produces the restore dependency graph for a solution or project via the
+    /// <c>GenerateRestoreGraphFile</c> MSBuild target, one child evaluation for the whole
+    /// solution, falling back to per-project evaluation and stopping early on a shared root
+    /// failure. Returns null when no project produced a graph.
     /// </summary>
     public static DependencyGraphSpec? CreateDependencyGraphSpec(
         string path,
         IDictionary<string, string>? extraGlobalProperties = null)
     {
-        var projects = EnumerateProjects(path).ToList();
+        var entry = Path.GetFullPath(path);
+
+        var solutionGraph = GenerateRestoreGraph(entry, extraGlobalProperties);
+        if (solutionGraph != null && solutionGraph.Projects.Count > 0)
+            return solutionGraph;
+
+        var projects = EnumerateProjects(entry).ToList();
         if (projects.Count == 0)
         {
             Log.Debug("NuGetResolver: no MSBuild projects found for {Path}", path);
             return null;
         }
 
+        if (projects.Count == 1 && string.Equals(projects[0], entry, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        Log.Debug("NuGetResolver: solution-level restore graph unavailable for {Path}; " +
+                  "falling back to per-project evaluation ({Count} projects)", path, projects.Count);
+
         var merged = new DependencyGraphSpec();
         var any = false;
+        string? repeatedFailure = null;
+        var repeatedFailureCount = 0;
+        var skipped = 0;
         foreach (var projectPath in projects)
         {
-            var dgSpec = GenerateRestoreGraph(projectPath, extraGlobalProperties);
-            if (dgSpec == null)
+            if (repeatedFailureCount >= RootFailureThreshold)
+            {
+                skipped++;
                 continue;
+            }
+
+            var dgSpec = GenerateRestoreGraph(projectPath, extraGlobalProperties, out var failureSignature);
+            if (dgSpec == null)
+            {
+                if (failureSignature != null && failureSignature == repeatedFailure)
+                {
+                    repeatedFailureCount++;
+                }
+                else
+                {
+                    repeatedFailure = failureSignature;
+                    repeatedFailureCount = failureSignature == null ? 0 : 1;
+                }
+                continue;
+            }
+
+            repeatedFailure = null;
+            repeatedFailureCount = 0;
             foreach (var project in dgSpec.Projects)
             {
                 if (merged.GetProjectSpec(project.RestoreMetadata?.ProjectUniqueName) == null)
@@ -126,6 +315,12 @@ public static class NuGetResolver
                 merged.AddRestore(restore);
             any = true;
         }
+
+        if (skipped > 0)
+            Log.Warning("Restore graph generation failed identically for {Threshold} consecutive projects " +
+                        "in {Path} ({Failure}); skipped the remaining {Skipped} projects rather than " +
+                        "re-proving the same root cause",
+                RootFailureThreshold, path, repeatedFailure, skipped);
 
         return any ? merged : null;
     }
@@ -198,26 +393,88 @@ public static class NuGetResolver
         properties["EnableWindowsTargeting"] = "true";
     }
 
-    // Serialize graph generation: concurrent SDK msbuild processes contend on obj/ and
-    // the NuGet http cache without adding throughput for our one-at-a-time callers.
     private static readonly object BuildGate = new();
 
-    private static readonly TimeSpan GraphGenTimeout = TimeSpan.FromMinutes(5);
+    private const int RootFailureThreshold = 3;
 
-    /// <summary>
-    /// Runs the <c>GenerateRestoreGraphFile</c> target for a single project via the .NET SDK's
-    /// own <c>dotnet msbuild</c> and loads the resulting <see cref="DependencyGraphSpec"/>.
-    /// Evaluation deliberately runs in the SDK's process, never ours: loading Microsoft.Build
-    /// into this process (MSBuildLocator-style) is fragile — any MSBuild assembly in the app
-    /// base defeats the redirection, and the SDK's restore tasks bind their own NuGet assembly
-    /// versions. Only *evaluation* happens in the child; dependency resolution and downloads
-    /// run in-process via <see cref="RestoreRunner"/>. Returns null on evaluation/target
-    /// failure (e.g. a legacy project whose imports cannot be resolved).
-    /// </summary>
+    private static readonly Dictionary<string, (DependencyGraphSpec? Graph, string? Failure)> GraphCache =
+        new(StringComparer.Ordinal);
+
+    private static long _graphGenerationMs;
+    private static long _restoreExecutionMs;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> EvaluationCounts =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private static long _noOpRestores;
+
+    /// <summary>Restores NuGet short-circuited because the project was already up to date.</summary>
+    public static long NoOpRestores => Interlocked.Read(ref _noOpRestores);
+
+    /// <summary>Child MSBuild evaluations run for paths under <paramref name="directory"/>.</summary>
+    public static long GraphEvaluationsUnder(string directory)
+    {
+        var prefix = Path.GetFullPath(directory);
+        return EvaluationCounts
+            .Where(kv => kv.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .Sum(kv => (long)kv.Value);
+    }
+
+    /// <summary>Wall-clock milliseconds spent generating restore graphs in this process.</summary>
+    public static long GraphGenerationMs => Interlocked.Read(ref _graphGenerationMs);
+
+    /// <summary>Wall-clock milliseconds spent resolving and downloading packages in this process.</summary>
+    public static long RestoreExecutionMs => Interlocked.Read(ref _restoreExecutionMs);
+
+    private static string GraphCacheKey(string path, IDictionary<string, string>? extraGlobalProperties)
+    {
+        if (extraGlobalProperties == null || extraGlobalProperties.Count == 0)
+            return path;
+        var props = extraGlobalProperties
+            .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(kv => kv.Key + "=" + kv.Value);
+        return path + " " + string.Join(" ", props);
+    }
+
     private static DependencyGraphSpec? GenerateRestoreGraph(
         string projectPath,
-        IDictionary<string, string>? extraGlobalProperties)
+        IDictionary<string, string>? extraGlobalProperties) =>
+        GenerateRestoreGraph(projectPath, extraGlobalProperties, out _);
+
+    private static DependencyGraphSpec? GenerateRestoreGraph(
+        string projectPath,
+        IDictionary<string, string>? extraGlobalProperties,
+        out string? failureSignature)
     {
+        var cacheKey = GraphCacheKey(projectPath, extraGlobalProperties);
+        lock (GraphCache)
+        {
+            if (GraphCache.TryGetValue(cacheKey, out var cached))
+            {
+                Log.Debug("NuGetResolver: restore graph cache hit for {Project}", projectPath);
+                failureSignature = cached.Failure;
+                return cached.Graph;
+            }
+        }
+
+        var sw = Stopwatch.StartNew();
+        var graph = GenerateRestoreGraphUncached(projectPath, extraGlobalProperties, out failureSignature);
+        Interlocked.Add(ref _graphGenerationMs, (long)sw.Elapsed.TotalMilliseconds);
+
+        lock (GraphCache)
+        {
+            GraphCache[cacheKey] = (graph, failureSignature);
+        }
+        return graph;
+    }
+
+    private static DependencyGraphSpec? GenerateRestoreGraphUncached(
+        string projectPath,
+        IDictionary<string, string>? extraGlobalProperties,
+        out string? failureSignature)
+    {
+        failureSignature = null;
+        MSBuildEnvironment.Ensure();
+        EvaluationCounts.AddOrUpdate(projectPath, 1, (_, n) => n + 1);
         var outputPath = Path.Combine(Path.GetTempPath(),
             "openrewrite-dg-" + Tree.RandomId().ToString("N")[..8] + ".json");
         try
@@ -241,46 +498,34 @@ public static class NuGetResolver
                     globalProps[k] = v;
             }
 
-            var psi = new ProcessStartInfo("dotnet")
-            {
-                WorkingDirectory = Path.GetDirectoryName(projectPath) ?? ".",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            psi.ArgumentList.Add("msbuild");
-            psi.ArgumentList.Add(projectPath);
-            psi.ArgumentList.Add("-t:GenerateRestoreGraphFile");
-            psi.ArgumentList.Add("-nologo");
-            psi.ArgumentList.Add("-v:quiet");
-            psi.ArgumentList.Add("-nodeReuse:false");
-            foreach (var (k, v) in globalProps)
-                psi.ArgumentList.Add($"-p:{k}={v}");
-
+            var buildLogger = new SerilogMSBuildLogger();
             lock (BuildGate)
             {
-                using var process = Process.Start(psi);
-                if (process == null)
+                using var projectCollection = new ProjectCollection(globalProps);
+                var parameters = new BuildParameters(projectCollection)
                 {
-                    Log.Debug("NuGetResolver: failed to start dotnet msbuild for {Project}", projectPath);
-                    return null;
-                }
-
-                // Read both streams before waiting to avoid pipe-buffer deadlock.
-                var stdoutTask = process.StandardOutput.ReadToEndAsync();
-                var stderrTask = process.StandardError.ReadToEndAsync();
-                if (!process.WaitForExit((int)GraphGenTimeout.TotalMilliseconds))
+                    DisableInProcNode = false,
+                    EnableNodeReuse = false,
+                    MaxNodeCount = 1,
+                    Loggers = new Microsoft.Build.Framework.ILogger[] { buildLogger },
+                };
+                var requestData = new BuildRequestData(
+                    projectPath,
+                    globalProps.ToDictionary(p => p.Key, p => (string?)p.Value, StringComparer.OrdinalIgnoreCase),
+                    null,
+                    new[] { "GenerateRestoreGraphFile" },
+                    null);
+                var result = BuildManager.DefaultBuildManager.Build(parameters, requestData);
+                if (result.OverallResult != BuildResultCode.Success || !File.Exists(outputPath))
                 {
-                    try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
-                    Log.Debug("NuGetResolver: GenerateRestoreGraphFile timed out for {Project}", projectPath);
-                    return null;
-                }
-
-                if (process.ExitCode != 0 || !File.Exists(outputPath))
-                {
-                    Log.Debug("NuGetResolver: GenerateRestoreGraphFile failed for {Project} (exit {Exit}):\n{Out}\n{Err}",
-                        projectPath, process.ExitCode, stdoutTask.Result.Trim(), stderrTask.Result.Trim());
+                    Log.Warning("Restore graph generation failed for {Project}: {Errors}",
+                        projectPath,
+                        buildLogger.Errors.Count > 0
+                            ? string.Join(" | ", buildLogger.Errors)
+                            : result.Exception?.Message ?? "(no MSBuild error reported)");
+                    failureSignature = buildLogger.FailureSignature
+                                       ?? result.Exception?.GetType().Name
+                                       ?? "build-failed";
                     return null;
                 }
             }
@@ -291,6 +536,7 @@ public static class NuGetResolver
         {
             Log.Debug("NuGetResolver: restore graph generation failed for {Project}: {Error}",
                 projectPath, ex.Message);
+            failureSignature = ex.GetType().Name;
             return null;
         }
         finally
@@ -298,6 +544,7 @@ public static class NuGetResolver
             try { File.Delete(outputPath); } catch { /* best effort */ }
         }
     }
+
 
     #endregion
 
@@ -349,7 +596,7 @@ public static class NuGetResolver
         var providerCache = new RestoreCommandProvidersCache();
         var restoreArgs = new RestoreArgs
         {
-            AllowNoOp = false,
+            AllowNoOp = true,
             CacheContext = cacheContext,
             Log = Logger,
             CachingSourceProvider = new CachingSourceProvider(new PackageSourceProvider(settings)),
@@ -358,7 +605,11 @@ public static class NuGetResolver
         var requestProvider = new DependencyGraphSpecRequestProvider(providerCache, restorable, settings);
         var requests = await requestProvider.CreateRequests(restoreArgs);
 
+        var sw = Stopwatch.StartNew();
         var results = await RestoreRunner.RunWithoutCommit(requests, restoreArgs);
+        Interlocked.Add(ref _restoreExecutionMs, (long)sw.Elapsed.TotalMilliseconds);
+
+        var noOpCount = 0;
         foreach (var pair in results)
         {
             var projectPath = pair.SummaryRequest.Request.Project.RestoreMetadata?.ProjectPath
@@ -366,6 +617,11 @@ public static class NuGetResolver
             if (!pair.Result.Success)
             {
                 Log.Debug("NuGetResolver: restore failed for {Project}", projectPath);
+            }
+            if (pair.Result is NoOpRestoreResult)
+            {
+                noOpCount++;
+                Interlocked.Increment(ref _noOpRestores);
             }
             if (commit)
             {
@@ -382,6 +638,7 @@ public static class NuGetResolver
                 lockFiles[Path.GetFullPath(projectPath)] = pair.Result.LockFile;
         }
 
+        Log.Debug("NuGetResolver: restored {Count} projects ({NoOp} up to date)", results.Count, noOpCount);
         return lockFiles;
     }
 

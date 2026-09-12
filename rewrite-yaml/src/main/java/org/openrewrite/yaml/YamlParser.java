@@ -431,12 +431,17 @@ public class YamlParser implements org.openrewrite.Parser {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, sse.getAnchor(), nextLastEnd, false);
                             anchors.put(sse.getAnchor(), anchor);
 
+                            // The sequence's prefix keeps the delimiter: the enclosing builder locates it there to
+                            // split the prefix and to decide whether a sequence entry has a dash.
+                            int delimiterIndex = anchorPrefixStart(fmt);
+                            String prefixThroughDelimiter = delimiterIndex == -1 ? fmt : fmt.substring(0, delimiterIndex + 1);
                             lastEnd = lastEnd + sse.getAnchor().length() + fmt.length() + 1;
                             fmt = reader.readStringFromBuffer(lastEnd, nextLastEnd);
                             int dashPrefixIndex = commentAwareIndexOf('-', fmt);
                             if (dashPrefixIndex > -1) {
                                 fmt = fmt.substring(0, dashPrefixIndex);
                             }
+                            fmt = prefixThroughDelimiter + fmt;
                         }
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, nextLastEnd);
                         String startBracketPrefix = null;
@@ -622,13 +627,19 @@ public class YamlParser implements org.openrewrite.Parser {
 
         String prefix = "";
         if (!isForScalar) {
-            int prefixStart = commentAwareIndexOf(':', eventPrefix);
-            if (prefixStart == -1) {
-                prefixStart = commentAwareIndexOf('-', eventPrefix);
-            }
+            int prefixStart = anchorPrefixStart(eventPrefix);
             prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
         }
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
+    }
+
+    /**
+     * The index within an event prefix of the delimiter introducing the anchored block: a mapping entry's colon or a
+     * sequence entry's dash, or -1 when it has neither. Whatever follows the delimiter is the anchor's own prefix.
+     */
+    private static int anchorPrefixStart(String eventPrefix) {
+        int colonIndex = commentAwareIndexOf(':', eventPrefix);
+        return colonIndex == -1 ? commentAwareIndexOf('-', eventPrefix) : colonIndex;
     }
 
     private static int commentAwareIndexOf(char target, String s) {

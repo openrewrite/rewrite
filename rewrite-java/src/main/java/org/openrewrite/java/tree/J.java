@@ -3654,10 +3654,18 @@ public interface J extends Tree {
         @With
         Markers markers;
 
+        /**
+         * The decoded value, with any escape sequence in {@link #valueSource} expanded; the source spelling
+         * instead when {@link #unicodeEscapes} is set.
+         */
         @With
         @Nullable
         Object value;
 
+        /**
+         * The literal as spelled in the source, delimiters included, minus any escape held in
+         * {@link #unicodeEscapes}. This is what gets printed, so a change to {@link #value} must be mirrored here.
+         */
         @With
         @Nullable
         String valueSource;

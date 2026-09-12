@@ -242,26 +242,6 @@ public interface Parser {
         public abstract Parser build();
 
         /**
-         * Which parser this builds is part of its identity, not just how that parser is configured, so builders
-         * of different concrete types are never equal. Without the class check, {@code XmlParser.Builder} and
-         * {@code MavenParser.Builder} would compare equal — both produce {@link SourceFile}s of the same type
-         * and neither adds fields — and grouping sources by parser would hand a pom to the wrong one.
-         * <p>
-         * Subclasses that carry configuration distinguishing two instances of themselves — a classpath, say —
-         * extend this with {@code @EqualsAndHashCode(callSuper = true)}.
-         */
-        @Override
-        public boolean equals(@Nullable Object o) {
-            return this == o || o != null && getClass() == o.getClass() &&
-                                sourceFileType.equals(((Builder) o).sourceFileType);
-        }
-
-        @Override
-        public int hashCode() {
-            return 31 * getClass().hashCode() + sourceFileType.hashCode();
-        }
-
-        /**
          * The name of the domain specific language this parser builder produces a parser for.
          * Used to disambiguate when multiple different parsers are potentially applicable to a source.
          * For example, determining that MavenParser should be used for a pom.xml instead of XmlParser.

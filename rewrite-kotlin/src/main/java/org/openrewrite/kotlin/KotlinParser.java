@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import lombok.EqualsAndHashCode;
 import kotlin.Pair;
 import kotlin.annotation.AnnotationTarget;
 import lombok.AccessLevel;
@@ -277,7 +276,6 @@ public class KotlinParser implements Parser {
     }
 
     @SuppressWarnings("unused")
-    @EqualsAndHashCode(callSuper = true)
     public static class Builder extends Parser.Builder {
         @Nullable
         private Collection<String> artifactNames = emptyList();
@@ -286,14 +284,8 @@ public class KotlinParser implements Parser {
         private Collection<Path> classpath = emptyList();
 
         private List<Input> dependsOn = emptyList();
-
-        /**
-         * Excluded from equality: mutable and shared, see {@link JavaParser.Builder}.
-         */
-        @EqualsAndHashCode.Exclude
         private JavaTypeCache typeCache = new JavaTypeCache();
 
-        @EqualsAndHashCode.Exclude
         @Nullable
         private JavaTypeFactory typeFactory;
 
