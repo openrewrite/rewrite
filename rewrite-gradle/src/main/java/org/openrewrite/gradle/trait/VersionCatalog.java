@@ -45,7 +45,7 @@ public interface VersionCatalog extends Trait<Tree> {
     /**
      * An entry's version, either written out at the entry or referring to a named declaration.
      */
-    interface LibraryVersion {
+    interface EntryVersion {
         @Nullable String getVersion();
 
         @Nullable String getVersionRef();
@@ -67,7 +67,12 @@ public interface VersionCatalog extends Trait<Tree> {
     /**
      * @return every library whose coordinates parse, in declaration order.
      */
-    Map<GroupArtifact, ? extends LibraryVersion> getLibraryVersions();
+    Map<GroupArtifact, ? extends EntryVersion> getLibraryVersions();
+
+    /**
+     * @return every plugin, by plugin id, in declaration order.
+     */
+    Map<String, ? extends EntryVersion> getPluginVersions();
 
     /**
      * @return the value of each named version declaration, by alias.
@@ -84,28 +89,36 @@ public interface VersionCatalog extends Trait<Tree> {
     VersionCatalog withVersionDeclarationValue(String alias, String newVersion);
 
     default @Nullable String getVersion(GroupArtifact ga) {
-        LibraryVersion library = getLibraryVersions().get(ga);
+        EntryVersion library = getLibraryVersions().get(ga);
         return library == null ? null : library.getResolvedVersion(getVersionDeclarations());
     }
 
     /**
      * Moves each library to its new version. A shared version declaration is changed in place when
-     * every library referring to it is moving to the same version, so the catalog goes on saying
-     * that those libraries are versioned together. Otherwise only the libraries that are moving get
-     * a version of their own.
+     * every entry referring to it is a library moving to the same version, so the catalog goes on
+     * saying that those libraries are versioned together. Otherwise only the libraries that are
+     * moving get a version of their own; a declaration a plugin refers to is never moved, since
+     * this moves no plugins.
      */
     default VersionCatalog withVersions(Map<GroupArtifact, String> newVersions) {
         if (newVersions.isEmpty()) {
             return this;
         }
-        Map<GroupArtifact, ? extends LibraryVersion> libraries = getLibraryVersions();
+        Map<GroupArtifact, ? extends EntryVersion> libraries = getLibraryVersions();
         Map<String, String> declarations = getVersionDeclarations();
 
         Map<String, List<GroupArtifact>> referrersByAlias = new LinkedHashMap<>();
-        for (Map.Entry<GroupArtifact, ? extends LibraryVersion> library : libraries.entrySet()) {
+        for (Map.Entry<GroupArtifact, ? extends EntryVersion> library : libraries.entrySet()) {
             String alias = library.getValue().getVersionRef();
             if (alias != null) {
                 referrersByAlias.computeIfAbsent(alias, k -> new ArrayList<>()).add(library.getKey());
+            }
+        }
+        Set<String> pluginAliases = new HashSet<>();
+        for (EntryVersion plugin : getPluginVersions().values()) {
+            String alias = plugin.getVersionRef();
+            if (alias != null) {
+                pluginAliases.add(alias);
             }
         }
 
@@ -114,7 +127,7 @@ public interface VersionCatalog extends Trait<Tree> {
         for (Map.Entry<GroupArtifact, String> entry : newVersions.entrySet()) {
             GroupArtifact ga = entry.getKey();
             String newVersion = entry.getValue();
-            LibraryVersion library = libraries.get(ga);
+            EntryVersion library = libraries.get(ga);
             if (library == null) {
                 continue;
             }
@@ -124,7 +137,7 @@ public interface VersionCatalog extends Trait<Tree> {
                     catalog = catalog.withLibraryVersion(ga, newVersion);
                 }
             } else if (!newVersion.equals(declarations.get(alias)) && !changedAliases.contains(alias)) {
-                boolean movingTogether = true;
+                boolean movingTogether = !pluginAliases.contains(alias);
                 for (GroupArtifact referrer : referrersByAlias.get(alias)) {
                     if (!newVersion.equals(newVersions.get(referrer))) {
                         movingTogether = false;

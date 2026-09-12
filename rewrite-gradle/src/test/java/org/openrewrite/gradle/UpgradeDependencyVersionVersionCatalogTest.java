@@ -421,6 +421,68 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
     }
 
     @Test
+    void pluginReferrerKeepsTheSharedVersionFromMoving() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('widgetVersion', '1.0')
+                          library('widgetA', 'com.acme', 'widget-a').versionRef('widgetVersion')
+                          plugin('widget', 'com.acme.widget').versionRef('widgetVersion')
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('widgetVersion', '1.0')
+                          library('widgetA', 'com.acme', 'widget-a').version('2.0')
+                          plugin('widget', 'com.acme.widget').versionRef('widgetVersion')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinPluginReferrerKeepsTheSharedVersionFromMoving() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)),
+          settingsGradleKts(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      create("libs") {
+                          version("widgetVersion", "1.0")
+                          library("widgetA", "com.acme", "widget-a").versionRef("widgetVersion")
+                          plugin("widget", "com.acme.widget").versionRef("widgetVersion")
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      create("libs") {
+                          version("widgetVersion", "1.0")
+                          library("widgetA", "com.acme", "widget-a").version("2.0")
+                          plugin("widget", "com.acme.widget").versionRef("widgetVersion")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void wildcardGroupAndArtifactUpgradesMultipleNonSharedLibrariesInOnePass() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)),

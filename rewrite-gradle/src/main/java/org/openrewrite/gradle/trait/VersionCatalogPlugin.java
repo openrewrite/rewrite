@@ -29,7 +29,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
  * A plugin entry in a Gradle version catalog TOML file, in its {@code [plugins]} table.
  */
 @Value
-public class VersionCatalogPlugin implements Trait<Toml.KeyValue> {
+public class VersionCatalogPlugin implements Trait<Toml.KeyValue>, VersionCatalog.EntryVersion {
     Cursor cursor;
     String pluginId;
     @Nullable String version;

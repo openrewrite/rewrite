@@ -62,6 +62,13 @@ public class TomlVersionCatalog implements VersionCatalog {
     }
 
     @Override
+    public Map<String, VersionCatalogPlugin> getPluginVersions() {
+        Map<String, VersionCatalogPlugin> plugins = new LinkedHashMap<>();
+        new VersionCatalogPlugin.Matcher().lower(cursor).forEach(plugin -> plugins.putIfAbsent(plugin.getPluginId(), plugin));
+        return plugins;
+    }
+
+    @Override
     public Map<String, String> getVersionDeclarations() {
         Map<String, String> versions = new LinkedHashMap<>();
         for (Toml value : getTree().getValues()) {

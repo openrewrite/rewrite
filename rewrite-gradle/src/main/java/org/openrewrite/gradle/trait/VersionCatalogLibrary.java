@@ -35,7 +35,7 @@ import org.openrewrite.trait.Trait;
  * inline table using {@code group}/{@code name} or {@code module} coordinates.
  */
 @Value
-public class VersionCatalogLibrary implements Trait<Toml.KeyValue>, VersionCatalog.LibraryVersion {
+public class VersionCatalogLibrary implements Trait<Toml.KeyValue>, VersionCatalog.EntryVersion {
 
     Cursor cursor;
     String groupId;

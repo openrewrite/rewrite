@@ -118,6 +118,36 @@ class UpgradeDependencyVersionTomlCatalogTest implements RewriteTest {
     }
 
     @Test
+    void pluginReferrerKeepsTheSharedVersionFromMoving() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)),
+          toml(
+            """
+              [versions]
+              widget = "1.0"
+
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version.ref = "widget" }
+
+              [plugins]
+              widget = { id = "com.acme.widget", version.ref = "widget" }
+              """,
+            """
+              [versions]
+              widget = "1.0"
+
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = "2.0" }
+
+              [plugins]
+              widget = { id = "com.acme.widget", version.ref = "widget" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void sequentialRecipesDetachAllButTheLastReferrer() {
         rewriteRun(
           spec -> spec.recipes(

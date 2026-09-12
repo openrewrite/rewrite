@@ -61,6 +61,18 @@ public class SettingsVersionCatalog implements VersionCatalog {
     }
 
     @Override
+    public Map<String, Plugin> getPluginVersions() {
+        Map<String, Plugin> plugins = new LinkedHashMap<>();
+        new Plugin.Matcher().lower(cursor).forEach(plugin -> {
+            String pluginId = plugin.getPluginId();
+            if (pluginId != null) {
+                plugins.putIfAbsent(pluginId, plugin);
+            }
+        });
+        return plugins;
+    }
+
+    @Override
     public Map<String, String> getVersionDeclarations() {
         Map<String, String> versions = new LinkedHashMap<>();
         new Version.Matcher().lower(cursor).forEach(version -> {
@@ -111,10 +123,11 @@ public class SettingsVersionCatalog implements VersionCatalog {
     }
 
     /**
-     * The {@code library(...)} call, whether {@code outer} is it or a call chained onto it.
+     * The {@code library(...)} or {@code plugin(...)} call, whether {@code outer} is it or a call
+     * chained onto it.
      */
-    private static J.MethodInvocation libraryCall(J.MethodInvocation outer) {
-        return outer.getSelect() instanceof J.MethodInvocation && "library".equals(((J.MethodInvocation) outer.getSelect()).getSimpleName()) ?
+    private static J.MethodInvocation entryCall(J.MethodInvocation outer, String name) {
+        return outer.getSelect() instanceof J.MethodInvocation && name.equals(((J.MethodInvocation) outer.getSelect()).getSimpleName()) ?
                 (J.MethodInvocation) outer.getSelect() : outer;
     }
 
@@ -150,11 +163,11 @@ public class SettingsVersionCatalog implements VersionCatalog {
      * {@code library(alias, "group:artifact:version")} one.
      */
     @Value
-    private static class Library implements Trait<J.MethodInvocation>, VersionCatalog.LibraryVersion {
+    private static class Library implements Trait<J.MethodInvocation>, VersionCatalog.EntryVersion {
         Cursor cursor;
 
         private @Nullable GroupArtifact getGroupArtifact() {
-            J.MethodInvocation library = libraryCall(getTree());
+            J.MethodInvocation library = entryCall(getTree(), "library");
             if (library.getArguments().size() == 3) {
                 String groupId = literalArgument(library, 1);
                 String artifactId = literalArgument(library, 2);
@@ -213,7 +226,7 @@ public class SettingsVersionCatalog implements VersionCatalog {
                     return null;
                 }
                 J.MethodInvocation outer = (J.MethodInvocation) value;
-                J.MethodInvocation library = libraryCall(outer);
+                J.MethodInvocation library = entryCall(outer, "library");
                 if (!"library".equals(library.getSimpleName()) || literalArgument(library, 0) == null) {
                     return null;
                 }
@@ -232,7 +245,43 @@ public class SettingsVersionCatalog implements VersionCatalog {
     }
 
     /**
-     * A {@code version(alias, value)} declaration, what a library's {@code versionRef(...)} points at.
+     * A {@code plugin(alias, id)} declaration with its {@code .version(...)} or
+     * {@code .versionRef(...)}.
+     */
+    @Value
+    private static class Plugin implements Trait<J.MethodInvocation>, VersionCatalog.EntryVersion {
+        Cursor cursor;
+
+        private @Nullable String getPluginId() {
+            return literalArgument(entryCall(getTree(), "plugin"), 1);
+        }
+
+        @Override
+        public @Nullable String getVersion() {
+            return isChained(getTree(), "version") ? literalArgument(getTree(), 0) : null;
+        }
+
+        @Override
+        public @Nullable String getVersionRef() {
+            return isChained(getTree(), "versionRef") ? literalArgument(getTree(), 0) : null;
+        }
+
+        private static class Matcher extends GradleTraitMatcher<Plugin> {
+            @Override
+            protected @Nullable Plugin test(Cursor cursor) {
+                Object value = cursor.getValue();
+                if (!(value instanceof J.MethodInvocation) || !isTopLevelStatement(cursor) || !withinBlock(cursor, "versionCatalogs")) {
+                    return null;
+                }
+                J.MethodInvocation plugin = entryCall((J.MethodInvocation) value, "plugin");
+                return "plugin".equals(plugin.getSimpleName()) && plugin.getArguments().size() == 2 &&
+                       literalArgument(plugin, 1) != null ? new Plugin(cursor) : null;
+            }
+        }
+    }
+
+    /**
+     * A {@code version(alias, value)} declaration, what an entry's {@code versionRef(...)} points at.
      */
     @Value
     private static class Version implements Trait<J.MethodInvocation> {
