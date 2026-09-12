@@ -39,7 +39,7 @@ import java.util.function.UnaryOperator;
  * either a Groovy {@code libs { ... } } closure or a Kotlin {@code create("libs") { ... } } call.
  */
 @Value
-public class SettingsVersionCatalog implements VersionCatalog {
+class SettingsVersionCatalog implements VersionCatalog {
     Cursor cursor;
     String catalogName;
 
@@ -163,7 +163,7 @@ public class SettingsVersionCatalog implements VersionCatalog {
      * {@code library(alias, "group:artifact:version")} one.
      */
     @Value
-    private static class Library implements Trait<J.MethodInvocation>, VersionCatalog.EntryVersion {
+    private static class Library implements Trait<J.MethodInvocation>, VersionCatalog.Entry {
         Cursor cursor;
 
         private @Nullable GroupArtifact getGroupArtifact() {
@@ -249,7 +249,7 @@ public class SettingsVersionCatalog implements VersionCatalog {
      * {@code .versionRef(...)}.
      */
     @Value
-    private static class Plugin implements Trait<J.MethodInvocation>, VersionCatalog.EntryVersion {
+    private static class Plugin implements Trait<J.MethodInvocation>, VersionCatalog.Entry {
         Cursor cursor;
 
         private @Nullable String getPluginId() {
@@ -316,7 +316,7 @@ public class SettingsVersionCatalog implements VersionCatalog {
         }
     }
 
-    public static class Matcher extends GradleTraitMatcher<SettingsVersionCatalog> {
+    static class Matcher extends GradleTraitMatcher<SettingsVersionCatalog> {
         @Override
         protected @Nullable SettingsVersionCatalog test(Cursor cursor) {
             Object value = cursor.getValue();

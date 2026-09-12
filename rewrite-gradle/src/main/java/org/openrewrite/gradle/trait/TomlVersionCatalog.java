@@ -37,7 +37,7 @@ import java.util.function.UnaryOperator;
  * A catalog declared as a TOML file, conventionally {@code gradle/libs.versions.toml}.
  */
 @Value
-public class TomlVersionCatalog implements VersionCatalog {
+class TomlVersionCatalog implements VersionCatalog {
     private static final List<String> CATALOG_TABLES = Arrays.asList("versions", "libraries", "bundles", "plugins");
 
     Cursor cursor;
@@ -45,7 +45,7 @@ public class TomlVersionCatalog implements VersionCatalog {
     /**
      * A cheaper test than {@link Matcher}, for narrowing which documents a visitor accepts.
      */
-    public static boolean isVersionCatalog(SourceFile sourceFile) {
+    static boolean isVersionCatalog(SourceFile sourceFile) {
         return sourceFile instanceof Toml.Document && sourceFile.getSourcePath().toString().endsWith(".versions.toml");
     }
 
@@ -124,7 +124,7 @@ public class TomlVersionCatalog implements VersionCatalog {
         return table.getName() != null && "versions".equals(table.getName().getName());
     }
 
-    public static class Matcher extends SimpleTraitMatcher<TomlVersionCatalog> {
+    static class Matcher extends SimpleTraitMatcher<TomlVersionCatalog> {
         @Override
         protected @Nullable TomlVersionCatalog test(Cursor cursor) {
             if (cursor.getValue() instanceof Toml.Document) {

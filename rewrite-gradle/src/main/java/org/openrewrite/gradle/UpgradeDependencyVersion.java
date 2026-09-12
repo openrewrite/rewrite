@@ -528,7 +528,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         Map<String, String> declarations = catalog.getVersionDeclarations();
         Map<GroupArtifact, String> selected = new LinkedHashMap<>();
         List<MavenDownloadingException> failures = new ArrayList<>();
-        for (Map.Entry<GroupArtifact, ? extends VersionCatalog.EntryVersion> library : catalog.getLibraryVersions().entrySet()) {
+        for (Map.Entry<GroupArtifact, ? extends VersionCatalog.Entry> library : catalog.getLibraryVersions().entrySet()) {
             GroupArtifact ga = library.getKey();
             String currentVersion = library.getValue().getResolvedVersion(declarations);
             if (currentVersion == null || !dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {

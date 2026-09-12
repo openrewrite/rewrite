@@ -38,14 +38,16 @@ import java.util.Set;
 
 /**
  * A Gradle version catalog, declared either in {@code settings.gradle(.kts)} or in a
- * {@code gradle/libs.versions.toml} file. {@link Matcher} finds either.
+ * {@code gradle/libs.versions.toml} file. {@link Matcher} finds either, and is the way to one:
+ * the implementations are not public.
  */
 public interface VersionCatalog extends Trait<Tree> {
 
     /**
-     * An entry's version, either written out at the entry or referring to a named declaration.
+     * A library or plugin, whose version is either written out at the entry itself or refers to one
+     * of the catalog's named declarations.
      */
-    interface EntryVersion {
+    interface Entry {
         @Nullable String getVersion();
 
         @Nullable String getVersionRef();
@@ -67,12 +69,12 @@ public interface VersionCatalog extends Trait<Tree> {
     /**
      * @return every library whose coordinates parse, in declaration order.
      */
-    Map<GroupArtifact, ? extends EntryVersion> getLibraryVersions();
+    Map<GroupArtifact, ? extends Entry> getLibraryVersions();
 
     /**
      * @return every plugin, by plugin id, in declaration order.
      */
-    Map<String, ? extends EntryVersion> getPluginVersions();
+    Map<String, ? extends Entry> getPluginVersions();
 
     /**
      * @return the value of each named version declaration, by alias.
@@ -89,7 +91,7 @@ public interface VersionCatalog extends Trait<Tree> {
     VersionCatalog withVersionDeclarationValue(String alias, String newVersion);
 
     default @Nullable String getVersion(GroupArtifact ga) {
-        EntryVersion library = getLibraryVersions().get(ga);
+        Entry library = getLibraryVersions().get(ga);
         return library == null ? null : library.getResolvedVersion(getVersionDeclarations());
     }
 
@@ -104,18 +106,18 @@ public interface VersionCatalog extends Trait<Tree> {
         if (newVersions.isEmpty()) {
             return this;
         }
-        Map<GroupArtifact, ? extends EntryVersion> libraries = getLibraryVersions();
+        Map<GroupArtifact, ? extends Entry> libraries = getLibraryVersions();
         Map<String, String> declarations = getVersionDeclarations();
 
         Map<String, List<GroupArtifact>> referrersByAlias = new LinkedHashMap<>();
-        for (Map.Entry<GroupArtifact, ? extends EntryVersion> library : libraries.entrySet()) {
+        for (Map.Entry<GroupArtifact, ? extends Entry> library : libraries.entrySet()) {
             String alias = library.getValue().getVersionRef();
             if (alias != null) {
                 referrersByAlias.computeIfAbsent(alias, k -> new ArrayList<>()).add(library.getKey());
             }
         }
         Set<String> pluginAliases = new HashSet<>();
-        for (EntryVersion plugin : getPluginVersions().values()) {
+        for (Entry plugin : getPluginVersions().values()) {
             String alias = plugin.getVersionRef();
             if (alias != null) {
                 pluginAliases.add(alias);
@@ -127,7 +129,7 @@ public interface VersionCatalog extends Trait<Tree> {
         for (Map.Entry<GroupArtifact, String> entry : newVersions.entrySet()) {
             GroupArtifact ga = entry.getKey();
             String newVersion = entry.getValue();
-            EntryVersion library = libraries.get(ga);
+            Entry library = libraries.get(ga);
             if (library == null) {
                 continue;
             }
@@ -156,8 +158,8 @@ public interface VersionCatalog extends Trait<Tree> {
     }
 
     /**
-     * Matches a {@link SettingsVersionCatalog} at its {@code libs { ... } } call or a
-     * {@link TomlVersionCatalog} at the document of a {@code *.versions.toml} file.
+     * Matches a settings catalog at its {@code libs { ... } } call, or a TOML catalog at the
+     * document of a {@code *.versions.toml} file.
      */
     class Matcher extends SimpleTraitMatcher<VersionCatalog> {
         private final SettingsVersionCatalog.Matcher settings = new SettingsVersionCatalog.Matcher();
