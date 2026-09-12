@@ -28,6 +28,7 @@ import org.openrewrite.gradle.trait.ExtraProperty;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
+import org.openrewrite.gradle.trait.VersionCatalog;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -52,6 +53,7 @@ import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static java.util.Collections.*;
@@ -106,7 +108,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             "Supports updating dependency declarations of various forms:\n" +
             " * `String` notation: `\"group:artifact:version\"` \n" +
             " * `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
-            "Can update version numbers which are defined earlier in the same file in variable declarations.";
+            "Can update version numbers which are defined earlier in the same file in variable declarations, " +
+            "and in a version catalog.";
 
     @Override
     public Validated<Object> validate() {
@@ -169,6 +172,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         List<BomCandidate> bomCandidates = new ArrayList<>();
 
         AtomicBoolean bomCandidatesResolved = new AtomicBoolean();
+
+        /**
+         * The root project's if it was scanned, otherwise the first one seen, so that a catalog
+         * carrying no marker of its own resolves against the same repositories the build does.
+         */
+        AtomicReference<@Nullable GradleProject> gradleProject = new AtomicReference<>();
     }
 
     @Value
@@ -206,6 +215,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    if (gradleProject != null && (acc.gradleProject.get() == null || ":".equals(gradleProject.getPath()))) {
+                        acc.gradleProject.set(gradleProject);
+                    }
                     for (GroupArtifactVersion bom : SpringBomProperty.importedBoms((JavaSourceFile) tree)) {
                         if (!acc.scriptImportedBoms.contains(bom)) {
                             acc.scriptImportedBoms.add(bom);
@@ -400,10 +412,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
+            private final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+            private final TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) -> {
+                // A catalog file has no marker and a settings script no GradleProject, so fall back to a scanned project's repositories
+                @Nullable GradleProject gradleProject = catalog.getCursor().firstEnclosingOrThrow(SourceFile.class).getMarkers()
+                        .findFirst(GradleProject.class).orElseGet(acc.gradleProject::get);
+                return upgradeCatalog(catalog, dependencyMatcher, new DependencyVersionSelector(metadataFailures, gradleProject, null), ctx);
+            });
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
-                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx);
+                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx) ||
+                       updateVersionCatalog.isAcceptable(sf, ctx);
             }
 
             @Override
@@ -417,6 +437,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         t = updateProperties.visitNonNull(t, ctx);
                     } else if (updateGradle.isAcceptable(sf, ctx)) {
                         t = updateGradle.visitNonNull(t, ctx);
+                    }
+                    if (updateVersionCatalog.isAcceptable(sf, ctx)) {
+                        t = updateVersionCatalog.visitNonNull(t, ctx);
                     }
                     Optional<GradleProject> projectMarker = t.getMarkers().findFirst(GradleProject.class);
                     if (tree != t && projectMarker.isPresent()) {
@@ -493,6 +516,42 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return constraints.isEmpty() ? gradleProject : gradleProject.addOrUpdateConstraints(constraints, ctx);
             }
         };
+    }
+
+    /**
+     * Moves every library this recipe matches to its selected version, however the catalog holding
+     * them is declared. A library whose metadata can't be downloaded is left alone and warned about
+     * on the catalog, the exception naming the library.
+     */
+    private Tree upgradeCatalog(VersionCatalog catalog, DependencyMatcher dependencyMatcher,
+                                DependencyVersionSelector versionSelector, ExecutionContext ctx) {
+        Map<String, String> declarations = catalog.getVersionDeclarations();
+        Map<GroupArtifact, String> selected = new LinkedHashMap<>();
+        List<MavenDownloadingException> failures = new ArrayList<>();
+        for (Map.Entry<GroupArtifact, ? extends VersionCatalog.Entry> library : catalog.getLibraryVersions().entrySet()) {
+            GroupArtifact ga = library.getKey();
+            String currentVersion = library.getValue().getResolvedVersion(declarations);
+            if (currentVersion == null || !dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
+                continue;
+            }
+            try {
+                GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), currentVersion);
+                String selectedVersion = versionSelector.select(gav, null, newVersion, versionPattern, ctx);
+                if (selectedVersion != null && !selectedVersion.equals(currentVersion)) {
+                    selected.put(ga, selectedVersion);
+                }
+            } catch (MavenDownloadingException e) {
+                failures.add(e);
+            }
+        }
+        Tree t = catalog.withVersions(selected).getTree();
+        // Warn once: a later cycle reports the same failure differently, which would never stabilize
+        if (!t.getMarkers().findFirst(Markup.Warn.class).isPresent()) {
+            for (MavenDownloadingException failure : failures) {
+                t = failure.warn(t);
+            }
+        }
+        return t;
     }
 
     @RequiredArgsConstructor
