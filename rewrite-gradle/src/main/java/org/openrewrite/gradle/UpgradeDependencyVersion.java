@@ -1074,14 +1074,24 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 String configName = dependency.getConfigurationName();
 
                 if (currentVersion == null) {
-                    // Only handle dependencies without versions if they are platform dependencies
-                    // Regular dependencies without versions are governed by constraints and should not be upgraded
-                    if (!dependency.isPlatform()) {
-                        return dependency.getTree();
-                    }
                     GroupArtifact ga = new GroupArtifact(groupId, artifactId);
-                    selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                            .select(ga, configName, newVersion, versionPattern, ctx);
+                    if (dependency.isPlatform()) {
+                        selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                .select(ga, configName, newVersion, versionPattern, ctx);
+                    } else {
+                        // A version the build never declares is ours to pin only when a platform supplies it.
+                        // One supplied by a constraint belongs to UpgradeTransitiveDependencyVersion.
+                        String managedVersion = platformManagedVersion(ga, configName, ctx);
+                        if (managedVersion == null) {
+                            return dependency.getTree();
+                        }
+                        GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, managedVersion);
+                        selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                .select(gav, configName, newVersion, versionPattern, ctx);
+                        if (managedVersion.equals(selectedVersion)) {
+                            return dependency.getTree();
+                        }
+                    }
                 } else {
                     GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, currentVersion);
                     selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
@@ -1123,6 +1133,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             return dependency.withDeclaredVersion(selectedVersion).getTree();
+        }
+
+        private @Nullable String platformManagedVersion(GroupArtifact ga, String configName, ExecutionContext ctx) {
+            if (gradleProject == null) {
+                return null;
+            }
+            GradleDependencyConfiguration configuration = gradleProject.getConfiguration(configName);
+            return configuration == null ? null :
+                    configuration.getPlatformManagedVersion(ga, gradleProject.getMavenRepositories(), ctx);
         }
 
         /**
