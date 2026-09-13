@@ -31,8 +31,11 @@ class Tree(ABC):
     # equality/hashing/scope checks below compare the raw `_id` int to stay off the
     # allocation path.
     @property
-    def id(self) -> UUID:
-        return UUID(int=self._id)  # ty: ignore[unresolved-attribute]  # _id is declared on concrete subclasses
+    def id(self) -> Optional[UUID]:
+        # The RPC receiver reads `.id` on an all-None placeholder before filling
+        # it in, so an unset `_id` must yield None rather than `UUID(int=None)`.
+        _id = self._id  # ty: ignore[unresolved-attribute]  # _id is declared on concrete subclasses
+        return UUID(int=_id) if _id is not None else None
 
     # `_id` is part of the public positional constructor surface, so callers may
     # pass a `uuid.UUID` (e.g. `uuid4()` or another node's `.id`). The dataclass
