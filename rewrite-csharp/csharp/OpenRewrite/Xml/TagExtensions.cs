@@ -71,7 +71,7 @@ public static class TagExtensions
         foreach (var attr in tag.Attributes)
         {
             if (string.Equals(attr.Key.Name, attrName, StringComparison.OrdinalIgnoreCase))
-                return attr.Val.Val;
+                return attr.Val is Attribute.Value value ? value.Val : null;
         }
         return null;
     }
@@ -86,7 +86,9 @@ public static class TagExtensions
         {
             if (string.Equals(attrs[i].Key.Name, attrName, StringComparison.OrdinalIgnoreCase))
             {
-                attrs[i] = attrs[i].WithVal(attrs[i].Val.WithVal(newValue));
+                if (attrs[i].Val is not Attribute.Value value)
+                    return tag;
+                attrs[i] = attrs[i].WithVal(value.WithVal(newValue));
                 return tag.WithAttributes(attrs);
             }
         }
