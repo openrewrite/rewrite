@@ -247,9 +247,15 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                     if (versionValidation.isValid()) {
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
                         try {
-                            // The version of the dependency currently in use (if any) might influence the version comparator
-                            // For example, "latest.patch" gives very different results depending on the version in use
-                            String currentVersion = getResolutionResult().findDependencies(convertedGroup, convertedArtifact, Scope.fromName(scope)).stream()
+                            // The version of the dependency currently in use (if any) might influence the version comparator.
+                            // For example, "latest.patch" gives very different results depending on the version in use.
+                            // `scope` is not a dependency search scope: it's what scope to tag the *new* managed
+                            // dependency entry with, and has no bearing on which scope(s) the dependency is actually
+                            // used in elsewhere in the project. Filtering this lookup by Scope.fromName(scope) would be
+                            // wrong even for a resolvable scope value - e.g. tagging a new entry "provided" doesn't
+                            // mean the dependency's real current usage is provided-scoped too, it could be compile,
+                            // test, etc. So search across all scopes here, regardless of `scope`.
+                            String currentVersion = getResolutionResult().findDependencies(convertedGroup, convertedArtifact, null).stream()
                                     .map(ResolvedDependency::getVersion)
                                     .findFirst()
                                     .orElse(existingManagedDependencyVersion());
@@ -280,7 +286,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
             }
 
             private @Nullable String existingManagedDependencyVersion() {
-                return getResolutionResult().getPom().getDependencyManagement().stream()
+                String version = getResolutionResult().getPom().getDependencyManagement().stream()
                         .map(resolvedManagedDep -> {
                             if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
                                 return resolvedManagedDep.getGav().getVersion();
@@ -292,6 +298,20 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                             return null;
                         })
                         .filter(Objects::nonNull)
+                        .findFirst().orElse(null);
+                if (version != null) {
+                    return version;
+                }
+                // An already-added "import" entry whose target has no dependencyManagement of its own (e.g. a
+                // plain jar coordinate, rather than a real BOM) contributes nothing to the resolved dependency
+                // management above, so it can never be detected as already present that way - the resolved
+                // model only records imports via the managed dependencies they in turn contribute. Fall back to
+                // this pom's own raw (unexpanded) managed dependency declarations to detect that case, so the
+                // recipe doesn't keep re-adding an already-present import on every cycle.
+                return getResolutionResult().getPom().getRequested().getDependencyManagement().stream()
+                        .filter(ManagedDependency.Imported.class::isInstance)
+                        .filter(d -> Objects.equals(groupId, d.getGroupId()) && artifactId.equals(d.getArtifactId()))
+                        .map(ManagedDependency::getVersion)
                         .findFirst().orElse(null);
             }
         });
