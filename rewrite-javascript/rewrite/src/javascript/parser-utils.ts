@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as ts from "typescript";
+import * as ts from "./compiler";
 import {Expression, J, Statement} from "../java";
 import {JS} from "./tree";
+import {childAt, childCountOf, childrenOf, lastTokenOf} from "./token-navigation";
 
 const is_statements: string[] = [
     J.Kind.Assert,
@@ -168,7 +169,7 @@ export function getNextSibling(node: ts.Node): ts.Node | undefined {
     const syntaxList = findContainingSyntaxList(node);
 
     if (syntaxList) {
-        const children = syntaxList.getChildren();
+        const children = childrenOf(syntaxList);
         const nodeIndex = children.indexOf(node);
 
         if (nodeIndex === -1) {
@@ -177,9 +178,9 @@ export function getNextSibling(node: ts.Node): ts.Node | undefined {
 
         // If the node is the last child in the SyntaxList, recursively check the parent's next sibling
         if (nodeIndex === children.length - 1) {
-            const syntaxListIndex = parent.getChildren().indexOf(syntaxList);
-            if (parent.getChildCount() > syntaxListIndex + 1) {
-                return parent.getChildAt(syntaxListIndex + 1);
+            const syntaxListIndex = childrenOf(parent).indexOf(syntaxList);
+            if (childCountOf(parent) > syntaxListIndex + 1) {
+                return childAt(parent, syntaxListIndex + 1);
             }
             const parentNextSibling = getNextSibling(parent);
             if (!parentNextSibling) {
@@ -189,7 +190,7 @@ export function getNextSibling(node: ts.Node): ts.Node | undefined {
             // Return the first child of the parent's next sibling
             const parentSyntaxList = findContainingSyntaxList(parentNextSibling);
             if (parentSyntaxList) {
-                const siblings = parentSyntaxList.getChildren();
+                const siblings = childrenOf(parentSyntaxList);
                 return siblings[0] || null;
             } else {
                 return parentNextSibling;
@@ -200,7 +201,7 @@ export function getNextSibling(node: ts.Node): ts.Node | undefined {
         return children[nodeIndex + 1];
     }
 
-    const parentChildren = parent.getChildren();
+    const parentChildren = childrenOf(parent);
     const nodeIndex = parentChildren.indexOf(node);
 
     if (nodeIndex === -1) {
@@ -215,7 +216,7 @@ export function getNextSibling(node: ts.Node): ts.Node | undefined {
         }
 
         // Return the first child of the parent's next sibling
-        return parentNextSibling.getChildCount() > 0 ? parentNextSibling.getChildAt(0) : parentNextSibling;
+        return childCountOf(parentNextSibling) > 0 ? childAt(parentNextSibling, 0) : parentNextSibling;
     }
 
     // Otherwise, return the next sibling
@@ -231,7 +232,7 @@ export function getPreviousSibling(node: ts.Node): ts.Node | undefined {
     const syntaxList = findContainingSyntaxList(node);
 
     if (syntaxList) {
-        const children = syntaxList.getChildren();
+        const children = childrenOf(syntaxList);
         const nodeIndex = children.indexOf(node);
 
         if (nodeIndex === -1) {
@@ -248,7 +249,7 @@ export function getPreviousSibling(node: ts.Node): ts.Node | undefined {
             // Return the last child of the parent's previous sibling
             const parentSyntaxList = findContainingSyntaxList(parentPreviousSibling);
             if (parentSyntaxList) {
-                const siblings = parentSyntaxList.getChildren();
+                const siblings = childrenOf(parentSyntaxList);
                 return siblings[siblings.length - 1] || null;
             } else {
                 return parentPreviousSibling;
@@ -259,7 +260,7 @@ export function getPreviousSibling(node: ts.Node): ts.Node | undefined {
         return children[nodeIndex - 1];
     }
 
-    const parentChildren = parent.getChildren();
+    const parentChildren = childrenOf(parent);
     const nodeIndex = parentChildren.indexOf(node);
 
     if (nodeIndex === -1) {
@@ -274,7 +275,7 @@ export function getPreviousSibling(node: ts.Node): ts.Node | undefined {
         }
 
         // Return the last child of the parent's previous sibling
-        return parentPreviousSibling.getChildCount() > 0 ? parentPreviousSibling.getLastToken()! : parentPreviousSibling;
+        return childCountOf(parentPreviousSibling) > 0 ? lastTokenOf(parentPreviousSibling)! : parentPreviousSibling;
     }
 
     // Otherwise, return the previous sibling
@@ -287,9 +288,9 @@ function findContainingSyntaxList(node: ts.Node): ts.SyntaxList | undefined {
         return undefined;
     }
 
-    const children = parent.getChildren();
+    const children = childrenOf(parent);
     for (const child of children) {
-        if (child.kind == ts.SyntaxKind.SyntaxList && child.getChildren().includes(node)) {
+        if (child.kind == ts.SyntaxKind.SyntaxList && childrenOf(child).includes(node)) {
             return child as ts.SyntaxList;
         }
     }
@@ -350,26 +351,40 @@ export function hasFlowAnnotation(sourceFile: ts.SourceFile) {
     return false;
 }
 
-export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile) {
-    // Only parse diagnostics decide whether a file gets an LST, so the visitor has to map every slot the
-    // parser fills — including ones the checker would reject — or the file loses text on print.
-    const diagnostics = program.getSyntacticDiagnostics(sourceFile);
-    let syntaxErrors : [errorMsg: string, errorCode: number][] = [];
-    if (diagnostics.length > 0) {
-        const errors = diagnostics.filter(d =>  (d.category === ts.DiagnosticCategory.Error) && isCriticalDiagnostic(d.code, sourceFile));
-        if (errors.length > 0) {
-            syntaxErrors = errors.map(e => {
-                let errorMsg;
-                if (e.file) {
-                    let {line, character} = ts.getLineAndCharacterOfPosition(e.file, e.start!);
-                    let message = ts.flattenDiagnosticMessageText(e.messageText, "\n");
-                    errorMsg = `(${line + 1},${character + 1}): ${message}`;
-                } else {
-                    errorMsg = ts.flattenDiagnosticMessageText(e.messageText, "\n");
-                }
-                return [errorMsg, e.code];
-            });
+/**
+ * The character ranges of every comment in `text`. The compiler parses JSDoc and reports syntax
+ * errors from inside it, with no option to stop it, so the parser locates those to leave them be.
+ */
+function commentRanges(text: string): Array<[number, number]> {
+    const scanner = ts.createScanner(false, ts.LanguageVariant.Standard, text);
+    const ranges: Array<[number, number]> = [];
+    for (; ;) {
+        const token = scanner.scan();
+        if (token === ts.SyntaxKind.EndOfFile) {
+            break;
         }
+        if (token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia) {
+            ranges.push([scanner.getTokenStart(), scanner.getTokenEnd()]);
+        }
+    }
+    return ranges;
+}
+
+export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile) {
+    // Only parse diagnostics decide whether a file gets an LST, so the visitor has to map every slot
+    // the parser fills — including ones the checker would reject — or the file loses text on print.
+    // Diagnostics arrive already localised and flattened, and carry offsets rather than a file.
+    const diagnostics = program.getSyntacticDiagnostics(sourceFile.fileName);
+    let syntaxErrors: [errorMsg: string, errorCode: number][] = [];
+    const comments = commentRanges(sourceFile.text);
+    const errors = diagnostics.filter(d =>
+        d.category === ts.DiagnosticCategory.Error && isCriticalDiagnostic(d.code, sourceFile)
+        && !comments.some(([from, to]) => d.pos >= from && d.pos < to));
+    if (errors.length > 0) {
+        syntaxErrors = errors.map(e => {
+            const {line, character} = sourceFile.getLineAndCharacterOfPosition(e.pos);
+            return [`(${line + 1},${character + 1}): ${e.text}`, e.code];
+        });
     }
     return syntaxErrors;
 }
