@@ -78,8 +78,7 @@ public class VersionCatalogLibrary implements Trait<Toml.KeyValue>, VersionCatal
         if (versionRef == null || !(getTree().getValue() instanceof Toml.Table)) {
             return this;
         }
-        Toml.Table inline = TomlTableValue.withKey((Toml.Table) getTree().getValue(), "version.ref", "version");
-        inline = TomlTableValue.withString(inline, "version", newVersion);
+        Toml.Table inline = VersionConstraint.withDetachedVersion((Toml.Table) getTree().getValue(), "version", newVersion);
         return new VersionCatalogLibrary(new Cursor(cursor.getParent(), getTree().withValue(inline)),
                 groupId, artifactId, module, newVersion, null);
     }
@@ -116,8 +115,8 @@ public class VersionCatalogLibrary implements Trait<Toml.KeyValue>, VersionCatal
                 inline = TomlTableValue.withString(inline, "group", newGroupId);
                 inline = TomlTableValue.withString(inline, "name", newArtifactId);
             }
-            if (newVersion != null && TomlTableValue.find(inline, "version.ref") == null) {
-                inline = TomlTableValue.withStringOrAdd(inline, "version", newVersion);
+            if (newVersion != null && VersionConstraint.getVersionRef(inline, "version") == null) {
+                inline = VersionConstraint.withVersionOrAdd(inline, "version", newVersion);
             }
             updated = keyValue.withValue(inline);
         } else {
@@ -209,8 +208,8 @@ public class VersionCatalogLibrary implements Trait<Toml.KeyValue>, VersionCatal
                 return null;
             }
             return new VersionCatalogLibrary(cursor, groupId, artifactId, module,
-                    TomlTableValue.getString(inline, "version"),
-                    TomlTableValue.getString(inline, "version.ref"));
+                    VersionConstraint.getVersion(inline, "version"),
+                    VersionConstraint.getVersionRef(inline, "version"));
         }
     }
 }

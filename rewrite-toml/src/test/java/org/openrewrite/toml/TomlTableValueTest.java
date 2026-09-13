@@ -138,6 +138,49 @@ class TomlTableValueTest {
                 .isEqualTo("library = { group = \"org.example\", name = \"old\", version = \"1.0.0\" }\n");
     }
 
+    @Test
+    void readsNestedTablesAndTheirStringValues() {
+        Toml.Table table = table("{ name = \"library\", version = { require = \"1.0\", reject = [\"1.1\"] } }");
+
+        assertThat(TomlTableValue.getTable(table, "version")).isNotNull();
+        assertThat(TomlTableValue.getTable(table, "name")).isNull();
+        assertThat(TomlTableValue.getString(table, "version", "require")).isEqualTo("1.0");
+        assertThat(TomlTableValue.getString(table, "version", "reject")).isNull();
+        assertThat(TomlTableValue.getString(table, "version", "strictly")).isNull();
+        assertThat(TomlTableValue.getString(table, "name", "require")).isNull();
+    }
+
+    @Test
+    void replacesNestedStringValuesAndLeavesSiblingsAlone() {
+        Toml.Document document = document("library = { version = { require = 'old', reject = [\"1.1\"] } }\n");
+        Toml.Table table = table(document);
+
+        Toml.Table updated = TomlTableValue.withString(table, "version", "require", "new");
+
+        assertThat(print(withTableValue(document, updated)))
+                .isEqualTo("library = { version = { require = 'new', reject = [\"1.1\"] } }\n");
+    }
+
+    @Test
+    void doesNotAddMissingNestedValue() {
+        Toml.Document document = document("library = { version = { require = \"1.0\" } }\n");
+        Toml.Table table = table(document);
+
+        assertThat(TomlTableValue.withString(table, "version", "strictly", "2.0")).isSameAs(table);
+        assertThat(TomlTableValue.withString(table, "missing", "strictly", "2.0")).isSameAs(table);
+    }
+
+    @Test
+    void renamesNestedKeys() {
+        Toml.Document document = document("library = { version = { ref = \"lib\", reject = [\"1.1\"] } }\n");
+        Toml.Table table = table(document);
+
+        Toml.Table updated = TomlTableValue.withKey(table, "version", "ref", "require");
+
+        assertThat(print(withTableValue(document, updated)))
+                .isEqualTo("library = { version = { require = \"lib\", reject = [\"1.1\"] } }\n");
+    }
+
     private static Toml.Table table(String source) {
         return table(document("library = " + source + "\n"));
     }

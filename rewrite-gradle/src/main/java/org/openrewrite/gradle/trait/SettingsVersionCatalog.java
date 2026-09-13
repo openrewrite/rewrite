@@ -24,12 +24,15 @@ import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.trait.Trait;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
@@ -40,6 +43,8 @@ import java.util.function.UnaryOperator;
  */
 @Value
 class SettingsVersionCatalog implements VersionCatalog {
+    private static final List<String> VERSION_CONSTRAINT_CALLS = Arrays.asList("strictly", "require", "prefer");
+
     Cursor cursor;
     String catalogName;
 
@@ -152,6 +157,62 @@ class SettingsVersionCatalog implements VersionCatalog {
         return null;
     }
 
+    /**
+     * The closure of a {@code version { ... } } constraint, as opposed to a plain string argument.
+     */
+    private static J.@Nullable Lambda versionBlock(J.MethodInvocation version) {
+        if (version.getArguments().isEmpty()) {
+            return null;
+        }
+        Expression last = version.getArguments().get(version.getArguments().size() - 1);
+        return last instanceof J.Lambda && ((J.Lambda) last).getBody() instanceof J.Block ? (J.Lambda) last : null;
+    }
+
+    /**
+     * The call carrying the version of a {@code version { ... } } constraint, {@code strictly}
+     * winning over {@code require} over {@code prefer}, as Gradle resolves them.
+     */
+    private static J.@Nullable MethodInvocation versionConstraint(J.MethodInvocation version) {
+        J.Lambda block = versionBlock(version);
+        if (block == null) {
+            return null;
+        }
+        J.MethodInvocation strongest = null;
+        for (Statement statement : ((J.Block) block.getBody()).getStatements()) {
+            J expression = statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement;
+            if (expression instanceof J.MethodInvocation) {
+                J.MethodInvocation m = (J.MethodInvocation) expression;
+                int rank = VERSION_CONSTRAINT_CALLS.indexOf(m.getSimpleName());
+                if (rank >= 0 && literalArgument(m, 0) != null &&
+                    (strongest == null || rank < VERSION_CONSTRAINT_CALLS.indexOf(strongest.getSimpleName()))) {
+                    strongest = m;
+                }
+            }
+        }
+        return strongest;
+    }
+
+    /**
+     * Writes {@code newVersion} at whichever call {@link #versionConstraint} read it from, so that the
+     * block's other calls, {@code reject} included, survive.
+     */
+    private static J.MethodInvocation withVersionConstraint(J.MethodInvocation version, String newVersion) {
+        J.Lambda block = versionBlock(version);
+        J.MethodInvocation versionConstraint = versionConstraint(version);
+        if (block == null || versionConstraint == null) {
+            return version;
+        }
+        J.Block body = (J.Block) block.getBody();
+        J.Lambda updated = block.withBody(body.withStatements(ListUtils.map(body.getStatements(), statement -> {
+            if (statement == versionConstraint) {
+                return withLiteralArgument(versionConstraint, 0, newVersion);
+            }
+            return statement instanceof J.Return && ((J.Return) statement).getExpression() == versionConstraint ?
+                    ((J.Return) statement).withExpression(withLiteralArgument(versionConstraint, 0, newVersion)) : statement;
+        })));
+        return version.withArguments(ListUtils.mapLast(version.getArguments(), argument -> updated));
+    }
+
     private static J.MethodInvocation withLiteralArgument(J.MethodInvocation m, int index, String value) {
         return m.withArguments(ListUtils.map(m.getArguments(), (i, argument) ->
                 i == index && argument instanceof J.Literal ? ChangeStringLiteral.withStringValue((J.Literal) argument, value) : argument));
@@ -185,7 +246,8 @@ class SettingsVersionCatalog implements VersionCatalog {
         @Override
         public @Nullable String getVersion() {
             if (isChained(getTree(), "version")) {
-                return literalArgument(getTree(), 0);
+                J.MethodInvocation versionConstraint = versionConstraint(getTree());
+                return versionConstraint == null ? literalArgument(getTree(), 0) : literalArgument(versionConstraint, 0);
             }
             Dependency dependency = coordinates(getTree());
             return dependency == null ? null : dependency.getVersion();
@@ -193,7 +255,9 @@ class SettingsVersionCatalog implements VersionCatalog {
 
         private Library withVersion(String newVersion) {
             if (isChained(getTree(), "version")) {
-                return withTree(withLiteralArgument(getTree(), 0, newVersion));
+                return withTree(versionBlock(getTree()) == null ?
+                        withLiteralArgument(getTree(), 0, newVersion) :
+                        withVersionConstraint(getTree(), newVersion));
             }
             Dependency dependency = coordinates(getTree());
             if (dependency == null) {
@@ -292,11 +356,14 @@ class SettingsVersionCatalog implements VersionCatalog {
         }
 
         private @Nullable String getVersion() {
-            return literalArgument(getTree(), 1);
+            J.MethodInvocation versionConstraint = versionConstraint(getTree());
+            return versionConstraint == null ? literalArgument(getTree(), 1) : literalArgument(versionConstraint, 0);
         }
 
         private Version withVersion(String newVersion) {
-            J.MethodInvocation updated = withLiteralArgument(getTree(), 1, newVersion);
+            J.MethodInvocation updated = versionBlock(getTree()) == null ?
+                    withLiteralArgument(getTree(), 1, newVersion) :
+                    withVersionConstraint(getTree(), newVersion);
             return updated == getTree() ? this : new Version(new Cursor(cursor.getParent(), updated));
         }
 
