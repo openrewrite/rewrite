@@ -73,6 +73,105 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void preservesInlineCommentOnDeeplyNestedUnchangedPropertyWhenMovingSibling() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.data.mongodb", "spring.mongodb", null, null, null)),
+          yaml(
+            """
+              spring:
+                data:
+                  mongodb:
+                    uri: "test"
+                servlet:
+                  multipart:
+                    max-request-size: 162529280 #155MB
+              """,
+            """
+              spring:
+                servlet:
+                  multipart:
+                    max-request-size: 162529280 #155MB
+                mongodb:
+                  uri: "test"
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesInlineCommentWhenMovingFinalProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("foo.bar", "bar", null, null, null)),
+          yaml(
+            """
+              foo:
+                before: before-val
+                bar:
+                  prop: val # keep me
+              """,
+            """
+              foo:
+                before: before-val
+              bar:
+                prop: val # keep me
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesInlineCommentBeforeDocumentSeparatorWhenMovingSibling() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("foo.bar", "bar", null, null, null)),
+          yaml(
+            """
+              foo:
+                bar:
+                  prop: val
+                other: other-val # keep me
+              ---
+              next: document
+              """,
+            """
+              foo:
+                other: other-val # keep me
+              bar:
+                prop: val
+              ---
+              next: document
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesCrLfAndStandaloneCommentAfterInlineComment() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("foo.bar", "bar", null, null, null)),
+          yaml(
+            """
+              foo:
+                bar:
+                  prop: val
+                other: other-val # keep me
+              # standalone
+              ---
+              next: document
+              """.replace("\n", "\r\n"),
+            """
+              foo:
+                other: other-val # keep me
+              bar:
+                prop: val
+              # standalone
+              ---
+              next: document
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2608")
     @Test
     void multiDocument() {
