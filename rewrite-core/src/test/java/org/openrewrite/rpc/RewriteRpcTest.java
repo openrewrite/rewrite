@@ -217,6 +217,30 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     /**
+     * A NO_CHANGE answer for an object this side never received means the peers have drifted apart,
+     * not that the object was deleted: getObject() must fail rather than hand back null.
+     */
+    @Test
+    void getObjectRejectsNoChangeWithoutABaseline() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        server.localObjects.put(id, original);
+        client.getObject(id, sourceFileType);
+
+        // The client loses its copy (a failed receive drops it) while the server still believes it was delivered.
+        client.remoteObjects.remove(id);
+
+        assertThatThrownBy(() -> client.getObject(id, sourceFileType))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("no change to " + id);
+    }
+
+    /**
      * {@link RewriteRpc#evict} drops the tree from both peers and rolls the client's ref maps
      * back to the pre-file checkpoint.
      */

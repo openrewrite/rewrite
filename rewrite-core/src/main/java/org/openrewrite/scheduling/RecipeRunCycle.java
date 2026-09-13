@@ -508,18 +508,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         try {
             response = rpc.batchVisit(originalBefore, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
-            if (!batch.recipeStacks.isEmpty()) {
-                SourceFile beforeError = source;
-                if (!(t instanceof RecipeRunException)) {
-                    source = Markup.error(source, t);
-                }
-                source = handleError(leaf(batch.recipeStacks.get(0)), originalBefore, source, t);
-                if (source != null && source != beforeError) {
-                    source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
-                }
-            }
-            batch.clear();
-            return source;
+            return batchFailed(batch, originalBefore, source, t);
         }
 
         // Build attribution map: SearchResult UUID → recipe name
@@ -556,12 +545,17 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             return null;
         }
 
-        SourceFile fetched;
+        SourceFile fetched = source;
         if (anyModified) {
-            // Fetch final tree state from remote
-            fetched = rpc.getObject(originalBefore.getId().toString(), DynamicDispatchRpcCodec.canonicalSourceFileType(originalBefore.getClass()));
-        } else {
-            fetched = source;
+            try {
+                fetched = rpc.getObject(originalBefore.getId().toString(), DynamicDispatchRpcCodec.canonicalSourceFileType(originalBefore.getClass()));
+                if (fetched == null) {
+                    // A batch reports its deletions in its results, so a missing tree here is one the remote lost.
+                    throw new IllegalStateException("Remote reported " + originalBefore.getSourcePath() + " as modified but no longer holds it");
+                }
+            } catch (Throwable t) {
+                return batchFailed(batch, originalBefore, source, t);
+            }
         }
 
         if (anyModified) {
@@ -588,6 +582,21 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
         batch.clear();
         return fetched;
+    }
+
+    private @Nullable SourceFile batchFailed(BatchState batch, SourceFile originalBefore, SourceFile source, Throwable t) {
+        if (!batch.recipeStacks.isEmpty()) {
+            SourceFile beforeError = source;
+            if (!(t instanceof RecipeRunException)) {
+                source = Markup.error(source, t);
+            }
+            source = handleError(leaf(batch.recipeStacks.get(0)), originalBefore, source, t);
+            if (source != null && source != beforeError) {
+                source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
+            }
+        }
+        batch.clear();
+        return source;
     }
 
     /**
