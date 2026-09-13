@@ -615,7 +615,7 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
     }
 
     @Test
-    void libraryWithUnresolvableVersionConstraintIsLeftUnchanged() {
+    void libraryWithVersionConstraintIsUpgradedInPlace() {
         rewriteRun(
           spec -> spec.recipes(
             new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null),
@@ -642,7 +642,7 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
                           version('widgetVersion', '2.0')
                           library('widgetA', 'com.acme', 'widget-a').version('2.0')
                           library('widgetB', 'com.acme', 'widget-b').versionRef('widgetVersion')
-                          library('widgetC', 'com.acme', 'widget-c').version { strictly('1.0') }
+                          library('widgetC', 'com.acme', 'widget-c').version { strictly('2.0') }
                       }
                   }
               }
@@ -652,7 +652,7 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
     }
 
     @Test
-    void libraryWithUnresolvableVersionConstraintIsLeftUnchangedWithWildcard() {
+    void libraryWithVersionConstraintIsUpgradedInPlaceWithWildcard() {
         rewriteRun(
           spec -> spec.recipes(
             new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)
@@ -677,7 +677,116 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
                           version('widgetVersion', '2.0')
                           library('widgetA', 'com.acme', 'widget-a').versionRef('widgetVersion')
                           library('widgetB', 'com.acme', 'widget-b').versionRef('widgetVersion')
-                          library('widgetC', 'com.acme', 'widget-c').version { strictly('1.0') }
+                          library('widgetC', 'com.acme', 'widget-c').version { strictly('2.0') }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinLibraryWithVersionConstraintIsUpgradedInPlace() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-c", "2.0", null)),
+          settingsGradleKts(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      create("libs") {
+                          library("widgetC", "com.acme", "widget-c").version { strictly("1.0") }
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      create("libs") {
+                          library("widgetC", "com.acme", "widget-c").version { strictly("2.0") }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void libraryWithVersionConstraintKeepsItsOtherCalls() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-c", "2.0", null)),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          library('widgetC', 'com.acme', 'widget-c').version {
+                              require('1.0')
+                              reject('1.1', '1.2')
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          library('widgetC', 'com.acme', 'widget-c').version {
+                              require('2.0')
+                              reject('1.1', '1.2')
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionConstraintDeclarationSharedByEveryReferrerIsUpgradedInPlace() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('widgetVersion') { require('1.0') }
+                          library('widgetA', 'com.acme', 'widget-a').versionRef('widgetVersion')
+                          library('widgetB', 'com.acme', 'widget-b').versionRef('widgetVersion')
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('widgetVersion') { require('2.0') }
+                          library('widgetA', 'com.acme', 'widget-a').versionRef('widgetVersion')
+                          library('widgetB', 'com.acme', 'widget-b').versionRef('widgetVersion')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void libraryAlreadyAtTheNewVersionConstraintIsLeftAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-c", "2.0", null)),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          library('widgetC', 'com.acme', 'widget-c').version { strictly('2.0') }
                       }
                   }
               }

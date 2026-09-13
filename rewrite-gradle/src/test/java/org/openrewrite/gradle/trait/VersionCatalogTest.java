@@ -72,4 +72,44 @@ class VersionCatalogTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void readsVersionConstraintsFromBothCatalogs() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new VersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
+              catalog.getVersion(new GroupArtifact("com.google.guava", "guava")))))),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          library('guava', 'com.google.guava', 'guava').version { strictly('29.0-jre') }
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      /*~~(29.0-jre)~~>*/libs {
+                          library('guava', 'com.google.guava', 'guava').version { strictly('29.0-jre') }
+                      }
+                  }
+              }
+              """
+          ),
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { require = "30.1.1-jre", reject = ["30.0-jre"] } }
+              """,
+            """
+              ~~(30.1.1-jre)~~>[libraries]
+              guava = { module = "com.google.guava:guava", version = { require = "30.1.1-jre", reject = ["30.0-jre"] } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
 }

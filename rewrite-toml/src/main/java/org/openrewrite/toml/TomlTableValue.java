@@ -27,6 +27,7 @@ import org.openrewrite.toml.tree.TomlType;
 
 import java.util.List;
 import java.util.function.BiFunction;
+import java.util.function.UnaryOperator;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -62,6 +63,20 @@ public final class TomlTableValue {
         return value instanceof String ? (String) value : null;
     }
 
+    /**
+     * @return the string at {@code nestedKey} of the table {@code key} holds, or {@code null} if
+     * {@code key} holds something other than a table.
+     */
+    public static @Nullable String getString(Toml.Table table, String key, String nestedKey) {
+        Toml.Table nested = getTable(table, key);
+        return nested == null ? null : getString(nested, nestedKey);
+    }
+
+    public static Toml.@Nullable Table getTable(Toml.Table table, String key) {
+        Toml.KeyValue keyValue = find(table, key);
+        return keyValue == null || !(keyValue.getValue() instanceof Toml.Table) ? null : (Toml.Table) keyValue.getValue();
+    }
+
     public static String quoted(Toml.Literal literal, String value) {
         String source = literal.getSource();
         String delimiter = source.startsWith("\"\"\"") || source.startsWith("'''") ?
@@ -84,6 +99,17 @@ public final class TomlTableValue {
     }
 
     /**
+     * Replaces a string-valued property of the table {@code key} holds, leaving that table's other
+     * properties alone.
+     *
+     * @return the table unchanged if {@code key} holds something other than a table, or that table
+     * has no string at {@code nestedKey}
+     */
+    public static Toml.Table withString(Toml.Table table, String key, String nestedKey, String value) {
+        return withNested(table, key, nested -> withString(nested, nestedKey, value));
+    }
+
+    /**
      * Renames an existing string-valued property, keeping its place, padding and value.
      *
      * @return the table unchanged if {@code key} is absent or not a string
@@ -93,6 +119,16 @@ public final class TomlTableValue {
             Toml.Identifier identifier = (Toml.Identifier) keyValue.getKey();
             return keyValue.withKey(new Toml.Identifier(identifier.getId(), identifier.getPrefix(), identifier.getMarkers(), newKey, newKey));
         });
+    }
+
+    /**
+     * Renames a string-valued property of the table {@code key} holds.
+     *
+     * @return the table unchanged if {@code key} holds something other than a table, or that table
+     * has no string at {@code nestedKey}
+     */
+    public static Toml.Table withKey(Toml.Table table, String key, String nestedKey, String newNestedKey) {
+        return withNested(table, key, nested -> withKey(nested, nestedKey, newNestedKey));
     }
 
     /**
@@ -120,7 +156,21 @@ public final class TomlTableValue {
             !(((Toml.Literal) keyValue.getValue()).getValue() instanceof String)) {
             return table;
         }
-        Toml.KeyValue edited = edit.apply(keyValue, (Toml.Literal) keyValue.getValue());
-        return edited == keyValue ? table : table.withValues(ListUtils.map(table.getValues(), value -> value == keyValue ? edited : value));
+        return withProperty(table, keyValue, edit.apply(keyValue, (Toml.Literal) keyValue.getValue()));
+    }
+
+    private static Toml.Table withNested(Toml.Table table, String key, UnaryOperator<Toml.Table> edit) {
+        Toml.KeyValue keyValue = find(table, key);
+        if (keyValue == null || !(keyValue.getValue() instanceof Toml.Table)) {
+            return table;
+        }
+        Toml.Table nested = (Toml.Table) keyValue.getValue();
+        Toml.Table edited = edit.apply(nested);
+        return edited == nested ? table : withProperty(table, keyValue, keyValue.withValue(edited));
+    }
+
+    private static Toml.Table withProperty(Toml.Table table, Toml.KeyValue keyValue, Toml.KeyValue edited) {
+        return edited == keyValue ? table :
+                table.withValues(ListUtils.map(table.getValues(), value -> value == keyValue ? edited : value));
     }
 }

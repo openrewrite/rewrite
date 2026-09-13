@@ -139,6 +139,44 @@ class VersionCatalogPluginTest implements RewriteTest {
     }
 
     @Test
+    void matchesVersionConstraint() {
+        rewriteRun(
+                toml(
+                        """
+                          [plugins]
+                          kotlin = { id = "org.jetbrains.kotlin.jvm", version = { strictly = "2.0.0" } }
+                          """,
+                        """
+                          [plugins]
+                          ~~(org.jetbrains.kotlin.jvm:2.0.0)~~>kotlin = { id = "org.jetbrains.kotlin.jvm", version = { strictly = "2.0.0" } }
+                          """,
+                        spec -> spec.path("gradle/libs.versions.toml")
+                )
+        );
+    }
+
+    @Test
+    void updatesVersionConstraintAndLeavesRejectsAlone() {
+        rewriteRun(
+                spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                        new VersionCatalogPlugin.Matcher()
+                                .pluginIdPattern("org.jetbrains.kotlin.jvm")
+                                .asVisitor(plugin -> plugin.withVersion("2.1.0").getTree()))),
+                toml(
+                        """
+                          [plugins]
+                          kotlin = { id = "org.jetbrains.kotlin.jvm", version = { require = "2.0.0", reject = ["2.0.10"] } }
+                          """,
+                        """
+                          [plugins]
+                          kotlin = { id = "org.jetbrains.kotlin.jvm", version = { require = "2.1.0", reject = ["2.0.10"] } }
+                          """,
+                        spec -> spec.path("gradle/libs.versions.toml")
+                )
+        );
+    }
+
+    @Test
     void doesNotUpdateVersionRef() {
         rewriteRun(
                 spec -> spec.recipe(RewriteTest.toRecipe(() ->

@@ -23,7 +23,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.toml.TomlIsoVisitor;
-import org.openrewrite.toml.TomlTableValue;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.trait.SimpleTraitMatcher;
 
@@ -73,12 +72,13 @@ class TomlVersionCatalog implements VersionCatalog {
         Map<String, String> versions = new LinkedHashMap<>();
         for (Toml value : getTree().getValues()) {
             if (value instanceof Toml.Table && isVersionsTable((Toml.Table) value)) {
-                for (Toml entry : ((Toml.Table) value).getValues()) {
-                    if (entry instanceof Toml.KeyValue) {
-                        Toml.KeyValue keyValue = (Toml.KeyValue) entry;
-                        if (keyValue.getKey() instanceof Toml.Identifier && keyValue.getValue() instanceof Toml.Literal &&
-                            ((Toml.Literal) keyValue.getValue()).getValue() instanceof String) {
-                            versions.put(((Toml.Identifier) keyValue.getKey()).getName(), (String) ((Toml.Literal) keyValue.getValue()).getValue());
+                Toml.Table table = (Toml.Table) value;
+                for (Toml entry : table.getValues()) {
+                    if (entry instanceof Toml.KeyValue && ((Toml.KeyValue) entry).getKey() instanceof Toml.Identifier) {
+                        String alias = ((Toml.Identifier) ((Toml.KeyValue) entry).getKey()).getName();
+                        String version = VersionConstraint.getVersion(table, alias);
+                        if (version != null) {
+                            versions.put(alias, version);
                         }
                     }
                 }
@@ -103,7 +103,7 @@ class TomlVersionCatalog implements VersionCatalog {
             @Override
             public Toml.Table visitTable(Toml.Table table, ExecutionContext ctx) {
                 Toml.Table t = super.visitTable(table, ctx);
-                return isVersionsTable(t) ? TomlTableValue.withString(t, alias, newVersion) : t;
+                return isVersionsTable(t) ? VersionConstraint.withVersion(t, alias, newVersion) : t;
             }
         }.visit(getTree(), new InMemoryExecutionContext(), cursor.getParent());
         return withTree((Toml.Document) newTree);

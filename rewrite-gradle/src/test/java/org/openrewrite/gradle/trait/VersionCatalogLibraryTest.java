@@ -600,7 +600,7 @@ class VersionCatalogLibraryTest implements RewriteTest {
     }
 
     @Test
-    void withModulePreservesRichVersionWhenAddingCoordinates() {
+    void withModuleAndVersionUpdatesBothWhileKeepingTheVersionConstraintTable() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new VersionCatalogLibrary.Matcher()
@@ -614,7 +614,7 @@ class VersionCatalogLibraryTest implements RewriteTest {
               """,
             """
               [libraries]
-              my-lib = { module = "org.new:new-artifact", version = { strictly = "1.0" } }
+              my-lib = { module = "org.new:new-artifact", version = { strictly = "2.0" } }
               """,
             spec -> spec.path("gradle/libs.versions.toml")
           )
@@ -622,7 +622,222 @@ class VersionCatalogLibraryTest implements RewriteTest {
     }
 
     @Test
-    void withModuleUpdatesCoordinatesWhilePreservingRichVersion() {
+    void matchesVersionConstraintRequire() {
+        rewriteRun(
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { require = "29.0-jre" } }
+              """,
+            """
+              [libraries]
+              ~~(com.google.guava:guava:29.0-jre)~~>guava = { module = "com.google.guava:guava", version = { require = "29.0-jre" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void matchesVersionConstraintPrefer() {
+        rewriteRun(
+          toml(
+            """
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version = { prefer = "29.0-jre" } }
+              """,
+            """
+              [libraries]
+              ~~(com.google.guava:guava:29.0-jre)~~>guava = { group = "com.google.guava", name = "guava", version = { prefer = "29.0-jre" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void matchesVersionConstraintStrictlyOverRequireAndPrefer() {
+        rewriteRun(
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { strictly = "29.0-jre", require = "28.0-jre", prefer = "27.0-jre" } }
+              """,
+            """
+              [libraries]
+              ~~(com.google.guava:guava:29.0-jre)~~>guava = { module = "com.google.guava:guava", version = { strictly = "29.0-jre", require = "28.0-jre", prefer = "27.0-jre" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void matchesVersionConstraintRefAsAVersionRef() {
+        rewriteRun(
+          toml(
+            """
+              [versions]
+              guava = "29.0-jre"
+
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { ref = "guava" } }
+              """,
+            """
+              [versions]
+              guava = "29.0-jre"
+
+              [libraries]
+              ~~(com.google.guava:guava (ref=guava))~~>guava = { module = "com.google.guava:guava", version = { ref = "guava" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void matchesVersionConstraintOfOnlyRejectsAsVersionless() {
+        rewriteRun(
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { reject = ["29.0-jre"] } }
+              """,
+            """
+              [libraries]
+              ~~(com.google.guava:guava)~~>guava = { module = "com.google.guava:guava", version = { reject = ["29.0-jre"] } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withVersionUpdatesVersionConstraintRequire() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new VersionCatalogLibrary.Matcher()
+              .groupPattern("com.google.guava")
+              .artifactPattern("guava")
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { require = "29.0-jre" } }
+              """,
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { require = "30.1-jre" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withVersionUpdatesVersionConstraintStrictlyAndLeavesRejectsAlone() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new VersionCatalogLibrary.Matcher()
+              .groupPattern("com.google.guava")
+              .artifactPattern("guava")
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { strictly = "29.0-jre", reject = ["28.0-jre", "27.0-jre"] } }
+              """,
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { strictly = "30.1-jre", reject = ["28.0-jre", "27.0-jre"] } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withVersionUpdatesVersionConstraintPrefer() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new VersionCatalogLibrary.Matcher()
+              .groupPattern("com.google.guava")
+              .artifactPattern("guava")
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
+          toml(
+            """
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version = { prefer = "29.0-jre" } }
+              """,
+            """
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version = { prefer = "30.1-jre" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withVersionDoesNotModifyVersionConstraintRef() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new VersionCatalogLibrary.Matcher()
+              .groupPattern("com.google.guava")
+              .artifactPattern("guava")
+              .asVisitor(dep -> dep.withVersion("30.1-jre").getTree()))),
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { ref = "guava" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withVersionLeavesAVersionConstraintAlreadyAtTheNewVersionAlone() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new VersionCatalogLibrary.Matcher()
+              .groupPattern("com.google.guava")
+              .artifactPattern("guava")
+              .asVisitor(dep -> dep.withVersion("29.0-jre").getTree()))),
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { require = "29.0-jre", reject = ["28.0-jre"] } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withDetachedVersionRenamesVersionConstraintRefToRequire() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new VersionCatalogLibrary.Matcher()
+              .groupPattern("com.google.guava")
+              .artifactPattern("guava")
+              .asVisitor(dep -> dep.withDetachedVersion("30.1-jre").getTree()))),
+          toml(
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { ref = "guava", reject = ["28.0-jre"] } }
+              """,
+            """
+              [libraries]
+              guava = { module = "com.google.guava:guava", version = { require = "30.1-jre", reject = ["28.0-jre"] } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void withModuleUpdatesCoordinatesWhilePreservingVersionConstraint() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new VersionCatalogLibrary.Matcher()

@@ -49,7 +49,7 @@ public class VersionCatalogPlugin implements Trait<Toml.KeyValue>, VersionCatalo
             String notation = pluginId + ":" + newVersion;
             updated = keyValue.withValue(literal.withSource(TomlTableValue.quoted(literal, notation)).withValue(notation));
         } else if (keyValue.getValue() instanceof Toml.Table) {
-            updated = keyValue.withValue(TomlTableValue.withString((Toml.Table) keyValue.getValue(), "version", newVersion));
+            updated = keyValue.withValue(VersionConstraint.withVersion((Toml.Table) keyValue.getValue(), "version", newVersion));
         } else {
             return this;
         }
@@ -107,8 +107,8 @@ public class VersionCatalogPlugin implements Trait<Toml.KeyValue>, VersionCatalo
                 return null;
             }
             return new VersionCatalogPlugin(cursor, pluginId,
-                    TomlTableValue.getString(inline, "version"),
-                    TomlTableValue.getString(inline, "version.ref"));
+                    VersionConstraint.getVersion(inline, "version"),
+                    VersionConstraint.getVersionRef(inline, "version"));
         }
 
         private boolean matchesPattern(String pluginId) {

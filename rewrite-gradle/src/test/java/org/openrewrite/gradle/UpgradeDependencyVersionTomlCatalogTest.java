@@ -67,6 +67,144 @@ class UpgradeDependencyVersionTomlCatalogTest implements RewriteTest {
     }
 
     @Test
+    void bumpsRequiredVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          toml(
+            """
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = { require = "1.0" } }
+              """,
+            """
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = { require = "2.0" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void bumpsStrictVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          toml(
+            """
+              [libraries]
+              widgetA = { group = "com.acme", name = "widget-a", version = { strictly = "1.0" } }
+              """,
+            """
+              [libraries]
+              widgetA = { group = "com.acme", name = "widget-a", version = { strictly = "2.0" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void bumpsPreferredVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          toml(
+            """
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = { prefer = "1.0" } }
+              """,
+            """
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = { prefer = "2.0" } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void bumpsRequiredVersionLeavingRejectsAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          toml(
+            """
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = { require = "1.0", reject = ["1.1", "1.2"] } }
+              """,
+            """
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = { require = "2.0", reject = ["1.1", "1.2"] } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void leavesAVersionConstraintAlreadyAtTheNewVersionAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          toml(
+            """
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = { require = "2.0", reject = ["1.1"] } }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void bumpsAVersionConstraintDeclaration() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)),
+          toml(
+            """
+              [versions]
+              widget = { require = "1.0", reject = ["1.1"] }
+
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version.ref = "widget" }
+              widgetB = { module = "com.acme:widget-b", version.ref = "widget" }
+              """,
+            """
+              [versions]
+              widget = { require = "2.0", reject = ["1.1"] }
+
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version.ref = "widget" }
+              widgetB = { module = "com.acme:widget-b", version.ref = "widget" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void targetingOneSharerOfAVersionConstraintDeclarationDetachesIt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          toml(
+            """
+              [versions]
+              widget = { strictly = "1.0" }
+
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = { ref = "widget" } }
+              widgetB = { module = "com.acme:widget-b", version.ref = "widget" }
+              """,
+            """
+              [versions]
+              widget = { strictly = "1.0" }
+
+              [libraries]
+              widgetA = { module = "com.acme:widget-a", version = { require = "2.0" } }
+              widgetB = { module = "com.acme:widget-b", version.ref = "widget" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void targetingOneSharerDetachesItFromTheSharedVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
