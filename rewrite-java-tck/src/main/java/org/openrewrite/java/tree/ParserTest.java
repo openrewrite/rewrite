@@ -16,7 +16,9 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RewriteTest;
@@ -27,8 +29,53 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import static java.util.stream.Collectors.toList;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class ParserTest implements RewriteTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8707")
+    @Test
+    void inferredLambdaParametersAfterLombokBuilderInvocationArePrintIdempotent() {
+        String source = """
+          import java.util.List;
+          import java.util.Map;
+          import java.util.stream.Collectors;
+          import java.util.stream.Stream;
+          import lombok.Builder;
+
+          class RoundTrip {
+              void convert(Map<String, List<String>> first, Map<String, List<String>> second) {
+                  Map<String, List<String>> merged = Stream.concat(first.entrySet().stream(), second.entrySet().stream())
+                      .collect(Collectors.toMap(Map.Entry::getKey,
+                          entry -> ResultView.builder()
+                              .value(entry.getKey())
+                              .details(entry.getValue())
+                              .build(),
+                          (a, b) -> {
+                              a.addAll(b);
+                              return a;
+                          }));
+              }
+          }
+
+          @Builder
+          class ResultView {
+              String value;
+              List<String> details;
+          }
+          """;
+
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+        SourceFile parsed = JavaParser.fromJavaVersion()
+          .classpath("lombok")
+          .build()
+          .parse(ctx, source)
+          .findFirst()
+          .get();
+
+        assertThat(parsed.printAll()).isEqualTo(source);
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/pull/4914")
     @Test
