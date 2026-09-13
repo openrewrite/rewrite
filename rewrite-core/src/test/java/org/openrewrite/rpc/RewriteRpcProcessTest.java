@@ -17,6 +17,7 @@ package org.openrewrite.rpc;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
 import java.io.BufferedReader;
@@ -295,6 +296,30 @@ class RewriteRpcProcessTest {
             assertThat(peer.getLivenessCheck()).isNull();
         } finally {
             peerProcess.destroyForcibly();
+        }
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    void memoryLimitLaunchesUnderUlimit() {
+        RewriteRpcProcess.setMemoryLimit(6L << 30);
+        try {
+            assertThat(new RewriteRpcProcess("noop", "--flag").launchCommand())
+                    .containsExactly("/bin/sh", "-c", "ulimit -d 6291456; exec \"$@\"", "sh", "noop", "--flag");
+        } finally {
+            RewriteRpcProcess.setMemoryLimit(0);
+        }
+        assertThat(new RewriteRpcProcess("noop", "--flag").launchCommand()).containsExactly("noop", "--flag");
+    }
+
+    @Test
+    @DisabledOnOs(OS.LINUX)
+    void memoryLimitOnlyAppliesOnLinux() {
+        RewriteRpcProcess.setMemoryLimit(6L << 30);
+        try {
+            assertThat(new RewriteRpcProcess("noop", "--flag").launchCommand()).containsExactly("noop", "--flag");
+        } finally {
+            RewriteRpcProcess.setMemoryLimit(0);
         }
     }
 
