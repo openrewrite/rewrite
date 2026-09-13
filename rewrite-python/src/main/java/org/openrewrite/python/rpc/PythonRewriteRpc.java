@@ -37,6 +37,7 @@ import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.request.GetObjectResponse;
+import org.openrewrite.rpc.request.ParseResponse;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -324,6 +325,96 @@ public class PythonRewriteRpc extends RewriteRpc {
     }
 
     /**
+     * Parses an explicit list of Python files.
+     * <p>
+     * Unlike {@link #parseProject(Path, ParseProjectOptions, ExecutionContext)}, which walks a
+     * directory and resolves the project's manifests, this parses exactly the files given and does
+     * no manifest discovery. The key capability is that {@code ty} (the type resolver) is rooted at
+     * a caller-chosen directory rather than at the files' own, so first-party imports resolve
+     * against a broader workspace root. This lets a caller parse a handful of files (e.g. the
+     * {@code .py} files of a single build target) while cross-package first-party imports still
+     * resolve against the monorepo root, without parsing the rest of the tree.
+     *
+     * @param inputs  The files to parse.
+     * @param options Where {@code ty} is rooted, what source paths are relative to, the dependency
+     *                environment, and any per-parse options; see {@link ParseOptions}.
+     * @param ctx     Execution context for parsing.
+     * @return Stream of parsed source files, in the same order as {@code inputs}.
+     */
+    public Stream<SourceFile> parse(List<Path> inputs, ParseOptions options, ExecutionContext ctx) {
+        if (inputs.isEmpty()) {
+            return Stream.empty();
+        }
+
+        List<Parse.Input> mappedInputs = new ArrayList<>(inputs.size());
+        for (Path input : inputs) {
+            mappedInputs.add(new Parse.Input(input));
+        }
+
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+        String sourceFileType = Py.CompilationUnit.class.getName();
+
+        return StreamSupport.stream(new Spliterator<SourceFile>() {
+            private int index = 0;
+            private @Nullable List<String> ids;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                if (ids == null) {
+                    parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputs.size()));
+                    ids = send("Parse", new Parse(mappedInputs, options.getRelativeTo(), options.getProjectRoot(),
+                            options.getDependencyPath(), options.getOptions()), ParseResponse.class);
+                    assert ids.size() == inputs.size();
+                }
+
+                if (index >= inputs.size()) {
+                    return false;
+                }
+
+                Path input = inputs.get(index);
+                String id = ids.get(index);
+                index++;
+
+                SourceFile sourceFile;
+                try {
+                    sourceFile = getObject(id, sourceFileType);
+                    parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
+                } catch (Exception e) {
+                    sourceFile = new ParseError(
+                            Tree.randomId(),
+                            new Markers(Tree.randomId(), Collections.singletonList(
+                                    ParseExceptionResult.build(PythonParser.class, e, null))),
+                            relativizeToBase(input, options.getRelativeTo()),
+                            null,
+                            StandardCharsets.UTF_8.name(),
+                            false,
+                            null,
+                            e.getMessage(),
+                            null
+                    );
+                }
+                action.accept(sourceFile);
+                return true;
+            }
+
+            @Override
+            public @Nullable Spliterator<SourceFile> trySplit() {
+                return null;
+            }
+
+            @Override
+            public long estimateSize() {
+                return ids == null ? Long.MAX_VALUE : inputs.size() - index;
+            }
+
+            @Override
+            public int characteristics() {
+                return ids == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
+            }
+        }, false);
+    }
+
+    /**
      * Stream the public types the {@code dependency} defines: its defined FQNs to {@code onFqns}
      * first, then each type to {@code onType}; referenced-but-undefined types come back shallow.
      */
@@ -340,6 +431,17 @@ public class PythonRewriteRpc extends RewriteRpc {
         if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
         }
+    }
+
+    /**
+     * The path a failed input is reported under: the same relativization the server applies to the
+     * files it did return, so every source path in a batch is expressed the same way.
+     */
+    private static Path relativizeToBase(Path input, @Nullable Path relativeTo) {
+        if (relativeTo != null && input.startsWith(relativeTo)) {
+            return relativeTo.relativize(input);
+        }
+        return input;
     }
 
     private @Nullable PythonResolutionResult createSetupPyMarker(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {

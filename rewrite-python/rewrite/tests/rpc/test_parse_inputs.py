@@ -53,12 +53,17 @@ def test_a_file_keeps_its_own_line_endings(tmp_path, newline):
 
 
 def test_every_input_gets_a_slot_whatever_is_wrong_with_it(crlf_file):
+    # Latin-1 bytes that are not valid UTF-8; sources are read as UTF-8.
+    undecodable = crlf_file.parent / "latin1.py"
+    undecodable.write_bytes(b"# -*- coding: latin-1 -*-\nx = '\xe9'\n")
+
     ids = handle_parse({"inputs": [{"sourcePath": str(crlf_file)},
                                    {"sourcePath": str(crlf_file.parent / "gone.py")},
+                                   {"sourcePath": str(undecodable)},
                                    {"sourcePath": None}],
                         "relativeTo": str(crlf_file.parent)})
 
-    assert len(ids) == 3
+    assert len(ids) == 4
     assert PythonPrinter().print(local_objects[ids[0]]) == CRLF_SOURCE
 
     # An error result carries the same project-relative path a parsed one would.
@@ -66,7 +71,10 @@ def test_every_input_gets_a_slot_whatever_is_wrong_with_it(crlf_file):
     assert str(local_objects[ids[1]].source_path) == "gone.py"
 
     assert isinstance(local_objects[ids[2]], ParseError)
-    assert str(local_objects[ids[2]].source_path) == "<unknown>"
+    assert str(local_objects[ids[2]].source_path) == "latin1.py"
+
+    assert isinstance(local_objects[ids[3]], ParseError)
+    assert str(local_objects[ids[3]].source_path) == "<unknown>"
 
 
 def test_parse_that_loses_source_becomes_a_parse_error(crlf_file, monkeypatch):
