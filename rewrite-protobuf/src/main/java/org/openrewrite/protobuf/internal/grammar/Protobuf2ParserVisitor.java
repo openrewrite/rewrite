@@ -50,6 +50,12 @@ public interface Protobuf2ParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitSyntax(Protobuf2Parser.SyntaxContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link Protobuf2Parser#edition}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitEdition(Protobuf2Parser.EditionContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link Protobuf2Parser#importStatement}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -181,6 +187,12 @@ public interface Protobuf2ParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitReserved(Protobuf2Parser.ReservedContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link Protobuf2Parser#extensions}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitExtensions(Protobuf2Parser.ExtensionsContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link Protobuf2Parser#ranges}.
 	 * @param ctx the parse tree

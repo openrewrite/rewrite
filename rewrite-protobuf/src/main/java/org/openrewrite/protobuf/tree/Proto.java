@@ -306,6 +306,72 @@ public interface Proto extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Extensions implements Proto {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        ProtoContainer<Proto> ranges;
+
+        public List<Proto> getRanges() {
+            return ranges.getElements();
+        }
+
+        public Extensions withRanges(List<Proto> ranges) {
+            return getPadding().withRanges(ProtoContainer.withElements(this.ranges, ranges));
+        }
+
+        @Override
+        public <P> Proto acceptProto(ProtoVisitor<P> v, P p) {
+            return v.visitExtensions(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Extensions t;
+
+            public ProtoContainer<Proto> getRanges() {
+                return t.ranges;
+            }
+
+            public Extensions withRanges(ProtoContainer<Proto> ranges) {
+                return t.ranges == ranges ? t : new Extensions(t.id, t.prefix, t.markers, ranges);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Field implements FullName {
         @Nullable
         @NonFinal

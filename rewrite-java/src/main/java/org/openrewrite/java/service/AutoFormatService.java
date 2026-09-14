@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.format.BlankLinesVisitor;
 import org.openrewrite.java.format.NormalizeFormatVisitor;
+import org.openrewrite.java.format.TabsAndIndentsVisitor;
 
 @Incubating(since = "8.2.0")
 public class AutoFormatService {
@@ -49,5 +50,12 @@ public class AutoFormatService {
      */
     public <P> JavaVisitor<P> blankLinesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
         return new BlankLinesVisitor<>(sourceFile, stopAfter);
+    }
+
+    /**
+     * Returns the language-appropriate {@link TabsAndIndentsVisitor}.
+     */
+    public <P> JavaVisitor<P> tabsAndIndentsVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        return new TabsAndIndentsVisitor<>(sourceFile, stopAfter);
     }
 }

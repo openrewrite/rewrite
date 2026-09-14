@@ -98,6 +98,9 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
             getCursor().putMessage("indentType", IndentType.ALIGN);
         } else if (tree instanceof J.Block && tree.getMarkers().findFirst(SingleExpressionBlock.class).isPresent()) {
             getCursor().putMessage("indentType", wrappingStyle.getExpressionBodyFunctions().getUseContinuationIndent() ? IndentType.CONTINUATION_INDENT : IndentType.INDENT);
+        } else if (tree instanceof J.Block && getCursor().getParentTreeCursor().getValue() instanceof JavaSourceFile) {
+            // A script's statements sit in a block that has no braces of its own, so it is not an indentation level
+            getCursor().putMessage("indentType", IndentType.ALIGN);
         } else if (tree instanceof J.Block ||
                 tree instanceof K.Property ||
                 tree instanceof K.AnnotatedExpression ||
