@@ -61,6 +61,13 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                     return method;
                 }
 
+                // Version catalog builders expose methods that look like property setters, e.g.
+                // `version("junit", "6.1.2")` and `library(...).version("1.0")`, but assigning to
+                // them is invalid DSL. Nothing inside the block is a Gradle project/task property.
+                if ("versionCatalogs".equals(method.getSimpleName())) {
+                    return method;
+                }
+
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 if (m.getArguments().size() != 1 || m.getArguments().get(0) instanceof J.Empty) {
@@ -74,6 +81,13 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                 }
 
                 if (!propertyName.equals(m.getSimpleName())) {
+                    return m;
+                }
+
+                // Don't convert calls chained onto another invocation, e.g.
+                // `library("a", "g", "a").version("1.0")`. Those are fluent builder APIs rather
+                // than property setters. A simple receiver such as `project.version` is still converted.
+                if (m.getSelect() instanceof J.MethodInvocation) {
                     return m;
                 }
 
