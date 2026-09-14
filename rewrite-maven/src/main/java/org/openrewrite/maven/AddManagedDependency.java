@@ -247,10 +247,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                     if (versionValidation.isValid()) {
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
                         try {
-                            /*
-                             * Search all scopes. The scope parameter of the recipe is scope under which managed
-                             * dependency is added not the dependency search scope.
-                             */
+                            // `scope` is the tag scope of the new entry, not a dependency search scope, so search all scopes.
                             String currentVersion = getResolutionResult().findDependencies(convertedGroup, convertedArtifact, null).stream()
                                     .map(ResolvedDependency::getVersion)
                                     .findFirst()
@@ -282,13 +279,17 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
             }
 
             private @Nullable String existingManagedDependencyVersion() {
-                String version = getResolutionResult().getPom().getDependencyManagement().stream()
+                // groupId/artifactId may be property placeholders; resolve before matching.
+                ResolvedPom pom = getResolutionResult().getPom();
+                String convertedGroup = pom.getValue(groupId);
+                String convertedArtifact = pom.getValue(artifactId);
+                String version = pom.getDependencyManagement().stream()
                         .map(resolvedManagedDep -> {
-                            if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
+                            if (resolvedManagedDep.matches(convertedGroup, convertedArtifact, type, classifier)) {
                                 return resolvedManagedDep.getGav().getVersion();
                             } else if (resolvedManagedDep.getRequestedBom() != null &&
-                                       resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId) &&
-                                       resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
+                                       Objects.equals(convertedGroup, resolvedManagedDep.getRequestedBom().getGroupId()) &&
+                                       Objects.equals(convertedArtifact, resolvedManagedDep.getRequestedBom().getArtifactId())) {
                                 return resolvedManagedDep.getRequestedBom().getVersion();
                             }
                             return null;
@@ -298,10 +299,11 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                 if (version != null) {
                     return version;
                 }
-                // Check managed dependencies too (needed for no resolved classpath case, i.e. BOM)
-                return getResolutionResult().getPom().getRequested().getDependencyManagement().stream()
+                // Only checks whether groupId:artifactId is already present as an import; nothing else.
+                return pom.getRequested().getDependencyManagement().stream()
                         .filter(ManagedDependency.Imported.class::isInstance)
-                        .filter(d -> Objects.equals(groupId, d.getGroupId()) && artifactId.equals(d.getArtifactId()))
+                        .filter(d -> Objects.equals(convertedGroup, pom.getValue(d.getGroupId())) &&
+                                     Objects.equals(convertedArtifact, pom.getValue(d.getArtifactId())))
                         .map(ManagedDependency::getVersion)
                         .findFirst().orElse(null);
             }

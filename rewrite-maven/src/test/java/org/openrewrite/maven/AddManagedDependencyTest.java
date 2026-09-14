@@ -453,6 +453,37 @@ class AddManagedDependencyTest implements RewriteTest {
     }
 
     @Test
+    void doesNotDuplicateWhenExistingEntryMatchesGroupIdAndArtifactIdProperties() {
+        // Recipe's own groupId/artifactId are properties; resolve them before matching the existing entry.
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("${archunit.group}", "${archunit.artifact}", "1.3.2", null,
+            null, null, null, null, null, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <archunit.group>com.tngtech.archunit</archunit.group>
+                  <archunit.artifact>archunit</archunit.artifact>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.tngtech.archunit</groupId>
+                      <artifactId>archunit</artifactId>
+                      <version>1.3.2</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotAddManagedDependencyIfTransitiveVersionIsTheSameAsRequested() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.18.0", null,
