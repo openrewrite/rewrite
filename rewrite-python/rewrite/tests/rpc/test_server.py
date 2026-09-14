@@ -742,8 +742,6 @@ def test_consecutive_parses_each_use_their_own_project_root(tmp_path, monkeypatc
 
 
 def test_a_source_the_caller_already_had_survives_the_parse(tmp_path, monkeypatch):
-    """Cleanup removes what materializing an inline source created, so a file that was
-    already on disk — and the directory holding it — outlive the batch."""
     import rewrite.rpc.server as server
     import rewrite.python.ty_client as ty_client_module
 
@@ -773,3 +771,48 @@ def test_a_source_the_caller_already_had_survives_the_parse(tmp_path, monkeypatc
 
     assert existing.exists(), "a file the server did not create must not be removed"
     assert pkg.exists()
+
+
+def test_the_scratch_root_is_only_for_inputs_with_nowhere_to_live(tmp_path, monkeypatch):
+    import tempfile
+
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    for name in ("a.py", "b.py"):
+        (pkg / name).write_text("x = 1\n", encoding="utf-8")
+
+    roots = []
+    scratch = []
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            roots.append(project_root)
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+    monkeypatch.setattr(server, "parse_python_file",
+                        lambda path, relative_to=None, ty_client=None, **kw: {"id": "parsed"})
+    monkeypatch.setattr(server, "parse_python_source",
+                        lambda source, path="<unknown>", relative_to=None, ty_client=None, **kw: {"id": "inline"})
+
+    real_mkdtemp = tempfile.mkdtemp
+    monkeypatch.setattr(tempfile, "mkdtemp",
+                        lambda *a, **k: scratch.append(real_mkdtemp(*a, **k)) or scratch[-1])
+
+    server.handle_parse({"inputs": [{"path": str(pkg / "a.py")}, {"path": str(pkg / "b.py")}]})
+    assert roots == [str(pkg)]
+    assert scratch == [], "a batch of files on disk needs no scratch directory"
+
+    roots.clear()
+    server.handle_parse({"inputs": [{"text": "x = 1\n", "sourcePath": "pkg/a.py"}]})
+    assert scratch, "inline text with no root still needs somewhere to live"
+    assert roots == [scratch[0]]
