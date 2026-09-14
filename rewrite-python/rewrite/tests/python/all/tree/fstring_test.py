@@ -243,3 +243,14 @@ def test_nested_fstring_in_expression():
         print(message)
         """
     ))
+
+
+def test_line_continuation_before_closing_delimiter():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        '''\
+a = f"""alpha {b}\\
+"""
+c = 1
+'''
+    ))

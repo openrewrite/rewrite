@@ -3682,7 +3682,11 @@ class ParserVisitor(ast.NodeVisitor):
         # tokenizer tokens: START, MIDDLE, OP, ..., OP, MIDDLE, END
         parts = []
         prev_token_idx = -1
-        while tok.type != _end and value_idx < len(node.values):
+        # A literal chunk that decodes to the empty string (e.g. a line continuation)
+        # contributes no `Constant` to `node.values`, yet the tokenizer still emits its
+        # source as a MIDDLE token, so keep consuming those after the values run out.
+        while tok.type != _end and (
+                value_idx < len(node.values) or (tok.type == _middle and tok.string)):
             # Safety check: ensure loop is making progress
             if self._token_idx == prev_token_idx:
                 raise RuntimeError(
@@ -3697,7 +3701,7 @@ class ParserVisitor(ast.NodeVisitor):
                 tok = self._advance_token()
                 continue
 
-            value = node.values[value_idx]
+            value = node.values[value_idx] if value_idx < len(node.values) else None
             if tok.type == _middle:
                 # Accumulate text from consecutive MIDDLE tokens
                 s = tok.string
@@ -3720,7 +3724,7 @@ class ParserVisitor(ast.NodeVisitor):
                     unicode_escapes,
                     JavaType.Primitive.String
                 ))
-                if cast(ast.Constant, value).value == s:
+                if isinstance(value, ast.Constant) and value.value == s:
                     value_idx += 1
             elif tok.type == token.OP and tok.string == '{':
                 tok = self._advance_token()  # consume '{', get next
