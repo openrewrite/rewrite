@@ -3657,8 +3657,9 @@ class ParserVisitor(ast.NodeVisitor):
             if len(node.values) == 1 and isinstance(node.values[0], ast.Constant):
                 # format specifiers are stored as f-strings in the AST; e.g. `f'{1:n}'`
                 format_val = node.values[0].value
-                format_str = str(format_val) if format_val is not None else None
-                value_source, unicode_escapes = self.__extract_surrogate_escapes(format_str) if format_str else (None, None)
+                # The printer emits `value_source`, so it comes from the specifier's MIDDLE
+                # token: the decoded `ast` constant has lost escapes and line continuations.
+                value_source, unicode_escapes = self.__extract_surrogate_escapes(tok.string) if tok.string else (None, None)
                 # Set value to None when there are unicode escapes (surrogates)
                 literal_value = None if unicode_escapes else format_val
                 self._token_idx += 1  # consume the format token

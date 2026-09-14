@@ -243,3 +243,14 @@ def test_nested_fstring_in_expression():
         print(message)
         """
     ))
+
+
+def test_format_spec_keeps_source_text():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        '''\
+a = f"{x:>10\\
+}"
+b = f"{x:>\\t10}"
+'''
+    ))
