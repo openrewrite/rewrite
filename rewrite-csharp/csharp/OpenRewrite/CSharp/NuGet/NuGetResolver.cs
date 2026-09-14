@@ -925,32 +925,48 @@ public static class NuGetResolver
     /// Reads the target framework from a legacy csproj's <c>TargetFrameworkVersion</c>
     /// (e.g. <c>v4.7.2</c>), or SDK-style <c>TargetFramework(s)</c> as fallback.
     /// </summary>
-    public static NuGetFramework? ReadLegacyFramework(string projectPath)
+    public static NuGetFramework? ReadLegacyFramework(string projectPath) =>
+        ReadTargetFrameworks(projectPath).FirstOrDefault();
+
+    /// <summary>
+    /// Every target framework a project declares, from a legacy
+    /// <c>TargetFrameworkVersion</c> (e.g. <c>v4.7.2</c>) or an SDK-style
+    /// <c>TargetFramework(s)</c> alike. Declarations are read straight from the project XML, so
+    /// frameworks that only appear once MSBuild has evaluated conditions or imported
+    /// <c>Directory.Build.props</c> are not seen.
+    /// </summary>
+    public static IReadOnlyList<NuGetFramework> ReadTargetFrameworks(string projectPath)
     {
+        var frameworks = new List<NuGetFramework>();
         try
         {
             var doc = XDocument.Load(projectPath);
             var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
 
-            var tfv = doc.Descendants(ns + "TargetFrameworkVersion").FirstOrDefault()?.Value?.Trim();
-            if (!string.IsNullOrEmpty(tfv))
-                return NuGetFramework.Parse($".NETFramework,Version={tfv}");
+            foreach (var tfv in doc.Descendants(ns + "TargetFrameworkVersion"))
+                Add($".NETFramework,Version={tfv.Value.Trim()}");
 
-            var tf = doc.Descendants(ns + "TargetFramework").FirstOrDefault()?.Value?.Trim();
-            if (!string.IsNullOrEmpty(tf))
-                return NuGetFramework.Parse(tf);
+            foreach (var tf in doc.Descendants(ns + "TargetFramework"))
+                Add(tf.Value.Trim());
 
-            var tfs = doc.Descendants(ns + "TargetFrameworks").FirstOrDefault()?.Value;
-            var first = tfs?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .FirstOrDefault();
-            if (!string.IsNullOrEmpty(first))
-                return NuGetFramework.Parse(first);
+            foreach (var tfs in doc.Descendants(ns + "TargetFrameworks"))
+            foreach (var tf in tfs.Value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                Add(tf);
         }
         catch (Exception ex)
         {
             Log.Debug("NuGetResolver: failed to read TFM from {Project}: {Error}", projectPath, ex.Message);
         }
-        return null;
+        return frameworks;
+
+        void Add(string moniker)
+        {
+            if (string.IsNullOrEmpty(moniker))
+                return;
+            var framework = NuGetFramework.Parse(moniker);
+            if (!framework.IsUnsupported && !frameworks.Contains(framework))
+                frameworks.Add(framework);
+        }
     }
 
     #endregion
