@@ -668,10 +668,10 @@ public class YamlParser implements org.openrewrite.Parser {
 
 
     /**
-     * After Helm templates have been replaced with UUIDs, lines consisting entirely
-     * of a UUID are standalone control flow directives. A bare UUID on its own line
-     * creates invalid YAML, so we prepend # to make it a YAML comment. {@code commentedUuids}
-     * receives those UUIDs, so restoration can tell that # from one the source already had.
+     * After Helm templates have been replaced with UUIDs, a line that is a standalone control flow
+     * directive (see {@link #standaloneHelmUuid}) is invalid YAML, so we prepend # to turn all of
+     * it into a YAML comment. {@code commentedUuids} receives those placeholders, so restoration
+     * can tell that # from one the source already had.
      */
     private static String convertStandaloneHelmLinesToComments(
             String source,
@@ -707,11 +707,12 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             }
 
-            if (helmUuids.contains(trimmed)) {
+            String standaloneUuid = standaloneHelmUuid(trimmed, helmUuids);
+            if (standaloneUuid != null) {
                 result.append(lineContent, 0, indent);
                 result.append('#');
                 result.append(trimmed);
-                commentedUuids.add(trimmed);
+                commentedUuids.add(standaloneUuid);
             } else {
                 result.append(lineContent);
                 if (isBlockScalarIndicator(trimmed)) {
@@ -724,6 +725,24 @@ public class YamlParser implements org.openrewrite.Parser {
         }
 
         return result.toString();
+    }
+
+    /**
+     * The Helm placeholder a trimmed line consists of, or {@code null} when anything but a comment
+     * follows it. YAML opens a comment at a {@code #} preceded by whitespace, so the line has to
+     * start with the bare placeholder; a leading {@code #} is a comment the source itself wrote.
+     */
+    private static @Nullable String standaloneHelmUuid(String trimmed, Set<String> helmUuids) {
+        int uuidEnd = 0;
+        while (uuidEnd < trimmed.length() && trimmed.charAt(uuidEnd) != ' ' && trimmed.charAt(uuidEnd) != '\t') {
+            uuidEnd++;
+        }
+        String uuid = trimmed.substring(0, uuidEnd);
+        if (!helmUuids.contains(uuid)) {
+            return null;
+        }
+        String afterUuid = trimmed.substring(uuidEnd).trim();
+        return afterUuid.isEmpty() || afterUuid.charAt(0) == '#' ? uuid : null;
     }
 
     private static int appendNewline(String source, int lineEnd, StringBuilder result) {

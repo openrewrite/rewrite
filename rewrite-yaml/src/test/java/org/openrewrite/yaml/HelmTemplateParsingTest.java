@@ -589,4 +589,33 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void standaloneTemplateWithTrailingComment() {
+        rewriteRun(
+          yaml(
+            """
+              {{- if .Values.a }} # only when enabled
+              k: v
+              {{- end }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void templateFollowedByContentIsNotAStandaloneLine() {
+        rewriteRun(
+          yaml(
+            """
+              {{ .Values.key }} : value
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                // Were the line commented out, this entry would be gone and the file would still print identically.
+                assertThat(root.getEntries().getFirst().getKey().getValue()).isEqualTo("{{ .Values.key }}");
+            })
+          )
+        );
+    }
 }
