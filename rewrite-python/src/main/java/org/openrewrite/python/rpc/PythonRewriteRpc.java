@@ -455,14 +455,11 @@ public class PythonRewriteRpc extends RewriteRpc {
 
     /**
      * The path a failed input is reported under, matching the relativization the server applies to
-     * the files it did return. A batch given no {@code relativeTo} keeps the absolute path, since
-     * the root the server infers for the others is not known here.
+     * the files it did return. An input from outside {@code relativeTo} stays absolute, as it does
+     * there.
      */
-    private static Path relativizeToBase(Path input, @Nullable Path relativeTo) {
-        if (relativeTo != null && input.startsWith(relativeTo)) {
-            return relativeTo.relativize(input);
-        }
-        return input;
+    private static Path relativizeToBase(Path input, Path relativeTo) {
+        return input.startsWith(relativeTo) ? relativeTo.relativize(input) : input;
     }
 
     private @Nullable PythonResolutionResult createSetupPyMarker(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {

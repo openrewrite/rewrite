@@ -15,6 +15,7 @@
  */
 package org.openrewrite.python.rpc;
 
+import lombok.NonNull;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.request.RpcRequest;
@@ -44,10 +45,9 @@ class Parse implements RpcRequest {
     List<Input> inputs;
 
     /**
-     * Path that returned source paths are made relative to. When {@code null}, the server infers
-     * one from the input paths.
+     * Path that returned source paths are made relative to.
      */
-    @Nullable
+    @NonNull
     Path relativeTo;
 
     /**

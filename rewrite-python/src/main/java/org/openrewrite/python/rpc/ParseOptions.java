@@ -16,6 +16,7 @@
 package org.openrewrite.python.rpc;
 
 import lombok.Builder;
+import lombok.NonNull;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
@@ -27,10 +28,10 @@ import java.util.Map;
 public class ParseOptions {
 
     /**
-     * Path that returned source paths are made relative to. When {@code null}, the server infers
-     * one from the input paths.
+     * Path that returned source paths are made relative to. Required: a batch parsed without one
+     * comes back carrying absolute paths.
      */
-    @Nullable
+    @NonNull
     Path relativeTo;
 
     /**
