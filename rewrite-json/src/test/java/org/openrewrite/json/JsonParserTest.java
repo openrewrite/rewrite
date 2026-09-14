@@ -266,6 +266,19 @@ class JsonParserTest implements RewriteTest {
     }
 
     @Test
+    void json5WhitespaceBetweenTokens() {
+        // the JSON5 whitespace set less CR and LF, which the rest of this file covers
+        String ws = new String(new int[]{
+          0x0009, 0x000B, 0x000C, 0x0020, 0x00A0, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004,
+          0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000,
+          0xFEFF
+        }, 0, 23);
+        rewriteRun(
+          json("{" + ws + "\"a\":" + ws + "1" + ws + "}")
+        );
+    }
+
+    @Test
     void malformedInputIsReportedAsASyntaxError() {
         // a template directive, whose tokens the grammar partly matches against the object below it
         assertSyntaxError("""

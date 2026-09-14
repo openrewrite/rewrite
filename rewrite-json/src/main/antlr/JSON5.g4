@@ -142,8 +142,10 @@ fragment NEWLINE
    | [\r\n\u2028\u2029]
    ;
 
+// JSON5 takes its inter-token whitespace from ECMAScript: the WhiteSpace production
+// (\p{Zs}, tab, vertical tab, form feed, NBSP, BOM) and the LineTerminator production
 WS
-   : [ \t\n\r\u00A0\uFEFF\u2003] + -> skip
+   : [\t\u000B\u000C\r\n\u00A0\uFEFF\u2028\u2029\p{Zs}] + -> skip
    ;
 
 UTF_8_BOM : '\uFEFF' -> skip;
