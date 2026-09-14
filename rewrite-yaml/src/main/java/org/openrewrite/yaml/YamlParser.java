@@ -32,6 +32,7 @@ import org.openrewrite.yaml.tree.YamlKey;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.events.*;
 import org.yaml.snakeyaml.parser.Parser;
+import org.yaml.snakeyaml.parser.ParserException;
 import org.yaml.snakeyaml.parser.ParserImpl;
 import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
@@ -57,6 +58,8 @@ public class YamlParser implements org.openrewrite.Parser {
     // Match single-brace placeholder templates like {C App} that contain at least one space
     // These are invalid YAML but used by some tools as placeholders
     private static final Pattern SINGLE_BRACE_TEMPLATE_PATTERN = Pattern.compile("\\{[A-Za-z][^{}\\n\\r]*\\s[^{}\\n\\r]*}");
+    // Match an anchor or alias token, i.e. a `&` or `*` opening a node rather than sitting inside a scalar
+    private static final Pattern ANCHOR_OR_ALIAS_PATTERN = Pattern.compile("[\\[{,:\\s][&*][^\\s\\[\\]{},]");
     // Match placeholder values starting with multiple asterisks like "*** REMOVED ***"
     // These are invalid YAML aliases but used as credential placeholders
     private static final Pattern ASTERISK_PLACEHOLDER_PATTERN = Pattern.compile(":\\s+(\\*{2,}[^\n\r]*)");
@@ -99,6 +102,21 @@ public class YamlParser implements org.openrewrite.Parser {
                 });
     }
 
+    /**
+     * A brace group carrying an anchor or alias and standing alone as a value or element is flow
+     * syntax rather than a placeholder. SnakeYAML has to see it, or the anchor never registers and
+     * an alias to it resolves to nothing.
+     */
+    private static boolean isFlowMappingWithAnchor(String source, int start, int end) {
+        if (!ANCHOR_OR_ALIAS_PATTERN.matcher(source.substring(start, end)).find()) {
+            return false;
+        }
+        char before = start == 0 ? '\n' : source.charAt(start - 1);
+        char after = end == source.length() ? '\n' : source.charAt(end);
+        return (Character.isWhitespace(before) || before == '[' || before == '{' || before == ',') &&
+               (Character.isWhitespace(after) || after == ']' || after == '}' || after == ',' || after == '#');
+    }
+
     private Yaml.Documents parseFromInput(Path sourceFile, EncodingDetectingInputStream source) {
         String yamlSource = source.readFully();
         Map<String, String> variableByUuid = new HashMap<>();
@@ -126,6 +144,9 @@ public class YamlParser implements org.openrewrite.Parser {
         Matcher singleBraceMatcher = SINGLE_BRACE_TEMPLATE_PATTERN.matcher(processedSource);
         StringBuffer singleBraceBuffer = new StringBuffer();
         while (singleBraceMatcher.find()) {
+            if (isFlowMappingWithAnchor(processedSource, singleBraceMatcher.start(), singleBraceMatcher.end())) {
+                continue;
+            }
             String uuid = UUID.randomUUID().toString();
             singleBraceTemplateByUuid.put(uuid, singleBraceMatcher.group());
             singleBraceMatcher.appendReplacement(singleBraceBuffer, uuid);
@@ -489,7 +510,8 @@ public class YamlParser implements org.openrewrite.Parser {
                         AliasEvent alias = (AliasEvent) event;
                         Yaml.Anchor anchor = anchors.get(alias.getAnchor());
                         if (anchor == null) {
-                            throw new UnsupportedOperationException("Unknown anchor: " + alias.getAnchor());
+                            throw new ParserException(null, null,
+                                    "found undefined alias " + alias.getAnchor(), event.getStartMark());
                         }
                         BlockBuilder builder = blockStack.peek();
                         builder.push(new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor));

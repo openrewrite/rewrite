@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -29,7 +30,9 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -778,6 +781,52 @@ class YamlParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void singleBraceTemplateGluedToTextIsStillAPlaceholder() {
+        rewriteRun(
+          yaml("host: {C App *v2}.example.int/y\n")
+        );
+    }
+
+    @Test
+    void flowMappingWithoutAnchorRemainsAPlaceholder() {
+        rewriteRun(
+          yaml("resolution: {integrity: sha512-abc}\n",
+            spec -> spec.afterRecipe(docs -> {
+                Yaml.Mapping root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(root.getEntries().getFirst().getValue()).isInstanceOf(Yaml.Scalar.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void anchorInsideFlowMappingIsResolvable() {
+        rewriteRun(
+          yaml(
+            """
+              a: {b: &x v}
+              c: *x
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                Yaml.Mapping root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(root.getEntries().getFirst().getValue()).isInstanceOf(Yaml.Mapping.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void aliasWithoutAnchorDegradesToParseError() {
+        List<SourceFile> sources = YamlParser.builder().build().parse("a: *x\n").toList();
+        assertThat(sources).singleElement().isInstanceOf(ParseError.class);
+        assertThat(((ParseError) sources.getFirst()).getMarkers().findFirst(ParseExceptionResult.class))
+          .get()
+          .extracting(ParseExceptionResult::getMessage, as(STRING))
+          .contains("found undefined alias x")
+          .contains("line 1, column 4");
     }
 
     @Test
