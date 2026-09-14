@@ -28,6 +28,8 @@ def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
     def fake_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **_):
         observed["source"] = source
         observed["path"] = path
+        # Read while the batch is still in flight; the file is removed once it ends.
+        observed["content_at_parse"] = open(path, encoding="utf-8").read()
         return {"id": "empty-file"}
 
     monkeypatch.setattr(server, "parse_python_source", fake_parse_python_source)
@@ -44,7 +46,7 @@ def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
     assert result == ["empty-file"]
     assert observed["source"] == ""
     assert observed["path"] == str(tmp_path / "pkg" / "__init__.py")
-    assert (tmp_path / "pkg" / "__init__.py").read_text(encoding="utf-8") == ""
+    assert observed["content_at_parse"] == ""
 
 
 def test_pip_install_recipe_package_shape(tmp_path, monkeypatch):
@@ -675,6 +677,7 @@ def test_inline_source_is_written_where_ty_is_rooted(tmp_path, monkeypatch):
     def fake_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **_):
         observed["path"] = path
         observed["relative_to"] = relative_to
+        observed["content_at_parse"] = open(path, encoding="utf-8").read()
         return {"id": "inline"}
 
     monkeypatch.setattr(server, "parse_python_source", fake_parse_python_source)
@@ -685,10 +688,15 @@ def test_inline_source_is_written_where_ty_is_rooted(tmp_path, monkeypatch):
         "projectRoot": str(ty_root),
     })
 
-    assert (ty_root / "pkg" / "a.py").read_text(encoding="utf-8") == "x = 1\n"
     assert observed["path"] == str(ty_root / "pkg" / "a.py")
+    assert observed["content_at_parse"] == "x = 1\n"
     # The base passed alongside it keeps the reported source path the caller's own.
     assert observed["relative_to"] == observed["ty_root"]
+
+    # The caller's directory is left as it was found; a later parse rooted here would
+    # otherwise pick these up as project sources.
+    assert not (ty_root / "pkg" / "a.py").exists()
+    assert not (ty_root / "pkg").exists()
 
 
 def test_consecutive_parses_each_use_their_own_project_root(tmp_path, monkeypatch):
@@ -731,3 +739,37 @@ def test_consecutive_parses_each_use_their_own_project_root(tmp_path, monkeypatc
     assert initialized == [str(roots[0]), str(roots[1])], \
         "each call roots ty at its own projectRoot; a client carried over unrooted " \
         "would leave later calls resolving against the first call's config"
+
+
+def test_a_source_the_caller_already_had_survives_the_parse(tmp_path, monkeypatch):
+    """Cleanup removes what materializing an inline source created, so a file that was
+    already on disk — and the directory holding it — outlive the batch."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    existing = pkg / "a.py"
+    existing.write_text("original = 1\n", encoding="utf-8")
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+    monkeypatch.setattr(server, "parse_python_source",
+                        lambda source, path="<unknown>", relative_to=None, ty_client=None, **_: {"id": "inline"})
+
+    server.handle_parse({
+        "inputs": [{"text": "replaced = 2\n", "sourcePath": "pkg/a.py"}],
+        "relativeTo": str(tmp_path),
+    })
+
+    assert existing.exists(), "a file the server did not create must not be removed"
+    assert pkg.exists()

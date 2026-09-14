@@ -509,6 +509,20 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
+def _make_dirs(directory: str) -> List[str]:
+    """``os.makedirs``, reporting the directories it had to create, deepest first."""
+    created = []
+    d = directory
+    while d and not os.path.isdir(d):
+        created.append(d)
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    os.makedirs(directory, exist_ok=True)
+    return created
+
+
 # Files larger than this are recorded as Quarks rather than parsed into an AST.
 # Matches the 1 MB cap in the JVM JavaScriptParser and the other RPC engines.
 MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024
@@ -589,6 +603,10 @@ def handle_parse(params: dict) -> List[str]:
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
     check_print = _require_print_equals_input(options)
+    # What materializing inline sources put on disk, removed once the batch is parsed so
+    # a caller's own directory is left as it was found.
+    created_files: List[str] = []
+    created_dirs: List[str] = []
     # Path to a virtual environment with the project's dependencies installed,
     # provisioned and forwarded by the caller (the CLI build step in production;
     # a test/template helper in-repo). Points ty-types at the deps so supertypes
@@ -670,7 +688,9 @@ def handle_parse(params: dict) -> List[str]:
                     base_dir = ty_root
                     if base_dir and not os.path.isabs(path):
                         disk_path = os.path.join(base_dir, path)
-                        os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                        created_dirs.extend(_make_dirs(os.path.dirname(disk_path)))
+                        if not os.path.exists(disk_path):
+                            created_files.append(disk_path)
                         # ty must read the same bytes the LST was built from.
                         with open(disk_path, 'w', encoding='utf-8', newline='') as f:
                             f.write(source)
@@ -692,6 +712,17 @@ def handle_parse(params: dict) -> List[str]:
             ty_client.shutdown()
         if tmpdir is not None:
             shutil.rmtree(tmpdir, ignore_errors=True)
+        for created in created_files:
+            try:
+                os.remove(created)
+            except OSError:
+                pass
+        # rmdir only takes an empty directory, so one the caller had content in stays.
+        for created in created_dirs:
+            try:
+                os.rmdir(created)
+            except OSError:
+                pass
 
     return results
 
