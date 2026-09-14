@@ -304,6 +304,78 @@ public class RewriteRpcServer
         var projectList = solution.Projects.Where(p => p.FilePath != null).ToList();
         Log.Debug("RPC ParseSolution: {ProjectCount} projects to parse", projectList.Count);
 
+        // Repository-relative paths already emitted, so a project recovered from disk after an
+        // MSBuild evaluation failure does not re-emit a file another project already contributed.
+        var emittedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var emittedProjectFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var projectsWithSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void EmitSourceFiles(List<SourceFile> sourceFiles)
+        {
+            foreach (var sourceFile in sourceFiles)
+            {
+                var id = sourceFile.Id.ToString();
+                var sourceFileType = sourceFile is ParseError
+                    ? "org.openrewrite.tree.ParseError"
+                    : "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+
+                emittedPaths.Add(sourceFile.SourcePath);
+                _localObjects[id] = sourceFile;
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = id,
+                    SourceFileType = sourceFileType
+                });
+            }
+
+            // Oversize source files skipped during parsing are emitted as Quarks; the Java
+            // side builds each Quark from SourcePath locally, so they carry no content and
+            // are deliberately not registered in _localObjects (no GetObject round-trip).
+            foreach (var relPath in solutionParser.LastOversizePaths)
+            {
+                emittedPaths.Add(relPath);
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = Tree.RandomId().ToString(),
+                    SourceFileType = "org.openrewrite.quark.Quark",
+                    SourcePath = relPath
+                });
+            }
+        }
+
+        // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker.
+        // The in-process restore during solution loading produced the in-memory LockFile
+        // for each project; fall back to a fresh in-process resolve when absent.
+        void EmitProjectFile(string projectPath)
+        {
+            if (!emittedProjectFiles.Add(Path.GetFullPath(projectPath)))
+                return;
+            try
+            {
+                var content = ReadFilePreservingBom(projectPath);
+                var relativePath = Path.GetRelativePath(rootDir, projectPath);
+                var xmlParser = new OpenRewrite.Xml.XmlParser();
+                var csprojDoc = xmlParser.Parse(content, relativePath);
+                var projectFullPath = Path.GetFullPath(projectPath);
+                var marker = solutionParser.RestoredLockFiles.TryGetValue(projectFullPath, out var lockFile)
+                    ? MSBuildProjectHelper.CreateMarker(csprojDoc, lockFile, Path.GetDirectoryName(projectFullPath)!)
+                    : MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
+                if (marker != null)
+                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
+                _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = csprojDoc.Id.ToString(),
+                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document"
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("RPC ParseSolution: failed to parse csproj for {ProjectPath}: {ExType}: {ExMessage}",
+                    projectPath, ex.GetType().Name, ex.Message);
+            }
+        }
+
         var projectIndex = 0;
         foreach (var project in projectList)
         {
@@ -327,61 +399,37 @@ public class RewriteRpcServer
                 throw;
             }
 
-            foreach (var sourceFile in sourceFiles)
-            {
-                var id = sourceFile.Id.ToString();
-                var sourceFileType = sourceFile is ParseError
-                    ? "org.openrewrite.tree.ParseError"
-                    : "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+            if (sourceFiles.Count > 0 || solutionParser.LastOversizePaths.Count > 0)
+                projectsWithSources.Add(Path.GetFullPath(project.FilePath!));
+            EmitSourceFiles(sourceFiles);
+            EmitProjectFile(project.FilePath!);
+        }
 
-                _localObjects[id] = sourceFile;
-                response.Items.Add(new ParseSolutionResponseItem
-                {
-                    Id = id,
-                    SourceFileType = sourceFileType
-                });
-            }
+        // Projects MSBuild could not evaluate come back with no documents, which would silently
+        // drop every source file they own — a build-only task (a source-control/PDB <UsingTask>,
+        // say) must not make source code disappear from an analysis build. Recover their sources
+        // straight off disk instead: syntax-only LSTs, no type attestation, but present.
+        foreach (var (projectPath, reason) in solutionParser.UnevaluatedProjects)
+        {
+            // A diagnostic can name a project that nonetheless evaluated far enough to yield its
+            // documents (an unresolvable ProjectReference, say). Recovering from disk there would
+            // resurrect files the project deliberately excludes, so leave those projects alone.
+            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)))
+                continue;
 
-            // Oversize source files skipped during parsing are emitted as Quarks; the Java
-            // side builds each Quark from SourcePath locally, so they carry no content and
-            // are deliberately not registered in _localObjects (no GetObject round-trip).
-            foreach (var relPath in solutionParser.LastOversizePaths)
-            {
-                response.Items.Add(new ParseSolutionResponseItem
-                {
-                    Id = Tree.RandomId().ToString(),
-                    SourceFileType = "org.openrewrite.quark.Quark",
-                    SourcePath = relPath
-                });
-            }
+            var recovered = solutionParser.ParseProjectWithoutMSBuild(projectPath, rootDir,
+                requirePrintEqualsInput, emittedPaths);
+            var oversize = solutionParser.LastOversizePaths.Count;
+            if (recovered.Count == 0 && oversize == 0)
+                continue;
 
-            // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker.
-            // The in-process restore during solution loading produced the in-memory LockFile
-            // for each project; fall back to a fresh in-process resolve when absent.
-            try
-            {
-                var content = ReadFilePreservingBom(project.FilePath!);
-                var relativePath = Path.GetRelativePath(rootDir, project.FilePath!);
-                var xmlParser = new OpenRewrite.Xml.XmlParser();
-                var csprojDoc = xmlParser.Parse(content, relativePath);
-                var projectFullPath = Path.GetFullPath(project.FilePath!);
-                var marker = solutionParser.RestoredLockFiles.TryGetValue(projectFullPath, out var lockFile)
-                    ? MSBuildProjectHelper.CreateMarker(csprojDoc, lockFile, Path.GetDirectoryName(projectFullPath)!)
-                    : MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
-                if (marker != null)
-                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
-                _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
-                response.Items.Add(new ParseSolutionResponseItem
-                {
-                    Id = csprojDoc.Id.ToString(),
-                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document"
-                });
-            }
-            catch (Exception ex)
-            {
-                Log.Debug("RPC ParseSolution: failed to parse csproj for {ProjectPath}: {ExType}: {ExMessage}",
-                    project.FilePath, ex.GetType().Name, ex.Message);
-            }
+            Log.Warning("MSBuild could not evaluate {ProjectPath}, so it contributed no source files: {Reason}. " +
+                        "Recovered {FileCount} source file(s) from disk without type attestation; " +
+                        "recipes that match on type will not see them",
+                projectPath, reason, recovered.Count + oversize);
+
+            EmitSourceFiles(recovered);
+            EmitProjectFile(projectPath);
         }
 
         // Capture build context files from disk for reattestation

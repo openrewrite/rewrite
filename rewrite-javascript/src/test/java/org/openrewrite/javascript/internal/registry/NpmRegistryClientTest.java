@@ -44,7 +44,7 @@ class NpmRegistryClientTest {
     }
 
     @Test
-    void packumentSendsInstallV1Accept() {
+    void packumentAcceptsInstallV1WithJsonFallback() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"dist-tags\":{\"latest\":\"4.17.21\"}," +
                 "\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
@@ -53,7 +53,8 @@ class NpmRegistryClientTest {
         AbbreviatedPackument packument = client.getPackument(registry(), "lodash");
 
         assertThat(sender.last().getUrl().getPath()).isEqualTo("/lodash");
-        assertThat(sender.last().getRequestHeaders()).containsEntry("Accept", "application/vnd.npm.install-v1+json");
+        assertThat(sender.last().getRequestHeaders())
+                .containsEntry("Accept", "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*");
         assertThat(packument.getVersions()).containsExactly("4.17.20", "4.17.21");
         assertThat(packument.getDistTags()).containsEntry("latest", "4.17.21");
     }

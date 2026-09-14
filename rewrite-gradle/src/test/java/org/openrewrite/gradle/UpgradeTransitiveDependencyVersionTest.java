@@ -1130,6 +1130,44 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void addConstraintForTransitiveDependencyManagedByPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
+            "com.fasterxml*", "jackson-core", "2.13.0", null, "CVE-2024-BAD", null)),
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins {
+                id 'java'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.13.0') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void noChangesIfDependencyIsAlsoPresentOnProject() {
         rewriteRun(
           buildGradle(
