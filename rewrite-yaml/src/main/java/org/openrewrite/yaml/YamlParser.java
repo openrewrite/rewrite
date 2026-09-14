@@ -119,8 +119,9 @@ public class YamlParser implements org.openrewrite.Parser {
 
         // Convert standalone Helm template lines (lines where a UUID is the only content)
         // to YAML comments so they don't create structurally invalid YAML
+        Set<String> commentedHelmUuids = new HashSet<>();
         processedSource = convertStandaloneHelmLinesToComments(
-                processedSource, helmTemplateByUuid.keySet());
+                processedSource, helmTemplateByUuid.keySet(), commentedHelmUuids);
 
         // Then, replace single-brace templates like {C App} with UUIDs
         Matcher singleBraceMatcher = SINGLE_BRACE_TEMPLATE_PATTERN.matcher(processedSource);
@@ -340,7 +341,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         // embed another UUID (e.g. an asterisk placeholder wrapping a Helm
                         // expression like `**${{ ... }}**`), so this resolves to a fixpoint.
                         scalarValue = restorePlaceholders(scalarValue, helmTemplateByUuid,
-                                singleBraceTemplateByUuid, variableByUuid);
+                                commentedHelmUuids, singleBraceTemplateByUuid, variableByUuid);
 
                         Yaml.Scalar.Style style;
                         switch (scalar.getScalarStyle()) {
@@ -529,7 +530,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         return text;
                     }
                     return restorePlaceholders(text, helmTemplateByUuid,
-                            singleBraceTemplateByUuid, variableByUuid);
+                            commentedHelmUuids, singleBraceTemplateByUuid, variableByUuid);
                 }
 
                 @Override
@@ -669,11 +670,13 @@ public class YamlParser implements org.openrewrite.Parser {
     /**
      * After Helm templates have been replaced with UUIDs, lines consisting entirely
      * of a UUID are standalone control flow directives. A bare UUID on its own line
-     * creates invalid YAML, so we prepend # to make it a YAML comment.
+     * creates invalid YAML, so we prepend # to make it a YAML comment. {@code commentedUuids}
+     * receives those UUIDs, so restoration can tell that # from one the source already had.
      */
     private static String convertStandaloneHelmLinesToComments(
             String source,
-            Set<String> helmUuids) {
+            Set<String> helmUuids,
+            Set<String> commentedUuids) {
         if (helmUuids.isEmpty()) {
             return source;
         }
@@ -708,6 +711,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 result.append(lineContent, 0, indent);
                 result.append('#');
                 result.append(trimmed);
+                commentedUuids.add(trimmed);
             } else {
                 result.append(lineContent);
                 if (isBlockScalarIndicator(trimmed)) {
@@ -735,16 +739,16 @@ public class YamlParser implements org.openrewrite.Parser {
     }
 
     /**
-     * Restore template/variable UUID placeholders to their original text. The Helm
-     * placeholder may appear in its comment-wrapped form ({@code #uuid}, produced for
-     * standalone control-flow lines) or bare. Because a restored value can itself embed
-     * another UUID (e.g. an asterisk placeholder capturing {@code **${{ ... }}**}, whose
-     * value contains a Helm UUID), the replacements are repeated until they reach a
-     * fixpoint.
+     * Restore template/variable UUID placeholders to their original text. A Helm placeholder
+     * listed in {@code commentedHelmUuids} also consumes the {@code #} that made its
+     * standalone line a comment. Because a restored value can itself embed another UUID
+     * (e.g. an asterisk placeholder capturing {@code **${{ ... }}**}, whose value contains a
+     * Helm UUID), the replacements are repeated until they reach a fixpoint.
      */
     private static String restorePlaceholders(
             String text,
             Map<String, String> helmTemplateByUuid,
+            Set<String> commentedHelmUuids,
             Map<String, String> singleBraceTemplateByUuid,
             Map<String, String> variableByUuid) {
         String result = text;
@@ -752,12 +756,9 @@ public class YamlParser implements org.openrewrite.Parser {
         do {
             previous = result;
             for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
-                // Check comment-wrapped form first (standalone Helm lines converted to #uuid)
-                String commentKey = "#" + entry.getKey();
-                if (result.contains(commentKey)) {
-                    result = result.replace(commentKey, entry.getValue());
-                } else if (result.contains(entry.getKey())) {
-                    result = result.replace(entry.getKey(), entry.getValue());
+                String key = commentedHelmUuids.contains(entry.getKey()) ? "#" + entry.getKey() : entry.getKey();
+                if (result.contains(key)) {
+                    result = result.replace(key, entry.getValue());
                 }
             }
             for (Map.Entry<String, String> entry : singleBraceTemplateByUuid.entrySet()) {
