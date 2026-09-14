@@ -254,3 +254,13 @@ a = f"""alpha {b}\\
 c = 1
 '''
     ))
+
+
+def test_unmatched_surrogate_escape_is_only_text():
+    RecipeSpec().rewrite_run(python(r'a = f"\ud800"'))
+
+    RecipeSpec().rewrite_run(python(r'a = f"{x:\uD800}"'))
+
+
+def test_consecutive_unmatched_surrogate_escapes():
+    RecipeSpec().rewrite_run(python(r'a = f"\ud800\udfffb"'))
