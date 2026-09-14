@@ -172,7 +172,11 @@ public class YamlParser implements org.openrewrite.Parser {
 
         try (FormatPreservingReader reader = new FormatPreservingReader(sourceText)) {
             StreamReader streamReader = new StreamReader(reader);
-            Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
+            // SnakeYAML caps each document at a code point limit as a denial-of-service guard for untrusted
+            // streams. The source is already fully in memory as a String here, so the cap protects nothing.
+            LoaderOptions loaderOptions = new LoaderOptions();
+            loaderOptions.setCodePointLimit(Integer.MAX_VALUE);
+            Scanner scanner = new ScannerImpl(streamReader, loaderOptions);
             Parser parser = new ParserImpl(scanner);
 
             int lastEnd = 0;

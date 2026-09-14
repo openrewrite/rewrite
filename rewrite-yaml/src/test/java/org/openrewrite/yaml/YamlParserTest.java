@@ -25,6 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
+import org.yaml.snakeyaml.LoaderOptions;
 
 import java.util.List;
 import java.util.stream.Stream;
@@ -917,5 +918,22 @@ class YamlParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void documentExceedingSnakeYamlDefaultCodePointLimit() {
+        int defaultCodePointLimit = new LoaderOptions().getCodePointLimit();
+        StringBuilder source = new StringBuilder(defaultCodePointLimit + 1024);
+        int entries = 0;
+        while (source.length() <= defaultCodePointLimit) {
+            source.append("key").append(entries).append(": value").append(entries).append('\n');
+            entries++;
+        }
+
+        SourceFile parsed = YamlParser.builder().build().parse(source.toString()).findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(Yaml.Documents.class);
+        assertThat(((Yaml.Mapping) ((Yaml.Documents) parsed).getDocuments().getFirst().getBlock()).getEntries()).hasSize(entries);
+        assertThat(parsed.printAll()).isEqualTo(source.toString());
     }
 }
