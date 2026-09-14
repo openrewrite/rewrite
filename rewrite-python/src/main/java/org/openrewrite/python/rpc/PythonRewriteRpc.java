@@ -346,10 +346,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             return Stream.empty();
         }
 
-        List<Parse.Input> mappedInputs = new ArrayList<>(inputs.size());
-        for (Path input : inputs) {
-            mappedInputs.add(new Parse.Input(input));
-        }
+        Parse request = parseRequest(inputs, options, ctx);
 
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         String sourceFileType = Py.CompilationUnit.class.getName();
@@ -362,9 +359,11 @@ public class PythonRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (ids == null) {
                     parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputs.size()));
-                    ids = send("Parse", new Parse(mappedInputs, options.getRelativeTo(), options.getProjectRoot(),
-                            options.getDependencyPath(), options.getOptions()), ParseResponse.class);
-                    assert ids.size() == inputs.size();
+                    ids = send("Parse", request, ParseResponse.class);
+                    if (ids.size() != inputs.size()) {
+                        throw new IllegalStateException("Parse returned " + ids.size() +
+                                " results for " + inputs.size() + " inputs");
+                    }
                 }
 
                 if (index >= inputs.size()) {
@@ -433,9 +432,31 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
     }
 
+    static Parse parseRequest(List<Path> inputs, ParseOptions options, ExecutionContext ctx) {
+        List<Parse.Input> mappedInputs = new ArrayList<>(inputs.size());
+        for (Path input : inputs) {
+            mappedInputs.add(new Parse.Input(input));
+        }
+        return new Parse(mappedInputs, options.getRelativeTo(), options.getProjectRoot(),
+                options.getDependencyPath(), rpcOptions(options, ctx));
+    }
+
     /**
-     * The path a failed input is reported under: the same relativization the server applies to the
-     * files it did return, so every source path in a batch is expressed the same way.
+     * The per-parse options the server receives: this context's settings, which a caller's own
+     * {@link ParseOptions#getOptions()} then override key by key.
+     */
+    static Map<String, String> rpcOptions(ParseOptions options, ExecutionContext ctx) {
+        Map<String, String> merged = new HashMap<>(parseOptions(ctx));
+        if (options.getOptions() != null) {
+            merged.putAll(options.getOptions());
+        }
+        return merged;
+    }
+
+    /**
+     * The path a failed input is reported under, matching the relativization the server applies to
+     * the files it did return. A batch given no {@code relativeTo} keeps the absolute path, since
+     * the root the server infers for the others is not known here.
      */
     private static Path relativizeToBase(Path input, @Nullable Path relativeTo) {
         if (relativeTo != null && input.startsWith(relativeTo)) {

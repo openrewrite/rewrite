@@ -20,8 +20,10 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,6 +44,23 @@ class PythonParseOptionsTest {
                 .containsEntry(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, "false");
 
         assertThat(PythonRewriteRpc.parseOptions(ctx, "2.7"))
+                .containsEntry(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, "false")
+                .containsEntry("languageLevel", "2.7");
+    }
+
+    @Test
+    void anExplicitFileListCarriesThePrintCheckToo() {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+
+        List<Path> inputs = Collections.singletonList(Paths.get("a.py"));
+
+        assertThat(PythonRewriteRpc.parseRequest(inputs, ParseOptions.builder().build(), ctx).getOptions())
+                .containsEntry(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, "false");
+
+        assertThat(PythonRewriteRpc.parseRequest(inputs, ParseOptions.builder()
+                .options(Collections.singletonMap("languageLevel", "2.7")).build(), ctx).getOptions())
+                .as("a caller's own options join the context-derived ones")
                 .containsEntry(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, "false")
                 .containsEntry("languageLevel", "2.7");
     }

@@ -28,9 +28,9 @@ import java.util.Map;
  * <p>
  * Unlike {@link ParseProject}, which walks a directory, this request parses exactly the
  * files it is given. The key capability is that {@code ty} (the type resolver) is rooted
- * at {@link #relativeTo} rather than at the files' own directory, so first-party imports
+ * at {@link #projectRoot} rather than at the files' own directory, so first-party imports
  * resolve against a broader workspace root. This lets a caller parse a handful of files
- * (e.g. the {@code .py} files of a single Bazel target) while cross-package first-party
+ * (e.g. the {@code .py} files of a single build target) while cross-package first-party
  * imports still resolve against the monorepo root, without parsing the rest of the tree.
  */
 @Value
