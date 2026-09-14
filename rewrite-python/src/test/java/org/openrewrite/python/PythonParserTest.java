@@ -24,16 +24,22 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.python;
 
@@ -164,6 +170,37 @@ class PythonParserTest implements RewriteTest {
             softly.assertThat(sf.getMarkers().getMarkers()).isEmpty();
             softly.assertThat(sf.printAll()).isEqualTo(source);
         });
+    }
+
+    @Test
+    void intLiteralTypeNamesTheBoxItsValueArrivesIn() {
+        SourceFile sf = PythonParser.builder().build()
+          .parse(
+            //language=python
+            """
+              a = 2147483647
+              b = 2147483648
+              c = 9223372036854775808
+              """)
+          .findFirst()
+          .orElseThrow();
+
+        Map<String, String> actual = new LinkedHashMap<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Literal visitLiteral(J.Literal literal, Integer p) {
+                actual.put(literal.getValueSource(),
+                  requireNonNull(literal.getValue()).getClass().getSimpleName() + "/" + literal.getType().name());
+                return literal;
+            }
+        }.visit(sf, 0);
+
+        assertThat(actual).containsExactly(
+          entry("2147483647", "Integer/Int"),
+          entry("2147483648", "Long/Long"),
+          // None is the enum's "no type": no member names a BigInteger.
+          entry("9223372036854775808", "BigInteger/None")
+        );
     }
 
     @Test
