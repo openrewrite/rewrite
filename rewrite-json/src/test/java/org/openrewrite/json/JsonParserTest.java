@@ -266,11 +266,27 @@ class JsonParserTest implements RewriteTest {
     }
 
     @Test
-    void invalidJsonProducesParseError() {
-        Stream<SourceFile> results = new JsonParser().parse(new InMemoryExecutionContext(), "{\"offset\": %s, \"limit\": %s}");
-        assertThat(results)
-          .singleElement()
-          .isInstanceOf(ParseError.class);
+    void malformedInputIsReportedAsASyntaxError() {
+        // a template directive, whose tokens the grammar partly matches against the object below it
+        assertSyntaxError("""
+          {% include "header" %}
+          {
+            "count": 3
+          }
+          """);
+
+        // a member value the grammar cannot match
+        assertSyntaxError("{\"offset\": %s, \"limit\": %s}");
+
+        // prose, which the grammar matches nowhere
+        assertSyntaxError("plain prose, not a document");
+    }
+
+    private void assertSyntaxError(String source) {
+        SourceFile parsed = new JsonParser().parse(new InMemoryExecutionContext(), source).findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getExceptionType())
+          .isEqualTo("JsonParsingException");
     }
 
     @Issue("https://github.com/openrewrite/rewrite/pull/6631")
