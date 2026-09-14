@@ -3654,15 +3654,22 @@ class ParserVisitor(ast.NodeVisitor):
                 _start, _middle, _end = FSTRING_START, FSTRING_MIDDLE, FSTRING_END
 
         if tok.type != _start:
-            if len(node.values) == 1 and isinstance(node.values[0], ast.Constant):
-                # format specifiers are stored as f-strings in the AST; e.g. `f'{1:n}'`
-                format_val = node.values[0].value
+            # A format specifier is an f-string in the AST (e.g. `f'{1:n}'`), but an
+            # all-literal one also reaches here as a bare `Constant`, which a `\N{...}`
+            # escape can produce.
+            spec_values = [node] if isinstance(node, ast.Constant) else node.values
+            if len(spec_values) == 1 and isinstance(spec_values[0], ast.Constant):
+                format_val = spec_values[0].value
                 # The printer emits `value_source`, so it comes from the specifier's MIDDLE
-                # token: the decoded `ast` constant has lost escapes and line continuations.
-                value_source, unicode_escapes = self.__extract_surrogate_escapes(tok.string) if tok.string else (None, None)
+                # tokens: the decoded `ast` constant has lost escapes and line continuations.
+                # A `\N{...}` escape splits the specifier's text across several such tokens.
+                spec_source = ''
+                while self._tokens[self._token_idx].type == _middle:
+                    spec_source += self._tokens[self._token_idx].string
+                    self._token_idx += 1
+                value_source, unicode_escapes = self.__extract_surrogate_escapes(spec_source) if spec_source else (None, None)
                 # Set value to None when there are unicode escapes (surrogates)
                 literal_value = None if unicode_escapes else format_val
-                self._token_idx += 1  # consume the format token
                 return (j.Literal(
                     random_id(),
                     self.__whitespace(),

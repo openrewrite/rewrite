@@ -254,3 +254,12 @@ a = f"{x:>10\\
 b = f"{x:>\\t10}"
 '''
     ))
+
+
+def test_format_spec_with_named_unicode_escape():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        r'''a = f"{x:>\N{BULLET}10}"
+b = f"{x:\N{BULLET}}"
+'''
+    ))
