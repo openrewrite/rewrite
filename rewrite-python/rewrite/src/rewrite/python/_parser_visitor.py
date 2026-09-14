@@ -3637,8 +3637,48 @@ class ParserVisitor(ast.NodeVisitor):
         assert res is not None
         return self._hoist_concat_prefix(res)
 
+    def __consume_fstring_middles(self, _middle, raw: bool) -> \
+            Tuple[str, str, Optional[List[j.Literal.UnicodeEscape]]]:
+        """Consume a run of MIDDLE tokens, returning `(source, value_source, escapes)`.
+
+        The tokenizer ends a MIDDLE after each `{{`, `}}` and `\\N{...}`, so one literal
+        chunk spans several of them.
+        """
+        source = ''
+        while self._tokens[self._token_idx].type == _middle:
+            source += self._tokens[self._token_idx].string
+            self._token_idx += 1
+        value_source, unicode_escapes = self.__extract_surrogate_escapes(self.__redouble_braces(source, raw))
+        return source, value_source, unicode_escapes
+
+    @staticmethod
+    def __redouble_braces(source: str, raw: bool) -> str:
+        """Put back the `{{`/`}}` that a MIDDLE token's text holds as a single brace.
+
+        A chunk's other braces belong to a `\\N{...}` escape and are single already.
+        Spotting one takes the backslash run's parity and `raw`: neither `f"\\\\N{{x}}"`
+        nor `rf"\\N{{x}}"` has an escape there.
+        """
+        out = []
+        i = 0
+        while i < len(source):
+            if source[i] == '\\':
+                run_end = i
+                while run_end < len(source) and source[run_end] == '\\':
+                    run_end += 1
+                out.append(source[i:run_end])
+                escape_end = source.find('}', run_end + 2)
+                if not raw and (run_end - i) % 2 and source.startswith('N{', run_end) and escape_end != -1:
+                    out.append(source[run_end:escape_end + 1])
+                    run_end = escape_end + 1
+                i = run_end
+            else:
+                out.append({'{': '{{', '}': '}}'}.get(source[i], source[i]))
+                i += 1
+        return ''.join(out)
+
     def __map_fstring(self, node, prefix: Space, tok: TokenInfo, value_idx: int = 0, *,
-                      _start=None, _middle=None, _end=None) -> \
+                      _start=None, _middle=None, _end=None, _raw: bool = False) -> \
             Tuple[J, TokenInfo, int]:
         """Map an f-string or t-string to a FormattedString AST node.
 
@@ -3654,14 +3694,17 @@ class ParserVisitor(ast.NodeVisitor):
                 _start, _middle, _end = FSTRING_START, FSTRING_MIDDLE, FSTRING_END
 
         if tok.type != _start:
-            if len(node.values) == 1 and isinstance(node.values[0], ast.Constant):
-                # format specifiers are stored as f-strings in the AST; e.g. `f'{1:n}'`
-                format_val = node.values[0].value
-                format_str = str(format_val) if format_val is not None else None
-                value_source, unicode_escapes = self.__extract_surrogate_escapes(format_str) if format_str else (None, None)
+            # A format specifier is an f-string in the AST (e.g. `f'{1:n}'`), but a
+            # `\N{...}` escape makes an all-literal one arrive as a bare `Constant` or as
+            # one `Constant` per chunk, depending on the CPython patch release.
+            spec_values = [node] if isinstance(node, ast.Constant) else node.values
+            if spec_values and all(isinstance(v, ast.Constant) for v in spec_values):
+                format_val = ''.join(v.value for v in spec_values)
+                # The printer emits `value_source`, so it comes from the specifier's MIDDLE
+                # tokens: the decoded `ast` constant has lost escapes and line continuations.
+                _, value_source, unicode_escapes = self.__consume_fstring_middles(_middle, _raw)
                 # Set value to None when there are unicode escapes (surrogates)
                 literal_value = None if unicode_escapes else format_val
-                self._token_idx += 1  # consume the format token
                 return (j.Literal(
                     random_id(),
                     self.__whitespace(),
@@ -3676,6 +3719,7 @@ class ParserVisitor(ast.NodeVisitor):
             consume_end_delim = False
         else:
             delimiter = tok.string
+            _raw = 'r' in delimiter[:delimiter.index(delimiter[-1])].lower()
             tok = self._advance_token()  # consume start token, get next
             consume_end_delim = True
 
@@ -3703,16 +3747,8 @@ class ParserVisitor(ast.NodeVisitor):
 
             value = node.values[value_idx] if value_idx < len(node.values) else None
             if tok.type == _middle:
-                # Accumulate text from consecutive MIDDLE tokens
-                s = tok.string
-                tok = self._advance_token()  # consume first MIDDLE, get next
-                while tok.type == _middle:
-                    s += tok.string
-                    tok = self._advance_token()  # consume and get next
-                # For value_source, escape braces so the printer outputs them correctly
-                # In f-strings, {{ becomes { and }} becomes }, so we reverse that
-                value_source = s.replace('{', '{{').replace('}', '}}')
-                value_source, unicode_escapes = self.__extract_surrogate_escapes(value_source)
+                s, value_source, unicode_escapes = self.__consume_fstring_middles(_middle, _raw)
+                tok = self._tokens[self._token_idx]
                 # Set value to None when there are unicode escapes (surrogates)
                 literal_value = None if unicode_escapes else s
                 parts.append(j.Literal(
@@ -3724,8 +3760,12 @@ class ParserVisitor(ast.NodeVisitor):
                     unicode_escapes,
                     JavaType.Primitive.String
                 ))
-                if isinstance(value, ast.Constant) and value.value == s:
-                    value_idx += 1
+                # Adjacent string literals are merged into one `Constant`, so a chunk ending
+                # at the closing delimiter may continue in the next literal; anywhere else it
+                # covers every `Constant` up to the next field.
+                if isinstance(value, ast.Constant) and tok.type != _end:
+                    while value_idx < len(node.values) and isinstance(node.values[value_idx], ast.Constant):
+                        value_idx += 1
             elif tok.type == token.OP and tok.string == '{':
                 tok = self._advance_token()  # consume '{', get next
                 if not isinstance(value, (ast.FormattedValue, _Interpolation)):
@@ -3811,7 +3851,7 @@ class ParserVisitor(ast.NodeVisitor):
                         self._token_idx += 1  # advance past ':' (needed after conversion or debug specifier)
                     format_spec, tok, _ = self.__map_fstring(
                         cast(ast.JoinedStr, value.format_spec), Space.EMPTY, self._tokens[self._token_idx],
-                        _start=_start, _middle=_middle, _end=_end)
+                        _start=_start, _middle=_middle, _end=_end, _raw=_raw)
                 else:
                     format_spec = None
 
