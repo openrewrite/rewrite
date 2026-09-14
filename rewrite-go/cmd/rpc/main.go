@@ -142,6 +142,10 @@ type server struct {
 	traceReceive bool
 	traceSend    bool
 
+	// Fixed at startup, unlike traceReceive/traceSend, which TraceGetObject
+	// toggles per session. See tracef.
+	traceCalls bool
+
 	metricsCsv string
 
 	configuredDataTableStore recipe.DataTableStore
@@ -248,6 +252,7 @@ func newServer(cfg serverConfig) *server {
 		batchSize:               1000,
 		traceReceive:            cfg.traceRpcMessages,
 		traceSend:               cfg.traceRpcMessages,
+		traceCalls:              cfg.traceRpcMessages,
 		metricsCsv:              cfg.metricsCsv,
 		reader:                  bufio.NewReader(os.Stdin),
 		writer:                  os.Stdout,
@@ -273,6 +278,15 @@ func newServer(cfg serverConfig) *server {
 	}
 
 	return s
+}
+
+// tracef logs detail that recurs once per RPC call or per resolved item, so it
+// is written only under --trace-rpc-messages. Lifecycle and error lines use
+// s.logger directly.
+func (s *server) tracef(format string, v ...any) {
+	if s.traceCalls {
+		s.logger.Printf(format, v...)
+	}
 }
 
 func (s *server) closeMetrics() {
@@ -331,7 +345,7 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 func parseFlags() serverConfig {
 	var cfg serverConfig
 	flag.StringVar(&cfg.logFile, "log-file", "", "path to write server log; empty = OS temp file")
-	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every GetObject batch send/receive")
+	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every RPC call and every GetObject batch send/receive")
 	flag.StringVar(&cfg.metricsCsv, "metrics-csv", "", "path to write per-RPC metrics as CSV")
 	flag.StringVar(&cfg.recipeInstallDir, "recipe-install-dir", "", "directory used as the recipe installer workspace; if empty, a temporary directory is created and cleaned up on shutdown")
 	flag.Parse()
@@ -487,7 +501,7 @@ func (s *server) safeHandleRequest(req *jsonRPCRequest) (resp *jsonRPCResponse) 
 
 // handleRequest dispatches to the appropriate handler.
 func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
-	s.logger.Printf("Handling: %s", req.Method)
+	s.tracef("Handling: %s", req.Method)
 
 	var result any
 	var rpcErr *rpcError
@@ -2994,7 +3008,7 @@ func (s *server) handleDependencyTypes(params json.RawMessage) (any, *rpcError) 
 		if err != nil {
 			return nil, &rpcError{Code: -32603, Message: err.Error()}
 		}
-		s.logger.Printf("DependencyTypes: %s %s -> %s", req.ModulePath, req.Version, dir)
+		s.tracef("DependencyTypes: %s %s -> %s", req.ModulePath, req.Version, dir)
 		types := goparser.ExportedTypes([]string{dir}, nil)
 
 		q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
@@ -3013,7 +3027,7 @@ func (s *server) handleDependencyTypes(params json.RawMessage) (any, *rpcError) 
 			func(v any) { sender.Visit(v.(java.JavaType), q) })
 		q.Put(rpc.RpcObjectData{State: rpc.EndOfObject})
 		q.Flush()
-		s.logger.Printf("DependencyTypes: %d types, %d items", len(types), len(data))
+		s.tracef("DependencyTypes: %d types, %d items", len(types), len(data))
 	}
 
 	n := s.batchSize

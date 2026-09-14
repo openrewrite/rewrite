@@ -167,7 +167,9 @@ public static class MSBuildProjectHelper
     /// <summary>
     ///     Builds the marker from the in-memory NuGet lock file: declared package references
     ///     (from the restore's PackageSpec), the fully-linked resolved package graph with
-    ///     per-package asset information, and project references.
+    ///     per-package asset information, and project references. Graph depth is measured from
+    ///     both the declared packages and the referenced projects, so anything reachable only
+    ///     through a project reference is still reported at its true distance from the project.
     /// </summary>
     public static MSBuildProject CreateFromLockFile(string? sdk, LockFile lockFile, string projectDir,
         bool includeDeclaredPackageReferences = true)
@@ -176,6 +178,7 @@ public static class MSBuildProjectHelper
 
         // Declared dependencies per TFM alias (framework-specific + project-level)
         var declaredByTfm = new Dictionary<string, List<PackageReference>>(StringComparer.OrdinalIgnoreCase);
+        var referencedProjectsByTfm = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         if (spec != null)
         {
             foreach (var tfi in spec.TargetFrameworks)
@@ -185,6 +188,19 @@ public static class MSBuildProjectHelper
                 foreach (var dep in tfi.Dependencies)
                     refs.Add(new PackageReference(dep.Name, dep.LibraryRange?.VersionRange?.MinVersion?.ToNormalizedString()));
                 declaredByTfm[tfm] = refs;
+            }
+
+            foreach (var restoreTfm in spec.RestoreMetadata?.TargetFrameworks ?? [])
+            {
+                var tfm = ShortTfm(restoreTfm.FrameworkName, restoreTfm.TargetAlias);
+                var names = new List<string>();
+                foreach (var reference in restoreTfm.ProjectReferences)
+                {
+                    var path = reference.ProjectPath ?? reference.ProjectUniqueName;
+                    if (!string.IsNullOrEmpty(path))
+                        names.Add(Path.GetFileNameWithoutExtension(path));
+                }
+                referencedProjectsByTfm[tfm] = names;
             }
         }
 
@@ -311,7 +327,10 @@ public static class MSBuildProjectHelper
                 }
             }
 
-            var depths = ComputeDepths(declared.Select(d => d.Include), nodes, dependencyNames);
+            referencedProjectsByTfm.TryGetValue(tfm, out var referencedProjects);
+            referencedProjects ??= referencedProjectsByTfm.Values.FirstOrDefault() ?? [];
+            var depths = ComputeDepths(
+                declared.Select(d => d.Include).Concat(referencedProjects), nodes, dependencyNames);
             var resolved = new List<ResolvedPackage>();
             foreach (var (name, node) in nodes)
                 resolved.Add(node.WithDepth(depths.TryGetValue(name, out var d) ? d : 0));

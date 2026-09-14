@@ -1571,22 +1571,20 @@ class PythonJavaPrinter:
         unicode_escapes = literal.unicode_escapes
         if unicode_escapes is None:
             p.append(value_source)
-        elif value_source:
-            # Handle unicode escapes
+        elif value_source is not None:
+            # Indices are positions in value_source, which excludes the escapes themselves.
             surrogate_iter = iter(unicode_escapes)
             surrogate = next(surrogate_iter, None)
-            i = 0
 
-            if surrogate and surrogate.value_source_index == 0:
-                p.append(f"\\u{surrogate.code_point}")
-                surrogate = next(surrogate_iter, None)
-
-            for c in value_source:
-                p.append(c)
-                i += 1
+            for i, c in enumerate(value_source):
                 while surrogate and surrogate.value_source_index == i:
                     p.append(f"\\u{surrogate.code_point}")
                     surrogate = next(surrogate_iter, None)
+                p.append(c)
+
+            while surrogate:
+                p.append(f"\\u{surrogate.code_point}")
+                surrogate = next(surrogate_iter, None)
 
         self._after_syntax(literal, p)
         return literal

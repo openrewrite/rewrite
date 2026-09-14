@@ -927,6 +927,179 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradesVersionManagedByPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.29'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionManagedByPlatformKotlinDsl() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:2.5.7"))
+                  implementation("org.yaml:snakeyaml")
+              }
+              """,
+            """
+              plugins {
+                  `java`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:2.5.7"))
+                  implementation("org.yaml:snakeyaml:1.29")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionManagedByEnforcedPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation enforcedPlatform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation enforcedPlatform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.29'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionDeclaredAlongsidePlatformIsUpgradedInPlace() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.27'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.29'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotPinAVersionAConstraintGoverns() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  constraints {
+                      implementation 'org.yaml:snakeyaml:1.28'
+                  }
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradesVariablesDefinedInExtraProperties() {
         rewriteRun(
           buildGradle(
