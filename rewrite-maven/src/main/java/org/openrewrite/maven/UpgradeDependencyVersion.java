@@ -351,6 +351,26 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return false;
             }
 
+            /**
+             * Check if a local parent POM (in the same repository) declares the property that holds the
+             * managed version. The parent's own pass changes it there, so adding an override to the child
+             * leaves two places to maintain and pins the child if the parent later moves.
+             */
+            private boolean isPropertyDeclaredByLocalParent(String propertyKey) {
+                MavenResolutionResult current = getResolutionResult().getParent();
+                while (current != null) {
+                    ResolvedPom parentPom = current.getPom();
+                    if (!accumulator.projectArtifacts.contains(new GroupArtifact(parentPom.getGroupId(), parentPom.getArtifactId()))) {
+                        break; // Reached a non-local (remote) parent
+                    }
+                    if (parentPom.getRequested().getProperties().containsKey(propertyKey)) {
+                        return true;
+                    }
+                    current = current.getParent();
+                }
+                return false;
+            }
+
             private Xml.Tag upgradeDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
                 ResolvedDependency d = findDependency(t);
                 if (isExternalDependency(accumulator, d)) {
@@ -364,10 +384,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             // if a managed dependency is expressed as a property, change the property value
                             // do this only when a requested bom is absent, otherwise changing property has no effect
                             if (dm != null && isProperty(dm.getRequested().getVersion()) && dm.getRequestedBom() == null) {
-                                // if a local parent also declares this dependency, it will handle the property change
-                                if (!isDeclaredByLocalParent(d.getGroupId(), d.getArtifactId())) {
-                                    doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
-                                            dm.getRequested().getVersion().length() - 1),
+                                String propertyKey = dm.getRequested().getVersion().substring(2,
+                                        dm.getRequested().getVersion().length() - 1);
+                                // if a local parent declares this dependency or owns the property itself, it will
+                                // handle the property change, and an override here would only shadow it
+                                if (!isDeclaredByLocalParent(d.getGroupId(), d.getArtifactId()) &&
+                                    !isPropertyDeclaredByLocalParent(propertyKey)) {
+                                    doAfterVisit(new ChangePropertyValue(propertyKey,
                                             newerVersion, overrideManagedVersion, false).getVisitor());
                                 }
                             } else if (dm != null && dm.getBomGav() == null) {

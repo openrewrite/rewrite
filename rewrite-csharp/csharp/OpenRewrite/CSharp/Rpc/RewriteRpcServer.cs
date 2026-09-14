@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
 using NuGet.Frameworks;
@@ -28,8 +31,10 @@ using OpenRewrite.Java;
 using Serilog;
 using StreamJsonRpc;
 using StreamJsonRpc.Protocol;
+using StreamJsonRpc.Reflection;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
+using OpenRewrite.CSharp.NuGet;
 
 namespace OpenRewrite.CSharp.Rpc;
 
@@ -288,12 +293,88 @@ public class RewriteRpcServer
             };
         }
 
+        var restoreMsBefore = SolutionRestore.TotalRestoreMs;
         var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
 
-        var response = new ParseSolutionResponse();
+        var response = new ParseSolutionResponse
+        {
+            RestoreTimeMs = SolutionRestore.TotalRestoreMs - restoreMsBefore,
+        };
         var seenProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var projectList = solution.Projects.Where(p => p.FilePath != null).ToList();
         Log.Debug("RPC ParseSolution: {ProjectCount} projects to parse", projectList.Count);
+
+        // Repository-relative paths already emitted, so a project recovered from disk after an
+        // MSBuild evaluation failure does not re-emit a file another project already contributed.
+        var emittedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var emittedProjectFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var projectsWithSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void EmitSourceFiles(List<SourceFile> sourceFiles)
+        {
+            foreach (var sourceFile in sourceFiles)
+            {
+                var id = sourceFile.Id.ToString();
+                var sourceFileType = sourceFile is ParseError
+                    ? "org.openrewrite.tree.ParseError"
+                    : "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+
+                emittedPaths.Add(sourceFile.SourcePath);
+                _localObjects[id] = sourceFile;
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = id,
+                    SourceFileType = sourceFileType
+                });
+            }
+
+            // Oversize source files skipped during parsing are emitted as Quarks; the Java
+            // side builds each Quark from SourcePath locally, so they carry no content and
+            // are deliberately not registered in _localObjects (no GetObject round-trip).
+            foreach (var relPath in solutionParser.LastOversizePaths)
+            {
+                emittedPaths.Add(relPath);
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = Tree.RandomId().ToString(),
+                    SourceFileType = "org.openrewrite.quark.Quark",
+                    SourcePath = relPath
+                });
+            }
+        }
+
+        // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker.
+        // The in-process restore during solution loading produced the in-memory LockFile
+        // for each project; fall back to a fresh in-process resolve when absent.
+        void EmitProjectFile(string projectPath)
+        {
+            if (!emittedProjectFiles.Add(Path.GetFullPath(projectPath)))
+                return;
+            try
+            {
+                var content = ReadFilePreservingBom(projectPath);
+                var relativePath = Path.GetRelativePath(rootDir, projectPath);
+                var xmlParser = new OpenRewrite.Xml.XmlParser();
+                var csprojDoc = xmlParser.Parse(content, relativePath);
+                var projectFullPath = Path.GetFullPath(projectPath);
+                var marker = solutionParser.RestoredLockFiles.TryGetValue(projectFullPath, out var lockFile)
+                    ? MSBuildProjectHelper.CreateMarker(csprojDoc, lockFile, Path.GetDirectoryName(projectFullPath)!)
+                    : MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
+                if (marker != null)
+                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
+                _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = csprojDoc.Id.ToString(),
+                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document"
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("RPC ParseSolution: failed to parse csproj for {ProjectPath}: {ExType}: {ExMessage}",
+                    projectPath, ex.GetType().Name, ex.Message);
+            }
+        }
 
         var projectIndex = 0;
         foreach (var project in projectList)
@@ -318,61 +399,37 @@ public class RewriteRpcServer
                 throw;
             }
 
-            foreach (var sourceFile in sourceFiles)
-            {
-                var id = sourceFile.Id.ToString();
-                var sourceFileType = sourceFile is ParseError
-                    ? "org.openrewrite.tree.ParseError"
-                    : "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+            if (sourceFiles.Count > 0 || solutionParser.LastOversizePaths.Count > 0)
+                projectsWithSources.Add(Path.GetFullPath(project.FilePath!));
+            EmitSourceFiles(sourceFiles);
+            EmitProjectFile(project.FilePath!);
+        }
 
-                _localObjects[id] = sourceFile;
-                response.Items.Add(new ParseSolutionResponseItem
-                {
-                    Id = id,
-                    SourceFileType = sourceFileType
-                });
-            }
+        // Projects MSBuild could not evaluate come back with no documents, which would silently
+        // drop every source file they own — a build-only task (a source-control/PDB <UsingTask>,
+        // say) must not make source code disappear from an analysis build. Recover their sources
+        // straight off disk instead: syntax-only LSTs, no type attestation, but present.
+        foreach (var (projectPath, reason) in solutionParser.UnevaluatedProjects)
+        {
+            // A diagnostic can name a project that nonetheless evaluated far enough to yield its
+            // documents (an unresolvable ProjectReference, say). Recovering from disk there would
+            // resurrect files the project deliberately excludes, so leave those projects alone.
+            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)))
+                continue;
 
-            // Oversize source files skipped during parsing are emitted as Quarks; the Java
-            // side builds each Quark from SourcePath locally, so they carry no content and
-            // are deliberately not registered in _localObjects (no GetObject round-trip).
-            foreach (var relPath in solutionParser.LastOversizePaths)
-            {
-                response.Items.Add(new ParseSolutionResponseItem
-                {
-                    Id = Tree.RandomId().ToString(),
-                    SourceFileType = "org.openrewrite.quark.Quark",
-                    SourcePath = relPath
-                });
-            }
+            var recovered = solutionParser.ParseProjectWithoutMSBuild(projectPath, rootDir,
+                requirePrintEqualsInput, emittedPaths);
+            var oversize = solutionParser.LastOversizePaths.Count;
+            if (recovered.Count == 0 && oversize == 0)
+                continue;
 
-            // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker.
-            // The in-process restore during solution loading produced the in-memory LockFile
-            // for each project; fall back to a fresh in-process resolve when absent.
-            try
-            {
-                var content = ReadFilePreservingBom(project.FilePath!);
-                var relativePath = Path.GetRelativePath(rootDir, project.FilePath!);
-                var xmlParser = new OpenRewrite.Xml.XmlParser();
-                var csprojDoc = xmlParser.Parse(content, relativePath);
-                var projectFullPath = Path.GetFullPath(project.FilePath!);
-                var marker = solutionParser.RestoredLockFiles.TryGetValue(projectFullPath, out var lockFile)
-                    ? MSBuildProjectHelper.CreateMarker(csprojDoc, lockFile, Path.GetDirectoryName(projectFullPath)!)
-                    : MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
-                if (marker != null)
-                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
-                _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
-                response.Items.Add(new ParseSolutionResponseItem
-                {
-                    Id = csprojDoc.Id.ToString(),
-                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document"
-                });
-            }
-            catch (Exception ex)
-            {
-                Log.Debug("RPC ParseSolution: failed to parse csproj for {ProjectPath}: {ExType}: {ExMessage}",
-                    project.FilePath, ex.GetType().Name, ex.Message);
-            }
+            Log.Warning("MSBuild could not evaluate {ProjectPath}, so it contributed no source files: {Reason}. " +
+                        "Recovered {FileCount} source file(s) from disk without type attestation; " +
+                        "recipes that match on type will not see them",
+                projectPath, reason, recovered.Count + oversize);
+
+            EmitSourceFiles(recovered);
+            EmitProjectFile(projectPath);
         }
 
         // Capture build context files from disk for reattestation
@@ -1018,6 +1075,7 @@ public class RewriteRpcServer
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        MSBuildEnvironment.ScrubFrom(psi);
 
         using var process = System.Diagnostics.Process.Start(psi)
                             ?? throw new InvalidOperationException("Failed to start dotnet process");
@@ -1442,10 +1500,17 @@ public class RewriteRpcServer
         foreach (var (key, value) in options)
         {
             var prop = recipeType.GetProperty(key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-            if (prop != null && prop.CanWrite)
+            if (prop == null || !prop.CanWrite)
             {
-                prop.SetValue(recipe, ConvertOptionValue(value, prop.PropertyType));
+                continue;
             }
+            var converted = ConvertOptionValue(value, prop.PropertyType);
+            if (converted == null && prop.PropertyType.IsValueType &&
+                Nullable.GetUnderlyingType(prop.PropertyType) == null)
+            {
+                continue;
+            }
+            prop.SetValue(recipe, converted);
         }
         return recipe;
     }
@@ -1462,7 +1527,7 @@ public class RewriteRpcServer
     {
         if (value is JsonElement element)
         {
-            return element.Deserialize(targetType, RpcJson.Options);
+            return ConvertOptionElement(element, targetType);
         }
         if (value is null || targetType.IsInstanceOfType(value))
         {
@@ -1470,6 +1535,95 @@ public class RewriteRpcServer
         }
         var conversionType = Nullable.GetUnderlyingType(targetType) ?? targetType;
         return Convert.ChangeType(value, conversionType);
+    }
+
+    private static object? ConvertOptionElement(JsonElement element, Type targetType)
+    {
+        var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
+        if (element.ValueKind == JsonValueKind.Null || element.ValueKind == JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            var text = element.GetString()!;
+            if (underlying != typeof(string) && string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+            if (TryCoerceFromString(text, underlying, out var coerced))
+            {
+                return coerced;
+            }
+        }
+        else if (underlying == typeof(string))
+        {
+            return element.ValueKind == JsonValueKind.Object || element.ValueKind == JsonValueKind.Array
+                ? element.Deserialize(targetType, RpcJson.Options)
+                : element.GetRawText();
+        }
+
+        return element.Deserialize(targetType, RpcJson.Options);
+    }
+
+    private static readonly HashSet<Type> NumericOptionTypes =
+    [
+        typeof(sbyte), typeof(byte), typeof(short), typeof(ushort), typeof(int), typeof(uint),
+        typeof(long), typeof(ulong), typeof(float), typeof(double), typeof(decimal)
+    ];
+
+    private static bool TryCoerceFromString(string text, Type targetType, out object? result)
+    {
+        result = null;
+        if (targetType == typeof(bool))
+        {
+            var trimmed = text.Trim();
+            if (bool.TryParse(trimmed, out var flag))
+            {
+                result = flag;
+                return true;
+            }
+            if (trimmed == "1" || trimmed == "0")
+            {
+                result = trimmed == "1";
+                return true;
+            }
+            return false;
+        }
+        if (NumericOptionTypes.Contains(targetType))
+        {
+            try
+            {
+                result = Convert.ChangeType(text.Trim(), targetType, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception e) when (e is FormatException or OverflowException)
+            {
+                return false;
+            }
+        }
+        if (targetType != typeof(string) && typeof(IEnumerable).IsAssignableFrom(targetType))
+        {
+            var elementType = targetType.IsArray
+                ? targetType.GetElementType()!
+                : targetType.GetInterfaces()
+                    .Concat([targetType])
+                    .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                    ?.GetGenericArguments()[0];
+            if (elementType == typeof(string))
+            {
+                var items = new JsonArray();
+                foreach (var part in text.Split(','))
+                {
+                    items.Add(JsonValue.Create(part));
+                }
+                result = items.Deserialize(targetType, RpcJson.Options);
+                return true;
+            }
+        }
+        return false;
     }
 
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
@@ -2057,7 +2211,7 @@ internal sealed class RpcMetricsWriter : IDisposable
 /// Wraps the message handler to record a metrics row when each inbound request's response is
 /// written. Notifications (Evict) get no response and aren't recorded; outbound requests are ignored.
 /// </summary>
-internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IDisposable
+internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IJsonRpcMessageBufferManager, IDisposable
 {
     private readonly IJsonRpcMessageHandler _inner;
     private readonly RpcMetricsWriter _metrics;
@@ -2072,6 +2226,13 @@ internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IDisposabl
     public bool CanRead => _inner.CanRead;
     public bool CanWrite => _inner.CanWrite;
     public IJsonRpcMessageFormatter Formatter => _inner.Formatter;
+
+    // JsonRpc looks for this interface on the outermost handler only, so a wrapper that
+    // omits it strands the callback that lets the inner handler advance past a consumed
+    // message: its read buffer then grows for the life of the connection, and the final
+    // read sees leftover bytes instead of the empty buffer that means a clean disconnect.
+    public void DeserializationComplete(JsonRpcMessage message) =>
+        (_inner as IJsonRpcMessageBufferManager)?.DeserializationComplete(message);
 
     public async ValueTask<JsonRpcMessage?> ReadAsync(CancellationToken cancellationToken)
     {
@@ -2152,6 +2313,9 @@ public class DependencyRequest
 public class ParseSolutionResponse
 {
     public List<ParseSolutionResponseItem> Items { get; set; } = new();
+
+    /// <summary>Milliseconds spent restoring NuGet dependencies for this entry path.</summary>
+    public long RestoreTimeMs { get; set; }
 }
 
 public class ParseSolutionResponseItem

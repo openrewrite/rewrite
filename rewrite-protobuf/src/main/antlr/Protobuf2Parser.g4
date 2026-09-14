@@ -3,7 +3,7 @@ parser grammar Protobuf2Parser;
 options { tokenVocab=Protobuf2Lexer; }
 
 proto
-  : syntax? (importStatement | packageStatement | optionDef | topLevelDef | emptyStatement)* EOF
+  : (syntax | edition)? (importStatement | packageStatement | optionDef | topLevelDef | emptyStatement)* EOF
   ;
 
 stringLiteral
@@ -17,6 +17,10 @@ identOrReserved
 
 syntax
   : SYNTAX ASSIGN stringLiteral SEMI
+  ;
+
+edition
+  : EDITION ASSIGN stringLiteral SEMI
   ;
 
 importStatement
@@ -52,6 +56,7 @@ topLevelDef
 
 ident
   : Ident
+  | reservedWord
   ;
 
 message
@@ -67,7 +72,7 @@ group
   ;
 
 messageBody
-  : LBRACE (messageField | group | enumDefinition | extend | message | optionDef | oneOf | mapField | reserved | emptyStatement)* RBRACE
+  : LBRACE (messageField | group | enumDefinition | extend | message | optionDef | oneOf | mapField | reserved | extensions | emptyStatement)* RBRACE
   ;
 
 extend
@@ -83,7 +88,7 @@ enumBody
   ;
 
 enumField
-  : ident ASSIGN MINUS? IntegerLiteral optionList? SEMI
+  : ident ASSIGN (MINUS? IntegerLiteral | NumericLiteral) optionList? SEMI
   ;
 
 service
@@ -110,12 +115,16 @@ reserved
   : RESERVED (ranges | fieldNames) SEMI
   ;
 
+extensions
+  : EXTENSIONS ranges SEMI
+  ;
+
 ranges
   : range (COMMA range)*
   ;
 
 range
-  : IntegerLiteral (TO IntegerLiteral)?
+  : IntegerLiteral (TO (IntegerLiteral | MAX))?
   ;
 
 fieldNames
@@ -169,7 +178,7 @@ keyType
   ;
 
 // Protobuf does not reserve its keywords: every keyword is also an identifier,
-// so any of them may be used as a field name (e.g. `optional string group = 8;`
+// so any of them may be spelled where an identifier is (e.g. `optional string group = 8;`
 // or `optional bool optional = 5;`, both common in real-world .proto files). The
 // lexer tokenizes each keyword distinctly, so they are re-admitted as identifiers
 // here. See https://protobuf.com/docs/language-spec#identifiers-and-keywords.
@@ -177,8 +186,10 @@ reservedWord
   : BOOL
   | BYTES
   | DOUBLE
+  | EDITION
   | ENUM
   | EXTEND
+  | EXTENSIONS
   | FIXED32
   | FIXED64
   | FLOAT
@@ -187,6 +198,7 @@ reservedWord
   | INT32
   | INT64
   | MAP
+  | MAX
   | MESSAGE
   | ONEOF
   | OPTION

@@ -69,8 +69,9 @@ class TestSourceDetection:
         src = "#!/usr/bin/env python\n# -*- python: 2.7 -*-\nx = 1\n"
         assert detect_from_source(src) == "2.7"
 
-    def test_magic_comment_not_after_line_two(self):
-        src = "# foo\n# bar\n# -*- python: 2 -*-\n"
+    @pytest.mark.parametrize("newline", ["\n", "\r\n", "\r"], ids=["lf", "crlf", "cr"])
+    def test_magic_comment_not_after_line_two(self, newline):
+        src = f"# foo{newline}# bar{newline}# -*- python: 2 -*-{newline}"
         assert detect_from_source(src) is None
 
     def test_magic_comment_beats_shebang(self):
