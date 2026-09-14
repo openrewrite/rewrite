@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Collections.Concurrent;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Format;
 using OpenRewrite.Java;
@@ -57,11 +56,9 @@ internal enum ScaffoldKind
 /// </summary>
 internal static class TemplateEngine
 {
-    private static readonly ConcurrentDictionary<string, J> GlobalCache = new();
+    private static readonly LruCache GlobalCache = new(MaxCacheEntries);
 
-    private static readonly ConcurrentQueue<string> CacheInsertions = new();
-
-    private const int MaxCacheEntries = 4096;
+    private const int MaxCacheEntries = 512;
 
     private const string CanonicalPrefix = "__k";
 
@@ -121,19 +118,70 @@ internal static class TemplateEngine
         // Compute preamble first — it affects the scaffold shape and must be part of the cache key
         var preamble = BuildScaffoldPreamble(captures);
         var cacheKey = BuildCacheKey(code, preamble, usings, context, dependencies, scaffoldKind);
-        if (GlobalCache.TryGetValue(cacheKey, out var cached))
+        if (GlobalCache.TryGet(cacheKey, out var cached))
             return cached;
 
         var result = ParseInternal(code, preamble, usings, context, dependencies, scaffoldKind);
-        if (GlobalCache.TryAdd(cacheKey, result))
+        GlobalCache.Put(cacheKey, result);
+        return result;
+    }
+
+    private sealed class LruCache(int maxEntries)
+    {
+        private readonly Dictionary<string, LinkedListNode<KeyValuePair<string, J>>> _entries =
+            new(StringComparer.Ordinal);
+
+        private readonly LinkedList<KeyValuePair<string, J>> _order = new();
+
+        private readonly object _gate = new();
+
+        internal IEnumerable<string> Keys
         {
-            CacheInsertions.Enqueue(cacheKey);
-            while (GlobalCache.Count > MaxCacheEntries && CacheInsertions.TryDequeue(out var oldest))
+            get
             {
-                GlobalCache.TryRemove(oldest, out _);
+                lock (_gate)
+                {
+                    return _entries.Keys.ToList();
+                }
             }
         }
-        return result;
+
+        internal bool TryGet(string key, out J value)
+        {
+            lock (_gate)
+            {
+                if (!_entries.TryGetValue(key, out var node))
+                {
+                    value = null!;
+                    return false;
+                }
+                _order.Remove(node);
+                _order.AddLast(node);
+                value = node.Value.Value;
+                return true;
+            }
+        }
+
+        internal void Put(string key, J value)
+        {
+            lock (_gate)
+            {
+                if (_entries.TryGetValue(key, out var existing))
+                {
+                    _order.Remove(existing);
+                    _entries.Remove(key);
+                }
+
+                _entries[key] = _order.AddLast(new KeyValuePair<string, J>(key, value));
+
+                while (_entries.Count > maxEntries)
+                {
+                    var evicted = _order.First!;
+                    _order.RemoveFirst();
+                    _entries.Remove(evicted.Value.Key);
+                }
+            }
+        }
     }
 
     private static Dictionary<string, string>? CanonicalCaptureNames(
