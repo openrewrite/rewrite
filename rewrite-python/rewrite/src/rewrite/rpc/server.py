@@ -509,22 +509,6 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
-def _common_input_parent(inputs: list) -> Optional[str]:
-    """The deepest directory holding every input that names a file on disk, or None when
-    no input does. Inline text is excluded: its ``sourcePath`` names nothing yet."""
-    parents = []
-    for item in inputs:
-        if isinstance(item, str):
-            named = item
-        elif isinstance(item, dict) and item.get('text') is None and item.get('source') is None:
-            named = item.get('path') or item.get('sourcePath') or item.get('relativePath')
-        else:
-            named = None
-        if named and os.path.isabs(named):
-            parents.append(os.path.dirname(named))
-    return os.path.commonpath(parents) if parents else None
-
-
 def _make_dirs(directory: str) -> List[str]:
     """``os.makedirs``, reporting the directories it had to create, deepest first."""
     created = []
@@ -659,10 +643,6 @@ def handle_parse(params: dict) -> List[str]:
         # so supertypes reaching into third-party packages resolve.
         ty_client = TyTypesClient(virtual_env=dependency_path,
                                   python_version=ty_version)
-        if not ty_root:
-            # Files on disk anchor ty themselves; rooting it anywhere else would leave
-            # them outside the project it resolves against.
-            ty_root = _common_input_parent(inputs)
         if not ty_root:
             # A scratch root gives inline text inputs somewhere on disk that ty can see.
             tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
