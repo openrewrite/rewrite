@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import ts from "typescript";
+import * as ts from "./compiler";
 import * as path from "path";
 import {Type} from "../java";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
+import {declarationsOf, declaredNameOf, fullyQualifiedNameOf, signatureKeyOf, typeAtLocation, valueDeclarationOf} from "./ts7/checker";
+import {isScanned} from "./token-navigation";
 
 /**
  * TypeScript orders union constituents by internal type id, which varies with what the checker resolved
@@ -49,17 +51,12 @@ export class JavaScriptTypeMapping {
         private readonly checker: ts.TypeChecker,
         private readonly sourceRoot?: string
     ) {
-        this.regExpSymbol = checker.resolveName(
-            "RegExp",
-            undefined,
-            ts.SymbolFlags.Type,
-            false
-        );
+        this.regExpSymbol = checker.resolveName("RegExp", ts.SymbolFlags.Type, undefined, false);
 
         // Resolve global wrapper types for primitives from TypeScript's lib
-        const stringSymbol = checker.resolveName("String", undefined, ts.SymbolFlags.Type, false);
-        const numberSymbol = checker.resolveName("Number", undefined, ts.SymbolFlags.Type, false);
-        const booleanSymbol = checker.resolveName("Boolean", undefined, ts.SymbolFlags.Type, false);
+        const stringSymbol = checker.resolveName("String", ts.SymbolFlags.Type, undefined, false);
+        const numberSymbol = checker.resolveName("Number", ts.SymbolFlags.Type, undefined, false);
+        const booleanSymbol = checker.resolveName("Boolean", ts.SymbolFlags.Type, undefined, false);
 
         // Store the TypeScript types; conversion to Type happens on-demand
         if (stringSymbol) {
@@ -89,12 +86,12 @@ export class JavaScriptTypeMapping {
         // TypeNode needs getTypeFromTypeNode (resolves the annotation itself).
         // Everything else — expressions, declarations, specifiers, bindings, etc. —
         // uses getTypeAtLocation which works for virtually all node kinds.
-        let type: ts.Type | undefined;
-        if (ts.isTypeNode(node)) {
-            type = this.checker.getTypeFromTypeNode(node);
-        } else {
-            type = this.checker.getTypeAtLocation(node);
+        // A scanned token stands for punctuation the compiler left out of its tree, so the checker
+        // has nothing to look it up by.
+        if (isScanned(node)) {
+            return undefined;
         }
+        const type = typeAtLocation(this.checker, node);
         return type && this.getType(type);
     }
 
@@ -222,8 +219,8 @@ export class JavaScriptTypeMapping {
         let type: ts.Type | undefined;
         if (target.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias | ts.SymbolFlags.ValueModule)) {
             type = this.checker.getDeclaredTypeOfSymbol(target);
-        } else if (target.valueDeclaration) {
-            type = this.checker.getTypeOfSymbolAtLocation(target, target.valueDeclaration);
+        } else if (valueDeclarationOf(target)) {
+            type = this.checker.getTypeOfSymbolAtLocation(target, valueDeclarationOf(target)!);
         }
         return type ? this.getType(type) : undefined;
     }
@@ -232,7 +229,7 @@ export class JavaScriptTypeMapping {
         // Check for error types first - these indicate type-checking failures
         // and should not be processed further
         if (type.flags & ts.TypeFlags.Any) {
-            const intrinsicName = (type as any).intrinsicName;
+            const intrinsicName = type.isIntrinsicType() ? type.intrinsicName : undefined;
             if (intrinsicName === 'error') {
                 return Type.unknownType;
             }
@@ -241,11 +238,11 @@ export class JavaScriptTypeMapping {
         // A type alias to an intersection or a plain anonymous object (e.g. kafkajs's
         // `export type Producer = Sender & {...}`, or `export type Consumer = {...}`) loses its name
         // when TypeScript resolves the structure, leaving an unnamed intersection / `<unknown>`.
-        // TypeScript still records the originating alias via `aliasSymbol`; use it to attribute the
+        // TypeScript still records the originating alias via `getAliasSymbol()`; use it to attribute the
         // nominal name (e.g. `kafkajs.Producer`) so the type is matchable. Unions keep their
         // structural Union mapping (recipes rely on it), and mapped / instantiated utility types
         // (`Partial<T>`, `Record<K, V>`, ...) are intentionally left untouched.
-        if (type.aliasSymbol) {
+        if (type.getAliasSymbol()) {
             let nameableAlias = !!(type.flags & ts.TypeFlags.Intersection);
             if (!nameableAlias && (type.flags & ts.TypeFlags.Object)) {
                 const objectFlags = (type as ts.ObjectType).objectFlags;
@@ -254,7 +251,7 @@ export class JavaScriptTypeMapping {
                     !(objectFlags & ts.ObjectFlags.Instantiated);
             }
             if (nameableAlias) {
-                const fullyQualifiedName = this.getFullyQualifiedNameFromSymbol(type.aliasSymbol);
+                const fullyQualifiedName = this.getFullyQualifiedNameFromSymbol(type.getAliasSymbol()!);
                 if (fullyQualifiedName && fullyQualifiedName !== 'unknown') {
                     const aliasSignature = this.getSignature(type);
                     const cached = this.typeCache.get(aliasSignature);
@@ -330,7 +327,7 @@ export class JavaScriptTypeMapping {
 
             if (isTypeReference) {
                 const typeRef = type as ts.TypeReference;
-                const hasTypeArgs = typeRef.typeArguments && typeRef.typeArguments.length > 0;
+                const hasTypeArgs = this.checker.getTypeArguments(typeRef) && this.checker.getTypeArguments(typeRef).length > 0;
 
                 if (hasTypeArgs) {
                     // This is a parameterized type reference (e.g., RefObject<HTMLButtonElement>)
@@ -340,7 +337,7 @@ export class JavaScriptTypeMapping {
                     // This happens when TypeScript expands type aliases but doesn't substitute the type parameters
                     // For example, React.Ref<HTMLButtonElement> expands to RefObject<T> | RefCallback<T> | null
                     // instead of RefObject<HTMLButtonElement> | RefCallback<HTMLButtonElement> | null
-                    const hasUnsubstitutedTypeParams = typeRef.typeArguments!.some((arg: any) =>
+                    const hasUnsubstitutedTypeParams = this.checker.getTypeArguments(typeRef)!.some((arg: any) =>
                         (arg as ts.Type).flags & ts.TypeFlags.TypeParameter
                     );
 
@@ -375,7 +372,7 @@ export class JavaScriptTypeMapping {
 
                             // Resolve type arguments (may recursively reference this parameterized type)
                             const typeParameters: Type[] = [];
-                            for (const typeArg of typeRef.typeArguments!) {
+                            for (const typeArg of this.checker.getTypeArguments(typeRef)!) {
                                 const resolvedArg = this.getType(typeArg as ts.Type);
                                 typeParameters.push(resolvedArg);
                             }
@@ -395,7 +392,7 @@ export class JavaScriptTypeMapping {
         if (symbol) {
             // Check for function symbols
             if (symbol.flags & ts.SymbolFlags.Function) {
-                const callSignatures = type.getCallSignatures();
+                const callSignatures = this.checker.getSignaturesOfType(type, ts.SignatureKind.Call);
                 if (callSignatures.length > 0) {
                     // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                     const functionType = this.createEmptyFunctionType();
@@ -407,7 +404,7 @@ export class JavaScriptTypeMapping {
 
             // Check for function-scoped or block-scoped variables that might be functions
             if (symbol.flags & (ts.SymbolFlags.FunctionScopedVariable | ts.SymbolFlags.BlockScopedVariable)) {
-                const callSignatures = type.getCallSignatures();
+                const callSignatures = this.checker.getSignaturesOfType(type, ts.SignatureKind.Call);
                 if (callSignatures.length > 0) {
                     // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                     const functionType = this.createEmptyFunctionType();
@@ -467,7 +464,7 @@ export class JavaScriptTypeMapping {
         }
 
         // Check for function types without symbols (anonymous functions, function types)
-        const callSignatures = type.getCallSignatures();
+        const callSignatures = this.checker.getSignaturesOfType(type, ts.SignatureKind.Call);
         if (callSignatures && callSignatures.length > 0) {
             // Shell-cache: Create stub, cache it, then populate (prevents cycles)
             const functionType = this.createEmptyFunctionType();
@@ -515,7 +512,7 @@ export class JavaScriptTypeMapping {
         const symbol = type.getSymbol?.();
 
         if (symbol) {
-            const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
+            const declaration = valueDeclarationOf(symbol) || declarationsOf(symbol)?.[0];
             if (declaration) {
                 const sourceFile = declaration.getSourceFile();
                 const fileName = sourceFile.fileName;
@@ -608,7 +605,7 @@ export class JavaScriptTypeMapping {
         // Check if the variable is imported
         if (symbol.flags & ts.SymbolFlags.Alias) {
             // For imported variables, find the module specifier
-            const declarations = symbol.declarations;
+            const declarations = declarationsOf(symbol);
             if (declarations && declarations.length > 0) {
                 let importNode: ts.Node | undefined = declarations[0];
 
@@ -641,7 +638,7 @@ export class JavaScriptTypeMapping {
             }
         } else {
             // For non-imported variables, check if they belong to a class/interface/namespace
-            const parentSymbol = (actualSymbol as any).parent as ts.Symbol | undefined;
+            const parentSymbol = actualSymbol.getParent() as ts.Symbol | undefined;
             if (parentSymbol) {
                 const parentType = this.checker.getDeclaredTypeOfSymbol(parentSymbol);
                 if (parentType) {
@@ -653,7 +650,7 @@ export class JavaScriptTypeMapping {
                     if (parentSymbol.flags & ts.SymbolFlags.ValueModule ||
                         parentSymbol.flags & ts.SymbolFlags.NamespaceModule) {
                         // Check if this namespace was imported
-                        const parentDeclarations = parentSymbol.declarations;
+                        const parentDeclarations = declarationsOf(parentSymbol);
                         if (parentDeclarations && parentDeclarations.length > 0) {
                             const firstDecl = parentDeclarations[0];
                             const sourceFile = firstDecl.getSourceFile();
@@ -691,7 +688,7 @@ export class JavaScriptTypeMapping {
         // Create the Type.Variable
         const variable = {
             kind: Type.Kind.Variable,
-            name: actualSymbol.getName(),
+            name: actualSymbol.name,
             owner: ownerType,
             type: mappedType,
             annotations: [],
@@ -792,20 +789,20 @@ export class JavaScriptTypeMapping {
         // This prevents cache collisions when methods with identical signatures have different names
         // (e.g., util.isString(): any vs util.isArray(): any)
         const declaringTypeSig = Type.signature(declaringType);
-        const signatureStr = this.checker.signatureToString(signature);
+        const signatureStr = signatureKeyOf(this.checker, signature);
         const cacheKey = `${declaringTypeSig}#${name}${signatureStr}`;
         const cached = this.methodCache.get(cacheKey);
         if (cached) {
             return cached;
         }
 
-        const returnType = signature.getReturnType();
+        const returnType = this.checker.getReturnTypeOfSignature(signature);
         const parameters = signature.getParameters();
         const parameterTypes: Type[] = [];
         const parameterNames: string[] = [];
 
         for (const param of parameters) {
-            parameterNames.push(param.getName());
+            parameterNames.push(param.name);
             const paramType = this.checker.getTypeOfSymbolAtLocation(param, node);
             parameterTypes.push(this.getType(paramType));
         }
@@ -816,7 +813,7 @@ export class JavaScriptTypeMapping {
             flags: 0, // FIXME - determine flags
             declaringType: declaringType,
             name: name,
-            returnType: this.getType(returnType),
+            returnType: this.getType(returnType!),
             parameterNames: parameterNames,
             parameterTypes: parameterTypes,
             thrownExceptions: [], // JavaScript doesn't have checked exceptions
@@ -889,7 +886,7 @@ export class JavaScriptTypeMapping {
             if (!symbol && ts.isPropertyAccessExpression(node.expression)) {
                 // For property access expressions where we couldn't get a symbol,
                 // try to get the symbol from the signature's declaration
-                const declaration = signature?.getDeclaration();
+                const declaration = signature?.declaration?.resolve();
                 if (declaration) {
                     symbol = this.checker.getSymbolAtLocation(declaration);
                 }
@@ -912,9 +909,9 @@ export class JavaScriptTypeMapping {
                         // Look for the variable declaration that assigns the require() result
                         const objSymbol = this.checker.getSymbolAtLocation(objExpr);
 
-                        if (objSymbol && objSymbol.valueDeclaration) {
-                            const valueDecl = objSymbol.valueDeclaration;
-                            if (ts.isVariableDeclaration(valueDecl) && valueDecl.initializer) {
+                        if (objSymbol && valueDeclarationOf(objSymbol)) {
+                            const valueDecl = valueDeclarationOf(objSymbol);
+                            if (valueDecl && ts.isVariableDeclaration(valueDecl) && valueDecl.initializer) {
                                 // Check if it's a require() call
                                 if (ts.isCallExpression(valueDecl.initializer)) {
                                     const callExpr = valueDecl.initializer;
@@ -965,14 +962,14 @@ export class JavaScriptTypeMapping {
                     }
                 }
 
-                const exprType = this.checker.getTypeAtLocation(node.expression.expression);
+                const exprType = this.checker.getTypeAtLocation(node.expression.expression)!;
                 const mappedType = this.getType(exprType);
 
                 // Handle different types
                 if (mappedType && mappedType.kind === Type.Kind.Class) {
                     // Update the declaring type with the corrected FQN
                     if (isImport && objSymbol) {
-                        const importName = objSymbol.getName();
+                        const importName = objSymbol.name;
                         const origFqn = (mappedType as Type.Class).fullyQualifiedName;
                         const lastDot = origFqn.lastIndexOf('.');
                         if (lastDot > 0) {
@@ -1032,17 +1029,17 @@ export class JavaScriptTypeMapping {
                     // If getAliasedSymbol returns something different, it's an import
                     if (aliasedSymbol && aliasedSymbol !== exprSymbol) {
                         // This is definitely an imported symbol
-                        const aliasedParentSymbol = (aliasedSymbol as any).parent as ts.Symbol | undefined;
+                        const aliasedParentSymbol = aliasedSymbol.getParent() as ts.Symbol | undefined;
 
-                        if (aliasedParentSymbol && aliasedParentSymbol.declarations?.[0] &&
-                            ts.isModuleDeclaration(aliasedParentSymbol.declarations[0]) &&
-                            ts.isIdentifier(aliasedParentSymbol.declarations[0].name)) {
+                        if (aliasedParentSymbol && declarationsOf(aliasedParentSymbol)?.[0] &&
+                            ts.isModuleDeclaration(declarationsOf(aliasedParentSymbol)[0]) &&
+                            ts.isIdentifier((declarationsOf(aliasedParentSymbol)[0] as ts.ModuleDeclaration).name)) {
                             // For namespace imports, use the namespace symbol's `name` as the module specifier (e.g. `React` instead of `react`)
                             moduleSpecifier = aliasedParentSymbol.name;
                         } else {
                             // Now find the import declaration to get the module specifier
-                            if (exprSymbol.declarations && exprSymbol.declarations.length > 0) {
-                                let importNode: ts.Node = exprSymbol.declarations[0];
+                            if (declarationsOf(exprSymbol) && declarationsOf(exprSymbol).length > 0) {
+                                let importNode: ts.Node = declarationsOf(exprSymbol)[0];
 
                                 // Traverse up to find the ImportDeclaration
                                 while (importNode && !ts.isImportDeclaration(importNode)) {
@@ -1080,7 +1077,7 @@ export class JavaScriptTypeMapping {
                         // A default import binds an `ImportClause`; its aliased symbol carries the internal
                         // name of the default export (e.g. `e` for express), so represent it as `<default>`.
                         // Named imports (`ImportSpecifier`) keep the original exported name.
-                        const isDefaultImport = exprSymbol?.declarations?.some(ts.isImportClause) ?? false;
+                        const isDefaultImport = exprSymbol ? declarationsOf(exprSymbol).some(ts.isImportClause) : false;
                         if (!isDefaultImport && aliasedSymbol && aliasedSymbol.name) {
                             methodName = aliasedSymbol.name;
                         } else {
@@ -1089,7 +1086,7 @@ export class JavaScriptTypeMapping {
                     }
                 } else {
                     // Fall back to the original logic for non-imported functions
-                    const exprType = this.checker.getTypeAtLocation(node.expression);
+                    const exprType = this.checker.getTypeAtLocation(node.expression)!;
                     const funcType = this.getType(exprType);
 
                     if (funcType && funcType.kind === Type.Kind.Class) {
@@ -1109,7 +1106,7 @@ export class JavaScriptTypeMapping {
                         }
                     } else {
                         // Try to use the symbol's parent or module
-                        const parent = (symbol as any).parent;
+                        const parent = symbol.getParent();
                         if (parent) {
                             const parentType = this.checker.getDeclaredTypeOfSymbol(parent);
                             declaringType = this.getType(parentType) as Type.FullyQualified;
@@ -1119,7 +1116,7 @@ export class JavaScriptTypeMapping {
                     }
                 }
             } else {
-                methodName = symbol.getName();
+                methodName = symbol.name;
                 declaringType = Type.unknownType as Type.FullyQualified;
             }
 
@@ -1127,7 +1124,7 @@ export class JavaScriptTypeMapping {
             const typeParameters = signature.getTypeParameters();
             if (typeParameters) {
                 for (const tp of typeParameters) {
-                    declaredFormalTypeNames.push(tp.symbol.getName());
+                    declaredFormalTypeNames.push(tp.getSymbol()!.name);
                 }
             }
         } else if (ts.isMethodDeclaration(node) || ts.isMethodSignature(node)) {
@@ -1142,12 +1139,12 @@ export class JavaScriptTypeMapping {
                 return undefined;
             }
 
-            methodName = symbol.getName();
+            methodName = symbol.name;
 
             // Get the declaring type (the class/interface that contains this method)
             const parent = node.parent;
             if (ts.isClassDeclaration(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent)) {
-                const parentType = this.checker.getTypeAtLocation(parent);
+                const parentType = this.checker.getTypeAtLocation(parent)!;
                 declaringType = this.getType(parentType) as Type.FullyQualified;
             } else {
                 declaringType = Type.unknownType as Type.FullyQualified;
@@ -1170,7 +1167,7 @@ export class JavaScriptTypeMapping {
 
             const parent = node.parent;
             if (ts.isClassDeclaration(parent) || ts.isClassExpression(parent)) {
-                const parentType = this.checker.getTypeAtLocation(parent);
+                const parentType = this.checker.getTypeAtLocation(parent)!;
                 declaringType = this.getType(parentType) as Type.FullyQualified;
             } else {
                 declaringType = Type.unknownType as Type.FullyQualified;
@@ -1237,9 +1234,9 @@ export class JavaScriptTypeMapping {
         // For imported types, we want to use the module specifier instead of the file path
         if (symbol.flags & ts.SymbolFlags.Alias) {
             const aliasedSymbol = this.checker.getAliasedSymbol(symbol);
-            if (aliasedSymbol && aliasedSymbol !== symbol && symbol.declarations && symbol.declarations.length > 0) {
+            if (aliasedSymbol && aliasedSymbol !== symbol && declarationsOf(symbol) && declarationsOf(symbol).length > 0) {
                 // Try to find the import declaration to get the module specifier
-                let importNode: ts.Node | undefined = symbol.declarations[0];
+                let importNode: ts.Node | undefined = declarationsOf(symbol)[0];
 
                 // Traverse up to find the ImportDeclaration or ImportSpecifier
                 while (importNode && importNode.parent && !ts.isImportDeclaration(importNode) && !ts.isImportSpecifier(importNode)) {
@@ -1270,7 +1267,7 @@ export class JavaScriptTypeMapping {
 
                 if (moduleSpecifier) {
                     // Build the fully qualified name from module specifier + symbol name
-                    const symbolName = symbol.getName();
+                    const symbolName = declaredNameOf(symbol);
                     return `${moduleSpecifier}.${symbolName}`;
                 }
             }
@@ -1279,7 +1276,7 @@ export class JavaScriptTypeMapping {
         // Fall back to TypeScript's built-in getFullyQualifiedName
         // This returns names with quotes that we need to clean up
         // e.g., '"React"."Component"' -> 'React.Component'
-        const tsQualifiedName = this.checker.getFullyQualifiedName(symbol);
+        const tsQualifiedName = fullyQualifiedNameOf(symbol);
         let cleanedName = tsQualifiedName.replace(/"/g, '');
 
         // Check if this is a file path from node_modules (happens with some packages)
@@ -1336,7 +1333,7 @@ export class JavaScriptTypeMapping {
             //    and which are not Class/Interface/Enum symbols;
             //  - local declarations (extractModuleNameFromPath returns undefined);
             //  - ambient globals (which are `global.`-qualified, hence not bare).
-            const declarationFile = symbol.declarations?.[0]?.getSourceFile();
+            const declarationFile = declarationsOf(symbol)?.[0]?.getSourceFile();
             if (declarationFile && ts.isExternalModule(declarationFile)) {
                 const packageName = this.extractModuleNameFromPath(declarationFile.fileName);
                 if (packageName) {
@@ -1356,7 +1353,7 @@ export class JavaScriptTypeMapping {
             //  - namespaces that already match the package name, and any non-node_modules type.
             const namespaceName = cleanedName.substring(0, cleanedName.indexOf('.'));
             if (namespaceName !== 'global') {
-                const declarationFile = symbol.declarations?.[0]?.getSourceFile();
+                const declarationFile = declarationsOf(symbol)?.[0]?.getSourceFile();
                 if (declarationFile && ts.isExternalModule(declarationFile)) {
                     const packageName = this.extractModuleNameFromPath(declarationFile.fileName);
                     if (packageName && packageName !== namespaceName &&
@@ -1442,7 +1439,7 @@ export class JavaScriptTypeMapping {
             const objectType = type as ts.ObjectType;
             if (objectType.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface)) {
                 try {
-                    baseTypes = (this.checker as any).getBaseTypes?.(type as ts.InterfaceType);
+                    baseTypes = [...this.checker.getBaseTypes(type as ts.InterfaceType)];
                 } catch (e) {
                     // getBaseTypes might fail for some types, fall back to declaration-based extraction
                 }
@@ -1457,18 +1454,18 @@ export class JavaScriptTypeMapping {
                     const declaredType = this.checker.getDeclaredTypeOfSymbol(classSymbol);
                     if (declaredType && declaredType !== type) {
                         try {
-                            baseTypes = (this.checker as any).getBaseTypes?.(declaredType as ts.InterfaceType);
+                            baseTypes = [...this.checker.getBaseTypes(declaredType as ts.InterfaceType)];
                         } catch (e) {
                             // getBaseTypes might fail, fall back to declaration-based extraction
                         }
                     }
-                } else if (classSymbol && classSymbol.valueDeclaration && ts.isClassDeclaration(classSymbol.valueDeclaration)) {
+                } else if (classSymbol && valueDeclarationOf(classSymbol) && ts.isClassDeclaration(valueDeclarationOf(classSymbol)!)) {
                     // Handle the case where the symbol is for a class value (constructor function)
                     // Get the instance type of the class
                     const instanceType = this.checker.getDeclaredTypeOfSymbol(classSymbol);
                     if (instanceType && instanceType !== type) {
                         try {
-                            baseTypes = (this.checker as any).getBaseTypes?.(instanceType as ts.InterfaceType);
+                            baseTypes = [...this.checker.getBaseTypes(instanceType as ts.InterfaceType)];
                         } catch (e) {
                             // getBaseTypes might fail, fall back to declaration-based extraction
                         }
@@ -1509,13 +1506,13 @@ export class JavaScriptTypeMapping {
 
         // Extract type parameters from declarations (not provided by getBaseTypes)
         if (symbol?.declarations) {
-            for (const declaration of symbol.declarations) {
+            for (const declaration of declarationsOf(symbol)) {
                 if (ts.isClassDeclaration(declaration) || ts.isInterfaceDeclaration(declaration)) {
                     // Extract type parameters
                     if (declaration.typeParameters) {
                         for (const tp of declaration.typeParameters) {
                             const tpType = this.checker.getTypeAtLocation(tp);
-                            classType.typeParameters.push(this.getType(tpType));
+                            classType.typeParameters.push(this.getType(tpType!));
                         }
                     }
                     break; // Only process the first declaration
@@ -1526,7 +1523,7 @@ export class JavaScriptTypeMapping {
         // Get properties and methods
         const properties = this.checker.getPropertiesOfType(type);
         for (const prop of properties) {
-            const declaration = prop.valueDeclaration || prop.declarations?.[0];
+            const declaration = valueDeclarationOf(prop) || declarationsOf(prop)?.[0];
             if (!declaration) {
                 // Skip properties without declarations (synthetic/built-in properties)
                 continue;
@@ -1541,7 +1538,7 @@ export class JavaScriptTypeMapping {
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
                 const variable: Type.Variable = {
                     kind: Type.Kind.Variable,
-                    name: prop.getName(),
+                    name: prop.name,
                     owner: classType,  // Cyclic reference to the containing class (already in cache)
                     type: this.getType(propType), // This will find classType in cache if it's recursive
                     annotations: [],
@@ -1561,10 +1558,10 @@ export class JavaScriptTypeMapping {
      */
     private createPrimitiveOrUnknownType(type: ts.Type): Type {
         // Check for literals first
-        if (type.isLiteral()) {
-            if (type.isNumberLiteral()) {
+        if (type.isLiteralType()) {
+            if (type.isNumberLiteralType()) {
                 return Type.Primitive.Double;
-            } else if (type.isStringLiteral()) {
+            } else if (type.isStringLiteralType()) {
                 return Type.Primitive.String;
             }
         }
@@ -1584,7 +1581,7 @@ export class JavaScriptTypeMapping {
             return Type.Primitive.Void;
         } else if (type.flags & (ts.TypeFlags.BigInt | ts.TypeFlags.BigIntLiteral | ts.TypeFlags.BigIntLike)) {
             return Type.Primitive.BigInt;
-        } else if (type.symbol !== undefined && type.symbol === this.regExpSymbol) {
+        } else if (type.getSymbol() !== undefined && type.getSymbol() === this.regExpSymbol) {
             return Type.Primitive.String;
         } else if (type.flags & (ts.TypeFlags.Boolean | ts.TypeFlags.BooleanLiteral | ts.TypeFlags.BooleanLike)) {
             return Type.Primitive.Boolean;
@@ -1618,7 +1615,7 @@ export class JavaScriptTypeMapping {
 
         // Now map all constituent types (may recursively reference this union)
         const bounds: Type[] = [];
-        for (const constituentType of unionType.types) {
+        for (const constituentType of unionType.getTypes()) {
             bounds.push(this.getType(constituentType));
         }
 
@@ -1644,7 +1641,7 @@ export class JavaScriptTypeMapping {
 
         // Now map all constituent types (may recursively reference this intersection)
         const bounds: Type[] = [];
-        for (const constituentType of intersectionType.types) {
+        for (const constituentType of intersectionType.getTypes()) {
             bounds.push(this.getType(constituentType));
         }
 
@@ -1661,7 +1658,7 @@ export class JavaScriptTypeMapping {
      */
     private createGenericTypeVariable(typeParam: ts.TypeParameter, cacheKey: string | number): Type.GenericTypeVariable {
         const symbol = typeParam.getSymbol();
-        const name = symbol ? symbol.getName() : '?';
+        const name = symbol ? declaredNameOf(symbol) : '?';
 
         // Shell-cache: Create stub, cache it, then populate (prevents cycles)
         const gtv = {
@@ -1674,7 +1671,7 @@ export class JavaScriptTypeMapping {
         this.typeCache.set(cacheKey, gtv);
 
         // Get the constraint (upper bound) if it exists
-        const constraint = typeParam.getConstraint();
+        const constraint = this.checker.getConstraintOfTypeParameter(typeParam);
         let bounds: Type[] = [];
         let variance = Type.GenericTypeVariable.Variance.Invariant;
 
@@ -1739,18 +1736,18 @@ export class JavaScriptTypeMapping {
      * Since the shell is already in the cache, any recursive references will find it.
      */
     private populateFunctionType(functionClass: Type.Class, signature: ts.Signature): void {
-        const returnType = this.getType(signature.getReturnType());
+        const returnType = this.getType(this.checker.getReturnTypeOfSignature(signature)!);
         const parameters = signature.getParameters();
         const parameterTypes: Type[] = [];
         const parameterNames: string[] = [];
 
         // Get parameter types
         for (const param of parameters) {
-            const declaration = param.valueDeclaration || param.declarations?.[0];
+            const declaration = valueDeclarationOf(param) || declarationsOf(param)?.[0];
             if (declaration) {
                 const paramType = this.checker.getTypeOfSymbolAtLocation(param, declaration);
                 parameterTypes.push(this.getType(paramType));
-                parameterNames.push(param.getName());
+                parameterNames.push(param.name);
             }
         }
 
