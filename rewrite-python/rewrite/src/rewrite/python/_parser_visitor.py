@@ -3012,7 +3012,7 @@ class ParserVisitor(ast.NodeVisitor):
         """The type nodes a quoted annotation contains, or None to keep it flat text.
 
         The body has to reproduce byte-identically to become structure, since a type
-        node has no slot for text it cannot print, such as padding inside the quotes.
+        node has no slot for text it cannot print, such as padding after the body.
         """
         try:
             return self.__structure(node, body, quote_style, prefix)
@@ -3028,9 +3028,14 @@ class ParserVisitor(ast.NodeVisitor):
         # `...` are types of their own.
         if body.isidentifier() and not keyword.iskeyword(body):
             return None
-        body_ast = ast.parse(body, mode='eval')
-        sub = ParserVisitor(body, type_mapping=_EmbeddedTypeMapping(
-            self._type_mapping, node.lineno - 1, node.col_offset + len(quote_style.quote)))
+        # An expression may not open with an indent, so the body parses from its first
+        # column and the indent goes back on afterwards.
+        indent = body[:len(body) - len(body.lstrip(' \t\f'))]
+        core = body[len(indent):]
+        body_ast = ast.parse(core, mode='eval')
+        sub = ParserVisitor(core, type_mapping=_EmbeddedTypeMapping(
+            self._type_mapping, node.lineno - 1,
+            node.col_offset + len(quote_style.quote) + len(indent)))
         tree = sub.__convert_type(body_ast.body)
         if not isinstance(tree, TypeTree):
             return None
@@ -3040,13 +3045,17 @@ class ParserVisitor(ast.NodeVisitor):
             return None
 
         tree = tree.replace(prefix=Space.EMPTY)
-        if PythonPrinter().print(tree) != body:
+        if PythonPrinter().print(tree) != core:
             return None
 
         tree = _with_type(tree, self._type_mapping.string_annotation_type(node))
-        return tree.replace(
-            prefix=prefix,
-            markers=Markers.build(random_id(), [Quoted(random_id(), quote_style)]))
+        quoted = Markers.build(random_id(), [Quoted(random_id(), quote_style)])
+        if not indent:
+            return tree.replace(prefix=prefix, markers=quoted)
+        # A prefix is the space before the opening quote, so an indent inside the quotes
+        # lives one level in, under the node those quotes print around.
+        return py.ExpressionTypeTree(
+            random_id(), prefix, quoted, tree.replace(prefix=Space.build([], indent)))
 
     def __convert_type_mapper(self, node) -> Optional[TypeTree]:
         if isinstance(node, ast.Constant):
