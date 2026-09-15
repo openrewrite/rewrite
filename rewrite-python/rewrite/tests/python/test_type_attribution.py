@@ -2114,6 +2114,38 @@ class TestKnownInstanceDescriptor:
         assert isinstance(result, JavaType.Class)
         assert result._fully_qualified_name == 'functools.partial'
 
+    def test_known_instance_method_wrapper_is_a_builtin(self):
+        # `staticmethod`/`classmethod` over a non-function callable arrives as a
+        # MethodWrapper.
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[400] = {
+            'kind': 'knownInstance',
+            'className': 'staticmethod',
+            'knownInstanceKind': 'MethodWrapper',
+            'wrappedType': 402,
+        }
+        assert _fqn(mapping._resolve_type(400)) == 'staticmethod'
+
+        mapping._type_registry[401] = {
+            'kind': 'knownInstance',
+            'className': 'classmethod',
+            'knownInstanceKind': 'MethodWrapper',
+            'wrappedType': 402,
+        }
+        assert _fqn(mapping._resolve_type(401)) == 'classmethod'
+
+    def test_known_instance_of_an_unmapped_class_is_unknown(self):
+        # Unknown beats minting an FQN that no module exports.
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[400] = {
+            'kind': 'knownInstance',
+            'className': 'ConstraintSet',
+            'knownInstanceKind': 'ConstraintSet',
+        }
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Unknown)
+
 
 class TestTypeAliasDescriptor:
     """Tests for the enriched typeAlias kind."""
@@ -2315,6 +2347,33 @@ class TestNewDescriptorsWithTyTypes:
             result = mapping.type(tree.body[3].value)
             assert isinstance(result, JavaType.FullyQualified)
             assert result._fully_qualified_name == 'functools.partial'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_classmethod_over_a_callable_instance_keeps_its_call_site_method(self):
+        # A classmethod binding a callable instance has no definition to take a
+        # name, module or declaring class from, so ty sends a boundMethod
+        # carrying none of them; the call site rebuilds the method regardless.
+        source = '''
+            class Caller:
+                def __call__(self, x: int) -> str:
+                    return ""
+
+            class Holder:
+                cm = classmethod(Caller())
+
+            Holder.cm(1)
+            Holder.cm
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            method = mapping.method_invocation_type(tree.body[-2].value)
+            assert method is not None
+            assert method._name == 'cm'
+            assert _fqn(method._declaring_type) == 'test.Holder'
+
+            attribute_type, _ = mapping.attribute_type_info(tree.body[-1].value)
+            assert isinstance(attribute_type, JavaType.Unknown)
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -4107,6 +4166,21 @@ _FQN_CASES = (
             r
         ''',
         expected='range',
+    ),
+    FqnCase(
+        id='known_instance_method_wrapper',
+        kind='knownInstance',
+        # Wrapping a callable instance rather than a function makes this a
+        # MethodWrapper. The call expression is the wrapper; a class attribute
+        # holding it reads back as `Caller`, which the descriptor protocol unwraps.
+        source='''
+            class Caller:
+                def __call__(self, x: int) -> str:
+                    return ""
+
+            staticmethod(Caller())
+        ''',
+        expected='staticmethod',
     ),
     FqnCase(
         id='special_form',
