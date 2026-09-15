@@ -84,9 +84,6 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                     return m;
                 }
 
-                // Don't convert calls chained onto another invocation, e.g.
-                // `library("a", "g", "a").version("1.0")`. Those are fluent builder APIs rather
-                // than property setters. A simple receiver such as `project.version` is still converted.
                 if (m.getSelect() instanceof J.MethodInvocation) {
                     return m;
                 }
