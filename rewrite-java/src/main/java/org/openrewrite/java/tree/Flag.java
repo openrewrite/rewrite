@@ -92,6 +92,40 @@ public enum Flag {
     }
 
     /**
+     * The JVM/bytecode {@code ACC_VARARGS} access flag, which is also the bit
+     * {@code java.lang.reflect.Member#getModifiers()} and ASM report for varargs methods.
+     * It occupies bit {@code 0x0080} — the very same bit this enum assigns to {@link #Transient}.
+     * Varargs, by contrast, is modeled by {@link #Varargs} ({@code 1L << 34}, matching javac's
+     * {@code com.sun.tools.javac.code.Flags.VARARGS}).
+     */
+    private static final long ACC_VARARGS = 0x0080;
+
+    /**
+     * Translate a bytecode-level access-flags bitmap of a <em>method or constructor</em> — as
+     * produced by ASM or {@code java.lang.reflect.Member#getModifiers()}, where
+     * {@code ACC_VARARGS == 0x0080} — into the canonical bitmap consumed by
+     * {@link #bitMapToFlags(long)} and stored on {@link org.openrewrite.java.tree.JavaType.Method}.
+     * <p>
+     * The {@code ACC_VARARGS} bit collides with {@link #Transient}. Because {@code transient} is
+     * meaningless on an executable, the bit is rewritten to {@link #Varargs} so that varargs methods
+     * carry the correct flag rather than a spurious {@code Transient}. Flags that originate from
+     * javac already use {@link #Varargs}'s bit and never set {@code 0x0080} on an executable, so they
+     * pass through unchanged.
+     * <p>
+     * Do not apply this to field access flags: for fields {@code 0x0080} legitimately means
+     * {@code transient}.
+     *
+     * @param accessFlags bytecode access flags for a method or constructor
+     * @return the access flags with {@code ACC_VARARGS} remapped to {@link #Varargs}
+     */
+    public static long mapBytecodeAccessFlagsToBitMap(long accessFlags) {
+        if ((accessFlags & ACC_VARARGS) != 0) {
+            return (accessFlags & ~ACC_VARARGS) | Varargs.bitMask;
+        }
+        return accessFlags;
+    }
+
+    /**
      * Converts a set of flag enumerations into the Java Language Specification's access_flags bitmap
      *
      * @param flags A set of Flag enumerations
