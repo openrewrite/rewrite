@@ -163,7 +163,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J j = super.visitTernary(ternary, executionContext);
         if (j instanceof J.Ternary) {
             J.Ternary asTernary = (J.Ternary) j;
-            if (asTernary.getCondition() instanceof J.Unary) {
+            if (asTernary.getCondition() instanceof J.Unary &&
+                ((J.Unary) asTernary.getCondition()).getOperator() == J.Unary.Type.Not) {
                 Expression negated = maybeNegate(asTernary.getCondition());
                 if (negated != asTernary.getCondition()) {
                     j = asTernary
