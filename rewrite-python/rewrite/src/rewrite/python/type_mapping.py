@@ -111,11 +111,34 @@ _ALIASED_MODULES: Dict[str, str] = {
     'genericpath': 'os.path',
 }
 
-# knownInstance descriptors carry no moduleName, and most of the singletons ty
-# reports live in `typing`. These `knownInstanceKind`s are the ones that don't.
+# knownInstance descriptors carry no moduleName, so `className` — the class ty
+# reports the singleton as an instance of — supplies it; a className absent here
+# has no FQN worth minting. `builtins` is stripped, so its classes map to ''.
+_KNOWN_INSTANCE_MODULES: Dict[str, str] = {
+    'range': '',
+    'staticmethod': '',
+    'classmethod': '',
+    'str': '',
+    'partial': 'functools',
+    'GenericAlias': 'types',
+    'UnionType': 'types',
+    'MethodWrapperType': 'types',
+    '_SpecialForm': 'typing',
+    'TypeVar': 'typing',
+    'ParamSpec': 'typing',
+    'TypeVarTuple': 'typing',
+    'TypeAliasType': 'typing',
+    'NewType': 'typing',
+    'Sequence': 'typing',
+    'Field': 'dataclasses',
+    'deprecated': 'typing_extensions',
+    'sentinel': 'typing_extensions',
+}
+
+# The `knownInstanceKind`s keyed by something other than their own class. A
+# partial's bound `__call__` is a `types.MethodWrapperType`, but the partial is
+# what a caller matches on.
 _KNOWN_INSTANCE_FQNS: Dict[str, str] = {
-    'Range': 'range',
-    'FunctoolsPartial': 'functools.partial',
     'FunctoolsPartialCall': 'functools.partial',
 }
 
@@ -839,9 +862,10 @@ class PythonTypeMapping:
             fqn = _KNOWN_INSTANCE_FQNS.get(descriptor.get('knownInstanceKind', ''))
             if fqn is None:
                 class_name = descriptor.get('className', '')
-                if not class_name:
+                module = _KNOWN_INSTANCE_MODULES.get(class_name)
+                if module is None:
                     return _UNKNOWN
-                fqn = f"typing.{class_name}"
+                fqn = f"{module}.{class_name}" if module else class_name
             return self._create_class_type(fqn)
 
         elif kind == 'typeAlias':
