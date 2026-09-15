@@ -1,12 +1,17 @@
 import ast
+from typing import Any
 
+import pytest
+
+from rewrite import ExecutionContext, Recipe, TreeVisitor
 from rewrite.java.support_types import JavaType
 from rewrite.java.tree import Identifier, Literal as JLiteral, ParameterizedType, VariableDeclarations
 from rewrite.python._parser_visitor import _EmbeddedTypeMapping
 from rewrite.python.markers import Quoted
-from rewrite.python.tree import CompilationUnit, LiteralType, UnionType
+from rewrite.python.tree import CompilationUnit, ExpressionTypeTree, LiteralType, UnionType
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
+
 
 Parameterized = JavaType.Parameterized
 
@@ -424,9 +429,73 @@ def test_a_body_that_is_itself_quoted_stays_text():
 
 def test_quoted_annotation_that_would_not_print_back_stays_flat():
     # language=python
-    annotation = _parsed_annotation('''x: "Foo " = None''')
+    annotation = _parsed_annotation('''x: "Foo  # c" = None''')
     assert isinstance(annotation, Identifier)
-    assert annotation.simple_name == 'Foo '
+    assert annotation.simple_name == 'Foo  # c'
+
+
+def test_leading_padding_inside_the_quotes_is_structured():
+    # language=python
+    annotation = _parsed_annotation('''x: "  List[int]" = None''')
+    assert isinstance(annotation, ExpressionTypeTree)
+    assert annotation.markers.find_first(Quoted) is not None
+    assert isinstance(annotation.reference, ParameterizedType)
+    assert annotation.reference.prefix.whitespace == '  '
+
+
+def test_a_wrapped_annotation_reads_and_writes_the_type_of_what_it_wraps():
+    # language=python
+    annotation = _parsed_annotation('''x: "  List[int]" = None''')
+    retyped = annotation.replace(type=JavaType.Primitive.Int)
+    assert retyped.reference.type is JavaType.Primitive.Int
+    assert retyped.type is JavaType.Primitive.Int
+
+    # A prefixed string is wrapped on its own account, so the write passes through two.
+    nested = _parsed_annotation("""x: "  r'Foo'" = None""")
+    assert nested.replace(type=JavaType.Primitive.Int).type is JavaType.Primitive.Int
+
+
+@pytest.mark.xfail(strict=True, reason='Trailing padding has no slot in the model.')
+def test_trailing_padding_inside_the_quotes_is_structured():
+    # language=python
+    annotation = _parsed_annotation('''x: "List[int]  " = None''')
+    assert not isinstance(annotation, Identifier)
+
+
+class _RenameList(Recipe):
+    @property
+    def name(self) -> str:
+        return 'test.RenameList'
+
+    @property
+    def display_name(self) -> str:
+        return 'Rename `List` to `list`'
+
+    @property
+    def description(self) -> str:
+        return 'Renames `List` on the name alone, as a migration off a removed API does.'
+
+    def editor(self) -> TreeVisitor[Any, ExecutionContext]:
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_identifier(self, ident: Identifier, p: ExecutionContext) -> Identifier:
+                ident = super().visit_identifier(ident, p)
+                return ident.replace(_simple_name='list') if ident.simple_name == 'List' else ident
+
+        return Visitor()
+
+
+def test_a_padded_forward_reference_is_renamed_where_a_quoted_value_is_not():
+    RecipeSpec(recipe=_RenameList()).rewrite_run(python(
+        # language=python
+        '''\
+        a: "  List[int]" = None
+        b: "Literal['List', 'Tuple']" = "List"
+        ''',
+        # language=python
+        '''\
+        a: "  list[int]" = None
+        b: "Literal['List', 'Tuple']" = "List"
+        '''))
 
 
 def _type_label(resolved) -> str:
@@ -450,8 +519,11 @@ def _type_labels(node) -> list:
     """The resolved types down ``node``: its own, its head name, and its members.
 
     A union keeps its members in ``types`` where a parameterized type keeps its
-    arguments in ``type_parameters``.
+    arguments in ``type_parameters``, and a wrapper what it holds in ``reference``.
     """
+    reference = getattr(node, 'reference', None)
+    if reference is not None:
+        return _type_labels(reference)
     labels = [_type_label(node.type)]
     head = getattr(node, 'clazz', None)
     if head is not None:
@@ -483,6 +555,23 @@ def test_quoted_annotation_attributes_like_an_unquoted_one():
     assert quoted == ['dict[...]', 'head Dict', 'Primitive.String',
                       'list[...]', 'head List', 'Primitive.Int']
     assert quoted == unquoted
+
+
+def test_a_padded_body_attributes_at_its_position_in_the_file():
+    # Of the padded forms only a triple-quoted body reaches ty's attribution, so it is
+    # the one that can pin where the body's positions land.
+    # language=python
+    padded, unpadded = _annotation_labels(
+        '''\
+        from typing import Dict, List
+
+        x: """  Dict[str, List[int]]""" = {}
+        y: "Dict[str, List[int]]" = {}
+        ''')
+
+    assert padded == ['dict[...]', 'head Dict', 'Primitive.String',
+                      'list[...]', 'head List', 'Primitive.Int']
+    assert padded == unpadded
 
 
 def test_quoted_union_attributes_each_member_and_the_union():
