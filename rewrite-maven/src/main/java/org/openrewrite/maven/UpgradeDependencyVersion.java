@@ -135,7 +135,58 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 ResolvedPom pom = getResolutionResult().getPom();
                 accumulator.projectArtifacts.add(new GroupArtifact(pom.getGroupId(), pom.getArtifactId()));
+                storeImportedBomVersionProperty(pom, ctx);
                 return super.visitDocument(document, ctx);
+            }
+
+            /**
+             * Record a newer BOM version against the pom that declares the version property an ancestor uses to
+             * import that BOM. A corporate parent may import a BOM at {@code ${spring-boot.version}} while each
+             * application pom overrides that property. The property reference lives in the ancestor, so neither
+             * the dependency nor the managed dependency tags of this pom expose it; only the resolved dependency
+             * management does.
+             */
+            private void storeImportedBomVersionProperty(ResolvedPom pom, ExecutionContext ctx) {
+                Path sourcePath = pom.getRequested().getSourcePath();
+                if (sourcePath == null) {
+                    return;
+                }
+                Set<ResolvedGroupArtifactVersion> seenBoms = new HashSet<>();
+                for (ResolvedManagedDependency dm : pom.getDependencyManagement()) {
+                    ManagedDependency requestedBom = dm.getRequestedBom();
+                    ResolvedGroupArtifactVersion bom = dm.getBomGav();
+                    if (requestedBom == null || bom == null) {
+                        continue;
+                    }
+                    if (!matchesGlob(bom.getGroupId(), groupId) || !matchesGlob(bom.getArtifactId(), artifactId)) {
+                        continue;
+                    }
+                    if (!seenBoms.add(bom)) {
+                        continue; // Every dependency the BOM manages repeats the same import
+                    }
+                    String requestedVersion = requestedBom.getVersion();
+                    if (!isProperty(requestedVersion)) {
+                        continue;
+                    }
+                    String newerVersion;
+                    try {
+                        newerVersion = MavenDependency.findNewerVersion(bom.getGroupId(), bom.getArtifactId(),
+                                bom.getVersion(), getResolutionResult(), metadataFailures, versionComparator, ctx);
+                    } catch (MavenDownloadingException ignored) {
+                        // Already recorded in the MavenMetadataFailures data table. A scanner cannot
+                        // mark the LST, since edits made here are discarded.
+                        continue;
+                    }
+                    if (newerVersion == null) {
+                        continue;
+                    }
+                    String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
+                    if (pom.getRequested().getProperties().containsKey(propertyName)) {
+                        accumulator.pomProperties.add(new PomProperty(sourcePath, propertyName, newerVersion));
+                    } else {
+                        storeParentPomProperty(getResolutionResult().getParent(), propertyName, newerVersion);
+                    }
+                }
             }
 
             @Override

@@ -23,23 +23,29 @@ import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import okhttp3.tls.HandshakeCertificates;
 import okhttp3.tls.HeldCertificate;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.maven.http.OkHttpSender;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.regex.Matcher;
@@ -3644,4 +3650,295 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Nested
+    class ImportedBomVersionProperty {
+        @Language("xml")
+        private static final String REMOTE_PARENT_POM = """
+          <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.example</groupId>
+              <artifactId>remote-parent</artifactId>
+              <version>1.0.0</version>
+              <packaging>pom</packaging>
+              <properties>
+                  <junit.version>5.10.0</junit.version>
+              </properties>
+              <dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit</groupId>
+                          <artifactId>junit-bom</artifactId>
+                          <version>${junit.version}</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                      </dependency>
+                  </dependencies>
+              </dependencyManagement>
+          </project>
+          """;
+
+        /**
+         * Publish the parent pom to a temporary local repository, so that it resolves as a remote parent
+         * rather than as a source file.
+         */
+        private ExecutionContext executionContextWithRemoteParent(Path localRepository) throws IOException {
+            Path parentDir = localRepository.resolve("com/example/remote-parent/1.0.0");
+            Files.createDirectories(parentDir);
+            Files.writeString(parentDir.resolve("remote-parent-1.0.0.pom"), REMOTE_PARENT_POM);
+
+            return MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
+              .setLocalRepository(MavenRepository.builder()
+                .id("local")
+                .uri(localRepository.toUri().toString())
+                .snapshots(false)
+                .knownToExist(true)
+                .build());
+        }
+
+        @Test
+        void bomVersionPropertyDeclaredLocallyButImportedByRemoteParent(@TempDir Path localRepository) throws IOException {
+            ExecutionContext ctx = executionContextWithRemoteParent(localRepository);
+            rewriteRun(
+              spec -> spec
+                .executionContext(ctx)
+                .recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.10.2", null, null, null)),
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
+                      <properties>
+                          <junit.version>5.10.1</junit.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
+                      <properties>
+                          <junit.version>5.10.2</junit.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void childOverrideOfBomVersionPropertyDeclaredByLocalParent() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.10.2", null, null, null)),
+              mavenProject("parent",
+                //language=xml
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>pom</packaging>
+                        <properties>
+                            <junit.version>5.10.0</junit.version>
+                        </properties>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.junit</groupId>
+                                    <artifactId>junit-bom</artifactId>
+                                    <version>${junit.version}</version>
+                                    <type>pom</type>
+                                    <scope>import</scope>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>pom</packaging>
+                        <properties>
+                            <junit.version>5.10.2</junit.version>
+                        </properties>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.junit</groupId>
+                                    <artifactId>junit-bom</artifactId>
+                                    <version>${junit.version}</version>
+                                    <type>pom</type>
+                                    <scope>import</scope>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject("app",
+                  //language=xml
+                  pomXml(
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.example</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0</version>
+                          </parent>
+                          <artifactId>app</artifactId>
+                          <properties>
+                              <junit.version>5.10.1</junit.version>
+                          </properties>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.junit.jupiter</groupId>
+                                  <artifactId>junit-jupiter-api</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """,
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.example</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0</version>
+                          </parent>
+                          <artifactId>app</artifactId>
+                          <properties>
+                              <junit.version>5.10.2</junit.version>
+                          </properties>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.junit.jupiter</groupId>
+                                  <artifactId>junit-jupiter-api</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
+        @Test
+        void doesNotChangePropertyWhenBomCoordinatesDoNotMatch(@TempDir Path localRepository) throws IOException {
+            ExecutionContext ctx = executionContextWithRemoteParent(localRepository);
+            rewriteRun(
+              spec -> spec
+                .executionContext(ctx)
+                .recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.10.2", null, null, null)),
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
+                      <properties>
+                          <junit.version>5.10.1</junit.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+        @Test
+        void changesPropertyRatherThanPinningAVersionWhenOverridingManagedVersions(@TempDir Path localRepository) throws IOException {
+            ExecutionContext ctx = executionContextWithRemoteParent(localRepository);
+            rewriteRun(
+              spec -> spec
+                .executionContext(ctx)
+                .recipe(new UpgradeDependencyVersion("org.junit*", "*", "5.10.2", null, true, null)),
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
+                      <properties>
+                          <junit.version>5.10.1</junit.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
+                      <properties>
+                          <junit.version>5.10.2</junit.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+    }
 }
