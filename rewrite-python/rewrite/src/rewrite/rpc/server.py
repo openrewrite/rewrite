@@ -509,6 +509,20 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
+def _make_dirs(directory: str) -> List[str]:
+    """``os.makedirs``, reporting the directories it had to create, deepest first."""
+    created = []
+    d = directory
+    while d and not os.path.isdir(d):
+        created.append(d)
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    os.makedirs(directory, exist_ok=True)
+    return created
+
+
 # Files larger than this are recorded as Quarks rather than parsed into an AST.
 # Matches the 1 MB cap in the JVM JavaScriptParser and the other RPC engines.
 MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024
@@ -580,11 +594,19 @@ def handle_parse(params: dict) -> List[str]:
 
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
+    # Where ty is rooted, and so where it finds its `ty.toml`. Separate from
+    # `relative_to`: relativizing a source path against a config directory the
+    # sources are not under silently leaves that path absolute.
+    project_root = params.get('projectRoot')
     # Per-parse options forwarded from the client (e.g. {"languageLevel": "2.7"}).
     # Absent for older clients; absent or unknown keys are silently ignored.
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
     check_print = _require_print_equals_input(options)
+    # What materializing inline sources put on disk, removed once the batch is parsed so
+    # a caller's own directory is left as it was found.
+    created_files: List[str] = []
+    created_dirs: List[str] = []
     # Path to a virtual environment with the project's dependencies installed,
     # provisioned and forwarded by the caller (the CLI build step in production;
     # a test/template helper in-repo). Points ty-types at the deps so supertypes
@@ -599,29 +621,33 @@ def handle_parse(params: dict) -> List[str]:
     # If no relativeTo provided, try to infer from absolute input paths
     if not relative_to:
         relative_to = _infer_project_root(inputs)
+    if not project_root:
+        project_root = relative_to
 
     # Resolve project-level language version once per request; per-file
     # detection (shebang / magic comment) can still override this inside
-    # parse_python_source.
+    # parse_python_source. The manifests declaring it sit with the sources, which
+    # `project_root` need not contain — it may hold only a ty config.
     project_language_level = detect_from_project(relative_to) if relative_to else None
+    if project_language_level is None and project_root and project_root != relative_to:
+        project_language_level = detect_from_project(project_root)
     ty_version = ty_python_version(language_level, project_language_level)
 
     # Create a ty-types client for this parse batch
     ty_client = None
     tmpdir = None
+    ty_root = project_root
     try:
         from rewrite.python.ty_client import TyTypesClient
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
         ty_client = TyTypesClient(virtual_env=dependency_path,
                                   python_version=ty_version)
-        if relative_to:
-            ty_client.initialize(relative_to)
-        else:
-            # For inline text inputs without a project root, create a temp directory
-            # so ty-types can still provide type attribution
+        if not ty_root:
+            # A scratch root gives inline text inputs somewhere on disk that ty can see.
             tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
-            ty_client.initialize(tmpdir)
+            ty_root = tmpdir
+        ty_client.initialize(ty_root)
     except (ImportError, RuntimeError):
         ty_client = None  # ty-types not available
 
@@ -655,13 +681,16 @@ def handle_parse(params: dict) -> List[str]:
                         source = input_item.get('source')
                     path = (input_item.get('sourcePath') or input_item.get('path') or
                             input_item.get('relativePath', '<unknown>'))
-                    # For relative paths, write the source under the project root
-                    # (tmpdir or relative_to) so ty-types can resolve imports from
-                    # the project's .venv and dependencies.
-                    base_dir = tmpdir or relative_to
+                    # ty analyses files from disk and resolves only what lies under the
+                    # root it was initialized at, so materialize the source there. Passing
+                    # that same root as the relativization base keeps the LST's source path
+                    # equal to the caller's own.
+                    base_dir = ty_root
                     if base_dir and not os.path.isabs(path):
                         disk_path = os.path.join(base_dir, path)
-                        os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                        created_dirs.extend(_make_dirs(os.path.dirname(disk_path)))
+                        if not os.path.exists(disk_path):
+                            created_files.append(disk_path)
                         # ty must read the same bytes the LST was built from.
                         with open(disk_path, 'w', encoding='utf-8', newline='') as f:
                             f.write(source)
@@ -683,6 +712,17 @@ def handle_parse(params: dict) -> List[str]:
             ty_client.shutdown()
         if tmpdir is not None:
             shutil.rmtree(tmpdir, ignore_errors=True)
+        for created in created_files:
+            try:
+                os.remove(created)
+            except OSError:
+                pass
+        # rmdir only takes an empty directory, so one the caller had content in stays.
+        for created in created_dirs:
+            try:
+                os.rmdir(created)
+            except OSError:
+                pass
 
     return results
 
