@@ -14,13 +14,13 @@
 
 """Shared utility functions for Python import handling."""
 
-import ast
 from typing import Iterator, Optional, Sequence, Set, Tuple
 
 from rewrite.java.support_types import JavaType, JRightPadded, Space, Statement
 from rewrite.java.tree import (Assignment, AssignmentOperation, Block, Empty, FieldAccess,
                                Identifier, If, Import, Literal, MethodInvocation)
 from rewrite.markers import Markers
+from rewrite.python.annotation_utils import annotation_names
 from rewrite.python.markers import Quoted
 from rewrite.python.tree import (ChainedAssignment, CollectionLiteral, ExpressionStatement,
                                  StatementExpression, TypeHintedExpression)
@@ -203,16 +203,11 @@ def get_canonical_fqn(imp: Import) -> Optional[str]:
 
 
 def referenced_names(ident: Identifier) -> Tuple[str, ...]:
-    """The names ``ident`` looks up. A quoted identifier is a forward reference, naming
-    one symbol where it spells one; text the parser kept whole names whatever parsing it
-    finds, and text that is not an expression names nothing."""
+    """The names ``ident`` looks up. A quoted identifier is a forward reference: one
+    symbol where it spells one, otherwise whatever the annotation it holds looks up."""
     if ident.markers.find_first(Quoted) is None or ident.simple_name.isidentifier():
         return (ident.simple_name,)
-    try:
-        reference = ast.parse(ident.simple_name.strip(), mode='eval')
-    except (SyntaxError, ValueError):
-        return ()
-    return tuple(node.id for node in ast.walk(reference) if isinstance(node, ast.Name))
+    return annotation_names(ident.simple_name)
 
 
 def pad_right(elem) -> JRightPadded:

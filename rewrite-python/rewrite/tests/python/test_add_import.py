@@ -216,6 +216,22 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_only_if_referenced_finds_a_reference_nested_inside_a_string_annotation(self, arm):
+        """A forward reference nested in another one names the symbol just the same."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'typing', 'Any', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                m: "'Dict[str, Any]'" = {}
+                """,
+                """
+                from typing import Any
+                m: "'Dict[str, Any]'" = {}
+                """,
+            )
+        )
+
     def test_only_if_referenced_finds_a_reference_in_a_comprehension(self, arm):
         """The only reference is inside a comprehension, a Python-specific node."""
         spec = RecipeSpec(recipe=from_visitor(

@@ -3232,6 +3232,123 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void latestPatchFindsBackpatchWithoutVersionPattern() throws Exception {
+        HeldCertificate certificate = new HeldCertificate.Builder()
+          .addSubjectAlternativeName(InetAddress.getByName("localhost").getCanonicalHostName())
+          .build();
+        HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+          .heldCertificate(certificate)
+          .build();
+        HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+          .addTrustedCertificate(certificate.certificate())
+          .build();
+
+        try (var mockRepo = new MockWebServer()) {
+            mockRepo.useHttps(serverCertificates.sslSocketFactory(), false);
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    String path = request.getPath();
+                    if (path == null || !path.contains("/com/example/my-lib/")) {
+                        return new MockResponse().setResponseCode(404);
+                    }
+                    if (path.endsWith("/maven-metadata.xml")) {
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <metadata>
+                            <groupId>com.example</groupId>
+                            <artifactId>my-lib</artifactId>
+                            <versioning>
+                              <versions>
+                                <version>2.14.1</version>
+                                <version>2.14.1.1-osera-00001</version>
+                                <version>2.14.1.1-osera-00002</version>
+                                <version>2.15.0</version>
+                              </versions>
+                            </versioning>
+                          </metadata>
+                          """);
+                    }
+                    if (path.endsWith(".pom")) {
+                        String version = path.substring(path.lastIndexOf("/my-lib-") + "/my-lib-".length(), path.length() - ".pom".length());
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <project>
+                            <modelVersion>4.0.0</modelVersion>
+                            <groupId>com.example</groupId>
+                            <artifactId>my-lib</artifactId>
+                            <version>%s</version>
+                          </project>
+                          """.formatted(version));
+                    }
+                    return new MockResponse().setResponseCode(404);
+                }
+            });
+            mockRepo.start();
+
+            @SuppressWarnings("ConstantConditions")
+            MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <mirrors>
+                        <mirror>
+                            <mirrorOf>*</mirrorOf>
+                            <name>mock</name>
+                            <url>https://%s:%d</url>
+                            <id>mock</id>
+                        </mirror>
+                    </mirrors>
+                </settings>
+                """.formatted(mockRepo.getHostName(), mockRepo.getPort())
+            ), new InMemoryExecutionContext());
+
+            OkHttpClient client = new OkHttpClient.Builder()
+              .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+              .connectTimeout(Duration.ofSeconds(1))
+              .readTimeout(Duration.ofSeconds(1))
+              .build();
+
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradeDependencyVersion("com.example", "my-lib", "latest.patch", null, null, null))
+                .executionContext(MavenExecutionContextView.view(
+                    HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+                      .setHttpSender(new OkHttpSender(client)))
+                  .setMavenSettings(settings, "mock")),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.example</groupId>
+                              <artifactId>my-lib</artifactId>
+                              <version>2.14.1</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.example</groupId>
+                              <artifactId>my-lib</artifactId>
+                              <version>2.14.1.1-osera-00002</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+    }
+
+    @Test
     void bomUpgradeSkipsSnapshotVersions() throws Exception {
         // Serve over TLS: MavenPomDownloader#normalizeRepository probes https first and only falls back to
         // http once that fails, so a plaintext mock costs two doomed handshakes per repository before anything

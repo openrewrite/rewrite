@@ -593,6 +593,13 @@ class ExpressionTypeTree(Py, Expression, TypeTree):
     def reference(self) -> J:
         return self._reference
 
+    @property
+    def type(self) -> Optional[JavaType]:
+        return getattr(self._reference, 'type', None)
+
+    def replace(self, **kwargs) -> 'ExpressionTypeTree':
+        return _replace_delegating(self, '_reference', ('type',), kwargs)
+
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J:
         return v.visit_expression_type_tree(self, p)

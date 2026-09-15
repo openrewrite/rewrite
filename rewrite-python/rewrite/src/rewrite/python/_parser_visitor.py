@@ -17,6 +17,7 @@ from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType,
 from rewrite.java import tree as j
 from rewrite.java.support_types import TextComment
 from . import tree as py
+from .annotation_utils import VALUE_SUBSCRIPTS, subscript_head
 from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
 from .printer import PythonPrinter
 from .type_mapping import PythonTypeMapping, compute_source_line_data
@@ -117,20 +118,6 @@ class _EmbeddedTypeMapping:
     def __in_file(self, line: int, col: int) -> Tuple[int, int]:
         # Only the body's first line shares a line with the opening quote.
         return line + self._line_offset, (col + self._col_offset) if line == 1 else col
-
-
-# The subscripts whose arguments from this index on are values rather than types, so a
-# string there names nothing. ``Annotated``'s first argument is still the annotated type.
-_VALUE_SUBSCRIPTS = {'Literal': 0, 'Annotated': 1}
-
-
-def _subscript_head(node) -> Optional[str]:
-    """The trailing name of a subscript's head, as spelled in the source."""
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        return node.attr
-    return None
 
 
 def _with_type(node: T, resolved: Optional[JavaType]) -> T:
@@ -3012,7 +2999,7 @@ class ParserVisitor(ast.NodeVisitor):
         """The type nodes a quoted annotation contains, or None to keep it flat text.
 
         The body has to reproduce byte-identically to become structure, since a type
-        node has no slot for text it cannot print, such as padding inside the quotes.
+        node has no slot for text it cannot print, such as padding after the body.
         """
         try:
             return self.__structure(node, body, quote_style, prefix)
@@ -3028,9 +3015,14 @@ class ParserVisitor(ast.NodeVisitor):
         # `...` are types of their own.
         if body.isidentifier() and not keyword.iskeyword(body):
             return None
-        body_ast = ast.parse(body, mode='eval')
-        sub = ParserVisitor(body, type_mapping=_EmbeddedTypeMapping(
-            self._type_mapping, node.lineno - 1, node.col_offset + len(quote_style.quote)))
+        # An expression may not open with an indent, so the body parses from its first
+        # column and the indent goes back on afterwards.
+        indent = body[:len(body) - len(body.lstrip(' \t\f'))]
+        core = body[len(indent):]
+        body_ast = ast.parse(core, mode='eval')
+        sub = ParserVisitor(core, type_mapping=_EmbeddedTypeMapping(
+            self._type_mapping, node.lineno - 1,
+            node.col_offset + len(quote_style.quote) + len(indent)))
         tree = sub.__convert_type(body_ast.body)
         if not isinstance(tree, TypeTree):
             return None
@@ -3040,13 +3032,17 @@ class ParserVisitor(ast.NodeVisitor):
             return None
 
         tree = tree.replace(prefix=Space.EMPTY)
-        if PythonPrinter().print(tree) != body:
+        if PythonPrinter().print(tree) != core:
             return None
 
         tree = _with_type(tree, self._type_mapping.string_annotation_type(node))
-        return tree.replace(
-            prefix=prefix,
-            markers=Markers.build(random_id(), [Quoted(random_id(), quote_style)]))
+        quoted = Markers.build(random_id(), [Quoted(random_id(), quote_style)])
+        if not indent:
+            return tree.replace(prefix=prefix, markers=quoted)
+        # A prefix is the space before the opening quote, so an indent inside the quotes
+        # lives one level in, under the node those quotes print around.
+        return py.ExpressionTypeTree(
+            random_id(), prefix, quoted, tree.replace(prefix=Space.build([], indent)))
 
     def __convert_type_mapper(self, node) -> Optional[TypeTree]:
         if isinstance(node, ast.Constant):
@@ -3152,7 +3148,7 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 slices = [node.slice]
 
-            values_from = _VALUE_SUBSCRIPTS.get(_subscript_head(node.value))
+            values_from = VALUE_SUBSCRIPTS.get(subscript_head(node.value))
             return j.ParameterizedType(
                 random_id(),
                 prefix,

@@ -875,6 +875,45 @@ class TestRemoveImportStringAnnotations:
             )
         )
 
+    @pytest.mark.parametrize('annotation', [
+        pytest.param('''"'List[int]'"''', id='whole_annotation'),
+        pytest.param('''"Dict[str, 'List[int]'] "''', id='inside_a_subscript'),
+        pytest.param('''"Annotated['List[int]', 'meta'] "''', id='annotated_type_argument'),
+    ])
+    def test_a_nested_reference_keeps_its_import(self, arm, annotation):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Annotated, Dict, List
+
+                m: {annotation} = None
+                """,
+                after_recipe=self._assert_type_hints_resolve,
+            )
+        )
+
+    @pytest.mark.parametrize('annotation', [
+        pytest.param('''"Literal['List'] "''', id='literal'),
+        pytest.param('''"Annotated[int, 'List'] "''', id='annotated_metadata'),
+    ])
+    def test_a_string_in_a_value_position_does_not_keep_an_import(self, arm, annotation):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Annotated, List, Literal
+
+                m: {annotation} = None
+                """,
+                f"""\
+                from typing import Annotated, Literal
+
+                m: {annotation} = None
+                """,
+            )
+        )
+
     def test_name_absent_from_the_reference_is_still_removed(self, arm):
         spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'Optional')))
         spec.rewrite_run(
