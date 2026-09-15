@@ -17,6 +17,7 @@ from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType,
 from rewrite.java import tree as j
 from rewrite.java.support_types import TextComment
 from . import tree as py
+from .annotation_utils import VALUE_SUBSCRIPTS, subscript_head
 from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
 from .printer import PythonPrinter
 from .type_mapping import PythonTypeMapping, compute_source_line_data
@@ -117,20 +118,6 @@ class _EmbeddedTypeMapping:
     def __in_file(self, line: int, col: int) -> Tuple[int, int]:
         # Only the body's first line shares a line with the opening quote.
         return line + self._line_offset, (col + self._col_offset) if line == 1 else col
-
-
-# The subscripts whose arguments from this index on are values rather than types, so a
-# string there names nothing. ``Annotated``'s first argument is still the annotated type.
-_VALUE_SUBSCRIPTS = {'Literal': 0, 'Annotated': 1}
-
-
-def _subscript_head(node) -> Optional[str]:
-    """The trailing name of a subscript's head, as spelled in the source."""
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        return node.attr
-    return None
 
 
 def _with_type(node: T, resolved: Optional[JavaType]) -> T:
@@ -3161,7 +3148,7 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 slices = [node.slice]
 
-            values_from = _VALUE_SUBSCRIPTS.get(_subscript_head(node.value))
+            values_from = VALUE_SUBSCRIPTS.get(subscript_head(node.value))
             return j.ParameterizedType(
                 random_id(),
                 prefix,
