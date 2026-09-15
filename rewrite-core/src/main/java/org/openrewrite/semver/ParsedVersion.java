@@ -63,6 +63,9 @@ final class ParsedVersion {
                     "(?:-(" + PRERELEASE_ID + "(?:\\." + PRERELEASE_ID + ")*))?" +
                     "(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$");
 
+    // Producer backpatches in the OSERA shape, e.g. 2.14.1.1-osera-00001 or 5.2.19.RELEASE-backpatch-00001.
+    private static final Pattern BACKPATCH = Pattern.compile("(.+)-(?:osera|backpatch)-\\d+", Pattern.CASE_INSENSITIVE);
+
     /**
      * Upper bound on retained entries. Comfortably larger than the distinct version-string working
      * set of a large multi-module upgrade (hundreds to low thousands), while keeping the retained
@@ -72,7 +75,7 @@ final class ParsedVersion {
 
     private static final Map<String, ParsedVersion> CACHE = LruCache.bounded(MAX_CACHE_SIZE);
 
-    private static final ParsedVersion NO_MATCH = new ParsedVersion(false, null, null, false,
+    private static final ParsedVersion NO_MATCH = new ParsedVersion(false, null, null, false, null,
             false, 0, 0, 0, emptyList(), emptyList());
 
     private final boolean matches;
@@ -88,6 +91,8 @@ final class ParsedVersion {
 
     private final boolean preReleaseEnding;
 
+    private final @Nullable String patchedVersion;
+
     private final boolean strictSemver;
 
     private final long strictMajor;
@@ -99,12 +104,14 @@ final class ParsedVersion {
     private final List<String> strictBuild;
 
     private ParsedVersion(boolean matches, @Nullable String @Nullable [] groups, @Nullable String qualifier,
-                          boolean preReleaseEnding, boolean strictSemver, long strictMajor, long strictMinor,
-                          long strictPatch, List<Object> strictPrerelease, List<String> strictBuild) {
+                          boolean preReleaseEnding, @Nullable String patchedVersion, boolean strictSemver,
+                          long strictMajor, long strictMinor, long strictPatch, List<Object> strictPrerelease,
+                          List<String> strictBuild) {
         this.matches = matches;
         this.groups = groups;
         this.qualifier = qualifier;
         this.preReleaseEnding = preReleaseEnding;
+        this.patchedVersion = patchedVersion;
         this.strictSemver = strictSemver;
         this.strictMajor = strictMajor;
         this.strictMinor = strictMinor;
@@ -129,6 +136,7 @@ final class ParsedVersion {
         @Nullable String[] groups = null;
         String qualifier = null;
         boolean preReleaseEnding = false;
+        String patchedVersion = null;
         if (matches) {
             groups = new String[]{
                     matcher.group(1),
@@ -139,6 +147,10 @@ final class ParsedVersion {
             };
             qualifier = matcher.group("qualifier");
             preReleaseEnding = PRE_RELEASE_ENDING.matcher(version).find();
+            Matcher backpatch = BACKPATCH.matcher(version);
+            if (backpatch.matches()) {
+                patchedVersion = backpatch.group(1);
+            }
         }
 
         Matcher strict = STRICT_PATTERN.matcher(version.trim());
@@ -163,7 +175,7 @@ final class ParsedVersion {
                         build.add(id);
                     }
                 }
-                return new ParsedVersion(matches, groups, qualifier, preReleaseEnding,
+                return new ParsedVersion(matches, groups, qualifier, preReleaseEnding, patchedVersion,
                         true, major, minor, patch, prerelease, build);
             } catch (NumberFormatException overflow) {
                 // fall through to the non-strict result
@@ -172,7 +184,8 @@ final class ParsedVersion {
         if (!matches) {
             return NO_MATCH;
         }
-        return new ParsedVersion(true, groups, qualifier, preReleaseEnding, false, 0, 0, 0, emptyList(), emptyList());
+        return new ParsedVersion(true, groups, qualifier, preReleaseEnding, patchedVersion,
+                false, 0, 0, 0, emptyList(), emptyList());
     }
 
     private static boolean isNumeric(String s) {
@@ -213,6 +226,14 @@ final class ParsedVersion {
      */
     boolean isPreReleaseEnding() {
         return preReleaseEnding;
+    }
+
+    /**
+     * @return the version with its backpatch qualifier removed ({@code 5.2.19.RELEASE} for
+     * {@code 5.2.19.RELEASE-osera-00001}), or {@code null} if the version is not a backpatch.
+     */
+    @Nullable String patchedVersion() {
+        return patchedVersion;
     }
 
     boolean isStrictSemver() {
