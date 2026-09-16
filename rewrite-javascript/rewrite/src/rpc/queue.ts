@@ -321,6 +321,8 @@ export class RpcReceiveQueue {
     private batchIndex = 0;
     private sinceYield = 0;
 
+    private readonly internedStrings = new Map<string, string>();
+
     constructor(private readonly refs: Map<number, any>,
                 private readonly sourceFileType: string | undefined,
                 private readonly pull: () => Promise<RpcObjectData[]>,
@@ -432,7 +434,9 @@ export class RpcReceiveQueue {
                 } else if ((codec = RpcCodecs.forInstance(before, this.sourceFileType))) {
                     after = await codec.rpcReceive(before, this);
                 } else if (message.value !== undefined) {
-                    after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
+                    after = message.valueType ?
+                        {kind: this.intern(message.valueType), ...message.value} :
+                        typeof message.value === "string" ? this.intern(message.value) : message.value;
                 } else if (message.state === RpcObjectState.ADD && message.valueType) {
                     throw new Error(
                         `No RPC codec registered on the TypeScript side for '${message.valueType}'. ` +
@@ -515,7 +519,16 @@ export class RpcReceiveQueue {
         if (codec?.rpcNew) {
             return codec.rpcNew();
         }
-        return {kind: type} as T;
+        return {kind: this.intern(type)} as T;
+    }
+
+    private intern(value: string): string {
+        const existing = this.internedStrings.get(value);
+        if (existing !== undefined) {
+            return existing;
+        }
+        this.internedStrings.set(value, value);
+        return value;
     }
 }
 
