@@ -455,15 +455,25 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     /**
      * The version a platform imported by this configuration supplies for a coordinate, or null when no such
      * platform governs it. A version supplied by a constraint rather than a platform is not reported here.
+     * <p>
+     * {@code bomVersionOverride} answers, for a platform's own coordinate, the version it is being upgraded to
+     * in the same run so the answer reflects the state the build is moving toward; it returns null when a
+     * platform's version is unchanged.
      */
-    public @Nullable String getPlatformManagedVersion(GroupArtifact ga, List<MavenRepository> repositories, ExecutionContext ctx) {
+    public @Nullable String getPlatformManagedVersion(GroupArtifact ga, List<MavenRepository> repositories, ExecutionContext ctx,
+                                                      Function<GroupArtifact, @Nullable String> bomVersionOverride) {
         MavenPomDownloader downloader = new MavenPomDownloader(ctx);
         for (Dependency dependency : requested) {
             if (!dependency.findAttribute(Category.class).filter(Category::isBom).isPresent()) {
                 continue;
             }
+            GroupArtifactVersion bomGav = dependency.getGav();
+            String override = bomVersionOverride.apply(bomGav.asGroupArtifact());
+            if (override != null) {
+                bomGav = bomGav.withVersion(override);
+            }
             try {
-                String managedVersion = downloader.download(dependency.getGav(), null, null, repositories)
+                String managedVersion = downloader.download(bomGav, null, null, repositories)
                         .resolve(emptyList(), downloader, ctx)
                         .getManagedVersion(ga.getGroupId(), ga.getArtifactId(), null, null);
                 if (managedVersion != null) {

@@ -1100,6 +1100,45 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void leavesVersionlessDependencyManagedByAnUpgradedPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "*", "2.7.18", null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+                  id "org.springframework.boot" version "2.6.15"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("org.springframework.boot:spring-boot-dependencies:2.6.15")
+                  implementation "org.springframework.boot:spring-boot-starter-web"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+                  id "org.springframework.boot" version "2.6.15"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("org.springframework.boot:spring-boot-dependencies:2.7.18")
+                  implementation "org.springframework.boot:spring-boot-starter-web"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradesVariablesDefinedInExtraProperties() {
         rewriteRun(
           buildGradle(

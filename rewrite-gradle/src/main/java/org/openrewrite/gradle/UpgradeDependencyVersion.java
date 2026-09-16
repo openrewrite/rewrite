@@ -1141,7 +1141,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
             GradleDependencyConfiguration configuration = gradleProject.getConfiguration(configName);
             return configuration == null ? null :
-                    configuration.getPlatformManagedVersion(ga, gradleProject.getMavenRepositories(), ctx);
+                    configuration.getPlatformManagedVersion(ga, gradleProject.getMavenRepositories(), ctx, bomGa -> {
+                        Object upgradedBomVersion = acc.gaToNewVersion.get(bomGa);
+                        return upgradedBomVersion instanceof String ? (String) upgradedBomVersion : null;
+                    });
         }
 
         /**
