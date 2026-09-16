@@ -1,6 +1,8 @@
 import {Json} from "../../src/json";
 import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue, RpcObjectState} from "../../src/rpc";
 import type {RpcObjectData} from "../../src/rpc";
+import {JavaScriptParser, JS, sourceFileCache} from "../../src/javascript";
+import {TreePrinters} from "../../src/print";
 
 describe("RPC queues", () => {
 
@@ -159,6 +161,21 @@ describe("RPC queues", () => {
         const received = await rq.receiveList(before);
 
         expect(received![0].version).toBe("8.0");
+    });
+
+    test("interning across a received tree preserves it", async () => {
+        // given
+        const source = "const a = a + a + a;";
+        const parser = new JavaScriptParser({sourceFileCache});
+        const parsed = (await parser.parse({text: source, sourcePath: "t.ts"}).next()).value as JS.CompilationUnit;
+
+        // when
+        const batch = await new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(parsed, undefined);
+        const received = await new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch, undefined, false)
+            .receive<JS.CompilationUnit>(undefined);
+
+        // then
+        expect(await TreePrinters.print(received)).toBe(source);
     });
 
     test("detects missing codec on receiver side", async () => {
