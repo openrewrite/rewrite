@@ -206,6 +206,22 @@ describe("RPC queues", () => {
         expect(table.size).toBe(0);
     });
 
+    test("empty lists deserialize to a single shared frozen instance", async () => {
+        // given
+        const emptyBatch = await sendList<string>([], undefined);
+
+        // when
+        const first = await new RpcReceiveQueue(new Map(), undefined, async () => emptyBatch, undefined, false)
+            .receiveList<string>(undefined);
+        const second = await new RpcReceiveQueue(new Map(), undefined, async () => emptyBatch, undefined, false)
+            .receiveList<string>(undefined);
+
+        // then
+        expect(first).toEqual([]);
+        expect(first).toBe(second);
+        expect(Object.isFrozen(first)).toBe(true);
+    });
+
     test("detects missing codec on receiver side", async () => {
         // given
         const batch: RpcObjectData[] = [

@@ -19,6 +19,8 @@ import {saveTrace, trace} from "./trace";
 import {updateIfChanged} from "../util";
 import {isRef, ReferenceMap} from "../reference";
 
+const EMPTY_LIST: readonly never[] = Object.freeze([]);
+
 /**
  * Interface representing an RPC codec that defines methods
  * for sending and receiving objects in an RPC communication.
@@ -518,7 +520,7 @@ export class RpcReceiveQueue {
         before: T[] | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T[]> {
-        return (await this.receiveList(before, onChange)) ?? [];
+        return (await this.receiveList(before, onChange)) ?? (EMPTY_LIST as unknown as T[]);
     }
 
     receiveList<T>(
@@ -555,6 +557,9 @@ export class RpcReceiveQueue {
                 const positions = d.value as number[];
                 if (!positions) {
                     throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
+                }
+                if (positions.length === 0) {
+                    return EMPTY_LIST as unknown as T[];
                 }
                 const after: T[] = new Array(positions.length);
                 for (let i = 0; i < positions.length; i++) {
