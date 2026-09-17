@@ -58,6 +58,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
+@SuppressWarnings("DataFlowIssue")
 class UpgradeDependencyVersionTest implements RewriteTest {
 
     @DocumentExample
@@ -3820,6 +3821,164 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       </dependencies>
                   </project>
                   """
+              )
+            );
+        }
+    }
+
+    /**
+     * Two artifacts of a multi-module build share one version property declared by their parent and
+     * resolve to different newer versions. Before the property was keyed on path and name alone, which
+     * of the two reached the pom depended on `HashSet` iteration order. The repository serves no
+     * `boot-a-3.2.0.pom`, so taking the higher of the two would leave a pom that no longer resolves.
+     */
+    @Test
+    void sharedVersionPropertyResolvesToTheLowestUpgrade() throws Exception {
+        HeldCertificate certificate = new HeldCertificate.Builder()
+          .addSubjectAlternativeName(InetAddress.getByName("localhost").getCanonicalHostName())
+          .build();
+        HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+          .heldCertificate(certificate)
+          .build();
+        HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+          .addTrustedCertificate(certificate.certificate())
+          .build();
+
+        try (var mockRepo = new MockWebServer()) {
+            mockRepo.useHttps(serverCertificates.sslSocketFactory(), false);
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    String path = request.getPath();
+                    if (path == null) {
+                        return new MockResponse().setResponseCode(404);
+                    }
+                    // boot-a stops at 3.1.0 while boot-b has published 3.2.0
+                    Matcher metadata = Pattern.compile("com/example/boot/(boot-[ab])/maven-metadata\\.xml").matcher(path);
+                    if (metadata.find()) {
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <metadata>
+                            <groupId>com.example.boot</groupId>
+                            <artifactId>%s</artifactId>
+                            <versioning>
+                              <versions>
+                                <version>3.0.0</version>
+                                <version>3.1.0</version>
+                                %s
+                              </versions>
+                            </versioning>
+                          </metadata>
+                          """.formatted(metadata.group(1),
+                          "boot-b".equals(metadata.group(1)) ? "<version>3.2.0</version>" : ""));
+                    }
+                    Matcher pom = Pattern.compile("com/example/boot/(boot-[ab])/([^/]+)/boot-[ab]-[^/]+\\.pom").matcher(path);
+                    if (pom.find()) {
+                        if ("boot-a".equals(pom.group(1)) && "3.2.0".equals(pom.group(2))) {
+                            return new MockResponse().setResponseCode(404); // boot-a never published 3.2.0
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <project>
+                            <modelVersion>4.0.0</modelVersion>
+                            <groupId>com.example.boot</groupId>
+                            <artifactId>%s</artifactId>
+                            <version>%s</version>
+                          </project>
+                          """.formatted(pom.group(1), pom.group(2)));
+                    }
+                    return new MockResponse().setResponseCode(404);
+                }
+            });
+            mockRepo.start();
+
+            @SuppressWarnings("ConstantConditions")
+            MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <mirrors>
+                        <mirror>
+                            <mirrorOf>*</mirrorOf>
+                            <name>mock</name>
+                            <url>https://%s:%d</url>
+                            <id>mock</id>
+                        </mirror>
+                    </mirrors>
+                </settings>
+                """.formatted(mockRepo.getHostName(), mockRepo.getPort())
+            ), new InMemoryExecutionContext());
+
+            OkHttpClient client = new OkHttpClient.Builder()
+              .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+              .connectTimeout(Duration.ofSeconds(1))
+              .readTimeout(Duration.ofSeconds(1))
+              .build();
+
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradeDependencyVersion("com.example.boot", "*", "latest.release", null, null, null))
+                .executionContext(MavenExecutionContextView.view(
+                    HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+                      .setHttpSender(new OkHttpSender(client)))
+                  .setMavenSettings(settings, "mock")),
+              mavenProject("parent",
+                //language=xml
+                pomXml(
+                  """
+                    <project>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>pom</packaging>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                        <properties>
+                            <boot.version>3.0.0</boot.version>
+                        </properties>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>pom</packaging>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                        <properties>
+                            <boot.version>3.1.0</boot.version>
+                        </properties>
+                    </project>
+                    """
+                ),
+                mavenProject("child",
+                  //language=xml
+                  pomXml(
+                    """
+                      <project>
+                          <parent>
+                              <groupId>com.example</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0</version>
+                          </parent>
+                          <artifactId>child</artifactId>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.example.boot</groupId>
+                                  <artifactId>boot-a</artifactId>
+                                  <version>${boot.version}</version>
+                              </dependency>
+                              <dependency>
+                                  <groupId>com.example.boot</groupId>
+                                  <artifactId>boot-b</artifactId>
+                                  <version>${boot.version}</version>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """
+                  )
+                )
               )
             );
         }
