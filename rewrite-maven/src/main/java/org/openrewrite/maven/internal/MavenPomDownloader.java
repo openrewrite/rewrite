@@ -28,6 +28,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.ProxyStatus;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
@@ -157,7 +158,7 @@ public class MavenPomDownloader {
                 try (HttpSender.Response response = httpSender.send(request)) {
                     if (!response.isSuccessful()) {
                         throw new HttpSenderResponseException(null, response.getCode(),
-                                new String(response.getBodyAsBytes()));
+                                new String(response.getBodyAsBytes()), ProxyStatus.parse(response.getHeaders()));
                     }
                     return response.getBodyAsBytes();
                 }
@@ -1320,11 +1321,19 @@ public class MavenPomDownloader {
 
         private final String body;
 
+        private final List<ProxyStatus> proxyStatus;
+
         public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode,
                                            String body) {
+            this(cause, responseCode, body, emptyList());
+        }
+
+        public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode,
+                                           String body, List<ProxyStatus> proxyStatus) {
             super(cause);
             this.responseCode = responseCode;
             this.body = body;
+            this.proxyStatus = proxyStatus;
         }
 
         /**
@@ -1344,7 +1353,7 @@ public class MavenPomDownloader {
         public String getMessage() {
             return responseCode == null ?
                     requireNonNull(getCause()).getMessage() :
-                    "HTTP " + responseCode;
+                    "HTTP " + responseCode + ProxyStatus.render(proxyStatus);
         }
 
         public boolean isAccessDenied() {
