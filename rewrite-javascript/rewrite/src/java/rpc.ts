@@ -15,7 +15,7 @@
  */
 import {JavaVisitor} from "./visitor";
 import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {Expression, isSpace, J, TextComment} from "./tree";
+import {emptySpace, Expression, isSpace, J, TextComment} from "./tree";
 import {isTree} from "../tree";
 import {Type} from "./type";
 import {TypeVisitor} from "./type-visitor";
@@ -1518,7 +1518,9 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             }),
             whitespace: await q.receive(space.whitespace)
         };
-        return updateIfChanged(space, updates);
+        return updates.whitespace === "" && updates.comments.length === 0
+            ? emptySpace
+            : updateIfChanged(space, updates);
     }
 
     public override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
