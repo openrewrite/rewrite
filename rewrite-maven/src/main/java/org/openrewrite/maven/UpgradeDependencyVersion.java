@@ -57,6 +57,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
+    private static final LatestRelease LATEST_RELEASE = new LatestRelease(null);
+
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
             example = "com.fasterxml.jackson*")
@@ -135,7 +137,56 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 ResolvedPom pom = getResolutionResult().getPom();
                 accumulator.projectArtifacts.add(new GroupArtifact(pom.getGroupId(), pom.getArtifactId()));
+                storeImportedBomVersionProperty(pom, ctx);
                 return super.visitDocument(document, ctx);
+            }
+
+            /**
+             * Record a newer BOM version against the pom that declares the version property an ancestor uses to
+             * import that BOM. A parent may import a BOM at {@code ${spring-boot.version}} while each
+             * application pom overrides that property.
+             */
+            private void storeImportedBomVersionProperty(ResolvedPom pom, ExecutionContext ctx) {
+                Path sourcePath = pom.getRequested().getSourcePath();
+                if (sourcePath == null) {
+                    return;
+                }
+                Set<ResolvedGroupArtifactVersion> seenBoms = new HashSet<>();
+                for (ResolvedManagedDependency dm : pom.getDependencyManagement()) {
+                    ManagedDependency requestedBom = dm.getRequestedBom();
+                    ResolvedGroupArtifactVersion bom = dm.getBomGav();
+                    if (requestedBom == null || bom == null) {
+                        continue;
+                    }
+                    if (!matchesGlob(bom.getGroupId(), groupId) || !matchesGlob(bom.getArtifactId(), artifactId)) {
+                        continue;
+                    }
+                    if (!seenBoms.add(bom)) {
+                        continue; // Every dependency the BOM manages repeats the same import
+                    }
+                    String requestedVersion = requestedBom.getVersion();
+                    if (!isProperty(requestedVersion)) {
+                        continue;
+                    }
+                    String newerVersion;
+                    try {
+                        newerVersion = MavenDependency.findNewerVersion(bom.getGroupId(), bom.getArtifactId(),
+                                bom.getVersion(), getResolutionResult(), metadataFailures, versionComparator, ctx);
+                    } catch (MavenDownloadingException ignored) {
+                        // Already recorded in the MavenMetadataFailures data table. A scanner cannot
+                        // mark the LST, since edits made here are discarded.
+                        continue;
+                    }
+                    if (newerVersion == null) {
+                        continue;
+                    }
+                    String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
+                    if (pom.getRequested().getProperties().containsKey(propertyName)) {
+                        accumulator.upgradeProperty(sourcePath, propertyName, newerVersion);
+                    } else {
+                        storeParentPomProperty(getResolutionResult().getParent(), propertyName, newerVersion);
+                    }
+                }
             }
 
             @Override
@@ -185,7 +236,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return; // Not a source file, so nothing to update
                 }
                 if (pom.getProperties().containsKey(propertyName)) {
-                    accumulator.pomProperties.add(new PomProperty(pom.getSourcePath(), propertyName, newerVersion));
+                    accumulator.upgradeProperty(pom.getSourcePath(), propertyName, newerVersion);
                     return; // Property found, so no further searching is needed
                 }
                 storeParentPomProperty(currentMavenResolutionResult.getParent(), propertyName, newerVersion);
@@ -242,15 +293,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 try {
                     if (isPropertyTag()) {
                         Path pomSourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
-                        for (PomProperty pomProperty : accumulator.pomProperties) {
-                            if (pomProperty.pomFilePath.equals(pomSourcePath) &&
-                                pomProperty.propertyName.equals(tag.getName())) {
+                        if (pomSourcePath != null) {
+                            String propertyValue = accumulator.pomProperties.get(new PomProperty(pomSourcePath, tag.getName()));
+                            if (propertyValue != null) {
                                 Optional<String> value = tag.getValue();
-                                if (!value.isPresent() || !value.get().equals(pomProperty.propertyValue)) {
-                                    doAfterVisit(new ChangeTagValueVisitor<>(tag, pomProperty.propertyValue));
+                                if (!value.isPresent() || !value.get().equals(propertyValue)) {
+                                    doAfterVisit(new ChangeTagValueVisitor<>(tag, propertyValue));
                                     maybeUpdateModel();
                                 }
-                                break;
                             }
                         }
                     } else if (isDependencyTag(groupId, artifactId)) {
@@ -616,13 +666,22 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Value
     public static class Accumulator {
         Set<GroupArtifact> projectArtifacts = new HashSet<>();
-        Set<PomProperty> pomProperties = new HashSet<>();
+        Map<PomProperty, String> pomProperties = new HashMap<>();
+
+        /**
+         * Artifacts sharing a property share a current version and selector, so the lower candidate's artifact
+         * published nothing above it and the higher value would not resolve. Keying the property on its value
+         * instead would leave the applying visitor choosing between candidates by hash order.
+         */
+        void upgradeProperty(Path pomFilePath, String propertyName, String newerVersion) {
+            pomProperties.merge(new PomProperty(pomFilePath, propertyName), newerVersion,
+                    (existing, candidate) -> LATEST_RELEASE.compare(null, candidate, existing) < 0 ? candidate : existing);
+        }
     }
 
     @Value
     public static class PomProperty {
         Path pomFilePath;
         String propertyName;
-        String propertyValue;
     }
 }
