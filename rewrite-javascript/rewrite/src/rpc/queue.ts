@@ -424,10 +424,12 @@ export class RpcReceiveQueue {
         }
         return this.receive(markers, async m => {
             return saveTrace(this.trace, async () => {
-                return updateIfChanged(markers!, {
-                    id: await this.receive(m.id),
-                    markers: (await this.receiveList(m.markers))!,
-                });
+                const id = await this.receive(m.id);
+                const markerList = (await this.receiveList(m.markers))!;
+                if (markerList.length === 0) {
+                    return emptyMarkers;
+                }
+                return updateIfChanged(markers!, {id, markers: markerList});
             })
         })
     }
