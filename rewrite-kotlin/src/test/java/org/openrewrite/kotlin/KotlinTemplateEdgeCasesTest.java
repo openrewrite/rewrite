@@ -59,11 +59,9 @@ class KotlinTemplateEdgeCasesTest implements RewriteTest {
 
 
     /**
-     * An invocation is both an {@code Expression} and a {@code Statement}. Without the
-     * {@code J.MethodInvocation} branch in {@code KotlinBlockStatementTemplateGenerator.contextFreeTemplate}
-     * it takes the expression branch and the template is wrapped as {@code var o : Any = «template»}, which
-     * does not parse when the template is a declaration. The branch wraps in an initializer block instead,
-     * binding to {@code «bindType» o = } only when the invocation is non-void, as Java does.
+     * An invocation is both an {@code Expression} and a {@code Statement}. Taking the expression branch wraps
+     * the template as {@code var o : Any = «template»}, which does not parse when the template is a
+     * declaration; {@code KotlinBlockStatementTemplateGenerator} wraps in an initializer block instead.
      */
     @Test
     void statementTemplateAtMethodInvocationSite() {
@@ -85,12 +83,9 @@ class KotlinTemplateEdgeCasesTest implements RewriteTest {
 
 
     /**
-     * Kotlin nullable types cannot be spelled in a matcher — {@code #{any(kotlin.String?)}} is rejected by the
-     * template-parameter grammar, which is shared with Java. That is deliberate rather than a gap: Kotlin
-     * cannot overload on nullability alone (the declarations would collide on the same JVM signature), so
-     * nullability never distinguishes one candidate from another and the matcher does not need it.
-     * <p>
-     * The non-null spelling is the supported form, and a nullable argument substitutes through it unchanged.
+     * {@code #{any(kotlin.String?)}} is rejected by the template-parameter grammar, which is shared with Java.
+     * That is no gap: Kotlin cannot overload on nullability alone, so nullability never distinguishes one
+     * candidate from another. The non-null spelling substitutes a nullable argument unchanged.
      */
     @Test
     void nullableArgumentSubstitutesThroughNonNullMatcher() {
@@ -126,9 +121,8 @@ class KotlinTemplateEdgeCasesTest implements RewriteTest {
 
     /**
      * A use-site target nests the real annotation inside a {@link org.openrewrite.kotlin.tree.K.AnnotationType}
-     * belonging to an outer synthetic annotation, so the generator has to look through that wrapper to find the
-     * declaration the annotation belongs to. All four targets — {@code get}, {@code field}, {@code set} and
-     * {@code param} — share that shape and were verified together; one is kept since they exercise one path.
+     * belonging to an outer synthetic annotation, which the generator has to look through. All four targets
+     * share that shape, so one case covers them.
      */
     @Test
     void replaceArgumentsOfAnnotationWithUseSiteTarget() {
@@ -153,10 +147,9 @@ class KotlinTemplateEdgeCasesTest implements RewriteTest {
     }
 
     /**
-     * Nullability is carried structurally by {@link J.NullableType}, not by {@link org.openrewrite.java.tree.JavaType},
-     * which has no notion of it — a nullable and a non-null {@code String} both attribute to
-     * {@code kotlin.String}. So the question of whether templating preserves nullable type attribution is
-     * answered by comparing a templated result against the same code parsed directly: they must agree.
+     * Nullability is carried structurally by {@link J.NullableType} rather than by
+     * {@link org.openrewrite.java.tree.JavaType}, so preservation is asserted by comparing a templated result
+     * against the same code parsed directly.
      */
     @Test
     void nullableTypeAttributionMatchesDirectlyParsedCode() {

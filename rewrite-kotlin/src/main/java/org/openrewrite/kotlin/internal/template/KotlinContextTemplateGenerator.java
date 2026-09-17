@@ -35,25 +35,13 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Builds the stub for a context-sensitive Kotlin template by <em>printing the whole source file</em> with the
- * template substituted at the insertion point, rather than reconstructing the enclosing scope bottom-up the way
- * {@link org.openrewrite.java.internal.template.BlockStatementTemplateGenerator} does for Java.
- * <p>
- * The printer already round-trips every J/K node, so syntactic correctness is free and there is no per-construct
- * reconstruction to get wrong. What remains is deciding what may be <em>elided</em>, and elision is not needed for
- * legality — the file is already legal. It exists to shrink the set of types that must resolve against the
- * template parser's classpath. So the rule is to elide only where provably safe.
- * <p>
- * A consequence worth stating: because statements preceding the insertion point are kept verbatim rather than
- * re-synthesized with dummy initializers, smart casts, {@code when} subject bindings and destructuring
- * declarations all remain live at the hole. Java's approach destroys these.
+ * Builds the stub for a context-sensitive Kotlin template by printing the whole source file with the
+ * template substituted at the insertion point. Portions of the file irrelevant to the insertion point are elided.
  */
 public class KotlinContextTemplateGenerator extends KotlinVisitor<Integer> {
 
     /**
-     * {@code kotlin.TODO()} returns {@code Nothing}, which is a subtype of every type including non-null ones,
-     * so it satisfies any declared return type or property type. kotlin-stdlib is unconditionally on every
-     * Kotlin parse's classpath (see {@code KotlinParser.buildModule}), so this always resolves.
+     * Returns {@code Nothing}, which is a subtype of every type including non-null ones.
      */
     private static final String ELIDED = "kotlin.TODO()";
 
@@ -73,8 +61,8 @@ public class KotlinContextTemplateGenerator extends KotlinVisitor<Integer> {
      * @param cursor            positioned at the insertion point.
      * @param hole              the substituted template, already wrapped in the template marker comments.
      * @param truncateAfterHole drop statements following the insertion point in its enclosing block. Only safe
-     *                          when the insertion point is being replaced; for before/after insertion the
-     *                          original statement still exists and later statements may reference it.
+     *                          when the insertion point is being replaced, since otherwise the original
+     *                          statement survives and later statements may reference it.
      */
     public static String stub(Cursor cursor, String hole, boolean truncateAfterHole) {
         J insertionPoint = cursor.getValue();
@@ -128,10 +116,9 @@ public class KotlinContextTemplateGenerator extends KotlinVisitor<Integer> {
     }
 
     /**
-     * R6: a body may only be elided when its type is written in the source. Eliding
-     * {@code fun f() = expr} to {@code = kotlin.TODO()} would infer {@code Nothing}, which does not fail
-     * loudly — it silently mis-attributes the type of every reference to {@code f}, defeating the very
-     * capability context-sensitivity exists to provide.
+     * R6: a body may only be elided when its type is written in the source. Eliding the body of
+     * {@code fun f() = expr} would infer {@code Nothing}, which does not fail loudly — it silently
+     * mis-attributes the type of every reference to {@code f}.
      */
     private boolean isElidableBody(J.MethodDeclaration method) {
         J.Block body = method.getBody();
@@ -156,17 +143,16 @@ public class KotlinContextTemplateGenerator extends KotlinVisitor<Integer> {
                 return false;
             }
         }
-        // `by` and the equals-less form live on the declaration itself, and the printer keys the separator off
-        // them (see KotlinPrinter#getEqualsText). Eliding either would emit `val x: T by kotlin.TODO()`, which
-        // resolves `getValue` against `Nothing`, or `val x: T kotlin.TODO()`, which is not syntax at all.
+        // The printer keys the separator off these markers (see KotlinPrinter#getEqualsText), so eliding either
+        // would emit `val x: T by <elided>` or `val x: T <elided>`, neither of which is usable.
         return !multiVariable.getMarkers().findFirst(By.class).isPresent() &&
                !multiVariable.getMarkers().findFirst(OmitEquals.class).isPresent();
     }
 
     /**
      * A constructor body is never elided: a class with {@code val} properties assigned there relies on those
-     * assignments for definite assignment, which {@code TODO()} does not satisfy. An {@code init} block is a
-     * {@link J.Block}, not a declaration, so it is left alone for free.
+     * assignments for definite assignment, which a function returning {@code Nothing} does not satisfy.
+     * An {@code init} block is a {@link J.Block}, not a declaration, so it is left alone for free.
      */
     private boolean isConstructor(J.MethodDeclaration method) {
         return method.getMethodType() != null && method.getMethodType().isConstructor() ||

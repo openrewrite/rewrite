@@ -26,12 +26,9 @@ import static org.openrewrite.java.internal.template.TemplateStubs.Imports.NONE;
 import static org.openrewrite.java.internal.template.TemplateStubs.Imports.TEMPLATE;
 
 /**
- * Kotlin stubs.
- * <p>
- * Two differences from {@link org.openrewrite.java.internal.template.JavaTemplateStubs} drive the shapes here.
- * Kotlin allows declarations at file scope, so most stubs need no wrapper class and are read straight off
- * {@link K.CompilationUnit#getStatements()}. And {@code $} is not a legal Kotlin identifier character, so the
- * synthetic names use {@code __Template__} / {@code __template__} rather than Java's {@code $Template}.
+ * Kotlin stubs. Unlike {@link org.openrewrite.java.internal.template.JavaTemplateStubs}, most need no wrapper
+ * class because Kotlin allows declarations at file scope, and the synthetic names are spelled
+ * {@code __Template__} because {@code $} is not a legal Kotlin identifier character.
  */
 public class KotlinTemplateStubs implements TemplateStubs {
 
@@ -52,9 +49,8 @@ public class KotlinTemplateStubs implements TemplateStubs {
     }
 
     /**
-     * Kotlin has no {@code extends}: the parser puts every supertype into the implements container and the
-     * printer renders them all after a single {@code :}. Both coordinates therefore share one stub, and
-     * {@code parseExtends} taking the first element lands on Kotlin's superclass position.
+     * Kotlin has no {@code extends}: every supertype goes into the implements container, so both coordinates
+     * share one stub and {@code parseExtends} taking the first element lands on the superclass.
      */
     @Override
     public Stub<TypeTree> anExtends() {
@@ -97,9 +93,8 @@ public class KotlinTemplateStubs implements TemplateStubs {
     }
 
     /**
-     * Top-level declarations are plain statements on {@link K.CompilationUnit}; there is no synthetic wrapper
-     * class to descend through as there is in Java. Note {@code getClasses()} cannot be used here because it
-     * filters to {@link J.ClassDeclaration} and so misses {@link K.ClassDeclaration}.
+     * Top-level declarations are plain statements on {@link K.CompilationUnit}. {@code getClasses()} cannot be
+     * used, as it filters to {@link J.ClassDeclaration} and so misses {@link K.ClassDeclaration}.
      */
     private static Statement firstStatement(JavaSourceFile cu) {
         return ((K.CompilationUnit) cu).getStatements().get(0);

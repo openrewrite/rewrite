@@ -260,10 +260,8 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
 
             int declMax = style.getKeepMaximum().getInDeclarations();
 
-            // A statement whose id is absent from the compilation unit is a detached replacement being
-            // formatted against the tree it is about to be spliced into (as JavaTemplate does). Its position
-            // is unknowable here and its prefix was already set deliberately by the caller, so adjusting it
-            // would prepend blank lines to what may well be the file's first declaration.
+            // A statement absent from the compilation unit is a detached replacement not yet spliced in, so its
+            // position is unknowable and its prefix was already set deliberately by the caller.
             boolean partOfCompilationUnit = false;
             for (Statement s : cu.getStatements()) {
                 if (s.isScope(j)) {
@@ -295,15 +293,10 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
     /**
-     * Whether a member should be preceded by a blank line because the member before it has a block body.
-     * Expression-bodied members are deliberately left compact, which is why this cannot simply separate every
-     * member the way the Java implementation does.
-     * <p>
-     * {@link #visitBlock} decides the same thing for a whole block, but from a running flag that only methods
-     * update, so an intervening property does not reset it and it separates members this does not. That path
-     * is unreachable when formatting is scoped to a single statement — as it is when a recipe formats a member
-     * it has just inserted — hence the second implementation here. {@code minimumLines} sets a floor, so a
-     * statement reached by both paths is unaffected by the overlap.
+     * Whether a member should be preceded by a blank line because the member before it has a block body;
+     * expression-bodied members are deliberately left compact. {@link #visitBlock} decides this for a whole
+     * block, but that path is unreachable when formatting is scoped to a single statement, as it is when a
+     * recipe formats a member it has just inserted.
      */
     private static boolean separatedFromPreviousMember(J.Block block, Statement statement) {
         List<Statement> statements = block.getStatements();

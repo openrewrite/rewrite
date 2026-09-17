@@ -570,10 +570,8 @@ class AutoFormatVisitorTest implements RewriteTest {
 
     /**
      * Formatting scoped to a single statement must still apply the blank line that separates class members.
-     * {@code BlankLinesVisitor} also applies that rule over the whole block in {@code visitBlock}, which a
-     * subtree-scoped visit never reaches — so whole-tree {@code AutoFormat} passing is not evidence the
-     * scoped path works. Recipes that insert a member and format only that member, as JavaTemplate does,
-     * depend on the scoped path.
+     * {@code BlankLinesVisitor#visitBlock} applies that rule over a whole block, but a subtree-scoped visit
+     * never reaches it, so whole-tree {@code AutoFormat} passing proves nothing about this path.
      */
     @SuppressWarnings({"OptionalGetWithoutIsPresent", "DataFlowIssue"})
     @Test

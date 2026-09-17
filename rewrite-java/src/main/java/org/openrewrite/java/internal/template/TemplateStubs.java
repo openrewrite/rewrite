@@ -25,16 +25,12 @@ import static java.util.Collections.singletonList;
 
 /**
  * The language-specific source snippets that {@link JavaTemplateParser} wraps around a template in order to
- * compile it, plus the logic for locating the templated element in the resulting tree.
+ * compile it, paired with the extractor that locates the templated element in the result. The wrapper's shape
+ * dictates where the result is read back from, so the two halves are kept together.
  * <p>
- * The stub and the extractor are paired deliberately. A language is free to wrap the template in whatever
- * shape its grammar requires, and that choice dictates where the result is read back from — Java hangs a
- * method off a synthetic class, while Kotlin can declare at file scope. Keeping the two halves in one object
- * prevents them from drifting apart.
- * <p>
- * Note this is the <em>snippet</em> language, which is chosen by the {@code JavaTemplate} subclass a recipe
- * author instantiates. It is independent of the language of the source file being modified; that is decided
- * separately by {@link JavaTemplateLanguageExtension}.
+ * This is the <em>snippet</em> language, chosen by the {@code JavaTemplate} subclass a recipe author
+ * instantiates. The language of the source file being modified is decided separately by
+ * {@link JavaTemplateLanguageExtension}.
  */
 public interface TemplateStubs {
 
@@ -78,10 +74,7 @@ public interface TemplateStubs {
             return new Stub<>(code, imports, extract);
         }
 
-        /**
-         * For coordinates that yield exactly one element. The parser still caches a list, so single-valued
-         * extractors are wrapped rather than given a separate code path.
-         */
+        /** For coordinates that yield exactly one element, which the parser still caches as a list. */
         public static <T extends J> Stub<T> ofOne(String code, Imports imports, Function<JavaSourceFile, T> extract) {
             return new Stub<>(code, imports, cu -> singletonList(extract.apply(cu)));
         }

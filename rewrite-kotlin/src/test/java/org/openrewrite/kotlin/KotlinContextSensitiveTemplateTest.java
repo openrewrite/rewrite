@@ -30,12 +30,8 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 /**
  * Context-sensitive Kotlin templates build their stub by printing the whole enclosing source file with the
- * template substituted at the insertion point, eliding only what is provably safe to elide — rather than
- * reconstructing the enclosing scope bottom-up as the Java implementation does.
- * <p>
- * The tests split in two. The behavioural tests assert that a template referencing symbols from its insertion
- * scope resolves. The stub-shape tests pin the elision rules directly, so a regression in what gets elided is
- * caught as such rather than surfacing as a confusing parse failure.
+ * template substituted at the insertion point. The behavioural tests assert that a template referencing
+ * symbols from its insertion scope resolves; the stub-shape tests pin the elision rules directly.
  */
 class KotlinContextSensitiveTemplateTest implements RewriteTest {
 
@@ -332,7 +328,7 @@ class KotlinContextSensitiveTemplateTest implements RewriteTest {
     }
 
     /**
-     * R6. Eliding an inferred return type to {@code = kotlin.TODO()} would infer {@code Nothing} and silently
+     * R6. Eliding an inferred return type to a function returning {@code Nothing} would silently
      * mis-attribute every reference to the function, so the body must survive.
      */
     @Test
@@ -425,7 +421,7 @@ class KotlinContextSensitiveTemplateTest implements RewriteTest {
 
     /**
      * Annotation arguments must be compile-time constants, so no placeholder can stand in for the surrounding
-     * scope. Java has an open TODO admitting it gets this case wrong; we reject it instead.
+     * scope. Java's implementation has a comment admitting it gets this case wrong; we reject it instead.
      */
     @Test
     void annotationArgumentsAreRejectedWithAnActionableError() {

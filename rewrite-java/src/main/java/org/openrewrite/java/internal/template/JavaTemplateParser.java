@@ -373,22 +373,13 @@ public class JavaTemplateParser {
         Class<? extends J> expected;
         Set<String> imports;
 
-        /**
-         * Two templates identical but for their bind type generate different stubs and attribute differently,
-         * so omitting this silently serves the first one's tree to the second.
-         */
+        /** Two templates differing only in bind type generate different stubs and attribute differently. */
         String bindType;
 
         /**
-         * The cache is scoped to a source file, not to a language, and a Kotlin file can legitimately have both
-         * a {@code JavaTemplate} and a {@code KotlinTemplate} applied to it. Their stubs are different source in
-         * different languages, so without this a template of one kind can be served the other's tree — a
-         * {@code JavaTemplate} silently succeeding on text that is not valid Java.
-         * <p>
-         * Carries the builder itself, so parsers of the same language configured with different classpaths are
-         * distinguished too. A defensive clone is stored: the live builder mutates on first
-         * {@code build()} when it folds artifact names into the resolved classpath, which would otherwise
-         * change the hash of a key already in the map.
+         * Discriminates both the stub's language and its classpath, since a Kotlin file may have both a
+         * {@code JavaTemplate} and a {@code KotlinTemplate} applied to it. A defensive clone is stored: the live
+         * builder mutates on first {@code build()}, changing the hash of a key already in the map.
          */
         Parser.Builder parser;
     }

@@ -37,17 +37,10 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 /**
- * Templating against a Kotlin source file has two independent axes, and this test pins every combination of
- * them so no cell is left to assumption:
- * <ul>
- *   <li><b>Snippet language</b> — whether the recipe author reached for {@link JavaTemplate} or
- *       {@link KotlinTemplate}. This decides which parser and which stubs compile the snippet.</li>
- *   <li><b>Visitor type</b> — whether the recipe is written as a {@link JavaIsoVisitor} or a
- *       {@link KotlinVisitor}. This should make no difference at all.</li>
- * </ul>
- * A Java snippet is supported here only so far as the Java parser can represent it and the Kotlin printer can
- * render the result. Making the tree surgery itself follow the target file, so that Kotlin-only shapes work
- * from a Java snippet too, is a separate change.
+ * Pins every combination of two independent axes: the snippet language ({@link JavaTemplate} vs
+ * {@link KotlinTemplate}), which decides the parser and stubs, and the visitor type ({@link JavaIsoVisitor} vs
+ * {@link KotlinVisitor}), which should make no difference. A Java snippet is supported only so far as the Java
+ * parser can represent it and the Kotlin printer can render the result.
  */
 class KotlinTemplateCompatibilityTest implements RewriteTest {
 
@@ -137,10 +130,8 @@ class KotlinTemplateCompatibilityTest implements RewriteTest {
     class KotlinSnippet {
 
         /**
-         * A `when` expression has no Java equivalent, so this can only work through the Kotlin parser. Driven
-         * from a plain JavaVisitor to show the snippet language, not the visitor, is what enables it. Note it
-         * cannot be an iso visitor: the template replaces a `J.MethodInvocation` with a `K.When`, and an iso
-         * visitor is by contract not allowed to change the node type.
+         * A `when` expression has no Java equivalent, so this can only work through the Kotlin parser. It cannot
+         * be an iso visitor, since the template replaces a `J.MethodInvocation` with a `K.When`.
          */
         @Test
         void fromJavaVisitor() {
@@ -216,10 +207,8 @@ class KotlinTemplateCompatibilityTest implements RewriteTest {
     }
 
     /**
-     * The context-free stub cache is scoped to the source file, not to a language, and a Kotlin file can
-     * legitimately have both kinds of template applied to it. Their stubs are different source in different
-     * languages, so the key has to discriminate them — otherwise a JavaTemplate is served the KotlinTemplate's
-     * tree and silently "succeeds" on text that is not valid Java.
+     * The context-free stub cache is scoped to the source file, not to a language, so without a discriminating
+     * key a JavaTemplate is served the KotlinTemplate's tree and "succeeds" on text that is not valid Java.
      */
     @Test
     void javaAndKotlinTemplatesDoNotShareCacheEntries() {
@@ -273,9 +262,8 @@ class KotlinTemplateCompatibilityTest implements RewriteTest {
     }
 
     /**
-     * Two templates of the same language differing only in their parser's classpath attribute differently, so
-     * the cache key carries the parser builder rather than just its type. Without this the second application
-     * receives the first's tree and its types come back unresolved.
+     * Two templates differing only in their parser's classpath attribute differently, so the cache key carries
+     * the parser builder rather than just its type.
      */
     @Test
     void classpathDiscriminatesCachedTemplates() {
