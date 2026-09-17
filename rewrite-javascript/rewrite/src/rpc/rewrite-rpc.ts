@@ -40,7 +40,7 @@ import {
 import {DataTableStore} from "../data-table";
 import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv, setCacheSizeProvider} from "./request/metrics";
-import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
+import {RpcObjectData, RpcObjectState, RpcReceiveQueue, StringInternTable} from "./queue";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
@@ -67,6 +67,11 @@ export class RewriteRpc {
     readonly remoteObjects: Map<string, any> = new Map();
     readonly remoteRefs: Map<number, any> = new Map();
     readonly localRefs: ReferenceMap = new ReferenceMap();
+
+    // One table for the whole connection so repeated discriminators, enum values and whitespace
+    // decoded across the many getObject calls of a run collapse to a single string instance rather
+    // than one per received object.
+    private readonly internedStrings = new StringInternTable();
 
     // Ref high-water per source file, captured before it is first visited so an Evict rolls
     // back exactly the refs it introduced. `send` = localRefs snapshot, `recvMax` = max remoteRefs key.
@@ -158,6 +163,7 @@ export class RewriteRpc {
             this.remoteRefs.clear();
             this.localRefs.clear();
             this.refCheckpoints.clear();
+            this.internedStrings.clear();
             preparedRecipes.clear();
             this.remoteLanguages = undefined;
         };
@@ -262,7 +268,7 @@ export class RewriteRpc {
                 nextPage = requestPage();
             }
             return page;
-        }, this.logger, this.traceGetObject.receive);
+        }, this.logger, this.traceGetObject.receive, this.internedStrings);
 
         let remoteObject: P;
         try {
