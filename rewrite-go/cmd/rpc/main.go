@@ -2606,6 +2606,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		var buildList []golang.GoResolvedDependency
 		var unresolved []string
 		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
+			mrr.ResolutionStatus = golang.GoResolutionGoSumOnly
 			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
 		} else {
 			buildList = resolved
@@ -2614,9 +2615,11 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			// still-used require would look unused. Withhold it and let require-removal
 			// no-op (its gate is len(PackageModules)==0) rather than break the build.
 			if pkgs.Incomplete {
+				mrr.ResolutionStatus = golang.GoResolutionIncomplete
 				unresolved = pkgs.Unresolved
 				s.logger.Printf("ParseProject: incomplete module resolution for %s; withholding package->module map to avoid unsafe require removal (unresolved imports: %v)", moduleDir, pkgs.Unresolved)
 			} else {
+				mrr.ResolutionStatus = golang.GoResolutionResolved
 				mrr.PackageModules = pkgs.Packages
 			}
 		}
@@ -2892,7 +2895,11 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
 			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr, m.goProject)
-			if len(m.unresolved) > 0 {
+			if m.mrr.ResolutionStatus == golang.GoResolutionGoSumOnly {
+				gm.Markers = java.AddMarkupWarn(gm.Markers,
+					"Go module resolution failed, so dependencies were derived from go.sum alone. go.sum records every version ever seen rather than the selected build list, so the dependency set is incomplete and may name older versions. Recipes that depend on the resolved module graph (e.g. go mod tidy) must not be trusted for this module until resolution succeeds.",
+					"")
+			} else if len(m.unresolved) > 0 {
 				gm.Markers = java.AddMarkupWarn(gm.Markers,
 					"Go module resolution was incomplete, so unused-require removal was skipped to avoid dropping a still-used dependency. Re-run once the modules below can be resolved.",
 					"unresolved imports: "+strings.Join(m.unresolved, ", "))

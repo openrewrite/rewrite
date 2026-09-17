@@ -40,8 +40,9 @@ const resolveTimeout = 120 * time.Second
 // go.sum alone cannot provide. It is a pure function of the on-disk module: no
 // marker coupling, no mutation of go.mod/go.sum (readonly + -e).
 //
-// It degrades gracefully: any hard toolchain/network failure returns an error
-// so the caller can keep today's go.sum-only behavior.
+// It degrades gracefully: any hard toolchain/network failure — including a
+// per-module lookup error that `-e` would otherwise mask as success — returns an
+// error so the caller can keep today's go.sum-only behavior.
 func ResolveModuleGraph(moduleDir string) (mods []golang.GoResolvedDependency, pkgs PackageResolution, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -84,6 +85,11 @@ type goModule struct {
 	Indirect  bool
 	GoVersion string
 	Replace   *goModule
+	Error     *goModuleError
+}
+
+type goModuleError struct {
+	Err string
 }
 
 type goPackage struct {
@@ -104,6 +110,7 @@ func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
 		return nil, err
 	}
 	var out []golang.GoResolvedDependency
+	var unresolved []string
 	dec := json.NewDecoder(bytes.NewReader(stdout))
 	for {
 		var m goModule
@@ -114,6 +121,14 @@ func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
 		}
 		if m.Path == "" {
 			continue
+		}
+		// `-e` turns a module lookup failure (unreachable proxy, private module,
+		// GOPROXY=off) into a per-module Error field with a zero exit rather than
+		// a process failure. A build list containing such a module is not the true
+		// MVS selection, so treat it as a hard resolution failure: the caller then
+		// falls back to go.sum-only and marks the result untrustworthy.
+		if m.Error != nil && !m.Main {
+			unresolved = append(unresolved, m.Path)
 		}
 		rd := golang.GoResolvedDependency{
 			ModulePath:      m.Path,
@@ -127,6 +142,10 @@ func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
 			rd.ReplaceVersion = m.Replace.Version
 		}
 		out = append(out, rd)
+	}
+	if len(unresolved) > 0 {
+		return nil, fmt.Errorf("go list -m: %d module(s) unresolved (build list unreliable): %s",
+			len(unresolved), strings.Join(unresolved, ", "))
 	}
 	return out, nil
 }

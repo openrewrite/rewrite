@@ -146,6 +146,7 @@ func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 			{ImportPath: "fmt", Standard: true},
 			{ImportPath: "github.com/google/uuid", ModulePath: "github.com/google/uuid", Version: "v1.6.0"},
 		},
+		ResolutionStatus: golang.GoResolutionResolved,
 	}
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
 
@@ -175,6 +176,30 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 	after := roundTripMarkers(t, before)
 	got := after.Entries[0].(golang.GoResolutionResult)
 	assert.Equalf(t, "example.com/empty", got.ModulePath, "ModulePath: want %q", "example.com/empty")
+}
+
+// TestGoResolutionResultUnsetStatusRoundTrip pins the old-LST case: a marker whose
+// ResolutionStatus is unset (as when deserialized from an LST serialized before the
+// field existed) must round-trip as empty and travel as null on the wire, so the
+// Java receive side never feeds an empty string to Enum.valueOf.
+func TestGoResolutionResultUnsetStatusRoundTrip(t *testing.T) {
+	id := uuid.MustParse("77777777-0000-0000-0000-000000000000")
+	mrr := golang.GoResolutionResult{
+		Ident:      id,
+		ModulePath: "example.com/old-lst",
+		Path:       "go.mod",
+		Requires:   []golang.GoRequire{},
+		Replaces:   []golang.GoReplace{},
+		Excludes:   []golang.GoExclude{},
+		Retracts:   []golang.GoRetract{},
+		// ResolutionStatus intentionally left unset ("").
+	}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
+
+	after := roundTripMarkers(t, before)
+	got := after.Entries[0].(golang.GoResolutionResult)
+	assert.Equalf(t, golang.GoResolutionStatus(""), got.ResolutionStatus,
+		"unset status must stay empty, got %q", got.ResolutionStatus)
 }
 
 // diffRoundTripMarkers serializes `after` as a delta against `before` and
