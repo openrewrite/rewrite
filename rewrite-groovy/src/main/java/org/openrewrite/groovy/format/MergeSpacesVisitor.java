@@ -210,6 +210,25 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
     }
 
     @Override
+    public J visitTupleExpression(G.TupleExpression tuple, @Nullable Object ctx) {
+        if (tuple == ctx || !(ctx instanceof G.TupleExpression)) {
+            return tuple;
+        }
+        G.TupleExpression newTuple = (G.TupleExpression) ctx;
+        G.TupleExpression t = tuple;
+        t = t.withPrefix(visitSpace(t.getPrefix(), GSpace.Location.TUPLE_PREFIX, newTuple.getPrefix()));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), newTuple.getMarkers()));
+        Expression temp = (Expression) visitExpression(t, newTuple);
+        if (!(temp instanceof G.TupleExpression)) {
+            return temp;
+        } else {
+            t = (G.TupleExpression) temp;
+        }
+        t = t.getPadding().withVariables(visitContainer(t.getPadding().getVariables(), GContainer.Location.TUPLE_ELEMENTS, newTuple.getPadding().getVariables()));
+        return t.withType(visitType(t.getType(), newTuple.getType()));
+    }
+
+    @Override
     public @Nullable J visit(@Nullable Tree tree, Object o) {
         if (o instanceof J.Block && !(tree instanceof J.Block)) {
             //Wrapping can introduce blocks

@@ -40,9 +40,15 @@ import {
     autoFormat,
     AutoformatVisitor,
     JavaScriptVisitor,
+    JS,
+    prettierStyle,
     typescript,
     withDetectedStyle
 } from "../../../src/javascript";
+import {J} from "../../../src/java";
+import {ExecutionContext} from "../../../src/execution";
+import {NamedStyles, randomId} from "../../../src";
+import {create as produce, Draft} from "mutative";
 
 
 describe('AutoformatVisitor', () => {
@@ -711,5 +717,47 @@ const x = 1;`
         })
     });
 
+    test('an edited import is laid out the same by the detected style as by Prettier', async () => {
+        const before = `
+            import { type A, type B } from 'm';
+            `;
+        const after = `
+            import type { A, B } from 'm';
+            `;
+
+        const detected = new RecipeSpec();
+        detected.recipe = fromVisitor(new HoistInlineTypeAndFormat());
+        await detected.rewriteRun({...typescript(before, after), beforeRecipe: withDetectedStyle});
+
+        // The file writes what Prettier's defaults would write, so the two agree exactly
+        const prettier = new RecipeSpec();
+        prettier.recipe = fromVisitor(new HoistInlineTypeAndFormat([prettierStyle(randomId(), {singleQuote: true})]));
+        await prettier.rewriteRun(typescript(before, after));
+    });
+
 });
 
+/** The edit `eslint-plugin-import-x`'s `consistent-type-specifier-style` makes, plus a layout pass. */
+class HoistInlineTypeAndFormat extends JavaScriptVisitor<ExecutionContext> {
+    constructor(private readonly styles?: NamedStyles<string>[]) {
+        super();
+    }
+
+    protected override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
+        const edited = await super.visitJsCompilationUnit(cu, ctx) as JS.CompilationUnit;
+        return autoFormat(edited, ctx, undefined, undefined, this.styles);
+    }
+
+    protected override async visitImportDeclaration(jsImport: JS.Import, ctx: ExecutionContext): Promise<J | undefined> {
+        return produce(jsImport, draft => {
+            const clause = draft.importClause;
+            if (clause?.namedBindings?.kind !== JS.Kind.NamedImports) {
+                return;
+            }
+            clause.typeOnly = true;
+            for (const element of (clause.namedBindings as Draft<JS.NamedImports>).elements.elements) {
+                element.element.importType.element = false;
+            }
+        });
+    }
+}

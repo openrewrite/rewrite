@@ -2347,6 +2347,11 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return true;
     }
 
+    /** Whether the receiver has to be walked even where attribution alone settles the call. */
+    protected selectMustBeVisited(_method: J.MethodInvocation): boolean {
+        return false;
+    }
+
     /**
      * Override method invocation comparison to include type attribution checking.
      * When types match semantically, we allow matching even if one has a receiver
@@ -2432,7 +2437,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // When types match (canSkipNameCheck = true), we can skip select comparison entirely.
         // This allows matching forwardRef() vs React.forwardRef() where types indicate same method.
-        if (!canSkipNameCheck) {
+        if (!canSkipNameCheck || this.selectMustBeVisited(method)) {
             // Types didn't provide a match - must compare receivers structurally
             if ((method.select === undefined) !== (otherMethod.select === undefined)) {
                 return this.structuralMismatch('select');

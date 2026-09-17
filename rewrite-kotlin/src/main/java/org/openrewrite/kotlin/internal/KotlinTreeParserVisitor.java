@@ -123,7 +123,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 randomId(),
                 deepPrefix(expression),
                 Markers.EMPTY,
-                padRight(expression.getExpression().accept(this, data), prefix(rPar))
+                padRight(convertToExpression(expression.getExpression().accept(this, data)), prefix(rPar))
         );
     }
 
@@ -552,15 +552,31 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitEscapeStringTemplateEntry(KtEscapeStringTemplateEntry entry, ExecutionContext data) {
+        String unescaped = entry.getUnescapedValue();
         return new J.Literal(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                entry.getText(),
+                hasUnpairedSurrogate(unescaped) ? entry.getText() : unescaped,
                 entry.getText(),
                 null,
                 JavaType.Primitive.String
         ).withPrefix(deepPrefix(entry));
+    }
+
+    /**
+     * A {@link J.Literal} value cannot hold a lone surrogate; see {@link J.Literal.UnicodeEscape}. Escape
+     * sequences that would decode to one keep their source spelling instead.
+     */
+    private static boolean hasUnpairedSurrogate(CharSequence s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (Character.isHighSurrogate(s.charAt(i)) && i + 1 < s.length() && Character.isLowSurrogate(s.charAt(i + 1))) {
+                i++;
+            } else if (Character.isSurrogate(s.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -587,6 +603,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             J.Block body = (J.Block) requireNonNull(ktFunctionLiteral.getBodyExpression()).accept(this, data);
             body = body.withEnd(endFixAndSuffix(ktFunctionLiteral.getBodyExpression()));
+            if (body.getStatements().isEmpty()) {
+                // With no statement to own it, the body's whitespace is still what precedes the closing brace
+                body = body.withEnd(merge(body.getPrefix(), body.getEnd())).withPrefix(Space.EMPTY);
+            }
 
             return new J.Lambda(
                     randomId(),
@@ -3268,23 +3288,29 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         StringBuilder valueSb = new StringBuilder();
-        Arrays.stream(entries).forEach(entry -> valueSb.append(maybeAdjustCRLF(entry))
-        );
+        StringBuilder sourceSb = new StringBuilder();
+        for (KtStringTemplateEntry entry : entries) {
+            String text = maybeAdjustCRLF(entry);
+            sourceSb.append(text);
+            valueSb.append(entry instanceof KtEscapeStringTemplateEntry ?
+                    ((KtEscapeStringTemplateEntry) entry).getUnescapedValue() : text);
+        }
 
-        String valueSource = getString(expression, valueSb);
+        String valueSource = getString(expression, sourceSb);
+        String value = hasUnpairedSurrogate(valueSb) ? sourceSb.toString() : valueSb.toString();
 
         return new J.Literal(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                valueSb.toString(),
+                value,
                 valueSource,
                 null,
                 JavaType.Primitive.String
         ).withPrefix(deepPrefix(expression));
     }
 
-    private static String getString(KtStringTemplateExpression expression, StringBuilder valueSb) {
+    private static String getString(KtStringTemplateExpression expression, StringBuilder sourceSb) {
         PsiElement openQuote;
         String prefix;
         if (expression.getInterpolationPrefix() == null) {
@@ -3302,7 +3328,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             throw new UnsupportedOperationException("This should never happen");
         }
 
-        return prefix + openQuote.getText() + valueSb + closingQuota.getText();
+        return prefix + openQuote.getText() + sourceSb + closingQuota.getText();
     }
 
     @Override

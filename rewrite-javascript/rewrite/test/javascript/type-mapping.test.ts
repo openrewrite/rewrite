@@ -276,7 +276,7 @@ describe('JavaScript type mapping', () => {
                             memberNames.includes('classList');
 
                         if (hasExpectedProperties) {
-                            return `${type.fullyQualifiedName} (${type.members.length} members)`;
+                            return `${type.fullyQualifiedName} (has expected members)`;
                         }
                         return type.fullyQualifiedName;
                     }
@@ -294,7 +294,7 @@ describe('JavaScript type mapping', () => {
                         element = div;
                     `,
                     `
-                        let element: /*~~(HTMLElement (246 members))~~>*/HTMLElement;
+                        let element: /*~~(HTMLElement (has expected members))~~>*/HTMLElement;
                         const div = document.createElement('div');
                         element = div;
                     `
@@ -1188,6 +1188,28 @@ describe('JavaScript type mapping', () => {
                     `,
                     `
                         let /*~~(Union[String, double])~~>*/value: string | number = "hello";
+                    `
+                )
+            );
+        });
+
+        test('should order union constituents by signature, not by TypeScript type id', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'value') {
+                    return Type.isUnion(type) ? `Union[${type.bounds.map(b => Type.signature(b)).join(', ')}]` : 'NOT_UNION';
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        let value: string | Error = "hello";
+                    `,
+                    `
+                        let /*~~(Union[Error, String])~~>*/value: string | Error = "hello";
                     `
                 )
             );

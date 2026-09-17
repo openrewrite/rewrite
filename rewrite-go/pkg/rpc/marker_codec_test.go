@@ -86,6 +86,24 @@ func TestPartialTypeAttributionMarkerRoundTrip(t *testing.T) {
 	assert.Equal(t, reason, got.Reason)
 }
 
+func TestMarkupWarnMarkerRoundTrip(t *testing.T) {
+	// given
+	message := "Go module resolution was incomplete, so unused-require removal was skipped."
+	detail := "unresolved imports: github.com/cof-primary/go-shared-libraries/gotel"
+	before := java.AddMarkupWarn(java.Markers{ID: uuid.New()}, message, detail)
+
+	// when
+	after := roundTripMarkers(t, before)
+
+	// then
+	require.Len(t, after.Entries, 1, "entries")
+	got, ok := after.Entries[0].(java.GenericMarker)
+	require.Truef(t, ok, "entry is %T, want java.GenericMarker", after.Entries[0])
+	assert.Equal(t, "org.openrewrite.marker.Markup$Warn", got.JavaType)
+	assert.Equal(t, message, got.Data["message"])
+	assert.Equal(t, detail, got.Data["detail"])
+}
+
 func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 	id := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	mrr := golang.GoResolutionResult{

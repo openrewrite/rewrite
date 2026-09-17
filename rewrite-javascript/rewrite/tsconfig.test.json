@@ -2,7 +2,6 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "target": "es2016",
-    "baseUrl": ".",
     "types": ["vitest/globals"],
     "paths": {
       "@openrewrite/rewrite": ["./src/index.ts"],

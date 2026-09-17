@@ -95,6 +95,24 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return (J2) service.autoFormatVisitor(stopAfter).visit(j, p, parent);
     }
 
+    public <J2 extends J> J2 autoIndent(J2 j, P p, Cursor parent) {
+        return autoIndent(j, null, p, parent);
+    }
+
+    /**
+     * Re-indent {@code j} for where it now sits, leaving every other aspect of its formatting alone. Statements
+     * moved in from elsewhere in the tree arrive with the indentation of where they came from, which is all that
+     * needs fixing when the surrounding shell was itself parsed from well-formed source.
+     */
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    public <J2 extends J> J2 autoIndent(J2 j, @Nullable J stopAfter, P p, Cursor parent) {
+        JavaSourceFile cu = (j instanceof JavaSourceFile) ?
+                (JavaSourceFile) j :
+                getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+        AutoFormatService service = cu.service(AutoFormatService.class);
+        return (J2) service.tabsAndIndentsVisitor(cu, stopAfter).visit(j, p, parent);
+    }
+
     /**
      * Targeted, low-blast-radius cleanup pass for the result of an LST edit.
      * Runs only the whitespace-normalisation steps of auto-format:

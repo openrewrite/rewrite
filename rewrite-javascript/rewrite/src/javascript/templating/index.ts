@@ -26,6 +26,7 @@ export type {
     TemplateParameter,
     TemplateOptions,
     RewriteRule,
+    TryOnOptions,
     RewriteConfig,
     DebugOptions,
     DebugLogEntry,

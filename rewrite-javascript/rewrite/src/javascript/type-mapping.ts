@@ -19,6 +19,24 @@ import {Type} from "../java";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
 
+/**
+ * TypeScript orders union constituents by internal type id, which varies with what the checker resolved
+ * earlier in the run; ordering by signature keeps a union's signature the same across parses. Intersections
+ * keep the order they were written in and are left alone. Call once `bounds` is attached to its owner, so
+ * a constituent that reaches back into it reads the whole constituent list rather than an empty one.
+ */
+function sortBySignature(bounds: Type[]): void {
+    const keys = new Map<Type, string>(bounds.map(b => [b, Type.signature(b)]));
+    bounds.sort((a, b) => {
+        const ka = keys.get(a)!, kb = keys.get(b)!;
+        return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+}
+
+function typeSignatureToJSON(this: Type): string {
+    return Type.signature(this);
+}
+
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
     // TypeScript assigns stable IDs to all types, so we don't need secondary caches
@@ -112,9 +130,7 @@ export class JavaScriptTypeMapping {
             interfaces: [],
             members: [],
             methods: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Class;
     }
 
@@ -190,9 +206,7 @@ export class JavaScriptTypeMapping {
             interfaces: [],
             members: [],
             methods: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Class;
         this.typeCache.set(cacheKey, classType);
         return classType;
@@ -257,9 +271,7 @@ export class JavaScriptTypeMapping {
                         interfaces: [],
                         members: [],
                         methods: [],
-                        toJSON: function () {
-                            return Type.signature(this);
-                        }
+                        toJSON: typeSignatureToJSON
                     } as Type.Class;
                     this.typeCache.set(aliasSignature, aliasType);
                     return aliasType;
@@ -353,9 +365,7 @@ export class JavaScriptTypeMapping {
                                 type: classType,
                                 typeParameters: [],
                                 fullyQualifiedName: classType.fullyQualifiedName,
-                                toJSON: function () {
-                                    return Type.signature(this);
-                                }
+                                toJSON: typeSignatureToJSON
                             } as Type.Parameterized;
                             this.typeCache.set(signature, parameterized);
 
@@ -618,9 +628,7 @@ export class JavaScriptTypeMapping {
                             interfaces: [],
                             members: [],
                             methods: [],
-                            toJSON: function () {
-                                return Type.signature(this);
-                            }
+                            toJSON: typeSignatureToJSON
                         } as Type.Class;
                     }
                 }
@@ -661,9 +669,7 @@ export class JavaScriptTypeMapping {
                                             interfaces: [],
                                             members: [],
                                             methods: [],
-                                            toJSON: function () {
-                                                return Type.signature(this);
-                                            }
+                                            toJSON: typeSignatureToJSON
                                         } as Type.Class;
                                     }
                                 }
@@ -681,9 +687,7 @@ export class JavaScriptTypeMapping {
             owner: ownerType,
             type: mappedType,
             annotations: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Variable;
 
         return variable;
@@ -809,9 +813,7 @@ export class JavaScriptTypeMapping {
             annotations: [],
             defaultValue: undefined,
             declaredFormalTypeNames: declaredFormalTypeNames,
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Method;
 
         this.methodCache.set(cacheKey, method);
@@ -850,9 +852,7 @@ export class JavaScriptTypeMapping {
                 thrownExceptions: [],
                 annotations: [],
                 declaredFormalTypeNames: [],
-                toJSON: function () {
-                    return Type.signature(this);
-                }
+                toJSON: typeSignatureToJSON
             } as Type.Method;
         }
 
@@ -1406,9 +1406,7 @@ export class JavaScriptTypeMapping {
             interfaces: [],
             members: [],
             methods: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Class;
     }
 
@@ -1531,9 +1529,7 @@ export class JavaScriptTypeMapping {
                     owner: classType,  // Cyclic reference to the containing class (already in cache)
                     type: this.getType(propType), // This will find classType in cache if it's recursive
                     annotations: [],
-                    toJSON: function () {
-                        return Type.signature(this);
-                    }
+                    toJSON: typeSignatureToJSON
                 } as Type.Variable;
                 classType.members.push(variable);
             }
@@ -1610,6 +1606,7 @@ export class JavaScriptTypeMapping {
 
         // Update the bounds in the union we created
         (union as any).bounds = bounds;
+        sortBySignature(bounds);
 
         return union;
     }
@@ -1690,9 +1687,7 @@ export class JavaScriptTypeMapping {
             interfaces: [],
             members: [],
             methods: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Class;
     }
 
@@ -1711,9 +1706,7 @@ export class JavaScriptTypeMapping {
             interfaces: [],
             members: [],
             methods: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Class;
     }
 
@@ -1777,9 +1770,7 @@ export class JavaScriptTypeMapping {
             annotations: [],
             defaultValue: undefined,
             declaredFormalTypeNames: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Method;
 
         // Add the apply method to the function class

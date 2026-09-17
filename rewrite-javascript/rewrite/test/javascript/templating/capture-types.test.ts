@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, JS, pattern, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, JS, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {J, Type} from "../../../src/java";
 
 describe('capture types', () => {
@@ -84,6 +84,29 @@ describe('capture types', () => {
         );
     });
 
+    test('a typed capture in receiver position still binds', () => {
+        // The type is what gives the pattern the target's own `methodType`, which settles the call
+        const router = capture({type: 'Router'});
+        const ctx = {context: ['declare class Router { getCurrentNavigation(): void; currentNavigation(): void; }']};
+        const rule = rewrite(() => ({
+            before: pattern`${router}.getCurrentNavigation()`.configure(ctx),
+            after: template`${router}.currentNavigation()`.configure(ctx)
+        }));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, m, {visitor: this}) ?? m;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                'class Router {\n    getCurrentNavigation() {}\n\n    currentNavigation() {}\n}\n\nnew Router().getCurrentNavigation();',
+                'class Router {\n    getCurrentNavigation() {}\n\n    currentNavigation() {}\n}\n\nnew Router().currentNavigation();'
+            )
+        );
+    });
+
     test('capture without type still works', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
@@ -102,6 +125,25 @@ describe('capture types', () => {
             //language=typescript
             typescript('const a = 5 + 1', 'const a = 5 * 2'),
         );
+    });
+
+    test('a parameter whose type is module-qualified still splices', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return m.name.simpleName === 'use' ?
+                    template`wrap(${m.arguments.elements[0].element})`.apply(m, this.cursor) : m;
+            }
+        });
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                'export class Foo {\n}\n\nconst f = new Foo();\nuse(f);',
+                'export class Foo {\n}\n\nconst f = new Foo();\nwrap(f);'
+            ),
+            // The module path is what qualifies `Foo`, giving the parameter a type no preamble can name
+            path: 'src/a.ts'
+        });
     });
 
     test('type derivation from J element in template', () => {

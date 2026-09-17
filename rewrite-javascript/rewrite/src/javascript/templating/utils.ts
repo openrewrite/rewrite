@@ -107,13 +107,15 @@ export function generateCacheKey(
     templateParts: string[] | TemplateStringsArray,
     itemsKey: string,
     contextStatements: string[],
-    dependencies: Record<string, string>
+    dependencies: Record<string, string>,
+    types?: string[]
 ): string {
     return [
         Array.from(templateParts).join('|'),
         itemsKey,
         contextStatements.join(';'),
-        JSON.stringify(dependencies)
+        JSON.stringify(dependencies),
+        JSON.stringify(types ?? null)
     ].join('::');
 }
 

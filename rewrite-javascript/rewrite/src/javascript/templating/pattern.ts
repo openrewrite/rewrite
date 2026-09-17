@@ -236,7 +236,8 @@ export class Pattern {
             // A capture's type reaches the parse as a declaration, so it shapes the tree the same
             // way an explicit context statement does and belongs in the key alongside one.
             [...contextStatements, ...TemplateEngine.capturePreamble(this.captures)],
-            this._options.dependencies || {}
+            this._options.dependencies || {},
+            this._options.types
         );
 
         // Level 2: Global cache (fast path - shared with Template)
@@ -247,7 +248,8 @@ export class Pattern {
                 this.templateParts,
                 this.captures,
                 contextStatements,
-                this._options.dependencies || {}
+                this._options.dependencies || {},
+                this._options.types
             );
             globalAstCache.set(cacheKey, tree);
         }

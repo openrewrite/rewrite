@@ -61,6 +61,7 @@ type jsonRPCRequest struct {
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params"`
 	Result  json.RawMessage `json:"result"` // present in responses
+	Error   *rpcError       `json:"error"`  // present in error responses
 }
 
 type jsonRPCResponse struct {
@@ -140,6 +141,10 @@ type server struct {
 
 	traceReceive bool
 	traceSend    bool
+
+	// Fixed at startup, unlike traceReceive/traceSend, which TraceGetObject
+	// toggles per session. See tracef.
+	traceCalls bool
 
 	metricsCsv string
 
@@ -234,7 +239,7 @@ func newServer(cfg serverConfig) *server {
 		remoteObjects:           make(map[string]any),
 		localRefs:               rpc.NewReferenceMap(),
 		inProgressGetObjects:    make(map[string]*getObjectTransfer),
-		pendingDependencyTypes:       make(map[string][]rpc.RpcObjectData),
+		pendingDependencyTypes:  make(map[string][]rpc.RpcObjectData),
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		reverseTypePool:         make(map[string]java.JavaType),
@@ -247,6 +252,7 @@ func newServer(cfg serverConfig) *server {
 		batchSize:               1000,
 		traceReceive:            cfg.traceRpcMessages,
 		traceSend:               cfg.traceRpcMessages,
+		traceCalls:              cfg.traceRpcMessages,
 		metricsCsv:              cfg.metricsCsv,
 		reader:                  bufio.NewReader(os.Stdin),
 		writer:                  os.Stdout,
@@ -272,6 +278,15 @@ func newServer(cfg serverConfig) *server {
 	}
 
 	return s
+}
+
+// tracef logs detail that recurs once per RPC call or per resolved item, so it
+// is written only under --trace-rpc-messages. Lifecycle and error lines use
+// s.logger directly.
+func (s *server) tracef(format string, v ...any) {
+	if s.traceCalls {
+		s.logger.Printf(format, v...)
+	}
 }
 
 func (s *server) closeMetrics() {
@@ -330,7 +345,7 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 func parseFlags() serverConfig {
 	var cfg serverConfig
 	flag.StringVar(&cfg.logFile, "log-file", "", "path to write server log; empty = OS temp file")
-	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every GetObject batch send/receive")
+	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every RPC call and every GetObject batch send/receive")
 	flag.StringVar(&cfg.metricsCsv, "metrics-csv", "", "path to write per-RPC metrics as CSV")
 	flag.StringVar(&cfg.recipeInstallDir, "recipe-install-dir", "", "directory used as the recipe installer workspace; if empty, a temporary directory is created and cleaned up on shutdown")
 	flag.Parse()
@@ -434,8 +449,26 @@ func (s *server) writeMessage(resp *jsonRPCResponse) error {
 	if err != nil {
 		return err
 	}
-	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
-	_, err = s.writer.Write(append([]byte(header), body...))
+	return s.writeFramed(body)
+}
+
+// Frame buffers are pooled rather than held on the server: a framed write is
+// reachable from the request loop and from a transfer goroutine, so a shared
+// scratch buffer would race.
+var framePool = sync.Pool{New: func() any { b := make([]byte, 0, 1<<16); return &b }}
+
+// Writes one Content-Length framed message in a single Write. The frame is
+// assembled in a pooled buffer, so the payload is not copied into a freshly
+// allocated one, and the header does not cost a second write.
+func (s *server) writeFramed(body []byte) error {
+	bp := framePool.Get().(*[]byte)
+	b := append((*bp)[:0], "Content-Length: "...)
+	b = strconv.AppendInt(b, int64(len(body)), 10)
+	b = append(b, '\r', '\n', '\r', '\n')
+	b = append(b, body...)
+	_, err := s.writer.Write(b)
+	*bp = b
+	framePool.Put(bp)
 	return err
 }
 
@@ -468,7 +501,7 @@ func (s *server) safeHandleRequest(req *jsonRPCRequest) (resp *jsonRPCResponse) 
 
 // handleRequest dispatches to the appropriate handler.
 func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
-	s.logger.Printf("Handling: %s", req.Method)
+	s.tracef("Handling: %s", req.Method)
 
 	var result any
 	var rpcErr *rpcError
@@ -1057,7 +1090,7 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 
 	strIntern := make(map[string]string)
 
-	fetchBatch := func() []rpc.RpcObjectData {
+	requestPage := func() error {
 		reqParams := getObjectRequest{ID: id, SourceFileType: sourceFileType}
 		paramsJSON, _ := json.Marshal(reqParams)
 		rpcReq := map[string]any{
@@ -1067,13 +1100,58 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			"params":  json.RawMessage(paramsJSON),
 		}
 		body, _ := json.Marshal(rpcReq)
-		header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
-		s.writer.Write(append([]byte(header), body...))
+		return s.writeFramed(body)
+	}
 
+	// The request for the next page goes out before the current one is handed back,
+	// so Java serializes it while Go is still deserializing what it already has.
+	// At most one request is outstanding, and drainPage below consumes it before
+	// this call returns -- an unread response would otherwise be read as the reply
+	// to whatever request comes next.
+	outstanding := false
+	drainPage := func() {
+		if !outstanding {
+			return
+		}
+		outstanding = false
+		// A message carrying a method is a request Java initiated, which Go cannot
+		// answer from here; it is read past so the page behind it still arrives.
+		for {
+			msg, err := s.readMessage()
+			if err != nil {
+				s.logger.Printf("Error draining prefetched page: %v", err)
+				return
+			}
+			if msg.Method == "" {
+				return
+			}
+			s.logger.Printf("Expected the prefetched GetObject page, got a %s request", msg.Method)
+		}
+	}
+
+	fetchBatch := func() []rpc.RpcObjectData {
+		if !outstanding {
+			if err := requestPage(); err != nil {
+				s.logger.Printf("Error requesting object page: %v", err)
+				return nil
+			}
+		}
+		outstanding = false
+
+		// A reply that cannot be turned into a batch panics: the receive queue indexes
+		// whatever this returns, so an empty batch would surface as "index out of range"
+		// naming nothing. The recover in the caller turns a panic into one clear error.
 		resp, err := s.readMessage()
 		if err != nil {
-			s.logger.Printf("Error reading bidirectional response: %v", err)
-			return nil
+			panic(fmt.Errorf("GetObject %s: reading the reply failed: %w", id, err))
+		}
+
+		if resp.Error != nil {
+			if resp.Error.Data != "" {
+				// The peer's own frames go to the log; the message travels back to it.
+				s.logger.Printf("GetObject %s failed on the peer:\n%s", id, resp.Error.Data)
+			}
+			panic(fmt.Errorf("GetObject %s failed on the peer: %s", id, resp.Error.Message))
 		}
 
 		resultData := resp.Result
@@ -1081,14 +1159,21 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			resultData = resp.Params
 		}
 		if resultData == nil {
-			s.logger.Printf("No result data in bidirectional response")
-			return nil
+			panic(fmt.Errorf("GetObject %s: reply carried no result", id))
 		}
 
 		batch, err := rpc.DecodeBatch(resultData, strIntern)
 		if err != nil {
-			s.logger.Printf("Error parsing response result: %v", err)
-			return nil
+			panic(fmt.Errorf("GetObject %s: decoding the reply failed: %w", id, err))
+		}
+		// END_OF_OBJECT closes the transfer, so a page carrying it has no successor
+		// to ask for; asking anyway would restart the transfer on the Java side.
+		if len(batch) > 0 && batch[len(batch)-1].State != rpc.EndOfObject {
+			if err = requestPage(); err != nil {
+				s.logger.Printf("Error requesting next object page: %v", err)
+			} else {
+				outstanding = true
+			}
 		}
 		return batch
 	}
@@ -1099,6 +1184,8 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 
 	var obj any
 	func() {
+		// Registered first so it runs last, after the recover below re-panics.
+		defer drainPage()
 		// A panic mid-receive leaves Go's per-id baseline diverged from Java's:
 		// Java records remoteObjects[id] when it generates the diff, so its next
 		// send would be a CHANGE delta against a baseline Go never finished
@@ -1132,9 +1219,12 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 			return v
 		})
 
-		// Consume the END_OF_OBJECT sentinel if present
-		if len(q.PeekBatch()) > 0 && q.PeekBatch()[0].State == rpc.EndOfObject {
-			q.Take()
+		// Taking the marker pulls the page still in flight — there is one whenever the
+		// last page did not end in END_OF_OBJECT — so a failure the peer reported on it
+		// reaches the recover above. Java's RewriteRpc.getObject and JS's rewrite-rpc.ts
+		// take the marker inside their failure scope for the same reason.
+		if msg := q.Take(); msg.State != rpc.EndOfObject {
+			panic(fmt.Errorf("GetObject %s: expected END_OF_OBJECT, got %v", id, msg.State))
 		}
 	}()
 
@@ -2481,6 +2571,9 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		// versions of the same module, only one of which is on disk.
 		buildList []golang.GoResolvedDependency
 		goProject golang.GoProject // lightweight per-CU marker; one shared instance per module
+		// unresolved lists imports that resolved to no module; when non-empty the
+		// package->module map was withheld and a warning is attached to the go.mod.
+		unresolved []string
 	}
 	mods := make(map[string]*modCtx, len(disc.goMods))
 	for _, modPath := range disc.goMods {
@@ -2511,18 +2604,28 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		// the go.sum-only result (never fail the parse).
 		moduleDir := filepath.Dir(modPath)
 		var buildList []golang.GoResolvedDependency
+		var unresolved []string
 		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
 			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
 		} else {
 			buildList = resolved
 			mrr.ResolvedDependencies = goparser.MergeResolvedDependencies(mrr.ResolvedDependencies, resolved)
-			mrr.PackageModules = pkgs
+			// A partial package->module map omits the modules that failed to resolve, so a
+			// still-used require would look unused. Withhold it and let require-removal
+			// no-op (its gate is len(PackageModules)==0) rather than break the build.
+			if pkgs.Incomplete {
+				unresolved = pkgs.Unresolved
+				s.logger.Printf("ParseProject: incomplete module resolution for %s; withholding package->module map to avoid unsafe require removal (unresolved imports: %v)", moduleDir, pkgs.Unresolved)
+			} else {
+				mrr.PackageModules = pkgs.Packages
+			}
 		}
 		mods[filepath.Dir(modPath)] = &modCtx{
-			dir:       filepath.Dir(modPath),
-			mrr:       mrr,
-			buildList: buildList,
-			goProject: golang.NewGoProject(mrr.ModulePath, mrr.ModulePath),
+			dir:        filepath.Dir(modPath),
+			mrr:        mrr,
+			buildList:  buildList,
+			goProject:  golang.NewGoProject(mrr.ModulePath, mrr.ModulePath),
+			unresolved: unresolved,
 		}
 	}
 
@@ -2789,6 +2892,11 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
 			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr, m.goProject)
+			if len(m.unresolved) > 0 {
+				gm.Markers = java.AddMarkupWarn(gm.Markers,
+					"Go module resolution was incomplete, so unused-require removal was skipped to avoid dropping a still-used dependency. Re-run once the modules below can be resolved.",
+					"unresolved imports: "+strings.Join(m.unresolved, ", "))
+			}
 		}
 		id := gm.Ident.String()
 		s.localObjects[id] = gm
@@ -2900,7 +3008,7 @@ func (s *server) handleDependencyTypes(params json.RawMessage) (any, *rpcError) 
 		if err != nil {
 			return nil, &rpcError{Code: -32603, Message: err.Error()}
 		}
-		s.logger.Printf("DependencyTypes: %s %s -> %s", req.ModulePath, req.Version, dir)
+		s.tracef("DependencyTypes: %s %s -> %s", req.ModulePath, req.Version, dir)
 		types := goparser.ExportedTypes([]string{dir}, nil)
 
 		q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
@@ -2919,7 +3027,7 @@ func (s *server) handleDependencyTypes(params json.RawMessage) (any, *rpcError) 
 			func(v any) { sender.Visit(v.(java.JavaType), q) })
 		q.Put(rpc.RpcObjectData{State: rpc.EndOfObject})
 		q.Flush()
-		s.logger.Printf("DependencyTypes: %d types, %d items", len(types), len(data))
+		s.tracef("DependencyTypes: %d types, %d items", len(types), len(data))
 	}
 
 	n := s.batchSize

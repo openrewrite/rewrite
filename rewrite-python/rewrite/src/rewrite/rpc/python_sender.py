@@ -15,7 +15,7 @@ from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
     StatementExpression, MultiImport, KeyValue, DictLiteral, CollectionLiteral,
-    FormattedString, Pass, TrailingElseWrapper, ComprehensionExpression,
+    FormattedString, Pass, Shebang, TrailingElseWrapper, ComprehensionExpression,
     TypeAlias, YieldFrom, UnionType, VariableScope, Del, SpecialParameter,
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
@@ -115,6 +115,8 @@ class PythonRpcSender:
             self._visit_formatted_string(tree, q)
         elif isinstance(tree, Pass):
             self._visit_pass(tree, q)
+        elif isinstance(tree, Shebang):
+            self._visit_shebang(tree, q)
         elif isinstance(tree, TrailingElseWrapper):
             self._visit_trailing_else_wrapper(tree, q)
         elif isinstance(tree, ComprehensionExpression.Condition):
@@ -269,6 +271,9 @@ class PythonRpcSender:
     def _visit_pass(self, pass_: Pass, q: 'RpcSendQueue') -> None:
         # No additional fields beyond id/prefix/markers
         pass
+
+    def _visit_shebang(self, shebang: Shebang, q: 'RpcSendQueue') -> None:
+        q.get_and_send(shebang, lambda x: x.text)
 
     def _visit_trailing_else_wrapper(self, tew: TrailingElseWrapper, q: 'RpcSendQueue') -> None:
         q.get_and_send(tew, lambda x: x.statement, lambda el: self._visit(el, q))

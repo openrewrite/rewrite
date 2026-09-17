@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
+
+using OpenRewrite.Core;
 
 namespace OpenRewrite.Core.Rpc;
 
@@ -28,6 +31,21 @@ namespace OpenRewrite.Core.Rpc;
 /// </summary>
 public class RpcReceiveQueue
 {
+    /// <summary>
+    /// Memoizes <see cref="FromJavaTypeName"/>, which scans every loaded assembly for a name a
+    /// receive resolves once per tree node. A plugin assembly can make a name that resolved to
+    /// null resolve, so an entry records the generation it was resolved in and an assembly load
+    /// makes every entry from an earlier generation a miss.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, (int Generation, Type? Type)> TypeByJavaName = new();
+
+    private static int _assemblyGeneration;
+
+    static RpcReceiveQueue()
+    {
+        AppDomain.CurrentDomain.AssemblyLoad += (_, _) => Interlocked.Increment(ref _assemblyGeneration);
+    }
+
     private readonly Queue<RpcObjectData> _batch = new();
     private readonly IDictionary<int, object> _refs;
     private readonly Func<List<RpcObjectData>>? _pull;
@@ -51,6 +69,10 @@ public class RpcReceiveQueue
         _sourceFileType = sourceFileType;
         _treeCodec = treeCodec;
     }
+
+    /// <summary>Messages already pulled and not yet taken, which a caller can drain without asking
+    /// the remote for another page.</summary>
+    internal int Buffered => _batch.Count;
 
     public RpcObjectData Take()
     {
@@ -314,7 +336,7 @@ public class RpcReceiveQueue
             else if (typeof(Marker).IsAssignableFrom(typeof(T)))
             {
                 // Unknown marker type from Java — use UnknownMarker as fallback
-                return (T)(object)new UnknownMarker(Guid.NewGuid());
+                return (T)(object)new UnknownMarker(Tree.RandomId());
             }
             else
             {
@@ -346,7 +368,7 @@ public class RpcReceiveQueue
         if (type.IsInterface || type.IsAbstract)
         {
             if (typeof(Marker).IsAssignableFrom(type))
-                return (T)(object)new UnknownMarker(Guid.NewGuid());
+                return (T)(object)new UnknownMarker(Tree.RandomId());
             throw new InvalidOperationException(
                 $"Cannot instantiate interface/abstract type: {type.FullName} (from {javaTypeName})");
         }
@@ -415,10 +437,10 @@ public class RpcReceiveQueue
             {
                 var id = je.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String
                     ? Guid.Parse(idProp.GetString()!)
-                    : Guid.NewGuid();
+                    : Tree.RandomId();
                 return (T)(object)new UnknownMarker(id);
             }
-            return (T)(object)new UnknownMarker(Guid.NewGuid());
+            return (T)(object)new UnknownMarker(Tree.RandomId());
         }
 
         if (value is JsonElement jeNormal)
@@ -438,7 +460,20 @@ public class RpcReceiveQueue
     /// <summary>
     /// Maps a Java type name to its C# Type. Reverse of RpcSendQueue.ToJavaTypeName.
     /// </summary>
-    private static Type? FromJavaTypeName(string javaTypeName)
+    internal static Type? FromJavaTypeName(string javaTypeName)
+    {
+        var generation = Volatile.Read(ref _assemblyGeneration);
+        if (TypeByJavaName.TryGetValue(javaTypeName, out var cached) && cached.Generation == generation)
+            return cached.Type;
+
+        // Stamped with the generation read before resolving, so a store that lands after a load
+        // carries the earlier generation and is rejected rather than surviving as a stale miss.
+        var resolved = ResolveJavaTypeName(javaTypeName);
+        TypeByJavaName[javaTypeName] = (generation, resolved);
+        return resolved;
+    }
+
+    private static Type? ResolveJavaTypeName(string javaTypeName)
     {
         // Known direct mappings
         return javaTypeName switch

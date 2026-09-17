@@ -26,10 +26,11 @@ import (
 )
 
 // WhitespaceValidationService walks a tree and reports any Space whose
-// Whitespace or Comment.Suffix contains non-whitespace characters, or
-// any Comment.Text that doesn't begin with `//` or `/*`. Such content
-// indicates a parser bug — the printer would otherwise re-emit
-// non-whitespace as if it were spacing, silently corrupting the source.
+// Whitespace or Comment.Suffix contains non-whitespace characters, a line
+// Comment.Text spanning a newline, or a block Comment.Text containing `*/`.
+// Comment.Text is delimiter-free (like Java's TextComment); a newline in a
+// line comment or a premature `*/` in a block comment indicates a parser bug —
+// the printer would re-emit corrupted source.
 //
 // Recipes get one via recipe.Service:
 //
@@ -131,8 +132,11 @@ func (w *spaceWalker) checkSpace(s java.Space, path string) {
 		if c.Suffix != "" && !isWhitespaceOnly(c.Suffix) {
 			w.errs = append(w.errs, fmt.Sprintf("%s: Comment[%d].Suffix contains non-whitespace: %q", path, i, truncateForError(c.Suffix, 80)))
 		}
-		if c.Text != "" && !strings.HasPrefix(c.Text, "//") && !strings.HasPrefix(c.Text, "/*") {
-			w.errs = append(w.errs, fmt.Sprintf("%s: Comment[%d].Text is not a comment: %q", path, i, truncateForError(c.Text, 80)))
+		if !c.Multiline && strings.ContainsAny(c.Text, "\n\r") {
+			w.errs = append(w.errs, fmt.Sprintf("%s: Comment[%d].Text (line comment) spans a newline: %q", path, i, truncateForError(c.Text, 80)))
+		}
+		if c.Multiline && strings.Contains(c.Text, "*/") {
+			w.errs = append(w.errs, fmt.Sprintf("%s: Comment[%d].Text (block comment) contains %q: %q", path, i, "*/", truncateForError(c.Text, 80)))
 		}
 	}
 }
