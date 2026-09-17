@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,6 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // TestParseProjectResolvesModuleGraph pins the parse-time resolution wiring:
@@ -116,6 +118,75 @@ func TestParseProjectResolvesTestOnlyDependency(t *testing.T) {
 		}
 	}
 	assert.Truef(t, sawTestDep, "expected test-only dependency example.com/bar in PackageModules: %+v", mrr.PackageModules)
+}
+
+// TestParseProjectDegradesToGoSumOnlyWhenModuleUnresolvable pins Defect 2 from
+// moderneinc/customer-requests#3150: when the toolchain cannot resolve the build
+// list (here forced with GOPROXY=off, mimicking a worker behind an unreachable
+// proxy), the parser must fall back to go.sum but say so — set ResolutionStatus
+// to GO_SUM_ONLY and attach a warning — rather than silently emitting a partial,
+// stale dependency set that looks like a successful resolution.
+func TestParseProjectDegradesToGoSumOnlyWhenModuleUnresolvable(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not on PATH")
+	}
+	// given: every module fetch fails (no network, no cache entry for this module)
+	t.Setenv("GOPROXY", "off")
+	s, _ := newTestServer(t)
+	projectDir := t.TempDir()
+	writeFile(t, filepath.Join(projectDir, "go.mod"),
+		"module example.com/foo\n\ngo 1.21\n\nrequire example.com/does/not/exist/xyz v1.2.3\n")
+	writeFile(t, filepath.Join(projectDir, "main.go"), "package main\n\nfunc main() {}\n")
+	writeFile(t, filepath.Join(projectDir, "go.sum"),
+		"example.com/does/not/exist/xyz v1.2.3 h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n"+
+			"example.com/does/not/exist/xyz v1.2.3/go.mod h1:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=\n")
+
+	relativeTo := projectDir
+	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
+	require.NoError(t, err, "marshal params")
+
+	// when
+	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
+		t.Fatalf("handleParseProject: %v", rpcErr.Message)
+	}
+
+	// then: the marker reports the degradation instead of a false-clean resolution
+	mrr := findGoResolutionResult(t, s)
+	assert.Equalf(t, golang.GoResolutionGoSumOnly, mrr.ResolutionStatus,
+		"expected go.sum-only fallback, got %q", mrr.ResolutionStatus)
+	// go.sum still supplies the dependency (with its hashes), but this is the
+	// go.sum-recorded set, not the toolchain-selected build list
+	require.NotNilf(t, mrr.FindResolved("example.com/does/not/exist/xyz"),
+		"go.sum-derived dependency missing: %+v", mrr.ResolvedDependencies)
+
+	// and the degradation is visible as a warning, not just a server log line
+	gm := findGoMod(t, s)
+	assert.Truef(t, hasGoSumOnlyWarning(gm),
+		"expected a Markup.Warn about go.sum-only resolution: %+v", gm.Markers.Entries)
+}
+
+func findGoMod(t *testing.T, s *server) *golang.GoMod {
+	t.Helper()
+	for _, obj := range s.localObjects {
+		if gm, ok := obj.(*golang.GoMod); ok {
+			return gm
+		}
+	}
+	t.Fatal("no GoMod produced")
+	return nil
+}
+
+func hasGoSumOnlyWarning(gm *golang.GoMod) bool {
+	for _, m := range gm.Markers.Entries {
+		gmk, ok := m.(java.GenericMarker)
+		if !ok || gmk.JavaType != "org.openrewrite.marker.Markup$Warn" {
+			continue
+		}
+		if msg, ok := gmk.Data["message"].(string); ok && strings.Contains(msg, "go.sum alone") {
+			return true
+		}
+	}
+	return false
 }
 
 func findGoResolutionResult(t *testing.T, s *server) golang.GoResolutionResult {

@@ -113,6 +113,35 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
      */
     List<PackageModule> packageModules;
 
+    /**
+     * How much of the module graph the parser resolved. Any value other than
+     * {@link ResolutionStatus#RESOLVED} means {@link #resolvedDependencies} was not
+     * produced from the toolchain's build list and must not be trusted by recipes
+     * that depend on the resolved module graph. Null when read from an LST
+     * serialized before this field existed; recipes must treat null as not-RESOLVED.
+     */
+    @Nullable ResolutionStatus resolutionStatus;
+
+    /**
+     * Whether the resolved build list is trustworthy.
+     */
+    public enum ResolutionStatus {
+        /** The toolchain produced the MVS build list and a complete package-&gt;module map. */
+        RESOLVED,
+        /**
+         * The build list resolved, but the package-&gt;module map was incomplete (some imports
+         * resolved to no module) and was withheld, so unused-require removal is unsafe.
+         */
+        INCOMPLETE,
+        /**
+         * The toolchain build list could not be obtained (network/proxy/toolchain failure), so
+         * {@link #resolvedDependencies} was derived from go.sum alone. go.sum records every version
+         * ever seen rather than the MVS selection, so the set is incomplete and may name older
+         * versions; graph-dependent recipes must not be trusted for this module.
+         */
+        GO_SUM_ONLY
+    }
+
     public @Nullable Require findRequire(String module) {
         for (Require r : requires) {
             if (r.getModulePath().equals(module)) {
@@ -165,6 +194,7 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
         q.getAndSendListAsRef(after, r -> r.getPackageModules() != null ? r.getPackageModules() : emptyList(),
                 PackageModule::getImportPath,
                 pm -> pm.rpcSend(pm, q));
+        q.getAndSend(after, r -> r.getResolutionStatus() == null ? null : r.getResolutionStatus().name());
     }
 
     @Override
@@ -180,7 +210,9 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                 .withExcludes(q.receiveList(before.excludes, r -> r.rpcReceive(r, q)))
                 .withRetracts(q.receiveList(before.retracts, r -> r.rpcReceive(r, q)))
                 .withResolvedDependencies(q.receiveList(before.resolvedDependencies, r -> r.rpcReceive(r, q)))
-                .withPackageModules(q.receiveList(before.packageModules, pm -> pm.rpcReceive(pm, q)));
+                .withPackageModules(q.receiveList(before.packageModules, pm -> pm.rpcReceive(pm, q)))
+                .withResolutionStatus(q.receiveAndGet(before.resolutionStatus,
+                        (String s) -> s == null || s.isEmpty() ? null : ResolutionStatus.valueOf(s)));
     }
 
     /**
