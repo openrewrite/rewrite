@@ -1,5 +1,5 @@
 import {Json} from "../../src/json";
-import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue, RpcObjectState} from "../../src/rpc";
+import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue, RpcObjectState, StringInternTable} from "../../src/rpc";
 import type {RpcObjectData} from "../../src/rpc";
 import {JavaScriptParser, JS, sourceFileCache} from "../../src/javascript";
 import {TreePrinters} from "../../src/print";
@@ -176,6 +176,34 @@ describe("RPC queues", () => {
 
         // then
         expect(await TreePrinters.print(received)).toBe(source);
+    });
+
+    test("intern table always interns discriminators but bounds scalar values", () => {
+        // given
+        const maxEntries = 3;
+        const maxValueLength = 5;
+        const table = new StringInternTable(maxEntries, maxValueLength);
+
+        // when / then: a value longer than the limit is returned uninterned and never stored
+        const long = "x".repeat(maxValueLength + 1);
+        expect(table.internValue(long)).toBe(long);
+        expect(table.size).toBe(0);
+
+        // and: short values are interned up to the cap, then returned uninterned
+        table.internValue("aa");
+        table.internValue("bb");
+        table.internValue("cc");
+        expect(table.size).toBe(maxEntries);
+        expect(table.internValue("dd")).toBe("dd");
+        expect(table.size).toBe(maxEntries);
+
+        // and: discriminators are interned even past the value cap, since their set is bounded
+        table.internType("org.openrewrite.java.tree.J$Identifier");
+        expect(table.size).toBe(maxEntries + 1);
+
+        // and: clear empties the table
+        table.clear();
+        expect(table.size).toBe(0);
     });
 
     test("detects missing codec on receiver side", async () => {

@@ -316,18 +316,71 @@ export class RpcSendQueue {
     }
 }
 
+/**
+ * Collapses repeated strings decoded from RPC messages to a single instance. Shared across every
+ * {@link RpcReceiveQueue} of a connection so the same discriminators, enum values and whitespace
+ * are deduplicated across the whole run rather than only within one received object.
+ */
+export class StringInternTable {
+    private readonly strings = new Map<string, string>();
+
+    constructor(private readonly maxEntries = 1 << 16,
+                private readonly maxValueLength = 200) {
+    }
+
+    /**
+     * Interns a `kind`/`valueType` discriminator. This set is bounded by the number of LST node
+     * types, so it is always interned and never subject to the cap.
+     */
+    internType(value: string): string {
+        const existing = this.strings.get(value);
+        if (existing !== undefined) {
+            return existing;
+        }
+        this.strings.set(value, value);
+        return value;
+    }
+
+    /**
+     * Interns a scalar string value, which is unbounded in principle. Only short strings are
+     * interned (whitespace and short tokens dominate the duplication), and the table stops growing
+     * at a cap so it can never turn into a leak; past either limit the original is returned as-is.
+     */
+    internValue(value: string): string {
+        if (value.length > this.maxValueLength) {
+            return value;
+        }
+        const existing = this.strings.get(value);
+        if (existing !== undefined) {
+            return existing;
+        }
+        if (this.strings.size >= this.maxEntries) {
+            return value;
+        }
+        this.strings.set(value, value);
+        return value;
+    }
+
+    clear(): void {
+        this.strings.clear();
+    }
+
+    get size(): number {
+        return this.strings.size;
+    }
+}
+
 export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
     private batchIndex = 0;
     private sinceYield = 0;
 
-    private readonly internedStrings = new Map<string, string>();
-
     constructor(private readonly refs: Map<number, any>,
                 private readonly sourceFileType: string | undefined,
                 private readonly pull: () => Promise<RpcObjectData[]>,
                 private readonly logger: rpc.Logger | undefined,
-                private readonly trace: boolean) {
+                private readonly trace: boolean,
+                private readonly internedStrings: StringInternTable = new StringInternTable()) {
     }
 
     /**
@@ -435,8 +488,8 @@ export class RpcReceiveQueue {
                     after = await codec.rpcReceive(before, this);
                 } else if (message.value !== undefined) {
                     after = message.valueType ?
-                        {kind: this.intern(message.valueType), ...message.value} :
-                        typeof message.value === "string" ? this.intern(message.value) : message.value;
+                        {kind: this.internedStrings.internType(message.valueType), ...message.value} :
+                        typeof message.value === "string" ? this.internedStrings.internValue(message.value) : message.value;
                 } else if (message.state === RpcObjectState.ADD && message.valueType) {
                     throw new Error(
                         `No RPC codec registered on the TypeScript side for '${message.valueType}'. ` +
@@ -519,16 +572,7 @@ export class RpcReceiveQueue {
         if (codec?.rpcNew) {
             return codec.rpcNew();
         }
-        return {kind: this.intern(type)} as T;
-    }
-
-    private intern(value: string): string {
-        const existing = this.internedStrings.get(value);
-        if (existing !== undefined) {
-            return existing;
-        }
-        this.internedStrings.set(value, value);
-        return value;
+        return {kind: this.internedStrings.internType(type)} as T;
     }
 }
 
