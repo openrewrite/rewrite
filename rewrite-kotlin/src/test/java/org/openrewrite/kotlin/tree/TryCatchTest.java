@@ -84,4 +84,20 @@ class TryCatchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingCommaAfterCatchParameter() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f() {
+                  try {
+                      println()
+                  } catch (e: Exception,) {
+                  }
+              }
+              """
+          )
+        );
+    }
 }
