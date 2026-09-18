@@ -133,4 +133,20 @@ class ForLoopTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void singleComponentDestructuring() {
+        rewriteRun(
+          kotlin(
+            """
+              data class Box(val value: String)
+              fun g(boxes: List<Box>) {
+                  for ((value) in boxes) {
+                      println(value)
+                  }
+              }
+              """
+          )
+        );
+    }
 }

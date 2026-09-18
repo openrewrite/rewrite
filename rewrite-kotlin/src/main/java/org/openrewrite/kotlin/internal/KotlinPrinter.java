@@ -24,6 +24,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Quoted;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.*;
@@ -569,6 +570,26 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             } else {
                 return super.visit(tree, p);
             }
+        }
+
+        @Override
+        public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, PrintOutputCapture<P> p) {
+            JRightPadded<T> tree = controlParens.getPadding().getTree();
+            Optional<TrailingComma> trailingComma = tree.getMarkers().findFirst(TrailingComma.class);
+            if (!trailingComma.isPresent()) {
+                return super.visitControlParentheses(controlParens, p);
+            }
+            // The inherited printer emits right-padded markers ahead of the element, which would put a
+            // catch parameter's trailing comma before the parameter it follows.
+            beforeSyntax(controlParens, Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+            p.append('(');
+            visit(tree.getElement(), p);
+            visitSpace(tree.getAfter(), Space.Location.PARENTHESES_SUFFIX, p);
+            p.append(',');
+            visitSpace(trailingComma.get().getSuffix(), Space.Location.TRAILING_COMMA_SUFFIX, p);
+            p.append(')');
+            afterSyntax(controlParens, p);
+            return controlParens;
         }
 
         @Override
@@ -1276,11 +1297,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(Extension.class).isPresent();
             List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
+            // LSTs carrying no marker are still deserialized, where more than one name means a destructuring pattern.
+            boolean destructured = !containsTypeReceiver &&
+                                   (variables.size() > 1 || multiVariable.getMarkers().findFirst(Destructured.class).isPresent());
             // V1: Covers and unique case in `mapForLoop` of the KotlinParserVisitor caused by how the FirElement represents for loops.
             for (int i = 0; i < variables.size(); i++) {
                 JRightPadded<J.VariableDeclarations.NamedVariable> variable = variables.get(i);
                 beforeSyntax(variable.getElement(), Space.Location.VARIABLE_PREFIX, p);
-                if (variables.size() > 1 && !containsTypeReceiver && i == 0) {
+                if (destructured && i == 0) {
                     p.append("(");
                 }
 
@@ -1307,7 +1331,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
                 if (i < variables.size() - 1) {
                     p.append(",");
-                } else if (variables.size() > 1 && !containsTypeReceiver) {
+                } else if (destructured) {
                     p.append(")");
                 }
 
