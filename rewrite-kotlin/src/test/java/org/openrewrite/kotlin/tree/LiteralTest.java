@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -182,6 +183,20 @@ class LiteralTest implements RewriteTest {
               K.StringTemplate template = (K.StringTemplate) vd.getVariables().getFirst().getInitializer();
               assertThat(((J.Literal) template.getStrings().getFirst()).getValue()).isEqualTo("\\uD800");
           }))
+        );
+    }
+
+    @Test
+    void integerLiteralArithmeticInUnresolvedCall() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).variableDeclarations(false).build()),
+          kotlin(
+            //language=none
+            """
+              val a = (-13).scaled
+              val b = (10 * 8).scaled
+              """
+          )
         );
     }
 

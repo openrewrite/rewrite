@@ -941,4 +941,19 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void typeArgumentsOnQualifier() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).variableDeclarations(false).build()),
+          kotlin(
+            //language=none
+            """
+              class A {
+                  val h = Holder<Unit>.create(Unit)
+              }
+              """
+          )
+        );
+    }
 }
