@@ -4205,7 +4205,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<KtDestructuringDeclarationEntry> entries = ktDestructuringDeclaration.getEntries();
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(entries.size());
 
-        for (KtDestructuringDeclarationEntry ktDestructuringDeclarationEntry : entries) {
+        for (int i = 0; i < entries.size(); i++) {
+            KtDestructuringDeclarationEntry ktDestructuringDeclarationEntry = entries.get(i);
             J.Identifier name = (J.Identifier) ktDestructuringDeclarationEntry.accept(this, data);
 
             J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
@@ -4217,7 +4218,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     null,
                     variableType(ktDestructuringDeclarationEntry, owner(ktDestructuringDeclarationEntry))
             );
-            variables.add(padRight(namedVariable, suffix(ktDestructuringDeclarationEntry)));
+            variables.add(maybeTrailingComma(ktDestructuringDeclarationEntry,
+                    padRight(namedVariable, suffix(ktDestructuringDeclarationEntry)), i == entries.size() - 1));
         }
 
         return new J.VariableDeclarations(

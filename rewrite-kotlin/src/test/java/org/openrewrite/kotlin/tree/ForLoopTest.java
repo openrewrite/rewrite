@@ -149,4 +149,24 @@ class ForLoopTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void destructuringTrailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              data class Box(val value: String)
+              fun g(boxes: List<Box>, pairs: List<Pair<String, String>>) {
+                  for ((value,) in boxes) {
+                      println(value)
+                  }
+
+                  for ((a, b,) in pairs) {
+                      println(a + b)
+                  }
+              }
+              """
+          )
+        );
+    }
 }

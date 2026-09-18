@@ -581,9 +581,12 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
             // The inherited printer emits right-padded markers ahead of the element, which would put a
             // catch parameter's trailing comma before the parameter it follows.
+            Markers others = tree.getMarkers().removeByType(TrailingComma.class);
             beforeSyntax(controlParens, Space.Location.CONTROL_PARENTHESES_PREFIX, p);
             p.append('(');
+            beforeSyntax(Space.EMPTY, others, null, p);
             visit(tree.getElement(), p);
+            afterSyntax(others, p);
             visitSpace(tree.getAfter(), Space.Location.PARENTHESES_SUFFIX, p);
             p.append(',');
             visitSpace(trailingComma.get().getSuffix(), Space.Location.TRAILING_COMMA_SUFFIX, p);
@@ -1332,6 +1335,10 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 if (i < variables.size() - 1) {
                     p.append(",");
                 } else if (destructured) {
+                    variable.getMarkers().findFirst(TrailingComma.class).ifPresent(t -> {
+                        p.append(",");
+                        visitSpace(t.getSuffix(), Space.Location.TRAILING_COMMA_SUFFIX, p);
+                    });
                     p.append(")");
                 }
 
