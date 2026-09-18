@@ -139,6 +139,10 @@ class KotlinTypeMapping(
                 type(type.lowerBound, signature)
             }
 
+            is ConeIntegerLiteralType -> {
+                type(type.getApproximatedType(), parent, signature)
+            }
+
             is ConeTypeProjection -> {
                 coneTypeProjectionType(type, signature)
             }
