@@ -412,7 +412,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             is FirPropertyAccessExpression -> {
                 // `X<T>.m()` is not valid Kotlin, so FIR resolves the qualifier as a property access; the
                 // type arguments still describe the parameterized type the author wrote.
-                if (psi is KtCallExpression && psi.valueArgumentList == null && psi.typeArgumentList != null)
+                if (psi is KtCallExpression && psi.valueArgumentList == null && psi.lambdaArguments.isEmpty() && psi.typeArgumentList != null)
                     ExpressionType.QUALIFIER
                 else
                     null
