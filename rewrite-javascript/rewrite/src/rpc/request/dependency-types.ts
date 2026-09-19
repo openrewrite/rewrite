@@ -114,12 +114,31 @@ function packageTypes(name: string, exportedTypes: ExportedTypes): Type.FullyQua
     return fs.existsSync(typesDir) ? exportedTypes([typesDir], []) : types;
 }
 
+/** The directories a TypeScript install keeps its `lib.*.d.ts` files in, nearest first. */
+function libDirectories(): string[] {
+    const directories = [
+        path.join(projectNodeModules(), "typescript", "lib"),
+        path.dirname(require.resolve("typescript")),
+    ];
+    // The declaration files ship in the package built for the running platform, alongside the
+    // executable, rather than in the `typescript` package that depends on it.
+    for (const nodeModules of [projectNodeModules(), path.join(path.dirname(require.resolve("typescript")), "..", "..")]) {
+        const scope = path.join(nodeModules, "@typescript");
+        try {
+            for (const entry of fs.readdirSync(scope)) {
+                directories.push(path.join(scope, entry, "lib"));
+            }
+        } catch {
+            // No platform packages here.
+        }
+    }
+    return directories;
+}
+
 /** A runtime declaration file (e.g. lib.dom.d.ts): the project's installed TypeScript first, else the engine's own. */
 function runtimeLibFile(name: string): string {
-    for (const lib of [
-        path.join(projectNodeModules(), "typescript", "lib", `${name}.d.ts`),
-        path.join(path.dirname(require.resolve("typescript")), `${name}.d.ts`),
-    ]) {
+    for (const directory of libDirectories()) {
+        const lib = path.join(directory, `${name}.d.ts`);
         if (fs.existsSync(lib)) {
             return lib;
         }
