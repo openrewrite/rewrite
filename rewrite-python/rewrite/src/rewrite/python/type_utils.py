@@ -56,17 +56,22 @@ _OBJECT_NAMES = frozenset({"object", "builtins.object", "java.lang.Object"})
 _PRIMITIVE_KEYWORDS = {
     JavaType.Primitive.String: "str",
     JavaType.Primitive.Int: "int",
+    JavaType.Primitive.Long: "int",
     JavaType.Primitive.Double: "float",
     JavaType.Primitive.Boolean: "bool",
-    JavaType.Primitive.None_: "None",
+    JavaType.Primitive.Null: "None",
 }
 _KEYWORD_TO_PRIMITIVE = {name: prim for prim, name in _PRIMITIVE_KEYWORDS.items()}
 
 # Permitted primitive widenings (``to`` accepts these ``from_`` primitives). In
-# Python ``bool`` is a subclass of ``int`` and ``int`` widens to ``float``.
+# Python ``bool`` is a subclass of ``int`` and ``int`` widens to ``float``. ``Int``
+# and ``Long`` both spell ``int``, so each accepts the other and the one
+# ``_KEYWORD_TO_PRIMITIVE`` picks for ``"int"`` does not matter.
 _PRIMITIVE_WIDENING = {
-    JavaType.Primitive.Int: frozenset({JavaType.Primitive.Boolean}),
-    JavaType.Primitive.Double: frozenset({JavaType.Primitive.Boolean, JavaType.Primitive.Int}),
+    JavaType.Primitive.Int: frozenset({JavaType.Primitive.Boolean, JavaType.Primitive.Long}),
+    JavaType.Primitive.Long: frozenset({JavaType.Primitive.Boolean, JavaType.Primitive.Int}),
+    JavaType.Primitive.Double: frozenset(
+        {JavaType.Primitive.Boolean, JavaType.Primitive.Int, JavaType.Primitive.Long}),
 }
 
 

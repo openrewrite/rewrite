@@ -151,7 +151,7 @@ class TestPythonTypeMappingPrimitives:
         assert result == JavaType.Primitive.Boolean
 
     def test_none_constant(self):
-        """Test that None maps to JavaType.Primitive.None_."""
+        """Test that None maps to JavaType.Primitive.Null."""
         source = 'None'
         tree = ast.parse(source)
         mapping = PythonTypeMapping(source)
@@ -160,7 +160,7 @@ class TestPythonTypeMappingPrimitives:
         result = mapping.type(const)
 
         mapping.close()
-        assert result == JavaType.Primitive.None_
+        assert result == JavaType.Primitive.Null
 
 
 class TestMethodInvocationType:
