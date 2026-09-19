@@ -61,6 +61,8 @@ export interface JavaScriptParserOptions extends ParserOptions {
      * naming here for those declarations to be in scope.
      */
     types?: string[],
+    /** Types each AMD factory parameter from the dependency bound to it. On by default. */
+    amdFactoryTypes?: boolean,
 }
 
 function getScriptKindFromFileName(fileName: string): ts.ScriptKind {
@@ -89,12 +91,57 @@ type WithInvalidSyntaxSlots<T> = T & {
     modifiers?: ts.NodeArray<ts.ModifierLike>;
 };
 
+/** Overloads pairing each AMD dependency with the parameter bound to it, which nothing else declares. */
+function amdFactoryOverloads(sourceFile: ts.SourceFile): string | undefined {
+    // Keyed by declaration, so a file that repeats a dependency list declares one overload.
+    const overloads = new Set<string>();
+
+    const visit = (node: ts.Node): void => {
+        if (ts.isCallExpression(node) && node.arguments.length >= 2) {
+            const callee = ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text :
+                ts.isIdentifier(node.expression) ? node.expression.text : undefined;
+            // `require` is declared globally by `@types/node`, so an overload there would overreach.
+            if (callee === "define" && ts.isArrayLiteralExpression(node.arguments[0])) {
+                const dependencies = node.arguments[0].elements;
+                if (dependencies.length > 0 && dependencies.every(ts.isStringLiteralLike)) {
+                    const modules = dependencies.map(d => (d as ts.StringLiteralLike).text);
+                    const tuple = modules.map(m => JSON.stringify(m)).join(", ");
+                    const parameters = modules
+                        .map((m, i) => `p${i}: typeof import(${JSON.stringify(m)}).default`)
+                        .join(", ");
+                    const signature = `function define(dependencies: [${tuple}], factory: (${parameters}) => any): void;`;
+                    // A qualified callee declares into its namespace; a bare one is global.
+                    const namespaceOf = ts.isPropertyAccessExpression(node.expression)
+                        ? node.expression.expression.getText(sourceFile)
+                        : undefined;
+                    overloads.add(namespaceOf !== undefined && /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(namespaceOf)
+                        ? `declare namespace ${namespaceOf} {\n    ${signature}\n}`
+                        : `declare ${signature}`);
+                }
+            }
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+
+    return overloads.size === 0 ? undefined : [...overloads].join("\n");
+}
+
+/** References each named type package ahead of the overloads, or a loader's own `define` outranks them. */
+function withReferencesTo(types: string[] | undefined, declarations: string): string {
+    // `*` stands for the type roots rather than a package, so there is nothing to reference.
+    const references = (types ?? []).filter(name => name !== "*")
+        .map(name => `/// <reference types="${name}" />`);
+    return references.length === 0 ? declarations : `${references.join("\n")}\n${declarations}`;
+}
+
 export class JavaScriptParser extends Parser {
 
     private readonly tsConfig: TsConfigResolver;
     private readonly styles?: NamedStyles[];
     private readonly oldPrograms = new Map<string, ts.Program>();
     private readonly sourceFileCache?: Map<string, ts.SourceFile>;
+    private readonly amdFactoryTypes: boolean;
 
     constructor(
         {
@@ -103,9 +150,11 @@ export class JavaScriptParser extends Parser {
             styles,
             sourceFileCache,
             types,
+            amdFactoryTypes = true,
         }: JavaScriptParserOptions = {},
     ) {
         super({ctx, relativeTo});
+        this.amdFactoryTypes = amdFactoryTypes;
         const defaultCompilerOptions: ts.CompilerOptions = {
             target: ts.ScriptTarget.Latest,
             // Bundler matches `exports` conditions leniently, so packages that publish types only under
@@ -232,6 +281,26 @@ export class JavaScriptParser extends Parser {
             this.sourceFileCache && this.sourceFileCache.delete(normalizedSourcePath);
         }
 
+        // Declarations typing AMD factory parameters, each beside the source it belongs to.
+        const amdOverloadFiles = new Map<string, string>();
+        const amdOverloadOf = new Map<SourcePath, string>();
+        for (const [sourcePath, input] of this.amdFactoryTypes ? inputFiles : []) {
+            const text = parserInputRead(input);
+            // Cheap enough to skip the parse for the files that cannot contain an AMD block.
+            if (!text.includes("define")) {
+                continue;
+            }
+            const overloads = amdFactoryOverloads(ts.createSourceFile(
+                sourcePath, text, ts.ScriptTarget.Latest, true, getScriptKindFromFileName(sourcePath)));
+            if (overloads !== undefined) {
+                // Beside the source, so a relative dependency resolves as it does for the source.
+                const overloadPath = path.normalize(`${sourcePath}.__amd-types.d.ts`);
+                amdOverloadFiles.set(overloadPath, withReferencesTo(
+                    this.tsConfig.forFile(sourcePath).options.types, overloads));
+                amdOverloadOf.set(sourcePath, overloadPath);
+            }
+        }
+
         // Packages in a monorepo each configure their own module resolution.
         for (const normalizedSourcePath of inputFiles.keys()) {
             const {configFilePath, options} = this.tsConfig.forFile(normalizedSourcePath);
@@ -242,6 +311,10 @@ export class JavaScriptParser extends Parser {
                 projects.set(projectKey, project = {options, rootNames: []});
             }
             project.rootNames.push(normalizedSourcePath);
+            const overloadPath = amdOverloadOf.get(normalizedSourcePath);
+            if (overloadPath !== undefined) {
+                project.rootNames.push(overloadPath);
+            }
         }
 
         // Module resolution probes a directory before the files in it, so a directory holding
@@ -258,7 +331,8 @@ export class JavaScriptParser extends Parser {
             // TypeScript carries the previous program's bound files forward when the root paths match,
             // so a parser held across parses of one path costs a fraction of a freshly built one.
             const program = ts.createProgram(rootNames, options,
-                this.createCompilerHost(options, inputFiles, inputDirectories), this.oldPrograms.get(projectKey));
+                this.createCompilerHost(options, inputFiles, inputDirectories, amdOverloadFiles),
+                this.oldPrograms.get(projectKey));
             this.oldPrograms.set(projectKey, program);
 
             // A JavaScriptTypeMapping deduplicates by `ts.Type.id`, which is only unique within
@@ -303,7 +377,8 @@ export class JavaScriptParser extends Parser {
     }
 
     private createCompilerHost(compilerOptions: ts.CompilerOptions, inputFiles: Map<SourcePath, ParserInput>,
-                               inputDirectories: Set<string>): ts.CompilerHost {
+                               inputDirectories: Set<string>,
+                               amdOverloadFiles: Map<string, string>): ts.CompilerHost {
         const host = ts.createCompilerHost(compilerOptions);
 
         // Set the current directory for module resolution
@@ -333,6 +408,8 @@ export class JavaScriptParser extends Parser {
             const input = inputFiles.get(normalizedFileName);
             if (input) {
                 sourceText = parserInputRead(input);
+            } else if (amdOverloadFiles.has(normalizedFileName)) {
+                sourceText = amdOverloadFiles.get(normalizedFileName);
             } else {
                 // For dependency files
                 sourceText = ts.sys.readFile(normalizedFileName);
@@ -355,7 +432,7 @@ export class JavaScriptParser extends Parser {
 
                 sourceFile = ts.createSourceFile(normalizedFileName, sourceText, sourceFileOptions, true, scriptKind);
                 // Cache the SourceFile if it's a dependency
-                if (!input && this.sourceFileCache) {
+                if (!input && !amdOverloadFiles.has(normalizedFileName) && this.sourceFileCache) {
                     this.sourceFileCache.set(cacheKey, sourceFile);
                 }
                 return sourceFile;
@@ -368,7 +445,8 @@ export class JavaScriptParser extends Parser {
         // Override fileExists
         host.fileExists = (fileName) => {
             const normalizedFileName = path.normalize(fileName);
-            return inputFiles.has(normalizedFileName) || ts.sys.fileExists(normalizedFileName);
+            return inputFiles.has(normalizedFileName) || amdOverloadFiles.has(normalizedFileName) ||
+                ts.sys.fileExists(normalizedFileName);
         };
 
         host.directoryExists = (directoryName) => {
@@ -380,7 +458,8 @@ export class JavaScriptParser extends Parser {
         host.readFile = (fileName) => {
             const normalizedFileName = path.normalize(fileName);
             const input = inputFiles.get(normalizedFileName);
-            return input ? parserInputRead(input) : ts.sys.readFile(normalizedFileName);
+            return input ? parserInputRead(input) :
+                amdOverloadFiles.get(normalizedFileName) ?? ts.sys.readFile(normalizedFileName);
         };
 
         // Custom module resolution to handle in-memory imports
