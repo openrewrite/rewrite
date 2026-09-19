@@ -512,6 +512,45 @@ describe('AddImport visitor', () => {
             );
         });
 
+        test('should keep a trailing comma single when appending to the list', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFileSync", onlyIfReferenced: false }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {readFile,} from 'fs';\n`,
+                    `import {readFile, readFileSync,} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should keep a trailing comma single when inserting before the first element', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "aaa", onlyIfReferenced: false }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {readFile,} from 'fs';\n`,
+                    `import {aaa, readFile,} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should move a multiline trailing comma to the appended element', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "zzz", onlyIfReferenced: false }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`,
+                    `import {\n    readFile,\n    stat, zzz,\n} from 'fs';\n`
+                )
+            );
+        });
+
         test('should merge aliased member into existing import', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFileSync", alias: "readSync", onlyIfReferenced: false }));

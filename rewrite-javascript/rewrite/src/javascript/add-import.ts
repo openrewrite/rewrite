@@ -1,8 +1,8 @@
 import {JavaScriptVisitor} from "./visitor";
-import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, Type} from "../java";
+import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, TrailingComma, Type} from "../java";
 import {JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
-import {emptyMarkers, markers} from "../markers";
+import {emptyMarkers, findMarker, markers} from "../markers";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
 import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
@@ -940,7 +940,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         // - trailingSpace: space before } (from last element's after)
                         const firstElementPrefix = existingElements[0]?.element?.prefix ?? emptySpace;
                         const lastIndex = existingElements.length - 1;
-                        const trailingSpace = existingElements[lastIndex].after;
+                        // A trailing comma is a marker on the last element rather than padding, so with
+                        // one present the space before `}` lives in the marker's suffix, not in `after`.
+                        const trailingComma = findMarker<TrailingComma>(existingElements[lastIndex], J.Markers.TrailingComma);
+                        const trailingSpace = trailingComma ? trailingComma.suffix : existingElements[lastIndex].after;
 
                         // Build the new elements array with proper spacing
                         const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
@@ -961,9 +964,18 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                     if (j === 0 && insertIndex === 0 && elem.element) {
                                         adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
                                     }
-                                    // Last element before a new trailing element loses its trailing space
+                                    // Last element before a new trailing element loses its trailing space,
+                                    // and hands off its trailing comma to the element that becomes last.
                                     if (j === lastIndex && insertIndex > lastIndex) {
-                                        adjusted = {...adjusted, after: emptySpace};
+                                        adjusted = trailingComma ?
+                                            {
+                                                ...adjusted,
+                                                markers: {
+                                                    ...adjusted.markers,
+                                                    markers: adjusted.markers.markers.filter(m => m !== trailingComma)
+                                                }
+                                            } :
+                                            {...adjusted, after: emptySpace};
                                     }
                                     results.push(adjusted);
                                     return results;
@@ -971,7 +983,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
                                 // Append at end if inserting after all existing elements
                                 if (insertIndex > lastIndex) {
-                                    newElements.push(rightPadded({...newSpecifier, prefix: singleSpace}, trailingSpace));
+                                    const appended = rightPadded(
+                                        {...newSpecifier, prefix: singleSpace},
+                                        trailingComma ? emptySpace : trailingSpace);
+                                    newElements.push(trailingComma ?
+                                        {...appended, markers: markers(trailingComma)} :
+                                        appended);
                                 }
 
                                 namedDraft.elements = {...namedImports.elements, elements: newElements};
