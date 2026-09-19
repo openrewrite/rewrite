@@ -1,3 +1,5 @@
+import pytest
+
 from rewrite.rpc.facade import Facade
 
 
@@ -140,7 +142,7 @@ class _EditingChildren(_FakeChildren):
 def test_cross_bundle_batch_pulls_each_bundles_edit_into_the_hub_in_order():
     children = _EditingChildren()
     pulls = []
-    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)))
     f._bundle_by_visitor.update({"edit:a": "A", "edit:b": "B"})
 
     f.batch_visit({"treeId": "T", "sourceFileType": "py",
@@ -156,7 +158,7 @@ def test_cross_bundle_batch_pulls_each_bundles_edit_into_the_hub_in_order():
 def test_single_visit_pulls_its_edit_into_the_hub():
     children = _EditingChildren()
     pulls = []
-    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)))
     f._bundle_by_visitor["edit:a"] = "A"
 
     f.visit({"visitor": "edit:a", "treeId": "T", "sourceFileType": "py"})
@@ -167,7 +169,7 @@ def test_single_visit_pulls_its_edit_into_the_hub():
 def test_single_visit_does_not_pull_when_nothing_changed():
     children = _EditingChildren(modified=False)
     pulls = []
-    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)))
     f._bundle_by_visitor["edit:a"] = "A"
 
     f.visit({"visitor": "edit:a", "treeId": "T", "sourceFileType": "py"})
@@ -178,7 +180,7 @@ def test_single_visit_does_not_pull_when_nothing_changed():
 def test_single_bundle_batch_still_pulls_its_edit_into_the_hub():
     children = _EditingChildren()
     pulls = []
-    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)))
     f._bundle_by_visitor.update({"edit:a1": "A", "edit:a2": "A"})
 
     f.batch_visit({"treeId": "T", "sourceFileType": "py",
@@ -192,7 +194,7 @@ def test_single_bundle_batch_still_pulls_its_edit_into_the_hub():
 def test_unmodified_run_is_not_pulled():
     children = _EditingChildren(modified=False)
     pulls = []
-    f = Facade(children, hub_pull=lambda ch, b, tid, sft: pulls.append((b, tid, sft)))
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)))
     f._bundle_by_visitor.update({"edit:a": "A"})
 
     f.batch_visit({"treeId": "T", "visitors": [{"visitor": "edit:a"}]})
@@ -686,9 +688,10 @@ def test_reset_drops_a_half_drained_dependency_types_page(monkeypatch):
 
 
 def test_a_childs_delete_is_forgotten_without_disturbing_ref_numbering(monkeypatch):
-    """A child that deletes the file answers the pull with DELETE. The facade has to let go of the
-    tree — otherwise it serves the next bundle a file that no longer exists — but must leave both
-    ref maps alone: no Evict has been broadcast, so the child still holds this file's refs."""
+    """A child that deletes the file in a single Visit can only say so by answering the pull with
+    DELETE. The facade has to let go of the tree — otherwise it serves the next bundle a file that
+    no longer exists — but must leave both ref maps alone: no Evict has been broadcast, so the child
+    still holds this file's refs."""
     import rewrite.rpc.server as server
     from rewrite.rpc.reference import ReferenceMap
 
@@ -705,7 +708,7 @@ def test_a_childs_delete_is_forgotten_without_disturbing_ref_numbering(monkeypat
     refs.create(object())
     server._hub_recv_refs[bundle] = {1: object()}
 
-    server._hub_pull_child_edit(_DeletingChild(), bundle, tree_id, sft)
+    server._hub_pull_child_edit(_DeletingChild(), bundle, tree_id, sft, may_delete=True)
 
     assert tree_id not in server._hub_tree
     assert (bundle, tree_id) not in server._hub_served
@@ -781,3 +784,62 @@ def test_replacing_a_bundles_child_drops_the_ref_tables_that_mirrored_it():
     assert not [k for k in server._hub_send_checkpoint if k[0] == "pkg"]
     assert not [k for k in server._hub_recv_checkpoint if k[0] == "pkg"]
     assert not [k for k in server._hub_served if k[0] == "pkg"]
+
+
+class _DeletingBatchChildren(_FakeChildren):
+    """Every BatchVisit reports that its visitors deleted the file."""
+    def request(self, bundle, method, params):
+        if method == "BatchVisit":
+            vs = [v["visitor"] for v in params.get("visitors", [])]
+            self.calls.append(("batch", bundle, vs))
+            return {"results": [{"visitor": v, "modified": True, "deleted": True} for v in vs]}
+        return super().request(bundle, method, params)
+
+
+def test_batch_visit_drops_a_deleted_file_instead_of_pulling_it():
+    children = _DeletingBatchChildren()
+    pulls, drops = [], []
+    f = Facade(children, hub_pull=lambda ch, b, tid, sft, **kw: pulls.append((b, tid, sft)),
+               hub_drop=lambda tid: drops.append(tid))
+    f._bundle_by_visitor.update({"edit:a": "A", "edit:b": "B"})
+
+    resp = f.batch_visit({"treeId": "T", "sourceFileType": "py",
+                          "visitors": [{"visitor": "edit:a"}, {"visitor": "edit:b"}]})
+
+    # The deletion is reported and ends the batch; nothing is pulled and B never runs.
+    assert [r["deleted"] for r in resp["results"]] == [True]
+    assert pulls == []
+    assert drops == ["T"]
+    assert [c for c in children.calls if c[0] == "batch"] == [("batch", "A", ["edit:a"])]
+
+
+class _LostTreeChild:
+    """A child that answers every GetObject with DELETE, as one does for an id it no longer holds."""
+    def request(self, bundle, method, params):
+        return [{"state": "DELETE"}, {"state": "END_OF_OBJECT"}]
+
+
+def test_hub_pull_refuses_a_child_that_lost_the_tree(monkeypatch):
+    """A batch reports its deletions in its results, so DELETE on the pull means the child lost the
+    tree. The facade must keep the file it holds and fail the pull rather than let the host read the
+    missing tree as a deletion."""
+    import rewrite.rpc.server as server
+
+    cu = _parse_python("x = 1\n")
+    tree_id, sft, bundle = str(cu.id), "org.openrewrite.python.tree.Py$CompilationUnit", "pkg"
+
+    _isolated_hub(monkeypatch, server)
+    monkeypatch.setattr(server, "get_object_from_java",
+                        lambda obj_id, source_file_type=None: cu if obj_id == tree_id else None)
+    server._hub_acquire(tree_id, sft)
+    server._hub_serve_child(bundle, tree_id, sft)
+
+    with pytest.raises(RuntimeError, match="no longer holds"):
+        server._hub_pull_child_edit(_LostTreeChild(), bundle, tree_id, sft)
+    assert server._hub_tree[tree_id] is cu
+    assert server.local_objects[tree_id] is cu
+
+    # A single Visit has no other way to report a deletion, so there the pull may let the file go.
+    server._hub_pull_child_edit(_LostTreeChild(), bundle, tree_id, sft, may_delete=True)
+    assert tree_id not in server._hub_tree
+    assert tree_id not in server.local_objects
