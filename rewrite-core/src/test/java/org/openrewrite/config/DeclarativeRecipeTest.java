@@ -138,6 +138,71 @@ class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
+    void partiallyInitializedRecipeIsRetriedAgainstAWiderResolver() {
+        var dr = new DeclarativeRecipe("org.example.Partial", "Partial", "Test.", emptySet(),
+          null, URI.create("dummy"), false, emptyList());
+        dr.addUninitialized("org.example.Missing");
+
+        dr.initialize(key -> null);
+        assertThat(dr.getRecipeList()).isEmpty();
+
+        ChangeText missing = new ChangeText("2");
+        dr.initialize(key -> "org.example.Missing".equals(key) ? missing : null);
+        assertThat(dr.getRecipeList()).containsExactly(missing);
+        assertThat(dr.validate().isValid())
+          .as("the failure recorded by the first, narrower resolver must not survive")
+          .isTrue();
+    }
+
+    @Test
+    void aResolverWithANarrowerViewCannotRemoveAlreadyResolvedEntries() {
+        var dr = new DeclarativeRecipe("org.example.Partial", "Partial", "Test.", emptySet(),
+          null, URI.create("dummy"), false, emptyList());
+        dr.addUninitialized("org.openrewrite.text.ChangeText");
+        dr.addUninitialized("org.example.Missing");
+
+        ChangeText resolved = new ChangeText("2");
+        dr.initialize(key -> "org.openrewrite.text.ChangeText".equals(key) ? resolved : null);
+        assertThat(dr.getRecipeList()).containsExactly(resolved);
+
+        dr.initialize(key -> null);
+        assertThat(dr.getRecipeList())
+          .as("a resolver that can see nothing must not drop what an earlier one resolved")
+          .containsExactly(resolved);
+    }
+
+    @Test
+    void unresolvableNestedRecipeIsAttributedToTheRecipeThatDeclaresIt() {
+        var nested = new DeclarativeRecipe("org.example.Nested", "Nested", "Test.", emptySet(),
+          null, URI.create("file:///nested.yaml"), false, emptyList());
+        nested.addUninitialized("org.example.Missing");
+
+        var outer = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("file:///outer.yaml"), false, emptyList());
+        outer.addUninitialized(nested);
+        outer.initialize(key -> null);
+
+        assertThat(outer.validate().failures())
+          .extracting(Validated.Invalid::getProperty)
+          .doesNotContain("org.example.Outer.recipeList[0] (in file:///outer.yaml)");
+        assertThat(nested.validate().failures())
+          .extracting(Validated.Invalid::getProperty)
+          .contains("org.example.Nested.recipeList[0] (in file:///nested.yaml)");
+    }
+
+    @Test
+    void unresolvablePreconditionIsAttributedToThePreconditionsProperty() {
+        var dr = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("file:///outer.yaml"), false, emptyList());
+        dr.addUninitializedPrecondition("org.example.Missing");
+        dr.initialize(key -> null);
+
+        assertThat(dr.validate().failures())
+          .extracting(Validated.Invalid::getProperty)
+          .contains("org.example.Outer.preconditions[0] (in file:///outer.yaml)");
+    }
+
+    @Test
     void uninitializedFailsValidation() {
         var dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
           null, URI.create("dummy"), true, emptyList());

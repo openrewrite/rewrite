@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.unmodifiableList;
 import static org.openrewrite.Validated.invalid;
 
@@ -83,7 +84,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private Validated<Object> validation = Validated.none();
 
     @JsonIgnore
-    private Validated<Object> initValidation = Validated.none();
+    private volatile Validated<Object> initValidation = Validated.none();
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
@@ -94,9 +95,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public void initialize(Collection<Recipe> availableRecipes) {
         Map<String, Recipe> recipeMap = new HashMap<>();
         availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
-        Set<String> initializingRecipes = new HashSet<>();
-        recipeList = initialize(uninitializedRecipes, recipeMap::get, initializingRecipes);
-        preconditions = initialize(uninitializedPreconditions, recipeMap::get, initializingRecipes);
+        initialize(recipeMap::get);
     }
 
     @Deprecated
@@ -106,9 +105,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     public void initialize(Function<String, @Nullable Recipe> availableRecipes) {
-        Set<String> initializingRecipes = new HashSet<>();
-        recipeList = initialize(uninitializedRecipes, availableRecipes, initializingRecipes);
-        preconditions = initialize(uninitializedPreconditions, availableRecipes, initializingRecipes);
+        initializeLists(availableRecipes, new HashSet<>());
     }
 
     @Deprecated
@@ -117,24 +114,61 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         this.initialize(availableRecipes);
     }
 
-    private List<Recipe> initialize(List<Recipe> uninitialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+    /**
+     * Resolve this recipe's declared recipes and preconditions, then replace all three pieces of
+     * resolved state at once so that a reader never sees validation that disagrees with the lists.
+     */
+    private void initializeLists(Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+        List<Validated<Object>> failures = new ArrayList<>();
+        List<Recipe> initializedRecipes = initialize(uninitializedRecipes, recipeList, "recipeList",
+                availableRecipes, initializingRecipes, failures);
+        List<Recipe> initializedPreconditions = initialize(uninitializedPreconditions, preconditions, "preconditions",
+                availableRecipes, initializingRecipes, failures);
+
+        Validated<Object> validated = Validated.none();
+        for (Validated<Object> failure : failures) {
+            validated = validated.and(failure);
+        }
+        initValidation = validated;
+        recipeList = initializedRecipes;
+        preconditions = initializedPreconditions;
+    }
+
+    /**
+     * Resolve {@code uninitialized} against {@code availableRecipes}. An entry that
+     * {@code previouslyResolved} already holds is kept instead of being looked up again, so a
+     * resolver can only add entries, never take away ones another resolver had already found.
+     */
+    private List<Recipe> initialize(List<Recipe> uninitialized, List<Recipe> previouslyResolved, String property,
+                                    Function<String, @Nullable Recipe> availableRecipes,
+                                    Set<String> initializingRecipes, List<Validated<Object>> failures) {
+        Map<String, Recipe> alreadyResolved = emptyMap();
+        if (!previouslyResolved.isEmpty()) {
+            alreadyResolved = new HashMap<>();
+            for (Recipe resolved : previouslyResolved) {
+                alreadyResolved.putIfAbsent(resolved.getName(), resolved);
+            }
+        }
+
         List<Recipe> result = new ArrayList<>();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
-                Recipe subRecipe = availableRecipes.apply(recipeFqn);
+                Recipe subRecipe = alreadyResolved.get(recipeFqn);
+                if (subRecipe == null) {
+                    subRecipe = availableRecipes.apply(recipeFqn);
+                }
                 if (subRecipe != null) {
                     if (subRecipe instanceof DeclarativeRecipe) {
                         initializeDeclarativeRecipe((DeclarativeRecipe) subRecipe, recipeFqn, availableRecipes, initializingRecipes);
                     }
                     result.add(subRecipe);
                 } else {
-                    initValidation = initValidation.and(
-                            invalid(name + ".recipeList[" + i + "] (in " + source + ")",
-                                    recipeFqn,
-                                    "refers to a recipe that doesn't exist.",
-                                    null));
+                    failures.add(invalid(name + "." + property + "[" + i + "] (in " + source + ")",
+                            recipeFqn,
+                            "refers to a recipe that doesn't exist.",
+                            null));
                 }
             } else {
                 if (recipe instanceof DeclarativeRecipe) {
@@ -156,8 +190,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                     "Recipe '" + recipeIdentifier + "' creates a cycle: " + cycle);
         } else {
             initializingRecipes.add(recipeName);
-            declarativeRecipe.recipeList = initialize(declarativeRecipe.uninitializedRecipes, availableRecipes, initializingRecipes);
-            declarativeRecipe.preconditions = initialize(declarativeRecipe.uninitializedPreconditions, availableRecipes, initializingRecipes);
+            declarativeRecipe.initializeLists(availableRecipes, initializingRecipes);
             initializingRecipes.remove(recipeName);
         }
     }
