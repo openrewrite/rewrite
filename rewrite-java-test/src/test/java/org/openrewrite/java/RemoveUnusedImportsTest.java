@@ -28,6 +28,7 @@ import org.openrewrite.test.TypeValidation;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 
 class RemoveUnusedImportsTest implements RewriteTest {
 
@@ -2473,6 +2474,95 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void keepExplicitImportShadowedByTypeInOwnPackage() {
+        rewriteRun(
+          spec -> spec.parser(foldingComExampleTypes()).beforeRecipe(withSourceTypesOnClasspath()),
+          //language=java
+          java(
+            """
+              package com.example.types;
+
+              public class Organization {}
+              """
+          ),
+          //language=java
+          java(
+            """
+              package com.example;
+
+              public class Organization {}
+              """
+          ),
+          //language=java
+          java(
+            """
+              package com.example;
+
+              import com.example.types.Organization;
+              import com.example.types.*;
+
+              class Fetcher {
+                  Organization organization;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeExplicitImportCoveredByStarImportWhenOwnPackageHasNoConflict() {
+        rewriteRun(
+          spec -> spec.parser(foldingComExampleTypes()).beforeRecipe(withSourceTypesOnClasspath()),
+          //language=java
+          java(
+            """
+              package com.example.types;
+
+              public class Organization {}
+              """
+          ),
+          //language=java
+          java(
+            """
+              package com.example;
+
+              import com.example.types.Organization;
+              import com.example.types.*;
+
+              class Fetcher {
+                  Organization organization;
+              }
+              """,
+            """
+              package com.example;
+
+              import com.example.types.*;
+
+              class Fetcher {
+                  Organization organization;
+              }
+              """
+          )
+        );
+    }
+
+    private static JavaParser.Builder<?, ?> foldingComExampleTypes() {
+        return JavaParser.fromJavaVersion().styles(
+          singletonList(
+            new NamedStyles(
+              Tree.randomId(), "test", "test", "test", emptySet(), singletonList(
+              ImportLayoutStyle.builder()
+                .packageToFold("com.example.types.*")
+                .importAllOthers()
+                .importStaticAllOthers()
+                .build()
+            )
+            )
           )
         );
     }
