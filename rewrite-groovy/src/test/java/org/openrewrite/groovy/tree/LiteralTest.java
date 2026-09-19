@@ -533,4 +533,41 @@ class LiteralTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void escapeSequencesInString() {
+        rewriteRun(
+          groovy("def s = \"x\\ny\\tz\\u2605q\\\\r\\$w\"", spec -> spec.beforeRecipe(cu -> {
+              J.Literal literal = initializerOf(cu);
+              assertThat(literal.getValue()).isEqualTo("x\ny\tz\u2605q\\r$w");
+              assertThat(literal.getValueSource()).isEqualTo("\"x\\ny\\tz\\u2605q\\\\r\\$w\"");
+          }))
+        );
+    }
+
+    @Test
+    void slashyStringDoesNotProcessEscapes() {
+        rewriteRun(
+          groovy("def s = /x\\ny/", spec -> spec.beforeRecipe(cu ->
+            assertThat(initializerOf(cu).getValue()).isEqualTo("x\\ny")))
+        );
+    }
+
+    @Test
+    void escapeSequenceInGStringFragment() {
+        rewriteRun(
+          groovy("def id = 1\ndef s = \"x\\ny${id}\"", spec -> spec.beforeRecipe(cu -> {
+              G.GString gString = (G.GString) requireNonNull(((J.VariableDeclarations) cu.getStatements().get(1))
+                .getVariables().getFirst().getInitializer());
+              J.Literal fragment = (J.Literal) gString.getStrings().getFirst();
+              assertThat(fragment.getValue()).isEqualTo("x\ny");
+              assertThat(fragment.getValueSource()).isEqualTo("x\\ny");
+          }))
+        );
+    }
+
+    private static J.Literal initializerOf(G.CompilationUnit cu) {
+        return requireNonNull((J.Literal) ((J.VariableDeclarations) cu.getStatements().getFirst())
+          .getVariables().getFirst().getInitializer());
+    }
 }
