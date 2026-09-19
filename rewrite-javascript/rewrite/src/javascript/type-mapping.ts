@@ -694,6 +694,38 @@ export class JavaScriptTypeMapping {
     }
 
     /**
+     * The module specifier of a `require('module')` call, or undefined for anything else.
+     *
+     * `require` is declared to return `any`, so the checker carries no module type through it and
+     * the specifier in the call is the only thing identifying the module.
+     */
+    private requiredModuleSpecifier(node: ts.Expression): string | undefined {
+        if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression) ||
+            node.expression.text !== 'require' || node.arguments.length === 0) {
+            return undefined;
+        }
+        const moduleArg = node.arguments[0];
+        return ts.isStringLiteral(moduleArg) ? moduleArg.text : undefined;
+    }
+
+    /**
+     * The module an expression evaluates to where that is a `require()` result — either the call
+     * itself (`require('x').fn()`) or an identifier bound to one (`const x = require('x')`).
+     */
+    private requiredModuleOfExpression(node: ts.Expression): string | undefined {
+        const direct = this.requiredModuleSpecifier(node);
+        if (direct) {
+            return direct;
+        }
+        if (!ts.isIdentifier(node)) {
+            return undefined;
+        }
+        const valueDecl = this.checker.getSymbolAtLocation(node)?.valueDeclaration;
+        return valueDecl && ts.isVariableDeclaration(valueDecl) && valueDecl.initializer ?
+            this.requiredModuleSpecifier(valueDecl.initializer) : undefined;
+    }
+
+    /**
      * Extract the npm module name from a file path.
      * Handles various package manager layouts:
      * - Standard: /path/node_modules/react/index.d.ts -> react
@@ -891,41 +923,14 @@ export class JavaScriptTypeMapping {
                     // where the module is typed as 'any' but methods still have signatures
 
                     // Try to trace back through the AST to find the require() call
-                    let inferredDeclaringType: Type.FullyQualified | undefined;
-                    const objExpr = node.expression.expression;
-
-                    if (ts.isIdentifier(objExpr)) {
-                        // Look for the variable declaration that assigns the require() result
-                        const objSymbol = this.checker.getSymbolAtLocation(objExpr);
-
-                        if (objSymbol && objSymbol.valueDeclaration) {
-                            const valueDecl = objSymbol.valueDeclaration;
-                            if (ts.isVariableDeclaration(valueDecl) && valueDecl.initializer) {
-                                // Check if it's a require() call
-                                if (ts.isCallExpression(valueDecl.initializer)) {
-                                    const callExpr = valueDecl.initializer;
-                                    if (ts.isIdentifier(callExpr.expression) &&
-                                        callExpr.expression.getText() === 'require' &&
-                                        callExpr.arguments.length > 0) {
-                                        // Extract the module name from require('module-name')
-                                        const moduleArg = callExpr.arguments[0];
-                                        if (ts.isStringLiteral(moduleArg)) {
-                                            const moduleName = moduleArg.text;
-
-                                            inferredDeclaringType = {
-                                                kind: Type.Kind.Class,
-                                                flags: 0, // TODO - determine flags
-                                                fullyQualifiedName: moduleName
-                                            } as Type.FullyQualified;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    const moduleName = this.requiredModuleOfExpression(node.expression.expression);
 
                     // Use the inferred type or fall back to unknown
-                    declaringType = inferredDeclaringType || Type.unknownType as Type.FullyQualified;
+                    declaringType = moduleName ? {
+                        kind: Type.Kind.Class,
+                        flags: 0, // TODO - determine flags
+                        fullyQualifiedName: moduleName
+                    } as Type.FullyQualified : Type.unknownType as Type.FullyQualified;
 
                     // Create the method type using the helper
                     return this.createMethodType(signature, node, declaringType, methodName);
@@ -983,6 +988,19 @@ export class JavaScriptTypeMapping {
                 } else {
                     // Default to unknown if we can't determine the type
                     declaringType = Type.unknownType as Type.FullyQualified;
+                }
+
+                // A `require()` result is typed `any`, so nothing above identifies the module; the
+                // specifier in the call does.
+                if (declaringType === Type.unknownType) {
+                    const moduleName = this.requiredModuleOfExpression(node.expression.expression);
+                    if (moduleName) {
+                        declaringType = {
+                            kind: Type.Kind.Class,
+                            flags: 0, // TODO - determine flags
+                            fullyQualifiedName: moduleName
+                        } as Type.FullyQualified;
+                    }
                 }
 
                 // For string methods like 'hello'.split(), ensure we have a proper declaring type for primitives
@@ -1294,9 +1312,14 @@ export class JavaScriptTypeMapping {
                 // file's node_modules path) match the names used for directly imported types.
                 packageName = this.normalizePackageName(packageName);
 
-                // Find the symbol name (everything after the last dot in the original cleaned name)
+                // The symbol name is appended to the declaration file's path, so it is whatever
+                // follows the last dot of the final path segment. Directory names carry dots of
+                // their own — `.pnpm`, `.yarn`, a hidden parent such as `.claude`, a versioned
+                // pnpm directory — so a search over the whole path would split there instead and
+                // fold most of the path into the name.
+                const lastSegmentIndex = cleanedName.lastIndexOf('/') + 1;
                 const lastDotIndex = cleanedName.lastIndexOf('.');
-                if (lastDotIndex > 0) {
+                if (lastDotIndex > lastSegmentIndex) {
                     const symbolName = cleanedName.substring(lastDotIndex + 1);
                     cleanedName = `${packageName}.${symbolName}`;
                 } else {

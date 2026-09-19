@@ -2176,6 +2176,105 @@ describe('JavaScript type mapping', () => {
         }, {unsafeCleanup: true});
     });
 
+    describe('module attribution across import styles', () => {
+        // Every style of binding a module reaches the same package, so a `MethodMatcher` or a
+        // type-based precondition written against the package matches all of them. Previously the
+        // declaring type for a default or namespace import was built from the local name plus the
+        // declaration file's path, split at the first dot of the path — which lands inside a
+        // directory name like `.pnpm` or a hidden parent directory — making it both wrong and
+        // unstable across machines.
+        test('default, namespace, named and require bindings all attribute to the package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodInvocation && Type.isMethod(type) ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import fse from 'fs-extra';
+                                import {remove} from 'fs-extra';
+                                import * as ns from 'fs-extra';
+                                const required = require('fs-extra');
+
+                                fse.ensureDir('a');
+                                remove('b');
+                                ns.pathExists('c');
+                                required.ensureDirSync('d');
+                            `,
+                            //@formatter:off
+                            `
+                                import fse from 'fs-extra';
+                                import {remove} from 'fs-extra';
+                                import * as ns from 'fs-extra';
+                                const required = /*~~(global.NodeJS)~~>*/require('fs-extra');
+
+                                /*~~(fs-extra)~~>*/fse.ensureDir('a');
+                                /*~~(fs-extra)~~>*/remove('b');
+                                /*~~(fs-extra)~~>*/ns.pathExists('c');
+                                /*~~(fs-extra)~~>*/required.ensureDirSync('d');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "fs-extra": "^11"
+                                },
+                                "devDependencies": {
+                                  "@types/fs-extra": "^11"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('a call directly on a require() result attributes to the required package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodInvocation && Type.isMethod(type) && type.name === 'install' ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `require('source-map-support').install();`,
+                            //@formatter:off
+                            `/*~~(source-map-support)~~>*/require('source-map-support').install();`
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "source-map-support": "^0.5"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+    });
+
     describe('object types', () => {
         test('an object literal is attributed as an object type whose members carry each field name and type', async () => {
             const literals: J.NewClass[] = [];
