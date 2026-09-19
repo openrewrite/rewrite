@@ -101,6 +101,31 @@ public class GroovyParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+        Map<String, String> stepToLibraryMap = new HashMap<>();
+        for (Input input : sources) {
+            Path path = input.getPath();
+            String pathStr = path.toString().replace('\\', '/');
+            int varsIndex = pathStr.indexOf("/vars/");
+            if (varsIndex == -1 && pathStr.startsWith("vars/")) {
+                varsIndex = 0;
+            }
+            if (varsIndex != -1 && pathStr.endsWith(".groovy")) {
+                String stepName = pathStr.substring(pathStr.lastIndexOf('/') + 1, pathStr.length() - 7);
+                String libraryName = "";
+                if (varsIndex > 0) {
+                    String sub = pathStr.substring(0, varsIndex);
+                    int lastSlash = sub.lastIndexOf('/');
+                    libraryName = lastSlash == -1 ? sub : sub.substring(lastSlash + 1);
+                } else {
+                    libraryName = "unknown";
+                }
+                stepToLibraryMap.put(stepName, libraryName);
+            }
+        }
+        if (!stepToLibraryMap.isEmpty()) {
+            ctx.putMessage("org.openrewrite.groovy.jenkins.sharedLibrarySteps", stepToLibraryMap);
+        }
+
         CompilerConfiguration configuration = new CompilerConfiguration();
         configuration.setTolerance(Integer.MAX_VALUE);
         configuration.setWarningLevel(WarningMessage.NONE);
