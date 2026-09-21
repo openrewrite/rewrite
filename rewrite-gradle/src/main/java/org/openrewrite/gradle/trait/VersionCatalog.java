@@ -37,9 +37,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A Gradle version catalog, declared either in {@code settings.gradle(.kts)} or in a
- * {@code gradle/libs.versions.toml} file. {@link Matcher} finds either, and is the way to one:
- * the implementations are not public.
+ * A Gradle version catalog, declared in {@code settings.gradle(.kts)}, in a
+ * {@code gradle/libs.versions.toml} file, or in the {@code catalog { versionCatalog { ... } } }
+ * block of a producer using the {@code version-catalog} plugin. {@link Matcher} finds any of them,
+ * and is the way to one: the implementations are not public.
  */
 public interface VersionCatalog extends Trait<Tree> {
 
@@ -158,8 +159,8 @@ public interface VersionCatalog extends Trait<Tree> {
     }
 
     /**
-     * Matches a settings catalog at its {@code libs { ... } } call, or a TOML catalog at the
-     * document of a {@code *.versions.toml} file.
+     * Matches a script catalog at its {@code libs { ... } } or {@code versionCatalog { ... } }
+     * call, or a TOML catalog at the document of a {@code *.versions.toml} file.
      */
     class Matcher extends SimpleTraitMatcher<VersionCatalog> {
         private final SettingsVersionCatalog.Matcher settings = new SettingsVersionCatalog.Matcher();
