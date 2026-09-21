@@ -541,4 +541,31 @@ class ChangeDependencyClassifierTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mapEntryClassifierWithAnEscapeSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "rewrite-core", "classified", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              dependencies {
+                  api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'javado\\u0063'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              dependencies {
+                  api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classified'
+              }
+              """
+          )
+        );
+    }
 }

@@ -452,6 +452,10 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         return null;
     }
 
+    public @Nullable String getPlatformManagedVersion(GroupArtifact ga, List<MavenRepository> repositories, ExecutionContext ctx) {
+        return getPlatformManagedVersion(ga, repositories, ctx, bomGa -> null);
+    }
+
     /**
      * The version a platform imported by this configuration supplies for a coordinate, or null when no such
      * platform governs it. A version supplied by a constraint rather than a platform is not reported here.
