@@ -132,6 +132,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     }
 
     /**
+     * Parser options forwarded to the Node server with every parse request, carrying this context's
+     * {@link ExecutionContext#REQUIRE_PRINT_EQUALS_INPUT} setting.
+     */
+    public static Map<String, String> parseOptions(ExecutionContext ctx) {
+        return Collections.singletonMap(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                String.valueOf(ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)));
+    }
+
+    /**
      * Parses an entire JavaScript/TypeScript project directory.
      * Discovers and parses all relevant source files, package.json files, and lock files.
      *
@@ -182,7 +191,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, base), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, base, parseOptions(ctx)), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 

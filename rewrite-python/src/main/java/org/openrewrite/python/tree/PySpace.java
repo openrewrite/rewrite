@@ -363,6 +363,7 @@ public final class PySpace {
         NAMED_ARGUMENT,
         NAMED_ARGUMENT_PREFIX,
         PASS_PREFIX,
+        SHEBANG_PREFIX,
         SLICE_PREFIX,
         SLICE_START_SUFFIX,
         SLICE_STEP_SUFFIX,

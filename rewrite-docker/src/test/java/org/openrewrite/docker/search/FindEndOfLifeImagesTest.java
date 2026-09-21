@@ -16,6 +16,8 @@
 package org.openrewrite.docker.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.docker.table.EolDockerImages;
 import org.openrewrite.test.RecipeSpec;
@@ -38,7 +40,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             //language=csv
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
-              Dockerfile,,debian,buster,2022-09-10,"trixie (13)"
+              Dockerfile,,debian,buster,2024-06-30,"trixie (13)"
               """
           ),
           docker(
@@ -47,7 +49,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:buster (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:buster
+              ~~(EOL: debian:buster (ended 2024-06-30, suggest trixie (13)))~~>FROM debian:buster
               RUN apt-get update
               """
           )
@@ -61,7 +63,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             //language=csv
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
-              Dockerfile,,debian,buster-slim,2022-09-10,"trixie (13)"
+              Dockerfile,,debian,buster-slim,2024-06-30,"trixie (13)"
               """
           ),
           docker(
@@ -70,7 +72,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:buster-slim (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:buster-slim
+              ~~(EOL: debian:buster-slim (ended 2024-06-30, suggest trixie (13)))~~>FROM debian:buster-slim
               RUN apt-get update
               """
           )
@@ -86,7 +88,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:stretch (ended 2020-07-18, suggest trixie (13)))~~>FROM debian:stretch
+              ~~(EOL: debian:stretch (ended 2022-07-01, suggest trixie (13)))~~>FROM debian:stretch
               RUN apt-get update
               """
           )
@@ -205,62 +207,17 @@ class FindEndOfLifeImagesTest implements RewriteTest {
         );
     }
 
-    @Test
-    void currentDebianNotFlagged() {
+    // Every tag here has to be one eol-images.yaml does not list; a release reaching EOL is added to
+    // that file, at which point it belongs among the flagged cases above and a newer tag replaces it.
+    @ParameterizedTest
+    @ValueSource(strings = {"debian:trixie", "ubuntu:24.04", "alpine:3.21", "python:3.12", "node:22"})
+    void currentImageNotFlagged(String image) {
         rewriteRun(
           docker(
             """
-              FROM debian:trixie
-              RUN apt-get update
-              """
-          )
-        );
-    }
-
-    @Test
-    void currentUbuntuNotFlagged() {
-        rewriteRun(
-          docker(
-            """
-              FROM ubuntu:24.04
-              RUN apt-get update
-              """
-          )
-        );
-    }
-
-    @Test
-    void currentAlpineNotFlagged() {
-        rewriteRun(
-          docker(
-            """
-              FROM alpine:3.21
-              RUN apk update
-              """
-          )
-        );
-    }
-
-    @Test
-    void currentPythonNotFlagged() {
-        rewriteRun(
-          docker(
-            """
-              FROM python:3.12
-              RUN pip install flask
-              """
-          )
-        );
-    }
-
-    @Test
-    void currentNodeNotFlagged() {
-        rewriteRun(
-          docker(
-            """
-              FROM node:22
-              RUN npm install
-              """
+              FROM %s
+              RUN echo building
+              """.formatted(image)
           )
         );
     }
@@ -297,7 +254,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
               Dockerfile,builder,node,14,2023-04-30,"26 or 24"
-              Dockerfile,,debian,buster,2022-09-10,"trixie (13)"
+              Dockerfile,,debian,buster,2024-06-30,"trixie (13)"
               """
           ),
           docker(
@@ -312,7 +269,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               ~~(EOL: node:14 (ended 2023-04-30, suggest 26 or 24))~~>FROM node:14 AS builder
               RUN npm run build
 
-              ~~(EOL: debian:buster (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:buster
+              ~~(EOL: debian:buster (ended 2024-06-30, suggest trixie (13)))~~>FROM debian:buster
               COPY --from=builder /app /app
               """
           )
@@ -326,22 +283,22 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             //language=csv
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
-              Dockerfile,,debian,buster,2022-09-10,"trixie (13)"
+              Dockerfile,,debian,buster,2024-06-30,"trixie (13)"
               """
           ),
           docker(
             """
-              FROM golang:1.25 AS builder
-              RUN go build -o app .
+              FROM debian:trixie AS builder
+              RUN ./build.sh
 
               FROM debian:buster
               COPY --from=builder /app /app
               """,
             """
-              FROM golang:1.25 AS builder
-              RUN go build -o app .
+              FROM debian:trixie AS builder
+              RUN ./build.sh
 
-              ~~(EOL: debian:buster (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:buster
+              ~~(EOL: debian:buster (ended 2024-06-30, suggest trixie (13)))~~>FROM debian:buster
               COPY --from=builder /app /app
               """
           )
@@ -369,7 +326,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:10 (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:10
+              ~~(EOL: debian:10 (ended 2024-06-30, suggest trixie (13)))~~>FROM debian:10
               RUN apt-get update
               """
           )

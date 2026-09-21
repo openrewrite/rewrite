@@ -1334,4 +1334,274 @@ const { data, error } = await (
             // @formatter:on
         )
     })
+
+    test('re-indents multi-line comment interiors along with the delimiter', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`function outer() {
+}
+\t/**
+\t * Does a thing.
+\t * @public
+\t */
+\tfunction helper() {}
+`,
+`function outer() {
+}
+/**
+ * Does a thing.
+ * @public
+ */
+function helper() {}
+`),
+            //language=typescript
+            typescript(
+`class A {
+        /*
+          a
+            b
+        */
+        m() {}
+}
+`,
+`class A {
+    /*
+      a
+        b
+    */
+    m() {}
+}
+`),
+            // An interior line sitting at the margin travels with it, column zero included.
+            //language=typescript
+            typescript(
+`class A {
+/**
+* flush
+ */
+m() {}
+}
+`,
+`class A {
+    /**
+    * flush
+     */
+    m() {}
+}
+`),
+            //language=typescript
+            typescript(
+`class A {
+\t/*
+    aligned with spaces
+\t*/
+\tm() {}
+}
+`,
+`class A {
+    /*
+    aligned with spaces
+    */
+    m() {}
+}
+`),
+            //language=typescript
+            typescript(
+`class A {
+/**
+ * one
+
+ * two
+ */
+m() {}
+}
+`,
+`class A {
+    /**
+     * one
+
+     * two
+     */
+    m() {}
+}
+`)
+            // @formatter:on
+        );
+    });
+
+    test('leaves comment interiors alone when their column is unknown, clamping out-dents at column zero', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`class A {
+        // a line comment
+        m() {} /* trailing
+   still trailing */
+}
+`,
+`class A {
+    // a line comment
+    m() {} /* trailing
+   still trailing */
+}
+`),
+            //language=typescript
+            typescript(
+`class A {
+        /**
+* flush left
+         */
+        m() {}
+}
+`,
+`class A {
+    /**
+* flush left
+     */
+    m() {}
+}
+`)
+            // @formatter:on
+        );
+    });
+
+    test('re-indents comments that sit before a closing delimiter', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+`class A {
+        m() {}
+        /* multi
+           line */
+}
+`,
+`class A {
+    m() {}
+    /* multi
+       line */
+}
+`),
+            //language=typescript
+            typescript(
+`class A {
+m() {}
+/* multi
+   line */
+}
+`,
+`class A {
+    m() {}
+    /* multi
+       line */
+}
+`),
+            //language=typescript
+            typescript(
+`class A {
+        m() {}
+        // trailing note
+}
+`,
+`class A {
+    m() {}
+    // trailing note
+}
+`),
+            //language=typescript
+            typescript(
+`class A {
+    m() {
+                // first
+                /* second
+                   more */
+    }
+}
+`,
+`class A {
+    m() {
+        // first
+        /* second
+           more */
+    }
+}
+`),
+            //language=typescript
+            typescript(
+`outer(
+        inner(
+                x
+                /* inner
+                   c */
+        )
+        /* outer
+           c */
+);
+`,
+`outer(
+    inner(
+        x
+        /* inner
+           c */
+    )
+    /* outer
+       c */
+);
+`),
+            // The last element shares the opening line, so nothing before the comment establishes
+            // the element column.
+            //language=typescript
+            typescript(
+`foo(a
+        /* c */
+);
+`,
+`foo(a
+    /* c */
+);
+`),
+            // The `}` rides along on the comment's line, so the Space's last whitespace holds no
+            // newline even though the comment's own line needs re-indenting.
+            //language=typescript
+            typescript(
+`class A {
+        m() {}
+        /* c */ }
+`,
+`class A {
+    m() {}
+    /* c */ }
+`),
+            // rewrite-java pulls the last comment's interior toward the `}` column instead, a shift
+            // it reapplies on every pass until the interior reaches column 0.
+            //language=typescript
+            typescript(
+`class A {
+        m() {}
+        /* first
+           more */
+        /* second
+           more */
+}
+`,
+`class A {
+    m() {}
+    /* first
+       more */
+    /* second
+       more */
+}
+`)
+            // @formatter:on
+        );
+    });
 });

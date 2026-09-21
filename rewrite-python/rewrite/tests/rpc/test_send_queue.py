@@ -43,3 +43,47 @@ def test_changed_ref_list_item_is_re_added_instead_of_changed():
     assert states == ['ADD', 'CHANGE', 'ADD', 'CHANGE', 'CHANGE', 'ADD']
     assert q.q[2]['ref'] == 1 and q.q[2]['value'] == 'A1'
     assert q.q[5]['ref'] == 2 and q.q[5]['value'] == 'A2'
+
+
+def _states(q):
+    return [d['state'] for d in q.q]
+
+
+def test_reordered_elements_are_repositioned_not_resent():
+    """The positions array is what lets a reorder cost one integer per element
+    instead of re-sending the elements themselves."""
+    a, b, c = "A", "B", "C"
+    q = RpcSendQueue()
+
+    q.send_list([c, a, b], [a, b, c], lambda x: x)
+
+    assert _states(q) == ['CHANGE', 'CHANGE', 'NO_CHANGE', 'NO_CHANGE', 'NO_CHANGE']
+    assert q.q[1]['value'] == [2, 0, 1]
+
+
+def test_every_element_is_added_when_the_before_list_is_empty():
+    q = RpcSendQueue()
+
+    q.send_list(["A", "B"], [], lambda x: x)
+
+    assert _states(q) == ['CHANGE', 'CHANGE', 'ADD', 'ADD']
+    assert q.q[1]['value'] == [-1, -1]
+
+
+def test_mixed_adds_and_removals():
+    a, b, c, d = "A", "B", "C", "D"
+    q = RpcSendQueue()
+
+    q.send_list([a, "E", "F", c], [a, b, c, d], lambda x: x)
+
+    assert _states(q) == ['CHANGE', 'CHANGE', 'NO_CHANGE', 'ADD', 'ADD', 'NO_CHANGE']
+    assert q.q[1]['value'] == [0, -1, -1, 2]
+
+
+def test_unchanged_list_is_no_change():
+    before = ["A", "B"]
+    q = RpcSendQueue()
+
+    q.send_list(before, before, lambda x: x)
+
+    assert _states(q) == ['NO_CHANGE']

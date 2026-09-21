@@ -80,6 +80,18 @@ public class Protobuf2ParserBaseListener implements Protobuf2ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterEdition(Protobuf2Parser.EditionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitEdition(Protobuf2Parser.EditionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterImportStatement(Protobuf2Parser.ImportStatementContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -339,6 +351,18 @@ public class Protobuf2ParserBaseListener implements Protobuf2ParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitReserved(Protobuf2Parser.ReservedContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterExtensions(Protobuf2Parser.ExtensionsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitExtensions(Protobuf2Parser.ExtensionsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

@@ -15,7 +15,7 @@ From `rewrite-python/rewrite/`:
 uv pip install -e ".[dev]"
 ```
 
-Requires Python 3.10+ (`pyproject.toml` specifies `>=3.10`).
+Requires Python 3.12+ (`pyproject.toml` specifies `>=3.12`).
 
 ## Running Tests
 
@@ -30,6 +30,10 @@ pytest tests/python/all/tree/import_test.py -v --timeout=60
 # From repo root: ./gradlew :rewrite-python:generateTestClasspath
 pytest tests/rpc/ --timeout=120
 ```
+
+`REWRITE_PYTHON_DUMP_TYPES=1 pytest ... -s` prints each parsed file's type
+attribution, which is what a `MethodMatcher` pattern written for that test has
+to match. `missing`, `all` and `supertypes` are the other accepted values.
 
 **RPC tests can hang indefinitely** if communication fails (deadlock, malformed response, printer bugs). Always use explicit `--timeout`.
 
@@ -53,6 +57,7 @@ rewrite-python/rewrite/
 │   │   ├── _py2_parser_visitor.py        # Python 2 parser visitor
 │   │   ├── add_import.py                 # Import addition logic
 │   │   ├── remove_import.py              # Import removal logic
+│   │   ├── type_report.py                # Type attribution listing (rewrite-python-types)
 │   │   ├── recipes/                      # Built-in recipes
 │   │   ├── format/                       # Formatting visitors (auto_format, blank_lines, etc.)
 │   │   └── template/                     # Template engine (coordinates, patterns, etc.)
@@ -79,9 +84,11 @@ rewrite-python/rewrite/
 
 ## Development Patterns
 
-### Frozen Dataclasses with Padding
+### Read-only Dataclasses with Padding
 
-All LST nodes are immutable frozen dataclasses. Private fields (prefixed `_`) store padded versions; public `@property` accessors return unwrapped values.
+LST nodes are read-only to a type checker and plain dataclasses to the interpreter: `@lst_dataclass` is a `dataclass_transform` carrying `frozen_default=True`. Nothing raises on assignment, and `Space.build`/`Markers.build` return shared instances, so one in-place write can rewrite every node holding that instance.
+
+Private fields (prefixed `_`) store padded versions; public `@property` accessors return unwrapped values.
 
 ```python
 # Updating a node
@@ -117,7 +124,7 @@ When inserting after existing imports, the new import needs `prefix=Space([], '\
 - `JLeftPadded[T]`: before-space + element T (used for operators like `=`)
 - `JContainer[T]`: leading `(`, elements, trailing `)` with full padding control
 - Always access public properties (`.statements`, `.names`); use `.padding` for modifications
-- All tree nodes are frozen. Use `replace_if_changed()` or `.padding.replace()` for modifications.
+- Never assign to a node's field. Use `replace_if_changed()` or `.padding.replace()` for modifications.
 
 ### Recipe Pattern
 

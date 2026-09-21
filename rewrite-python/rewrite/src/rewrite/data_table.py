@@ -21,7 +21,8 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, Iterator, List, Optional, Type, TypeVar, TYPE_CHECKING, cast
+from typing import (Any, Dict, Generic, Iterator, List, Optional, Type, TypeVar, TYPE_CHECKING,
+                    Union, cast, get_args, get_origin)
 
 if TYPE_CHECKING:
     from rewrite.execution import ExecutionContext
@@ -251,6 +252,63 @@ class CsvDataTableStore(DataTableStore):
         return s
 
 
+# Java derives a column's type from `field.getType().getSimpleName()` (see
+# RecipeIntrospectionUtils). `type` is one of only two non-nullable fields on
+# ColumnDescriptor, so a Python table that omits it produces a descriptor Java
+# consumers cannot render. Map the annotation onto the Java simple name that an
+# equivalent Java-authored table would report.
+_JAVA_TYPE_NAMES = {
+    "str": "String",
+    # Python integers are arbitrary-precision, so Long is the closer analogue.
+    "int": "Long",
+    "bool": "Boolean",
+    "float": "Double",
+}
+
+# Every value is displayable as text, so an unrecognized annotation degrades to
+# String rather than failing the descriptor.
+DEFAULT_COLUMN_TYPE = "String"
+
+_OPTIONAL = re.compile(r"(?:typing\.)?Optional\[(.+)\]")
+
+
+def _unwrap_optional(annotation: Any) -> Any:
+    """Strip Optional/Union-with-None, which describes nullability, not type.
+
+    Java names a nullable column by its underlying type, so `Optional[str]` and
+    `str` must both report String.
+    """
+    args = [a for a in get_args(annotation) if a is not type(None)]
+    if get_origin(annotation) is Union and len(args) == 1:
+        return args[0]
+    return annotation
+
+
+def _java_type_name(annotation: Any) -> str:
+    """Map a dataclass field annotation to its Java simple type name."""
+    if annotation is None:
+        return DEFAULT_COLUMN_TYPE
+
+    if not isinstance(annotation, str):
+        # A real annotation object: unwrap before reading its name, since
+        # `Optional[int].__name__` is "Optional" and loses the inner type.
+        annotation = _unwrap_optional(annotation)
+        name = getattr(annotation, "__name__", str(annotation))
+    else:
+        # Under `from __future__ import annotations` the annotation is source
+        # text, so unwrap the same two spellings textually.
+        name = annotation.strip()
+        optional = _OPTIONAL.fullmatch(name)
+        if optional:
+            name = optional.group(1)
+        else:
+            union = [part.strip() for part in name.split("|")]
+            if len(union) == 2 and "None" in union:
+                name = next(part for part in union if part != "None")
+
+    return _JAVA_TYPE_NAMES.get(name.strip(), DEFAULT_COLUMN_TYPE)
+
+
 Row = TypeVar("Row")
 
 
@@ -340,6 +398,7 @@ class DataTable(Generic[Row]):
                     columns.append(
                         {
                             "name": field_name,
+                            "type": _java_type_name(field.type),
                             "displayName": col_desc.display_name,
                             "description": col_desc.description,
                         }

@@ -18,6 +18,7 @@ import {J, Type} from '../../java';
 import type {Pattern} from "./pattern";
 import type {Template} from "./template";
 import type {CaptureValue, RawCode} from "./capture";
+import type {JavaScriptVisitor} from "../visitor";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -349,6 +350,12 @@ export interface PatternOptions {
     dependencies?: Record<string, string>;
 
     /**
+     * Type packages to load whose declarations nothing imports, as {@link TemplateOptions.types}.
+     * A pattern matches on attribution, so a module typed only ambiently needs this to match.
+     */
+    types?: string[];
+
+    /**
      * When true, allows patterns without type annotations to match code with type annotations.
      * This enables more flexible pattern matching during development or when full type attribution
      * is not needed. When false, enforces strict type matching where both pattern and target must
@@ -481,6 +488,21 @@ export interface TemplateOptions {
      * The template engine will create a package.json with these dependencies.
      */
     dependencies?: Record<string, string>;
+
+    /**
+     * Type packages to load whose declarations nothing imports. TypeScript reads `@types/*` on its
+     * own and everything else only when named here, so a package declaring its modules ambiently —
+     * rather than at a path matching the specifier — resolves only with this set.
+     *
+     * @example `{dependencies: {'@sapui5/types': '^1.120.0'}, types: ['@sapui5/types']}`
+     */
+    types?: string[];
+
+    /**
+     * @deprecated Name the module in {@link TemplateOptions.context} as the import it stands for:
+     * `bindings: {vi: {module: 'vitest', member: 'vi'}}` is `context: ["import {vi} from 'vitest';"]`.
+     */
+    bindings?: never;
 }
 
 /**
@@ -509,6 +531,32 @@ export interface ApplyOptions {
      * ```
      */
     values?: Map<Capture | string, J> | MatchResult | Record<string, J>;
+
+    /**
+     * Whether the result is fitted to where it lands. Defaults to `true`; pass `false` to assemble
+     * several results into one subtree and format that subtree once, rather than once per application.
+     * The anchor supplies the result's prefix either way.
+     */
+    format?: boolean;
+
+    /**
+     * Local names for the bindings the template declares, keyed as they are declared — normally
+     * {@link Template.resolveBindings}. Every declared binding needs one.
+     */
+    bindings?: Record<string, string>;
+}
+
+/** Options a caller supplies per node, as against the ones {@link RewriteConfig} fixes for the rule. */
+export interface TryOnOptions {
+    /**
+     * The visitor to bind the applied template's declared modules in. The rule holds that template,
+     * so it resolves them itself, and only once a pattern has matched — a rule that does not fire
+     * leaves the file's imports alone. {@link TryOnOptions.bindings} overrides this.
+     */
+    visitor?: JavaScriptVisitor<any>;
+
+    /** As {@link ApplyOptions.bindings}, for a caller that resolves the modules some other way. */
+    bindings?: Record<string, string>;
 }
 
 /**
@@ -524,7 +572,7 @@ export interface RewriteRule {
      *          When using in a visitor, always use the `|| node` pattern to return the original
      *          node when there's no match: `return await rule.tryOn(this.cursor, node) || node;`
      */
-    tryOn(cursor: Cursor, node: J): Promise<J | undefined>;
+    tryOn(cursor: Cursor, node: J, options?: TryOnOptions): Promise<J | undefined>;
 
     /**
      * Chains this rule with another rule, creating a composite rule that applies both transformations sequentially.
@@ -623,6 +671,9 @@ export interface PostMatchContext {
 export interface RewriteConfig {
     before: Pattern | Pattern[];
     after: Template | ((match: MatchResult) => Template);
+
+    /** As {@link ApplyOptions.format}, applied to every node the rule rewrites. */
+    format?: boolean;
 
     /**
      * Optional predicate evaluated BEFORE pattern matching.

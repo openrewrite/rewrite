@@ -218,6 +218,23 @@ public class WhitespaceValidatorTests
     }
 
     [Fact]
+    public void AttributeOnAccessor()
+    {
+        AssertNoViolations(
+            """
+            class Foo {
+                int P
+                {
+                    [Obsolete]
+                    get { return 1; }
+                    [Obsolete]
+                    private set { }
+                }
+            }
+            """);
+    }
+
+    [Fact]
     public void AttributeOnParameter()
     {
         AssertNoViolations(

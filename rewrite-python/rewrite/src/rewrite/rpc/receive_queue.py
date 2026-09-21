@@ -23,10 +23,11 @@ This processes the same JSON format that Python sends:
 ]
 """
 from collections import deque
-from typing import Any, Callable, Deque, Dict, List, NamedTuple, Optional, TypeVar, cast
+from typing import Any, Callable, Deque, Dict, List, NamedTuple, Optional, Set, TypeVar, cast
 
 from rewrite import Markers
 from rewrite.rpc.send_queue import RpcObjectState
+from rewrite.utils import assign_fields, replace_if_changed
 
 T = TypeVar('T')
 
@@ -79,6 +80,10 @@ class RpcReceiveQueue:
         self._source_file_type = source_file_type
         self._pull = pull
         self._trace = trace
+        # Ids of the objects this queue built and has not published yet. A child
+        # is added and dropped inside its own frame, so this holds one entry per
+        # level of the tree being received rather than one per node.
+        self._fresh: Set[int] = set()
 
     def take(self) -> RpcObjectData:
         """Take the next message from the queue, fetching more if needed."""
@@ -164,21 +169,39 @@ class RpcReceiveQueue:
                 # New object or forward declaration with ref
                 if message.value_type is None:
                     before = message.value
+                    fresh = False
                 else:
                     before = self._new_obj(message.value_type)
+                    fresh = True
 
                 if ref is not None:
                     # Store for future references (handles cyclic graphs)
                     self._refs[ref] = before
 
             # Fall through to CHANGE for field-by-field deserialization
-            return self._do_change(before, on_change, message, ref)
+            if not fresh:
+                return self._do_change(before, on_change, message, ref)
+            self._fresh.add(id(before))
+            try:
+                return self._do_change(before, on_change, message, ref)
+            finally:
+                self._fresh.discard(id(before))
 
         elif message.state == RpcObjectState.CHANGE:
             return self._do_change(before, on_change, message, message.ref)
 
         else:
             raise RuntimeError(f"Unknown state type: {message.state}")
+
+    def apply(self, obj: T, **kwargs) -> T:
+        """Give a node the fields just read off the wire.
+
+        A node this queue is still building is filled in place; one the caller
+        already holds is copied, because a visitor may be sharing it.
+        """
+        if id(obj) in self._fresh:
+            return assign_fields(obj, **kwargs)
+        return replace_if_changed(obj, **kwargs)
 
     def _do_change(
         self,
@@ -307,7 +330,7 @@ class RpcReceiveQueue:
             new_id = self.receive_defined(m.id)
             new_markers_list = self.receive_list(list(m.markers) if m.markers else None)
 
-            return Markers(new_id, new_markers_list or [])
+            return Markers.build(new_id, new_markers_list or [])
 
         return self.receive(markers, on_change) or Markers.EMPTY
 
@@ -432,7 +455,7 @@ def _receive_markers(markers: 'Markers', q: RpcReceiveQueue) -> 'Markers':
     new_id = q.receive_defined(markers.id)
     new_markers_list = q.receive_list(list(markers.markers) if markers.markers else None)
 
-    return Markers(new_id, new_markers_list or [])
+    return Markers.build(new_id, new_markers_list or [])
 
 
 # ============================================================================

@@ -120,7 +120,25 @@ describe('Malformed hex escape sequences (error 1125)', () => {
         }
     }));
 
-    test('should NOT parse in .ts files', () => {
-        return expect(spec.rewriteRun(typescript('/\\x-.*/'))).rejects.toThrow(/Hexadecimal digit expected/);
+    test('should parse in .ts files', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('/\\x-.*/')
+        ));
+
+    test('string escape should parse in .js files', () => spec.rewriteRun(javascript("'\\x'")));
+
+    test('string escape should NOT parse in .ts files', () => {
+        // A regex literal's `\x` is validated by the checker, a string literal's by the scanner, so only
+        // the latter reaches `jsOnlyExcludedCodes`.
+        return expect(spec.rewriteRun(typescript("'\\x'"))).rejects.toThrow(/Hexadecimal digit expected/);
     });
+});
+
+describe('surrogate pairs', () => {
+    test('a character outside the BMP round-trips as itself', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('const s = "\u{1F42D}";')
+        ));
 });

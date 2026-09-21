@@ -17,6 +17,7 @@
 package parenthesize
 
 import (
+	"go/build"
 	goparser "go/parser"
 	gotoken "go/token"
 	"os"
@@ -125,9 +126,15 @@ func TestVisitorRegroupsStdlibToParseableCode(t *testing.T) {
 			if err != nil {
 				t.Skip(err)
 			}
-			cu, err := parser.NewGoParser().Parse(filepath.Base(rel), string(content))
+			src := string(content)
+			if !parser.MatchBuildContext(build.Default, filepath.Base(rel), src) {
+				t.Skipf("%s is excluded from the build under this toolchain", rel)
+			}
+			// Past the build filter, a parse failure is a gap in the parser, not
+			// a corpus the toolchain moved out from under.
+			cu, err := parser.NewGoParser().Parse(filepath.Base(rel), src)
 			if err != nil {
-				t.Skip(err)
+				t.Fatalf("parse: %v", err)
 			}
 			ungrouped := printer.Print(visitor.Init(&unwrapper{}).Visit(cu, nil))
 			got := printer.Print(NewVisitor().Visit(visitor.Init(&unwrapper{}).Visit(cu, nil), nil))

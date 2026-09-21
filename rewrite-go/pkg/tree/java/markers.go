@@ -186,3 +186,14 @@ func MarkupInfo(markers Markers, message string) Markers {
 func MarkupError(markers Markers, message string) Markers {
 	return AddMarker(markers, NewMarkup(MarkupErrorLevel, message, ""))
 }
+
+const markupWarnJavaType = "org.openrewrite.marker.Markup$Warn"
+
+func AddMarkupWarn(markers Markers, message, detail string) Markers {
+	id := uuid.New()
+	data := map[string]any{"id": id.String(), "message": message}
+	if detail != "" {
+		data["detail"] = detail
+	}
+	return AddMarker(markers, GenericMarker{Ident: id, JavaType: markupWarnJavaType, Data: data})
+}

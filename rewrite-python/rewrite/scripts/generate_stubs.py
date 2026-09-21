@@ -237,11 +237,17 @@ def extract_abstract_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[s
     return methods
 
 
+# `dataclass_transform` aliases for an LST node: a dataclass to a checker, which a
+# stub spells as `@dataclass(frozen=True)`. So they are recognised here but never
+# emitted, and their names are dropped from a stub's imports.
+_LST_TRANSFORMS = ("lst_dataclass", "lst_value_dataclass")
+_DATACLASS_TRANSFORMS = ("dataclass",) + _LST_TRANSFORMS
+
+
 def is_dataclass(node: ast.ClassDef) -> bool:
     """Check if a class is decorated with @dataclass (any variant)."""
     for decorator in node.decorator_list:
-        # @dataclass or @dataclass()
-        if isinstance(decorator, ast.Name) and decorator.id == "dataclass":
+        if isinstance(decorator, ast.Name) and decorator.id in _DATACLASS_TRANSFORMS:
             return True
         if isinstance(decorator, ast.Call):
             if isinstance(decorator.func, ast.Name) and decorator.func.id == "dataclass":
@@ -250,8 +256,16 @@ def is_dataclass(node: ast.ClassDef) -> bool:
 
 
 def is_frozen_dataclass(node: ast.ClassDef) -> bool:
-    """Check if a class is decorated with @dataclass(frozen=True)."""
+    """Check whether a class is read-only to a type checker.
+
+    Three spellings count: `@dataclass(frozen=True)`, `@lst_dataclass` and
+    `@lst_value_dataclass`. The latter two are `dataclass_transform`s carrying
+    `frozen_default=True`, so the node stays read-only to a checker without the
+    interpreter enforcing it. All must reach the stub as `@dataclass(frozen=True)`.
+    """
     for decorator in node.decorator_list:
+        if isinstance(decorator, ast.Name) and decorator.id in _LST_TRANSFORMS:
+            return True
         if isinstance(decorator, ast.Call):
             if isinstance(decorator.func, ast.Name) and decorator.func.id == "dataclass":
                 for keyword in decorator.keywords:
@@ -585,11 +599,13 @@ def extract_imports(tree: ast.Module, current_package: str = "") -> List[Tuple[s
                     f"{alias.name} as {alias.asname or alias.name}"
                     for alias in node.names
                     if alias.name != "*"  # star imports handled separately
+                    and alias.name not in _LST_TRANSFORMS
                 )
             else:
                 names = ", ".join(
                     alias.name + (f" as {alias.asname}" if alias.asname else "")
                     for alias in node.names
+                    if alias.name not in _LST_TRANSFORMS
                 )
 
             if names:  # Skip if only star import

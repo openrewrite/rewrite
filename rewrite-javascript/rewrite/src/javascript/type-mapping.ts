@@ -17,6 +17,25 @@ import ts from "typescript";
 import * as path from "path";
 import {Type} from "../java";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
+import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
+
+/**
+ * TypeScript orders union constituents by internal type id, which varies with what the checker resolved
+ * earlier in the run; ordering by signature keeps a union's signature the same across parses. Intersections
+ * keep the order they were written in and are left alone. Call once `bounds` is attached to its owner, so
+ * a constituent that reaches back into it reads the whole constituent list rather than an empty one.
+ */
+function sortBySignature(bounds: Type[]): void {
+    const keys = new Map<Type, string>(bounds.map(b => [b, Type.signature(b)]));
+    bounds.sort((a, b) => {
+        const ka = keys.get(a)!, kb = keys.get(b)!;
+        return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+}
+
+function typeSignatureToJSON(this: Type): string {
+    return Type.signature(this);
+}
 
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
@@ -111,9 +130,7 @@ export class JavaScriptTypeMapping {
             interfaces: [],
             members: [],
             methods: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Class;
     }
 
@@ -189,9 +206,7 @@ export class JavaScriptTypeMapping {
             interfaces: [],
             members: [],
             methods: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Class;
         this.typeCache.set(cacheKey, classType);
         return classType;
@@ -256,9 +271,7 @@ export class JavaScriptTypeMapping {
                         interfaces: [],
                         members: [],
                         methods: [],
-                        toJSON: function () {
-                            return Type.signature(this);
-                        }
+                        toJSON: typeSignatureToJSON
                     } as Type.Class;
                     this.typeCache.set(aliasSignature, aliasType);
                     return aliasType;
@@ -352,9 +365,7 @@ export class JavaScriptTypeMapping {
                                 type: classType,
                                 typeParameters: [],
                                 fullyQualifiedName: classType.fullyQualifiedName,
-                                toJSON: function () {
-                                    return Type.signature(this);
-                                }
+                                toJSON: typeSignatureToJSON
                             } as Type.Parameterized;
                             this.typeCache.set(signature, parameterized);
 
@@ -461,12 +472,23 @@ export class JavaScriptTypeMapping {
             return functionType;
         }
 
-        // For anonymous object types that could have circular references
+        // A structural type has no nominal name, so every object literal `{a: 1}` and type
+        // literal `{a: number}` shares the synthetic FQN `{}`, with `members` carrying the shape.
         if (type.flags & ts.TypeFlags.Object) {
             const objectFlags = (type as ts.ObjectType).objectFlags;
             if (objectFlags & ts.ObjectFlags.Anonymous) {
-                return Type.unknownType;
+                const objectType = this.createEmptyObjectType();
+                this.typeCache.set(signature, objectType);
+                this.populateClassType(objectType, type);
+                return objectType;
             }
+        }
+
+        // The `object` keyword: an object of unknown shape.
+        if (type.flags & ts.TypeFlags.NonPrimitive) {
+            const objectType = this.createEmptyObjectType();
+            this.typeCache.set(signature, objectType);
+            return objectType;
         }
 
         // Pre-cache as unknownType before resolving type aliases to prevent infinite
@@ -606,9 +628,7 @@ export class JavaScriptTypeMapping {
                             interfaces: [],
                             members: [],
                             methods: [],
-                            toJSON: function () {
-                                return Type.signature(this);
-                            }
+                            toJSON: typeSignatureToJSON
                         } as Type.Class;
                     }
                 }
@@ -649,9 +669,7 @@ export class JavaScriptTypeMapping {
                                             interfaces: [],
                                             members: [],
                                             methods: [],
-                                            toJSON: function () {
-                                                return Type.signature(this);
-                                            }
+                                            toJSON: typeSignatureToJSON
                                         } as Type.Class;
                                     }
                                 }
@@ -669,12 +687,42 @@ export class JavaScriptTypeMapping {
             owner: ownerType,
             type: mappedType,
             annotations: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Variable;
 
         return variable;
+    }
+
+    /**
+     * The module specifier of a `require('module')` call, or undefined for anything else.
+     *
+     * `require` is declared to return `any`, so the checker carries no module type through it and
+     * the specifier in the call is the only thing identifying the module.
+     */
+    private requiredModuleSpecifier(node: ts.Expression): string | undefined {
+        if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression) ||
+            node.expression.text !== 'require' || node.arguments.length === 0) {
+            return undefined;
+        }
+        const moduleArg = node.arguments[0];
+        return ts.isStringLiteral(moduleArg) ? moduleArg.text : undefined;
+    }
+
+    /**
+     * The module an expression evaluates to where that is a `require()` result — either the call
+     * itself (`require('x').fn()`) or an identifier bound to one (`const x = require('x')`).
+     */
+    private requiredModuleOfExpression(node: ts.Expression): string | undefined {
+        const direct = this.requiredModuleSpecifier(node);
+        if (direct) {
+            return direct;
+        }
+        if (!ts.isIdentifier(node)) {
+            return undefined;
+        }
+        const valueDecl = this.checker.getSymbolAtLocation(node)?.valueDeclaration;
+        return valueDecl && ts.isVariableDeclaration(valueDecl) && valueDecl.initializer ?
+            this.requiredModuleSpecifier(valueDecl.initializer) : undefined;
     }
 
     /**
@@ -797,9 +845,7 @@ export class JavaScriptTypeMapping {
             annotations: [],
             defaultValue: undefined,
             declaredFormalTypeNames: declaredFormalTypeNames,
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Method;
 
         this.methodCache.set(cacheKey, method);
@@ -820,6 +866,27 @@ export class JavaScriptTypeMapping {
     }
 
     methodType(node: ts.Node): Type.Method | undefined {
+        // An object literal is a `J.NewClass`, and `J.NewClass.getType()` reads
+        // `constructorType.returnType`, as it does for a Java anonymous class.
+        if (ts.isObjectLiteralExpression(node)) {
+            const objectType = this.type(node);
+            if (!Type.isFullyQualified(objectType)) {
+                return undefined;
+            }
+            return {
+                kind: Type.Kind.Method,
+                flags: 0,
+                declaringType: objectType,
+                name: '<constructor>',
+                returnType: objectType,
+                parameterNames: [],
+                parameterTypes: [],
+                thrownExceptions: [],
+                annotations: [],
+                declaredFormalTypeNames: [],
+                toJSON: typeSignatureToJSON
+            } as Type.Method;
+        }
 
         let signature: ts.Signature | undefined;
         let methodName: string;
@@ -856,41 +923,14 @@ export class JavaScriptTypeMapping {
                     // where the module is typed as 'any' but methods still have signatures
 
                     // Try to trace back through the AST to find the require() call
-                    let inferredDeclaringType: Type.FullyQualified | undefined;
-                    const objExpr = node.expression.expression;
-
-                    if (ts.isIdentifier(objExpr)) {
-                        // Look for the variable declaration that assigns the require() result
-                        const objSymbol = this.checker.getSymbolAtLocation(objExpr);
-
-                        if (objSymbol && objSymbol.valueDeclaration) {
-                            const valueDecl = objSymbol.valueDeclaration;
-                            if (ts.isVariableDeclaration(valueDecl) && valueDecl.initializer) {
-                                // Check if it's a require() call
-                                if (ts.isCallExpression(valueDecl.initializer)) {
-                                    const callExpr = valueDecl.initializer;
-                                    if (ts.isIdentifier(callExpr.expression) &&
-                                        callExpr.expression.getText() === 'require' &&
-                                        callExpr.arguments.length > 0) {
-                                        // Extract the module name from require('module-name')
-                                        const moduleArg = callExpr.arguments[0];
-                                        if (ts.isStringLiteral(moduleArg)) {
-                                            const moduleName = moduleArg.text;
-
-                                            inferredDeclaringType = {
-                                                kind: Type.Kind.Class,
-                                                flags: 0, // TODO - determine flags
-                                                fullyQualifiedName: moduleName
-                                            } as Type.FullyQualified;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    const moduleName = this.requiredModuleOfExpression(node.expression.expression);
 
                     // Use the inferred type or fall back to unknown
-                    declaringType = inferredDeclaringType || Type.unknownType as Type.FullyQualified;
+                    declaringType = moduleName ? {
+                        kind: Type.Kind.Class,
+                        flags: 0, // TODO - determine flags
+                        fullyQualifiedName: moduleName
+                    } as Type.FullyQualified : Type.unknownType as Type.FullyQualified;
 
                     // Create the method type using the helper
                     return this.createMethodType(signature, node, declaringType, methodName);
@@ -948,6 +988,19 @@ export class JavaScriptTypeMapping {
                 } else {
                     // Default to unknown if we can't determine the type
                     declaringType = Type.unknownType as Type.FullyQualified;
+                }
+
+                // A `require()` result is typed `any`, so nothing above identifies the module; the
+                // specifier in the call does.
+                if (declaringType === Type.unknownType) {
+                    const moduleName = this.requiredModuleOfExpression(node.expression.expression);
+                    if (moduleName) {
+                        declaringType = {
+                            kind: Type.Kind.Class,
+                            flags: 0, // TODO - determine flags
+                            fullyQualifiedName: moduleName
+                        } as Type.FullyQualified;
+                    }
                 }
 
                 // For string methods like 'hello'.split(), ensure we have a proper declaring type for primitives
@@ -1259,9 +1312,14 @@ export class JavaScriptTypeMapping {
                 // file's node_modules path) match the names used for directly imported types.
                 packageName = this.normalizePackageName(packageName);
 
-                // Find the symbol name (everything after the last dot in the original cleaned name)
+                // The symbol name is appended to the declaration file's path, so it is whatever
+                // follows the last dot of the final path segment. Directory names carry dots of
+                // their own — `.pnpm`, `.yarn`, a hidden parent such as `.claude`, a versioned
+                // pnpm directory — so a search over the whole path would split there instead and
+                // fold most of the path into the name.
+                const lastSegmentIndex = cleanedName.lastIndexOf('/') + 1;
                 const lastDotIndex = cleanedName.lastIndexOf('.');
-                if (lastDotIndex > 0) {
+                if (lastDotIndex > lastSegmentIndex) {
                     const symbolName = cleanedName.substring(lastDotIndex + 1);
                     cleanedName = `${packageName}.${symbolName}`;
                 } else {
@@ -1371,9 +1429,7 @@ export class JavaScriptTypeMapping {
             interfaces: [],
             members: [],
             methods: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Class;
     }
 
@@ -1496,9 +1552,7 @@ export class JavaScriptTypeMapping {
                     owner: classType,  // Cyclic reference to the containing class (already in cache)
                     type: this.getType(propType), // This will find classType in cache if it's recursive
                     annotations: [],
-                    toJSON: function () {
-                        return Type.signature(this);
-                    }
+                    toJSON: typeSignatureToJSON
                 } as Type.Variable;
                 classType.members.push(variable);
             }
@@ -1575,6 +1629,7 @@ export class JavaScriptTypeMapping {
 
         // Update the bounds in the union we created
         (union as any).bounds = bounds;
+        sortBySignature(bounds);
 
         return union;
     }
@@ -1644,6 +1699,21 @@ export class JavaScriptTypeMapping {
         return gtv;
     }
 
+    private createEmptyObjectType(): Type.Class {
+        return {
+            kind: Type.Kind.Class,
+            flags: 0,
+            classKind: Type.Class.Kind.Interface,
+            fullyQualifiedName: OBJECT_TYPE_NAME,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
+            toJSON: typeSignatureToJSON
+        } as Type.Class;
+    }
+
     /**
      * Create an empty function type shell with FQN 𝑓.
      * The shell will be populated later to handle circular references.
@@ -1659,9 +1729,7 @@ export class JavaScriptTypeMapping {
             interfaces: [],
             members: [],
             methods: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Class;
     }
 
@@ -1725,9 +1793,7 @@ export class JavaScriptTypeMapping {
             annotations: [],
             defaultValue: undefined,
             declaredFormalTypeNames: [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
+            toJSON: typeSignatureToJSON
         } as Type.Method;
 
         // Add the apply method to the function class

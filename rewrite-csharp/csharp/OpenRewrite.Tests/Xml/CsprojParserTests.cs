@@ -214,6 +214,10 @@ public class CsprojParserTests
         var edge = Assert.Single(placeholder.Dependencies);
         Assert.Equal("Newtonsoft.Json", edge.Name);
         Assert.Equal("13.0.3", edge.ResolvedVersion); // edge links to the RESOLVED node
+        // The DECLARED range from the lock file is preserved alongside the resolved edge
+        var declaredRange = Assert.Single(placeholder.DependencyRanges);
+        Assert.Equal("Newtonsoft.Json", declaredRange.Key);
+        Assert.Equal("[13.0.1, )", declaredRange.Value);
 
         var newtonsoft = tf.ResolvedPackages.Single(p => p.Name == "Newtonsoft.Json");
         Assert.Equal(1, newtonsoft.Depth); // transitive
@@ -224,5 +228,81 @@ public class CsprojParserTests
         Assert.True(newtonsoft.HasInstallScripts);
         Assert.True(newtonsoft.HasXdtTransforms);
         Assert.True(newtonsoft.HasLegacyContentFolder);
+        Assert.Empty(newtonsoft.DependencyRanges);
+    }
+
+    [Fact]
+    public void ReferencedProjectsAreGraphRootsForDepthComputation()
+    {
+        var lockFileJson = """
+            {
+              "version": 3,
+              "targets": {
+                "net8.0": {
+                  "Lib/1.0.0": {
+                    "type": "project",
+                    "dependencies": {
+                      "Newtonsoft.Json": "13.0.3"
+                    }
+                  },
+                  "Newtonsoft.Json/13.0.3": {
+                    "type": "package",
+                    "compile": {
+                      "lib/net6.0/Newtonsoft.Json.dll": {}
+                    }
+                  }
+                }
+              },
+              "libraries": {
+                "Lib/1.0.0": {
+                  "type": "project",
+                  "path": "../Lib/Lib.csproj",
+                  "msbuildProject": "../Lib/Lib.csproj"
+                },
+                "Newtonsoft.Json/13.0.3": {
+                  "type": "package",
+                  "path": "newtonsoft.json/13.0.3",
+                  "files": [ "lib/net6.0/Newtonsoft.Json.dll" ]
+                }
+              },
+              "projectFileDependencyGroups": {
+                "net8.0": []
+              },
+              "packageFolders": {},
+              "project": {
+                "version": "1.0.0",
+                "restore": {
+                  "projectName": "App",
+                  "projectStyle": "PackageReference",
+                  "originalTargetFrameworks": ["net8.0"],
+                  "frameworks": {
+                    "net8.0": {
+                      "targetAlias": "net8.0",
+                      "projectReferences": {
+                        "../Lib/Lib.csproj": {
+                          "projectPath": "../Lib/Lib.csproj"
+                        }
+                      }
+                    }
+                  }
+                },
+                "frameworks": {
+                  "net8.0": {
+                    "targetAlias": "net8.0",
+                    "dependencies": {}
+                  }
+                }
+              }
+            }
+            """;
+        var lockFile = new LockFileFormat().Parse(lockFileJson, "in-memory");
+
+        var marker = MSBuildProjectHelper.CreateFromLockFile(
+            "Microsoft.NET.Sdk", lockFile, Path.GetTempPath());
+
+        var tf = Assert.Single(marker.TargetFrameworks);
+        Assert.Equal(0, tf.ResolvedPackages.Single(p => p.Name == "Lib").Depth);
+        // Reached only through the project reference — depth 1, not a root.
+        Assert.Equal(1, tf.ResolvedPackages.Single(p => p.Name == "Newtonsoft.Json").Depth);
     }
 }
