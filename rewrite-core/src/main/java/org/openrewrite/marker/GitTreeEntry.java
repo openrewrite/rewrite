@@ -15,9 +15,11 @@
  */
 package org.openrewrite.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -30,4 +32,36 @@ public class GitTreeEntry implements Marker {
     String objectId;
 
     int fileMode;
+
+    /**
+     * How the bytes the source file was parsed from compare to this blob, or null when not recorded.
+     */
+    @Nullable
+    WorkingTreeMatch workingTreeMatch;
+
+    public GitTreeEntry(UUID id, String objectId, int fileMode) {
+        this(id, objectId, fileMode, null);
+    }
+
+    @JsonCreator
+    public GitTreeEntry(UUID id, String objectId, int fileMode, @Nullable WorkingTreeMatch workingTreeMatch) {
+        this.id = id;
+        this.objectId = objectId;
+        this.fileMode = fileMode;
+        this.workingTreeMatch = workingTreeMatch;
+    }
+
+    public enum WorkingTreeMatch {
+        IDENTICAL,
+
+        /**
+         * Identical once CRLF line endings are converted to LF, as git does on commit with autocrlf.
+         */
+        CRLF,
+
+        /**
+         * An uncommitted change, or a symlink whose target was parsed in its place.
+         */
+        DIFFERENT
+    }
 }
