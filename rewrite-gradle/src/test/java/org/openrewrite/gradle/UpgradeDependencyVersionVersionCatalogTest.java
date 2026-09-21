@@ -23,6 +23,7 @@ import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
 
@@ -796,7 +797,7 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
     }
 
     @Test
-    void libraryWithInterpolatedVersionIsLeftUnchanged() {
+    void libraryWithInterpolatedVersionIsUpgraded() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-d", "2.0", null)),
           settingsGradle(
@@ -807,6 +808,37 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
                   versionCatalogs {
                       libs {
                           library('widgetD', 'com.acme', 'widget-d').version("${widgetDVersion}")
+                      }
+                  }
+              }
+              """,
+            """
+              def widgetDVersion = '2.0'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          library('widgetD', 'com.acme', 'widget-d').version("${widgetDVersion}")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void libraryWithPartiallyInterpolatedVersionIsLeftUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-d", "2.0", null)),
+          settingsGradle(
+            """
+              def widgetDMinor = '0'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          library('widgetD', 'com.acme', 'widget-d').version("1.${widgetDMinor}")
                       }
                   }
               }
@@ -1103,6 +1135,292 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
                       versionCatalog {
                           library('widgetA', 'com.acme', 'widget-a').version('2.0')
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionHeldInAVariableIsUpgraded() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)),
+          settingsGradle(
+            """
+              ext {
+                  widgetAVersion = '1.0'
+              }
+
+              def widgetBVersion = '1.0'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('widgetB', widgetBVersion)
+                          library('widgetA', 'com.acme', 'widget-a').version(widgetAVersion)
+                          library('widgetB', 'com.acme', 'widget-b').versionRef('widgetB')
+                      }
+                  }
+              }
+              """,
+            """
+              ext {
+                  widgetAVersion = '2.0'
+              }
+
+              def widgetBVersion = '2.0'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('widgetB', widgetBVersion)
+                          library('widgetA', 'com.acme', 'widget-a').version(widgetAVersion)
+                          library('widgetB', 'com.acme', 'widget-b').versionRef('widgetB')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinVersionHeldInAVariableIsUpgraded() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)),
+          settingsGradleKts(
+            """
+              val widgetAVersion = "1.0"
+              val widgetBVersion = "1.0"
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      create("libs") {
+                          library("widgetA", "com.acme", "widget-a").version(widgetAVersion)
+                          library("widgetB", "com.acme", "widget-b").version("$widgetBVersion")
+                      }
+                  }
+              }
+              """,
+            """
+              val widgetAVersion = "2.0"
+              val widgetBVersion = "2.0"
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      create("libs") {
+                          library("widgetA", "com.acme", "widget-a").version(widgetAVersion)
+                          library("widgetB", "com.acme", "widget-b").version("$widgetBVersion")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionHeldInGradlePropertiesIsUpgraded() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          properties(
+            """
+              widgetVersion=1.0
+              """,
+            """
+              widgetVersion=2.0
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('widget', widgetVersion)
+                          library('widgetA', 'com.acme', 'widget-a').versionRef('widget')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void pluginSharingTheVariableDoesNotHoldTheUpgradeBack() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          settingsGradle(
+            """
+              def widgetVersion = '1.0'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('widget', widgetVersion)
+                          library('widgetA', 'com.acme', 'widget-a').versionRef('widget')
+                          plugin('widgetPlugin', 'com.acme.widget').versionRef('widget')
+                      }
+                  }
+              }
+              """,
+            """
+              def widgetVersion = '2.0'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('widget', widgetVersion)
+                          library('widgetA', 'com.acme', 'widget-a').versionRef('widget')
+                          plugin('widgetPlugin', 'com.acme.widget').versionRef('widget')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedVariableMovesWhenTheUntargetedNeighbourIsPublishedAtTheNewVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "tomcat-embed-core", "10.0.27", null)),
+          settingsGradle(
+            """
+              rootProject.name = 'catalog-variable'
+              apply from: './gradle/versions.gradle'
+              """
+          ),
+          buildGradle(
+            """
+              def tomcatVersion = '10.0.0'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('tomcat', tomcatVersion)
+                          library('tomcatCore', 'org.apache.tomcat.embed', 'tomcat-embed-core').versionRef('tomcat')
+                          library('tomcatEl', 'org.apache.tomcat.embed', 'tomcat-embed-el').versionRef('tomcat')
+                      }
+                  }
+              }
+              """,
+            """
+              def tomcatVersion = '10.0.27'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('tomcat', tomcatVersion)
+                          library('tomcatCore', 'org.apache.tomcat.embed', 'tomcat-embed-core').versionRef('tomcat')
+                          library('tomcatEl', 'org.apache.tomcat.embed', 'tomcat-embed-el').versionRef('tomcat')
+                      }
+                  }
+              }
+              """,
+            spec -> spec.path("gradle/versions.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedVariableIsLeftAloneWhenTheUntargetedNeighbourHasNoSuchVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "tomcat-embed-core", "10.0.27", null)),
+          settingsGradle(
+            """
+              rootProject.name = 'catalog-variable'
+              apply from: './gradle/versions.gradle'
+              """
+          ),
+          buildGradle(
+            """
+              def tomcatVersion = '10.0.0'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('tomcat', tomcatVersion)
+                          library('tomcatCore', 'org.apache.tomcat.embed', 'tomcat-embed-core').versionRef('tomcat')
+                          library('guava', 'com.google.guava', 'guava').versionRef('tomcat')
+                      }
+                  }
+              }
+              """,
+            spec -> spec.path("gradle/versions.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void producerBlockVersionHeldInAnExtPropertyIsUpgraded() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      widgetVersion = '1.0'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      version('widget', widgetVersion)
+                      library('widgetA', 'com.acme', 'widget-a').versionRef('widget')
+                      plugin('widgetPlugin', 'com.acme.widget').versionRef('widget')
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  ext {
+                      widgetVersion = '2.0'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      version('widget', widgetVersion)
+                      library('widgetA', 'com.acme', 'widget-a').versionRef('widget')
+                      plugin('widgetPlugin', 'com.acme.widget').versionRef('widget')
                   }
               }
               """

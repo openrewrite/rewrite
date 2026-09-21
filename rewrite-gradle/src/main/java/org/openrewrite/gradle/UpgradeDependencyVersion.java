@@ -202,6 +202,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         //noinspection BooleanMethodIsAlwaysInverted
         JavaVisitor<ExecutionContext> scanGradle = new JavaVisitor<ExecutionContext>() {
+            final VersionCatalog.Matcher catalogMatcher = new VersionCatalog.Matcher();
+
             @Nullable
             GradleProject gradleProject;
 
@@ -253,7 +255,27 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         .artifactId(artifactId)
                         .get(getCursor())
                         .ifPresent(entry -> scanSpringDependencyManagementEntry(entry, ctx));
+
+                catalogMatcher.get(getCursor()).ifPresent(this::trackCatalogVariableUsage);
                 return m;
+            }
+
+            /**
+             * Records every library, matched or not, so the shared-variable guard vets the neighbours.
+             * Plugins are left out: their marker artifact usually lives in the plugin portal, so
+             * requiring it be published there would decline safe upgrades.
+             */
+            private void trackCatalogVariableUsage(VersionCatalog catalog) {
+                Map<String, String> declarationVariables = catalog.getVersionDeclarationVariables();
+                catalog.getLibraryVersions().forEach((ga, library) -> {
+                    String variable = library.getResolvedVersionVariable(declarationVariables);
+                    if (variable != null) {
+                        acc.versionPropNameToGA.computeIfAbsent(variable, k -> new HashMap<>())
+                                .computeIfAbsent(ga, k -> new HashSet<>());
+                        acc.variableNames.computeIfAbsent(variable, k -> new HashMap<>())
+                                .computeIfAbsent(ga, k -> new HashSet<>());
+                    }
+                });
             }
 
             private void trackVariableUsage(GradleDependency gradleDependency) {
