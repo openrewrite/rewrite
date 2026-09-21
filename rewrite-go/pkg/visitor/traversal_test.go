@@ -51,7 +51,7 @@ type spaceCollector struct {
 }
 
 func (c *spaceCollector) VisitSpace(space java.Space, p any) java.Space {
-	c.spaces = append(c.spaces, space.Whitespace)
+	c.spaces = append(c.spaces, space.Whitespace())
 	return c.GoVisitor.VisitSpace(space, p)
 }
 
@@ -228,11 +228,8 @@ func TestEmptyMarkersAreVisited(t *testing.T) {
 	// given
 	found := uuid.New()
 	empty := &java.Empty{
-		ID: uuid.New(),
-		Markers: java.Markers{
-			ID:      uuid.New(),
-			Entries: []java.Marker{java.SearchResult{Ident: found}},
-		},
+		ID:      uuid.New(),
+		Markers: java.MakeMarkers(uuid.New(), []java.Marker{java.SearchResult{Ident: found}}),
 	}
 
 	// when

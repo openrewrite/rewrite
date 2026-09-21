@@ -85,11 +85,11 @@ func canonicalDoc(s java.Space, atFileStart bool) java.Space {
 	if !ok {
 		return s
 	}
-	formatted, ok := canonicalDocComment(s.Comments[start:])
+	formatted, ok := canonicalDocComment(s.Comments()[start:])
 	if !ok {
 		return s
 	}
-	s.Comments = append(append([]java.Comment(nil), s.Comments[:start]...), formatted...)
+	s = java.MakeSpace(append(append([]java.Comment(nil), s.Comments()[:start]...), formatted...), s.Whitespace())
 	return s
 }
 
@@ -99,26 +99,27 @@ func canonicalDoc(s java.Space, atFileStart bool) java.Space {
 // nothing, and dropping it would join two tokens. Earlier comments belong to
 // whatever preceded them.
 func docCommentRun(s java.Space, atFileStart bool) (int, bool) {
-	last := len(s.Comments) - 1
+	comments := s.Comments()
+	last := len(comments) - 1
 	// Only the line break itself may stand between the run and the token it
 	// documents: go/printer leaves an indented token undocumented.
-	if last < 0 || s.Comments[last].Suffix != "\n" {
+	if last < 0 || comments[last].Suffix != "\n" {
 		return 0, false
 	}
 	for start := last; ; start-- {
 		// A run reaching the start of s, or preceded by anything other than a
 		// single line break, is as far back as this doc comment goes.
 		if start == 0 {
-			if s.Whitespace == "" && !atFileStart {
+			if s.Whitespace() == "" && !atFileStart {
 				return 0, false
 			}
-			if s.Whitespace != "" && !strings.HasSuffix(s.Whitespace, "\n") {
+			if s.Whitespace() != "" && !strings.HasSuffix(s.Whitespace(), "\n") {
 				return 0, false
 			}
 			return 0, true
 		}
-		if !joinsLines(s.Comments[start-1].Suffix) {
-			return start, strings.Contains(s.Comments[start-1].Suffix, "\n")
+		if !joinsLines(comments[start-1].Suffix) {
+			return start, strings.Contains(comments[start-1].Suffix, "\n")
 		}
 	}
 }

@@ -28,7 +28,7 @@ import (
 func TestJavaReceiverVisitIfUsesExistingElsePartAsReceiveBaseline(t *testing.T) {
 	elseType := "org.openrewrite.java.tree.J$If$Else"
 	beforeElseBody := &java.Block{}
-	beforeElsePadding := java.Space{Whitespace: " "}
+	beforeElsePadding := java.MakeSpace(nil, " ")
 	before := &java.If{
 		ElsePart: &java.Else{
 			Prefix: beforeElsePadding,

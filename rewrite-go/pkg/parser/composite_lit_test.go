@@ -61,7 +61,7 @@ func TestUntypedCompositeCarriesLeadingWhitespaceOnPrefix(t *testing.T) {
 
 	// then
 	require.Nil(t, inner.TypeExpr, "inner element is an untyped composite")
-	require.Equal(t, "\n\t\t", inner.Prefix.Whitespace, "leading whitespace on Prefix")
+	require.Equal(t, "\n\t\t", inner.Prefix.Whitespace(), "leading whitespace on Prefix")
 	require.True(t, inner.Elements.Before.IsEmpty(), "Elements.Before must not hold leading whitespace")
 }
 
@@ -75,7 +75,7 @@ func TestTypedCompositeKeepsPrefixAheadOfTypeExpr(t *testing.T) {
 
 	// then
 	require.NotNil(t, outer.TypeExpr, "outer literal is typed")
-	require.Equal(t, " ", outer.Prefix.Whitespace, "space after `:=`")
+	require.Equal(t, " ", outer.Prefix.Whitespace(), "space after `:=`")
 	require.True(t, outer.Elements.Before.IsEmpty(), "nothing between the type and `{`")
 }
 
@@ -102,7 +102,7 @@ func TestUntypedCompositeInMapLiteral(t *testing.T) {
 	require.Len(t, composites, 2)
 	inner := composites[1]
 	require.Nil(t, inner.TypeExpr)
-	require.Equal(t, " ", inner.Prefix.Whitespace, "space after the key's `:`")
+	require.Equal(t, " ", inner.Prefix.Whitespace(), "space after the key's `:`")
 	require.True(t, inner.Elements.Before.IsEmpty())
 	require.Equal(t, src, printer.Print(cu))
 }

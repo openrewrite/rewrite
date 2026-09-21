@@ -59,7 +59,7 @@ func TestRecipesThatMadeChangesRoundTrip(t *testing.T) {
 	effort := int64(300000)
 	markerID := uuid.MustParse("11111111-2222-3333-4444-555555555555")
 
-	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{
+	before := java.MakeMarkers(uuid.New(), []java.Marker{
 		java.RecipesThatMadeChanges{
 			Ident: markerID,
 			Recipes: [][]java.RecipeThatMadeChanges{{
@@ -73,7 +73,7 @@ func TestRecipesThatMadeChangesRoundTrip(t *testing.T) {
 				},
 			}},
 		},
-	}}
+	})
 
 	// Markers travel as refs, so both hops go through SendMarkersCodec. Hop 1 exercises the
 	// receiver against a Java-shaped stream; hop 2 exercises this peer's own sender.
@@ -86,12 +86,12 @@ func TestRecipesThatMadeChangesRoundTrip(t *testing.T) {
 	}
 	got = receiveMarkers(secondHop)
 
-	if len(got.Entries) != 1 {
-		t.Fatalf("entries: want 1, got %d", len(got.Entries))
+	if len(got.Entries()) != 1 {
+		t.Fatalf("entries: want 1, got %d", len(got.Entries()))
 	}
-	m, ok := got.Entries[0].(java.RecipesThatMadeChanges)
+	m, ok := got.Entries()[0].(java.RecipesThatMadeChanges)
 	if !ok {
-		t.Fatalf("entry is %T, want java.RecipesThatMadeChanges", got.Entries[0])
+		t.Fatalf("entry is %T, want java.RecipesThatMadeChanges", got.Entries()[0])
 	}
 	if m.Ident != markerID {
 		t.Errorf("id: want %v, got %v", markerID, m.Ident)

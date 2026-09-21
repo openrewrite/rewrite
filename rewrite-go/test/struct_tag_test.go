@@ -108,14 +108,14 @@ func TestStructTag_MultipleKeysParseIntoMultipleAnnotations(t *testing.T) {
 		t.Errorf("[1] Source: got %q, want %q", lit.Source, `"email_address"`)
 	}
 	// Inter-pair whitespace lives on the second annotation's Prefix.
-	assert.Equalf(t, " ", second.Prefix.Whitespace, "[1] Prefix.Whitespace: got %q, want %q", second.Prefix.Whitespace, " ")
+	assert.Equalf(t, " ", second.Prefix.Whitespace(), "[1] Prefix.Whitespace: got %q, want %q", second.Prefix.Whitespace(), " ")
 }
 
 func TestStructTag_NoMarkerLeftBehind(t *testing.T) {
 	src := "package main\n\ntype User struct {\n\tName string `json:\"name\"`\n}\n"
 	vd := parseStructAndFindField(t, src, "Name")
 
-	for _, m := range vd.Markers.Entries {
+	for _, m := range vd.Markers.Entries() {
 		if _, ok := m.(golang.StructTag); ok {
 			t.Errorf("StructTag marker should no longer be emitted; LeadingAnnotations is the canonical pathway")
 		}

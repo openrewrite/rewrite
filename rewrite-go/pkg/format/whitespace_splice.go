@@ -178,20 +178,20 @@ func (s *splicer) markers(orig, fmtd reflect.Value) (reflect.Value, bool) {
 	om := orig.Interface().(java.Markers)
 	fm := fmtd.Interface().(java.Markers)
 
-	entries := om.Entries
+	entries := om.Entries()
 	changed := false
 	copyOnWrite := func() {
 		if !changed {
-			entries = append([]java.Marker(nil), om.Entries...)
+			entries = append([]java.Marker(nil), om.Entries()...)
 			changed = true
 		}
 	}
 
-	oIdx, fIdx := layoutPeers(om.Entries), layoutPeers(fm.Entries)
+	oIdx, fIdx := layoutPeers(om.Entries()), layoutPeers(fm.Entries())
 	if len(oIdx) == len(fIdx) {
 		for k := range oIdx {
-			ov := reflect.ValueOf(om.Entries[oIdx[k]])
-			fv := reflect.ValueOf(fm.Entries[fIdx[k]])
+			ov := reflect.ValueOf(om.Entries()[oIdx[k]])
+			fv := reflect.ValueOf(fm.Entries()[fIdx[k]])
 			if ov.Type() != fv.Type() {
 				continue
 			}
@@ -222,7 +222,7 @@ func (s *splicer) markers(orig, fmtd reflect.Value) (reflect.Value, bool) {
 	if !changed {
 		return orig, false
 	}
-	return reflect.ValueOf(java.Markers{ID: om.ID, Entries: entries}), true
+	return reflect.ValueOf(java.MakeMarkers(om.GetID(), entries)), true
 }
 
 // layoutPeers indexes the entries that pair up positionally between the two
@@ -242,11 +242,11 @@ func layoutPeers(entries []java.Marker) []int {
 // based on the comments slice, which would report every commented Space of a
 // freshly parsed tree as different.
 func spaceContentEqual(a, b java.Space) bool {
-	if a.Whitespace != b.Whitespace || len(a.Comments) != len(b.Comments) {
+	if a.Whitespace() != b.Whitespace() || len(a.Comments()) != len(b.Comments()) {
 		return false
 	}
-	for i := range a.Comments {
-		x, y := a.Comments[i], b.Comments[i]
+	for i := range a.Comments() {
+		x, y := a.Comments()[i], b.Comments()[i]
 		if x.Multiline != y.Multiline || x.Text != y.Text || x.Suffix != y.Suffix {
 			return false
 		}

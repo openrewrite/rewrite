@@ -23,10 +23,50 @@ type Marker interface {
 	ID() uuid.UUID
 }
 
+// Markers is a value-typed handle over shared, immutable backing. A nil handle
+// is the empty Markers, so the zero value is valid and allocation-free; every
+// empty Markers shares one process-wide id (emptyMarkersID) since the id carries
+// no identity meaning and empty markers must be shareable to save memory.
 type Markers struct {
-	ID      uuid.UUID
-	Entries []Marker
+	d *markersData
 }
+
+type markersData struct {
+	id      uuid.UUID
+	entries []Marker
+}
+
+// emptyMarkersID is the shared id reported by every empty Markers. It is stable
+// per process and non-nil; nothing keys node identity on it (RPC ref-dedup keys
+// on the individual marker entries, not this container id).
+var emptyMarkersID = uuid.New()
+
+// MakeMarkers builds a Markers, sharing one backing for the empty case so that
+// the common empty markers on most nodes cost nothing beyond a nil pointer.
+func MakeMarkers(id uuid.UUID, entries []Marker) Markers {
+	if len(entries) == 0 {
+		return Markers{}
+	}
+	return Markers{&markersData{id: id, entries: entries}}
+}
+
+// GetID returns the container id. Empty markers report the shared emptyMarkersID.
+func (m Markers) GetID() uuid.UUID {
+	if m.d == nil {
+		return emptyMarkersID
+	}
+	return m.d.id
+}
+
+// Entries returns the marker entries.
+func (m Markers) Entries() []Marker {
+	if m.d == nil {
+		return nil
+	}
+	return m.d.entries
+}
+
+var EmptyMarkers = Markers{}
 
 // GenericMarker is a marker type for Java-side markers that the Go side
 // doesn't have a native type for (e.g., RecipesThatMadeChanges, SearchResult).
@@ -68,7 +108,7 @@ type SearchResultMarker struct {
 func (m SearchResultMarker) ID() uuid.UUID { return m.Ident }
 
 func FindMarker[T any](markers Markers) *T {
-	for _, m := range markers.Entries {
+	for _, m := range markers.Entries() {
 		if t, ok := m.(T); ok {
 			return &t
 		}
@@ -77,7 +117,7 @@ func FindMarker[T any](markers Markers) *T {
 }
 
 func HasMarker[T any](markers Markers) bool {
-	for _, m := range markers.Entries {
+	for _, m := range markers.Entries() {
 		if _, ok := m.(T); ok {
 			return true
 		}
@@ -86,10 +126,15 @@ func HasMarker[T any](markers Markers) bool {
 }
 
 func AddMarker(markers Markers, marker Marker) Markers {
-	entries := make([]Marker, len(markers.Entries)+1)
-	copy(entries, markers.Entries)
-	entries[len(markers.Entries)] = marker
-	return Markers{ID: markers.ID, Entries: entries}
+	existing := markers.Entries()
+	entries := make([]Marker, len(existing)+1)
+	copy(entries, existing)
+	entries[len(existing)] = marker
+	id := markers.GetID()
+	if markers.d == nil {
+		id = uuid.New()
+	}
+	return Markers{&markersData{id: id, entries: entries}}
 }
 
 // SearchResult is a marker indicating that a search recipe found a match.

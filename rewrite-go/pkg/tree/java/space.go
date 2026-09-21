@@ -16,7 +16,10 @@
 
 package java
 
-import "strings"
+import (
+	"strings"
+	"sync"
+)
 
 type Comment struct {
 	// Multiline reports whether this is a block comment (/* */) rather than a
@@ -29,27 +32,74 @@ type Comment struct {
 	Markers   Markers
 }
 
-// This is the fundamental unit of formatting preservation in OpenRewrite.
+// Space is the fundamental unit of formatting preservation in OpenRewrite. It is
+// a value-typed handle over shared, immutable backing: copies are one pointer wide
+// and identical spaces (empty, common indentation) share one backing allocation.
+// A nil handle is the empty space, so the zero value is valid and allocation-free.
 type Space struct {
-	Comments   []Comment
-	Whitespace string
+	d *spaceData
+}
+
+type spaceData struct {
+	comments   []Comment
+	whitespace string
 }
 
 var EmptySpace = Space{}
 
-var SingleSpace = Space{Whitespace: " "}
+var SingleSpace = MakeSpace(nil, " ")
+
+// wsInterned deduplicates whitespace-only spaces (the overwhelming majority) so
+// the same indentation string is backed by a single allocation across the tree.
+var wsInterned sync.Map // map[string]*spaceData
+
+// MakeSpace builds a Space, interning empty and whitespace-only spaces so equal
+// layout shares one backing allocation. Callers must treat the backing as
+// immutable: to change a space, build a new one.
+func MakeSpace(comments []Comment, whitespace string) Space {
+	if len(comments) == 0 {
+		if whitespace == "" {
+			return Space{}
+		}
+		if v, ok := wsInterned.Load(whitespace); ok {
+			return Space{v.(*spaceData)}
+		}
+		d := &spaceData{whitespace: whitespace}
+		actual, _ := wsInterned.LoadOrStore(whitespace, d)
+		return Space{actual.(*spaceData)}
+	}
+	return Space{&spaceData{comments: comments, whitespace: whitespace}}
+}
+
+// Whitespace returns the whitespace preceding the first comment (or all of it
+// when there are no comments).
+func (s Space) Whitespace() string {
+	if s.d == nil {
+		return ""
+	}
+	return s.d.whitespace
+}
+
+// Comments returns the comments carried by this space.
+func (s Space) Comments() []Comment {
+	if s.d == nil {
+		return nil
+	}
+	return s.d.comments
+}
 
 func (s Space) IsEmpty() bool {
-	return s.Whitespace == "" && len(s.Comments) == 0
+	return s.d == nil || (s.d.whitespace == "" && len(s.d.comments) == 0)
 }
 
 // Indent returns the indentation of this space, which is the whitespace
 // after the last newline (or all whitespace if no newline is present).
 func (s Space) Indent() string {
-	if idx := strings.LastIndex(s.Whitespace, "\n"); idx >= 0 {
-		return s.Whitespace[idx+1:]
+	ws := s.Whitespace()
+	if idx := strings.LastIndex(ws, "\n"); idx >= 0 {
+		return ws[idx+1:]
 	}
-	return s.Whitespace
+	return ws
 }
 
 // ParseSpace parses raw text (between two token positions) into a Space,
@@ -68,7 +118,7 @@ func ParseSpace(raw string) Space {
 
 	firstComment := findCommentStart(raw, 0)
 	if firstComment == len(raw) {
-		return Space{Whitespace: raw}
+		return MakeSpace(nil, raw)
 	}
 
 	whitespace := raw[:firstComment]
@@ -110,7 +160,7 @@ func ParseSpace(raw string) Space {
 		}
 	}
 
-	return Space{Comments: comments, Whitespace: whitespace}
+	return MakeSpace(comments, whitespace)
 }
 
 // findCommentStart returns the index of the next // or /* starting from position 'from'.

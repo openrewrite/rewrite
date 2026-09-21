@@ -63,6 +63,7 @@ func (s *WhitespaceValidationService) IsValid(root java.Tree) bool {
 
 var (
 	spaceType     = reflect.TypeOf(java.Space{})
+	markersType   = reflect.TypeOf(java.Markers{})
 	javaTypeIface = reflect.TypeOf((*java.JavaType)(nil)).Elem()
 )
 
@@ -106,6 +107,14 @@ func (w *spaceWalker) walk(v reflect.Value, path string) {
 			w.checkSpace(v.Interface().(java.Space), path)
 			return
 		}
+		if v.Type() == markersType {
+			// Markers backing is unexported now; descend into entries explicitly
+			// so spaces embedded in markers (e.g. TrailingComma.Before) stay checked.
+			for _, e := range v.Interface().(java.Markers).Entries() {
+				w.walk(reflect.ValueOf(e), path)
+			}
+			return
+		}
 		if v.Type().Implements(javaTypeIface) {
 			return
 		}
@@ -125,10 +134,10 @@ func (w *spaceWalker) walk(v reflect.Value, path string) {
 }
 
 func (w *spaceWalker) checkSpace(s java.Space, path string) {
-	if s.Whitespace != "" && !isWhitespaceOnly(s.Whitespace) {
-		w.errs = append(w.errs, fmt.Sprintf("%s: Space.Whitespace contains non-whitespace: %q", path, truncateForError(s.Whitespace, 80)))
+	if s.Whitespace() != "" && !isWhitespaceOnly(s.Whitespace()) {
+		w.errs = append(w.errs, fmt.Sprintf("%s: Space.Whitespace contains non-whitespace: %q", path, truncateForError(s.Whitespace(), 80)))
 	}
-	for i, c := range s.Comments {
+	for i, c := range s.Comments() {
 		if c.Suffix != "" && !isWhitespaceOnly(c.Suffix) {
 			w.errs = append(w.errs, fmt.Sprintf("%s: Comment[%d].Suffix contains non-whitespace: %q", path, i, truncateForError(c.Suffix, 80)))
 		}

@@ -44,10 +44,10 @@ func TestParseSpaceCommentTextIsDelimiterFree(t *testing.T) {
 			space := ParseSpace(tc.raw)
 
 			// then
-			if len(space.Comments) != 1 {
-				t.Fatalf("want 1 comment, got %d for %q", len(space.Comments), tc.raw)
+			if len(space.Comments()) != 1 {
+				t.Fatalf("want 1 comment, got %d for %q", len(space.Comments()), tc.raw)
 			}
-			c := space.Comments[0]
+			c := space.Comments()[0]
 			if c.Multiline != tc.wantMultiline {
 				t.Errorf("Multiline: want %v, got %v", tc.wantMultiline, c.Multiline)
 			}
@@ -81,8 +81,8 @@ func TestParseSpaceRoundTrips(t *testing.T) {
 	for _, in := range inputs {
 		space := ParseSpace(in)
 		var sb strings.Builder
-		sb.WriteString(space.Whitespace)
-		for _, c := range space.Comments {
+		sb.WriteString(space.Whitespace())
+		for _, c := range space.Comments() {
 			if c.Multiline {
 				sb.WriteString("/*" + c.Text + "*/")
 			} else {
