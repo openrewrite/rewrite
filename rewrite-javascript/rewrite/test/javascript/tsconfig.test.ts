@@ -163,7 +163,8 @@ describe('tsconfig.json compiler options', () => {
             await withoutTypesEntry.rewriteRun(npm(repo.path, typescript(THEMING_SNIPPET)));
         }, {unsafeCleanup: true});
 
-        expect(captured.get('setTheme')).toBe('<unknown>{name=setTheme,return=<unknown>,parameters=[]}');
+        // Unloaded, the call has no signature, though the import still names the module it calls into.
+        expect(captured.get('setTheme')).toBe('sap/ui/core/Theming{name=setTheme,return=<unknown>,parameters=[]}');
     }, 120000);
 
     test('`baseUrl` roots a bare specifier at the directory the project names', async () => {
@@ -272,7 +273,8 @@ describe('tsconfig.json compiler options', () => {
             `)));
         }, {unsafeCleanup: true});
 
-        expect(resolution.get('go')).toBe('plain/sub{name=unknown,return=<unknown>,parameters=[]}');
+        // Unresolved, the call has no signature, but keeps the name it was imported by.
+        expect(resolution.get('go')).toBe('plain/sub{name=go,return=<unknown>,parameters=[]}');
 
         const conditions = new Map<string, string>();
         const notAdopted = new RecipeSpec();
