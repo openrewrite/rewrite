@@ -1394,7 +1394,7 @@ public class GroovyParserVisitor {
             Space beforeOpenParen = whitespace();
 
             boolean hasParentheses = true;
-            if (source.charAt(cursor) == '(') {
+            if (source.charAt(cursor) == '(' && !startsLambdaArgument(expression)) {
                 skip("(");
             } else {
                 hasParentheses = false;
@@ -1486,6 +1486,14 @@ public class GroovyParserVisitor {
             }
 
             queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));
+        }
+
+        private boolean startsLambdaArgument(ArgumentListExpression expression) {
+            List<org.codehaus.groovy.ast.expr.Expression> arguments = expression.getExpressions();
+            return !arguments.isEmpty() &&
+                    arguments.get(0) instanceof LambdaExpression &&
+                    appearsInSource(arguments.get(0)) &&
+                    sourceOffset(arguments.get(0)) == cursor;
         }
 
         public boolean endsWithClosures(List<org.codehaus.groovy.ast.expr.Expression> list) {
@@ -3655,9 +3663,13 @@ public class GroovyParserVisitor {
         if (!appearsInSource(field)) {
             return false;
         }
-        int offset = sourceLineNumberOffsets[field.getLineNumber() - 1] + field.getColumnNumber() - 1;
+        int offset = sourceOffset(field);
         return source.startsWith("@" + Field.class.getSimpleName(), offset) ||
                 source.startsWith("@" + Field.class.getCanonicalName(), offset);
+    }
+
+    private int sourceOffset(ASTNode node) {
+        return sourceLineNumberOffsets[node.getLineNumber() - 1] + node.getColumnNumber() - 1;
     }
 
     private static boolean isSynthetic(ASTNode node) {
