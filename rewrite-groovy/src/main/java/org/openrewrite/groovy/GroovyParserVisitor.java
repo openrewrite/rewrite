@@ -1491,7 +1491,8 @@ public class GroovyParserVisitor {
         private boolean startsLambdaArgument(ArgumentListExpression expression) {
             List<org.codehaus.groovy.ast.expr.Expression> arguments = expression.getExpressions();
             return !arguments.isEmpty() &&
-                    arguments.get(0) instanceof LambdaExpression &&
+                    // Compared by name because LambdaExpression does not exist in Groovy 2
+                    "org.codehaus.groovy.ast.expr.LambdaExpression".equals(arguments.get(0).getClass().getName()) &&
                     appearsInSource(arguments.get(0)) &&
                     sourceOffset(arguments.get(0)) == cursor;
         }
