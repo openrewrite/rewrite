@@ -53,7 +53,7 @@ func roundTripMarkers(t *testing.T, before java.Markers) java.Markers {
 	})
 	// receiveMarkersCodec expects the receive queue positioned at the
 	// Markers ID slot, matching what SendMarkersCodec emits.
-	return receiveMarkersCodec(recvQ, java.Markers{})
+	return receiveMarkersCodec(recvQ, java.EmptyMarkers)
 }
 
 func TestGoProjectMarkerRoundTrip(t *testing.T) {

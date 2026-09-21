@@ -23,13 +23,12 @@ type Marker interface {
 	ID() uuid.UUID
 }
 
-// Markers is a value-typed handle over shared, immutable backing. A nil handle
-// is the empty Markers, so the zero value is valid and allocation-free; every
-// empty Markers shares one process-wide id (emptyMarkersID) since the id carries
-// no identity meaning and empty markers must be shareable to save memory.
-type Markers struct {
-	d *markersData
-}
+// Markers is a pointer to shared, immutable backing. Build via MakeMarkers; a nil
+// pointer reads as empty through every method, but MakeMarkers returns the shared
+// non-nil EmptyMarkers so an empty Markers keeps its type across `any`. Every empty
+// Markers reports one process-wide id (emptyMarkersID) since the id carries no
+// identity meaning and empty markers must be shareable to save memory.
+type Markers = *markersData
 
 type markersData struct {
 	id      uuid.UUID
@@ -45,28 +44,28 @@ var emptyMarkersID = uuid.New()
 // the common empty markers on most nodes cost nothing beyond a nil pointer.
 func MakeMarkers(id uuid.UUID, entries []Marker) Markers {
 	if len(entries) == 0 {
-		return Markers{}
+		return EmptyMarkers
 	}
-	return Markers{&markersData{id: id, entries: entries}}
+	return &markersData{id: id, entries: entries}
 }
 
 // GetID returns the container id. Empty markers report the shared emptyMarkersID.
-func (m Markers) GetID() uuid.UUID {
-	if m.d == nil {
+func (m *markersData) GetID() uuid.UUID {
+	if m == nil {
 		return emptyMarkersID
 	}
-	return m.d.id
+	return m.id
 }
 
 // Entries returns the marker entries.
-func (m Markers) Entries() []Marker {
-	if m.d == nil {
+func (m *markersData) Entries() []Marker {
+	if m == nil {
 		return nil
 	}
-	return m.d.entries
+	return m.entries
 }
 
-var EmptyMarkers = Markers{}
+var EmptyMarkers Markers = &markersData{id: emptyMarkersID}
 
 // GenericMarker is a marker type for Java-side markers that the Go side
 // doesn't have a native type for (e.g., RecipesThatMadeChanges, SearchResult).
@@ -131,10 +130,10 @@ func AddMarker(markers Markers, marker Marker) Markers {
 	copy(entries, existing)
 	entries[len(existing)] = marker
 	id := markers.GetID()
-	if markers.d == nil {
+	if markers == nil {
 		id = uuid.New()
 	}
-	return Markers{&markersData{id: id, entries: entries}}
+	return &markersData{id: id, entries: entries}
 }
 
 // SearchResult is a marker indicating that a search recipe found a match.

@@ -41,7 +41,7 @@ func receiveMarkers(messages []RpcObjectData) java.Markers {
 		delivered = true
 		return messages
 	})
-	return receiveMarkersCodec(recvQ, java.Markers{})
+	return receiveMarkersCodec(recvQ, java.EmptyMarkers)
 }
 
 func streamCarries(messages []RpcObjectData, value string) bool {

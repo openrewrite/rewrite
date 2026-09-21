@@ -498,7 +498,7 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 	}
 	c := *cu
 	imps := *c.Imports
-	removedLastAfter := java.Space{}
+	removedLastAfter := java.EmptySpace
 	removedWasLast := false
 	removedWasFirst := false
 	out := make([]java.RightPadded[*java.Import], 0, len(imps.Elements))
@@ -625,7 +625,7 @@ func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, 
 		prev := &out[len(out)-2]
 		newTail := &out[len(out)-1]
 		newTail.After = prev.After
-		prev.After = java.Space{}
+		prev.After = java.EmptySpace
 	}
 	return out
 }

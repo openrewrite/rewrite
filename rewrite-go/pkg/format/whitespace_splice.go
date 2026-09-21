@@ -24,8 +24,8 @@ import (
 )
 
 var (
-	spaceType    = reflect.TypeOf(java.Space{})
-	markersType  = reflect.TypeOf(java.Markers{})
+	spaceType    = reflect.TypeOf(java.EmptySpace)
+	markersType  = reflect.TypeOf(java.EmptyMarkers)
 	javaTypeType = reflect.TypeOf((*java.JavaType)(nil)).Elem()
 	treeType     = reflect.TypeOf((*java.Tree)(nil)).Elem()
 )

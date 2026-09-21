@@ -676,7 +676,7 @@ func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix java.Space, ke
 			}
 			nameAfters = append(nameAfters, after)
 		} else {
-			nameAfters = append(nameAfters, java.Space{})
+			nameAfters = append(nameAfters, java.EmptySpace)
 		}
 	}
 
@@ -3072,7 +3072,7 @@ func (ctx *parseContext) closeTypeArgs(elements []java.RightPadded[java.Expressi
 	}
 	elements[len(elements)-1].After = ctx.prefix(rbrack)
 	ctx.skip(1) // "]"
-	return java.Markers{}
+	return java.EmptyMarkers
 }
 
 // mapParameterizedTypeMulti maps a multi-type-arg generic instantiation in a type position,

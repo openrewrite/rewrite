@@ -62,8 +62,8 @@ func (s *WhitespaceValidationService) IsValid(root java.Tree) bool {
 }
 
 var (
-	spaceType     = reflect.TypeOf(java.Space{})
-	markersType   = reflect.TypeOf(java.Markers{})
+	spaceType     = reflect.TypeOf(java.EmptySpace)
+	markersType   = reflect.TypeOf(java.EmptyMarkers)
 	javaTypeIface = reflect.TypeOf((*java.JavaType)(nil)).Elem()
 )
 
@@ -82,6 +82,17 @@ func (w *spaceWalker) walk(v reflect.Value, path string) {
 			return
 		}
 		if v.Kind() == reflect.Ptr {
+			// Space and Markers are pointer handles (*spaceData / *markersData).
+			if v.Type() == spaceType {
+				w.checkSpace(v.Interface().(java.Space), path)
+				return
+			}
+			if v.Type() == markersType {
+				for _, e := range v.Interface().(java.Markers).Entries() {
+					w.walk(reflect.ValueOf(e), path)
+				}
+				return
+			}
 			// Type graphs are cyclic by construction and hold no Space;
 			// stopping at them keeps the walk finite and cheap.
 			if v.Type().Implements(javaTypeIface) {
@@ -103,18 +114,6 @@ func (w *spaceWalker) walk(v reflect.Value, path string) {
 			w.walk(v.MapIndex(k), path)
 		}
 	case reflect.Struct:
-		if v.Type() == spaceType {
-			w.checkSpace(v.Interface().(java.Space), path)
-			return
-		}
-		if v.Type() == markersType {
-			// Markers backing is unexported now; descend into entries explicitly
-			// so spaces embedded in markers (e.g. TrailingComma.Before) stay checked.
-			for _, e := range v.Interface().(java.Markers).Entries() {
-				w.walk(reflect.ValueOf(e), path)
-			}
-			return
-		}
 		if v.Type().Implements(javaTypeIface) {
 			return
 		}

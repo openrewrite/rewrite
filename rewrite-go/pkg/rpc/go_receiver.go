@@ -395,7 +395,7 @@ func (r *GoReceiver) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	if td.Assign != nil {
 		beforeAssign = *td.Assign
 	}
-	if result := q.Receive(beforeAssign, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
+	if result := q.Receive(beforeAssign, func(v any) any { return receiveLeftPaddedSpaceVal(r, q, v) }); result != nil {
 		lp := result.(java.LeftPadded[java.Space])
 		td.Assign = &lp
 	} else {
@@ -437,7 +437,7 @@ func (r *GoReceiver) VisitMultiAssignment(ma *golang.MultiAssignment, p any) jav
 		coerceToExpressionRP); after != nil {
 		ma.Variables = after
 	}
-	if result := q.Receive(ma.Operator, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
+	if result := q.Receive(ma.Operator, func(v any) any { return receiveLeftPaddedSpaceVal(r, q, v) }); result != nil {
 		ma.Operator = result.(java.LeftPadded[java.Space])
 	}
 	if after := receiveTypedList(q, ma.Values,
