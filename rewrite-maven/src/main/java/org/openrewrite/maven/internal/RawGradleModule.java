@@ -25,7 +25,6 @@ import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 
-import javax.xml.bind.annotation.XmlRootElement;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -46,7 +45,6 @@ import static org.openrewrite.internal.ObjectMappers.propertyBasedMapper;
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
-@XmlRootElement(name = "project")
 @SuppressWarnings("unused")
 public class RawGradleModule {
 
