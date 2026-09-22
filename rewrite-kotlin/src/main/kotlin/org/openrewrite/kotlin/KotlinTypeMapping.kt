@@ -395,7 +395,7 @@ class KotlinTypeMapping(
         }
     }
 
-    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class)
+    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class, ResolvedQualifierTypeAccess::class)
     private fun classType(type: Any, parent: Any?, signature: String): FullyQualified {
         val fqn = signatureBuilder.classSignature(type)
         var params: List<*>? = null
