@@ -17,8 +17,13 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"ControlFlowWithEmptyBody", "RemoveForLoopIndices"})
@@ -127,6 +132,71 @@ class ForLoopTest implements RewriteTest {
             """
               fun method ( ) {
                   for ( i in 6 downTo 0 step 2 ) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void singleComponentDestructuring() {
+        AtomicBoolean asserted = new AtomicBoolean();
+        rewriteRun(
+          kotlin(
+            """
+              data class Box(val value: String)
+              fun g(boxes: List<Box>) {
+                  for ((value) in boxes) {
+                      println(value)
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, Integer p) {
+                        J.VariableDeclarations v = (J.VariableDeclarations) control.getVariable();
+                        assertThat(v.getVariables()).singleElement().satisfies(nv ->
+                          assertThat(nv.getDeclarator()).isInstanceOf(K.DestructuringPattern.class));
+                        asserted.set(true);
+                        return super.visitForEachControl(control, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void destructuringTrailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              data class Box(val value: String)
+              fun g(boxes: List<Box>, pairs: List<Pair<String, String>>) {
+                  for ((value,) in boxes) {
+                      println(value)
+                  }
+
+                  for ((a, b,) in pairs) {
+                      println(a + b)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typedDestructuringEntries() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(pairs: List<Pair<Int, String>>) {
+                  for ((a: Int, b: String) in pairs) {
+                      println(a.toString() + b)
                   }
               }
               """

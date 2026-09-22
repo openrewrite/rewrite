@@ -929,9 +929,10 @@ class KotlinTypeMappingTest {
                         var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
-                            public K.DestructuringDeclaration visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, AtomicBoolean found) {
+                            public K.DestructuringPattern visitDestructuringPattern(K.DestructuringPattern pattern, AtomicBoolean found) {
                                 found.set(true);
-                                return super.visitDestructuringDeclaration(destructuringDeclaration, found);
+                                assertThat(pattern.getType().toString()).isEqualTo("kotlin.Triple<int, int, int>");
+                                return super.visitDestructuringPattern(pattern, found);
                             }
 
                             @Override
@@ -945,9 +946,14 @@ class KotlinTypeMappingTest {
 
                             @Override
                             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, AtomicBoolean found) {
+                                if (variable.getDeclarator() instanceof K.DestructuringPattern) {
+                                    // The declaration names no variable of its own; it is typed by the synthetic
+                                    // receiver the component calls are made on.
+                                    assertThat(variable.getVariableType().toString())
+                                            .isEqualTo("openRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=<destruct>,type=kotlin.Triple<int, int, int>}");
+                                    return super.visitVariable(variable, found);
+                                }
                                 switch (variable.getSimpleName()) {
-                                    case "<destruct>" -> assertThat(variable.getName().getType().toString())
-                                            .isEqualTo("kotlin.Triple<int, int, int>");
                                     case "a" -> {
                                         assertThat(variable.getVariableType().toString())
                                                 .isEqualTo("openRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=a,type=int}");

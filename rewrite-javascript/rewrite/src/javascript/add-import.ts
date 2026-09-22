@@ -940,6 +940,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         // - trailingSpace: space before } (from last element's after)
                         const firstElementPrefix = existingElements[0]?.element?.prefix ?? emptySpace;
                         const lastIndex = existingElements.length - 1;
+                        // What separates one element from the next after its comma: the space in front of
+                        // the second element, or for a lone element on its own line, that line break.
+                        const separator = existingElements[1]?.element?.prefix ??
+                            (firstElementPrefix.whitespace.includes('\n') ? firstElementPrefix : singleSpace);
                         // A trailing comma is a marker on the last element rather than padding, so with
                         // one present the space before `}` lives in the marker's suffix, not in `after`.
                         const trailingComma = findMarker<TrailingComma>(existingElements[lastIndex], J.Markers.TrailingComma);
@@ -956,13 +960,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                         // Insert new element here
                                         // First element gets the same prefix as the original first element
                                         // Other positions get a single space (separator after comma)
-                                        const prefix = j === 0 ? firstElementPrefix : singleSpace;
+                                        const prefix = j === 0 ? firstElementPrefix : separator;
                                         results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
                                     }
                                     // Adjust existing element: if inserting before first, give it space prefix
                                     let adjusted = elem;
                                     if (j === 0 && insertIndex === 0 && elem.element) {
-                                        adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
+                                        adjusted = {...elem, element: {...elem.element, prefix: separator}};
                                     }
                                     // Last element before a new trailing element loses its trailing space,
                                     // and hands off its trailing comma to the element that becomes last.
@@ -984,7 +988,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 // Append at end if inserting after all existing elements
                                 if (insertIndex > lastIndex) {
                                     const appended = rightPadded(
-                                        {...newSpecifier, prefix: singleSpace},
+                                        {...newSpecifier, prefix: separator},
                                         trailingComma ? emptySpace : trailingSpace);
                                     newElements.push(trailingComma ?
                                         {...appended, markers: markers(trailingComma)} :

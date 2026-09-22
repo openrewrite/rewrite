@@ -273,6 +273,12 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 }
             }
 
+            is ConeIntegerLiteralType -> {
+                // An operator on an integer literal keeps this type until an expected type fixes it as Int or
+                // Long, and an unresolved surrounding call never supplies one.
+                signature(type.getApproximatedType())
+            }
+
             else -> throw UnsupportedOperationException("Unsupported ConeTypeProjection ${type.javaClass.name}")
         }
     }

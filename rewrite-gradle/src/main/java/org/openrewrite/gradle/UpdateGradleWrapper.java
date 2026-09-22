@@ -61,14 +61,14 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     String displayName = "Update Gradle wrapper";
 
     String description = "Update the version of Gradle used in an existing Gradle wrapper. " +
-        "Queries `downloads.gradle.org` to determine the available releases, but prefers the artifact repository URL " +
+        "Queries `services.gradle.org` to determine the available releases, but prefers the artifact repository URL " +
         "which already exists within the wrapper properties file. " +
-        "If your artifact repository does not contain the same Gradle distributions as `downloads.gradle.org`, " +
+        "If your artifact repository does not contain the same Gradle distributions as `services.gradle.org`, " +
         "then the recipe may suggest a version which is not available in your artifact repository.";
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "Defaults to the latest release available from `downloads.gradle.org` if not specified.",
+                          "Defaults to the latest release available from `services.gradle.org` if not specified.",
             example = "7.x",
             required = false)
     @Nullable
@@ -91,7 +91,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     Boolean addIfMissing;
 
-    @Option(example = "https://downloads.gradle.org/distributions/gradle-8.5-bin.zip",
+    @Option(example = "https://services.gradle.org/distributions/gradle-8.5-bin.zip",
             displayName = "Wrapper URI",
             description = "The URI of the Gradle wrapper distribution.\n" +
                     "Specifies a custom location from which to download the Gradle wrapper scripts (gradlew, gradlew.bat, etc.). This is useful for setting up the Gradle wrapper without relying on Gradle's official distribution services.\n\n" +
@@ -198,7 +198,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return entry;
                         }
 
-                        // Typical example: https://downloads.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
+                        // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
                         String currentDistributionUrl = entry.getValue().getText();
                         acc.currentDistributionUrl = currentDistributionUrl;
 

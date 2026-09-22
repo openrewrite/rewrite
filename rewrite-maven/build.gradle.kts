@@ -21,7 +21,6 @@ dependencies {
     implementation("dev.failsafe:failsafe:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
-    implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
 
     // needed by AddDependency
