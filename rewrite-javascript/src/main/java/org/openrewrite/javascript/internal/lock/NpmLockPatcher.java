@@ -381,6 +381,10 @@ public final class NpmLockPatcher implements LockPatcher {
 
         // Site (3): the v2 legacy dependencies tree.
         if (lockfileVersion == 2) {
+            if (edit.getAliasName() != null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        name + " is an npm: alias; its lockfileVersion 2 legacy entry is not yet supported");
+            }
             root = insertLegacyEntry(root, edit);
         }
         return root;
@@ -469,6 +473,10 @@ public final class NpmLockPatcher implements LockPatcher {
                 keyIndent.substring(indentOf(closeWs).length()) : "  ";
 
         List<EntryField> fields = new ArrayList<>();
+        // An npm: alias entry leads with the real package name; NpmKeyOrder sorts it ahead of version.
+        if (edit.getAliasName() != null) {
+            fields.add(new EntryField("name", jsonEncode(edit.getAliasName()), false));
+        }
         fields.add(new EntryField("version", jsonEncode(edit.getNewVersion()), false));
         fields.add(new EntryField("resolved", jsonEncode(edit.getNewResolved()), false));
         fields.add(new EntryField("integrity", jsonEncode(edit.getNewIntegrity()), false));

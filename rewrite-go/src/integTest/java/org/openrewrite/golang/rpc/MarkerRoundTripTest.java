@@ -132,7 +132,8 @@ class MarkerRoundTripTest {
                         new GoResolutionResult.PackageModule("fmt", null, null, true),
                         new GoResolutionResult.PackageModule("github.com/google/uuid",
                                 "github.com/google/uuid", "v1.6.0", false)
-                )
+                ),
+                GoResolutionResult.ResolutionStatus.RESOLVED
         );
         cu = cu.withMarkers(cu.getMarkers().addIfAbsent(marker));
 
@@ -161,7 +162,8 @@ class MarkerRoundTripTest {
                 emptyList(),
                 emptyList(),
                 emptyList(),
-                emptyList()
+                emptyList(),
+                GoResolutionResult.ResolutionStatus.GO_SUM_ONLY
         );
         cu = cu.withMarkers(cu.getMarkers().addIfAbsent(marker));
 
@@ -191,7 +193,8 @@ class MarkerRoundTripTest {
                         emptyList(),
                         emptyList(),
                         emptyList(),
-                        emptyList()
+                        emptyList(),
+                        GoResolutionResult.ResolutionStatus.RESOLVED
                 ));
         cu = cu.withMarkers(markers);
 
@@ -228,7 +231,8 @@ class MarkerRoundTripTest {
                                                 new GoResolutionResult.ModuleRef("golang.org/x/mod", "v0.35.0")))),
                         singletonList(
                                 new GoResolutionResult.PackageModule("github.com/google/uuid",
-                                        "github.com/google/uuid", "v1.6.0", false)))));
+                                        "github.com/google/uuid", "v1.6.0", false)),
+                        GoResolutionResult.ResolutionStatus.RESOLVED)));
 
         var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
         Tree result = recipe.getVisitor().visit(cu, new org.openrewrite.InMemoryExecutionContext());
@@ -257,6 +261,36 @@ class MarkerRoundTripTest {
             assertThat(pm.getImportPath()).isEqualTo("github.com/google/uuid");
             assertThat(pm.getModulePath()).isEqualTo("github.com/google/uuid");
         });
+        assertThat(mrr.getResolutionStatus()).isEqualTo(GoResolutionResult.ResolutionStatus.RESOLVED);
+    }
+
+    @Test
+    void nullResolutionStatusFromOldLstRoundTripsViaVisit() {
+        // An LST serialized before resolutionStatus existed deserializes with a null
+        // status. It must survive a Java -> Go -> Java visit round-trip: Java sends
+        // null, Go holds it as empty and sends it back as null (never an empty string
+        // that Enum.valueOf would reject), and Java reads null again.
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source = "package main\n\nfunc f() {\n\tvar x = true\n\t_ = x\n}\n";
+        SourceFile cu = GolangParser.builder().build()
+                .parse(source).findFirst().orElseThrow();
+
+        UUID gomodId = UUID.randomUUID();
+        cu = cu.withMarkers(cu.getMarkers()
+                .addIfAbsent(new GoResolutionResult(
+                        gomodId, "example.com/foo", "1.22", null, "go.mod",
+                        singletonList(new GoResolutionResult.Require("github.com/google/uuid", "v1.6.0", false)),
+                        emptyList(), emptyList(), emptyList(), emptyList(), emptyList(),
+                        null)));
+
+        var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
+        Tree result = recipe.getVisitor().visit(cu, new org.openrewrite.InMemoryExecutionContext());
+        assertThat(result).isInstanceOf(SourceFile.class);
+
+        GoResolutionResult mrr = ((SourceFile) result).getMarkers().findFirst(GoResolutionResult.class).orElseThrow(
+                () -> new AssertionError("GoResolutionResult marker missing from round-trip result"));
+        assertThat(mrr.getResolutionStatus()).isNull();
+        assertThat(mrr.getModulePath()).isEqualTo("example.com/foo");
     }
 
     /**

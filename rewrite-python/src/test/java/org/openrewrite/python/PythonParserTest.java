@@ -18,6 +18,9 @@ package org.openrewrite.python;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
@@ -25,6 +28,12 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.python;
 
@@ -155,5 +164,23 @@ class PythonParserTest implements RewriteTest {
             softly.assertThat(sf.getMarkers().getMarkers()).isEmpty();
             softly.assertThat(sf.printAll()).isEqualTo(source);
         });
+    }
+
+    @Test
+    void crlfFileOnDiskPrintsBackIdentically(@TempDir Path tempDir) throws IOException {
+        // A file input reaches the RPC server as a path it reads itself, which
+        // the source text of the tests above never exercises.
+        String source = "import sys\r\n\r\n\r\ndef greet(name):\r\n    # a comment\r\n    print(name)\r\n";
+        Path file = tempDir.resolve("crlf.py");
+        Files.write(file, source.getBytes(UTF_8));
+
+        SourceFile sf = PythonParser.builder().build()
+          .parseInputs(singletonList(Parser.Input.fromFile(file)), tempDir,
+            new InMemoryExecutionContext(Throwable::printStackTrace))
+          .findFirst()
+          .orElseThrow();
+
+        assertThat(sf).isInstanceOf(Py.CompilationUnit.class);
+        assertThat(sf.printAll()).isEqualTo(source);
     }
 }

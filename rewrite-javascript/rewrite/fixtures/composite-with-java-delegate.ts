@@ -21,16 +21,10 @@ export async function activate(marketplace: RecipeMarketplace) {
 }
 
 /**
- * Mirrors the shape of Angular's `UpgradeToAngular19`: a JS composite whose
- * {@code recipeList()} contains a recipe that delegates entirely to a Java recipe
- * (here {@code org.openrewrite.javascript.UpgradeDependencyVersion}, via
- * {@link prepareJavaRecipe}).
- *
- * The host re-prepares each child of this composite by id while building
- * {@code RpcRecipe.getRecipeList()}. The Java-delegate child is an {@code RpcRecipe}
- * that {@code installSubRecipes} does not register in this server's marketplace, so the
- * re-prepare misses here and the server must answer with {@code delegatesTo} (rather than
- * throwing) so the host resolves it from its own marketplace as a local Java recipe.
+ * A JS composite whose {@code recipeList()} contains recipes that delegate entirely to Java
+ * recipes (via {@link prepareJavaRecipe}), the shape of a framework upgrade recipe. The server
+ * emits each such child as {@code delegatesTo} and the host builds it from its marketplace while
+ * building {@code RpcRecipe.getRecipeList()}.
  */
 class CompositeWithJavaDelegate extends Recipe {
     name = "org.openrewrite.example.npm.composite-with-java-delegate";
@@ -39,10 +33,8 @@ class CompositeWithJavaDelegate extends Recipe {
 
     async recipeList(): Promise<Recipe[]> {
         return [
-            await prepareJavaRecipe("org.openrewrite.javascript.UpgradeDependencyVersion", {
-                packagePattern: "@angular/*",
-                newVersion: "19.x"
-            })
+            await prepareJavaRecipe("org.openrewrite.example.host.replace-hello"),
+            await prepareJavaRecipe("org.openrewrite.text.FindAndReplace", {find: "goodbye", replace: "farewell"})
         ];
     }
 }

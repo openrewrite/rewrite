@@ -351,8 +351,9 @@ export function hasFlowAnnotation(sourceFile: ts.SourceFile) {
 }
 
 export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile) {
-    const diagnostics = ts.getPreEmitDiagnostics(program, sourceFile);
-    // checking Parsing and Syntax Errors
+    // Only parse diagnostics decide whether a file gets an LST, so the visitor has to map every slot the
+    // parser fills — including ones the checker would reject — or the file loses text on print.
+    const diagnostics = program.getSyntacticDiagnostics(sourceFile);
     let syntaxErrors : [errorMsg: string, errorCode: number][] = [];
     if (diagnostics.length > 0) {
         const errors = diagnostics.filter(d =>  (d.category === ts.DiagnosticCategory.Error) && isCriticalDiagnostic(d.code, sourceFile));
@@ -372,14 +373,6 @@ export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile
     }
     return syntaxErrors;
 }
-
-const additionalCriticalCodes = new Set([
-    // Syntax errors
-    17019, // "'{0}' at the end of a type is not valid TypeScript syntax. Did you mean to write '{1}'?"
-    17020, // "'{0}' at the start of a type is not valid TypeScript syntax. Did you mean to write '{1}'?"
-
-    // Other critical errors
-]);
 
 // errors code description available at https://github.com/microsoft/TypeScript/blob/main/src/compiler/diagnosticMessages.json
 const excludedCodes = new Set([
@@ -447,7 +440,7 @@ function isCriticalDiagnostic(code: number, sourceFile: ts.SourceFile): boolean 
         }
     }
 
-    return (code > 1000 && code < 2000 && !excludedCodes.has(code)) || additionalCriticalCodes.has(code);
+    return code > 1000 && code < 2000 && !excludedCodes.has(code);
 }
 
 export function isValidSurrogateRange(unicodeString: string): boolean {

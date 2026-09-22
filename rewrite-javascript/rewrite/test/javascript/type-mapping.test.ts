@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {javascript, JavaScriptVisitor, npm, packageJson, tsx, typescript} from "../../src/javascript";
+import {javascript, JavaScriptVisitor, JS, npm, packageJson, tsx, typescript} from "../../src/javascript";
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
@@ -1193,6 +1193,28 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('should order union constituents by signature, not by TypeScript type id', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'value') {
+                    return Type.isUnion(type) ? `Union[${type.bounds.map(b => Type.signature(b)).join(', ')}]` : 'NOT_UNION';
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        let value: string | Error = "hello";
+                    `,
+                    `
+                        let /*~~(Union[Error, String])~~>*/value: string | Error = "hello";
+                    `
+                )
+            );
+        });
+
         test('should map intersection type', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -2154,6 +2176,290 @@ describe('JavaScript type mapping', () => {
         }, {unsafeCleanup: true});
     });
 
+    describe('module attribution across import styles', () => {
+        // Every style of binding a module reaches the same package, so a `MethodMatcher` or a
+        // type-based precondition written against the package matches all of them. Previously the
+        // declaring type for a default or namespace import was built from the local name plus the
+        // declaration file's path, split at the first dot of the path — which lands inside a
+        // directory name like `.pnpm` or a hidden parent directory — making it both wrong and
+        // unstable across machines.
+        test('default, namespace, named and require bindings all attribute to the package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodInvocation && Type.isMethod(type) ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import fse from 'fs-extra';
+                                import {remove} from 'fs-extra';
+                                import * as ns from 'fs-extra';
+                                const required = require('fs-extra');
+
+                                fse.ensureDir('a');
+                                remove('b');
+                                ns.pathExists('c');
+                                required.ensureDirSync('d');
+                            `,
+                            //@formatter:off
+                            `
+                                import fse from 'fs-extra';
+                                import {remove} from 'fs-extra';
+                                import * as ns from 'fs-extra';
+                                const required = /*~~(global.NodeJS)~~>*/require('fs-extra');
+
+                                /*~~(fs-extra)~~>*/fse.ensureDir('a');
+                                /*~~(fs-extra)~~>*/remove('b');
+                                /*~~(fs-extra)~~>*/ns.pathExists('c');
+                                /*~~(fs-extra)~~>*/required.ensureDirSync('d');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "fs-extra": "^11"
+                                },
+                                "devDependencies": {
+                                  "@types/fs-extra": "^11"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('a call directly on a require() result attributes to the required package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodInvocation && Type.isMethod(type) && type.name === 'install' ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `require('source-map-support').install();`,
+                            //@formatter:off
+                            `/*~~(source-map-support)~~>*/require('source-map-support').install();`
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "source-map-support": "^0.5"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        const declaringTypeAndName = (node: any, type: Type | undefined) =>
+            (node?.kind === J.Kind.MethodInvocation || node?.kind === JS.Kind.FunctionCall) && Type.isMethod(type) &&
+            !(node.kind === J.Kind.MethodInvocation && node.name.simpleName === 'require') ?
+                `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null;
+
+        test('a static method on an imported class attributes to the class', async () => {
+            // Previously the import's local name replaced the class's package, giving \`URL.URL\`.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import {URL} from 'node:url';
+
+                                URL.canParse('https://example.com');
+                            `,
+                            //@formatter:off
+                            `
+                                import {URL} from 'node:url';
+
+                                /*~~(url.URL#canParse)~~>*/URL.canParse('https://example.com');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^22"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('calling a namespace import\'s default export attributes like a default import call', async () => {
+            // The namespace object's type used to map to \`{}\`.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import requestId from 'express-request-id';
+                                import * as ns from 'express-request-id';
+
+                                requestId();
+                                ns.default();
+                            `,
+                            //@formatter:off
+                            `
+                                import requestId from 'express-request-id';
+                                import * as ns from 'express-request-id';
+
+                                /*~~(express-request-id#<default>)~~>*/requestId();
+                                /*~~(express-request-id#<default>)~~>*/ns.default();
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "express-request-id": "1.4.1"
+                                },
+                                "devDependencies": {
+                                  "@types/express-request-id": "1.4.3"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('imports of a package without type declarations attribute to the package', async () => {
+            // An untyped package's bindings are \`any\`, so only the import specifier identifies the module.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=javascript
+                        javascript(
+                            `
+                                import fse from 'fs-extra';
+                                import {remove} from 'fs-extra';
+                                import * as ns from 'fs-extra';
+
+                                fse.readFile('a');
+                                remove('b');
+                                ns.copy('a', 'b');
+                            `,
+                            //@formatter:off
+                            `
+                                import fse from 'fs-extra';
+                                import {remove} from 'fs-extra';
+                                import * as ns from 'fs-extra';
+
+                                /*~~(fs-extra#readFile)~~>*/fse.readFile('a');
+                                /*~~(fs-extra#remove)~~>*/remove('b');
+                                /*~~(fs-extra#copy)~~>*/ns.copy('a', 'b');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "fs-extra": "^11"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('calling an untyped module itself attributes to its default export', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=javascript
+                        javascript(
+                            `
+                                const requestId = require('express-request-id');
+
+                                requestId();
+                                require('express-request-id')();
+                            `,
+                            //@formatter:off
+                            `
+                                const requestId = require('express-request-id');
+
+                                /*~~(express-request-id#<default>)~~>*/requestId();
+                                /*~~(express-request-id#<default>)~~>*/require('express-request-id')();
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "express-request-id": "1.4.1"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+    });
+
     describe('object types', () => {
         test('an object literal is attributed as an object type whose members carry each field name and type', async () => {
             const literals: J.NewClass[] = [];
@@ -2294,6 +2600,15 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
 
                 async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J.MethodInvocation> {
                     const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                    const description = predicate(visited, visited.methodType);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
+                async visitFunctionCall(functionCall: JS.FunctionCall, p: ExecutionContext): Promise<JS.FunctionCall> {
+                    const visited = await super.visitFunctionCall(functionCall, p) as JS.FunctionCall;
                     const description = predicate(visited, visited.methodType);
                     if (description) {
                         return foundSearchResult(visited, description);

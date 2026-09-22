@@ -18,6 +18,8 @@ package java
 
 import "fmt"
 
+// JavaType is what the type checker made of a node. Every slot holding one is
+// optional — nil is the answer for a node no checker attributed.
 type JavaType interface {
 	isJavaType()
 }

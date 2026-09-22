@@ -2164,9 +2164,8 @@ public class GroovyParserVisitor {
                     } else {
                         Delimiter delimiter = getDelimiter(expression, cursor);
                         if (delimiter != null) {
-                            // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                            value = sourceSubstring(cursor + delimiter.open.length(), delimiter.close);
-                            text = delimiter.open + value + delimiter.close;
+                            // value is decoded per this delimiter's escaping rules; the source supplies the spelling
+                            text = delimiter.open + sourceSubstring(cursor + delimiter.open.length(), delimiter.close) + delimiter.close;
                         }
                     }
                 } else if (expression.isNullExpression()) {
@@ -2493,12 +2492,11 @@ public class GroovyParserVisitor {
                         columnOffset++;
                     }
                 } else if (e instanceof ConstantExpression) {
-                    // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                    String value = hasInterpolation ?
+                    String valueSource = hasInterpolation ?
                             readConstantSegmentBeforeNextInterpolation(delimiter) :
                             sourceSubstring(cursor, delimiter.close);
-                    strings.add(new J.Literal(randomId(), EMPTY, Markers.EMPTY, value, value, null, JavaType.Primitive.String));
-                    skip(value);
+                    strings.add(new J.Literal(randomId(), EMPTY, Markers.EMPTY, ((ConstantExpression) e).getValue(), valueSource, null, JavaType.Primitive.String));
+                    skip(valueSource);
                 } else {
                     // Everything should be handled already by the other two code paths, but just in case
                     strings.add(doVisit(e));
@@ -3166,13 +3164,15 @@ public class GroovyParserVisitor {
             for (int i = 0; i < varExprs.size(); i++) {
                 VariableExpression varExpr = varExprs.get(i);
                 TypeTree innerType = visitVariableExpressionType(varExpr);
+                Space innerPrefix = innerType.getPrefix();
+                innerType = innerType.withPrefix(EMPTY);
                 J.Identifier name = doVisit(varExpr);
                 J.VariableDeclarations.NamedVariable nv = new J.VariableDeclarations.NamedVariable(
                         randomId(), name.getPrefix(), Markers.EMPTY,
                         name.withPrefix(EMPTY), emptyList(), null,
                         typeMapping.variableType(name.getSimpleName(), innerType.getType()));
                 J.VariableDeclarations innerDecl = new J.VariableDeclarations(
-                        randomId(), EMPTY, Markers.EMPTY, emptyList(), emptyList(),
+                        randomId(), innerPrefix, Markers.EMPTY, emptyList(), emptyList(),
                         innerType, null, singletonList(JRightPadded.build(nv)));
                 Space after = i < varExprs.size() - 1 ? sourceBefore(",") : sourceBefore(")");
                 tupleVars.add(JRightPadded.<J.VariableDeclarations>build(innerDecl).withAfter(after));

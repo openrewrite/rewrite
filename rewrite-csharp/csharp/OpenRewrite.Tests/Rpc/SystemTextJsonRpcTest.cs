@@ -116,6 +116,123 @@ public class SystemTextJsonRpcTest
         Assert.Equal("hi", OptionValue(response, "Label"));
     }
 
+    [Fact]
+    public async Task PrepareRecipe_WithStringEncodedScalars_CoercesToPropertyTypes()
+    {
+        var recipe = new TypedOptionRecipe();
+        var marketplace = new RecipeMarketplace();
+        marketplace.Install(recipe);
+        var server = new RewriteRpcServer(marketplace);
+
+        var request = new PrepareRecipeRequest
+        {
+            Id = recipe.Name,
+            Options = new Dictionary<string, object?>
+            {
+                ["Count"] = JsonSerializer.SerializeToElement("42", RpcJson.Options),
+                ["Enabled"] = JsonSerializer.SerializeToElement("false", RpcJson.Options),
+                ["Ratio"] = JsonSerializer.SerializeToElement("1.5", RpcJson.Options),
+                ["Label"] = JsonSerializer.SerializeToElement("hi", RpcJson.Options),
+            },
+        };
+
+        var response = await server.PrepareRecipe(request);
+
+        Assert.Equal(42, OptionValue(response, "Count"));
+        Assert.Equal(false, OptionValue(response, "Enabled"));
+        Assert.Equal(1.5, OptionValue(response, "Ratio"));
+        Assert.Equal("hi", OptionValue(response, "Label"));
+    }
+
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("True", true)]
+    [InlineData(" TRUE ", true)]
+    [InlineData("false", false)]
+    [InlineData("False", false)]
+    [InlineData("1", true)]
+    [InlineData("0", false)]
+    public async Task PrepareRecipe_WithStringEncodedBoolean_ParsesSpellings(string wire, bool expected)
+    {
+        var recipe = new TypedOptionRecipe();
+        var marketplace = new RecipeMarketplace();
+        marketplace.Install(recipe);
+        var server = new RewriteRpcServer(marketplace);
+
+        var response = await server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = recipe.Name,
+            Options = new Dictionary<string, object?>
+            {
+                ["Enabled"] = JsonSerializer.SerializeToElement(wire, RpcJson.Options),
+            },
+        });
+
+        Assert.Equal(expected, OptionValue(response, "Enabled"));
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_WithBlankOrNullValue_KeepsRecipeDefault()
+    {
+        var recipe = new DefaultedOptionRecipe();
+        var marketplace = new RecipeMarketplace();
+        marketplace.Install(recipe);
+        var server = new RewriteRpcServer(marketplace);
+
+        var response = await server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = recipe.Name,
+            Options = new Dictionary<string, object?>
+            {
+                ["Enabled"] = JsonSerializer.SerializeToElement("", RpcJson.Options),
+                ["Count"] = JsonSerializer.SerializeToElement((object?)null, RpcJson.Options),
+            },
+        });
+
+        Assert.Equal(true, OptionValue(response, "Enabled"));
+        Assert.Equal(7, OptionValue(response, "Count"));
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_WithNumericValueForStringOption_Stringifies()
+    {
+        var recipe = new TypedOptionRecipe();
+        var marketplace = new RecipeMarketplace();
+        marketplace.Install(recipe);
+        var server = new RewriteRpcServer(marketplace);
+
+        var response = await server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = recipe.Name,
+            Options = new Dictionary<string, object?>
+            {
+                ["Label"] = JsonSerializer.SerializeToElement(14.0, RpcJson.Options),
+            },
+        });
+
+        Assert.Equal("14", OptionValue(response, "Label"));
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_WithCommaDelimitedStringForListOption_Splits()
+    {
+        var recipe = new ListOptionRecipe();
+        var marketplace = new RecipeMarketplace();
+        marketplace.Install(recipe);
+        var server = new RewriteRpcServer(marketplace);
+
+        var response = await server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = recipe.Name,
+            Options = new Dictionary<string, object?>
+            {
+                ["Packages"] = JsonSerializer.SerializeToElement("a,b,c", RpcJson.Options),
+            },
+        });
+
+        Assert.Equal(new[] { "a", "b", "c" }, Assert.IsType<List<string>>(OptionValue(response, "Packages")));
+    }
+
     private static object? OptionValue(PrepareRecipeResponse response, string name) =>
         response.Descriptor.Options.Single(o => o.Name == name).Value;
 
@@ -132,6 +249,34 @@ public class SystemTextJsonRpcTest
 
         [Option(DisplayName = "Label", Description = "A string option")]
         public string Label { get; set; } = "";
+
+        [Option(DisplayName = "Ratio", Description = "A floating point option")]
+        public double Ratio { get; set; }
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
+    }
+
+    private class DefaultedOptionRecipe : OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Defaulted option recipe";
+        public override string Description => "Recipe whose options carry non-default initial values.";
+
+        [Option(DisplayName = "Enabled", Description = "A boolean option defaulting to true")]
+        public bool Enabled { get; set; } = true;
+
+        [Option(DisplayName = "Count", Description = "An integer option defaulting to 7")]
+        public int Count { get; set; } = 7;
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
+    }
+
+    private class ListOptionRecipe : OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "List option recipe";
+        public override string Description => "Recipe with a list option for wire-format conversion testing.";
+
+        [Option(DisplayName = "Packages", Description = "A list option")]
+        public List<string> Packages { get; set; } = [];
 
         public override ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
     }

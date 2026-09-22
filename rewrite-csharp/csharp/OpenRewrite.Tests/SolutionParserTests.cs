@@ -15,6 +15,10 @@
  */
 using LibGit2Sharp;
 using OpenRewrite.CSharp;
+using OpenRewrite.CSharp.NuGet;
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
 
 namespace OpenRewrite.Tests;
 
@@ -215,6 +219,81 @@ public class SolutionParserTests : IDisposable
     }
 
     [Fact]
+    public async Task WindowsTargetedProjectResolvesReferencesOnAnyOperatingSystem()
+    {
+        WriteFile("Win.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0-windows</TargetFramework>
+                <UseWindowsForms>true</UseWindowsForms>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget { }\n");
+
+        var parser = new SolutionParser();
+        var solution = await parser.LoadAsync(Path.Combine(_tempDir, "Win.csproj"));
+
+        // Without EnableWindowsTargeting the SDK fails evaluation with NETSDK1100 on
+        // Linux/macOS, and the project loads with no references to attest against.
+        var project = Assert.Single(solution.Projects);
+        Assert.NotEmpty(project.MetadataReferences);
+
+        var results = parser.ParseProject(solution, Path.Combine(_tempDir, "Win.csproj"), _tempDir);
+        Assert.Single(results);
+    }
+
+    [Fact]
+    public async Task ProjectsThatResolveNoReferencesAreWarnedAboutOnce()
+    {
+        WriteFile("Unsupported.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net99.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget { }\n");
+
+        var warnings = new List<string>();
+        var previousLogger = Log.Logger;
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Warning()
+            .WriteTo.Sink(new CollectingSink(warnings))
+            .CreateLogger();
+        try
+        {
+            await new SolutionParser().LoadAsync(Path.Combine(_tempDir, "Unsupported.csproj"));
+        }
+        finally
+        {
+            Log.Logger = previousLogger;
+        }
+
+        var warning = Assert.Single(warnings, w => w.Contains("Unsupported.csproj") &&
+                                                   w.Contains("resolved no reference metadata"));
+        Assert.Contains("1 of 1", warning);
+    }
+
+    [Fact]
+    public void WindowsTargetedProjectProducesRestoreGraph()
+    {
+        var csproj = WriteFile("MultiTarget.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net48;net10.0-windows</TargetFrameworks>
+                <UseWPF>true</UseWPF>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var dgSpec = NuGetResolver.CreateDependencyGraphSpec(csproj);
+
+        Assert.NotNull(dgSpec);
+        Assert.NotEmpty(dgSpec.Projects);
+    }
+
+    [Fact]
     public async Task ParseSolutionFile()
     {
         // Create a project directory
@@ -251,5 +330,14 @@ public class SolutionParserTests : IDisposable
         var results = parser.ParseProject(solution, project.FilePath!, _tempDir);
 
         Assert.Single(results);
+    }
+
+    private sealed class CollectingSink(List<string> messages) : ILogEventSink
+    {
+        public void Emit(LogEvent logEvent)
+        {
+            lock (messages)
+                messages.Add(logEvent.RenderMessage());
+        }
     }
 }

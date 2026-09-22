@@ -21,6 +21,8 @@ using OpenRewrite.Xml;
 using Serilog;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
+using OpenRewrite.Core;
+
 namespace OpenRewrite.CSharp;
 
 /// <summary>
@@ -107,11 +109,11 @@ public static class MSBuildProjectHelper
         var sdk = doc.Root.GetAttributeValue("Sdk");
 
         if (rootDir == null)
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return new MSBuildProject(Tree.RandomId(), sdk);
 
         var projectPath = Path.GetFullPath(Path.Combine(rootDir, doc.SourcePath));
         if (!File.Exists(projectPath))
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return new MSBuildProject(Tree.RandomId(), sdk);
 
         try
         {
@@ -119,7 +121,7 @@ public static class MSBuildProjectHelper
                 .ResolveProjectLockFileAsync(projectPath, null, CancellationToken.None)
                 .GetAwaiter().GetResult();
             if (lockFile == null)
-                return new MSBuildProject(Guid.NewGuid(), sdk);
+                return new MSBuildProject(Tree.RandomId(), sdk);
 
             var projectDir = Path.GetDirectoryName(projectPath)!;
             return CreateFromLockFile(sdk, lockFile, projectDir,
@@ -128,7 +130,7 @@ public static class MSBuildProjectHelper
         catch (Exception ex)
         {
             Log.Debug("Failed to resolve lock file for {Path}: {Error}", projectPath, ex.Message);
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return new MSBuildProject(Tree.RandomId(), sdk);
         }
     }
 
@@ -165,7 +167,9 @@ public static class MSBuildProjectHelper
     /// <summary>
     ///     Builds the marker from the in-memory NuGet lock file: declared package references
     ///     (from the restore's PackageSpec), the fully-linked resolved package graph with
-    ///     per-package asset information, and project references.
+    ///     per-package asset information, and project references. Graph depth is measured from
+    ///     both the declared packages and the referenced projects, so anything reachable only
+    ///     through a project reference is still reported at its true distance from the project.
     /// </summary>
     public static MSBuildProject CreateFromLockFile(string? sdk, LockFile lockFile, string projectDir,
         bool includeDeclaredPackageReferences = true)
@@ -174,6 +178,7 @@ public static class MSBuildProjectHelper
 
         // Declared dependencies per TFM alias (framework-specific + project-level)
         var declaredByTfm = new Dictionary<string, List<PackageReference>>(StringComparer.OrdinalIgnoreCase);
+        var referencedProjectsByTfm = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         if (spec != null)
         {
             foreach (var tfi in spec.TargetFrameworks)
@@ -183,6 +188,19 @@ public static class MSBuildProjectHelper
                 foreach (var dep in tfi.Dependencies)
                     refs.Add(new PackageReference(dep.Name, dep.LibraryRange?.VersionRange?.MinVersion?.ToNormalizedString()));
                 declaredByTfm[tfm] = refs;
+            }
+
+            foreach (var restoreTfm in spec.RestoreMetadata?.TargetFrameworks ?? [])
+            {
+                var tfm = ShortTfm(restoreTfm.FrameworkName, restoreTfm.TargetAlias);
+                var names = new List<string>();
+                foreach (var reference in restoreTfm.ProjectReferences)
+                {
+                    var path = reference.ProjectPath ?? reference.ProjectUniqueName;
+                    if (!string.IsNullOrEmpty(path))
+                        names.Add(Path.GetFileNameWithoutExtension(path));
+                }
+                referencedProjectsByTfm[tfm] = names;
             }
         }
 
@@ -261,6 +279,16 @@ public static class MSBuildProjectHelper
                     }
                 }
 
+                var dependencyRanges = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (library.Dependencies != null)
+                {
+                    foreach (var dependency in library.Dependencies)
+                    {
+                        if (dependency.VersionRange != null)
+                            dependencyRanges[dependency.Id] = dependency.VersionRange.ToNormalizedString();
+                    }
+                }
+
                 var node = new ResolvedPackage(
                     library.Name,
                     library.Version.ToNormalizedString(),
@@ -278,7 +306,8 @@ public static class MSBuildProjectHelper
                     analyzerAssemblies: analyzers,
                     hasInstallScripts: hasInstallScripts,
                     hasXdtTransforms: hasXdt,
-                    hasLegacyContentFolder: hasLegacyContent);
+                    hasLegacyContentFolder: hasLegacyContent,
+                    dependencyRanges: dependencyRanges);
                 nodes[library.Name] = node;
                 dependencyNames[library.Name] =
                     library.Dependencies?.Select(d => d.Id).ToList() ?? new List<string>();
@@ -298,7 +327,10 @@ public static class MSBuildProjectHelper
                 }
             }
 
-            var depths = ComputeDepths(declared.Select(d => d.Include), nodes, dependencyNames);
+            referencedProjectsByTfm.TryGetValue(tfm, out var referencedProjects);
+            referencedProjects ??= referencedProjectsByTfm.Values.FirstOrDefault() ?? [];
+            var depths = ComputeDepths(
+                declared.Select(d => d.Include).Concat(referencedProjects), nodes, dependencyNames);
             var resolved = new List<ResolvedPackage>();
             foreach (var (name, node) in nodes)
                 resolved.Add(node.WithDepth(depths.TryGetValue(name, out var d) ? d : 0));
@@ -333,7 +365,7 @@ public static class MSBuildProjectHelper
         var packageSources = ReadPackageSourcesFromTree(projectDir);
 
         return new MSBuildProject(
-            Guid.NewGuid(),
+            Tree.RandomId(),
             sdk,
             new Dictionary<string, PropertyValue>(),
             packageSources,
@@ -513,7 +545,7 @@ public static class MSBuildProjectHelper
         string? tempDir = null;
         try
         {
-            tempDir = Path.Combine(Path.GetTempPath(), "openrewrite-dotnet-" + Guid.NewGuid().ToString("N")[..8]);
+            tempDir = Path.Combine(Path.GetTempPath(), "openrewrite-dotnet-" + Tree.RandomId().ToString("N")[..8]);
             Directory.CreateDirectory(tempDir);
 
             // Materialize all captured build files from the repository context

@@ -31,6 +31,7 @@ import {DependencyWorkspace} from "../dependency-workspace";
 import {ModuleScopeBinding, moduleScopeBindings} from '../add-import';
 import {walk} from '../scope';
 import {isIdentifier} from '../../java';
+import {findMarker, MarkersKind, ParseExceptionResult} from '../../markers';
 
 /** A module a template's context binds, and whether the parse resolved it well enough to attribute. */
 export interface ContextBinding extends ModuleScopeBinding {
@@ -211,6 +212,15 @@ function isTypeReference(name: string): boolean {
 }
 
 /**
+ * The compiler's diagnostic for code that did not parse, as one line: the marker states it ahead
+ * of a stack, and its positions index the whole parsed text, context statements included.
+ */
+function parseFailureReason(cu: JS.CompilationUnit): string {
+    const failure = findMarker<ParseExceptionResult>(cu, MarkersKind.ParseExceptionResult);
+    return failure ? failure.message.split('\n')[0].replace(/:$/, '') : 'no statements';
+}
+
+/**
  * Internal template engine - handles the core templating logic.
  * Not exported from index, so only visible within the templating module.
  */
@@ -239,7 +249,26 @@ export class TemplateEngine {
         const contextWithPreamble = preamble.length > 0
             ? [...contextStatements, ...preamble]
             : contextStatements;
-        return templateCache.getOrParse(templateString, [], contextWithPreamble, dependencies, types);
+        return TemplateEngine.parseOrThrow('template', templateString, [], contextWithPreamble, dependencies, types);
+    }
+
+    /**
+     * The parse behind every template and pattern. Code that fails to parse yields a compilation
+     * unit with no statements, which every caller goes on to read, so it fails here naming the code.
+     */
+    private static async parseOrThrow(
+        kind: 'template' | 'pattern',
+        templateString: string,
+        captures: (Capture | Any)[],
+        contextStatements: string[],
+        dependencies: Record<string, string>,
+        types: string[] | undefined
+    ): Promise<JS.CompilationUnit> {
+        const cu = await templateCache.getOrParse(templateString, captures, contextStatements, dependencies, types);
+        if (!cu.statements || cu.statements.length === 0) {
+            throw new Error(`Failed to parse ${kind} code (${parseFailureReason(cu)}):\n${templateString}`);
+        }
+        return cu;
     }
 
     /**
@@ -277,11 +306,6 @@ export class TemplateEngine {
         types?: string[]
     ): Promise<J> {
         const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types);
-
-        // Check if there are any statements
-        if (!cu.statements || cu.statements.length === 0) {
-            throw new Error(`Failed to parse template code (no statements):\n${TemplateEngine.buildTemplateString(templateParts, parameters)}`);
-        }
 
         // The template code is always the last statement (after context + preamble)
         const lastStatement = cu.statements[cu.statements.length - 1].element;
@@ -575,19 +599,14 @@ export class TemplateEngine {
             !(c instanceof RawCode || (c && typeof c === 'object' && (c as any)[RAW_CODE_SYMBOL]))
         ) as (Capture | Any)[];
 
-        // Use cache to get or parse the compilation unit
-        const cu = await templateCache.getOrParse(
+        const cu = await TemplateEngine.parseOrThrow(
+            'pattern',
             templateString,
             actualCaptures,
             contextWithPreamble,
             dependencies,
             types
         );
-
-        // Check if there are any statements
-        if (!cu.statements || cu.statements.length === 0) {
-            throw new Error(`Failed to parse pattern code (no statements):\n${templateString}`);
-        }
 
         // The pattern code is always the last statement (after context + preamble)
         const lastStatement = cu.statements[cu.statements.length - 1].element;

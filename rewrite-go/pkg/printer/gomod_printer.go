@@ -97,7 +97,7 @@ func printGoModBlock(b *golang.GoModBlock, out *PrintOutputCapture) {
 func printGoModSpace(space java.Space, out *PrintOutputCapture) {
 	out.Append(space.Whitespace)
 	for _, comment := range space.Comments {
-		out.Append(comment.Text)
+		printComment(comment, out)
 		out.Append(comment.Suffix)
 	}
 }

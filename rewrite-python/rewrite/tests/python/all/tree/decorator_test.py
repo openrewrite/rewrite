@@ -110,6 +110,20 @@ def test_subscript_decorator():
     ))
 
 
+def test_call_of_call_decorator():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        def factory():
+            return lambda n: lambda f: f
+
+        @factory()(1)
+        def f():
+            pass
+        """
+    ))
+
+
 def test_parenthesized_decorator():
     # language=python
     RecipeSpec().rewrite_run(python(

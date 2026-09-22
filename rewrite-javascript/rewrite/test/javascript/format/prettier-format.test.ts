@@ -122,6 +122,33 @@ describe('AutoformatVisitor with Prettier', () => {
         )
     });
 
+    test('a statement Prettier is told to ignore keeps its own layout', async () => {
+        const visitor = new class extends JavaScriptVisitor<any> {
+            override async visitImportDeclaration(jsImport: any, p: any): Promise<any> {
+                return await autoFormat(jsImport, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
+            }
+        }();
+
+        const testSpec = new RecipeSpec();
+        testSpec.recipe = fromVisitor(visitor);
+        // Reconciling Prettier's answer replaces nodes whether or not it moved any whitespace
+        testSpec.allowEmptyDiff = true;
+
+        return testSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                const z = 1;
+
+                // prettier-ignore
+                import {a,   b} from 'x';
+                `
+            )
+            // @formatter:on
+        )
+    });
+
     test('subtree formatting in nested block with Prettier', async () => {
         // This tests the pruning in nested blocks
         const visitor = new class extends JavaScriptVisitor<any> {

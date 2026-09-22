@@ -97,6 +97,8 @@ func TestConversionCarriesTheTypeItNames(t *testing.T) {
 		{"string(b)", "string"},
 		{"[]byte(s)", "byte[]"},
 		{"(*MyInt)(q)", "main.MyInt"},
+		// `interface{}` spells no name; the empty interface is `any`.
+		{"interface{}(s)", "any"},
 	} {
 		t.Run(tc.conversion, func(t *testing.T) {
 			src := "package main\n\nimport \"time\"\n\ntype MyInt int\n\n" +
