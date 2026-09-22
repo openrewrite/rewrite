@@ -889,8 +889,9 @@ public interface K extends J {
     }
 
     /**
-     * The parenthesized names of a destructuring pattern, as in {@code for ((a, b) in pairs)}, occupying the
+     * The parenthesized entries of a destructuring pattern, as in {@code val (a: Int, b) = pair}, occupying the
      * declarator slot of the single {@link J.VariableDeclarations.NamedVariable} that the pattern declares.
+     * Each entry is a declaration of its own so that it can carry a type.
      */
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -916,15 +917,25 @@ public interface K extends J {
         @With
         Markers markers;
 
-        JContainer<J.Identifier> names;
+        JContainer<J.VariableDeclarations> variables;
+
+        public List<J.VariableDeclarations> getVariables() {
+            return variables.getElements();
+        }
+
+        public DestructuringPattern withVariables(List<J.VariableDeclarations> variables) {
+            return getPadding().withVariables(JContainer.withElements(this.variables, variables));
+        }
 
         @Override
         public List<J.Identifier> getNames() {
-            return names.getElements();
-        }
-
-        public DestructuringPattern withNames(List<J.Identifier> names) {
-            return getPadding().withNames(JContainer.withElements(this.names, names));
+            List<J.Identifier> names = new ArrayList<>(variables.getElements().size());
+            for (J.VariableDeclarations variable : variables.getElements()) {
+                for (J.VariableDeclarations.NamedVariable namedVariable : variable.getVariables()) {
+                    names.addAll(namedVariable.getDeclarator().getNames());
+                }
+            }
+            return names;
         }
 
         @Getter
@@ -962,12 +973,12 @@ public interface K extends J {
         public static class Padding {
             private final DestructuringPattern t;
 
-            public JContainer<J.Identifier> getNames() {
-                return t.names;
+            public JContainer<J.VariableDeclarations> getVariables() {
+                return t.variables;
             }
 
-            public DestructuringPattern withNames(JContainer<J.Identifier> names) {
-                return t.names == names ? t : new DestructuringPattern(t.id, t.prefix, t.markers, names, t.type);
+            public DestructuringPattern withVariables(JContainer<J.VariableDeclarations> variables) {
+                return t.variables == variables ? t : new DestructuringPattern(t.id, t.prefix, t.markers, variables, t.type);
             }
         }
 
@@ -977,6 +988,12 @@ public interface K extends J {
         }
     }
 
+    /**
+     * @deprecated A destructuring declaration is a {@link J.VariableDeclarations} whose single
+     * {@link J.VariableDeclarations.NamedVariable} has a {@link DestructuringPattern} declarator. Retained so that
+     * LSTs written before that shape remain readable.
+     */
+    @Deprecated
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

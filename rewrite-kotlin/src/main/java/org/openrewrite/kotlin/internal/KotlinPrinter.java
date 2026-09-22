@@ -188,6 +188,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    @Deprecated
     public J visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, PrintOutputCapture<P> p) {
         beforeSyntax(destructuringDeclaration, KSpace.Location.DESTRUCTURING_DECLARATION_PREFIX, p);
         visit(destructuringDeclaration.getInitializer().getLeadingAnnotations(), p);
@@ -223,7 +224,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitDestructuringPattern(K.DestructuringPattern destructuringPattern, PrintOutputCapture<P> p) {
         beforeSyntax(destructuringPattern, KSpace.Location.DESTRUCTURING_PATTERN_PREFIX, p);
-        visitContainer("(", destructuringPattern.getPadding().getNames(), KContainer.Location.DESTRUCTURING_PATTERN_NAMES, ")", p);
+        visitContainer("(", destructuringPattern.getPadding().getVariables(), KContainer.Location.DESTRUCTURING_PATTERN_NAMES, ")", p);
         afterSyntax(destructuringPattern, p);
         return destructuringPattern;
     }

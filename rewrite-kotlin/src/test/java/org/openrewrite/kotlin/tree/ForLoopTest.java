@@ -188,4 +188,19 @@ class ForLoopTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void typedDestructuringEntries() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(pairs: List<Pair<Int, String>>) {
+                  for ((a: Int, b: String) in pairs) {
+                      println(a.toString() + b)
+                  }
+              }
+              """
+          )
+        );
+    }
 }

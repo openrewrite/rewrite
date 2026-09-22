@@ -68,6 +68,7 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    @Deprecated
     public K.DestructuringDeclaration visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, P p) {
         return (K.DestructuringDeclaration) super.visitDestructuringDeclaration(destructuringDeclaration, p);
     }
