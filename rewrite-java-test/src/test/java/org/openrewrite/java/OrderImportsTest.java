@@ -222,6 +222,221 @@ class OrderImportsTest implements RewriteTest {
     }
 
     @Test
+    void foldConfiguredPackageWithTrailingComment() {
+        rewriteRun(
+          java(
+            "import java.util.List; // Lists",
+            "import java.util.*; // Lists",
+            spec -> spec.markers(new NamedStyles(
+              randomId(), "test", "Test", "Test", emptySet(), singletonList(
+              ImportLayoutStyle.builder()
+                .packageToFold("java.util.*", false)
+                .importAllOthers()
+                .importStaticAllOthers()
+                .build())))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n"})
+    void foldConfiguredPackagePreservingComments(String lineEnding) {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+
+              /* Import header */
+              import java.util.List; // Lists
+              // Set types
+              import java.util.Set; /* Sets */
+              import java.io.File;
+              """.replace("\n", lineEnding),
+            """
+              package com.example;
+
+              /* Import header */
+              import java.io.File;
+              // Set types
+              /* Sets */
+              import java.util.*; // Lists
+              """.replace("\n", lineEnding),
+            spec -> spec.markers(new NamedStyles(
+              randomId(), "test", "Test", "Test", emptySet(), singletonList(
+              ImportLayoutStyle.builder()
+                .packageToFold("java.util.*", false)
+                .importAllOthers()
+                .importStaticAllOthers()
+                .build())))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n"})
+    void foldIntoExistingStarPreservingComments(String lineEnding) {
+        rewriteRun(
+          java(
+            """
+              import java.util.*; // Collections
+              import java.util.List; // Lists
+              import java.io.File;
+              """.replace("\n", lineEnding),
+            """
+              import java.io.File;
+              // Lists
+              import java.util.*; // Collections
+              """.replace("\n", lineEnding)
+          )
+        );
+    }
+
+    @Test
+    void foldIntoCommentedStar() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*; // Collections
+              import java.util.List;
+              """,
+            """
+              import java.util.*; // Collections
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n"})
+    void preserveCommentBeforeSemicolonWhenFolding(String lineEnding) {
+        rewriteRun(
+          java(
+            """
+              import java.util.List /* Lists */;
+              import java.util.*; // Collections
+              """.replace("\n", lineEnding),
+            """
+              /* Lists */
+              import java.util.*; // Collections
+              """.replace("\n", lineEnding)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n"})
+    void preserveFinalCommentWhenFolding(String lineEnding) {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+              import java.util.List; // Lists
+              """.replace("\n", lineEnding),
+            """
+              // Lists
+              import java.util.*;
+              """.replace("\n", lineEnding)
+          )
+        );
+    }
+
+    @Test
+    void keepStaticAndNonStaticWildcardCommentsSeparate() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Map.*; // Nested types
+              import java.util.Map.Entry; // Entries
+              import static java.util.Map.*; // Factories
+              import static java.util.Map.entry; // Entry factory
+              """,
+            """
+              // Entries
+              import java.util.Map.*; // Nested types
+
+              // Entry factory
+              import static java.util.Map.*; // Factories
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotForceFoldCommentedImportsWhenSourceSetIsDirty() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        markSourceSetDirty(ctx, "demo");
+        rewriteRun(
+          spec -> spec.executionContext(ctx),
+          mavenProject("demo",
+            java(
+              """
+                import java.util.List; // Lists
+                import java.util.Set; // Sets
+                """,
+              spec -> spec.markers(new NamedStyles(
+                randomId(), "test", "Test", "Test", emptySet(), singletonList(
+                ImportLayoutStyle.builder()
+                  .packageToFold("java.util.*", false)
+                  .importAllOthers()
+                  .importStaticAllOthers()
+                  .build())))
+            )
+          )
+        );
+    }
+
+    @Test
+    void foldConfiguredStaticPackagePreservingComments() {
+        rewriteRun(
+          java(
+            """
+              import static java.util.Collections.emptyList; // Empty lists
+              import static java.util.Collections.singletonList; // Singleton lists
+              """,
+            """
+              // Singleton lists
+              import static java.util.Collections.*; // Empty lists
+              """,
+            spec -> spec.markers(new NamedStyles(
+              randomId(), "test", "Test", "Test", emptySet(), singletonList(
+              ImportLayoutStyle.builder()
+                .staticPackageToFold("java.util.Collections.*", false)
+                .importAllOthers()
+                .importStaticAllOthers()
+                .build())))
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentsWhenFoldingThenUnfoldingImports() {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true, null)),
+          java(
+            """
+              import java.util.*; // Collections
+              import java.util.List; // Lists
+              import java.io.File;
+
+              class A {
+                  Map<String, List<File>> files;
+              }
+              """,
+            """
+              import java.io.File;
+              // Lists
+              import java.util.List;
+              import java.util.Map; // Collections
+
+              class A {
+                  Map<String, List<File>> files;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void preserveCommentsOnAlreadyOrderedImports() {
         rewriteRun(
           java(

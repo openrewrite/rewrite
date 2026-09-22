@@ -102,6 +102,7 @@ public class OrderImports extends Recipe {
                 ImportLayoutStyle importLayoutStyle = importLayoutStyle(cu, namedStyles);
                 ImportComments comments = new ImportComments(cu);
                 List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(comments.imports, classpath, classpathDirty);
+                comments.recordFoldedImports(orderedImports);
                 // Restore comments after removal, so dropping an unused import cannot discard its neighbor's comments.
                 if (Boolean.TRUE.equals(removeUnused)) {
                     J.CompilationUnit prepared = cu.getPadding().withImports(orderedImports);
@@ -182,6 +183,41 @@ public class OrderImports extends Recipe {
             }
             trailing.put(previousImport, Space.build(prefix.getWhitespace(), comments.subList(0, count)));
             return Space.build(whitespace, comments.subList(count, comments.size()));
+        }
+
+        void recordFoldedImports(List<JRightPadded<J.Import>> orderedImports) {
+            Set<UUID> retained = new HashSet<>();
+            for (JRightPadded<J.Import> padded : orderedImports) {
+                retained.add(padded.getElement().getId());
+            }
+            for (JRightPadded<J.Import> padded : orderedImports) {
+                J.Import wildcard = padded.getElement();
+                if (!"*".equals(wildcard.getQualid().getSimpleName())) {
+                    continue;
+                }
+                String target = wildcard.getQualid().getTarget().printTrimmed();
+                for (JRightPadded<J.Import> original : imports) {
+                    J.Import anImport = original.getElement();
+                    if (retained.contains(anImport.getId()) || anImport.isStatic() != wildcard.isStatic() ||
+                        !target.equals(anImport.getQualid().getTarget().printTrimmed())) {
+                        continue;
+                    }
+                    Space prefix = leading.get(anImport.getId());
+                    Space suffix = trailing.getOrDefault(anImport.getId(), Space.EMPTY);
+                    List<Comment> comments = ListUtils.concatAll(prefix.getComments(), original.getAfter().getComments());
+                    comments = ListUtils.concatAll(comments, suffix.getComments());
+                    if (!comments.isEmpty()) {
+                        // The individual import is gone; keep its comments above the wildcard, leaving
+                        // the wildcard's own trailing comment in place. A final line comment needs a newline.
+                        Space wildcardPrefix = leading.get(wildcard.getId());
+                        String newline = prefix.getWhitespace().contains("\r\n") ||
+                                wildcardPrefix.getWhitespace().contains("\r\n") ? "\r\n" : "\n";
+                        comments = ListUtils.map(comments, c -> hasLineBreak(c.getSuffix()) ? c : c.withSuffix(newline));
+                        leading.put(wildcard.getId(), wildcardPrefix.withComments(
+                                ListUtils.concatAll(wildcardPrefix.getComments(), comments)));
+                    }
+                }
+            }
         }
 
         void recordUnfoldedImports(List<JRightPadded<J.Import>> retainedImports) {
