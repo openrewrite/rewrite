@@ -1379,6 +1379,58 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
     }
 
     @Test
+    void latestPatchUpgradesAVersionHeldInAVariable() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "tomcat-embed-core", "latest.patch", null)),
+          settingsGradle(
+            """
+              rootProject.name = 'catalog-variable'
+              apply from: './gradle/versions.gradle'
+              """
+          ),
+          buildGradle(
+            """
+              def tomcatVersion = '10.0.0'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('tomcat', tomcatVersion)
+                          library('tomcatEmbedCore', 'org.apache.tomcat.embed', 'tomcat-embed-core').versionRef('tomcat')
+                      }
+                  }
+              }
+              """,
+            """
+              def tomcatVersion = '10.0.27'
+
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('tomcat', tomcatVersion)
+                          library('tomcatEmbedCore', 'org.apache.tomcat.embed', 'tomcat-embed-core').versionRef('tomcat')
+                      }
+                  }
+              }
+              """,
+            spec -> spec.path("gradle/versions.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void producerBlockVersionHeldInAnExtPropertyIsUpgraded() {
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi())

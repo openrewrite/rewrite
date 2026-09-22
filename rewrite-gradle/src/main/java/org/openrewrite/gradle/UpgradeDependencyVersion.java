@@ -592,7 +592,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         @Override
         public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if (acc.versionPropNameToGA.containsKey(entry.getKey())) {
-                String agreedVersion = safeUpdatedVersion(entry.getKey(), dependencyMatcher, acc, null, ctx);
+                String agreedVersion = safeUpdatedVersion(entry.getKey(), dependencyMatcher, acc, null, entry.getValue().getText(), ctx);
                 if (agreedVersion == null) {
                     return entry;
                 }
@@ -646,6 +646,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return Semver.validate(StringUtils.isBlank(newVersion) ? "latest.release" : newVersion, versionPattern).getValue();
     }
 
+    private @Nullable String safeUpdatedVersion(
+            String varName,
+            DependencyMatcher dependencyMatcher,
+            DependencyVersionState acc,
+            @Nullable GradleProject gradleProject,
+            ExecutionContext ctx) {
+        return safeUpdatedVersion(varName, dependencyMatcher, acc, gradleProject, null, ctx);
+    }
+
     /**
      * Returns the agreed-upon resolved version when it is safe to update the shared variable,
      * or null otherwise. The check has two phases:
@@ -661,12 +670,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
      * When the verdict cannot be computed because no {@code GradleProject} is available (e.g.
      * the {@code gradle.properties} visitor path), the previously-cached verdict from the
      * build.gradle visit is consulted instead.
+     * <p>
+     * {@code currentVersion} is the version the variable holds now, so that a selector relative to
+     * it such as {@code latest.patch} resolves against the real version rather than a stand-in.
      */
     private @Nullable String safeUpdatedVersion(
             String varName,
             DependencyMatcher dependencyMatcher,
             DependencyVersionState acc,
             @Nullable GradleProject gradleProject,
+            @Nullable String currentVersion,
             ExecutionContext ctx) {
         Map<GroupArtifact, Set<String>> usages = acc.variableNames.get(varName);
         if (usages == null || usages.isEmpty()) {
@@ -697,7 +710,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     selector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
                 }
                 try {
-                    selected = selector.select(ga, configName, newVersion, versionPattern, ctx);
+                    selected = currentVersion == null ?
+                            selector.select(ga, configName, newVersion, versionPattern, ctx) :
+                            selector.select(new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), currentVersion),
+                                    configName, newVersion, versionPattern, ctx);
                 } catch (MavenDownloadingException e) {
                     return null;
                 }
@@ -942,7 +958,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 if (!acc.variableNames.containsKey(variableName)) {
                                     return prop.getTree();
                                 }
-                                String selectedVersion = safeUpdatedVersion(variableName, dependencyMatcher, acc, gradleProject, execCtx);
+                                String selectedVersion = safeUpdatedVersion(variableName, dependencyMatcher, acc, gradleProject, prop.getValue(), execCtx);
                                 if (selectedVersion == null) {
                                     return prop.getTree();
                                 }
