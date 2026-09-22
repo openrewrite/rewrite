@@ -315,7 +315,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         val s = StringBuilder(classSignature(type))
         val joiner = StringJoiner(", ", "<", ">")
         for (tp in type.typeArguments) {
-            joiner.add(signature(tp, type.symbol?.fir))
+            joiner.add(signature(tp, type.qualifierSymbol?.fir))
         }
         return s.append(joiner).toString()
     }

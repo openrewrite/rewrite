@@ -156,8 +156,8 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             return null
         }
         if (psiElement != null && fir is FirResolvedQualifier && fir.source != null && (fir.source.psi is KtDotQualifiedExpression || fir.source.psi is KtNameReferenceExpression)) {
-            if (fir.symbol is FirRegularClassSymbol) {
-                val classId = (fir.symbol as FirRegularClassSymbol).classId
+            if (fir.qualifierSymbol is FirRegularClassSymbol) {
+                val classId = (fir.qualifierSymbol as FirRegularClassSymbol).classId
                 return if (isPackage(psiElement, classId)) {
                     null
                 } else {
