@@ -720,9 +720,67 @@ export class JavaScriptTypeMapping {
         if (!ts.isIdentifier(node)) {
             return undefined;
         }
-        const valueDecl = this.checker.getSymbolAtLocation(node)?.valueDeclaration;
+        // In a JavaScript file the checker binds `const x = require('x')` as an alias, which has
+        // declarations but no value declaration.
+        const symbol = this.checker.getSymbolAtLocation(node);
+        const valueDecl = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
         return valueDecl && ts.isVariableDeclaration(valueDecl) && valueDecl.initializer ?
             this.requiredModuleSpecifier(valueDecl.initializer) : undefined;
+    }
+
+    /**
+     * How an identifier is bound by an `import` declaration: the module specifier, whether it binds
+     * the whole module (a default or namespace import) or one named export, and that export's name.
+     * Read from the syntax, since an import of a package without type declarations resolves to
+     * nothing the checker can describe.
+     */
+    private importBinding(node: ts.Expression): { module: string, namespace: boolean, exportName?: string } | undefined {
+        if (!ts.isIdentifier(node)) {
+            return undefined;
+        }
+        const declaration = this.checker.getSymbolAtLocation(node)?.declarations?.[0];
+        if (!declaration) {
+            return undefined;
+        }
+        let importDecl: ts.Node | undefined = declaration;
+        while (importDecl && !ts.isImportDeclaration(importDecl)) {
+            importDecl = importDecl.parent;
+        }
+        if (!importDecl || !ts.isStringLiteral((importDecl as ts.ImportDeclaration).moduleSpecifier)) {
+            return undefined;
+        }
+        const module = ((importDecl as ts.ImportDeclaration).moduleSpecifier as ts.StringLiteral).text;
+        if (ts.isNamespaceImport(declaration)) {
+            return {module, namespace: true};
+        }
+        if (ts.isImportClause(declaration)) {
+            return {module, namespace: false};
+        }
+        if (ts.isImportSpecifier(declaration)) {
+            return {module, namespace: false, exportName: (declaration.propertyName ?? declaration.name).text};
+        }
+        return undefined;
+    }
+
+    /**
+     * The module an expression evaluates to where it binds a whole module: a `require()` result or
+     * a default or namespace import. Named imports bind an export, not the module.
+     */
+    private moduleOfExpression(node: ts.Expression): string | undefined {
+        const required = this.requiredModuleOfExpression(node);
+        if (required) {
+            return required;
+        }
+        const binding = this.importBinding(node);
+        return binding && binding.exportName === undefined ? binding.module : undefined;
+    }
+
+    private moduleType(module: string): Type.FullyQualified {
+        return {
+            kind: Type.Kind.Class,
+            flags: 0, // TODO - determine flags
+            fullyQualifiedName: module
+        } as Type.FullyQualified;
     }
 
     /**
@@ -901,6 +959,12 @@ export class JavaScriptTypeMapping {
                 return undefined;
             }
 
+            // Calling a module itself, as in `require('m')()`, calls its default export.
+            const calledModule = ts.isCallExpression(node) ? this.requiredModuleSpecifier(node.expression) : undefined;
+            if (calledModule) {
+                return this.createMethodType(signature, node, this.moduleType(calledModule), '<default>');
+            }
+
             let symbol = this.checker.getSymbolAtLocation(node.expression);
 
 
@@ -922,8 +986,8 @@ export class JavaScriptTypeMapping {
                     // to find the declaring type. This happens with CommonJS require() calls
                     // where the module is typed as 'any' but methods still have signatures
 
-                    // Try to trace back through the AST to find the require() call
-                    const moduleName = this.requiredModuleOfExpression(node.expression.expression);
+                    // Trace back through the AST to the require() call or import binding the receiver comes from
+                    const moduleName = this.moduleOfExpression(node.expression.expression);
 
                     // Use the inferred type or fall back to unknown
                     declaringType = moduleName ? {
@@ -959,26 +1023,22 @@ export class JavaScriptTypeMapping {
                 const exprType = this.checker.getTypeAtLocation(node.expression.expression);
                 const mappedType = this.getType(exprType);
 
+                // A namespace import of an ES module is typed as its anonymous namespace object, so the
+                // module is what declares its members, and its `default` is the default export. One
+                // declared as a TypeScript namespace (`export = React`) keeps that namespace's name.
+                const receiverBinding = isImport ? this.importBinding(node.expression.expression) : undefined;
+                const anonymous = !mappedType || mappedType.kind !== Type.Kind.Class ||
+                    (mappedType as Type.Class).fullyQualifiedName.startsWith('{');
+
                 // Handle different types
-                if (mappedType && mappedType.kind === Type.Kind.Class) {
-                    // Update the declaring type with the corrected FQN
-                    if (isImport && objSymbol) {
-                        const importName = objSymbol.getName();
-                        const origFqn = (mappedType as Type.Class).fullyQualifiedName;
-                        const lastDot = origFqn.lastIndexOf('.');
-                        if (lastDot > 0) {
-                            const typeName = origFqn.substring(lastDot + 1);
-                            declaringType = {
-                                kind: Type.Kind.Class,
-                                flags: 0, // TODO - determine flags
-                                fullyQualifiedName: `${importName}.${typeName}`
-                            } as Type.FullyQualified;
-                        } else {
-                            declaringType = mappedType as Type.FullyQualified;
-                        }
-                    } else {
-                        declaringType = mappedType as Type.FullyQualified;
+                if (receiverBinding?.namespace && anonymous) {
+                    declaringType = this.moduleType(receiverBinding.module);
+                    if (methodName === 'default') {
+                        methodName = '<default>';
                     }
+                } else if (mappedType && mappedType.kind === Type.Kind.Class) {
+                    // An imported class keeps its own fully qualified name, as it does wherever else it's referenced.
+                    declaringType = mappedType as Type.FullyQualified;
                 } else if (mappedType && mappedType.kind === Type.Kind.Parameterized) {
                     // For parameterized types (e.g., Array<string>, number[]), use the base class type
                     declaringType = (mappedType as Type.Parameterized).type;
@@ -990,10 +1050,10 @@ export class JavaScriptTypeMapping {
                     declaringType = Type.unknownType as Type.FullyQualified;
                 }
 
-                // A `require()` result is typed `any`, so nothing above identifies the module; the
-                // specifier in the call does.
+                // A `require()` result, and an import of a package without type declarations, is typed
+                // `any`, so nothing above identifies the module; the specifier in the call or import does.
                 if (declaringType === Type.unknownType) {
-                    const moduleName = this.requiredModuleOfExpression(node.expression.expression);
+                    const moduleName = this.moduleOfExpression(node.expression.expression);
                     if (moduleName) {
                         declaringType = {
                             kind: Type.Kind.Class,
@@ -1085,12 +1145,20 @@ export class JavaScriptTypeMapping {
                         // name of the default export (e.g. `e` for express), so represent it as `<default>`.
                         // Named imports (`ImportSpecifier`) keep the original exported name.
                         const isDefaultImport = exprSymbol?.declarations?.some(ts.isImportClause) ?? false;
-                        if (!isDefaultImport && aliasedSymbol && aliasedSymbol.name) {
+                        if (isDefaultImport) {
+                            methodName = '<default>';
+                        } else if (aliasedSymbol?.declarations?.length) {
                             methodName = aliasedSymbol.name;
                         } else {
-                            methodName = '<default>';
+                            // A package without type declarations resolves the import to the checker's
+                            // `unknown` symbol, so the exported name comes from the import itself.
+                            methodName = this.importBinding(node.expression)?.exportName ?? aliasedSymbol?.name ?? methodName;
                         }
                     }
+                } else if (this.requiredModuleOfExpression(node.expression)) {
+                    // `const m = require('m'); m()` calls the module's default export.
+                    declaringType = this.moduleType(this.requiredModuleOfExpression(node.expression)!);
+                    methodName = '<default>';
                 } else {
                     // Fall back to the original logic for non-imported functions
                     const exprType = this.checker.getTypeAtLocation(node.expression);
