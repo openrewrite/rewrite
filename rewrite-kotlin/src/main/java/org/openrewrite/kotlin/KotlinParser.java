@@ -25,7 +25,7 @@ import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
-import org.jetbrains.kotlin.cli.jvm.compiler.CliCompilerUtilsKt;
+import org.jetbrains.kotlin.cli.common.messages.SyntaxErrorReporter;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
@@ -54,7 +54,6 @@ import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
-import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.utils.PathUtil;
@@ -91,7 +90,6 @@ import static java.util.stream.Collectors.toSet;
 import static org.jetbrains.kotlin.cli.FrontendConfigurationKeysKt.*;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.JvmArgumentsKt.*;
-import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
 import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
 import static org.jetbrains.kotlin.compiler.plugin.ExtensionRegistrationUtilsKt.registerInProject;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
@@ -199,7 +197,7 @@ public class KotlinParser implements Parser {
                     assert kotlinSource.getFirFile() != null;
                     assert kotlinSource.getFirFile().getSource() != null;
                     PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
-                    AnalyzerWithCompilerReport.SyntaxErrorReport report =
+                    SyntaxErrorReporter.SyntaxErrorReport report =
                             AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true));
                     if (report.isHasErrors()) {
                         parsed.add(ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException()));
@@ -445,7 +443,7 @@ public class KotlinParser implements Parser {
 
     public CompiledSource parse(List<Parser.Input> sources, Disposable disposable, ExecutionContext ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
-        Module module = buildModule(compilerConfiguration);
+        configureJvmRoots(compilerConfiguration);
 
         KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
                 disposable,
@@ -487,9 +485,9 @@ public class KotlinParser implements Parser {
 
         AbstractProjectFileSearchScope libraryScope = projectEnvironment.getSearchScopeForProjectLibraries();
 
-        Name name = Name.identifier(module.getModuleName());
-        DependencyListForCliModule libraryList = CliCompilerUtilsKt.createLibraryListForJvm(
-                module.getModuleName(),
+        Name name = Name.identifier(moduleName);
+        DependencyListForCliModule libraryList = JvmFrontendPipelinePhase.INSTANCE.createLibraryListForJvm(
+                moduleName,
                 compilerConfiguration,
                 compilerConfiguration.get(JVMConfigurationKeys.FRIEND_PATHS, emptyList())
         );
@@ -505,7 +503,7 @@ public class KotlinParser implements Parser {
                         ktFile -> false,
                         KtFile::isScript,
                         (ktFile, mn) -> true,
-                        files -> null
+                        null
                 )
                 .stream()
                 .findFirst()
@@ -528,7 +526,7 @@ public class KotlinParser implements Parser {
 
     }
 
-    private Module buildModule(CompilerConfiguration compilerConfiguration) {
+    private void configureJvmRoots(CompilerConfiguration compilerConfiguration) {
         if (classpath != null) {
             for (Path path : classpath) {
                 File file;
@@ -549,8 +547,6 @@ public class KotlinParser implements Parser {
         configureKlibPaths(compilerConfiguration, arguments);
         configureContentRootsFromClassPath(compilerConfiguration, arguments);
         configureJdkClasspathRoots(compilerConfiguration);
-
-        return configureModuleChunk(compilerConfiguration, arguments, null).getModules().get(0);
     }
 
     private static String buildFilename(Input source, int index) {
