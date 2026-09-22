@@ -848,10 +848,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         TypeTree typeTree = (TypeTree) requireNonNull(innerType).accept(this, data);
+        // A function type carries the space that follows it on its return type, so the closing parenthesis
+        // must not print it a second time. Every other type element leaves that space for the parenthesis.
         Set<PsiElement> consumedSpaces = new HashSet<>();
-        if (innerType.getNextSibling() != null &&
-            isSpace(innerType.getNextSibling().getNode()) &&
-            !(innerType instanceof KtNullableType)) {
+        if (innerType instanceof KtFunctionType &&
+            innerType.getNextSibling() != null &&
+            isSpace(innerType.getNextSibling().getNode())) {
             consumedSpaces.add(innerType.getNextSibling());
         }
 
