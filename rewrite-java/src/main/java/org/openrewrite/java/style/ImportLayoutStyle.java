@@ -750,7 +750,10 @@ public class ImportLayoutStyle implements JavaStyle {
                     boolean starImportExists = importGroup.stream()
                             .anyMatch(it -> "*".equals(it.getElement().getQualid().getSimpleName()));
 
-                    if (importLayoutConflictDetection.isPackageFoldable(packageOrOuterClassName(toStar)) &&
+                    // Folding would discard the comments attached to individual imports.
+                    if (importGroup.stream().allMatch(it -> it.getElement().getComments().isEmpty() &&
+                            it.getAfter().getComments().isEmpty()) &&
+                            importLayoutConflictDetection.isPackageFoldable(packageOrOuterClassName(toStar)) &&
                             (isPackageAlwaysFolded(packagesToFold, toStar.getElement()) || importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1))) {
 
                         J.FieldAccess qualid = toStar.getElement().getQualid();

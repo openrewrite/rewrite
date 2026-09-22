@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
@@ -37,6 +39,350 @@ class OrderImportsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new OrderImports(false, null));
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6143")
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n"})
+    void preserveCommentsWhenOrderingImports(String lineEnding) {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+
+              /*
+               * Copyright 2024 Example Inc.
+               * Licensed under the Apache License, Version 2.0
+               */
+              import java.util.List;
+              import java.io.File; // File I/O operations
+              import java.util.ArrayList;
+              """.replace("\n", lineEnding),
+            """
+              package com.example;
+
+              /*
+               * Copyright 2024 Example Inc.
+               * Licensed under the Apache License, Version 2.0
+               */
+              import java.io.File; // File I/O operations
+              import java.util.ArrayList;
+              import java.util.List;
+              """.replace("\n", lineEnding)
+          )
+        );
+    }
+
+    @Test
+    void preserveLeadingCommentWhenImportMovesFirst() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              // File I/O operations
+              import java.io.File;
+              """,
+            """
+              // File I/O operations
+              import java.io.File;
+              import java.util.List;
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveTrailingCommentWhenImportMovesLast() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List; // Lists
+              import java.io.File;
+
+              /** The application. */
+              class A {}
+              """,
+            """
+              import java.io.File;
+              import java.util.List; // Lists
+
+              /** The application. */
+              class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveMultilineTrailingCommentWhenImportMovesLast() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List; /* Lists
+                                       and collections */
+              import java.io.File;
+
+              class A {}
+              """,
+            """
+              import java.io.File;
+              import java.util.List; /* Lists
+                                       and collections */
+
+              class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveTrailingCommentFromLastImport() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.io.File; // Files
+              """,
+            """
+              import java.io.File; // Files
+              import java.util.List;
+              """
+          )
+        );
+    }
+
+    @Test
+    void distinguishTrailingAndLeadingComments() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List; /* Lists */ // Collection types
+              // File I/O operations
+              import java.io.File;
+              """,
+            """
+              // File I/O operations
+              import java.io.File;
+              import java.util.List; /* Lists */ // Collection types
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotFoldCommentedImports() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List; // Lists
+              import java.util.Set; // Sets
+              import java.util.Map;
+              import java.util.ArrayList;
+              import java.util.Collection;
+              import java.io.Closeable;
+              import java.io.File;
+              import java.io.IOException;
+              import java.io.InputStream;
+              import java.io.OutputStream;
+              """,
+            """
+              import java.io.*;
+              import java.util.ArrayList;
+              import java.util.Collection;
+              import java.util.List; // Lists
+              import java.util.Map;
+              import java.util.Set; // Sets
+              """
+          )
+        );
+    }
+
+    @Test
+    void foldImportsWithHeaderComment() {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+
+              /* Import header */
+              import java.util.List;
+              import java.util.Set;
+              import java.util.Map;
+              import java.util.ArrayList;
+              import java.util.Collection;
+              """,
+            """
+              package com.example;
+
+              /* Import header */
+              import java.util.*;
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentsOnAlreadyOrderedImports() {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+
+              /* Import header */
+              import java.io.File; // Files
+              // Collections
+              import java.util.List; /* Lists */
+
+              /** The application. */
+              class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentsAcrossImportGroups() {
+        rewriteRun(
+          java(
+            """
+              import static java.util.Collections.emptyList; // Empty lists
+              import java.util.List; // Lists
+              import java.io.File; // Files
+
+              class A {}
+              """,
+            """
+              import java.io.File; // Files
+              import java.util.List; // Lists
+
+              import static java.util.Collections.emptyList; // Empty lists
+
+              class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentsWhenRemovingUnusedImports() {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true, null)),
+          java(
+            """
+              import java.util.List; // Lists
+              import java.io.File; // Files
+              import java.util.Set; // Unused sets
+
+              class A {
+                  List<File> files;
+              }
+              """,
+            """
+              import java.io.File; // Files
+              import java.util.List; // Lists
+
+              class A {
+                  List<File> files;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentsOnDuplicateImports() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List; // First comment
+              import java.util.List; // Second comment
+              import java.io.File;
+              """,
+            """
+              import java.io.File;
+              import java.util.List; // First comment
+              import java.util.List; // Second comment
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentsWhenUnfoldingWildcardImport() {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true, null)),
+          java(
+            """
+              import java.util.*; // Collections
+              import java.io.File; // Files
+
+              class A {
+                  Map<String, List<File>> files;
+              }
+              """,
+            """
+              import java.io.File; // Files
+              import java.util.List;
+              import java.util.Map; // Collections
+
+              class A {
+                  Map<String, List<File>> files;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentsWhenUnfoldingStaticWildcardImport() {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true, null)),
+          java(
+            """
+              import static java.util.Collections.*; // Collection helpers
+              import java.util.List;
+
+              class A {
+                  List<String> empty = emptyList();
+                  List<String> single = singletonList("a");
+              }
+              """,
+            """
+              import java.util.List;
+
+              import static java.util.Collections.emptyList;
+              import static java.util.Collections.singletonList; // Collection helpers
+
+              class A {
+                  List<String> empty = emptyList();
+                  List<String> single = singletonList("a");
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveHeaderWhenRemovingAllImports() {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true, null)),
+          java(
+            """
+              package com.example;
+
+              /* Import header */
+              import java.util.List; // Lists
+
+              class A {}
+              """,
+            """
+              package com.example;
+
+              /* Import header */
+              class A {}
+              """
+          )
+        );
     }
 
     @DocumentExample
