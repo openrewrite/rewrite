@@ -17,6 +17,7 @@ package org.openrewrite.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.UUID;
@@ -35,6 +36,12 @@ public class GitTree implements Marker {
     String commitId;
 
     String treeId;
+
+    /**
+     * The commit object exactly as git stored it, so it can be written back into an object
+     * database and still hash to {@link #commitId}. Null when the tree was recorded without it.
+     */
+    byte @Nullable [] commit;
 
     /**
      * In the order a recursive tree walk yields them.
