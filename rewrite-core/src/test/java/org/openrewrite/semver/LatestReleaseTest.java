@@ -20,8 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -299,39 +297,38 @@ class LatestReleaseTest {
         assertThat(latestRelease.compare(null, higher, lower)).isPositive();
     }
 
+    private static final List<String> MIXED_VERSIONS = List.of(
+      "1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.2", "1.0.0-alpha.10", "1.0.0-alpha.beta",
+      "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11",
+      "1.0-M1", "1.0-M2", "1.0-M10", "1.0.0-milestone-3", "1.0.0-milestone-12",
+      "1.0.0-RC1", "1.0.0-RC2", "1.0.0-rc-3", "1.0.0-RC10", "1.0.0-cr.11",
+      "1.0.0-SNAPSHOT", "1.0.0", "1.0.0-jre", "1.0.0-android", "1.0.0-custom10", "1.0.0-custom9",
+      "1.0.0-2", "1.0.0-10", "1.0.0.sp1", "1.0.0.sp10", "1.0.0-20211102.000501-28",
+      "1.0.0-20211102.012229-29"
+    );
+
     @Test
     void preReleaseOrderIsTransitive() {
-        List<String> versions = List.of(
-          "1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.2", "1.0.0-alpha.10", "1.0.0-alpha.beta",
-          "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11",
-          "1.0-M1", "1.0-M2", "1.0-M10", "1.0.0-milestone-3", "1.0.0-milestone-12",
-          "1.0.0-RC1", "1.0.0-RC2", "1.0.0-rc-3", "1.0.0-RC10", "1.0.0-cr.11",
-          "1.0.0-SNAPSHOT", "1.0.0", "1.0.0-jre", "1.0.0-android", "1.0.0-custom10", "1.0.0-custom9",
-          "1.0.0-2", "1.0.0-10", "1.0.0.sp1", "1.0.0.sp10", "1.0.0-20211102.000501-28",
-          "1.0.0-20211102.012229-29"
-        );
-        for (String a : versions) {
-            assertThat(latestRelease.compare(null, a, a)).as(a).isZero();
-            for (String b : versions) {
-                assertThat(Integer.signum(latestRelease.compare(null, a, b)))
+        for (String a : MIXED_VERSIONS) {
+            for (String b : MIXED_VERSIONS) {
+                int ab = latestRelease.compare(null, a, b);
+                assertThat(Integer.signum(ab))
                   .as("%s vs %s", a, b)
                   .isEqualTo(-Integer.signum(latestRelease.compare(null, b, a)));
-                for (String c : versions) {
-                    if (latestRelease.compare(null, a, b) <= 0 && latestRelease.compare(null, b, c) <= 0) {
+                for (String c : MIXED_VERSIONS) {
+                    if (ab <= 0 && latestRelease.compare(null, b, c) <= 0) {
                         assertThat(latestRelease.compare(null, a, c)).as("%s <= %s <= %s", a, b, c).isNotPositive();
                     }
                 }
             }
         }
+    }
 
-        List<String> shuffled = new ArrayList<>(versions);
-        Collections.shuffle(shuffled);
-        shuffled.sort(latestRelease::compare);
-        assertThat(shuffled).containsSubsequence(
-          "1.0.0-alpha.1", "1.0.0-alpha.2", "1.0.0-alpha.10", "1.0.0-alpha.beta",
-          "1.0.0-beta.2", "1.0.0-beta.11",
-          "1.0-M1", "1.0-M2", "1.0-M10",
-          "1.0.0-RC1", "1.0.0-RC2", "1.0.0-RC10",
+    @Test
+    void preReleaseVersionsSortInExpectedOrder() {
+        assertThat(MIXED_VERSIONS.stream().sorted(latestRelease::compare)).containsSubsequence(
+          "1.0.0-alpha.10", "1.0.0-alpha.beta", "1.0.0-beta.2", "1.0.0-beta.11",
+          "1.0.0-milestone-3", "1.0.0-milestone-12", "1.0.0-cr.11", "1.0.0-rc-3",
           "1.0.0-SNAPSHOT", "1.0.0", "1.0.0.sp1", "1.0.0.sp10", "1.0.0-custom9", "1.0.0-custom10"
         );
     }

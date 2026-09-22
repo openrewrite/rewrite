@@ -178,23 +178,21 @@ public class LatestRelease implements VersionComparator {
         int i1 = 0;
         int i2 = 0;
         while (i1 < v1.length() && i2 < v2.length()) {
+            int c;
             if (isAsciiDigit(v1.charAt(i1)) && isAsciiDigit(v2.charAt(i2))) {
                 int end1 = digitRunEnd(v1, i1);
                 int end2 = digitRunEnd(v2, i2);
-                int c = compareDigitRuns(v1, i1, end1, v2, i2, end2);
-                if (c != 0) {
-                    return c;
-                }
+                c = compareDigitRuns(v1, i1, end1, v2, i2, end2);
                 i1 = end1;
                 i2 = end2;
             } else {
-                int c = Character.compare(Character.toLowerCase(v1.charAt(i1++)), Character.toLowerCase(v2.charAt(i2++)));
-                if (c != 0) {
-                    return c;
-                }
+                c = Character.compare(Character.toLowerCase(v1.charAt(i1++)), Character.toLowerCase(v2.charAt(i2++)));
+            }
+            if (c != 0) {
+                return c;
             }
         }
-        return Boolean.compare(i1 < v1.length(), i2 < v2.length());
+        return Integer.compare(v1.length() - i1, v2.length() - i2);
     }
 
     private static int compareDigitRuns(String v1, int start1, int end1, String v2, int start2, int end2) {
@@ -204,11 +202,16 @@ public class LatestRelease implements VersionComparator {
         while (start2 < end2 - 1 && v2.charAt(start2) == '0') {
             start2++;
         }
-        int c = Integer.compare(end1 - start1, end2 - start2);
-        for (int i = 0; c == 0 && i < end1 - start1; i++) {
-            c = Character.compare(v1.charAt(start1 + i), v2.charAt(start2 + i));
+        if (end1 - start1 != end2 - start2) {
+            return Integer.compare(end1 - start1, end2 - start2);
         }
-        return c;
+        while (start1 < end1) {
+            int c = Character.compare(v1.charAt(start1++), v2.charAt(start2++));
+            if (c != 0) {
+                return c;
+            }
+        }
+        return 0;
     }
 
     private static int digitRunEnd(String v, int start) {
@@ -219,6 +222,8 @@ public class LatestRelease implements VersionComparator {
         return i;
     }
 
+    // Not Character.isDigit: it accepts non-ASCII digits, whose code points sit above the letters
+    // that compareNaturally compares them against, which would make the order intransitive.
     private static boolean isAsciiDigit(char c) {
         return c >= '0' && c <= '9';
     }
