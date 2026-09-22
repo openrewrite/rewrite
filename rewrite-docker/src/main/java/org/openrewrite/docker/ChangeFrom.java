@@ -119,7 +119,8 @@ public class ChangeFrom extends Recipe {
         validated = validateBackrefs(validated, "newImageName", newImageName, oldImageName);
         validated = validateBackrefs(validated, "newTag", newTag, oldTag);
         validated = validateBackrefs(validated, "newDigest", newDigest, oldDigest);
-        return validateBackrefs(validated, "newPlatform", newPlatform, oldPlatform);
+        validated = validateBackrefs(validated, "newPlatform", newPlatform, oldPlatform);
+        return validated;
     }
 
     private static Validated<Object> validateBackrefs(Validated<Object> validated, String field,

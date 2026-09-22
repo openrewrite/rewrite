@@ -32,12 +32,33 @@ type GoTemplate struct {
 	code     string
 	captures map[string]*Capture
 	imports  []string
+	context  []string
 	kind     ScaffoldKind
 	importerCache
 
 	once     sync.Once
 	cached   java.J
 	parseErr error
+
+	// required names the captures the parsed tree stands in for, which is a
+	// property of the template rather than of an application.
+	requiredOnce sync.Once
+	required     map[string]bool
+}
+
+// required names the captures a substitution has to bind. A capture the
+// template never names has no placeholder to leave behind, so a recipe may
+// declare one and share it across alternatives that do not all use it.
+func (t *GoTemplate) requiredCaptures(tree java.J) map[string]bool {
+	t.requiredOnce.Do(func() {
+		t.required = map[string]bool{}
+		for name := range placeholdersIn(tree) {
+			if _, declared := t.captures[name]; declared {
+				t.required[name] = true
+			}
+		}
+	})
+	return t.required
 }
 
 // Apply produces a new AST node by parsing the template and substituting
@@ -51,13 +72,18 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 		return nil
 	}
 
-	// Deep-copy the template tree by re-parsing (safe because parseScaffold is cached
-	// and we need a fresh tree to substitute into).
-	// For now, re-parse each time. Optimization: clone the cached tree.
-	fresh, err := parseScaffold(t.code, t.captures, t.imports, t.kind, t.shared())
-	if err != nil {
-		return nil
+	// A placeholder left unsubstituted prints as the identifier standing in
+	// for it, which would reach the source file.
+	for name := range t.requiredCaptures(templateTree) {
+		if values == nil || !values.satisfies(t.captures[name]) {
+			return nil
+		}
 	}
+
+	// Giving every node a new ID copies the whole tree, so the result shares
+	// no node with the cached one and two applications share none with each
+	// other. The cache is what the scaffold parse produced, once.
+	fresh := withFreshIDs(templateTree)
 
 	if values != nil {
 		fresh = substitute(fresh, values)
@@ -71,22 +97,17 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 // Instantiate produces the template as a detached node for a recipe that
 // inserts the result somewhere new, where Apply replaces a matched node. Bound
 // values are copied, so a spliced subtree may also stay where it came from.
-// The result carries no leading whitespace. It is nil unless every capture is
-// bound, through Bind for a single subtree or BindList for a run of them
-// within the capture's declared bounds.
+// The result carries no leading whitespace. Like Apply it is nil unless every
+// capture is bound, through Bind for a single subtree or BindList for a run of
+// them within the capture's declared bounds.
 func (t *GoTemplate) Instantiate(values *MatchResult) java.J {
-	for _, capture := range t.captures {
-		if values == nil || !values.satisfies(capture) {
-			return nil
-		}
-	}
 	instantiated := t.Apply(nil, values)
 	if instantiated == nil {
 		return nil
 	}
 	// The prefix is the gap the scaffold leaves before the template code,
 	// not whitespace the template itself declares.
-	return setLeadingPrefix(withFreshIDs(instantiated), java.EmptySpace)
+	return setLeadingPrefix(instantiated, java.EmptySpace)
 }
 
 // withFreshIDs returns a copy of j in which every node has a new ID, keeping
@@ -112,7 +133,7 @@ func (v *idRefreshVisitor) Visit(t java.Tree, p any) java.Tree {
 // getTree lazily parses the template and caches the result.
 func (t *GoTemplate) getTree() (java.J, error) {
 	t.once.Do(func() {
-		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.kind, t.shared())
+		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.context, t.kind, t.shared())
 	})
 	return t.cached, t.parseErr
 }
@@ -121,6 +142,7 @@ type TemplateBuilder struct {
 	code       string
 	captures   []*Capture
 	imports    []string
+	context    []string
 	kind       ScaffoldKind
 	exportData []fs.FS
 }
@@ -148,6 +170,13 @@ func (b *TemplateBuilder) Imports(pkgs ...string) *TemplateBuilder {
 	return b
 }
 
+// Context adds declarations the template is parsed against. See
+// PatternBuilder.Context.
+func (b *TemplateBuilder) Context(decls ...string) *TemplateBuilder {
+	b.context = append(b.context, decls...)
+	return b
+}
+
 // ExportData attributes the template against compiler export data the recipe
 // module carries, reaching packages the running toolchain cannot load. Sets
 // accumulate, as Imports does, so a module can draw on several generated
@@ -162,6 +191,7 @@ func (b *TemplateBuilder) Build() *GoTemplate {
 		code:          b.code,
 		captures:      captureMap(b.captures),
 		imports:       b.imports,
+		context:       b.context,
 		kind:          b.kind,
 		importerCache: importerCache{exportData: b.exportData},
 	}
@@ -219,4 +249,18 @@ func setLeadingPrefix(j java.J, prefix java.Space) java.J {
 // leading prefix lives directly on the node.
 func getLeadingPrefix(j java.J) java.Space {
 	return j.GetPrefix()
+}
+
+// placeholdersIn names the captures a template tree stands in for.
+func placeholdersIn(tree java.J) map[string]bool {
+	names := map[string]bool{}
+	visitor.Walk(tree, func(t java.Tree) bool {
+		if ident, ok := t.(*java.Identifier); ok {
+			if name, isPlaceholder := FromPlaceholder(ident.Name); isPlaceholder {
+				names[name] = true
+			}
+		}
+		return true
+	})
+	return names
 }

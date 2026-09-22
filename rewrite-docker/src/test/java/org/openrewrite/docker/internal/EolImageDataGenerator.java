@@ -29,10 +29,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.*;
-
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
+import java.util.stream.Collectors;
 
 /**
  * Fetches end-of-life data from <a href="https://endoflife.date">endoflife.date</a>
@@ -237,7 +234,7 @@ public class EolImageDataGenerator {
             List<VersionInfo> eolVersions = filterEolVersions(parsed);
             List<VersionInfo> activeVersions = parsed.stream()
                     .filter(v -> !v.isEol)
-                    .collect(toList());
+                    .collect(Collectors.toList());
 
             if (eolVersions.isEmpty()) {
                 continue;
@@ -280,7 +277,7 @@ public class EolImageDataGenerator {
         HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             System.err.println("HTTP " + response.statusCode() + " for " + url);
-            return emptyList();
+            return Collections.emptyList();
         }
         return JSON.readValue(response.body(), new TypeReference<>() {});
     }
@@ -349,7 +346,7 @@ public class EolImageDataGenerator {
                         return false;
                     }
                 })
-                .collect(toList());
+                .collect(Collectors.toList());
     }
 
     private static String computeReplacement(TrackedProduct product,
@@ -362,7 +359,7 @@ public class EolImageDataGenerator {
                 yield sorted.stream()
                         .limit(2)
                         .map(v -> v.cycle)
-                        .collect(joining(" or "));
+                        .collect(Collectors.joining(" or "));
             }
             case TWO_NEWEST_LTS -> {
                 // For Ubuntu, LTS versions end in .04

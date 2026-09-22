@@ -52,7 +52,7 @@ func Importer(sets ...fs.FS) types.Importer {
 	if union := union(sets); union != nil {
 		imp = append(imp, shippedOnly(union))
 	}
-	return &chain{imp: append(imp, importer.Default())}
+	return &chain{imp: append(imp, recovering(importer.Default()))}
 }
 
 // union reads from the first set carrying a name, or nil if there are none.
@@ -102,22 +102,34 @@ func Verify(fsys fs.FS, importPaths ...string) error {
 // go/importer off its default search entirely, which is why Importer chains
 // this rather than handing it the whole job.
 func shippedOnly(fsys fs.FS) types.Importer {
-	return importer.ForCompiler(token.NewFileSet(), "gc", func(path string) (rc io.ReadCloser, err error) {
-		// A set is supplied by the recipe module; one that panics on Open
-		// costs the attribution it would have carried, like one that has no
-		// blob for the path.
-		defer func() {
-			if r := recover(); r != nil {
-				rc, err = nil, fmt.Errorf("export data for %q: %v", path, r)
-			}
-		}()
+	return recovering(importer.ForCompiler(token.NewFileSet(), "gc", func(path string) (io.ReadCloser, error) {
 		blob, err := fs.ReadFile(fsys, BlobName(path))
 		if err != nil {
 			return nil, err
 		}
 		return io.NopCloser(bytes.NewReader(blob)), nil
+	}))
+}
+
+// recovering turns a panic out of imp into an error. internal/pkgbits panics on
+// export data newer than the toolchain supports, and a set is supplied by the
+// recipe module, so an importer here reads bytes it did not produce. Only the
+// path is certain to be known here — a panic out of a supplied set says
+// whatever it likes.
+func recovering(imp types.Importer) types.Importer {
+	return importerFunc(func(path string) (pkg *types.Package, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				pkg, err = nil, fmt.Errorf("import %q: %v", path, r)
+			}
+		}()
+		return imp.Import(path)
 	})
 }
+
+type importerFunc func(string) (*types.Package, error)
+
+func (f importerFunc) Import(path string) (*types.Package, error) { return f(path) }
 
 // chain is the first importer to resolve a path, in order. The lock lets one
 // chain serve concurrent parses, which is how callers get to hold on to what

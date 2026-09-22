@@ -33,7 +33,7 @@ public class AddToTagVisitor<P>(Tag scope, Tag tagToAdd, Comparison<Content>? ta
             if (t.ClosingTag == null)
             {
                 t = t.WithClosingTag(new Tag.Closing(
-                        Guid.NewGuid(), "\n", Markers.Empty, t.Name, ""))
+                        Tree.RandomId(), "\n", Markers.Empty, t.Name, ""))
                     .WithBeforeTagDelimiterPrefix("");
             }
 

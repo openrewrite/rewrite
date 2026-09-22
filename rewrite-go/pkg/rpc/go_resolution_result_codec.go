@@ -40,6 +40,7 @@ import (
 //
 // 10. resolvedDependencies (List<ResolvedDependency>, ref-by-key)
 // 11. packageModules (List<PackageModule>, ref-by-key)
+// 12. resolutionStatus (String enum name)
 //
 // Each ResolvedDependency element sends, after goModHash: indirect, main,
 // replacePath, replaceVersion, moduleGoVersion, then deps (List<ModuleRef>).
@@ -141,6 +142,10 @@ func sendGoResolutionResult(m golang.GoResolutionResult, q *SendQueue) {
 			q.GetAndSend(p, func(y any) any { return emptyAsNil(y.(golang.GoPackageModule).Version) }, nil)
 			q.GetAndSend(p, func(y any) any { return y.(golang.GoPackageModule).Standard }, nil)
 		})
+
+	// emptyAsNil so a marker deserialized from a pre-status LST (status "") travels
+	// as null, never as an empty string the Java side would feed to Enum.valueOf.
+	q.GetAndSend(m, func(x any) any { return emptyAsNil(string(x.(golang.GoResolutionResult).ResolutionStatus)) }, nil)
 }
 
 // receiveGoResolutionResult mirrors Java's
@@ -163,6 +168,7 @@ func receiveGoResolutionResult(before golang.GoResolutionResult, q *ReceiveQueue
 	before.Retracts = recvRetracts(q, before.Retracts)
 	before.ResolvedDependencies = recvResolvedDeps(q, before.ResolvedDependencies)
 	before.PackageModules = recvPackageModules(q, before.PackageModules)
+	before.ResolutionStatus = golang.GoResolutionStatus(receiveScalar[string](q, string(before.ResolutionStatus)))
 	return before
 }
 

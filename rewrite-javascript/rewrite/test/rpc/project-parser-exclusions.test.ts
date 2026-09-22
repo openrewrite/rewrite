@@ -90,3 +90,85 @@ describe("ProjectParser exclusions", () => {
         }
     });
 });
+
+/** A git repo whose project lives in `ui/`, with the only `.gitignore` at the root. */
+function nestedProject(root: string): string {
+    write(root, ".gitignore", "target/\n");
+    write(root, "pom.xml", "<project/>\n");
+    write(root, "ui/package.json", '{"name": "ui"}\n');
+    write(root, "ui/src/app.ts");
+    write(root, "ui/dist/keep.ts");
+    write(root, "ui/target/classes/static/browser/app.js");
+
+    spawnSync("git", ["init"], {cwd: root});
+    spawnSync("git", ["add", "ui/dist/keep.ts"], {cwd: root});
+    return path.join(root, "ui");
+}
+
+describe("ProjectParser discovery in a project below the git root", () => {
+    it("honours the repository root .gitignore", async () => {
+        const tmpDir = await dir({unsafeCleanup: true});
+        try {
+            const files = await discovered(nestedProject(tmpDir.path));
+            expect(files).toContain("src/app.ts");
+            expect(files).not.toContain("target/classes/static/browser/app.js");
+        } finally {
+            await tmpDir.cleanup();
+        }
+    });
+
+    it("keeps a tracked output directory, which is the project's own source", async () => {
+        const tmpDir = await dir({unsafeCleanup: true});
+        try {
+            expect(await discovered(nestedProject(tmpDir.path))).toContain("dist/keep.ts");
+        } finally {
+            await tmpDir.cleanup();
+        }
+    });
+
+    it("recognizes a work tree whose .git is a file", async () => {
+        const tmpDir = await dir({unsafeCleanup: true});
+        try {
+            const root = path.join(tmpDir.path, "repo");
+            nestedProject(root);
+            const git = (...args: string[]) => spawnSync("git", args, {cwd: root, encoding: "utf8"});
+            git("add", "-A");
+            git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "--no-verify", "-m", "initial");
+            const worktree = path.join(tmpDir.path, "linked");
+            git("worktree", "add", "--detach", worktree);
+            expect(fs.statSync(path.join(worktree, ".git")).isFile()).toBe(true);
+            // Ignored output is not checked out, so this work tree needs its own copy.
+            write(worktree, "ui/target/classes/static/browser/app.js");
+
+            const files = await discovered(path.join(worktree, "ui"));
+            expect(files).toContain("dist/keep.ts");
+            expect(files).not.toContain("target/classes/static/browser/app.js");
+        } finally {
+            await tmpDir.cleanup();
+        }
+    });
+
+    it("falls back to the walk for a project the repository ignores entirely", async () => {
+        const tmpDir = await dir({unsafeCleanup: true});
+        try {
+            write(tmpDir.path, ".gitignore", "ui/\n");
+            write(tmpDir.path, "ui/src/app.ts");
+            spawnSync("git", ["init"], {cwd: tmpDir.path});
+            expect(await discovered(path.join(tmpDir.path, "ui"))).toEqual(["src/app.ts"]);
+        } finally {
+            await tmpDir.cleanup();
+        }
+    });
+
+    it("walks with the default exclusions when no work tree encloses the project", async () => {
+        const tmpDir = await dir({unsafeCleanup: true});
+        try {
+            write(tmpDir.path, "src/app.ts");
+            write(tmpDir.path, "dist/keep.ts");
+            write(tmpDir.path, "build/out.ts");
+            expect(await discovered(tmpDir.path)).toEqual(["src/app.ts"]);
+        } finally {
+            await tmpDir.cleanup();
+        }
+    });
+});

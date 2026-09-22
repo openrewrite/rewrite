@@ -63,7 +63,7 @@ public class FindMavenSettings extends Recipe {
                                 document.getSourcePath().toString(),
                                 Boolean.TRUE.equals(existenceCheckOnly) ?
                                         "exists" :
-                                        mapper.writerWithDefaultPrettyPrinter().writeValueAsString(mrr.getMavenSettings())
+                                        mapper.writerWithDefaultPrettyPrinter().writeValueAsString(effectiveSettings)
                         ));
                     } catch (JsonProcessingException e) {
                         throw new UncheckedIOException(e);

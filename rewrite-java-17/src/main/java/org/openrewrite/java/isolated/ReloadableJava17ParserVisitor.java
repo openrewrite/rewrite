@@ -133,9 +133,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             List<JRightPadded<Expression>> expressions;
             if (node.getArguments().size() == 1) {
                 ExpressionTree arg = node.getArguments().get(0);
-                if (arg instanceof JCAssign) {
-                    if (endPos(arg) < 0) {
-                        expressions = singletonList(convert(((JCAssign) arg).rhs, t -> sourceBefore(")")));
+                if (arg instanceof JCAssign assign && assign.lhs instanceof JCIdent) {
+                    // javac's `Annotate#enterAnnotation` builds an elided `value =` with `make.at(rhs.pos)`
+                    if (assign.lhs.pos == assign.rhs.pos) {
+                        expressions = singletonList(convert(assign.rhs, t -> sourceBefore(")")));
                     } else {
                         expressions = singletonList(convert(arg, t -> sourceBefore(")")));
                     }
@@ -1704,8 +1705,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         if (vartype == null) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
-            if ((node.sym.flags() & Flags.PARAMETER) > 0) {
-                // this is a lambda parameter with an inferred type expression
+            if (!hasLombokGeneratedSymbol(node)) {
+                // Inferred lambda parameter types and unresolved types have no source representation.
                 typeExpr = null;
             } else {
                 Space space = whitespace();

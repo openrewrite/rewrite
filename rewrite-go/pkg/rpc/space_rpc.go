@@ -236,6 +236,10 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 			func(v any) { sendSpace(v.(java.Space), q) })
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After },
 			func(v any) { sendSpace(v.(java.Space), q) })
+	case golang.PartialTypeAttribution:
+		// PartialTypeAttribution.rpcSend sends: id (UUID string), reason (string)
+		q.GetAndSend(m, func(x any) any { return x.(golang.PartialTypeAttribution).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.PartialTypeAttribution).Reason }, nil)
 	case golang.StructTagQuote:
 		// StructTagQuote.rpcSend sends: id (UUID string), quote (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTagQuote).Ident.String() }, nil)
@@ -493,6 +497,15 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 					Source: valueSource,
 				}
 			}
+			return m
+		case golang.PartialTypeAttribution:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.Reason = receiveScalar[string](q, m.Reason)
 			return m
 		case golang.StructTagQuote:
 			idStr := receiveScalar[string](q, m.Ident.String())

@@ -17,6 +17,7 @@ using System.Diagnostics;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
+using NuGet.Frameworks;
 using NuGet.ProjectModel;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Format;
@@ -37,24 +38,59 @@ internal static class SolutionRestore
     private static readonly Dictionary<string, IReadOnlyDictionary<string, LockFile>> Restored =
         new(StringComparer.OrdinalIgnoreCase);
 
+    private static long _totalRestoreMs;
+
+    internal static long TotalRestoreMs => Interlocked.Read(ref _totalRestoreMs);
+
     /// <summary>
     /// .NET Framework build assets that are not present on non-Windows machines. They are
     /// restored as NuGet packages and handed to MSBuildWorkspace as MSBuild properties so
     /// legacy projects can be evaluated: <c>VSToolsPath</c> resolves the web-application
-    /// targets import and <c>TargetFrameworkRootPath</c> resolves the reference assemblies.
+    /// targets import and <c>TargetFrameworkRootPath</c> /
+    /// <c>TargetFrameworkFallbackSearchPaths</c> resolve the reference assemblies.
     /// </summary>
     private const string WebTargetsPackage = "MSBuild.Microsoft.VisualStudio.Web_WebApplication.Targets";
     private const string WebTargetsVersion = "12.0.2";
-    private const string ReferenceAssembliesPackage = "Microsoft.NETFramework.ReferenceAssemblies.net48";
     private const string ReferenceAssembliesVersion = "1.0.3";
 
-    private static NetFrameworkBuildAssets? _buildAssets;
+    /// <summary>
+    /// Directories to search for pre-provisioned .NET Framework reference assemblies before
+    /// restoring them from NuGet, separated by <c>;</c>. Each entry is a
+    /// <c>TargetFrameworkRootPath</c>, i.e. a directory containing
+    /// <c>.NETFramework/&lt;version&gt;</c> subdirectories. Set this on machines with no access
+    /// to the reference-assembly packages.
+    /// </summary>
+    public const string ReferenceAssembliesEnvironmentVariable = "REWRITE_DOTNET_REFERENCE_ASSEMBLIES";
 
     /// <summary>
-    /// MSBuild property values pointing at restored .NET Framework build assets. A value is
-    /// null when the corresponding package could not be restored.
+    /// The .NET Framework versions that ship as <c>Microsoft.NETFramework.ReferenceAssemblies.*</c>
+    /// packages, keyed by MSBuild <c>TargetFrameworkVersion</c>.
     /// </summary>
-    internal record NetFrameworkBuildAssets(string? VSToolsPath, string? TargetFrameworkRootPath);
+    private static readonly IReadOnlyDictionary<string, string> ReferenceAssemblyPackages =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["v2.0"] = "net20", ["v3.5"] = "net35", ["v4.0"] = "net40", ["v4.0.3"] = "net403",
+            ["v4.5"] = "net45", ["v4.5.1"] = "net451", ["v4.5.2"] = "net452", ["v4.6"] = "net46",
+            ["v4.6.1"] = "net461", ["v4.6.2"] = "net462", ["v4.7"] = "net47", ["v4.7.1"] = "net471",
+            ["v4.7.2"] = "net472", ["v4.8"] = "net48", ["v4.8.1"] = "net481",
+        };
+
+    private static string? _vsToolsPath;
+    private static bool _vsToolsPathResolved;
+
+    private static readonly Dictionary<string, string?> ReferenceAssemblyRoots =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// MSBuild property values pointing at .NET Framework build assets.
+    /// <see cref="VSToolsPath"/> is null when the web-application targets could not be restored,
+    /// and <see cref="MissingVersions"/> lists the target framework versions whose reference
+    /// assemblies are unavailable — those projects evaluate without type attestation.
+    /// </summary>
+    internal record NetFrameworkBuildAssets(
+        string? VSToolsPath,
+        IReadOnlyList<string> ReferenceAssemblyRoots,
+        IReadOnlyList<string> MissingVersions);
 
     /// <summary>
     /// Restores a solution/project in-process: PackageReference projects via restore-graph
@@ -91,8 +127,17 @@ internal static class SolutionRestore
             var lockFiles = new Dictionary<string, LockFile>(StringComparer.OrdinalIgnoreCase);
             var rootDir = Path.GetDirectoryName(key) ?? ".";
 
+            using var sourceFailures = NuGetSourceFailures.Begin(
+                Path.GetFileName(path), NuGetResolver.EnabledSourceUrls(rootDir));
+
+            var totalStopwatch = Stopwatch.StartNew();
+            var graphMsBefore = NuGetResolver.GraphGenerationMs;
+            var restoreMsBefore = NuGetResolver.RestoreExecutionMs;
+            var packagesConfigStopwatch = new Stopwatch();
+
             if (hasPackagesConfig)
             {
+                packagesConfigStopwatch.Start();
                 // Materialize the solution-local packages/ folder for legacy HintPaths.
                 var packagesConfigs = Directory
                     .EnumerateFiles(rootDir, "packages.config", SearchOption.AllDirectories)
@@ -113,6 +158,7 @@ internal static class SolutionRestore
                             lockFiles[Path.GetFullPath(projectFile)] = lockFile;
                     }
                 }
+                packagesConfigStopwatch.Stop();
             }
 
             // In-process restore of PackageReference projects (replaces `dotnet restore`).
@@ -135,6 +181,18 @@ internal static class SolutionRestore
             }
             Log.Debug("<< in-process restore ({FileName}) ({Elapsed})", Path.GetFileName(path), sw.Elapsed);
 
+            totalStopwatch.Stop();
+            Interlocked.Add(ref _totalRestoreMs, (long)totalStopwatch.Elapsed.TotalMilliseconds);
+
+            Log.Information(
+                "restore {FileName}: {Total} ms total — packages.config {PackagesConfig} ms, " +
+                "graph generation {Graph} ms, resolve/download {Resolve} ms",
+                Path.GetFileName(path),
+                (long)totalStopwatch.Elapsed.TotalMilliseconds,
+                (long)packagesConfigStopwatch.Elapsed.TotalMilliseconds,
+                NuGetResolver.GraphGenerationMs - graphMsBefore,
+                NuGetResolver.RestoreExecutionMs - restoreMsBefore);
+
             var result = (IReadOnlyDictionary<string, LockFile>)lockFiles;
             lock (Restored)
             {
@@ -150,43 +208,139 @@ internal static class SolutionRestore
     }
 
     /// <summary>
-    /// Restores the .NET Framework reference assemblies and web-application targets as NuGet
-    /// packages into a stable per-machine cache directory (flat, version-less layout), so
-    /// MSBuildWorkspace can evaluate legacy projects on non-Windows machines. The result is
-    /// cached for the process lifetime.
+    /// Provisions the reference assemblies for the given .NET Framework target versions plus the
+    /// web-application targets, so MSBuildWorkspace can evaluate legacy projects on machines
+    /// without a .NET Framework targeting pack. Each version is looked for in
+    /// <see cref="ReferenceAssembliesEnvironmentVariable"/>, then in the NuGet global package
+    /// cache, and is only downloaded when neither has it. Roots already present on the machine
+    /// are returned as well, after the requested ones: they cost nothing and cover a version the
+    /// project scan cannot see, and MSBuild ignores a search path lacking the version a project
+    /// asks for. Results are cached for the process lifetime.
     /// </summary>
-    public static async Task<NetFrameworkBuildAssets> RestoreNetFrameworkBuildAssetsAsync(CancellationToken ct)
+    public static async Task<NetFrameworkBuildAssets> RestoreNetFrameworkBuildAssetsAsync(
+        IEnumerable<string> frameworkVersions, CancellationToken ct)
     {
-        if (_buildAssets != null)
-            return _buildAssets;
-
         await Gate.WaitAsync(ct);
         try
         {
-            if (_buildAssets != null)
-                return _buildAssets;
-
             var cacheDir = Path.Combine(Path.GetTempPath(), "openrewrite-netfx-build-assets");
-            var vsToolsPath = Path.Combine(cacheDir, WebTargetsPackage, "tools", "VSToolsPath");
-            var targetFrameworkRootPath = Path.Combine(cacheDir, ReferenceAssembliesPackage, "build");
+            using var sourceFailures = NuGetSourceFailures.Begin(
+                "the .NET Framework build assets", NuGetResolver.EnabledSourceUrls(cacheDir));
 
-            if (!Directory.Exists(vsToolsPath))
-                await NuGetResolver.InstallPackageAsync(
-                    WebTargetsPackage, WebTargetsVersion, cacheDir, excludeVersion: true, ct);
-            if (!Directory.Exists(targetFrameworkRootPath))
-                await NuGetResolver.InstallPackageAsync(
-                    ReferenceAssembliesPackage, ReferenceAssembliesVersion, cacheDir, excludeVersion: true, ct);
+            if (!_vsToolsPathResolved)
+            {
+                var vsToolsPath = Path.Combine(cacheDir, WebTargetsPackage, "tools", "VSToolsPath");
+                if (!Directory.Exists(vsToolsPath))
+                    await NuGetResolver.InstallPackageAsync(
+                        WebTargetsPackage, WebTargetsVersion, cacheDir, excludeVersion: true, ct);
+                _vsToolsPath = Directory.Exists(vsToolsPath) ? vsToolsPath : null;
+                _vsToolsPathResolved = true;
+            }
 
-            _buildAssets = new NetFrameworkBuildAssets(
-                Directory.Exists(vsToolsPath) ? vsToolsPath : null,
-                Directory.Exists(targetFrameworkRootPath) ? targetFrameworkRootPath : null);
-            Log.Debug("netfx build assets — VSToolsPath={VSToolsPath}, TargetFrameworkRootPath={TargetFrameworkRootPath}",
-                _buildAssets.VSToolsPath ?? "(missing)", _buildAssets.TargetFrameworkRootPath ?? "(missing)");
-            return _buildAssets;
+            var roots = new List<string>();
+            var missing = new List<string>();
+            foreach (var version in frameworkVersions)
+            {
+                if (!ReferenceAssemblyRoots.TryGetValue(version, out var root))
+                {
+                    root = await ResolveReferenceAssemblyRootAsync(version, cacheDir, ct);
+                    ReferenceAssemblyRoots[version] = root;
+                }
+
+                if (root == null)
+                    missing.Add(version);
+                else if (!roots.Contains(root, StringComparer.OrdinalIgnoreCase))
+                    roots.Add(root);
+            }
+
+            foreach (var root in AvailableReferenceAssemblyRoots())
+                if (!roots.Contains(root, StringComparer.OrdinalIgnoreCase))
+                    roots.Add(root);
+
+            Log.Debug("netfx build assets — VSToolsPath={VSToolsPath}, reference assembly roots=[{Roots}], missing=[{Missing}]",
+                _vsToolsPath ?? "(missing)", string.Join(";", roots), string.Join(";", missing));
+            return new NetFrameworkBuildAssets(_vsToolsPath, roots, missing);
         }
         finally
         {
             Gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Locates a <c>TargetFrameworkRootPath</c> holding the reference assemblies for a single
+    /// <c>TargetFrameworkVersion</c>, restoring the matching NuGet package when necessary.
+    /// </summary>
+    private static async Task<string?> ResolveReferenceAssemblyRootAsync(
+        string version, string cacheDir, CancellationToken ct)
+    {
+        foreach (var configured in PreProvisionedReferenceAssemblyRoots())
+        {
+            if (Directory.Exists(Path.Combine(configured, ".NETFramework", version)))
+                return configured;
+        }
+
+        if (!ReferenceAssemblyPackages.TryGetValue(version, out var moniker))
+        {
+            Log.Debug("netfx build assets: no reference assembly package exists for {Version}", version);
+            return null;
+        }
+
+        var packageId = "Microsoft.NETFramework.ReferenceAssemblies." + moniker;
+        foreach (var cacheRoot in SolutionParser.NuGetCacheRoots)
+        {
+            var packageDir = Path.Combine(cacheRoot, packageId.ToLowerInvariant());
+            if (!Directory.Exists(packageDir))
+                continue;
+            foreach (var installed in Directory.EnumerateDirectories(packageDir))
+            {
+                var cached = Path.Combine(installed, "build");
+                if (Directory.Exists(Path.Combine(cached, ".NETFramework", version)))
+                    return cached;
+            }
+        }
+
+        var buildDir = Path.Combine(cacheDir, packageId, "build");
+        if (!Directory.Exists(buildDir))
+            await NuGetResolver.InstallPackageAsync(
+                packageId, ReferenceAssembliesVersion, cacheDir, excludeVersion: true, ct);
+
+        return Directory.Exists(Path.Combine(buildDir, ".NETFramework", version)) ? buildDir : null;
+    }
+
+    private static IEnumerable<string> PreProvisionedReferenceAssemblyRoots()
+    {
+        var configured = Environment.GetEnvironmentVariable(ReferenceAssembliesEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(configured))
+            yield break;
+
+        foreach (var entry in configured.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            yield return entry;
+    }
+
+    /// <summary>
+    /// Every reference assembly root already present on the machine: the pre-provisioned
+    /// directories and each <c>Microsoft.NETFramework.ReferenceAssemblies.*</c> package in the
+    /// NuGet global cache. Nothing is downloaded.
+    /// </summary>
+    private static IEnumerable<string> AvailableReferenceAssemblyRoots()
+    {
+        foreach (var configured in PreProvisionedReferenceAssemblyRoots())
+            if (Directory.Exists(Path.Combine(configured, ".NETFramework")))
+                yield return configured;
+
+        foreach (var cacheRoot in SolutionParser.NuGetCacheRoots)
+        {
+            if (!Directory.Exists(cacheRoot))
+                continue;
+            foreach (var packageDir in Directory.EnumerateDirectories(
+                         cacheRoot, "microsoft.netframework.referenceassemblies.*"))
+            foreach (var installed in Directory.EnumerateDirectories(packageDir))
+            {
+                var root = Path.Combine(installed, "build");
+                if (Directory.Exists(Path.Combine(root, ".NETFramework")))
+                    yield return root;
+            }
         }
     }
 }
@@ -204,12 +358,23 @@ public class SolutionParser
     private IReadOnlyDictionary<string, LockFile> _restoredLockFiles =
         new Dictionary<string, LockFile>(StringComparer.OrdinalIgnoreCase);
 
+    private readonly Dictionary<string, string> _unevaluatedProjects = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// In-memory NuGet lock files (keyed by absolute project path) from the most recent
     /// <see cref="LoadAsync"/>. Used for MSBuildProject marker attestation without reading
     /// <c>project.assets.json</c> from disk.
     /// </summary>
     public IReadOnlyDictionary<string, LockFile> RestoredLockFiles => _restoredLockFiles;
+
+    /// <summary>
+    /// C# projects the most recent <see cref="LoadAsync"/> could not evaluate, keyed by absolute
+    /// project path with the MSBuild failure message as the value. Such a project either never
+    /// reached <c>Solution.Projects</c> or reached it stripped of its documents, so its sources
+    /// would silently vanish from the LST. Callers recover them with
+    /// <see cref="ParseProjectWithoutMSBuild"/>.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> UnevaluatedProjects => _unevaluatedProjects;
 
     /// <summary>
     /// Load a solution or project via MSBuildWorkspace.
@@ -226,21 +391,39 @@ public class SolutionParser
         // A solution can mix SDK-style and non-SDK projects, so both paths may run.
         var hasPackagesConfig = HasPackagesConfig(path);
 
-        // MSBuild properties handed to MSBuildWorkspace (and restore-graph evaluation). For
-        // legacy (non-SDK) projects these point MSBuild at the .NET Framework reference
-        // assemblies and web-application targets that are not present on non-Windows machines.
-        // Gated on non-SDK project presence (not packages.config): a converted project that
-        // uses PackageReference in a classic csproj still needs them to evaluate/compile.
+        // MSBuild properties handed to MSBuildWorkspace (and restore-graph evaluation). They
+        // point MSBuild at the .NET Framework reference assemblies and web-application targets
+        // that are not present on non-Windows machines. A .NET Framework project without its
+        // own reference assemblies resolves nothing, not even mscorlib, and parses without
+        // type attestation.
         var msbuildProperties = new Dictionary<string, string>();
+        var frameworkVersions = DetectNetFrameworkVersions(path);
 
-        if (hasPackagesConfig || HasNonSdkProject(path))
+        if (hasPackagesConfig || frameworkVersions.Count > 0)
         {
-            var buildAssets = await SolutionRestore.RestoreNetFrameworkBuildAssetsAsync(ct);
+            var buildAssets = await SolutionRestore.RestoreNetFrameworkBuildAssetsAsync(frameworkVersions, ct);
             if (buildAssets.VSToolsPath != null)
                 msbuildProperties["VSToolsPath"] = buildAssets.VSToolsPath;
-            if (buildAssets.TargetFrameworkRootPath != null)
-                msbuildProperties["TargetFrameworkRootPath"] = buildAssets.TargetFrameworkRootPath;
+            if (buildAssets.ReferenceAssemblyRoots.Count > 0)
+            {
+                msbuildProperties["TargetFrameworkRootPath"] = buildAssets.ReferenceAssemblyRoots[0];
+                msbuildProperties["TargetFrameworkFallbackSearchPaths"] =
+                    string.Join(";", buildAssets.ReferenceAssemblyRoots);
+            }
+            if (buildAssets.MissingVersions.Count > 0)
+                Log.Warning(
+                    "Reference assemblies for .NETFramework {Versions} are unavailable, so those projects " +
+                    "are parsed without type attestation. Make the " +
+                    "Microsoft.NETFramework.ReferenceAssemblies.* packages restorable, or point {EnvVar} " +
+                    "at a directory containing .NETFramework/<version> reference assemblies.",
+                    string.Join(", ", buildAssets.MissingVersions),
+                    SolutionRestore.ReferenceAssembliesEnvironmentVariable);
         }
+
+        // Windows-targeted projects (net*-windows with WPF/WinForms or a Windows SDK version)
+        // otherwise fail evaluation with NETSDK1100 on Linux/macOS, and one failing project
+        // reference takes the reference metadata of everything that depends on it with it.
+        NuGetResolver.ApplyWindowsTargetingDefault(msbuildProperties);
 
         _restoredLockFiles = await SolutionRestore.RunAsync(path, hasPackagesConfig, msbuildProperties, ct);
 
@@ -254,30 +437,129 @@ public class SolutionParser
             Log.Debug("MSBuild progress: {Operation} {FilePath}", p.Operation, Path.GetFileName(p.FilePath));
         });
 
+        _unevaluatedProjects.Clear();
+
+        // The C# projects the entry path declares, so a project MSBuild drops entirely (or
+        // strips of its documents) can still be recognized and recovered from disk.
+        var declaredProjects = NuGetResolver.EnumerateProjects(path)
+            .Where(p => p.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+            .Select(Path.GetFullPath)
+            .ToList();
+
         Solution solution;
         Log.Debug(">> MSBuildWorkspace.Open ({FileName})", Path.GetFileName(path));
-        if (path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
-            solution = await workspace.OpenSolutionAsync(path, progress, cancellationToken: ct);
-        else
-            solution = (await workspace.OpenProjectAsync(path, progress, cancellationToken: ct)).Solution;
+        try
+        {
+            if (path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase) ||
+                path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
+                solution = await workspace.OpenSolutionAsync(path, progress, cancellationToken: ct);
+            else
+                solution = (await workspace.OpenProjectAsync(path, progress, cancellationToken: ct)).Solution;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Opening failed outright — degrade to an empty solution and let every declared
+            // project fall back to syntax-only parsing rather than dropping the whole tree.
+            Log.Warning("MSBuildWorkspace could not open {Path} ({ExType}: {ExMessage}); " +
+                        "its {ProjectCount} project(s) will be parsed without type attestation",
+                path, ex.GetType().Name, ex.Message, declaredProjects.Count);
+            foreach (var declared in declaredProjects)
+                _unevaluatedProjects[declared] = ex.Message;
+            return workspace.CurrentSolution;
+        }
         Log.Debug("<< MSBuildWorkspace.Open ({FileName}) ({Elapsed})", Path.GetFileName(path), sw.Elapsed);
 
         // Report any workspace diagnostics
         var diags = workspace.Diagnostics;
         if (diags.Count > 0)
         {
-            Log.Debug("MSBuildWorkspace: {DiagCount} diagnostics", diags.Count);
-            foreach (var d in diags.Take(10))
-                Log.Debug("  MSBuild diagnostic {Kind}: {Message}", d.Kind, d.Message);
-            if (diags.Count > 10)
-                Log.Debug("  ... and {Remaining} more diagnostics", diags.Count - 10);
+            var grouped = new Dictionary<string, (int Count, WorkspaceDiagnosticKind Kind, string Message)>(
+                StringComparer.Ordinal);
+            foreach (var d in diags)
+            {
+                var key = NuGetSourceFailures.Collapse(d.Message ?? string.Empty, null, null, null);
+                grouped[key] = grouped.TryGetValue(key, out var seen)
+                    ? (seen.Count + 1, seen.Kind, seen.Message)
+                    : (1, d.Kind, d.Message ?? string.Empty);
+            }
+            Log.Debug("MSBuildWorkspace: {DiagCount} diagnostics ({DistinctCount} distinct)",
+                diags.Count, grouped.Count);
+            foreach (var g in grouped.Values.OrderByDescending(g => g.Count).Take(10))
+                Log.Debug("  MSBuild diagnostic {Kind} x{Count}: {Message}", g.Kind, g.Count, g.Message);
+            if (grouped.Count > 10)
+                Log.Debug("  ... and {Remaining} more distinct diagnostics", grouped.Count - 10);
         }
 
-        var projectCount = solution.Projects.Count();
-        var docCount = solution.Projects.Sum(p => p.Documents.Count());
-        Log.Debug("LoadAsync: loaded {ProjectCount} projects, {DocCount} documents", projectCount, docCount);
+        RecordUnevaluatedProjects(declaredProjects, solution, diags);
+
+        var projects = solution.Projects.ToList();
+        var docCount = projects.Sum(p => p.Documents.Count());
+        Log.Debug("LoadAsync: loaded {ProjectCount} projects, {DocCount} documents", projects.Count, docCount);
+
+        var unreferenced = projects.Where(p => !p.MetadataReferences.Any()).ToList();
+        if (unreferenced.Count > 0)
+            Log.Warning("{UnreferencedCount} of {ProjectCount} projects in {FileName} resolved no reference " +
+                        "metadata; their source parses without type attestation: {Projects}. Cause(s): {Reasons}",
+                unreferenced.Count, projects.Count, Path.GetFileName(path),
+                Summarize(unreferenced.Select(p => p.Name)),
+                Summarize(diags.Where(d => d.Kind == WorkspaceDiagnosticKind.Failure)
+                    .Select(FailureReason).Distinct(), limit: 3));
+
         return solution;
+    }
+
+    private static string Summarize(IEnumerable<string> items, int limit = 5)
+    {
+        var list = items.ToList();
+        if (list.Count == 0)
+            return "(none reported)";
+        return list.Count <= limit
+            ? string.Join("; ", list)
+            : string.Join("; ", list.Take(limit)) + $"; and {list.Count - limit} more";
+    }
+
+    private static string FailureReason(WorkspaceDiagnostic diagnostic)
+    {
+        const string marker = "with message: ";
+        var index = diagnostic.Message.IndexOf(marker, StringComparison.Ordinal);
+        return (index < 0 ? diagnostic.Message : diagnostic.Message[(index + marker.Length)..]).Trim();
+    }
+
+    /// <summary>
+    /// Flags declared C# projects that MSBuild failed to evaluate: those a workspace failure
+    /// diagnostic names (a build-only <c>UsingTask</c>, an unresolvable <c>Import</c>, ...) and
+    /// those that never reached the solution at all. Both cases surface as a project with no
+    /// documents, which would otherwise be indistinguishable from a genuinely empty project.
+    /// </summary>
+    private void RecordUnevaluatedProjects(
+        IReadOnlyList<string> declaredProjects,
+        Solution solution,
+        IReadOnlyList<WorkspaceDiagnostic> diagnostics)
+    {
+        if (declaredProjects.Count == 0)
+            return;
+
+        var loaded = new HashSet<string>(
+            solution.Projects.Where(p => p.FilePath != null).Select(p => Path.GetFullPath(p.FilePath!)),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var declared in declaredProjects)
+        {
+            if (!loaded.Contains(declared))
+            {
+                _unevaluatedProjects[declared] = "not loaded by MSBuildWorkspace";
+                continue;
+            }
+            foreach (var diagnostic in diagnostics)
+            {
+                if (diagnostic.Kind == WorkspaceDiagnosticKind.Failure &&
+                    diagnostic.Message.Contains(declared, StringComparison.OrdinalIgnoreCase))
+                {
+                    _unevaluatedProjects[declared] = FailureReason(diagnostic);
+                    break;
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -337,6 +619,86 @@ public class SolutionParser
         Log.Debug("ParseProject: {ProjectName} has {UserDocCount} user source files (of {TotalDocCount} total)",
             projectName, userDocs.Count, project.Documents.Count());
 
+        var units = userDocs
+            .Select(doc => new ParseUnit(
+                doc.FilePath!,
+                () => doc.GetTextAsync().Result?.ToString(),
+                () =>
+                {
+                    if (compilation == null)
+                        return null;
+                    var syntaxTree = doc.GetSyntaxTreeAsync().Result;
+                    return syntaxTree == null ? null : compilation.GetSemanticModel(syntaxTree);
+                }))
+            .ToList();
+
+        return ParseUnits(projectPath, rootDir, units, configSymbolSets, requirePrintEqualsInput);
+    }
+
+    /// <summary>
+    /// Parse a project's C# sources straight off disk, without MSBuild. Used when MSBuild could
+    /// not evaluate the project (see <see cref="UnevaluatedProjects"/>) and therefore reported it
+    /// with no documents: the resulting LSTs carry no type attestation, but the files are present
+    /// instead of silently missing. Paths in <paramref name="alreadyParsed"/> (repository-relative,
+    /// forward slashes) are skipped so a file another project already contributed is not duplicated.
+    /// </summary>
+    public List<SourceFile> ParseProjectWithoutMSBuild(
+        string projectPath, string rootDir,
+        bool requirePrintEqualsInput = true,
+        ISet<string>? alreadyParsed = null)
+    {
+        LastOversizePaths.Clear();
+        var projectName = Path.GetFileNameWithoutExtension(projectPath);
+
+        var filePaths = EnumerateProjectSourceFiles(projectPath);
+        if (alreadyParsed is { Count: > 0 })
+            filePaths = filePaths
+                .Where(p => !alreadyParsed.Contains(Path.GetRelativePath(rootDir, p).Replace('\\', '/')))
+                .ToList();
+
+        var ignoredPaths = GetGitIgnoredPaths(rootDir, filePaths);
+        if (ignoredPaths.Count > 0)
+            filePaths = filePaths.Where(p => !ignoredPaths.Contains(p)).ToList();
+
+        Log.Debug("ParseProjectWithoutMSBuild: {ProjectName} recovered {FileCount} source files from disk",
+            projectName, filePaths.Count);
+
+        var units = filePaths
+            .Select(filePath => new ParseUnit(filePath, () => ReadSource(filePath), () => null))
+            .ToList();
+
+        return ParseUnits(projectPath, rootDir, units, new List<HashSet<string>> { new() },
+            requirePrintEqualsInput);
+    }
+
+    /// <summary>
+    /// A single file to parse: where it lives, how to read it, and how to obtain its semantic
+    /// model (null when the project could not be evaluated, yielding a syntax-only LST).
+    /// </summary>
+    private sealed record ParseUnit(
+        string FilePath,
+        Func<string?> ReadSource,
+        Func<SemanticModel?> GetSemanticModel);
+
+    private static string? ReadSource(string filePath)
+    {
+        try
+        {
+            return File.ReadAllText(filePath);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("Failed to read {FilePath}: {ExType}: {ExMessage}", filePath, ex.GetType().Name, ex.Message);
+            return null;
+        }
+    }
+
+    private List<SourceFile> ParseUnits(
+        string projectPath, string rootDir, IReadOnlyList<ParseUnit> units,
+        List<HashSet<string>> configSymbolSets, bool requirePrintEqualsInput)
+    {
+        var projectName = Path.GetFileNameWithoutExtension(projectPath);
+
         // Create an EditorConfigResolver to detect formatting style from .editorconfig files.
         // The resolver caches results per directory, so files in the same directory share
         // the same CSharpFormatStyle marker instance.
@@ -353,41 +715,35 @@ public class SolutionParser
         var results = new List<SourceFile>();
         var fileIndex = 0;
         var projectSw = Stopwatch.StartNew();
-        foreach (var doc in userDocs)
+        foreach (var unit in units)
         {
             fileIndex++;
 
             // Files too large to parse into a Roslyn tree/LST are recorded as Quarks
             // (path only) by the RPC layer; skip the expensive parse entirely.
             long docSize;
-            try { docSize = new FileInfo(doc.FilePath!).Length; } catch { docSize = 0; }
+            try { docSize = new FileInfo(unit.FilePath).Length; } catch { docSize = 0; }
             if (docSize > MaxParseableSizeBytes)
             {
-                LastOversizePaths.Add(Path.GetRelativePath(rootDir, doc.FilePath!).Replace('\\', '/'));
+                LastOversizePaths.Add(Path.GetRelativePath(rootDir, unit.FilePath).Replace('\\', '/'));
                 continue;
             }
 
-            var source = doc.GetTextAsync().Result?.ToString();
+            var source = unit.ReadSource();
             if (source == null) continue;
 
-            var relativePath = Path.GetRelativePath(rootDir, doc.FilePath!);
+            var relativePath = Path.GetRelativePath(rootDir, unit.FilePath);
             // Normalize path separators to forward slashes for cross-platform consistency
             relativePath = relativePath.Replace('\\', '/');
 
             // Detect UTF-8 BOM — Roslyn's SourceText.ToString() strips the BOM character,
             // so we check the raw file bytes to preserve the flag for patch fidelity.
-            var charsetBomMarked = HasUtf8Bom(doc.FilePath!);
+            var charsetBomMarked = HasUtf8Bom(unit.FilePath);
 
             var fileSw = Stopwatch.StartNew();
             try
             {
-                SemanticModel? semanticModel = null;
-                if (compilation != null)
-                {
-                    var syntaxTree = doc.GetSyntaxTreeAsync().Result;
-                    if (syntaxTree != null)
-                        semanticModel = compilation.GetSemanticModel(syntaxTree);
-                }
+                var semanticModel = unit.GetSemanticModel();
 
                 CompilationUnit cu;
                 if (configSymbolSets.Count > 1)
@@ -401,7 +757,7 @@ public class SolutionParser
                 }
 
                 // Attach formatting style marker from .editorconfig
-                var formatStyle = editorConfigResolver.Resolve(doc.FilePath!);
+                var formatStyle = editorConfigResolver.Resolve(unit.FilePath);
                 cu = cu.WithMarkers(cu.Markers.Add(formatStyle));
 
                 if (requirePrintEqualsInput)
@@ -410,7 +766,7 @@ public class SolutionParser
                     if (printed != source)
                     {
                         Log.Debug("  IDEMPOTENCY [{FileIndex}/{TotalFiles}] {RelativePath}",
-                            fileIndex, userDocs.Count, relativePath);
+                            fileIndex, units.Count, relativePath);
                         var diff = DiffUtils.UnifiedDiff(source, printed, relativePath);
                         results.Add(ParseError.Build(relativePath, source,
                             new InvalidOperationException(relativePath + " is not print idempotent. \n" + diff)));
@@ -426,13 +782,13 @@ public class SolutionParser
                 // Log every file with duration — slow files (>1s) get a warning prefix
                 var prefix = fileSw.Elapsed.TotalSeconds > 1.0 ? "SLOW " : "";
                 Log.Debug("  {Prefix}[{FileIndex}/{TotalFiles}] {RelativePath} ({ElapsedMs}ms)",
-                    prefix, fileIndex, userDocs.Count, relativePath, fileSw.Elapsed.TotalMilliseconds.ToString("F0"));
+                    prefix, fileIndex, units.Count, relativePath, fileSw.Elapsed.TotalMilliseconds.ToString("F0"));
             }
             catch (Exception ex)
             {
                 fileSw.Stop();
                 Log.Debug("  ERROR [{FileIndex}/{TotalFiles}] {RelativePath} ({ElapsedMs}ms): {ExType}: {ExMessage}",
-                    fileIndex, userDocs.Count, relativePath, fileSw.Elapsed.TotalMilliseconds.ToString("F0"),
+                    fileIndex, units.Count, relativePath, fileSw.Elapsed.TotalMilliseconds.ToString("F0"),
                     ex.GetType().Name, ex.Message);
                 results.Add(ParseError.Build(relativePath, source, ex));
             }
@@ -442,6 +798,48 @@ public class SolutionParser
         Log.Debug("ParseProject: {ProjectName} completed {ResultCount} files in {ElapsedSec}s",
             projectName, results.Count, projectSw.Elapsed.TotalSeconds.ToString("F1"));
         return results;
+    }
+
+    /// <summary>
+    /// Enumerates the C# sources that belong to a project directory when MSBuild cannot say
+    /// which they are: every <c>.cs</c> file under the project directory, skipping build output
+    /// and tool directories, and skipping subtrees owned by another project file (which is
+    /// parsed — or recovered — on its own).
+    /// </summary>
+    private static List<string> EnumerateProjectSourceFiles(string projectPath)
+    {
+        var projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath));
+        var files = new List<string>();
+        if (projectDir == null || !Directory.Exists(projectDir))
+            return files;
+        CollectSourceFiles(projectDir, files, isProjectRoot: true);
+        files.Sort(StringComparer.Ordinal);
+        return files;
+    }
+
+    private static readonly string[] NonSourceDirectories =
+        { "bin", "obj", ".vs", ".git", "packages", "node_modules", "TestResults" };
+
+    private static void CollectSourceFiles(string dir, List<string> files, bool isProjectRoot)
+    {
+        try
+        {
+            if (!isProjectRoot && Directory.EnumerateFiles(dir, "*.*proj").Any())
+                return;
+            files.AddRange(Directory.EnumerateFiles(dir, "*.cs"));
+            foreach (var subDir in Directory.EnumerateDirectories(dir))
+            {
+                var name = Path.GetFileName(subDir);
+                if (NonSourceDirectories.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    continue;
+                CollectSourceFiles(subDir, files, isProjectRoot: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("Failed to enumerate sources under {Dir}: {ExType}: {ExMessage}",
+                dir, ex.GetType().Name, ex.Message);
+        }
     }
 
     /// <summary>
@@ -577,7 +975,7 @@ public class SolutionParser
         return true;
     }
 
-    private static readonly string[] NuGetCacheRoots = BuildNuGetCacheRoots();
+    internal static readonly string[] NuGetCacheRoots = BuildNuGetCacheRoots();
 
     private static string[] BuildNuGetCacheRoots()
     {
@@ -650,42 +1048,68 @@ public class SolutionParser
             Log.Debug("Failed to read project metadata from {ProjectPath}: {Error}", projectPath, ex.Message);
         }
 
-        return new DotNetProject(Guid.NewGuid(), projectName, tfms, sdk);
+        return new DotNetProject(Tree.RandomId(), projectName, tfms, sdk);
     }
 
     /// <summary>
-    /// Returns true if the solution/project directory tree contains a classic (non-SDK-style)
-    /// project file — one whose root Project element has no Sdk attribute. Such projects need
-    /// the .NET Framework build assets to evaluate on non-Windows machines, whether or not
-    /// they still use packages.config.
+    /// The MSBuild <c>TargetFrameworkVersion</c> values (highest first) that projects in the
+    /// solution/project directory tree target — classic projects declaring
+    /// <c>TargetFrameworkVersion</c> and SDK-style ones declaring a .NET Framework
+    /// <c>TargetFramework(s)</c> moniker alike. Empty when nothing targets .NET Framework.
     /// </summary>
-    private static bool HasNonSdkProject(string path)
+    internal static IReadOnlyList<string> DetectNetFrameworkVersions(string path)
     {
+        const string ClassicProjectDefaultVersion = "v4.0";
+
+        var versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
             var dir = Path.GetDirectoryName(Path.GetFullPath(path));
             if (dir == null)
-                return false;
-            foreach (var projectFile in Directory.EnumerateFiles(dir, "*.csproj", SearchOption.AllDirectories))
+                return Array.Empty<string>();
+            foreach (var projectFile in Directory.EnumerateFiles(dir, "*.*proj", SearchOption.AllDirectories))
             {
-                try
+                var frameworks = NuGetResolver.ReadTargetFrameworks(projectFile);
+                foreach (var framework in frameworks)
                 {
-                    var root = XDocument.Load(projectFile).Root;
-                    if (root != null && root.Attribute("Sdk") == null)
-                        return true;
+                    if (framework.Framework == FrameworkConstants.FrameworkIdentifiers.Net)
+                        versions.Add(TargetFrameworkVersionOf(framework));
                 }
-                catch
-                {
-                    // Unparseable project file — ignore.
-                }
+
+                if (frameworks.Count == 0 && IsClassicProject(projectFile))
+                    versions.Add(ClassicProjectDefaultVersion);
             }
         }
         catch (Exception ex)
         {
-            Log.Debug("HasNonSdkProject: failed for {Path} ({ExType}: {ExMessage}), assuming none",
+            Log.Debug("DetectNetFrameworkVersions: failed for {Path} ({ExType}: {ExMessage}), assuming none",
                 path, ex.GetType().Name, ex.Message);
         }
-        return false;
+
+        return versions.OrderByDescending(v => Version.Parse(v[1..])).ToList();
+    }
+
+    /// <summary>
+    /// The MSBuild <c>TargetFrameworkVersion</c> spelling of a framework: <c>v4.7.2</c> rather
+    /// than the <c>4.7.2.0</c> a parsed moniker carries.
+    /// </summary>
+    private static string TargetFrameworkVersionOf(NuGetFramework framework)
+    {
+        var version = framework.Version;
+        var fieldCount = version.Revision > 0 ? 4 : version.Build > 0 ? 3 : 2;
+        return "v" + version.ToString(fieldCount);
+    }
+
+    private static bool IsClassicProject(string projectFile)
+    {
+        try
+        {
+            return XDocument.Load(projectFile).Root?.Attribute("Sdk") == null;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>

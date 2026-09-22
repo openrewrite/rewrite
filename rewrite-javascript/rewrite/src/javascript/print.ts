@@ -950,6 +950,13 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return typeDeclaration;
     }
 
+    override async visitUnknownSource(source: J.UnknownSource, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(source, p);
+        p.append(source.text);
+        await this.afterSyntax(source, p);
+        return source;
+    }
+
     override async visitLiteralType(literalType: JS.LiteralType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(literalType, p);
         await this.visit(literalType.literal, p);
@@ -1413,6 +1420,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(propertyAssignment, p);
 
+        for (const m of propertyAssignment.modifiers) {
+            await this.visitModifier(m, p);
+        }
         await this.visitRightPadded(propertyAssignment.name, p);
 
         if (propertyAssignment.initializer) {

@@ -39,7 +39,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * keyed by (registry, name[, version]). Mirrors the Python {@code SimpleIndexClient}.
  */
 public class NpmRegistryClient {
-    private static final String PACKUMENT_ACCEPT = "application/vnd.npm.install-v1+json";
+    // https://github.com/npm/registry/blob/main/docs/responses/package-metadata.md
+    private static final String PACKUMENT_ACCEPT =
+            "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*";
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 

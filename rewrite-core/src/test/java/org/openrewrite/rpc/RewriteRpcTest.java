@@ -54,6 +54,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -180,7 +181,7 @@ class RewriteRpcTest implements RewriteTest {
         try {
             client.getObject(id, sourceFileType);
         } catch (Exception expected) {
-            // Expected — sender failed and emitted premature END_OF_OBJECT
+            // The cause it carries is pinned by sendFailureSurfacesItsCauseToTheReceiver
         }
 
         // Step 4: verify the sender cleaned up its stale remoteObjects entry
@@ -198,6 +199,21 @@ class RewriteRpcTest implements RewriteTest {
         server.localObjects.put(id, fixed);
         PlainText result = client.getObject(id, sourceFileType);
         assertThat(result.getText()).isEqualTo("Fixed");
+    }
+
+    @Test
+    void sendFailureSurfacesItsCauseToTheReceiver() {
+        // No sourcePath → the sender NPEs mid-traversal
+        PlainText badTree = PlainText.builder()
+          .text("Bad")
+          .build();
+        String id = badTree.getId().toString();
+        server.localObjects.put(id, badTree);
+
+        assertThatThrownBy(() -> client.getObject(id, PlainText.class.getName()))
+          .hasStackTraceContaining("Failed to send object " + id)
+          // the sender's own frames, carried across the wire in the error's data
+          .hasStackTraceContaining("PlainTextRpcCodec.rpcSend");
     }
 
     /**

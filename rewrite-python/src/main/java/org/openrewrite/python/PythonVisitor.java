@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-/*
- * -------------------THIS FILE IS AUTO GENERATED--------------------------
- * Changes to this file may cause incorrect behavior and will be lost if
- * the code is regenerated.
-*/
-
 package org.openrewrite.python;
 
 import org.jspecify.annotations.Nullable;
@@ -53,6 +47,17 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         async = (Py.Async) tempStatement;
         async = async.withMarkers(visitMarkers(async.getMarkers(), p));
         return async.withStatement(visitAndCast(async.getStatement(), p));
+    }
+
+    public J visitShebang(Py.Shebang shebang, P p) {
+        shebang = shebang.withPrefix(visitSpace(shebang.getPrefix(), PySpace.Location.SHEBANG_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(shebang, p);
+        if (!(tempStatement instanceof Py.Shebang))
+        {
+            return tempStatement;
+        }
+        shebang = (Py.Shebang) tempStatement;
+        return shebang.withMarkers(visitMarkers(shebang.getMarkers(), p));
     }
 
     public J visitAwait(Py.Await await, P p) {
@@ -292,6 +297,7 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         typeAlias = (Py.TypeAlias) tempStatement;
         typeAlias = typeAlias.withMarkers(visitMarkers(typeAlias.getMarkers(), p));
         typeAlias = typeAlias.withName(visitAndCast(typeAlias.getName(), p));
+        typeAlias = typeAlias.getPadding().withTypeParameters(visitContainer(typeAlias.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         typeAlias = typeAlias.getPadding().withValue(visitLeftPadded(typeAlias.getPadding().getValue(), PyLeftPadded.Location.TYPE_ALIAS_VALUE, p));
         return typeAlias.getPadding().withValue(typeAlias.getPadding().getValue().withElement(visitTypeNameIfNameTree(typeAlias.getPadding().getValue().getElement(), p)));
     }

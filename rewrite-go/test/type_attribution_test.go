@@ -17,14 +17,17 @@
 package test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -68,30 +71,8 @@ func main() {
 `)
 	require.NoError(t, err)
 
-	v := visitor.Init(&typeCollector{identTypes: make(map[string]java.JavaType)})
-	v.Visit(cu, nil)
-
-	// "x" should be an int type
-	if xType, ok := v.identTypes["x"]; ok {
-		if prim, ok := xType.(*java.JavaTypePrimitive); ok {
-			assert.Equal(t, "int", prim.Keyword, "expected x to be int")
-		} else {
-			t.Errorf("expected x to be primitive, got %T", xType)
-		}
-	} else {
-		t.Error("no type attribution for x")
-	}
-
-	// "y" should be a string type (mapped as Primitive "String")
-	if yType, ok := v.identTypes["y"]; ok {
-		if prim, ok := yType.(*java.JavaTypePrimitive); ok {
-			assert.Equal(t, "String", prim.Keyword, "expected y to be String")
-		} else {
-			t.Errorf("expected y to be primitive, got %T", yType)
-		}
-	} else {
-		t.Error("no type attribution for y")
-	}
+	ExpectType(t, cu, "x", "int")
+	ExpectType(t, cu, "y", "string")
 }
 
 func TestTypeAttributionFuncDecl(t *testing.T) {
@@ -111,11 +92,7 @@ func add(a int, b int) int {
 	require.True(t, ok, "no method type for add()")
 	assert.Equal(t, "add", addType.Name, "expected method name 'add")
 	assert.Len(t, addType.ParameterTypes, 2, "expected 2 parameters")
-	if ret, ok := addType.ReturnType.(*java.JavaTypePrimitive); ok {
-		assert.Equal(t, "int", ret.Keyword, "expected return type int")
-	} else {
-		t.Errorf("expected primitive return type, got %T", addType.ReturnType)
-	}
+	assert.Equal(t, "int", matcher.GetFullyQualifiedName(addType.ReturnType), "expected return type int")
 }
 
 func TestTypeAttributionMultiReturn(t *testing.T) {
@@ -141,12 +118,7 @@ func divmod(a int, b int) (int, int) {
 	assert.False(t, param.Type == nil || param.Type.GetFullyQualifiedName() != "go.tuple", "expected tuple FQN 'go.tuple")
 	require.Len(t, param.TypeParameters, 2, "expected 2 tuple type parameters")
 	for i, tp := range param.TypeParameters {
-		prim, ok := tp.(*java.JavaTypePrimitive)
-		if !ok {
-			t.Errorf("tuple element %d: expected primitive, got %T", i, tp)
-			continue
-		}
-		assert.Equalf(t, "int", prim.Keyword, "tuple element %d: expected int", i)
+		assert.Equalf(t, "int", matcher.GetFullyQualifiedName(tp), "tuple element %d", i)
 	}
 }
 
@@ -172,14 +144,8 @@ func split() (string, int, bool) {
 	require.Truef(t, ok, "expected parameterized return type, got %T", mt.ReturnType)
 	assert.False(t, param.Type == nil || param.Type.GetFullyQualifiedName() != "go.tuple", "expected tuple FQN 'go.tuple")
 	require.Len(t, param.TypeParameters, 3, "expected 3 tuple type parameters")
-	expectedKeywords := []string{"String", "int", "boolean"}
-	for i, want := range expectedKeywords {
-		prim, ok := param.TypeParameters[i].(*java.JavaTypePrimitive)
-		if !ok {
-			t.Errorf("tuple element %d: expected primitive, got %T", i, param.TypeParameters[i])
-			continue
-		}
-		assert.Equalf(t, want, prim.Keyword, "tuple element %d", i)
+	for i, want := range []string{"string", "int", "bool"} {
+		assert.Equalf(t, want, matcher.GetFullyQualifiedName(param.TypeParameters[i]), "tuple element %d", i)
 	}
 }
 
@@ -243,12 +209,32 @@ func TestTypeAttributionAssignment(t *testing.T) {
 		found++
 		if a.Type == nil {
 			t.Errorf("assignment %d has no type", found)
-		} else if prim, ok := a.Type.(*java.JavaTypePrimitive); !ok || prim.Keyword != "int" {
-			t.Errorf("assignment %d type: got %v, want int", found, a.Type)
+		} else if got := matcher.GetFullyQualifiedName(a.Type); got != "int" {
+			t.Errorf("assignment %d type: got %q, want int", found, got)
 		}
 	})
 	if found != 3 {
 		t.Fatalf("expected 3 assignments, found %d", found)
+	}
+}
+
+func TestTypeAttributionCompoundAssignment(t *testing.T) {
+	src := "package main\n\nfunc f(m map[string]int) {\n" +
+		"\tx := 1\n\tx += 2\n\tm[\"k\"] &^= 4\n\t_ = x\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	var got []string
+	forEachAssignmentOperation(cu, func(a *java.AssignmentOperation) {
+		got = append(got, matcher.GetFullyQualifiedName(a.Type))
+	})
+	// `&^=` maps to the golang node, so it needs its own walk.
+	forEachGoAssignmentOperation(cu, func(a *golang.AssignmentOperation) {
+		got = append(got, matcher.GetFullyQualifiedName(a.Type))
+	})
+	if want := []string{"int", "int"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("compound assignment types: got %v, want %v", got, want)
 	}
 }
 
@@ -273,6 +259,8 @@ func TestTypeAttributionSliceType(t *testing.T) {
 type assignmentWalker struct {
 	visitor.GoVisitor
 	onAssignment        func(*java.Assignment)
+	onAssignmentOp      func(*java.AssignmentOperation)
+	onGoAssignmentOp    func(*golang.AssignmentOperation)
 	onArrayType         func(*java.ArrayType)
 	onMethodDeclaration func(*java.MethodDeclaration)
 	onMethodInvocation  func(*java.MethodInvocation)
@@ -286,6 +274,20 @@ func (v *assignmentWalker) VisitAssignment(a *java.Assignment, p any) java.J {
 	return v.GoVisitor.VisitAssignment(a, p)
 }
 
+func (v *assignmentWalker) VisitAssignmentOperation(a *java.AssignmentOperation, p any) java.J {
+	if v.onAssignmentOp != nil {
+		v.onAssignmentOp(a)
+	}
+	return v.GoVisitor.VisitAssignmentOperation(a, p)
+}
+
+func (v *assignmentWalker) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p any) java.J {
+	if v.onGoAssignmentOp != nil {
+		v.onGoAssignmentOp(a)
+	}
+	return v.GoVisitor.VisitGoAssignmentOperation(a, p)
+}
+
 func (v *assignmentWalker) VisitArrayType(a *java.ArrayType, p any) java.J {
 	if v.onArrayType != nil {
 		v.onArrayType(a)
@@ -295,6 +297,14 @@ func (v *assignmentWalker) VisitArrayType(a *java.ArrayType, p any) java.J {
 
 func forEachAssignment(cu java.Tree, f func(*java.Assignment)) {
 	visitor.Init(&assignmentWalker{onAssignment: f}).Visit(cu, nil)
+}
+
+func forEachAssignmentOperation(cu java.Tree, f func(*java.AssignmentOperation)) {
+	visitor.Init(&assignmentWalker{onAssignmentOp: f}).Visit(cu, nil)
+}
+
+func forEachGoAssignmentOperation(cu java.Tree, f func(*golang.AssignmentOperation)) {
+	visitor.Init(&assignmentWalker{onGoAssignmentOp: f}).Visit(cu, nil)
 }
 
 func forEachArrayType(cu java.Tree, f func(*java.ArrayType)) {
@@ -316,8 +326,8 @@ func TestTypeAttributionFuncLit(t *testing.T) {
 		if got := len(m.MethodType.ParameterTypes); got != 1 {
 			t.Errorf("parameter types: got %d, want 1", got)
 		}
-		if prim, ok := m.MethodType.ReturnType.(*java.JavaTypePrimitive); !ok || prim.Keyword != "int" {
-			t.Errorf("return type: got %v, want int", m.MethodType.ReturnType)
+		if got := matcher.GetFullyQualifiedName(m.MethodType.ReturnType); got != "int" {
+			t.Errorf("return type: got %q, want int", got)
 		}
 	})
 	if found != 1 {

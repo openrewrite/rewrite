@@ -46,6 +46,7 @@ import org.jetbrains.kotlin.ir.declarations.IrConstructor
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrMemberWithContainerSource
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
+import org.jetbrains.kotlin.ir.declarations.IrPackageFragment
 import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
@@ -72,7 +73,9 @@ import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.IrTypeArgument
 import org.jetbrains.kotlin.ir.types.IrTypeProjection
 import org.jetbrains.kotlin.ir.types.classFqName
+import org.jetbrains.kotlin.ir.types.classOrNull
 import org.jetbrains.kotlin.ir.types.defaultType
+import org.jetbrains.kotlin.ir.types.isPrimitiveType
 import org.jetbrains.kotlin.ir.util.addChild
 import org.jetbrains.kotlin.ir.util.createThisReceiverParameter
 import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
@@ -156,17 +159,34 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          */
         const val VARARGS_SENTINEL = "VARARGS"
 
-        /**
-         * Kotlin builtin → Java FQN, for typing the fixed prefix params of a
-         * varargs MethodMatcher spec. `JavaType.Method` carries Java types even
-         * for Kotlin sources, so `kotlin.String` must be spelled
-         * `java.lang.String` for the matcher to fire.
-         */
+        /** Kotlin builtin → Java FQN, for JavaTemplate placeholder types. */
         val KOTLIN_BUILTIN_TO_JAVA_FQN: Map<String, String> = mapOf(
             "kotlin.String" to "java.lang.String",
             "kotlin.CharSequence" to "java.lang.CharSequence",
             "kotlin.Any" to "java.lang.Object",
             "kotlin.Throwable" to "java.lang.Throwable",
+            "kotlin.Int" to "int",
+            "kotlin.Long" to "long",
+            "kotlin.Short" to "short",
+            "kotlin.Byte" to "byte",
+            "kotlin.Boolean" to "boolean",
+            "kotlin.Char" to "char",
+            "kotlin.Float" to "float",
+            "kotlin.Double" to "double",
+        )
+
+        /**
+         * Kotlin builtin → a MethodMatcher argument token that names it in both a
+         * Kotlin and a Java LST. `KotlinTypeMapping` only remaps builtins to their
+         * JVM FQN for Java-declared methods, so the same `String` parameter reads
+         * `kotlin.String` on a Kotlin-declared callee and `java.lang.String` on a
+         * Java-declared one; hence the package wildcards. `kotlin.Any` has no
+         * entry — it shares no simple name with `java.lang.Object`.
+         */
+        val KOTLIN_BUILTIN_TO_MATCHER_TOKEN: Map<String, String> = mapOf(
+            "kotlin.String" to "*..String",
+            "kotlin.CharSequence" to "*..CharSequence",
+            "kotlin.Throwable" to "*..Throwable",
             "kotlin.Int" to "int",
             "kotlin.Long" to "long",
             "kotlin.Short" to "short",
@@ -1307,10 +1327,10 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Emit a precise MethodMatcher arg pattern (e.g. `*,*` for two args, empty for
-     * zero) instead of the `..` wildcard. Tightening the arg count is what
-     * distinguishes overloaded methods on the same name: `Iterable<T>.any()` (no
-     * predicate) versus `Iterable<T>.any(predicate: (T) -> Boolean)`. A recipe
+     * Emit a precise MethodMatcher arg pattern (e.g. `double,*` for two args,
+     * empty for zero) instead of the `..` wildcard. Tightening the arg count is
+     * what distinguishes overloaded methods on the same name: `Iterable<T>.any()`
+     * (no predicate) versus `Iterable<T>.any(predicate: (T) -> Boolean)`. A recipe
      * authored as `xs.filter(p).any()` would otherwise also match
      * `xs.filter(p1).any { p2 }` via `(..)` and silently drop the `p2` predicate.
      *
@@ -1346,17 +1366,37 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }
         val jvmArgCount = params.size + extReceiverArg
         if (jvmArgCount == 0) return ""
-        return List(jvmArgCount) { "*" }.joinToString(",")
+        // A receiver is usually declared in the callee's own type parameters
+        // (`Iterable<T>`), so its slot stays `*`.
+        val tokens = mutableListOf<String>()
+        repeat(extReceiverArg) { tokens += "*" }
+        for (param in params) {
+            tokens += matcherParamType(param.type)
+        }
+        return tokens.joinToString(",")
     }
 
     /**
-     * Render a fixed prefix parameter's type as a MethodMatcher type token,
-     * mapping Kotlin builtins back to the Java FQN the matcher resolves against.
-     * Falls back to `*` when the type can't be named.
+     * Render a parameter's declared type as a MethodMatcher argument token, so
+     * that `Math.abs(x: Double)` doesn't also rewrite `Math.abs(anInt)`.
+     *
+     * A wrong token silently stops the recipe firing, so anything whose
+     * `JavaType` spelling isn't predictable falls back to `*`: type parameters,
+     * nullable primitives (`Int?` boxes to `java.lang.Integer`), value classes,
+     * nested classes (`Map$Entry` in a `JavaType`), and the rest of `kotlin.`,
+     * whose collections, arrays and function types all erase to a different name.
      */
     private fun matcherParamType(type: IrType): String {
         val fqn = type.classFqName?.asString() ?: return "*"
-        return KOTLIN_BUILTIN_TO_JAVA_FQN[fqn] ?: fqn
+        val token = KOTLIN_BUILTIN_TO_MATCHER_TOKEN[fqn]
+        if (token != null) {
+            return if ('.' !in token && !type.isPrimitiveType()) "*" else token
+        }
+        val cls = type.classOrNull?.owner ?: return "*"
+        if (cls.isValue || cls.parent !is IrPackageFragment || fqn.startsWith("kotlin.")) {
+            return "*"
+        }
+        return fqn
     }
 
     private fun computeJvmFacadeFqn(fn: IrSimpleFunction): String? {

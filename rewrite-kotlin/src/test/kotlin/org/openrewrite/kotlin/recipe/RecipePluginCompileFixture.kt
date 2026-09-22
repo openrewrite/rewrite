@@ -20,6 +20,7 @@ import com.tschuchort.compiletesting.JvmCompilationResult
 import com.tschuchort.compiletesting.KotlinCompilation
 import com.tschuchort.compiletesting.SourceFile
 import org.intellij.lang.annotations.Language
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.openrewrite.kotlin.recipe.internal.RecipeCompilerPluginRegistrar
 
 /**
@@ -38,10 +39,14 @@ internal object RecipePluginCompileFixture {
      * enabled. The runtime DSL surface (RecipeDsl.kt) is on the inheriting classpath,
      * so authors can `import org.openrewrite.recipe`.
      */
-    fun compile(@Language("kotlin") source: String, fileName: String = "Recipes.kt"): JvmCompilationResult {
+    fun compile(
+        @Language("kotlin") source: String,
+        fileName: String = "Recipes.kt",
+        registrar: CompilerPluginRegistrar = RecipeCompilerPluginRegistrar(),
+    ): JvmCompilationResult {
         val compilation = KotlinCompilation().apply {
             sources = listOf(SourceFile.kotlin(fileName, source))
-            compilerPluginRegistrars = listOf(RecipeCompilerPluginRegistrar())
+            compilerPluginRegistrars = listOf(registrar)
             // Inherit the test classpath so `org.openrewrite.recipe` resolves to the
             // RecipeDsl.kt symbols in rewrite-kotlin's main source set.
             inheritClassPath = true

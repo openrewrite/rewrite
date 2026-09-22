@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-import {NamedStyles, Style} from "../style";
+import {isNamedStyles, NamedStyles, Style} from "../style";
 import {randomId} from "../uuid";
 import {Tree} from "../tree";
-import {MarkersKind} from "../markers";
 
 export const JavaScriptStyles = {
     IntelliJ: "org.openrewrite.javascript.style.IntelliJ",
@@ -562,13 +561,7 @@ export namespace IntelliJ {
 }
 
 export function styleFromSourceFile(styleKind: string, sourceFile: Tree): Style | undefined {
-    const namedStyles = sourceFile.markers.markers.filter(marker => marker.kind === MarkersKind.NamedStyles) as NamedStyles[];
-    const candidate = namedStyles.map(namedStyle => namedStyle.styles).flat()
-        .find(style => style.kind === styleKind)
-    if (candidate) {
-        return candidate;
-    }
-    return IntelliJ.TypeScript.defaults.styles.find(style => style.kind === styleKind) as Style;
+    return getStyle(styleKind, sourceFile);
 }
 
 /**
@@ -591,8 +584,7 @@ export function getStyle(styleKind: string, sourceFile: Tree, styles?: NamedStyl
     }
 
     // Then check source file markers
-    const namedStyles = sourceFile.markers.markers.filter(marker => marker.kind === MarkersKind.NamedStyles) as NamedStyles[];
-    for (const namedStyle of namedStyles) {
+    for (const namedStyle of sourceFile.markers.markers.filter(isNamedStyles)) {
         const found = namedStyle.styles.find(s => s.kind === styleKind);
         if (found) {
             return found;

@@ -32,7 +32,7 @@ export class GetObject {
         trace: () => boolean,
         metricsCsv?: string,
     ): void {
-        const pendingData = new Map<string, RpcObjectData[]>();
+        const pendingData = new Map<string, { data: (RpcObjectData | undefined)[], offset: number }>();
 
         connection.onRequest(
             new rpc.RequestType<GetObject, any, Error>("GetObject"),
@@ -58,8 +58,8 @@ export class GetObject {
                     const obj = localObjects.get(objId);
                     context.target = extractSourcePath(obj);
 
-                    let allData = pendingData.get(objId);
-                    if (!allData) {
+                    let pending = pendingData.get(objId);
+                    if (!pending) {
                         const after = obj;
                         const before = remoteObjects.get(objId);
 
@@ -68,9 +68,12 @@ export class GetObject {
                         // was added during this exchange.
                         const savedRefCount = localRefs.snapshot();
                         try {
-                            allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
-                                .generate(after, before);
-                            pendingData.set(objId, allData);
+                            pending = {
+                                data: await new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                                    .generate(after, before),
+                                offset: 0
+                            };
+                            pendingData.set(objId, pending);
                             remoteObjects.set(objId, after);
                         } catch (e) {
                             remoteObjects.delete(objId);
@@ -79,10 +82,17 @@ export class GetObject {
                         }
                     }
 
-                    const batch = allData.splice(0, batchSize);
+                    // Advancing an offset keeps paging linear; removing the head copies the
+                    // remaining elements on every page. The whole object is materialized as
+                    // messages up front, so a sent page stays reachable through its slots
+                    // until they are cleared.
+                    const end = Math.min(pending.offset + batchSize, pending.data.length);
+                    const batch = pending.data.slice(pending.offset, end);
+                    pending.data.fill(undefined, pending.offset, end);
+                    pending.offset = end;
 
                     // If we've sent all data, remove from pending
-                    if (allData.length === 0) {
+                    if (pending.offset >= pending.data.length) {
                         pendingData.delete(objId);
                     }
 

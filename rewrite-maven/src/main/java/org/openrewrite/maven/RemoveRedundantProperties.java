@@ -83,7 +83,7 @@ public class RemoveRedundantProperties extends Recipe {
                     MavenPomDownloader downloader = new MavenPomDownloader(
                             mrr.getProjectPoms(),
                             ctx,
-                            mrr.getMavenSettings(),
+                            MavenExecutionContextView.view(ctx).effectiveSettings(mrr),
                             mrr.getActiveProfiles());
                     try {
                         // Resolve the external parent POM properties

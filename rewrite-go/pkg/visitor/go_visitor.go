@@ -205,6 +205,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitArrayType(n, p)
 	case *java.Parentheses:
 		return v.self().VisitParentheses(n, p)
+	case *java.ParenthesizedTypeTree:
+		return v.self().VisitParenthesizedTypeTree(n, p)
 	case *golang.TypeAssertion:
 		return v.self().VisitTypeAssertion(n, p)
 	case *java.TypeCast:
@@ -338,6 +340,7 @@ type VisitorI interface {
 	VisitArrayType(at *java.ArrayType, p any) java.J
 	VisitGoArrayType(at *golang.ArrayType, p any) java.J
 	VisitParentheses(paren *java.Parentheses, p any) java.J
+	VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, p any) java.J
 	VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J
 	VisitTypeCast(tc *java.TypeCast, p any) java.J
 	VisitControlParentheses(cp *java.ControlParentheses, p any) java.J
@@ -959,26 +962,19 @@ func (v *GoVisitor) VisitAssignmentOperation(ao *java.AssignmentOperation, p any
 func (v *GoVisitor) VisitSwitch(sw *java.Switch, p any) java.J {
 	prefix := v.self().VisitSpace(sw.Prefix, p)
 	markers := v.visitMarkers(sw.Markers, p)
-	tag := sw.Tag
-	if tag != nil {
-		elem := visitExpression(v, tag.Element, p)
-		after := v.self().VisitSpace(tag.After, p)
-		if elem != tag.Element || !java.SpaceEqual(after, tag.After) {
-			c := *tag
-			c.Element = elem
-			c.After = after
-			tag = &c
-		}
+	var selector *java.ControlParentheses
+	if sw.Selector != nil {
+		selector = visitAndCast[*java.ControlParentheses](v, sw.Selector, p)
 	}
 	body := visitAndCast[*java.Block](v, sw.Body, p)
 	if java.SpaceEqual(prefix, sw.Prefix) && java.MarkersEqual(markers, sw.Markers) &&
-		tag == sw.Tag && body == sw.Body {
+		selector == sw.Selector && body == sw.Body {
 		return sw
 	}
 	c := *sw
 	c.Prefix = prefix
 	c.Markers = markers
-	c.Tag = tag
+	c.Selector = selector
 	c.Body = body
 	return &c
 }
@@ -1409,6 +1405,23 @@ func (v *GoVisitor) VisitParentheses(paren *java.Parentheses, p any) java.J {
 	c.Markers = markers
 	c.Tree.Element = treeElem
 	c.Tree.After = treeAfter
+	return &c
+}
+
+func (v *GoVisitor) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, p any) java.J {
+	prefix := v.self().VisitSpace(ptt.Prefix, p)
+	markers := v.visitMarkers(ptt.Markers, p)
+	anns := visitAnnotationList(v, ptt.Annotations, p)
+	parenthesizedType := visitAndCast[*java.Parentheses](v, ptt.Type, p)
+	if java.SpaceEqual(prefix, ptt.Prefix) && java.MarkersEqual(markers, ptt.Markers) &&
+		java.SameSlice(anns, ptt.Annotations) && parenthesizedType == ptt.Type {
+		return ptt
+	}
+	c := *ptt
+	c.Prefix = prefix
+	c.Markers = markers
+	c.Annotations = anns
+	c.Type = parenthesizedType
 	return &c
 }
 

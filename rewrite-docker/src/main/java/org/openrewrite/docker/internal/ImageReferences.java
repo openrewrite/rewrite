@@ -23,28 +23,16 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Splits an image reference (the {@code name:tag@digest} form) into its component
- * {@link Docker.Argument}s. Used where the reference reaches the trait layer as text rather than as
- * a parse tree: the value of the {@code --from} flag of {@code COPY}/{@code ADD}, which the lexer
- * keeps as one token, and a reference handed in by a recipe. A {@code FROM} instruction is split by
- * the grammar instead, in the {@code IMAGE_REF} lexer mode.
+ * Splits a parsed image reference (the {@code name:tag@digest} form used by {@code FROM} and by
+ * the {@code --from} flag of {@code COPY}/{@code ADD}) into its component {@link Docker.Argument}s.
+ * Shared by the parser and the trait layer to keep a single source of truth.
  */
 public final class ImageReferences {
 
     private ImageReferences() {
-    }
-
-    /**
-     * Splits an image reference a recipe supplied as text, such as {@code "nginx:1.25"}, into
-     * {@code {imageName, tag, digest}}. The parts are unquoted literals, so that a colon in the
-     * text separates the tag rather than being kept as part of a quoted name.
-     */
-    public static Docker.@Nullable Argument[] split(String reference, Space prefix) {
-        return split(singletonList(new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, reference, null)), prefix);
     }
 
     /**
@@ -140,10 +128,6 @@ public final class ImageReferences {
         return new Docker.@Nullable Argument[]{imageName, tag, digest};
     }
 
-    /**
-     * The index of the colon that separates the tag, or {@code -1} when there is none. A colon
-     * before the last {@code /} is a registry port rather than a tag separator.
-     */
     private static int tagColonIndex(String text) {
         return text.indexOf(':', text.lastIndexOf('/') + 1);
     }

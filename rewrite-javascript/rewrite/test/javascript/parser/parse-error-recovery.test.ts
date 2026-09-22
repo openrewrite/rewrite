@@ -30,6 +30,72 @@ describe('parse error recovery', () => {
             )
         ));
 
+    test('a grammar error the checker alone reports is not fatal', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('function f(...a: number[], b: number) {}')
+        ));
+
+    test('a type the visitor does not map keeps its source text', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('type T = string?;')
+        ));
+
+    test('an interface property keeps an initializer', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('interface I { x: number = 1; }')
+        ));
+
+    test('a constructor keeps a return type annotation', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('class C { constructor(): void {} }')
+        ));
+
+    test('an object literal member keeps its modifiers', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('const o = { static readonly x: 1 };')
+        ));
+
+    test('a shorthand object literal member keeps its modifiers', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('const o = { static x };')
+        ));
+
+    test('a file keeps its byte order mark', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('\uFEFFconst a = 1;')
+        ));
+
+    test('a getter keeps type parameters', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('class C { get x<T>() { return 1; } }')
+        ));
+
+    test('a setter keeps type parameters and a return type', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('class C { set x<T>(v: any): void {} }')
+        ));
+
+    test('a computed getter keeps type parameters', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('const k = "a"; class C { get [k]<T>() { return 1; } }')
+        ));
+
+    test('a computed setter keeps type parameters and a return type', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('const k = "a"; class C { set [k]<T>(v: any): void {} }')
+        ));
+
     test('mutually recursive generic types do not cause stack overflow', () =>
         spec.rewriteRun(
             //language=typescript

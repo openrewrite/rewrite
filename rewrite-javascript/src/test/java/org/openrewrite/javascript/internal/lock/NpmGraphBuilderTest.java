@@ -22,6 +22,7 @@ import org.openrewrite.javascript.internal.lock.EngineFailure;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -311,13 +312,38 @@ class NpmGraphBuilderTest {
     }
 
     @Test
-    void defersAliasForkingWithUnaliasedCopy() {
-        // react-is is both a normal dependency and an alias target: the alias would fork a non-aliased copy — defer.
+    void resolvesAliasForkWithUnaliasedCopy() {
+        // react-is is both a normal dependency and an alias target: the alias forks the un-aliased copy and both
+        // resolve at 18.3.1, each keyed by its own slot.
         FakeRegistry registry = new FakeRegistry().add("react-is", "18.3.1", emptyMap());
 
-        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
-                new NpmGraphBuilder(registry).build(singletonMap("",
-                        "{\"dependencies\":{\"react-is\":\"^18.3.1\",\"react-is-18\":\"npm:react-is@^18.3.1\"}}")));
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
+                "{\"dependencies\":{\"react-is\":\"^18.3.1\",\"react-is-18\":\"npm:react-is@^18.3.1\"}}"));
+
+        assertThat(graph.getNodes()).containsOnlyKeys("react-is@18.3.1", "react-is-18@18.3.1");
+        assertThat(graph.node("react-is-18", "18.3.1").getName()).isEqualTo("react-is");
+    }
+
+    @Test
+    void resolvesStringWidthCjsAliasForkWithUnaliasedCopy() {
+        // @isaacs/cliui pins both string-width (^5, ESM) and a string-width-cjs alias of string-width (^4, CJS);
+        // the alias forks the un-aliased copy and both resolve, each keyed by its own slot.
+        Map<String, String> cliuiDeps = new LinkedHashMap<>();
+        cliuiDeps.put("string-width", "^5.1.2");
+        cliuiDeps.put("string-width-cjs", "npm:string-width@^4.2.0");
+        FakeRegistry registry = new FakeRegistry()
+                .add("string-width", "4.2.3", emptyMap())
+                .add("string-width", "5.1.2", emptyMap())
+                .add("@isaacs/cliui", "8.0.2", cliuiDeps);
+
+        ResolutionGraph graph = new NpmGraphBuilder(registry)
+                .build(singletonMap("", "{\"dependencies\":{\"@isaacs/cliui\":\"^8.0.2\"}}"));
+
+        assertThat(graph.getNodes())
+                .containsOnlyKeys("@isaacs/cliui@8.0.2", "string-width@5.1.2", "string-width-cjs@4.2.3");
+        // The alias slot carries the real package's manifest (name string-width), distinct from the un-aliased copy.
+        assertThat(graph.node("string-width-cjs", "4.2.3").getName()).isEqualTo("string-width");
+        assertThat(graph.node("string-width", "5.1.2").getName()).isEqualTo("string-width");
     }
 
     @Test
@@ -328,6 +354,30 @@ class NpmGraphBuilderTest {
         assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
                 new NpmGraphBuilder(registry).build(singletonMap("",
                         "{\"dependencies\":{\"dep\":\"npm:foo@github:owner/foo\"}}")));
+    }
+
+    @Test
+    void defersAliasWhoseRealNameIsRequiredAsPeer() {
+        // myx aliases x, and hp requires x as a peer; the peer machinery keys by real name, so the entanglement defers.
+        FakeRegistry registry = new FakeRegistry().add("x", "1.0.0", emptyMap());
+        registry.versionsByName.computeIfAbsent("hp", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("hp@1.0.0", vm("hp", "1.0.0", emptyMap(), singletonMap("x", ">=1.0.0")));
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
+                new NpmGraphBuilder(registry).build(singletonMap("",
+                        "{\"dependencies\":{\"myx\":\"npm:x@^1.0.0\",\"hp\":\"^1.0.0\"}}")));
+    }
+
+    @Test
+    void defersAliasThatDeclaresPeers() {
+        // myx aliases x, and x declares its own peerDependencies; the peer machinery keys by real name, so it defers.
+        FakeRegistry registry = new FakeRegistry().add("y", "1.0.0", emptyMap());
+        registry.versionsByName.computeIfAbsent("x", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("x@1.0.0", vm("x", "1.0.0", emptyMap(), singletonMap("y", ">=1.0.0")));
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
+                new NpmGraphBuilder(registry).build(singletonMap("",
+                        "{\"dependencies\":{\"myx\":\"npm:x@^1.0.0\"}}")));
     }
 
     @Test

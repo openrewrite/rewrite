@@ -1,0 +1,7 @@
+{
+  "name": "multi-alias-same",
+  "version": "1.0.0",
+  "dependencies": {
+    "er-x": "npm:emoji-regex@^8.0.0"
+  }
+}

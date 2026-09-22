@@ -26,12 +26,17 @@ type MatchResult struct {
 	bindings map[string]any // single: java.J, variadic: []java.J
 }
 
+// The map is built by the first binding: most comparisons fail before there
+// is one, and a match that fails is never read.
 func NewMatchResult() *MatchResult {
-	return &MatchResult{bindings: make(map[string]any)}
+	return &MatchResult{}
 }
 
 // bind stores a single captured value.
 func (m *MatchResult) bind(name string, value java.J) {
+	if m.bindings == nil {
+		m.bindings = make(map[string]any)
+	}
 	m.bindings[name] = value
 }
 
@@ -45,6 +50,9 @@ func (m *MatchResult) Bind(c *Capture, value java.J) *MatchResult {
 
 // bindList stores a variadic captured list.
 func (m *MatchResult) bindList(name string, values []java.J) {
+	if m.bindings == nil {
+		m.bindings = make(map[string]any)
+	}
 	m.bindings[name] = values
 }
 
@@ -78,6 +86,9 @@ func Elems[T java.J](groups ...[]T) []java.J {
 // at all. It is the binding's shape, not the capture's declaration, that
 // decides how substitution treats a placeholder.
 func (m *MatchResult) listBinding(name string) ([]java.J, bool) {
+	if m == nil {
+		return nil, false
+	}
 	list, ok := m.bindings[name].([]java.J)
 	return list, ok
 }
@@ -92,11 +103,17 @@ func (m *MatchResult) satisfies(c *Capture) bool {
 }
 
 func (m *MatchResult) Has(name string) bool {
+	if m == nil {
+		return false
+	}
 	_, ok := m.bindings[name]
 	return ok
 }
 
 func (m *MatchResult) Get(name string) java.J {
+	if m == nil {
+		return nil
+	}
 	v, ok := m.bindings[name]
 	if !ok {
 		return nil

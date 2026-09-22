@@ -925,11 +925,11 @@ func (n *ForEachControl) WithMarkers(markers Markers) *ForEachControl {
 // and the case block. Go's optional init clause (`switch x := f(); x {}`) has no
 // slot here — it lives on a wrapping golang.StatementWithInit instead.
 type Switch struct {
-	ID      uuid.UUID
-	Prefix  Space
-	Markers Markers
-	Tag     *RightPadded[Expression] // optional tag expression; After = space before {
-	Body    *Block                   // contains Case statements
+	ID       uuid.UUID
+	Prefix   Space
+	Markers  Markers
+	Selector *ControlParentheses // selector expression (matching J.Switch); Go has no parens, so the wrapper carries no whitespace and the inner element holds the tag. Tree.Element is an Empty for a tagless `switch {}`. Tree.After = space before {
+	Body     *Block              // contains Case statements
 }
 
 func (*Switch) IsTree()      {}
@@ -1525,6 +1525,40 @@ func (n *Parentheses) WithPrefix(prefix Space) *Parentheses {
 }
 
 func (n *Parentheses) WithMarkers(markers Markers) *Parentheses {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// ParenthesizedTypeTree is a type written in parentheses, such as the `(*T)` of
+// `(*T)(nil)`. Go spells a parenthesized type and a parenthesized expression
+// alike, so only the position tells them apart; the separate node is what keeps
+// a type a TypeTree in slots such as TypeCast.Clazz, which Java bounds to one.
+type ParenthesizedTypeTree struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Annotations []*Annotation
+	Type        *Parentheses // the parentheses, and the type they enclose
+}
+
+func (*ParenthesizedTypeTree) IsTree()       {}
+func (*ParenthesizedTypeTree) IsJ()          {}
+func (*ParenthesizedTypeTree) IsExpression() {}
+
+func (n *ParenthesizedTypeTree) WithPrefix(prefix Space) *ParenthesizedTypeTree {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ParenthesizedTypeTree) WithMarkers(markers Markers) *ParenthesizedTypeTree {
 	if MarkersEqual(n.Markers, markers) {
 		return n
 	}

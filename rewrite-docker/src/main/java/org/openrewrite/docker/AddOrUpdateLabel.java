@@ -86,11 +86,10 @@ public class AddOrUpdateLabel extends Recipe {
 
         @Override
         public Docker.Label.LabelPair visitLabelPair(Docker.Label.LabelPair pair, ExecutionContext ctx) {
-            if (key.equals(pair.getKey().getTextWithVariables())) {
+            if (key.equals(extractText(pair.getKey()))) {
                 boolean shouldOverwrite = overwriteExisting == null || overwriteExisting;
-                return shouldOverwrite && !value.equals(pair.getValue().getTextWithVariables()) ?
-                        pair.withValue(createArgument(value, pair.getValue())
-                                .withPrefix(pair.getValue().getPrefix())) : pair;
+                return shouldOverwrite && !value.equals(extractText(pair.getValue())) ?
+                        pair.withValue(createArgument(value, pair.getValue())) : pair;
             }
             return super.visitLabelPair(pair, ctx);
         }
@@ -124,7 +123,7 @@ public class AddOrUpdateLabel extends Recipe {
             return new DockerIsoVisitor<AtomicBoolean>() {
                 @Override
                 public Docker.Label.LabelPair visitLabelPair(Docker.Label.LabelPair pair, AtomicBoolean matchFound) {
-                    if (!matchFound.get() && key.equals(pair.getKey().getTextWithVariables())) {
+                    if (!matchFound.get() && key.equals(extractText(pair.getKey()))) {
                         matchFound.set(true);
                     }
                     return pair;
@@ -156,13 +155,46 @@ public class AddOrUpdateLabel extends Recipe {
         }
     }
 
-    private static Docker.Argument createArgument(String text, Docker.@Nullable Argument original) {
-        Docker.Literal.@Nullable QuoteStyle quoteStyle = null;
-        if (text.contains(" ") || text.contains("=")) {
-            Docker.Literal.QuoteStyle originalStyle = original == null ? null : original.getQuoteStyle();
-            quoteStyle = originalStyle == null ? Docker.Literal.QuoteStyle.DOUBLE : originalStyle;
+    private static @Nullable String extractText(Docker.@Nullable Argument arg) {
+        if (arg == null) {
+            return null;
         }
-        return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(
-                new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle)));
+        StringBuilder builder = new StringBuilder();
+        for (Docker.ArgumentContent content : arg.getContents()) {
+            if (content instanceof Docker.Literal) {
+                builder.append(((Docker.Literal) content).getText());
+            } else if (content instanceof Docker.EnvironmentVariable) {
+                Docker.EnvironmentVariable env = (Docker.EnvironmentVariable) content;
+                // Include the variable reference as-is (e.g., ${VAR} or $VAR)
+                if (env.isBraced()) {
+                    builder.append("${").append(env.getName()).append("}");
+                } else {
+                    builder.append("$").append(env.getName());
+                }
+            }
+        }
+        return builder.toString();
+    }
+
+    private static Docker.Argument createArgument(String text, Docker.@Nullable Argument original) {
+        // Quote if contains spaces or special characters
+        boolean needsQuotes = text.contains(" ") || text.contains("=");
+        Docker.ArgumentContent content;
+        if (needsQuotes) {
+            // Preserve quote style from original if available
+            Docker.Literal.QuoteStyle quoteStyle = Docker.Literal.QuoteStyle.DOUBLE;
+            if (original != null) {
+                for (Docker.ArgumentContent c : original.getContents()) {
+                    if (c instanceof Docker.Literal && ((Docker.Literal) c).isQuoted()) {
+                        quoteStyle = ((Docker.Literal) c).getQuoteStyle();
+                        break;
+                    }
+                }
+            }
+            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, quoteStyle);
+        } else {
+            content = new Docker.Literal(randomId(), Space.EMPTY, Markers.EMPTY, text, null);
+        }
+        return new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(content));
     }
 }

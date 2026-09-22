@@ -56,6 +56,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -118,6 +119,15 @@ public class GoRewriteRpc extends RewriteRpc {
     }
 
     /**
+     * Parser options forwarded to the Go server with every parse request, carrying
+     * this context's {@link ExecutionContext#REQUIRE_PRINT_EQUALS_INPUT} setting.
+     */
+    public static Map<String, String> parseOptions(ExecutionContext ctx) {
+        return Collections.singletonMap(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                String.valueOf(ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)));
+    }
+
+    /**
      * Parse a batch of Go source inputs with project (module) context.
      * The Go server constructs a {@code ProjectImporter} from the module
      * path + go.mod content, registers every input as a sibling, and uses
@@ -157,7 +167,8 @@ public class GoRewriteRpc extends RewriteRpc {
                 mappedInputs,
                 relativeTo != null ? relativeTo.toString() : null,
                 module,
-                goModContent
+                goModContent,
+                parseOptions(ctx)
         ), ParseResponse.class);
         if (ids.size() != inputList.size()) {
             throw new IllegalStateException("Parse response size " + ids.size() + " != input size " + inputList.size());
@@ -266,7 +277,7 @@ public class GoRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, base), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, base, parseOptions(ctx)), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -386,8 +397,10 @@ public class GoRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Supplies the path to the Go RPC binary. The supplier is invoked at most
-         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * Supplies the path to the Go RPC binary. The supplier is invoked once per
+         * thread that starts an RPC, since {@link RewriteRpcProcessManager} holds one
+         * RPC per thread; invocations are serialized across threads (see
+         * {@link #resolveGoBinaryPath}). Returning {@code null} uses the built-in
          * fallback discovery (same as not configuring the path at all). Exceptions
          * thrown by the supplier propagate out of the RPC-start call.
          *
@@ -445,7 +458,7 @@ public class GoRewriteRpc extends RewriteRpc {
 
         @Override
         public GoRewriteRpc get() {
-            @Nullable Path goBinaryPath = goBinaryPathSupplier.get();
+            @Nullable Path goBinaryPath = resolveGoBinaryPath(goBinaryPathSupplier);
             String binaryPath;
             if (goBinaryPath != null) {
                 binaryPath = goBinaryPath.toString();
@@ -487,6 +500,14 @@ public class GoRewriteRpc extends RewriteRpc {
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
+            }
+        }
+
+        private static final Object BINARY_PATH_LOCK = new Object();
+
+        static @Nullable Path resolveGoBinaryPath(Supplier<@Nullable Path> goBinaryPathSupplier) {
+            synchronized (BINARY_PATH_LOCK) {
+                return goBinaryPathSupplier.get();
             }
         }
     }

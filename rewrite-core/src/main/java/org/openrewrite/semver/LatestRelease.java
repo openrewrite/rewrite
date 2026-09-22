@@ -40,7 +40,9 @@ public class LatestRelease implements VersionComparator {
         int lastDotIdx = version.lastIndexOf('.');
         for (String suffix : RELEASE_SUFFIXES) {
             if (version.regionMatches(true, lastDotIdx, suffix, 0, suffix.length())) {
-                version = version.substring(0, lastDotIdx);
+                String patchedVersion = ParsedVersion.parse(version).patchedVersion();
+                version = version.substring(0, lastDotIdx) +
+                        (patchedVersion == null ? "" : version.substring(patchedVersion.length()));
                 break;
             }
         }
@@ -48,7 +50,7 @@ public class LatestRelease implements VersionComparator {
         int versionParts = countVersionParts(version);
 
         if (versionParts <= 2) {
-            String[] versionAndMetadata = version.split("(?=[-+])");
+            String[] versionAndMetadata = version.split("(?=[-+])", 2);
             for (; versionParts <= 2; versionParts++) {
                 versionAndMetadata[0] += ".0";
             }

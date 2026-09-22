@@ -51,6 +51,10 @@ public class LockEditSet {
     public static class PackageEdit {
         String name;
 
+        /** For an {@code npm:} alias, the real package name written as the entry's {@code name} field; else {@code null}. */
+        @Nullable
+        String aliasName;
+
         String oldVersion;
 
         /** The resolved target version, or {@code null} for a removal. */

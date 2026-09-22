@@ -17,6 +17,7 @@
 package parenthesize
 
 import (
+	"go/build"
 	goparser "go/parser"
 	gotoken "go/token"
 	"os"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -67,6 +69,45 @@ func TestVisitorRestoresGrammarRequiredParentheses(t *testing.T) {
 	}
 }
 
+// Printing cannot tell a parenthesized type from a parenthesized expression, so
+// the node the regrouping restores is what this pins down.
+func TestVisitorRestoresAConversionTypeAsATypeTree(t *testing.T) {
+	for _, tc := range []struct{ name, body string }{
+		{"pointer conversion", "func c(p *T) {\n\t_ = (*T)(p)\n}\n"},
+		{"channel conversion", "func c(ch chan int) {\n\t_ = (<-chan int)(ch)\n}\n"},
+		{"func conversion", "func c(fn func()) {\n\t_ = (func())(fn)\n}\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cu, err := parser.NewGoParser().Parse("cases.go", caseHeader+tc.body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			regrouped := NewVisitor().Visit(visitor.Init(&unwrapper{}).Visit(cu, nil), nil)
+
+			var clazz java.Expression
+			visitor.Init(&typeCastCollector{found: &clazz}).Visit(regrouped, nil)
+			if clazz == nil {
+				t.Fatal("no conversion in the regrouped tree")
+			}
+			if _, ok := clazz.(*java.ParenthesizedTypeTree); !ok {
+				t.Errorf("conversion type is %T, want *java.ParenthesizedTypeTree", clazz)
+			}
+		})
+	}
+}
+
+type typeCastCollector struct {
+	visitor.GoVisitor
+	found *java.Expression
+}
+
+func (c *typeCastCollector) PreVisit(t java.Tree, p any) java.Tree {
+	if tc, ok := t.(*java.TypeCast); ok && tc.Clazz != nil {
+		*c.found = tc.Clazz.Tree.Element
+	}
+	return t
+}
+
 // Stripping every parenthesis from real code and grouping it again has to
 // produce something Go still accepts, which covers spellings no hand-written
 // case list thinks of.
@@ -85,9 +126,15 @@ func TestVisitorRegroupsStdlibToParseableCode(t *testing.T) {
 			if err != nil {
 				t.Skip(err)
 			}
-			cu, err := parser.NewGoParser().Parse(filepath.Base(rel), string(content))
+			src := string(content)
+			if !parser.MatchBuildContext(build.Default, filepath.Base(rel), src) {
+				t.Skipf("%s is excluded from the build under this toolchain", rel)
+			}
+			// Past the build filter, a parse failure is a gap in the parser, not
+			// a corpus the toolchain moved out from under.
+			cu, err := parser.NewGoParser().Parse(filepath.Base(rel), src)
 			if err != nil {
-				t.Skip(err)
+				t.Fatalf("parse: %v", err)
 			}
 			ungrouped := printer.Print(visitor.Init(&unwrapper{}).Visit(cu, nil))
 			got := printer.Print(NewVisitor().Visit(visitor.Init(&unwrapper{}).Visit(cu, nil), nil))

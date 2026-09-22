@@ -15,6 +15,8 @@ import java.util.Queue;}
     private boolean heredocIdentifierCaptured = false;
     // Track if we're at the start of a logical line (where instructions can appear)
     private boolean atLineStart = true;
+    // Track if we're after FROM to recognize AS as a keyword (for stage aliasing)
+    private boolean afterFrom = false;
     // Track if we're after HEALTHCHECK to recognize CMD/NONE as keywords
     private boolean afterHealthcheck = false;
 }
@@ -33,7 +35,7 @@ COMMENT : '#' ~[\r\n]* -> channel(HIDDEN);
 // Instructions (case-insensitive)
 // Instructions are only recognized at line start. Otherwise they become UNQUOTED_TEXT.
 // This eliminates ambiguity between instruction keywords and shell command text.
-FROM       : 'FROM'       { if (!atLineStart) setType(UNQUOTED_TEXT); else pushMode(IMAGE_REF); atLineStart = false; };
+FROM       : 'FROM'       { if (!atLineStart) setType(UNQUOTED_TEXT); else afterFrom = true; atLineStart = false; };
 RUN        : 'RUN'        { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 // CMD is a keyword at line start (CMD instruction) or after HEALTHCHECK
 CMD        : 'CMD'        { if (!atLineStart && !afterHealthcheck) setType(UNQUOTED_TEXT); atLineStart = false; afterHealthcheck = false; };
@@ -57,6 +59,9 @@ HEALTHCHECK: 'HEALTHCHECK'{ if (!atLineStart) setType(UNQUOTED_TEXT); else after
 SHELL      : 'SHELL'      { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 MAINTAINER : 'MAINTAINER' { if (!atLineStart) setType(UNQUOTED_TEXT); atLineStart = false; };
 
+// AS is only a keyword after FROM (for stage aliasing)
+AS         : 'AS' { if (!afterFrom) setType(UNQUOTED_TEXT); atLineStart = false; afterFrom = false; };
+
 // Heredoc start - captures <<EOF or <<-EOF including the identifier and switches to HEREDOC_PREAMBLE mode
 HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {
     // Extract and store the heredoc marker identifier in FIFO order
@@ -70,9 +75,7 @@ HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {
 
 // Line continuation - HIDDEN in main mode
 // Supports both backslash (Linux) and backtick (Windows with # escape=`)
-LINE_CONTINUATION : LINE_CONT -> channel(HIDDEN);
-
-fragment LINE_CONT : ('\\' | '`') [ \t]* '\r'? '\n';
+LINE_CONTINUATION : ('\\' | '`') [ \t]* '\r'? '\n' -> channel(HIDDEN);
 
 // JSON array delimiters (for exec form) - no mode switching, handled in parser
 LBRACKET : '[' { atLineStart = false; };
@@ -86,9 +89,7 @@ EQUALS     : '=' { if (!afterHealthcheck) atLineStart = false; };
 // Captures the entire flag as a single token, stopping at whitespace
 // This avoids the greedy flagValue+ parsing issue while keeping shell commands working
 // Flag values can contain quoted strings (which may include spaces)
-FLAG : FLAG_TOKEN { if (!afterHealthcheck) atLineStart = false; };
-
-fragment FLAG_TOKEN : '--' [a-z] [a-z0-9_-]* ('=' FLAG_VALUE_PART+)?;
+FLAG : '--' [a-z] [a-z0-9_-]* ('=' FLAG_VALUE_PART+)? { if (!afterHealthcheck) atLineStart = false; };
 fragment FLAG_VALUE_PART
     : '"' ( '\\' ~[\r\n] | ~["\\\r\n] )* '"'   // Double-quoted string (with escapes)
     | '\'' ~['\r\n]* '\''                        // Single-quoted string (literal)
@@ -109,15 +110,11 @@ fragment ESCAPED_CHAR : '\\' .;
 // Double-quoted strings support escape sequences, line continuation, and bare newlines
 // Backtick followed by whitespace+newline is continuation; standalone backtick is regular char
 // Bare newlines are allowed (e.g., comment lines inside PowerShell strings don't need trailing backtick)
-DOUBLE_QUOTED_STRING : DQ_STRING { if (!afterHealthcheck) atLineStart = false; };
-
-fragment DQ_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | [\r\n] | ~["\\\r\n`] )* '"';
+DOUBLE_QUOTED_STRING : '"' ( ESCAPE_SEQUENCE | INLINE_CONTINUATION | '`' | [\r\n] | ~["\\\r\n`] )* '"' { if (!afterHealthcheck) atLineStart = false; };
 // Single-quoted strings in shell are literal - no escape processing inside
 // But they DO support line continuation (backslash or backtick followed by newline)
 // Bare newlines are also allowed for multi-line strings
-SINGLE_QUOTED_STRING : SQ_STRING { if (!afterHealthcheck) atLineStart = false; };
-
-fragment SQ_STRING : '\'' ( INLINE_CONTINUATION | [\r\n] | ~['\r\n] )* '\'';
+SINGLE_QUOTED_STRING : '\'' ( INLINE_CONTINUATION | [\r\n] | ~['\r\n] )* '\'' { if (!afterHealthcheck) atLineStart = false; };
 
 // Inline line continuation (inside strings) - backtick or backslash followed by newline
 fragment INLINE_CONTINUATION : ('\\' | '`') [ \t]* [\r\n]+;
@@ -129,14 +126,10 @@ fragment ESCAPE_SEQUENCE
 fragment HEX_DIGIT : [0-9A-F];
 
 // Environment variable reference
-ENV_VAR : VAR_REF { atLineStart = false; };
-
-fragment VAR_REF : '$' '{' [A-Z_][A-Z0-9_]* ( ':-' | ':+' | ':' )? ~[}]* '}' | '$' [A-Z_][A-Z0-9_]*;
+ENV_VAR : ('$' '{' [A-Z_][A-Z0-9_]* ( ':-' | ':+' | ':' )? ~[}]* '}' | '$' [A-Z_][A-Z0-9_]*) { atLineStart = false; };
 
 // Special shell variables ($!, $$, $?, $#, $@, $*, $0-$9)
-SPECIAL_VAR : SPECIAL_VAR_REF { atLineStart = false; };
-
-fragment SPECIAL_VAR_REF : '$' [!$?#@*0-9];
+SPECIAL_VAR : '$' [!$?#@*0-9] { atLineStart = false; };
 
 // Command substitution $(command) or $((arithmetic))
 // Handles nested parentheses by counting them
@@ -173,42 +166,9 @@ WS : WS_CHAR+ -> channel(HIDDEN);
 fragment WS_CHAR : [ \t];
 
 // Newlines - HIDDEN in main mode, reset state for next line
-NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; } -> channel(HIDDEN);
+NEWLINE : NEWLINE_CHAR+ { atLineStart = true; afterFrom = false; afterHealthcheck = false; } -> channel(HIDDEN);
 
 fragment NEWLINE_CHAR : [\r\n];
-
-// ----------------------------------------------------------------------------------------------
-// IMAGE_REF mode - the image reference of a FROM instruction, i.e. name:tag@digest
-// Entered from the FROM keyword and left at AS or at the end of the line. Only here are ':' and '@'
-// their own tokens, so the parser can split the reference while a colon inside a quoted string, a
-// variable reference or a registry port ('host:5000/img') stays part of the image name.
-// ----------------------------------------------------------------------------------------------
-mode IMAGE_REF;
-
-IR_WS                : WS_CHAR+      -> type(WS), channel(HIDDEN);
-IR_LINE_CONTINUATION : LINE_CONT     -> type(LINE_CONTINUATION), channel(HIDDEN);
-IR_COMMENT           : '#' ~[\r\n]*  -> type(COMMENT), channel(HIDDEN);
-IR_NEWLINE           : NEWLINE_CHAR+ { atLineStart = true; afterHealthcheck = false; } -> type(NEWLINE), channel(HIDDEN), popMode;
-
-COLON : ':';
-AT    : '@';
-
-// AS ends the reference; the stage name that follows it is ordinary text
-AS : 'AS' -> popMode;
-
-IR_FLAG                 : FLAG_TOKEN      -> type(FLAG);
-IR_DOUBLE_QUOTED_STRING : DQ_STRING       -> type(DOUBLE_QUOTED_STRING);
-IR_SINGLE_QUOTED_STRING : SQ_STRING       -> type(SINGLE_QUOTED_STRING);
-IR_ENV_VAR              : VAR_REF         -> type(ENV_VAR);
-IR_SPECIAL_VAR          : SPECIAL_VAR_REF -> type(SPECIAL_VAR);
-IR_DOLLAR               : '$'             -> type(DOLLAR);
-
-// Text of one part of the reference. A colon that a '/' follows belongs to a registry port rather
-// than to a tag ('host:5000/img:tag'), so it stays inside the token.
-IR_UNQUOTED_TEXT : ( IR_TEXT_CHAR | ESCAPED_CHAR | IR_PORT_COLON )+ -> type(UNQUOTED_TEXT);
-
-fragment IR_TEXT_CHAR  : ~[:@ \t\r\n\\"'$];
-fragment IR_PORT_COLON : ':' ( IR_TEXT_CHAR | ':' )* '/';
 
 // ----------------------------------------------------------------------------------------------
 // HEREDOC_PREAMBLE mode - for parsing shell command preamble after heredoc marker(s)
@@ -218,7 +178,7 @@ fragment IR_PORT_COLON : ':' ( IR_TEXT_CHAR | ':' )* '/';
 mode HEREDOC_PREAMBLE;
 
 // Line continuation in preamble - stay in HEREDOC_PREAMBLE mode
-HP_LINE_CONTINUATION : LINE_CONT -> channel(HIDDEN);
+HP_LINE_CONTINUATION : ('\\' | '`') [ \t]* '\r'? '\n' -> channel(HIDDEN);
 
 // Newline without continuation - transition to HEREDOC mode for body content
 HP_NEWLINE : '\n' -> type(NEWLINE), mode(HEREDOC);

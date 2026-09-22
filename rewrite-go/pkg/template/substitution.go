@@ -45,6 +45,9 @@ func (v *substitutionVisitor) VisitIdentifier(ident *java.Identifier, p any) jav
 	if val == nil {
 		return v.GoVisitor.VisitIdentifier(ident, p)
 	}
+	// A bound subtree came from the source and stays there, so what is
+	// spliced is a copy of it.
+	val = withFreshIDs(val)
 
 	// Preserve the placeholder's prefix whitespace on the substituted node.
 	// Use setLeadingPrefix to handle compound nodes where the prefix
@@ -145,7 +148,7 @@ func expandList[T java.J](v *substitutionVisitor, elements []java.RightPadded[T]
 		for i, value := range values {
 			// Returning the list untouched leaves the placeholder
 			// standing, which substitute reads as the failure it is.
-			element, ok := setPrefix(value, sep(i, prefix)).(T)
+			element, ok := setPrefix(withFreshIDs(value), sep(i, prefix)).(T)
 			if !ok {
 				return elements, false
 			}
@@ -175,24 +178,18 @@ func substitute(templateTree java.J, values *MatchResult) java.J {
 	return substituted
 }
 
+// holdsPlaceholder reports a placeholder the substitution left standing,
+// which is the failure its caller reads. A list binding leaves its
+// placeholder for the enclosing list to expand, so whether one was resolved
+// is known only once the whole tree has been rewritten.
 func holdsPlaceholder(j java.J) bool {
 	found := false
-	f := &placeholderFinder{found: &found}
-	f.Self = f
-	f.Visit(j, nil)
+	visitor.Walk(j, func(t java.Tree) bool {
+		ident, ok := t.(*java.Identifier)
+		found = ok && IsPlaceholder(ident.Name)
+		return !found
+	})
 	return found
-}
-
-type placeholderFinder struct {
-	visitor.GoVisitor
-	found *bool
-}
-
-func (v *placeholderFinder) VisitIdentifier(ident *java.Identifier, p any) java.J {
-	if IsPlaceholder(ident.Name) {
-		*v.found = true
-	}
-	return v.GoVisitor.VisitIdentifier(ident, p)
 }
 
 func setPrefix(j java.J, prefix java.Space) java.J {
@@ -250,6 +247,8 @@ func setPrefix(j java.J, prefix java.Space) java.J {
 	case *java.VariableDeclarator:
 		return n.WithPrefix(prefix)
 	case *java.Parentheses:
+		return n.WithPrefix(prefix)
+	case *java.ParenthesizedTypeTree:
 		return n.WithPrefix(prefix)
 	case *golang.TypeAssertion:
 		return n.WithPrefix(prefix)

@@ -151,6 +151,46 @@ func firstLiteralOfType(t *testing.T, src, keyword string) *java.Literal {
 	return found
 }
 
+func TestLiteralKeywords(t *testing.T) {
+	for _, tc := range []struct{ decl, want string }{
+		{"var v rune = 'b'", "char"},
+		{"var v byte = 'c'", "byte"},
+		{"var v int32 = 3", "int"},
+		{"var v int8 = 3", "byte"},
+		{"var v int64 = 3", "long"},
+		{"var v float64 = 3.5", "double"},
+		{"var v string = \"s\"", "String"},
+	} {
+		t.Run(tc.decl, func(t *testing.T) {
+			lit := firstLiteral(t, "package main\n\nfunc main() {\n\t"+tc.decl+"\n\t_ = v\n}\n")
+			prim, ok := lit.Type.(*java.JavaTypePrimitive)
+			require.Truef(t, ok, "Type is %T, want *java.JavaTypePrimitive", lit.Type)
+			assert.Equal(t, tc.want, prim.Keyword)
+		})
+	}
+}
+
+func TestComplexLiteralCarriesNoPrimitive(t *testing.T) {
+	lit := firstLiteral(t, "package main\n\nfunc main() {\n\tvar v complex128 = 3i\n\t_ = v\n}\n")
+	assert.Nil(t, lit.Type)
+	assert.Equal(t, "3i", lit.Value)
+}
+
+func firstLiteral(t *testing.T, src string) *java.Literal {
+	t.Helper()
+	cu, err := parser.NewGoParser().Parse("g.go", src)
+	require.NoError(t, err, "parse")
+	var found *java.Literal
+	visitor.Walk(cu, func(n java.Tree) bool {
+		if lit, ok := n.(*java.Literal); ok && found == nil {
+			found = lit
+		}
+		return found == nil
+	})
+	require.NotNil(t, found, "no literal in tree")
+	return found
+}
+
 // A Go byte-typed character literal such as `'^'` must round-trip through the
 // JVM-side LST deserializer. That deserializer is type-directed: for a J.Literal
 // whose Type is the `byte` primitive it coerces the value with

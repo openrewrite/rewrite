@@ -318,6 +318,7 @@ func buildProjectImporter(flat []SourceSpec) *parser.ProjectImporter {
 	pi := parser.NewProjectImporter(mrr.ModulePath, nil)
 	for _, req := range mrr.Requires {
 		pi.AddRequire(req.ModulePath)
+		pi.AddModule(req.ModulePath, "", req.Version)
 	}
 	for _, s := range flat {
 		if !strings.HasSuffix(s.Path, ".go") {

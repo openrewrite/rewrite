@@ -17,15 +17,26 @@ import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
-import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
+import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, treeIds, WRAPPER_FUNCTION_NAME} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
+import {maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
 import {JavaCoordinates} from './template';
 import {maybeAutoFormat} from '../format';
+import {renameBindings} from './bindings';
 import {isExpression, isStatement} from '../parser-utils';
 import {randomId} from '../../uuid';
 import ts from "typescript";
 import {DependencyWorkspace} from "../dependency-workspace";
+import {ModuleScopeBinding, moduleScopeBindings} from '../add-import';
+import {walk} from '../scope';
+import {isIdentifier} from '../../java';
+import {findMarker, MarkersKind, ParseExceptionResult} from '../../markers';
+
+/** A module a template's context binds, and whether the parse resolved it well enough to attribute. */
+export interface ContextBinding extends ModuleScopeBinding {
+    attributed: boolean;
+}
 import {Parameter} from "./types";
 
 /**
@@ -81,6 +92,23 @@ let templateSourceFileCache: Map<string, ts.SourceFile> | undefined;
  */
 export function setTemplateSourceFileCache(cache?: Map<string, ts.SourceFile>): void {
     templateSourceFileCache = cache;
+    templateParsers.clear();
+}
+
+// Every template parses under `template.tsx`, so one parser per workspace carries its program
+// from one compile to the next; see `JavaScriptParser.parse`.
+const templateParsers: Map<string, JavaScriptParser> = new Map();
+
+function templateParser(workspaceDir?: string, types?: string[]): JavaScriptParser {
+    // `types` changes what the compiler loads, so parsers cannot be shared across differing sets.
+    // An empty list loads nothing where absence loads the defaults, so the two encode apart.
+    const key = `${workspaceDir ?? ""}::${JSON.stringify(types ?? null)}`;
+    let parser = templateParsers.get(key);
+    if (!parser) {
+        parser = new JavaScriptParser({relativeTo: workspaceDir, sourceFileCache: templateSourceFileCache, types});
+        templateParsers.set(key, parser);
+    }
+    return parser;
 }
 
 /**
@@ -98,7 +126,8 @@ class TemplateCache {
         templateString: string,
         captures: (Capture | Any)[],
         contextStatements: string[],
-        dependencies: Record<string, string>
+        dependencies: Record<string, string>,
+        types: string[] | undefined
     ): string {
         // Use the actual template string (with placeholders) as the primary key
         const templateKey = templateString;
@@ -112,7 +141,7 @@ class TemplateCache {
         // Dependencies
         const depsKey = JSON.stringify(dependencies || {});
 
-        return `${templateKey}::${capturesKey}::${contextKey}::${depsKey}`;
+        return `${templateKey}::${capturesKey}::${contextKey}::${depsKey}::${JSON.stringify(types ?? null)}`;
     }
 
     /**
@@ -122,9 +151,10 @@ class TemplateCache {
         templateString: string,
         captures: (Capture | Any)[],
         contextStatements: string[],
-        dependencies: Record<string, string>
+        dependencies: Record<string, string>,
+        types?: string[]
     ): Promise<JS.CompilationUnit> {
-        const key = this.generateKey(templateString, captures, contextStatements, dependencies);
+        const key = this.generateKey(templateString, captures, contextStatements, dependencies, types);
 
         let cu = this.cache.get(key);
         if (cu) {
@@ -146,10 +176,7 @@ class TemplateCache {
 
         // Parse and cache (workspace only needed during parsing)
         // Use templateSourceFileCache if configured for ~3.2x speedup on dependency file parsing
-        const parser = new JavaScriptParser({
-            relativeTo: workspaceDir,
-            sourceFileCache: templateSourceFileCache
-        });
+        const parser = templateParser(workspaceDir, types);
         const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.tsx'});
         cu = (await parseGenerator.next()).value as JS.CompilationUnit;
 
@@ -179,6 +206,20 @@ export function clearTemplateCache(): void {
     templateCache.clear();
 }
 
+/** Whether a name reads as a TypeScript type reference: a dotted chain of identifiers. */
+function isTypeReference(name: string): boolean {
+    return /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(name);
+}
+
+/**
+ * The compiler's diagnostic for code that did not parse, as one line: the marker states it ahead
+ * of a stack, and its positions index the whole parsed text, context statements included.
+ */
+function parseFailureReason(cu: JS.CompilationUnit): string {
+    const failure = findMarker<ParseExceptionResult>(cu, MarkersKind.ParseExceptionResult);
+    return failure ? failure.message.split('\n')[0].replace(/:$/, '') : 'no statements';
+}
+
 /**
  * Internal template engine - handles the core templating logic.
  * Not exported from index, so only visible within the templating module.
@@ -194,35 +235,77 @@ export class TemplateEngine {
      * @param dependencies NPM dependencies for type attribution
      * @returns A Promise resolving to the extracted template AST
      */
+    /** The template parsed with its context, which is what gives its code types to attribute against. */
+    private static async parseWithContext(
+        templateParts: TemplateStringsArray,
+        parameters: Parameter[],
+        contextStatements: string[],
+        dependencies: Record<string, string>,
+        types: string[] | undefined
+    ): Promise<JS.CompilationUnit> {
+        // A capture's declared type reaches the parse as a declaration, so it belongs with context.
+        const preamble = TemplateEngine.parameterPreamble(parameters);
+        const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
+        const contextWithPreamble = preamble.length > 0
+            ? [...contextStatements, ...preamble]
+            : contextStatements;
+        return TemplateEngine.parseOrThrow('template', templateString, [], contextWithPreamble, dependencies, types);
+    }
+
+    /**
+     * The parse behind every template and pattern. Code that fails to parse yields a compilation
+     * unit with no statements, which every caller goes on to read, so it fails here naming the code.
+     */
+    private static async parseOrThrow(
+        kind: 'template' | 'pattern',
+        templateString: string,
+        captures: (Capture | Any)[],
+        contextStatements: string[],
+        dependencies: Record<string, string>,
+        types: string[] | undefined
+    ): Promise<JS.CompilationUnit> {
+        const cu = await templateCache.getOrParse(templateString, captures, contextStatements, dependencies, types);
+        if (!cu.statements || cu.statements.length === 0) {
+            throw new Error(`Failed to parse ${kind} code (${parseFailureReason(cu)}):\n${templateString}`);
+        }
+        return cu;
+    }
+
+    /**
+     * The modules the template's context binds, for the caller to bind in the file being edited.
+     * An `import` or `require` states one; anything else — a `declare`, a helper signature — types
+     * the template without asking for a binding.
+     */
+    static async getContextBindings(
+        templateParts: TemplateStringsArray,
+        parameters: Parameter[],
+        contextStatements: string[] = [],
+        dependencies: Record<string, string> = {},
+        types?: string[]
+    ): Promise<ContextBinding[]> {
+        const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types);
+        // The template's own code is the last statement, so everything ahead of it is context.
+        const context = {...cu, statements: cu.statements.slice(0, -1)};
+        const attributed = new Set<string>();
+        walk(context.statements, node => {
+            if (isIdentifier(node) && (node.type !== undefined || node.fieldType !== undefined)) {
+                attributed.add(node.simpleName);
+            }
+            return true;
+        });
+        return moduleScopeBindings(context)
+            .filter(b => b.module !== undefined)
+            .map(b => ({...b, attributed: attributed.has(b.name)}));
+    }
+
     static async getTemplateTree(
         templateParts: TemplateStringsArray,
         parameters: Parameter[],
         contextStatements: string[] = [],
-        dependencies: Record<string, string> = {}
+        dependencies: Record<string, string> = {},
+        types?: string[]
     ): Promise<J> {
-        // Generate type preamble for captures/parameters with types
-        const preamble = TemplateEngine.generateTypePreamble(parameters);
-
-        // Build the template string with parameter placeholders
-        const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
-
-        // Add preamble to context statements (so they're skipped during extraction)
-        const contextWithPreamble = preamble.length > 0
-            ? [...contextStatements, ...preamble]
-            : contextStatements;
-
-        // Use cache to get or parse the compilation unit
-        const cu = await templateCache.getOrParse(
-            templateString,
-            [],
-            contextWithPreamble,
-            dependencies
-        );
-
-        // Check if there are any statements
-        if (!cu.statements || cu.statements.length === 0) {
-            throw new Error(`Failed to parse template code (no statements):\n${templateString}`);
-        }
+        const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types);
 
         // The template code is always the last statement (after context + preamble)
         const lastStatement = cu.statements[cu.statements.length - 1].element;
@@ -243,15 +326,21 @@ export class TemplateEngine {
      * @param coordinates The coordinates specifying where and how to insert the generated AST
      * @param values Map of capture names to values to replace the parameters with
      * @param wrappersMap Map of capture names to J.RightPadded wrappers (for preserving markers)
+     * @param format Whether to fit the result to where it lands
+     * @param renames Local names for the template's declared bindings, keyed as declared
+     * @param modules The module each declared binding names, keyed as declared
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplateFromAst(
-        ast: JS.CompilationUnit,
+        ast: J,
         parameters: Parameter[],
         cursor: Cursor,
         coordinates: JavaCoordinates,
         values: Pick<Map<string, J>, 'get'> = new Map(),
-        wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map()
+        wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map(),
+        format: boolean = true,
+        renames: Record<string, string> = {},
+        modules: Record<string, string> = {}
     ): Promise<J | undefined> {
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
@@ -260,12 +349,30 @@ export class TemplateEngine {
             substitutions.set(placeholder, parameters[i]);
         }
 
+        // Before substitution, so that ids carried over from the source tree survive this pass
+        const fresh = await randomizeIds(ast);
+
+        const bound = Object.keys(renames).length > 0
+            ? await renameBindings(fresh.tree as J, renames, modules)
+            : fresh.tree;
+
         // Unsubstitute placeholders with actual parameter values and match results
         const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap);
-        const unsubstitutedAst = (await visitor.visit(ast, null))!;
+        const unsubstitutedAst = (await visitor.visit(bound, null))!;
+
+        // An id may only be kept where the node answering to it is leaving the tree, which is the
+        // subtree this application replaces. A parameter named twice, or spliced in from somewhere
+        // that stays, would otherwise put one id in two places.
+        const retainable = new Set(fresh.ids);
+        if (coordinates.tree) {
+            for (const id of await treeIds(coordinates.tree as J)) {
+                retainable.add(id);
+            }
+        }
+        const uniqueAst = await retainIds(unsubstitutedAst, retainable);
 
         // Apply the template to the current AST
-        return new TemplateApplier(cursor, coordinates, unsubstitutedAst).apply();
+        return new TemplateApplier(cursor, coordinates, uniqueAst, format).apply();
     }
 
     /**
@@ -274,7 +381,33 @@ export class TemplateEngine {
      * @param parameters The parameters
      * @returns Array of preamble statements
      */
-    private static generateTypePreamble(parameters: Parameter[]): string[] {
+    /** The declarations that give a capture's placeholder its type while the pattern is parsed. */
+    static capturePreamble(captures: (Capture | Any | RawCode)[]): string[] {
+        const preamble: string[] = [];
+        for (const capture of captures) {
+            // Raw code is spliced in as source, so it declares nothing
+            if (capture instanceof RawCode || (capture && typeof capture === 'object' && (capture as any)[RAW_CODE_SYMBOL])) {
+                continue;
+            }
+
+            const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
+            const captureType = (capture as any)[CAPTURE_TYPE_SYMBOL];
+            if (captureType) {
+                const typeString = typeof captureType === 'string'
+                    ? captureType
+                    : this.typeToString(captureType);
+                // `any` attributes nothing, so a declaration for it would only cost a parse
+                if (typeString !== 'any') {
+                    const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
+                    preamble.push(`let ${placeholder}: ${typeString};`);
+                }
+            }
+        }
+        return preamble;
+    }
+
+    /** The parameter counterpart of {@link capturePreamble}. */
+    static parameterPreamble(parameters: Parameter[]): string[] {
         const preamble: string[] = [];
 
         for (let i = 0; i < parameters.length; i++) {
@@ -362,7 +495,7 @@ export class TemplateEngine {
 
         // Always wrap in function body - let the parser decide what it is,
         // then we'll extract intelligently based on what was parsed
-        return `function ${WRAPPER_FUNCTION_NAME}() { ${result} }`;
+        return `function ${WRAPPER_FUNCTION_NAME}() { ${dedentTemplate(result)} }`;
     }
 
     /**
@@ -375,7 +508,10 @@ export class TemplateEngine {
         // Handle Type.Class and Type.ShallowClass - return their fully qualified names
         if (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) {
             const classType = type as Type.Class;
-            return classType.fullyQualifiedName;
+            // A module qualifies its types by where they come from — `src/a.Foo` — and a path that
+            // is no type reference cannot be declared for. Naming a module's type takes a `context`
+            // statement of the caller's own, which `type` then names.
+            return isTypeReference(classType.fullyQualifiedName) ? classType.fullyQualifiedName : 'any';
         }
 
         // Handle Type.Primitive - map to TypeScript primitive types
@@ -413,45 +549,23 @@ export class TemplateEngine {
     }
 
     /**
-     * Gets the parsed and extracted pattern tree with capture markers attached.
-     * This is the entry point for pattern processing, providing pattern-specific
-     * functionality on top of the shared template tree generation.
+     * Gets the parsed and extracted pattern tree, with placeholder identifiers left bare;
+     * `attachCaptureMarkers` binds it to a particular set of captures.
      *
      * @param templateParts The string parts of the template
      * @param captures The captures between the string parts (can include RawCode)
      * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
-     * @returns A Promise resolving to the extracted pattern AST with capture markers
+     * @returns A Promise resolving to the extracted pattern AST
      */
     static async getPatternTree(
         templateParts: TemplateStringsArray,
         captures: (Capture | Any | RawCode)[],
         contextStatements: string[] = [],
-        dependencies: Record<string, string> = {}
+        dependencies: Record<string, string> = {},
+        types?: string[]
     ): Promise<J> {
-        // Generate type preamble for captures with types (skip RawCode)
-        const preamble: string[] = [];
-        for (const capture of captures) {
-            // Skip raw code - it's not a capture
-            if (capture instanceof RawCode || (capture && typeof capture === 'object' && (capture as any)[RAW_CODE_SYMBOL])) {
-                continue;
-            }
-
-            const captureName = (capture as any)[CAPTURE_NAME_SYMBOL] || capture.getName();
-            const captureType = (capture as any)[CAPTURE_TYPE_SYMBOL];
-            if (captureType) {
-                // Convert Type to string if needed
-                const typeString = typeof captureType === 'string'
-                    ? captureType
-                    : this.typeToString(captureType);
-                // Only add preamble if we have a concrete type (not 'any')
-                if (typeString !== 'any') {
-                    const placeholder = PlaceholderUtils.createCapture(captureName, undefined);
-                    preamble.push(`let ${placeholder}: ${typeString};`);
-                }
-            }
-            // Don't add preamble declarations without types - they don't provide type attribution
-        }
+        const preamble = TemplateEngine.capturePreamble(captures);
 
         // Build the template string with placeholders for captures and raw code
         let result = '';
@@ -485,35 +599,38 @@ export class TemplateEngine {
             !(c instanceof RawCode || (c && typeof c === 'object' && (c as any)[RAW_CODE_SYMBOL]))
         ) as (Capture | Any)[];
 
-        // Use cache to get or parse the compilation unit
-        const cu = await templateCache.getOrParse(
+        const cu = await TemplateEngine.parseOrThrow(
+            'pattern',
             templateString,
             actualCaptures,
             contextWithPreamble,
-            dependencies
+            dependencies,
+            types
         );
-
-        // Check if there are any statements
-        if (!cu.statements || cu.statements.length === 0) {
-            throw new Error(`Failed to parse pattern code (no statements):\n${templateString}`);
-        }
 
         // The pattern code is always the last statement (after context + preamble)
         const lastStatement = cu.statements[cu.statements.length - 1].element;
 
         // Extract from wrapper using shared utility
-        const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, 'Pattern');
+        return PlaceholderUtils.extractFromWrapper(lastStatement, 'Pattern');
+    }
 
-        // Attach CaptureMarkers to capture identifiers (only for actual captures, not raw code)
-        const visitor = new MarkerAttachmentVisitor(actualCaptures);
-        return (await visitor.visit(extracted, undefined))!;
+    /**
+     * Binds a pattern tree to a set of captures by attaching a CaptureMarker, carrying that
+     * capture's constraint and variadic options, to each placeholder identifier.
+     */
+    static async attachCaptureMarkers(tree: J, captures: (Capture | Any | RawCode)[]): Promise<J> {
+        const actualCaptures = captures.filter(c =>
+            !(c instanceof RawCode || (c && typeof c === 'object' && (c as any)[RAW_CODE_SYMBOL]))
+        ) as (Capture | Any)[];
+        return (await new MarkerAttachmentVisitor(actualCaptures).visit(tree, undefined))!;
     }
 }
 
 /**
  * Visitor that attaches CaptureMarkers to capture identifiers in pattern ASTs.
  * This allows efficient capture detection without string parsing during matching.
- * Used by TemplateEngine.getPatternTree() for pattern-specific processing.
+ * Reached through TemplateEngine.attachCaptureMarkers().
  */
 class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
     constructor(private readonly captures: (Capture | Any)[]) {
@@ -641,7 +758,8 @@ export class TemplateApplier {
     constructor(
         private readonly cursor: Cursor,
         private readonly coordinates: JavaCoordinates,
-        private readonly ast: J
+        private readonly ast: J,
+        private readonly shouldFormat: boolean = true
     ) {
     }
 
@@ -677,8 +795,41 @@ export class TemplateApplier {
         }
 
         const originalTree = tree as J;
-        const resultToUse = this.wrapTree(originalTree, this.ast);
+        let resultToUse = this.wrapTree(originalTree, this.ast);
+        const slot = this.replacedSlot(originalTree);
+        if (slot) {
+            // `format` substitutes the target's prefix, so decide against the prefix that will print
+            resultToUse = maybeParenthesize(slot[0], slot[1], {...resultToUse, prefix: originalTree.prefix});
+        }
         return this.format(resultToUse, originalTree);
+    }
+
+    /** The node holding the tree being replaced and the id it holds it under, per the cursor. */
+    private replacedSlot(originalTree: J): [J, string] | undefined {
+        const frames: J[] = [];
+        for (let c: Cursor | undefined = this.cursor; c && frames.length < 2; c = c.parent) {
+            if (isTree(c.value)) {
+                frames.push(c.value as J);
+            }
+        }
+        if (frames.length === 0) {
+            return undefined;
+        }
+
+        // The visitor may sit on the node holding what is being replaced rather than on it
+        if (requiredPrecedence(frames[0], originalTree.id) !== undefined) {
+            return [frames[0], originalTree.id];
+        }
+        if (frames.length < 2) {
+            return undefined;
+        }
+        if (requiredPrecedence(frames[1], originalTree.id) !== undefined) {
+            return [frames[1], originalTree.id];
+        }
+        // A chained rule rewrites the previous rule's detached result, leaving the cursor on the node
+        // that result stands in for; a wrong guess here only ever adds parentheses, never drops them
+        return frames[0].id !== originalTree.id && requiredPrecedence(frames[1], frames[0].id) !== undefined ?
+            [frames[1], frames[0].id] : undefined;
     }
 
     private async format(resultToUse: J, originalTree: J) {
@@ -689,6 +840,10 @@ export class TemplateApplier {
             id: originalTree.id,
             prefix: originalTree.prefix
         };
+
+        if (!this.shouldFormat) {
+            return {...result, id: resultToUse.id};
+        }
 
         // Apply auto-formatting to the result
         const formatted =
@@ -721,14 +876,16 @@ export class TemplateApplier {
 
             // Determine context and wrap if needed
             if (parentExpectsStatement && originalIsStatement) {
+                const needsGrouping = resultIsExpression && startsWithDeclarationToken(resultToUse);
                 // Statement context: wrap in ExpressionStatement if result is not a statement
-                if (!resultIsStatement && resultIsExpression) {
+                if (needsGrouping || (!resultIsStatement && resultIsExpression)) {
+                    const expression = needsGrouping ? parenthesize(resultToUse) : resultToUse;
                     resultToUse = {
                         kind: JS.Kind.ExpressionStatement,
                         id: randomId(),
-                        prefix: resultToUse.prefix,
-                        markers: resultToUse.markers,
-                        expression: { ...resultToUse, prefix: emptySpace }
+                        prefix: expression.prefix,
+                        markers: expression.markers,
+                        expression: { ...expression, prefix: emptySpace }
                     } as JS.ExpressionStatement;
                 }
             } else if (!parentExpectsStatement) {

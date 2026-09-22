@@ -34,7 +34,7 @@ import (
 )
 
 func TestScaffoldExpression(t *testing.T) {
-	source, _ := buildScaffold("1 + 2", nil, nil, ScaffoldExpression)
+	source, _ := buildScaffold("1 + 2", nil, nil, nil, ScaffoldExpression)
 	require.NotEqual(t, "", source, "expected non-empty scaffold source")
 
 	p := parser.NewGoParser()
@@ -43,7 +43,7 @@ func TestScaffoldExpression(t *testing.T) {
 }
 
 func TestScaffoldStatement(t *testing.T) {
-	source, _ := buildScaffold("x = 1", nil, nil, ScaffoldStatement)
+	source, _ := buildScaffold("x = 1", nil, nil, nil, ScaffoldStatement)
 	require.NotEqual(t, "", source, "expected non-empty scaffold source")
 
 	p := parser.NewGoParser()
@@ -53,16 +53,22 @@ func TestScaffoldStatement(t *testing.T) {
 
 func TestScaffoldWithCaptures(t *testing.T) {
 	caps := captureMap([]*Capture{Expr("x")})
-	source, count := buildScaffold(fmt.Sprintf("%s + 1", Expr("x")), caps, nil, ScaffoldExpression)
-	assert.Equal(t, 1, count, "expected preamble count")
+	source, _ := buildScaffold(fmt.Sprintf("%s + 1", Expr("x")), caps, nil, nil, ScaffoldExpression)
 
 	p := parser.NewGoParser()
 	_, err := p.Parse("test.go", source)
 	require.NoErrorf(t, err, "scaffold with captures should parse: %v\nsource:\n%s", err, source)
 }
 
+// The count says how far into __f__'s body the target sits.
+func TestStatementScaffoldCountsItsPreamble(t *testing.T) {
+	caps := captureMap([]*Capture{Expr("x")})
+	_, count := buildScaffold(fmt.Sprintf("_ = %s", Expr("x")), caps, nil, nil, ScaffoldStatement)
+	assert.Equal(t, 1, count)
+}
+
 func TestParseScaffoldExpression(t *testing.T) {
-	node, err := parseScaffold("1 + 2", nil, nil, ScaffoldExpression, nil)
+	node, err := parseScaffold("1 + 2", nil, nil, nil, ScaffoldExpression, nil)
 	require.NoError(t, err, "parseScaffold error")
 	require.NotNil(t, node, "expected non-nil node")
 	bin, ok := node.(*java.Binary)

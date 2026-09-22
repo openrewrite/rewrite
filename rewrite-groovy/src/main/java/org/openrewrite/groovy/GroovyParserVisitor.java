@@ -197,6 +197,20 @@ public class GroovyParserVisitor {
         }
 
         for (ClassNode aClass : ast.getClasses()) {
+            if (aClass.getName().equals(ast.getMainClassName())) {
+                for (FieldNode field : aClass.getFields()) {
+                    if (isFieldDeclaration(field)) {
+                        // The @Field transform leaves a null ConstantExpression in the script body, but the generated
+                        // script field retains the declaration's type and initializer. Restore the source annotation
+                        // and replace that placeholder statement with the field.
+                        ClassNode fieldAnnotationType = new ClassNode(Field.class);
+                        if (field.getAnnotations(fieldAnnotationType).isEmpty()) {
+                            field.addAnnotation(new AnnotationNode(fieldAnnotationType));
+                        }
+                        sortedByPosition.put(pos(field), field);
+                    }
+                }
+            }
             // skip over the synthetic script class
             if (!aClass.getName().equals(ast.getMainClassName()) || !aClass.getName().endsWith("doesntmatter")) {
                 // synthetic helper classes Groovy generates for traits hold the bodies of trait methods/fields;
@@ -943,7 +957,7 @@ public class GroovyParserVisitor {
                     typeMapping.variableType(field)
             );
 
-            if (field.getInitialExpression() != null) {
+            if (field.getInitialExpression() != null && !(field.getInitialExpression() instanceof EmptyExpression)) {
                 Space beforeAssign = sourceBefore("=");
                 Expression initializer = visitor.doVisit(field.getInitialExpression());
                 namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
@@ -1380,7 +1394,7 @@ public class GroovyParserVisitor {
             Space beforeOpenParen = whitespace();
 
             boolean hasParentheses = true;
-            if (source.charAt(cursor) == '(') {
+            if (source.charAt(cursor) == '(' && !startsLambdaArgument(expression)) {
                 skip("(");
             } else {
                 hasParentheses = false;
@@ -1472,6 +1486,15 @@ public class GroovyParserVisitor {
             }
 
             queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));
+        }
+
+        private boolean startsLambdaArgument(ArgumentListExpression expression) {
+            List<org.codehaus.groovy.ast.expr.Expression> arguments = expression.getExpressions();
+            return !arguments.isEmpty() &&
+                    // Compared by name because LambdaExpression does not exist in Groovy 2
+                    "org.codehaus.groovy.ast.expr.LambdaExpression".equals(arguments.get(0).getClass().getName()) &&
+                    appearsInSource(arguments.get(0)) &&
+                    sourceOffset(arguments.get(0)) == cursor;
         }
 
         public boolean endsWithClosures(List<org.codehaus.groovy.ast.expr.Expression> list) {
@@ -2150,9 +2173,8 @@ public class GroovyParserVisitor {
                     } else {
                         Delimiter delimiter = getDelimiter(expression, cursor);
                         if (delimiter != null) {
-                            // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                            value = sourceSubstring(cursor + delimiter.open.length(), delimiter.close);
-                            text = delimiter.open + value + delimiter.close;
+                            // value is decoded per this delimiter's escaping rules; the source supplies the spelling
+                            text = delimiter.open + sourceSubstring(cursor + delimiter.open.length(), delimiter.close) + delimiter.close;
                         }
                     }
                 } else if (expression.isNullExpression()) {
@@ -2479,12 +2501,11 @@ public class GroovyParserVisitor {
                         columnOffset++;
                     }
                 } else if (e instanceof ConstantExpression) {
-                    // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                    String value = hasInterpolation ?
+                    String valueSource = hasInterpolation ?
                             readConstantSegmentBeforeNextInterpolation(delimiter) :
                             sourceSubstring(cursor, delimiter.close);
-                    strings.add(new J.Literal(randomId(), EMPTY, Markers.EMPTY, value, value, null, JavaType.Primitive.String));
-                    skip(value);
+                    strings.add(new J.Literal(randomId(), EMPTY, Markers.EMPTY, ((ConstantExpression) e).getValue(), valueSource, null, JavaType.Primitive.String));
+                    skip(valueSource);
                 } else {
                     // Everything should be handled already by the other two code paths, but just in case
                     strings.add(doVisit(e));
@@ -3152,13 +3173,15 @@ public class GroovyParserVisitor {
             for (int i = 0; i < varExprs.size(); i++) {
                 VariableExpression varExpr = varExprs.get(i);
                 TypeTree innerType = visitVariableExpressionType(varExpr);
+                Space innerPrefix = innerType.getPrefix();
+                innerType = innerType.withPrefix(EMPTY);
                 J.Identifier name = doVisit(varExpr);
                 J.VariableDeclarations.NamedVariable nv = new J.VariableDeclarations.NamedVariable(
                         randomId(), name.getPrefix(), Markers.EMPTY,
                         name.withPrefix(EMPTY), emptyList(), null,
                         typeMapping.variableType(name.getSimpleName(), innerType.getType()));
                 J.VariableDeclarations innerDecl = new J.VariableDeclarations(
-                        randomId(), EMPTY, Markers.EMPTY, emptyList(), emptyList(),
+                        randomId(), innerPrefix, Markers.EMPTY, emptyList(), emptyList(),
                         innerType, null, singletonList(JRightPadded.build(nv)));
                 Space after = i < varExprs.size() - 1 ? sourceBefore(",") : sourceBefore(")");
                 tupleVars.add(JRightPadded.<J.VariableDeclarations>build(innerDecl).withAfter(after));
@@ -3507,6 +3530,11 @@ public class GroovyParserVisitor {
             RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
             classVisitor.visitMethod(methodNode);
             return JRightPadded.build(classVisitor.pollQueue());
+        } else if (node instanceof FieldNode) {
+            FieldNode fieldNode = (FieldNode) node;
+            RewriteGroovyClassVisitor classVisitor = new RewriteGroovyClassVisitor(unit);
+            classVisitor.visitField(fieldNode);
+            return JRightPadded.build(classVisitor.pollQueue());
         } else if (node instanceof ImportNode) {
             ImportNode importNode = (ImportNode) node;
             Space importPrefix = sourceBefore("import");
@@ -3630,6 +3658,19 @@ public class GroovyParserVisitor {
 
     private static LineColumn pos(ASTNode node) {
         return new LineColumn(node.getLineNumber(), node.getColumnNumber());
+    }
+
+    private boolean isFieldDeclaration(FieldNode field) {
+        if (!appearsInSource(field)) {
+            return false;
+        }
+        int offset = sourceOffset(field);
+        return source.startsWith("@" + Field.class.getSimpleName(), offset) ||
+                source.startsWith("@" + Field.class.getCanonicalName(), offset);
+    }
+
+    private int sourceOffset(ASTNode node) {
+        return sourceLineNumberOffsets[node.getLineNumber() - 1] + node.getColumnNumber() - 1;
     }
 
     private static boolean isSynthetic(ASTNode node) {

@@ -21,16 +21,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // ExpectType walks the tree rooted at root and asserts that the first
 // identifier whose Name == name carries a fully-qualified type whose FQN
-// matches expectedFQN. Use this for class/struct/parameterized types; for
-// primitives use ExpectPrimitiveType.
+// matches expectedFQN. Go's basic types are attributed under their own Go
+// names, so this covers them too: "int32", "string", "untyped rune".
 //
 // Fails the test if no matching identifier is found, if its Type is nil,
 // or if the type does not implement java.FullyQualified.
@@ -45,20 +43,6 @@ func ExpectType(t *testing.T, root java.Tree, name string, expectedFQN string) {
 	if got := fq.GetFullyQualifiedName(); got != expectedFQN {
 		t.Errorf("ExpectType(%q): FQN = %q, want %q", name, got, expectedFQN)
 	}
-}
-
-// ExpectPrimitiveType asserts that the first identifier named `name` has a
-// JavaTypePrimitive whose Keyword matches expectedKeyword (e.g. "int",
-// "String", "bool"). Mirrors ExpectType for primitive type attribution.
-func ExpectPrimitiveType(t *testing.T, root java.Tree, name string, expectedKeyword string) {
-	t.Helper()
-	c := visitor.Init(&identifierTypeCollector{name: name})
-	c.Visit(root, nil)
-	require.Truef(t, c.found, "ExpectPrimitiveType(%q): no identifier with that name in tree", name)
-	require.NotNilf(t, c.typ, "ExpectPrimitiveType(%q): identifier has nil Type", name)
-	prim, ok := c.typ.(*java.JavaTypePrimitive)
-	require.Truef(t, ok, "ExpectPrimitiveType(%q): identifier Type is %T, want *JavaTypePrimitive", name, c.typ)
-	assert.Equalf(t, prim.Keyword, expectedKeyword, "ExpectPrimitiveType(%q): keyword", name)
 }
 
 // ExpectMethodType walks the tree rooted at root and asserts that the
