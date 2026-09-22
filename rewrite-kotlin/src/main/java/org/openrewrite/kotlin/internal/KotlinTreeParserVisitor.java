@@ -4195,34 +4195,42 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private J mapDestructuringDeclaration(KtDestructuringDeclaration ktDestructuringDeclaration, ExecutionContext data) {
         List<KtDestructuringDeclarationEntry> entries = ktDestructuringDeclaration.getEntries();
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(entries.size());
+        List<JRightPadded<J.Identifier>> names = new ArrayList<>(entries.size());
 
         for (int i = 0; i < entries.size(); i++) {
-            KtDestructuringDeclarationEntry ktDestructuringDeclarationEntry = entries.get(i);
-            J.Identifier name = (J.Identifier) ktDestructuringDeclarationEntry.accept(this, data);
-
-            J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
-                    randomId(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    name,
-                    emptyList(),
-                    null,
-                    variableType(ktDestructuringDeclarationEntry, owner(ktDestructuringDeclarationEntry))
-            );
-            variables.add(maybeTrailingComma(ktDestructuringDeclarationEntry,
-                    padRight(namedVariable, suffix(ktDestructuringDeclarationEntry)), i == entries.size() - 1));
+            KtDestructuringDeclarationEntry entry = entries.get(i);
+            J.Identifier name = (J.Identifier) entry.accept(this, data);
+            name = name.withFieldType(variableType(entry, owner(entry)));
+            names.add(maybeTrailingComma(entry, padRight(name, suffix(entry)), i == entries.size() - 1));
         }
+
+        K.DestructuringPattern pattern = new K.DestructuringPattern(
+                randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                JContainer.build(prefix(ktDestructuringDeclaration.getLPar()), names, Markers.EMPTY),
+                null
+        );
+
+        J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
+                randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                pattern,
+                emptyList(),
+                null,
+                null
+        );
 
         return new J.VariableDeclarations(
                 randomId(),
                 prefix(ktDestructuringDeclaration),
-                Markers.EMPTY.addIfAbsent(new OmitEquals(randomId())).addIfAbsent(new Destructured(randomId())),
+                Markers.EMPTY.addIfAbsent(new OmitEquals(randomId())),
                 emptyList(),
                 emptyList(),
                 null,
                 null,
-                variables
+                singletonList(padRight(namedVariable, Space.EMPTY))
         );
     }
 

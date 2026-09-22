@@ -221,6 +221,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitDestructuringPattern(K.DestructuringPattern destructuringPattern, PrintOutputCapture<P> p) {
+        beforeSyntax(destructuringPattern, KSpace.Location.DESTRUCTURING_PATTERN_PREFIX, p);
+        visitContainer("(", destructuringPattern.getPadding().getNames(), KContainer.Location.DESTRUCTURING_PATTERN_NAMES, ")", p);
+        afterSyntax(destructuringPattern, p);
+        return destructuringPattern;
+    }
+
+    @Override
     public J visitFunctionType(K.FunctionType functionType, PrintOutputCapture<P> p) {
         beforeSyntax(functionType, KSpace.Location.FUNCTION_TYPE_PREFIX, p);
 
@@ -1293,9 +1301,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(Extension.class).isPresent();
             List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
-            // More than one name is always a destructuring pattern, so the marker is not required to recognise one.
-            boolean destructured = !containsTypeReceiver &&
-                                   (variables.size() > 1 || multiVariable.getMarkers().findFirst(Destructured.class).isPresent());
+            // Older LSTs spread a destructuring pattern over one named variable per name, with no declarator to hold them.
+            boolean destructured = !containsTypeReceiver && variables.size() > 1;
             for (int i = 0; i < variables.size(); i++) {
                 JRightPadded<J.VariableDeclarations.NamedVariable> variable = variables.get(i);
                 beforeSyntax(variable.getElement(), Space.Location.VARIABLE_PREFIX, p);
@@ -1303,7 +1310,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append("(");
                 }
 
-                visit(variable.getElement().getName(), p);
+                visit(variable.getElement().getDeclarator(), p);
                 visitSpace(variable.getAfter(), Space.Location.VARIABLE_INITIALIZER, p);
 
                 if (multiVariable.getTypeExpression() != null) {
@@ -1327,10 +1334,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 if (i < variables.size() - 1) {
                     p.append(",");
                 } else if (destructured) {
-                    variable.getMarkers().findFirst(TrailingComma.class).ifPresent(t -> {
-                        p.append(",");
-                        visitSpace(t.getSuffix(), Space.Location.TRAILING_COMMA_SUFFIX, p);
-                    });
                     p.append(")");
                 }
 

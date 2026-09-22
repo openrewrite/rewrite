@@ -888,6 +888,95 @@ public interface K extends J {
         }
     }
 
+    /**
+     * The parenthesized names of a destructuring pattern, as in {@code for ((a, b) in pairs)}, occupying the
+     * declarator slot of the single {@link J.VariableDeclarations.NamedVariable} that the pattern declares.
+     */
+    @SuppressWarnings("unused")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DestructuringPattern implements K, Expression, TypedTree, VariableDeclarator {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        JContainer<J.Identifier> names;
+
+        @Override
+        public List<J.Identifier> getNames() {
+            return names.getElements();
+        }
+
+        public DestructuringPattern withNames(List<J.Identifier> names) {
+            return getPadding().withNames(JContainer.withElements(this.names, names));
+        }
+
+        @Getter
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitDestructuringPattern(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DestructuringPattern t;
+
+            public JContainer<J.Identifier> getNames() {
+                return t.names;
+            }
+
+            public DestructuringPattern withNames(JContainer<J.Identifier> names) {
+                return t.names == names ? t : new DestructuringPattern(t.id, t.prefix, t.markers, names, t.type);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
+    }
+
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

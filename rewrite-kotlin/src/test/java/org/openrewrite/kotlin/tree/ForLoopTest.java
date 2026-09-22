@@ -17,8 +17,13 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"ControlFlowWithEmptyBody", "RemoveForLoopIndices"})
@@ -136,6 +141,7 @@ class ForLoopTest implements RewriteTest {
 
     @Test
     void singleComponentDestructuring() {
+        AtomicBoolean asserted = new AtomicBoolean();
         rewriteRun(
           kotlin(
             """
@@ -145,7 +151,20 @@ class ForLoopTest implements RewriteTest {
                       println(value)
                   }
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, Integer p) {
+                        J.VariableDeclarations v = (J.VariableDeclarations) control.getVariable();
+                        assertThat(v.getVariables()).singleElement().satisfies(nv ->
+                          assertThat(nv.getDeclarator()).isInstanceOf(K.DestructuringPattern.class));
+                        asserted.set(true);
+                        return super.visitForEachControl(control, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted).isTrue();
+            })
           )
         );
     }

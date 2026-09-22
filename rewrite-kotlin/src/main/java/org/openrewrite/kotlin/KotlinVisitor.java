@@ -133,6 +133,20 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return d.withDelegate(visitAndCast(d.getDelegate(), p));
     }
 
+    public J visitDestructuringPattern(K.DestructuringPattern destructuringPattern, P p) {
+        K.DestructuringPattern d = destructuringPattern;
+        d = d.withPrefix(visitSpace(d.getPrefix(), KSpace.Location.DESTRUCTURING_PATTERN_PREFIX, p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(d, p);
+        if (!(temp instanceof K.DestructuringPattern)) {
+            return temp;
+        } else {
+            d = (K.DestructuringPattern) temp;
+        }
+        d = d.withType(visitType(d.getType(), p));
+        return d.getPadding().withNames(visitContainer(d.getPadding().getNames(), KContainer.Location.DESTRUCTURING_PATTERN_NAMES, p));
+    }
+
     public J visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, P p) {
         K.DestructuringDeclaration d = destructuringDeclaration;
         d = d.withPrefix(visitSpace(d.getPrefix(), KSpace.Location.DESTRUCTURING_DECLARATION_PREFIX, p));
