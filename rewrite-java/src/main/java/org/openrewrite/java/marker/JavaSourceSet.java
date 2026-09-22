@@ -444,13 +444,25 @@ public class JavaSourceSet implements SourceSet {
      * Uses file I/O to compute the classpath.
      */
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath) {
+        return build(sourceSetName, classpath, JavaSourceSet::gavFromPath);
+    }
+
+    /**
+     * Extract type information from the provided classpath, keying {@link #getGavToTypes()} by the
+     * "group:artifact:version" that {@code gavForPath} returns for each entry. A build tool that resolved
+     * the classpath already knows each artifact's coordinates and can supply them directly, rather than
+     * relying on {@link #gavFromPath}, which only recognizes the default Maven and Gradle cache layouts.
+     * Entries for which {@code gavForPath} returns null are still on the classpath but have no GAV.
+     */
+    public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath,
+                                      Function<Path, @Nullable String> gavForPath) {
         List<JavaType.FullyQualified> types = getJavaStandardLibraryTypes();
         Map<String, List<JavaType.FullyQualified>> gavToTypes = new LinkedHashMap<>();
         for (Path path : classpath) {
             List<JavaType.FullyQualified> typesFromPath = typesFromPath(path, null);
 
             types.addAll(typesFromPath);
-            String gav = gavFromPath(path);
+            String gav = gavForPath.apply(path);
             if (gav != null) {
                 gavToTypes.put(gav, typesFromPath);
             }

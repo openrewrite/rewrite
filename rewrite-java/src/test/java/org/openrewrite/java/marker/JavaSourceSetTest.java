@@ -66,6 +66,28 @@ class JavaSourceSetTest {
           .containsExactly("net.bytebuddy.asm.Advice");
     }
 
+    @Test
+    void gavToTypesFromCallerSuppliedCoordinates() throws Exception {
+        // A relocated <localRepository>: nothing in the path says where the groupId starts
+        Path versionDir = tempDir.resolve("m2repo/org/example/lib/1.0");
+        Files.createDirectories(versionDir);
+        Path jar = versionDir.resolve("lib-1.0.jar");
+        try (JarOutputStream jos = new JarOutputStream(Files.newOutputStream(jar))) {
+            writeEntry(jos, "org/example/Lib.class", new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
+        }
+        assertThat(JavaSourceSet.build("main", List.of(jar)).getGavToTypes()).isEmpty();
+
+        JavaSourceSet jss = JavaSourceSet.build("main", List.of(jar), p -> "org.example:lib:1.0");
+
+        assertThat(jss.getGavToTypes().keySet()).containsExactly("org.example:lib:1.0");
+        assertThat(jss.getGavToTypes().get("org.example:lib:1.0"))
+          .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+          .containsExactly("org.example.Lib");
+        assertThat(jss.getClasspath())
+          .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+          .contains("org.example.Lib", "java.lang.String");
+    }
+
     private static void writeEntry(JarOutputStream jos, String name, byte[] content) throws java.io.IOException {
         JarEntry entry = new JarEntry(name);
         jos.putNextEntry(entry);
