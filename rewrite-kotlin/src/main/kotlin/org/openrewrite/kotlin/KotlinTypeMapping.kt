@@ -874,7 +874,7 @@ class KotlinTypeMapping(
                             resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)!!.fir
                         )
                     )
-                } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library) {
+                } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library || resolvedSymbol.origin == FirDeclarationOrigin.BuiltIns) {
                     if (resolvedSymbol.fir.containerSource is JvmPackagePartSource) {
                         val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
                         if (source != null) {
