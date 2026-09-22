@@ -414,8 +414,10 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 // type arguments still describe the parameterized type the author wrote.
                 if (psi is KtCallExpression && psi.valueArgumentList == null && psi.lambdaArguments.isEmpty() && psi.typeArgumentList != null)
                     ExpressionType.QUALIFIER
-                else
+                else if (fir.source?.psi !== psi)
                     null
+                else
+                    throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
             }
             is FirSafeCallExpression -> {
                 val selector = fir.selector

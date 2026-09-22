@@ -354,13 +354,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, PrintOutputCapture<P> p) {
-        visitSpace(parTree.getPrefix(), Space.Location.PARENTHESES_PREFIX, p);
-        visitParentheses(parTree.getParenthesizedType(), p);
-        return parTree;
-    }
-
-    @Override
     public J visitProperty(K.Property property, PrintOutputCapture<P> p) {
         beforeSyntax(property, KSpace.Location.PROPERTY_PREFIX, p);
 
@@ -1300,10 +1293,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(Extension.class).isPresent();
             List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
-            // LSTs carrying no marker are still deserialized, where more than one name means a destructuring pattern.
+            // More than one name is always a destructuring pattern, so the marker is not required to recognise one.
             boolean destructured = !containsTypeReceiver &&
                                    (variables.size() > 1 || multiVariable.getMarkers().findFirst(Destructured.class).isPresent());
-            // V1: Covers and unique case in `mapForLoop` of the KotlinParserVisitor caused by how the FirElement represents for loops.
             for (int i = 0; i < variables.size(); i++) {
                 JRightPadded<J.VariableDeclarations.NamedVariable> variable = variables.get(i);
                 beforeSyntax(variable.getElement(), Space.Location.VARIABLE_PREFIX, p);

@@ -2051,20 +2051,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             TypeTree name = (J.Identifier) expression.getCalleeExpression().accept(this, data);
             name = name.withType(mt != null ? mt.getReturnType() : JavaType.Unknown.getInstance());
             if (!expression.getTypeArguments().isEmpty()) {
-                List<KtTypeProjection> typeArguments = expression.getTypeArguments();
-                List<JRightPadded<Expression>> parameters = new ArrayList<>(typeArguments.size());
-                for (int i = 0; i < typeArguments.size(); i++) {
-                    KtTypeProjection ktTypeProjection = typeArguments.get(i);
-                    parameters.add(maybeTrailingComma(ktTypeProjection,
-                            padRight(convertToExpression(ktTypeProjection.accept(this, data)), suffix(ktTypeProjection)), i == typeArguments.size() - 1));
-                }
-
                 name = mapType(new J.ParameterizedType(
                         randomId(),
                         name.getPrefix(),
                         Markers.EMPTY,
                         name.withPrefix(Space.EMPTY),
-                        JContainer.build(prefix(expression.getTypeArgumentList()), parameters, Markers.EMPTY),
+                        mapTypeArguments(expression.getTypeArgumentList(), data),
                         type(expression)
                 ));
             }
@@ -3384,7 +3376,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (!modifiers.isEmpty()) {
             if (insideParentheses) {
                 modifiers = ListUtils.mapFirst(modifiers, mod -> mod.withPrefix(merge(prefix(typeReference.getModifierList()), mod.getPrefix())));
-            } else if (findFirstNonSpaceChild(typeReference) != null) {
+            } else {
                 modifiers = ListUtils.mapFirst(modifiers, mod -> mod.withPrefix(prefix(typeReference)));
                 consumedSpaces.add(findFirstPrefixSpace(typeReference));
             }
@@ -4133,7 +4125,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private static boolean isFirstNonSpaceChildLPAR(@Nullable PsiElement parent) {
         PsiElement first = findFirstNonSpaceChild(parent);
-        return first != null && first.getNode().getElementType() == KtTokens.LPAR;
+        return first != null && isLPAR(first);
     }
 
     private static boolean isLPAR(PsiElement element) {

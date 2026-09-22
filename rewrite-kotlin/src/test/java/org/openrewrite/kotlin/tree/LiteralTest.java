@@ -17,8 +17,12 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -188,6 +192,7 @@ class LiteralTest implements RewriteTest {
 
     @Test
     void integerLiteralArithmeticInUnresolvedCall() {
+        AtomicInteger asserted = new AtomicInteger();
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).variableDeclarations(false).build()),
           kotlin(
@@ -195,7 +200,25 @@ class LiteralTest implements RewriteTest {
             """
               val a = (-13).scaled
               val b = (10 * 8).scaled
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.Unary visitUnary(J.Unary unary, Integer p) {
+                        assertThat(unary.getType()).isEqualTo(JavaType.Primitive.Int);
+                        asserted.incrementAndGet();
+                        return super.visitUnary(unary, p);
+                    }
+
+                    @Override
+                    public J.Binary visitBinary(J.Binary binary, Integer p) {
+                        assertThat(binary.getType()).isEqualTo(JavaType.Primitive.Int);
+                        asserted.incrementAndGet();
+                        return super.visitBinary(binary, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted).hasValue(2);
+            })
           )
         );
     }

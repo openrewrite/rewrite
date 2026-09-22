@@ -18,9 +18,12 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -944,6 +947,7 @@ class MethodInvocationTest implements RewriteTest {
 
     @Test
     void typeArgumentsOnQualifier() {
+        AtomicBoolean asserted = new AtomicBoolean();
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).variableDeclarations(false).build()),
           kotlin(
@@ -952,7 +956,20 @@ class MethodInvocationTest implements RewriteTest {
               class A {
                   val h = Holder<Unit>.create(Unit)
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        if ("create".equals(method.getSimpleName())) {
+                            assertThat(method.getSelect()).isInstanceOf(J.ParameterizedType.class);
+                            asserted.set(true);
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted).isTrue();
+            })
           )
         );
     }
