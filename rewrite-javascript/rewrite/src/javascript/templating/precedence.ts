@@ -15,7 +15,7 @@
  */
 import {isTree} from '../..';
 import {emptySpace, J} from '../../java';
-import {emptyMarkers, Marker, markers} from '../../markers';
+import {emptyMarkers, Marker, markers, Markers} from '../../markers';
 import {randomId} from '../../uuid';
 import {JS} from '..';
 
@@ -319,9 +319,12 @@ export function requiredPrecedence(parent: J, childId: string): number | undefin
     return slotConstraints(parent, childId)?.precedence;
 }
 
-/** Parenthesizes `expression` if the slot of `parent` holding `childId` would otherwise reparse it. */
+/**
+ * Parenthesizes `expression` if the slot of `parent` holding `childId` would otherwise reparse it.
+ * `slotMarkers` are the markers the slot contributed; {@link parenthesize} says what they decide.
+ */
 export function maybeParenthesize(parent: J | undefined, childId: string, expression: J,
-                                  slotOwnsTrailingMarkers: boolean = false): J {
+                                  slotMarkers?: Markers): J {
     if (!parent) {
         return expression;
     }
@@ -334,10 +337,10 @@ export function maybeParenthesize(parent: J | undefined, childId: string, expres
     // A statement wrapper is transparent here: the parentheses belong around the expression
     if (expression.kind === JS.Kind.ExpressionStatement) {
         const inner = (expression as JS.ExpressionStatement).expression;
-        const wrapped = wrapIfNeeded(parent, childId, constraints, inner, slotOwnsTrailingMarkers);
+        const wrapped = wrapIfNeeded(parent, childId, constraints, inner, slotMarkers);
         return wrapped === inner ? expression : {...expression, expression: wrapped} as JS.ExpressionStatement;
     }
-    return wrapIfNeeded(parent, childId, constraints, expression, slotOwnsTrailingMarkers);
+    return wrapIfNeeded(parent, childId, constraints, expression, slotMarkers);
 }
 
 /** The nearest enclosing LST node in a cursor path, skipping the padding wrappers visitors push. */
@@ -352,18 +355,23 @@ export function enclosingTree(cursor: { value: any, parent?: any } | undefined):
     return undefined;
 }
 
-/** Wraps in `J.Parentheses`, moving the prefix out so the surrounding whitespace survives. */
-export function parenthesize(expression: J, slotOwnsTrailingMarkers: boolean = false): J.Parentheses<J> {
-    const trailing = slotOwnsTrailingMarkers ? expression.markers.markers.filter(isTrailingMarker) : [];
-    const inner = trailing.length === 0 ? expression : {
+/**
+ * Wraps in `J.Parentheses`, moving the prefix out so the surrounding whitespace survives. A trailing marker
+ * `slotMarkers` also carries belongs to the slot around the expression, so it moves out too: `${x}!` with `x`
+ * bound to `a + b` gives `(a + b)!`, while a bare `${x}` bound to `a!` gives `(a!)`.
+ */
+export function parenthesize(expression: J, slotMarkers?: Markers): J.Parentheses<J> {
+    const hoisted = expression.markers.markers.filter(
+        m => isTrailingMarker(m) && slotMarkers?.markers.some(slot => slot.kind === m.kind));
+    const inner = hoisted.length === 0 ? expression : {
         ...expression,
-        markers: markers(...expression.markers.markers.filter(m => !isTrailingMarker(m)))
+        markers: markers(...expression.markers.markers.filter(m => !hoisted.includes(m)))
     };
     return {
         kind: J.Kind.Parentheses,
         id: randomId(),
         prefix: expression.prefix,
-        markers: trailing.length === 0 ? emptyMarkers : markers(...trailing),
+        markers: hoisted.length === 0 ? emptyMarkers : markers(...hoisted),
         tree: {
             kind: J.Kind.RightPadded,
             element: {...inner, prefix: emptySpace},
@@ -374,7 +382,7 @@ export function parenthesize(expression: J, slotOwnsTrailingMarkers: boolean = f
 }
 
 function wrapIfNeeded(parent: J, childId: string, constraints: SlotConstraints, expression: J,
-                      slotOwnsTrailingMarkers: boolean): J {
+                      slotMarkers: Markers | undefined): J {
     if (precedenceOf(expression) < constraints.precedence ||
         (constraints.noCallShape && isCallShaped(expression)) ||
         (constraints.noOptionalChain && hasOptionalChain(expression)) ||
@@ -383,7 +391,7 @@ function wrapIfNeeded(parent: J, childId: string, constraints: SlotConstraints, 
         (constraints.followedByDot && isDotAdjacentNumber(expression)) ||
         mixesNullishWithLogical(parent, expression) ||
         wouldFuseSigns(parent, childId, expression)) {
-        return parenthesize(expression, slotOwnsTrailingMarkers);
+        return parenthesize(expression, slotMarkers);
     }
     return expression;
 }

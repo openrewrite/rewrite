@@ -16,6 +16,7 @@
 import {Checksum, FileAttributes, TreeKind} from "../tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./queue";
 import {
+    emptyMarkers,
     Markers,
     MarkersKind,
     MarkupDebug,
@@ -33,7 +34,7 @@ export * from "./queue";
 export * from "../reference";
 export {RewriteRpc} from "./rewrite-rpc";
 export {RpcRecipe, RpcVisitor} from "./recipe";
-export {prepareJavaRecipe} from "./java-recipe";
+export {DelegatingRecipe, prepareJavaRecipe} from "./java-recipe";
 export {registerVisitor} from "./request/visitor-registry";
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
@@ -76,10 +77,12 @@ RpcCodecs.registerCodec(TreeKind.FileAttributes, {
 
 RpcCodecs.registerCodec(MarkersKind.Markers, {
     async rpcReceive(before: Markers, q: RpcReceiveQueue): Promise<Markers> {
-        return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            markers: (await q.receiveList(before.markers))!,
-        });
+        const id = await q.receive(before.id);
+        const markers = (await q.receiveList(before.markers))!;
+        if (markers.length === 0) {
+            return emptyMarkers;
+        }
+        return updateIfChanged(before, {id, markers});
     },
 
     async rpcSend(after: Markers, q: RpcSendQueue): Promise<void> {

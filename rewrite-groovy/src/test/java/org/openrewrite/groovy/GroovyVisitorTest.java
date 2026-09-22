@@ -47,9 +47,7 @@ class GroovyVisitorTest implements RewriteTest {
               Test.test({ it })
               """,
             """
-              Test.test {
-                  it
-              }
+              Test.test { it }
               """
           )
         );

@@ -19,6 +19,7 @@ package rpc
 import (
 	"testing"
 	"unsafe"
+
 	"github.com/stretchr/testify/require"
 )
 

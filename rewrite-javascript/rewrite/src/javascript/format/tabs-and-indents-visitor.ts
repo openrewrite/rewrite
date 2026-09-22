@@ -44,6 +44,11 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         this.useTabCharacter = this.tabsAndIndentsStyle.useTabCharacter;
     }
 
+    /** Width of existing indent whitespace in the unit {@link indentString} takes, where a tab is one indent. */
+    private indentWidth(indent: string): number {
+        return [...indent].reduce((width, ch) => width + (ch === "\t" ? this.indentSize : 1), 0);
+    }
+
     private indentString(indent: number): string {
         if (this.useTabCharacter) {
             return "\t".repeat(Math.floor(indent / this.indentSize));
@@ -647,7 +652,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
                 const idx = ws.lastIndexOf('\n');
                 if (idx !== -1) {
                     anchorCursor = c;
-                    anchorIndent = ws.length - idx - 1;
+                    anchorIndent = this.indentWidth(ws.substring(idx + 1));
                 }
             }
 

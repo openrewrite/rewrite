@@ -16,6 +16,7 @@
 package org.openrewrite.python.service;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.python.tree.Py;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -76,8 +77,14 @@ class PythonRemoveImportVisitorTest {
     }
 
     @Test
-    void dispatchesForAWholeModuleRequestAgainstAFromImport() {
-        assertThat(mightChange("typing", null, cu(fromImport("typing", member("List"))))).isTrue();
+    void dispatchesForAWholeModuleRequestAgainstAModuleBinding() {
+        assertThat(mightChange("os.path", null,
+                cu(fromImport("os", member("path", null, JavaType.ShallowClass.build("os.path")))))).isTrue();
+    }
+
+    @Test
+    void skipsAWholeModuleRequestAgainstAMemberOfThatModule() {
+        assertThat(mightChange("typing", null, cu(fromImport("typing", member("List"))))).isFalse();
     }
 
     @Test

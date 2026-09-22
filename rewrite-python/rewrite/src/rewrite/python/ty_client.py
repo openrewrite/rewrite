@@ -27,8 +27,11 @@ import json
 import logging
 import os
 import queue
+import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -37,6 +40,23 @@ from typing import Any, Dict, Optional
 from .type_mapping import SessionTypeCache
 
 logger = logging.getLogger(__name__)
+
+# ty has only ever shipped Python 3 stubs.
+_TY_PYTHON_VERSION = re.compile(r'3\.\d+')
+
+
+def _ty_user_config_dir(python_version: str) -> str:
+    """A throwaway ``XDG_CONFIG_HOME`` holding a ty user config naming
+    ``python_version``. ty ranks a project's own ``ty.toml`` and
+    ``requires-python`` above it, so it only fills in versions ty cannot read
+    for itself, such as setuptools classifiers.
+    """
+    config_dir = tempfile.mkdtemp(prefix='ty-user-config-')
+    ty_dir = os.path.join(config_dir, 'ty')
+    os.mkdir(ty_dir)
+    with open(os.path.join(ty_dir, 'ty.toml'), 'w', encoding='utf-8') as f:
+        f.write('[environment]\npython-version = "%s"\n' % python_version)
+    return config_dir
 
 
 class TyTypesClient:
@@ -54,7 +74,8 @@ class TyTypesClient:
             result = client.get_types("/path/to/file.py")
     """
 
-    def __init__(self, virtual_env: Optional[str] = None):
+    def __init__(self, virtual_env: Optional[str] = None,
+                 python_version: Optional[str] = None):
         """Create a client and start the ``ty-types --serve`` subprocess.
 
         Args:
@@ -67,12 +88,20 @@ class TyTypesClient:
                 from the project's ``pyproject.toml`` so that supertypes reaching
                 into installed dependencies (e.g. ``class User(BaseModel)``)
                 resolve.
+            python_version: Optional Python version ("3.10") whose stdlib
+                surface ty resolves against, for projects declaring one
+                somewhere ty does not look. Non-3.x values are ignored.
         """
         self._process: Optional[subprocess.Popen] = None
         self._request_id: int = 0
         self._initialized = False
         self._project_root: Optional[str] = None
         self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
+        self._python_version: Optional[str] = (
+            python_version if python_version and _TY_PYTHON_VERSION.fullmatch(python_version)
+            else None
+        )
+        self._ty_config_dir: Optional[str] = None
 
         # Cumulative type table for the lifetime of this ``--serve`` session.
         #
@@ -114,16 +143,22 @@ class TyTypesClient:
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
 
+        if self._python_version is not None and self._ty_config_dir is None:
+            self._ty_config_dir = _ty_user_config_dir(self._python_version)
+
         try:
             self._process = subprocess.Popen(
                 [str(binary), '--serve'],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=self._subprocess_env(virtual_env=self._virtual_env),
+                env=self._subprocess_env(virtual_env=self._virtual_env,
+                                         ty_config_dir=self._ty_config_dir),
             )
         except FileNotFoundError:
             self._process = None
+            # No instance escapes the constructor to be shut down later.
+            self._discard_ty_config()
             raise RuntimeError(
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
@@ -164,7 +199,8 @@ class TyTypesClient:
     def _subprocess_env(base_env: Optional[Dict[str, str]] = None,
                         prefix: Optional[str] = None,
                         base_prefix: Optional[str] = None,
-                        virtual_env: Optional[str] = None) -> Dict[str, str]:
+                        virtual_env: Optional[str] = None,
+                        ty_config_dir: Optional[str] = None) -> Dict[str, str]:
         """Build the environment for the ty-types subprocess.
 
         ty-types resolves a project's third-party packages by discovering the
@@ -189,6 +225,10 @@ class TyTypesClient:
         are injectable to keep this unit-testable.
         """
         env = dict(os.environ if base_env is None else base_env)
+
+        # Where ty looks for its user config, per platform.
+        if ty_config_dir:
+            env['APPDATA' if os.name == 'nt' else 'XDG_CONFIG_HOME'] = ty_config_dir
 
         def _point_at(venv: str) -> None:
             env['VIRTUAL_ENV'] = venv
@@ -302,6 +342,23 @@ class TyTypesClient:
             self.java_types.clear()
             self._start_process()
 
+        if self._try_initialize(project_root):
+            return True
+
+        # ty rejects a version outside the range it ships stubs for by failing
+        # initialization outright, which costs the batch every type rather than
+        # only the version-gated ones. The version is a fallback, so trade it
+        # away. A timeout is no verdict on it, and retrying would pay it twice.
+        if self._python_version is not None and self._consecutive_timeouts == 0:
+            logger.debug("ty-types rejected python-version %s; retrying without it",
+                         self._python_version)
+            self._python_version = None
+            self.shutdown()
+            self._start_process()
+            return self._try_initialize(project_root)
+        return False
+
+    def _try_initialize(self, project_root: str) -> bool:
         # Bounded so a wedged ty degrades to untyped instead of hanging; large
         # because ty indexes the whole project up front.
         result = self._send_request("initialize", {"projectRoot": project_root},
@@ -313,7 +370,8 @@ class TyTypesClient:
         return False
 
     def get_types(self, file_path: str, timeout: float = 30,
-                  include_display: bool = False) -> Optional[Dict[str, Any]]:
+                  include_display: bool = False,
+                  include_bindings: bool = False) -> Optional[Dict[str, Any]]:
         """Get all node types for a Python file.
 
         Args:
@@ -322,12 +380,16 @@ class TyTypesClient:
                      Some files with recursive types can cause ty to hang.
             include_display: Whether to include display strings in type
                            descriptors (default False — uses structured data).
+            include_bindings: Whether each name and attribute reference carries the
+                           module and qualified name binding it. Costs roughly 10%
+                           inference time and 17% payload.
         """
         if not self._initialized:
             return None
         result = self._send_request(
             "getTypes",
-            {"file": file_path, "includeDisplay": include_display},
+            {"file": file_path, "includeDisplay": include_display,
+             "includeBindings": include_bindings},
             timeout=timeout,
         )
         if result:
@@ -351,6 +413,7 @@ class TyTypesClient:
         # Local: the "shutdown" request can trip the breaker, whose ``_kill`` detaches ``self._process``.
         process = self._process
         if process is None:
+            self._discard_ty_config()
             return
 
         try:
@@ -362,6 +425,7 @@ class TyTypesClient:
             self._process = None
             self._initialized = False
             self._project_root = None
+            self._discard_ty_config()
 
     def _kill(self) -> None:
         """Forcibly terminate an unresponsive ty-types process."""
@@ -369,8 +433,16 @@ class TyTypesClient:
         self._process = None
         self._initialized = False
         self._project_root = None
+        self._discard_ty_config()
         if process is not None:
             try:
                 process.kill()
             except OSError:
                 pass
+
+    def _discard_ty_config(self) -> None:
+        """Remove the throwaway user-config dir; ``_start_process`` rebuilds it
+        while a version is still in play."""
+        if self._ty_config_dir is not None:
+            shutil.rmtree(self._ty_config_dir, ignore_errors=True)
+            self._ty_config_dir = None

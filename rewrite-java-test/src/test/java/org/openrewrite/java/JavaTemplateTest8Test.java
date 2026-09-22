@@ -22,9 +22,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -706,7 +708,185 @@ class JavaTemplateTest8Test implements RewriteTest {
             """
               class Test {
                   void test() {
+                      int n = 1;
                       System.out.println(hashCode());
+                  }
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        // The coordinate names a statement that is not inside `scope`, so nothing can ever match it
+        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                if ("println".equals(method.getSimpleName())) {
+                    J.MethodDeclaration enclosing = getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class);
+                    Statement sibling = requireNonNull(enclosing.getBody()).getStatements().getFirst();
+                    return JavaTemplate.apply("0", getCursor(), sibling.getCoordinates().replace());
+                }
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("JavaTemplate coordinates were never matched")
+          .hasMessageContaining(J.VariableDeclarations.class.getName());
+    }
+
+    @Test
+    void coordinatesNestedInArgumentsAreReachable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("println".equals(method.getSimpleName()) && method.getArguments().getFirst() instanceof J.MethodInvocation) {
+                      return JavaTemplate.apply("0", getCursor(), method.getArguments().getFirst().getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test() {
+                      System.out.println(hashCode());
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      System.out.println(0);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchToAnIfThatHasNone() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  if (iff.getElsePart() != null) {
+                      return iff;
+                  }
+                  return JavaTemplate.apply("if (true) {\n}", getCursor(), iff.getCoordinates().addElseBranch());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else if (true) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchExtendsAnExistingChain() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  // Only the head of the chain, and only while it still falls through to a plain else
+                  if (getCursor().getParentTreeCursor().getValue() instanceof J.If.Else ||
+                      iff.getElsePart() == null || !(iff.getElsePart().getBody() instanceof J.Block)) {
+                      return super.visitIf(iff, ctx);
+                  }
+                  return JavaTemplate.apply("if (true) {\n}", getCursor(), iff.getCoordinates().addElseBranch());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else {
+                          System.out.println(n);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else if (true) {
+                      } else {
+                          System.out.println(n);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchWithABlockMakesAPlainElse() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  if (iff.getElsePart() != null) {
+                      return iff;
+                  }
+                  return JavaTemplate.apply("{\n    System.out.println(\"fallthrough\");\n}", getCursor(),
+                    iff.getCoordinates().addElseBranch());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else {
+                          System.out.println("fallthrough");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addElseBranchRejectsANonIfWhenAnElseAlreadyExists() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  void test(int n) {
+                      if (n == 1) {
+                      } else {
+                      }
                   }
               }
               """
@@ -717,17 +897,13 @@ class JavaTemplateTest8Test implements RewriteTest {
 
         assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                if ("println".equals(method.getSimpleName())) {
-                    // The argument is nested inside `method`, which the template visitor never descends into
-                    return JavaTemplate.apply("0", getCursor(), method.getArguments().getFirst().getCoordinates().replace());
-                }
-                return super.visitMethodInvocation(method, p);
+            public J.If visitIf(J.If iff, Integer p) {
+                return JavaTemplate.apply("{\n}", getCursor(), iff.getCoordinates().addElseBranch());
             }
         }.visit(cu, 0))
           .rootCause()
-          .isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining("JavaTemplate coordinates were never matched")
-          .hasMessageContaining(J.MethodInvocation.class.getName());
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("requires a template that produces an `if`");
     }
+
 }

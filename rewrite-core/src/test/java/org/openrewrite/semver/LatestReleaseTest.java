@@ -239,6 +239,33 @@ class LatestReleaseTest {
     }
 
     @Test
+    void backpatchIsAsMuchAReleaseAsTheVersionItPatches() {
+        assertThat(latestRelease.isValid(null, "2.14.1.1-osera-00001")).isTrue();
+        assertThat(latestRelease.isValid(null, "2.14.1.1-backpatch-00001")).isTrue();
+        assertThat(latestRelease.isValid(null, "5.2.19.RELEASE-osera-00001")).isTrue();
+        assertThat(latestRelease.isValid(null, "3.2.9.Final-backpatch-00001")).isTrue();
+
+        assertThat(latestRelease.isValid(null, "3.5.0-RC1-osera-00001")).isFalse();
+        assertThat(latestRelease.isValid(null, "29.0-jre-osera-00001")).isFalse();
+        assertThat(new LatestRelease("-jre").isValid(null, "29.0-jre-osera-00001")).isTrue();
+        assertThat(new LatestRelease("-osera-\\d+").isValid(null, "2.14.1.1-backpatch-00001")).isFalse();
+
+        assertThat(latestRelease.isValid(null, "2.14.1.1-acme-00001")).isFalse();
+    }
+
+    @Test
+    void backpatchSortsAboveTheVersionItPatchesAndBelowTheNextRelease() {
+        assertThat(latestRelease.compare(null, "2.14.1.1-osera-00001", "2.14.1")).isPositive();
+        assertThat(latestRelease.compare(null, "2.14.1.1-osera-00001", "2.14.2")).isNegative();
+        assertThat(latestRelease.compare(null, "2.14.1.1-osera-00001", "2.14.1.1-osera-00002")).isNegative();
+
+        assertThat(latestRelease.compare(null, "5.2.19.RELEASE-osera-00001", "5.2.19.RELEASE")).isPositive();
+        assertThat(latestRelease.compare(null, "5.2.19.RELEASE-osera-00001", "5.2.20.RELEASE")).isNegative();
+        assertThat(latestRelease.compare(null, "5.2.19.RELEASE-osera-00001", "5.2.19.RELEASE-osera-00002")).isNegative();
+        assertThat(latestRelease.compare(null, "4.1.Final-backpatch-00001", "4.1.Final-backpatch-00002")).isNegative();
+    }
+
+    @Test
     void preReleaseVersionsShouldBeLessThanReleaseVersions() {
         assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0")).isLessThan(0);
         assertThat(latestRelease.compare(null, "3.5.0", "3.5.0-RC1")).isGreaterThan(0);

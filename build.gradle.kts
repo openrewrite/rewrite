@@ -15,6 +15,18 @@ allprojects {
 }
 
 subprojects {
+    // The shared build plugin requests the JUnit BOM as a `6.+` range, which a snapshot in a
+    // developer's local Maven repository satisfies. No snapshot carries `junit-platform-suite-*`,
+    // which several integTest suites need, so selecting one leaves them unresolvable.
+    // `latest.release` would exclude snapshots; a range cannot, so the candidate is filtered out.
+    configurations.matching { it.name.startsWith("integTest") }.configureEach {
+        resolutionStrategy.componentSelection.all {
+            if (candidate.group.startsWith("org.junit") && candidate.version.endsWith("-SNAPSHOT")) {
+                reject("no JUnit snapshot carries every artifact an integTest suite needs")
+            }
+        }
+    }
+
     tasks.withType<JavaExec>().configureEach {
         if (name == "generateAntlrSources") {
             doLast {

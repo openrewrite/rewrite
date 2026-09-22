@@ -18,8 +18,17 @@ package org.openrewrite.csharp.rpc;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.nio.file.Path;
+
 @Value
 public class InstallRecipesResponse {
     int recipesInstalled;
     @Nullable String version;
+
+    /**
+     * Where a NuGet bundle's publish output landed. Passing it to
+     * {@link CSharpRewriteRpc#installRecipes(java.io.File)} on a later server instance loads
+     * the bundle again without a registry. Null for a loose assembly.
+     */
+    @Nullable Path publishDir;
 }

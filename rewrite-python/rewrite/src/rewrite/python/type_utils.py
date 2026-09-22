@@ -21,6 +21,8 @@ commonly need:
 * :func:`is_assignable_to` — is a value of ``from_`` assignable to ``to``
   (a fully-qualified name *or* a :class:`JavaType`), walking the supertype and
   interface hierarchy.
+* :func:`is_of_type_with_name` — the same hierarchy walk against a name
+  predicate, for callers matching by pattern rather than by exact name.
 * :func:`is_of_type` — exact structural type equality.
 * :func:`is_of_class_type` — does a type match a given fully-qualified name.
 
@@ -30,10 +32,13 @@ qualified name.
 """
 
 
+from collections.abc import Callable
+
 from rewrite.java.support_types import JavaType
 
 __all__ = [
     "is_assignable_to",
+    "is_of_type_with_name",
     "is_of_type",
     "is_of_class_type",
     "is_string",
@@ -163,6 +168,49 @@ def is_of_type(type1: JavaType | None, type2: JavaType | None) -> bool:
     return False
 
 
+def is_of_type_with_name(
+    type_: JavaType | None,
+    match_overrides: bool,
+    matcher: Callable[[str], bool],
+) -> bool:
+    """True if ``matcher`` accepts the name of ``type_``, or — when
+    ``match_overrides`` is set — the name of any of its supertypes.
+
+    Ports ``TypeUtils.isOfTypeWithName``; a pattern naming ``object`` matches
+    any type, as ty's mapped supertype chains stop short of the implicit root.
+    """
+    return _is_of_type_with_name(type_, match_overrides, matcher, set())
+
+
+def _is_of_type_with_name(
+    type_: JavaType | None,
+    match_overrides: bool,
+    matcher: Callable[[str], bool],
+    seen: set[int],
+) -> bool:
+    fq = as_fully_qualified(type_)
+    # The type mapping resolves recursive references through placeholders it
+    # back-fills, so a hierarchy can lead back to a type already on this walk.
+    if fq is None or id(fq) in seen:
+        return False
+    seen.add(id(fq))
+    if matcher(fq.fully_qualified_name):
+        return True
+    if match_overrides:
+        # Only ty's spelling of the root short-circuits. A glob can cover a
+        # root name incidentally — ``builtins.*`` matches ``builtins.object``
+        # — so accepting the other ``_OBJECT_NAMES`` spellings here would
+        # make such a pattern match every type.
+        if matcher("object"):
+            return True
+        if _is_of_type_with_name(fq.supertype, True, matcher, seen):
+            return True
+        for interface in fq.interfaces:
+            if _is_of_type_with_name(interface, True, matcher, seen):
+                return True
+    return False
+
+
 def is_assignable_to(to: str | JavaType, from_: JavaType | None) -> bool:
     """True if a value of type ``from_`` can be assigned to ``to``.
 
@@ -180,14 +228,10 @@ def is_assignable_to(to: str | JavaType, from_: JavaType | None) -> bool:
 
 def _is_assignable_to_fqn(to: str, from_: JavaType | None) -> bool:
     if isinstance(from_, JavaType.FullyQualified) and not isinstance(from_, JavaType.Unknown):
-        if fully_qualified_names_are_equal(to, _fqn(from_)):
+        if is_of_type_with_name(
+            from_, True, lambda name: fully_qualified_names_are_equal(to, name)
+        ):
             return True
-        if _is_assignable_to_fqn(to, getattr(from_, "_supertype", None)):
-            return True
-        for i in getattr(from_, "_interfaces", None) or []:
-            if _is_assignable_to_fqn(to, i):
-                return True
-        return False
     elif isinstance(from_, JavaType.GenericTypeVariable):
         for bound in from_.bounds:
             if _is_assignable_to_fqn(to, bound):
