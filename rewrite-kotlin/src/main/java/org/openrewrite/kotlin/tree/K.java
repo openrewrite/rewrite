@@ -888,6 +888,112 @@ public interface K extends J {
         }
     }
 
+    /**
+     * The parenthesized entries of a destructuring pattern, as in {@code val (a: Int, b) = pair}, occupying the
+     * declarator slot of the single {@link J.VariableDeclarations.NamedVariable} that the pattern declares.
+     * Each entry is a declaration of its own so that it can carry a type.
+     */
+    @SuppressWarnings("unused")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DestructuringPattern implements K, Expression, TypedTree, VariableDeclarator {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        JContainer<J.VariableDeclarations> variables;
+
+        public List<J.VariableDeclarations> getVariables() {
+            return variables.getElements();
+        }
+
+        public DestructuringPattern withVariables(List<J.VariableDeclarations> variables) {
+            return getPadding().withVariables(JContainer.withElements(this.variables, variables));
+        }
+
+        @Override
+        public List<J.Identifier> getNames() {
+            List<J.Identifier> names = new ArrayList<>(variables.getElements().size());
+            for (J.VariableDeclarations variable : variables.getElements()) {
+                for (J.VariableDeclarations.NamedVariable namedVariable : variable.getVariables()) {
+                    names.addAll(namedVariable.getDeclarator().getNames());
+                }
+            }
+            return names;
+        }
+
+        @Getter
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitDestructuringPattern(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DestructuringPattern t;
+
+            public JContainer<J.VariableDeclarations> getVariables() {
+                return t.variables;
+            }
+
+            public DestructuringPattern withVariables(JContainer<J.VariableDeclarations> variables) {
+                return t.variables == variables ? t : new DestructuringPattern(t.id, t.prefix, t.markers, variables, t.type);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
+    }
+
+    /**
+     * @deprecated A destructuring declaration is a {@link J.VariableDeclarations} whose single
+     * {@link J.VariableDeclarations.NamedVariable} has a {@link DestructuringPattern} declarator. Retained so that
+     * LSTs written before that shape remain readable.
+     */
+    @Deprecated
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

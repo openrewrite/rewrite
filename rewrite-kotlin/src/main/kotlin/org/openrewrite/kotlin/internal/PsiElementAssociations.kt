@@ -409,6 +409,16 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     else -> throw UnsupportedOperationException("Unsupported resolved symbol: ${fir.calleeReference.resolved?.resolvedSymbol?.javaClass}")
                 }
             }
+            is FirPropertyAccessExpression -> {
+                // `X<T>.m()` is not valid Kotlin, so FIR resolves the qualifier as a property access; the
+                // type arguments still describe the parameterized type the author wrote.
+                if (psi is KtCallExpression && psi.valueArgumentList == null && psi.lambdaArguments.isEmpty() && psi.typeArgumentList != null)
+                    ExpressionType.QUALIFIER
+                else if (fir.source?.psi !== psi)
+                    null
+                else
+                    throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+            }
             is FirSafeCallExpression -> {
                 val selector = fir.selector
                 when (selector) {
