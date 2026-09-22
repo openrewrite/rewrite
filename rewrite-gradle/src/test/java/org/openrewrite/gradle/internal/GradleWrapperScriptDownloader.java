@@ -23,7 +23,6 @@ import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.remote.Remote;
-import org.openrewrite.semver.LatestRelease;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -70,7 +69,7 @@ public class GradleWrapperScriptDownloader {
 
         // Write versions.csv once at the end
         List<String> sortedVersions = new ArrayList<>(allVersions.keySet());
-        sortedVersions.sort(new LatestRelease(null).reversed());
+        sortedVersions.sort(Comparator.comparing(GradleVersion::version).thenComparing(Comparator.naturalOrder()).reversed());
         try (BufferedWriter writer = Files.newBufferedWriter(WRAPPER_SCRIPTS.resolve("versions.csv"))) {
             writer.write("version,gradlew,gradlewBat\n");
             for (String sortedVersion : sortedVersions) {
