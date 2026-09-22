@@ -154,7 +154,10 @@ public class LatestRelease implements VersionComparator {
             return Integer.compare(v1Prio, v2Prio);
         }
 
-        // Both are either pre-release or release versions, do string comparison
+        int identifierCompare = compareNaturally(normalized1, normalized2);
+        if (identifierCompare != 0) {
+            return identifierCompare;
+        }
         int normalizedCompare = normalized1.compareTo(normalized2);
         if (normalizedCompare != 0) {
             return normalizedCompare;
@@ -169,6 +172,55 @@ public class LatestRelease implements VersionComparator {
             return nv1.compareTo(nv2);
         }
         return 0;
+    }
+
+    private static int compareNaturally(String v1, String v2) {
+        int i1 = 0;
+        int i2 = 0;
+        while (i1 < v1.length() && i2 < v2.length()) {
+            if (isAsciiDigit(v1.charAt(i1)) && isAsciiDigit(v2.charAt(i2))) {
+                int end1 = digitRunEnd(v1, i1);
+                int end2 = digitRunEnd(v2, i2);
+                int c = compareDigitRuns(v1, i1, end1, v2, i2, end2);
+                if (c != 0) {
+                    return c;
+                }
+                i1 = end1;
+                i2 = end2;
+            } else {
+                int c = Character.compare(Character.toLowerCase(v1.charAt(i1++)), Character.toLowerCase(v2.charAt(i2++)));
+                if (c != 0) {
+                    return c;
+                }
+            }
+        }
+        return Boolean.compare(i1 < v1.length(), i2 < v2.length());
+    }
+
+    private static int compareDigitRuns(String v1, int start1, int end1, String v2, int start2, int end2) {
+        while (start1 < end1 - 1 && v1.charAt(start1) == '0') {
+            start1++;
+        }
+        while (start2 < end2 - 1 && v2.charAt(start2) == '0') {
+            start2++;
+        }
+        int c = Integer.compare(end1 - start1, end2 - start2);
+        for (int i = 0; c == 0 && i < end1 - start1; i++) {
+            c = Character.compare(v1.charAt(start1 + i), v2.charAt(start2 + i));
+        }
+        return c;
+    }
+
+    private static int digitRunEnd(String v, int start) {
+        int i = start;
+        while (i < v.length() && isAsciiDigit(v.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    private static boolean isAsciiDigit(char c) {
+        return c >= '0' && c <= '9';
     }
 
     private static boolean bothMatchMetadata(String nv1, String nv2, String metadataPattern) {
