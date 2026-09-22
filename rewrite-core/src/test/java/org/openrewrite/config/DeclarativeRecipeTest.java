@@ -138,6 +138,28 @@ class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
+    void laterInitializationDoesNotUndoAnEarlierOne() {
+        var nested = new DeclarativeRecipe("org.example.Nested", "Nested", "Test.", emptySet(),
+          null, URI.create("dummy"), false, emptyList());
+        nested.addUninitialized("org.openrewrite.text.ChangeText");
+        ChangeText resolved = new ChangeText("2");
+        nested.initialize(key -> "org.openrewrite.text.ChangeText".equals(key) ? resolved : null);
+
+        var outer = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("dummy"), false, emptyList());
+        outer.addUninitialized(nested);
+        outer.initialize(key -> null);
+        nested.initialize(key -> null);
+
+        assertThat(nested.getRecipeList())
+          .as("neither the outer recipe's resolver nor a direct call can see the entry, " +
+              "so resolving again would drop it")
+          .containsExactly(resolved);
+        assertThat(outer.validateAll())
+          .allSatisfy(validated -> assertThat(validated.isValid()).isTrue());
+    }
+
+    @Test
     void uninitializedFailsValidation() {
         var dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
           null, URI.create("dummy"), true, emptyList());

@@ -85,6 +85,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     @JsonIgnore
     private Validated<Object> initValidation = Validated.none();
 
+    @JsonIgnore
+    private volatile boolean initialized;
+
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return estimatedEffortPerOccurrence == null ? Duration.ofMinutes(0) :
@@ -94,9 +97,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public void initialize(Collection<Recipe> availableRecipes) {
         Map<String, Recipe> recipeMap = new HashMap<>();
         availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
-        Set<String> initializingRecipes = new HashSet<>();
-        recipeList = initialize(uninitializedRecipes, recipeMap::get, initializingRecipes);
-        preconditions = initialize(uninitializedPreconditions, recipeMap::get, initializingRecipes);
+        initialize(recipeMap::get);
     }
 
     @Deprecated
@@ -106,9 +107,13 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     public void initialize(Function<String, @Nullable Recipe> availableRecipes) {
+        if (initialized) {
+            return;
+        }
         Set<String> initializingRecipes = new HashSet<>();
         recipeList = initialize(uninitializedRecipes, availableRecipes, initializingRecipes);
         preconditions = initialize(uninitializedPreconditions, availableRecipes, initializingRecipes);
+        initialized = true;
     }
 
     @Deprecated
@@ -149,6 +154,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,
                                              Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
         String recipeName = declarativeRecipe.getName();
+        if (declarativeRecipe.initialized) {
+            return;
+        }
         if (initializingRecipes.contains(recipeName)) {
             // Cycle detected - throw exception to fail fast
             String cycle = String.join(" -> ", initializingRecipes) + " -> " + recipeName;
@@ -158,6 +166,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             initializingRecipes.add(recipeName);
             declarativeRecipe.recipeList = initialize(declarativeRecipe.uninitializedRecipes, availableRecipes, initializingRecipes);
             declarativeRecipe.preconditions = initialize(declarativeRecipe.uninitializedPreconditions, availableRecipes, initializingRecipes);
+            declarativeRecipe.initialized = true;
             initializingRecipes.remove(recipeName);
         }
     }
@@ -578,6 +587,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         copy.preconditions = source.preconditions;
         copy.validation = source.validation;
         copy.initValidation = source.initValidation;
+        copy.initialized = source.initialized;
         return copy;
     }
 
