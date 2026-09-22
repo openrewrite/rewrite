@@ -725,6 +725,10 @@ class NativeLockEngineTest {
 
     @Test
     void overridesOutsideDeclaredDependenciesFailsLoud() {
+        // No registry is stubbed here, so the whole-closure fallback in resolveAndPatch cannot run: its
+        // packument fetch 404s and the NodeRegistryException is swallowed back into this per-dependency
+        // deferral. The deferral asserted below is therefore the unreachable-registry path, not proof
+        // that an override defers in general -- see overrideOfALockedTransitiveMustNotSilentlySucceed.
         Result result = regen(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"1.0.0\"}}",
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"2.0.0\"}}",
@@ -733,6 +737,50 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         assertThat(result.getFailure().getDetail()).contains("outside declared dependencies");
+    }
+
+    /**
+     * The whole-closure resolver reads only declared dependencies, so it recomputes the identical
+     * closure and reports success over a lock that still pins the old version.
+     */
+    @Test
+    void overrideOfALockedTransitiveMustNotSilentlySucceed() {
+        routes.put("https://registry.npmjs.org/lodash",
+                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{\"tslib\":\"^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\"," +
+                        "\"integrity\":\"sha512-LODASH\"}}");
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/1.0.0",
+                "{\"name\":\"tslib\",\"version\":\"1.0.0\"," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\"," +
+                        "\"integrity\":\"sha512-TSLIB1\"}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\"," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\"," +
+                        "\"integrity\":\"sha512-TSLIB2\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib\":\"^2.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20"}},
+                    "node_modules/lodash": {"version": "4.17.20", "dependencies": {"tslib": "^1.0.0"}},
+                    "node_modules/tslib": {"version": "1.0.0"}
+                  }
+                }
+                """);
+
+        // Honoring the override or deferring are both defensible; claiming success is not.
+        assertThat(result.isSuccess() && result.getLockFileContent().contains("\"version\": \"1.0.0\""))
+                .as("must not report success while the lock still pins the overridden transitive")
+                .isFalse();
     }
 
     @Test
