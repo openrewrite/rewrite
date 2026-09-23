@@ -214,7 +214,7 @@ class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
     @Test
     void aRefusedOverrideChangesNothing() {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("is-number", "^7.0.0", "is-odd")).executionContext(ctx),
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("is-number", "^7.0.0", "a>is-odd")).executionContext(ctx),
                 packageJson(
                         """
                         {
@@ -225,7 +225,7 @@ class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
                         }
                         """,
                         """
-                        /*~~(lock regeneration failed: RESOLUTION_REQUIRED [is-odd]: nested override of is-odd is not supported)~~>*/{
+                        /*~~(lock regeneration failed: RESOLUTION_REQUIRED [a]: override nested under a is not supported)~~>*/{
                           "name": "npm-transitive-override",
                           "dependencies": {
                             "is-odd": "3.0.1"
@@ -245,12 +245,127 @@ class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
                         }
                         """,
                         """
-                        /*~~(lock regeneration failed: RESOLUTION_REQUIRED [is-odd]: nested override of is-odd is not supported)~~>*/{
+                        /*~~(lock regeneration failed: RESOLUTION_REQUIRED [a]: override nested under a is not supported)~~>*/{
                           "name": "npm-transitive-override",
                           "lockfileVersion": 3,
                           "packages": {
                             "": {"name": "npm-transitive-override", "dependencies": {"is-odd": "3.0.1"}},
                             "node_modules/is-odd": {"version": "3.0.1"}
+                          }
+                        }
+                        """,
+                        s -> s.noTrim())
+        );
+    }
+
+    @Test
+    void npmScopedOverrideRegeneratesLock() {
+        routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/transitive-override/http/is-odd-3.0.1"));
+        routes.put("https://registry.npmjs.org/is-number", resource("lock/npm/transitive-override/http/is-number"));
+        routes.put("https://registry.npmjs.org/is-number/6.0.0", resource("lock/npm/transitive-override/http/is-number-6.0.0"));
+        routes.put("https://registry.npmjs.org/is-number/7.0.0", resource("lock/npm/transitive-override/http/is-number-7.0.0"));
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("is-number", "^7.0.0", "is-odd")).executionContext(ctx),
+                packageJson(
+                        """
+                        {
+                          "name": "npm-transitive-override",
+                          "version": "1.0.0",
+                          "dependencies": {
+                            "is-odd": "3.0.1"
+                          }
+                        }
+                        """,
+                        """
+                        {
+                          "name" : "npm-transitive-override",
+                          "version" : "1.0.0",
+                          "dependencies" : {
+                            "is-odd" : "3.0.1"
+                          },
+                          "overrides" : {
+                            "is-odd" : {
+                              "is-number" : "^7.0.0"
+                            }
+                          }
+                        }
+                        """,
+                        isOddBringingIsNumber6()),
+                packageLock(
+                        """
+                        {
+                          "name": "npm-transitive-override",
+                          "version": "1.0.0",
+                          "lockfileVersion": 3,
+                          "requires": true,
+                          "packages": {
+                            "": {
+                              "name": "npm-transitive-override",
+                              "version": "1.0.0",
+                              "dependencies": {
+                                "is-odd": "3.0.1"
+                              }
+                            },
+                            "node_modules/is-number": {
+                              "version": "6.0.0",
+                              "resolved": "https://registry.npmjs.org/is-number/-/is-number-6.0.0.tgz",
+                              "integrity": "sha512-Wu1VHeILBK8KAWJUAiSZQX94GmOE45Rg6/538fKwiloUu21KncEkYGPqob2oSZ5mUT73vLGrHQjKw3KMPwfDzg==",
+                              "license": "MIT",
+                              "engines": {
+                                "node": ">=0.10.0"
+                              }
+                            },
+                            "node_modules/is-odd": {
+                              "version": "3.0.1",
+                              "resolved": "https://registry.npmjs.org/is-odd/-/is-odd-3.0.1.tgz",
+                              "integrity": "sha512-CQpnWPrDwmP1+SMHXZhtLtJv90yiyVfluGsX5iNCVkrhQtU3TQHsUWPG9wkdk9Lgd5yNpAg9jQEo90CBaXgWMA==",
+                              "license": "MIT",
+                              "dependencies": {
+                                "is-number": "^6.0.0"
+                              },
+                              "engines": {
+                                "node": ">=4"
+                              }
+                            }
+                          }
+                        }
+                        """,
+                        """
+                        {
+                          "name": "npm-transitive-override",
+                          "version": "1.0.0",
+                          "lockfileVersion": 3,
+                          "requires": true,
+                          "packages": {
+                            "": {
+                              "name": "npm-transitive-override",
+                              "version": "1.0.0",
+                              "dependencies": {
+                                "is-odd": "3.0.1"
+                              }
+                            },
+                            "node_modules/is-number": {
+                              "version": "7.0.0",
+                              "resolved": "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz",
+                              "integrity": "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==",
+                              "license": "MIT",
+                              "engines": {
+                                "node": ">=0.12.0"
+                              }
+                            },
+                            "node_modules/is-odd": {
+                              "version": "3.0.1",
+                              "resolved": "https://registry.npmjs.org/is-odd/-/is-odd-3.0.1.tgz",
+                              "integrity": "sha512-CQpnWPrDwmP1+SMHXZhtLtJv90yiyVfluGsX5iNCVkrhQtU3TQHsUWPG9wkdk9Lgd5yNpAg9jQEo90CBaXgWMA==",
+                              "license": "MIT",
+                              "dependencies": {
+                                "is-number": "^6.0.0"
+                              },
+                              "engines": {
+                                "node": ">=4"
+                              }
+                            }
                           }
                         }
                         """,

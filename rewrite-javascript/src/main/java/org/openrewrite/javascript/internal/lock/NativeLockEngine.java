@@ -249,9 +249,11 @@ public final class NativeLockEngine {
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
+        Map<String, String> scopedParent = new LinkedHashMap<>();
         ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock),
-                        declaredOverrides(PackageManager.Npm, editedPackageJson))
+                        declaredOverrides(PackageManager.Npm, editedPackageJson, scopedParent))
                 .build(singletonMap("", editedPackageJson));
+        requireScopeHolds(graph, scopedParent);
         List<LockEditSet.PackageEdit> edits = NpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Npm, packageJsonPath),
                 PackageManager.Npm, editedPackageJson, edits);
@@ -267,7 +269,7 @@ public final class NativeLockEngine {
                                                    NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBerry(existingLock),
-                        declaredOverrides(PackageManager.YarnBerry, editedPackageJson))
+                        declaredOverrides(PackageManager.YarnBerry, editedPackageJson, new LinkedHashMap<>()))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
         for (LockEditSet.PackageEdit edit : edits) {
@@ -310,7 +312,7 @@ public final class NativeLockEngine {
                                                      NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsYarnClassic(existingLock),
-                        declaredOverrides(PackageManager.YarnClassic, editedPackageJson))
+                        declaredOverrides(PackageManager.YarnClassic, editedPackageJson, new LinkedHashMap<>()))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnClassic, packageJsonPath),
@@ -346,7 +348,7 @@ public final class NativeLockEngine {
                                               NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsPnpm(existingLock),
-                        declaredOverrides(PackageManager.Pnpm, editedPackageJson))
+                        declaredOverrides(PackageManager.Pnpm, editedPackageJson, new LinkedHashMap<>()))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = PnpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Pnpm, packageJsonPath),
@@ -381,7 +383,7 @@ public final class NativeLockEngine {
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock),
-                        declaredOverrides(PackageManager.Bun, editedPackageJson))
+                        declaredOverrides(PackageManager.Bun, editedPackageJson, new LinkedHashMap<>()))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),
@@ -400,7 +402,8 @@ public final class NativeLockEngine {
      * and yarn {@code "express/accepts"}. {@link PackageJsonOverrides#parsePath} already separates those from a
      * scoped name like {@code "@types/node"}, so reuse it rather than testing for {@code '/'}.
      */
-    private static Map<String, String> declaredOverrides(PackageManager pm, String manifestJson) {
+    private static Map<String, String> declaredOverrides(PackageManager pm, String manifestJson,
+                                                         Map<String, String> scopedParent) {
         try {
             JsonNode root = JSON.readTree(manifestJson);
             JsonNode node = pm == PackageManager.Pnpm ?
@@ -424,9 +427,27 @@ public final class NativeLockEngine {
                 Map.Entry<String, JsonNode> f = fields.next();
                 String key = f.getKey();
                 JsonNode value = f.getValue();
+                if (value.isObject()) {
+                    // One level of nesting, {"parent": {"child": range}}, is what a dependencyPath run writes.
+                    // It is applied globally and the equivalence is proved afterwards by requireScopeHolds:
+                    // if the parent is the only thing requiring the child, scoping changes nothing. Deeper
+                    // nesting stays refused.
+                    Iterator<Map.Entry<String, JsonNode>> inner = value.fields();
+                    while (inner.hasNext()) {
+                        Map.Entry<String, JsonNode> c = inner.next();
+                        if (!c.getValue().isTextual() || c.getValue().asText().startsWith("$") ||
+                                PackageJsonOverrides.parsePath(c.getKey()).size() > 1) {
+                            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                                    "override nested under " + key + " is not supported");
+                        }
+                        overrides.put(c.getKey(), c.getValue().asText());
+                        scopedParent.put(c.getKey(), key);
+                    }
+                    continue;
+                }
                 if (!value.isTextual()) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
-                            "nested override of " + key + " is not supported");
+                            "override of " + key + " is not a version range");
                 }
                 if (value.asText().startsWith("$")) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
@@ -445,6 +466,31 @@ public final class NativeLockEngine {
             // parsePath rejects malformed keys by throwing; a raw exception here would escape as a recipe crash
             // rather than the warning the caller turns a failure into.
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest overrides");
+        }
+    }
+
+    /**
+     * A nested override is scoped to one parent, but it was applied to the whole closure. That is only the same
+     * answer when the parent is the sole requirer, so prove it: any other requirer, or a direct declaration,
+     * would have kept its own version and needed a second copy this engine does not place.
+     */
+    private static void requireScopeHolds(ResolutionGraph graph, Map<String, String> scopedParent) {
+        for (Map.Entry<String, String> e : scopedParent.entrySet()) {
+            String child = e.getKey();
+            String parent = e.getValue();
+            for (ResolutionGraph.Importer importer : graph.getImporters()) {
+                if (importer.getResolved().containsKey(child)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, child,
+                            "override of " + child + " scoped to " + parent + " also applies to it as a direct dependency");
+                }
+            }
+            for (ResolvedNode n : graph.getNodes().values()) {
+                if (n.getResolvedEdges().containsKey(child) && !parent.equals(n.getManifest().getName())) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, child,
+                            "override of " + child + " scoped to " + parent + " but " +
+                                    n.getManifest().getName() + " also requires it");
+                }
+            }
         }
     }
 

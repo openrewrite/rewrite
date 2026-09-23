@@ -783,15 +783,16 @@ class NativeLockEngineTest {
                 .isFalse();
     }
 
+    /** One level of nesting is applied; anything deeper the resolver cannot express. */
     @Test
-    void nestedOverrideFailsLoud() {
+    void deeplyNestedOverrideFailsLoud() {
         Result result = regen(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":{\"b\":\"1.0.0\"}}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":{\"b\":{\"c\":\"1.0.0\"}}}}",
                 npmLock("4.17.20"));
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("nested override");
+        assertThat(result.getFailure().getDetail()).contains("override nested under a");
     }
 
     /**

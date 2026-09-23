@@ -162,9 +162,40 @@ public final class PackageJsonOverrides {
             return setFlatEntry(doc, "overrides", packageName, newVersion);
         }
 
+        // The reparse below rebuilds the whole document, so without this the entry is rewritten on every cycle
+        // and the recipe never stabilises. Same guard setFlatEntry applies to the un-nested case.
+        if (newVersion.equals(nestedOverrideValue(doc, path, packageName))) {
+            return doc;
+        }
+
         // Deep-nested case: build nested JSON string and reparse
         String overrideValue = buildNpmNestedOverride(packageName, newVersion, path);
         return mergeTopLevelObjectReparse(doc, "overrides", overrideValue);
+    }
+
+    /** The value {@code overrides} already holds at {@code path -> packageName}, or {@code null}. */
+    private static @Nullable String nestedOverrideValue(Json.Document doc, List<DependencyPathSegment> path,
+                                                        String packageName) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return null;
+        }
+        Json.JsonObject at = findObjectMember((Json.JsonObject) doc.getValue(), "overrides");
+        for (DependencyPathSegment seg : path) {
+            if (at == null) {
+                return null;
+            }
+            at = findObjectMember(at, seg.getVersion() != null ?
+                    seg.getName() + "@" + seg.getVersion() : seg.getName());
+        }
+        if (at == null) {
+            return null;
+        }
+        for (org.openrewrite.json.tree.Json m : at.getMembers()) {
+            if (m instanceof Json.Member && packageName.equals(literalString(((Json.Member) m).getKey()))) {
+                return literalString(((Json.Member) m).getValue());
+            }
+        }
+        return null;
     }
 
     /**
