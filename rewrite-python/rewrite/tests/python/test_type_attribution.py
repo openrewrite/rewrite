@@ -2684,6 +2684,34 @@ def test_field_specifier_assignment_takes_declared_type():
 
 
 @requires_ty_types_cli
+def test_quoted_type_hint_takes_the_type_it_names():
+    src = '''
+        def f() -> "int":
+            return 1
+
+        a: "int"
+        b: "list[int]" = []
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        hints: list = []
+
+        class _Collector(PythonVisitor):
+            def visit_type_hint(self, hint, p):
+                hints.append(hint)
+                return super().visit_type_hint(hint, p)
+
+        _Collector().visit(cu, None)
+        returns, annotation_only, with_value = hints
+        assert returns.type == JavaType.Primitive.Int
+        assert annotation_only.type == JavaType.Primitive.Int
+        assert isinstance(with_value.type, JavaType.Parameterized)
+        assert with_value.type.fully_qualified_name == 'list'
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
 class TestMethodInvocationResultType:
     """J.MethodInvocation.type must reflect the callee's return type.
 
