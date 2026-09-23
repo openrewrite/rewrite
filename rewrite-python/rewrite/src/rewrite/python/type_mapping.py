@@ -111,30 +111,6 @@ _ALIASED_MODULES: Dict[str, str] = {
     'genericpath': 'os.path',
 }
 
-# knownInstance descriptors carry no moduleName, so `className` — the class ty
-# reports the singleton as an instance of — supplies it; a className absent here
-# has no FQN worth minting. `builtins` is stripped, so its classes map to ''.
-_KNOWN_INSTANCE_MODULES: Dict[str, str] = {
-    'range': '',
-    'staticmethod': '',
-    'classmethod': '',
-    'str': '',
-    'partial': 'functools',
-    'GenericAlias': 'types',
-    'UnionType': 'types',
-    'MethodWrapperType': 'types',
-    '_SpecialForm': 'typing',
-    'TypeVar': 'typing',
-    'ParamSpec': 'typing',
-    'TypeVarTuple': 'typing',
-    'TypeAliasType': 'typing',
-    'NewType': 'typing',
-    'Sequence': 'typing',
-    'Field': 'dataclasses',
-    'deprecated': 'typing_extensions',
-    'sentinel': 'typing_extensions',
-}
-
 # The `knownInstanceKind`s keyed by something other than their own class. A
 # partial's bound `__call__` is a `types.MethodWrapperType`, but the partial is
 # what a caller matches on.
@@ -464,25 +440,14 @@ class PythonTypeMapping:
         return self._pos_to_byte_offset(node.lineno, node.col_offset)  # ty: ignore[unresolved-attribute]  # AST nodes with lineno always have col_offset
 
     def _resolve_type(self, type_id: int) -> Optional[JavaType]:
-        """Resolve a type ID to a JavaType, maximizing object reuse.
-
-        Caches resolved types so the same type_id always returns the same
-        object. Breaks cyclic type references by creating a placeholder Class
-        only when a cycle is actually detected — the placeholder is updated
-        in-place once resolution completes.
-        """
+        """Resolve a type ID to a JavaType, caching it so the same type_id returns the
+        same object. A cycle's back-references get a placeholder (see
+        :meth:`_cycle_placeholder`)."""
         if type_id in self._type_id_cache:
             return self._type_id_cache[type_id]
 
-        # Cycle detected — create a placeholder that will be updated later
         if type_id in self._resolving_type_ids:
-            if type_id not in self._cycle_placeholders:
-                placeholder = JavaType.Class()
-                placeholder._flags_bit_map = 0
-                placeholder._kind = JavaType.FullyQualified.Kind.Class
-                placeholder._fully_qualified_name = ''
-                self._cycle_placeholders[type_id] = placeholder
-            return self._cycle_placeholders[type_id]
+            return self._cycle_placeholder(type_id, self._cycle_placeholders)
 
         descriptor = self._type_registry.get(type_id)
         if not descriptor:
@@ -497,28 +462,61 @@ class PythonTypeMapping:
         if result is None:
             return None
 
-        # If a cycle created a placeholder for this type_id, update it in-place
-        if type_id in self._cycle_placeholders:
-            placeholder = self._cycle_placeholders.pop(type_id)
+        return self._settle_cycle(type_id, result, self._cycle_placeholders,
+                                  self._type_id_cache, copy_members=True)
+
+    def _cycle_placeholder(self, type_id: int,
+                           placeholders: Dict[int, JavaType.Class]) -> JavaType:
+        """The back-reference handed out for a cycle through ``type_id``, completed by
+        :meth:`_settle_cycle`. A union cannot be completed into a Class, so a
+        back-reference to one is Unknown."""
+        if self._aliased_kind(type_id) == 'union':
+            return _UNKNOWN
+        if type_id not in placeholders:
+            placeholder = JavaType.Class()
+            placeholder._flags_bit_map = 0
+            placeholder._kind = JavaType.FullyQualified.Kind.Class
+            placeholder._fully_qualified_name = ''
+            placeholders[type_id] = placeholder
+        return placeholders[type_id]
+
+    def _aliased_kind(self, type_id: int) -> Optional[str]:
+        """The descriptor kind ``type_id`` denotes, seen through type aliases."""
+        seen = set()
+        descriptor = self._type_registry.get(type_id)
+        while descriptor and descriptor.get('kind') == 'typeAlias':
+            value_id = descriptor.get('valueType')
+            if value_id is None or value_id in seen:
+                break
+            seen.add(value_id)
+            descriptor = self._type_registry.get(value_id)
+        return descriptor.get('kind') if descriptor else None
+
+    @staticmethod
+    def _settle_cycle(type_id: int, result: JavaType, placeholders: Dict[int, JavaType.Class],
+                      cache: Dict[int, Any], copy_members: bool) -> JavaType:
+        """Cache what ``type_id`` resolved to. A cycle's Class placeholder takes on a Class
+        result in place; other results cannot, so the back-reference keeps the raw class
+        (if any) and the id resolves to the result. A result still pending as an outer
+        frame's placeholder stays uncached, so the next lookup gets the finished type."""
+        placeholder = placeholders.pop(type_id, None)
+        if placeholder is not None:
             if isinstance(result, JavaType.Class):
                 placeholder._fully_qualified_name = result.fully_qualified_name
                 placeholder._kind = result._kind
-                # Copy enriched fields so cycle placeholders retain supertypes/methods
-                for attr in ('_supertype', '_methods', '_type_parameters', '_interfaces',
-                             '_members', '_owning_class', '_annotations'):
+                for attr in (('_supertype', '_methods', '_type_parameters', '_interfaces',
+                              '_members', '_owning_class', '_annotations') if copy_members else ()):
                     val = getattr(result, attr, None)
                     if val is not None:
                         setattr(placeholder, attr, val)
-            elif isinstance(result, JavaType.Parameterized):
-                if hasattr(result._type, 'fully_qualified_name'):
-                    placeholder._fully_qualified_name = result._type.fully_qualified_name
-            self._type_id_cache[type_id] = placeholder
-            return placeholder
-
-        # No cycle — cache the actual result directly for maximum reuse.
-        # For Class types this preserves the object from _create_class_type,
-        # ensuring FQN-based deduplication across type_ids.
-        self._type_id_cache[type_id] = result
+                cache[type_id] = placeholder
+                return placeholder
+            if isinstance(result, JavaType.Parameterized) and \
+                    hasattr(result._type, 'fully_qualified_name'):
+                placeholder._fully_qualified_name = result._type.fully_qualified_name
+        if any(result is p for p in placeholders.values()):
+            return result
+        cache[type_id] = result
         return result
 
     def _class_fqn(self, descriptor: Dict[str, Any], name_key: str = 'className') -> str:
@@ -861,11 +859,11 @@ class PythonTypeMapping:
         elif kind == 'knownInstance':
             fqn = _KNOWN_INSTANCE_FQNS.get(descriptor.get('knownInstanceKind', ''))
             if fqn is None:
-                class_name = descriptor.get('className', '')
-                module = _KNOWN_INSTANCE_MODULES.get(class_name)
-                if module is None:
+                # `ty_extensions` is ty's own vocabulary, which no importable module exports.
+                module = descriptor.get('moduleName')
+                fqn = self._class_fqn(descriptor) if module and module != 'ty_extensions' else ''
+                if not fqn:
                     return _UNKNOWN
-                fqn = f"{module}.{class_name}" if module else class_name
             return self._create_class_type(fqn)
 
         elif kind == 'typeAlias':
@@ -942,6 +940,13 @@ class PythonTypeMapping:
             return self._resolve_type(type_id)
 
         return None
+
+    def is_field_specifier_call(self, node: ast.expr) -> bool:
+        """Whether ty typed ``node`` as a dataclass field-specifier call, which it
+        models as its ``dataclasses.Field`` marker rather than the call's value."""
+        descriptor = self._descriptor_of(node)
+        return (descriptor.get('kind') == 'knownInstance'
+                and descriptor.get('knownInstanceKind') == 'Field')
 
     def string_annotation_type(self, node: ast.Constant) -> Optional[JavaType]:
         """The type a string in a type slot denotes, rather than ``str``.
@@ -1665,21 +1670,15 @@ class PythonTypeMapping:
     def _resolve_declaring_type(self, type_id: int) -> Optional[JavaType.FullyQualified]:
         """Resolve a type ID to a declaring type, maximizing object reuse.
 
-        NOTE: The cycle-detection pattern here mirrors _resolve_type intentionally.
-        They use separate caches and placeholder dicts because declaring types are
-        resolved independently (often to a simpler Class without methods/members).
+        Separate caches and placeholders from :meth:`_resolve_type`, because a declaring
+        type often resolves to a simpler Class than the expression type; its cycle
+        placeholders take only the name and kind.
         """
         if type_id in self._declaring_type_id_cache:
             return self._declaring_type_id_cache[type_id]
 
         if type_id in self._resolving_declaring_type_ids:
-            if type_id not in self._declaring_cycle_placeholders:
-                placeholder = JavaType.Class()
-                placeholder._flags_bit_map = 0
-                placeholder._kind = JavaType.FullyQualified.Kind.Class
-                placeholder._fully_qualified_name = ''
-                self._declaring_cycle_placeholders[type_id] = placeholder
-            return self._declaring_cycle_placeholders[type_id]
+            return self._cycle_placeholder(type_id, self._declaring_cycle_placeholders)
 
         descriptor = self._type_registry.get(type_id)
         if not descriptor:
@@ -1694,16 +1693,8 @@ class PythonTypeMapping:
         if result is None:
             return None
 
-        if type_id in self._declaring_cycle_placeholders:
-            placeholder = self._declaring_cycle_placeholders.pop(type_id)
-            if isinstance(result, JavaType.Class):
-                placeholder._fully_qualified_name = result.fully_qualified_name
-                placeholder._kind = result._kind
-            self._declaring_type_id_cache[type_id] = placeholder
-            return placeholder
-
-        self._declaring_type_id_cache[type_id] = result
-        return result
+        return self._settle_cycle(type_id, result, self._declaring_cycle_placeholders,
+                                  self._declaring_type_id_cache, copy_members=False)
 
     def _class_reference(self, descriptor: Dict[str, Any]) -> JavaType.Class:
         """Resolve a descriptor's class through its classLiteral so annotation,
