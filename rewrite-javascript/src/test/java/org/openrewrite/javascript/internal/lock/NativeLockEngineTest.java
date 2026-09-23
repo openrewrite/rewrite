@@ -987,6 +987,131 @@ class NativeLockEngineTest {
         assertThat(result.getLockFileContent()).doesNotContain("tslib-1.0.0.tgz");
     }
 
+    /** An override may move a transitive down as well as up. */
+    @Test
+    void globalOverrideDowngrades() {
+        routes.put("https://registry.npmjs.org/lodash",
+                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{\"tslib\":\"^2.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\"integrity\":\"sha512-LODASH41720\"}}");
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/1.0.0",
+                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-TSLIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib\":\"1.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20"}},
+                    "node_modules/lodash": {"version": "4.17.20", "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz", "integrity": "sha512-LODASH41720", "dependencies": {"tslib": "^2.0.0"}},
+                    "node_modules/tslib": {"version": "2.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz", "integrity": "sha512-TSLIB200"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("tslib-1.0.0.tgz");
+        assertThat(result.getLockFileContent()).doesNotContain("tslib-2.0.0.tgz");
+    }
+
+    /** The overridden version brings a dependency the closure did not have. */
+    @Test
+    void overrideIntroducingANewPackage() {
+        routes.put("https://registry.npmjs.org/lodash",
+                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{\"tslib\":\"^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\"integrity\":\"sha512-LODASH41720\"}}");
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/1.0.0",
+                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-TSLIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dependencies\":{\"brand-new\":\"^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
+        routes.put("https://registry.npmjs.org/brand-new",
+                "{\"name\":\"brand-new\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/brand-new/1.0.0",
+                "{\"name\":\"brand-new\",\"version\":\"1.0.0\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/brand-new/-/brand-new-1.0.0.tgz\",\"integrity\":\"sha512-BRANDNEW100\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib\":\"^2.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20"}},
+                    "node_modules/lodash": {"version": "4.17.20", "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz", "integrity": "sha512-LODASH41720", "dependencies": {"tslib": "^1.0.0"}},
+                    "node_modules/tslib": {"version": "1.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz", "integrity": "sha512-TSLIB100"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("brand-new");
+    }
+
+    /**
+     * The overridden version drops a dependency the old one had, orphaning it. The engine has no prune edit
+     * for that shape, so it refuses rather than leave an unreachable entry in the lock. A gap, not a wrong
+     * answer: the lock is untouched and the failure names the package.
+     */
+    @Test
+    void overrideOrphaningAPackageFailsLoud() {
+        routes.put("https://registry.npmjs.org/lodash",
+                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{\"tslib\":\"^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\"integrity\":\"sha512-LODASH41720\"}}");
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/1.0.0",
+                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dependencies\":{\"only-old\":\"^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-TSLIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
+        routes.put("https://registry.npmjs.org/only-old",
+                "{\"name\":\"only-old\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/only-old/1.0.0",
+                "{\"name\":\"only-old\",\"version\":\"1.0.0\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/only-old/-/only-old-1.0.0.tgz\",\"integrity\":\"sha512-ONLYOLD100\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib\":\"^2.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20"}},
+                    "node_modules/lodash": {"version": "4.17.20", "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz", "integrity": "sha512-LODASH41720", "dependencies": {"tslib": "^1.0.0"}},
+                    "node_modules/only-old": {"version": "1.0.0", "resolved": "https://registry.npmjs.org/only-old/-/only-old-1.0.0.tgz", "integrity": "sha512-ONLYOLD100"},
+                    "node_modules/tslib": {"version": "1.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz", "integrity": "sha512-TSLIB100"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getPackageName()).isEqualTo("only-old");
+        assertThat(result.getFailure().getDetail()).contains("no longer resolved");
+    }
+
     @Test
     void nullLockFailsLoud() {
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
