@@ -1400,9 +1400,8 @@ class TestCyclicTypeResolution:
         # This should NOT raise RecursionError
         result = mapping._resolve_type(10)
 
-        # Should get a Class (possibly empty) instead of crashing
         assert result is not None
-        assert isinstance(result, JavaType.Class)
+        assert result.fully_qualified_name == 'type'
 
     def test_cyclic_union_does_not_recurse(self):
         """Cyclic union members should not cause infinite recursion."""
@@ -2052,99 +2051,52 @@ class TestWrapperDescriptor:
 class TestKnownInstanceDescriptor:
     """Tests for the knownInstance kind."""
 
-    def test_known_instance_resolves_to_class(self):
-        """A knownInstance with className should resolve to a class type."""
+    def test_known_instance_is_named_by_its_module(self):
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[400] = {
             'kind': 'knownInstance',
-            'className': 'TypeVar',
+            'className': 'Field',
+            'moduleName': 'dataclasses',
+            'knownInstanceKind': 'Field',
         }
 
         result = mapping._resolve_type(400)
         assert isinstance(result, JavaType.Class)
-        assert result._fully_qualified_name == 'typing.TypeVar'
+        assert result._fully_qualified_name == 'dataclasses.Field'
 
-    def test_known_instance_special_form(self):
-        """A knownInstance for _SpecialForm should resolve correctly."""
+    def test_known_instance_no_module_exports_is_unknown(self):
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[400] = {
             'kind': 'knownInstance',
-            'className': '_SpecialForm',
+            'className': 'Field',
+            'knownInstanceKind': 'Field',
         }
-
-        result = mapping._resolve_type(400)
-        assert isinstance(result, JavaType.Class)
-        assert 'typing' in result._fully_qualified_name
-
-    def test_known_instance_empty_classname_returns_unknown(self):
-        """A knownInstance without className should return Unknown."""
-        mapping = PythonTypeMapping("", file_path=None)
-        mapping._type_registry[400] = {
-            'kind': 'knownInstance',
-            'className': '',
-        }
-
-        result = mapping._resolve_type(400)
-        assert isinstance(result, JavaType.Unknown)
-
-    def test_known_instance_range_is_a_builtin(self):
-        mapping = PythonTypeMapping("", file_path=None)
-        mapping._type_registry[400] = {
-            'kind': 'knownInstance',
-            'className': 'range',
-            'knownInstanceKind': 'Range',
-            'isNonEmpty': True,
-        }
-
-        result = mapping._resolve_type(400)
-        assert isinstance(result, JavaType.Class)
-        assert result._fully_qualified_name == 'range'
-
-    @pytest.mark.parametrize('known_instance_kind',
-                             ['FunctoolsPartial', 'FunctoolsPartialCall'])
-    def test_known_instance_functools_partial(self, known_instance_kind):
-        mapping = PythonTypeMapping("", file_path=None)
-        mapping._type_registry[400] = {
-            'kind': 'knownInstance',
-            'className': 'partial',
-            'knownInstanceKind': known_instance_kind,
-        }
-
-        result = mapping._resolve_type(400)
-        assert isinstance(result, JavaType.Class)
-        assert result._fully_qualified_name == 'functools.partial'
-
-    def test_known_instance_method_wrapper_is_a_builtin(self):
-        # `staticmethod`/`classmethod` over a non-function callable arrives as a
-        # MethodWrapper.
-        mapping = PythonTypeMapping("", file_path=None)
-        mapping._type_registry[400] = {
-            'kind': 'knownInstance',
-            'className': 'staticmethod',
-            'knownInstanceKind': 'MethodWrapper',
-            'wrappedType': 402,
-        }
-        assert _fqn(mapping._resolve_type(400)) == 'staticmethod'
+        assert isinstance(mapping._resolve_type(400), JavaType.Unknown)
 
         mapping._type_registry[401] = {
             'kind': 'knownInstance',
-            'className': 'classmethod',
-            'knownInstanceKind': 'MethodWrapper',
-            'wrappedType': 402,
+            'className': '',
+            'moduleName': 'typing',
         }
-        assert _fqn(mapping._resolve_type(401)) == 'classmethod'
+        assert isinstance(mapping._resolve_type(401), JavaType.Unknown)
 
-    def test_known_instance_of_an_unmapped_class_is_unknown(self):
-        # Unknown beats minting an FQN that no module exports.
+        mapping._type_registry[402] = {
+            'kind': 'knownInstance',
+            'className': 'ConstraintSet',
+            'moduleName': 'ty_extensions',
+            'knownInstanceKind': 'ConstraintSet',
+        }
+        assert isinstance(mapping._resolve_type(402), JavaType.Unknown)
+
+    def test_partial_call_is_named_by_the_partial(self):
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[400] = {
             'kind': 'knownInstance',
-            'className': 'ConstraintSet',
-            'knownInstanceKind': 'ConstraintSet',
+            'className': 'MethodWrapperType',
+            'moduleName': 'types',
+            'knownInstanceKind': 'FunctoolsPartialCall',
         }
-
-        result = mapping._resolve_type(400)
-        assert isinstance(result, JavaType.Unknown)
+        assert _fqn(mapping._resolve_type(400)) == 'functools.partial'
 
 
 class TestTypeAliasDescriptor:
@@ -2162,6 +2114,46 @@ class TestTypeAliasDescriptor:
 
         result = mapping._resolve_type(500)
         assert result == JavaType.Primitive.Int
+
+    @staticmethod
+    def _recursive_tuple_alias():
+        # R = tuple[int, "R | None"]: the alias's value refers back to the alias.
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[500] = {'kind': 'typeAlias', 'name': 'R', 'valueType': 501}
+        mapping._type_registry[501] = {
+            'kind': 'instance', 'className': 'tuple', 'moduleName': 'builtins',
+            'tupleElements': [{'kind': 'fixed', 'typeId': 1},
+                              {'kind': 'fixed', 'typeId': 502}],
+        }
+        mapping._type_registry[502] = {'kind': 'union', 'members': [500, 1]}
+        return mapping
+
+    def test_recursive_alias_entered_at_the_alias_resolves_to_its_value(self):
+        mapping = self._recursive_tuple_alias()
+        result = mapping._resolve_type(500)
+        assert isinstance(result, JavaType.Parameterized)
+        assert result.fully_qualified_name == 'tuple'
+        assert result.type_parameters[0] == JavaType.Primitive.Int
+
+        # Json = list["Json"] | str
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[2] = {'kind': 'instance', 'className': 'str'}
+        mapping._type_registry[600] = {'kind': 'typeAlias', 'name': 'Json', 'valueType': 601}
+        mapping._type_registry[601] = {'kind': 'union', 'members': [602, 2]}
+        mapping._type_registry[602] = {'kind': 'instance', 'className': 'list',
+                                       'moduleName': 'builtins', 'typeArgs': [600]}
+        json = mapping._resolve_type(600)
+        assert isinstance(json, JavaType.Union)
+        json_list = next(t for t in json.bounds if isinstance(t, JavaType.Parameterized))
+        assert isinstance(json_list.type_parameters[0], JavaType.Unknown)
+
+    def test_recursive_alias_entered_at_its_value_resolves_to_its_value(self):
+        mapping = self._recursive_tuple_alias()
+        mapping._resolve_type(501)
+        result = mapping._resolve_type(500)
+        assert isinstance(result, JavaType.Parameterized)
+        assert result.type_parameters[0] == JavaType.Primitive.Int
 
     def test_type_alias_without_value_type(self):
         """A typeAlias without valueType should fall back to class from name."""
@@ -2546,7 +2538,7 @@ class TestDeclaringTypeUnification:
         assert t.fully_qualified_name == 'missing_dep.Widget'
 
 
-class TestCyclicTypeResolution:
+class TestFqnDedupSupertypes:
     """Tests that FQN-deduplicated types don't produce self-referential supertypes.
 
     Python's namedtuple pattern ``class Pair(namedtuple('Pair', ...))`` creates
@@ -2650,6 +2642,45 @@ def _collect_class_declarations(cu) -> dict:
 
     _Collector().visit(cu, None)
     return found
+
+
+@requires_ty_types_cli
+def test_field_specifier_assignment_takes_declared_type():
+    src = '''
+        from dataclasses import dataclass, field
+        from typing import Final
+
+        @dataclass
+        class D:
+            q: int = field(default=1)
+            r: "int" = field(default=2)
+            s: Final = field(default=3)
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        found: list = []
+
+        class _Collector(PythonVisitor):
+            def visit_assignment(self, a, p):
+                found.append(a)
+                return super().visit_assignment(a, p)
+
+        _Collector().visit(cu, None)
+        assignment = found[0]
+        target = assignment.variable.expression
+        assert assignment.type == JavaType.Primitive.Int
+        assert target.type == JavaType.Primitive.Int
+        assert target.field_type.type == JavaType.Primitive.Int
+
+        quoted = found[1]
+        assert quoted.type == JavaType.Primitive.Int
+        assert quoted.variable.expression.type == JavaType.Primitive.Int
+
+        bare_final = found[2]
+        assert isinstance(bare_final.type, JavaType.Unknown)
+        assert isinstance(bare_final.variable.expression.type, JavaType.Unknown)
+    finally:
+        _cleanup_parse(tmpdir, client)
 
 
 @requires_ty_types_cli
@@ -4148,8 +4179,6 @@ _FQN_CASES = (
     FqnCase(
         id='known_instance_functools_partial',
         kind='knownInstance',
-        # knownInstance carries no moduleName and its className is bare `partial`;
-        # only knownInstanceKind identifies the module, via _KNOWN_INSTANCE_FQNS.
         source='''
             import functools
 
