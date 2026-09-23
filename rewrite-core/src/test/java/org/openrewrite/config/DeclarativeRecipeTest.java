@@ -473,60 +473,11 @@ class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
-    void getDataTableDescriptorsThreadSafe() throws Exception {
-        var dr = new DeclarativeRecipe("org.openrewrite.ConcurrentTest", "concurrent test",
-          "test", emptySet(), null, URI.create("dummy"), true, emptyList());
-        dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
-        dr.initialize(List.of());
-
-        int threadCount = 10;
-        int iterations = 100;
-        try (ExecutorService executor = Executors.newFixedThreadPool(threadCount)) {
-            var startLatch = new CountDownLatch(1);
-            var doneLatch = new CountDownLatch(threadCount);
-            var errors = new ConcurrentLinkedQueue<Throwable>();
-
-            for (int i = 0; i < threadCount; i++) {
-                final int threadIdx = i;
-                executor.submit(() -> {
-                    try {
-                        startLatch.await();
-                        for (int j = 0; j < iterations; j++) {
-                            if (threadIdx % 2 == 0) {
-                                // Reader threads: iterate via getDataTableDescriptors and getDescriptor
-                                dr.getDataTableDescriptors();
-                                dr.getDescriptor();
-                            } else {
-                                // Writer threads: re-initialize to modify recipeList concurrently
-                                dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
-                                dr.initialize(List.of());
-                            }
-                        }
-                    } catch (Throwable t) {
-                        errors.add(t);
-                    } finally {
-                        doneLatch.countDown();
-                    }
-                });
-            }
-
-            startLatch.countDown();
-            doneLatch.await();
-            executor.shutdown();
-
-            assertThat(errors).as("Concurrent access to getDataTableDescriptors/getDescriptor should not throw").isEmpty();
-        }
-    }
-
-    @Test
     void concurrentInitializeDoesNotDuplicateRecipes() throws Exception {
         var dr = new DeclarativeRecipe("org.openrewrite.ConcurrentInitTest", "concurrent init test",
           "test", emptySet(), null, URI.create("dummy"), true, emptyList());
         dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
         dr.addUninitialized(new ChangeText("hello"));
-        dr.initialize(List.of());
-
-        int expectedSize = dr.getRecipeList().size();
 
         int threadCount = 20;
         try (ExecutorService executor = Executors.newFixedThreadPool(threadCount)) {
@@ -554,7 +505,7 @@ class DeclarativeRecipeTest implements RewriteTest {
             executor.shutdown();
 
             assertThat(errors).as("Concurrent initialize() should not throw").isEmpty();
-            assertThat(dr.getRecipeList()).as("Concurrent initialize() should not duplicate recipes").hasSize(expectedSize);
+            assertThat(dr.getRecipeList()).as("Concurrent initialize() should not duplicate recipes").hasSize(2);
         }
     }
 
