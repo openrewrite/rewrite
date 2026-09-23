@@ -122,13 +122,17 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                         ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
-                        SourceFile out = ps.modifiedPackageJson;
-                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
+                            // A manifest carrying an override its lock contradicts is the broken state this
+                            // recipe exists to prevent, and `npm ci` rejects it outright. If the lock cannot be
+                            // regenerated, keep the edit out of the tree and out of the shared live state, and
+                            // leave only the warning.
                             recordFailure(ctx, ps, p);
-                            return Markup.warn(out, new RuntimeException(
+                            return Markup.warn(sf, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
+                        SourceFile out = ps.modifiedPackageJson;
+                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         return out;
                     }
                 }
@@ -146,7 +150,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                         if (pkg == null) pkg = ips.capturedPackageJson;
                         if (pkg != null && canApply(pkg)) {
                             ensureComputed(ips, pkg, ctx);
-                            if (ips.modifiedPackageJson != null) {
+                            // Same rule as above: a failed regeneration must not publish the edited manifest,
+                            // or a later recipe reads an override that was never actually applied.
+                            if (ips.modifiedPackageJson != null &&
+                                    (ips.regenResult == null || ips.regenResult.isSuccess())) {
                                 PackageJsonHelper.putLiveTree(ctx, importer, ips.modifiedPackageJson);
                             }
                         }

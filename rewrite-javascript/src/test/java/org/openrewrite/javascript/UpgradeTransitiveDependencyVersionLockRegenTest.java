@@ -206,6 +206,58 @@ class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
         );
     }
 
+    /**
+     * A {@code dependencyPath} run writes a nested override the resolver cannot apply. Leaving the manifest
+     * edited while the lock contradicts it reproduces the broken state this recipe exists to prevent, so a
+     * refusal must change nothing and warn.
+     */
+    @Test
+    void aRefusedOverrideChangesNothing() {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("is-number", "^7.0.0", "is-odd")).executionContext(ctx),
+                packageJson(
+                        """
+                        {
+                          "name": "npm-transitive-override",
+                          "dependencies": {
+                            "is-odd": "3.0.1"
+                          }
+                        }
+                        """,
+                        """
+                        /*~~(lock regeneration failed: RESOLUTION_REQUIRED [is-odd]: nested override of is-odd is not supported)~~>*/{
+                          "name": "npm-transitive-override",
+                          "dependencies": {
+                            "is-odd": "3.0.1"
+                          }
+                        }
+                        """,
+                        isOddBringingIsNumber6()),
+                packageLock(
+                        """
+                        {
+                          "name": "npm-transitive-override",
+                          "lockfileVersion": 3,
+                          "packages": {
+                            "": {"name": "npm-transitive-override", "dependencies": {"is-odd": "3.0.1"}},
+                            "node_modules/is-odd": {"version": "3.0.1"}
+                          }
+                        }
+                        """,
+                        """
+                        /*~~(lock regeneration failed: RESOLUTION_REQUIRED [is-odd]: nested override of is-odd is not supported)~~>*/{
+                          "name": "npm-transitive-override",
+                          "lockfileVersion": 3,
+                          "packages": {
+                            "": {"name": "npm-transitive-override", "dependencies": {"is-odd": "3.0.1"}},
+                            "node_modules/is-odd": {"version": "3.0.1"}
+                          }
+                        }
+                        """,
+                        s -> s.noTrim())
+        );
+    }
+
     private static NodeResolutionResult isOddBringingIsNumber6() {
         ResolvedDependency isNumber6 = new ResolvedDependency("is-number", "6.0.0",
                 emptyList(), emptyList(), emptyList(), emptyList(),
