@@ -65,6 +65,13 @@ public final class NpmGraphBuilder {
      */
     private final Map<String, Set<String>> lockedVersions;
 
+    /**
+     * Global overrides declared by the root manifest, keyed by package name. The caller extracts these because
+     * only it knows the field ({@code overrides}, {@code resolutions} or {@code pnpm.overrides}) and which key
+     * forms it could translate into plain package names.
+     */
+    private final Map<String, String> overrides;
+
     public NpmGraphBuilder(Registry registry) {
         this(registry, false);
     }
@@ -74,9 +81,15 @@ public final class NpmGraphBuilder {
     }
 
     public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions) {
+        this(registry, autoInstallPeers, lockedVersions, emptyMap());
+    }
+
+    public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions,
+                           Map<String, String> overrides) {
         this.registry = registry;
         this.autoInstallPeers = autoInstallPeers;
         this.lockedVersions = lockedVersions;
+        this.overrides = overrides;
     }
 
     public ResolutionGraph build(Map<String, String> importerManifests) {
@@ -169,6 +182,13 @@ public final class NpmGraphBuilder {
     private String select(String name, String range,
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
                           Deque<String[]> work) {
+        // Every requirement funnels through here, so a name carrying an override is caught wherever it is
+        // reached from. A name nothing depends on is never selected, which is why an override naming a package
+        // outside the closure stays the no-op it is.
+        if (overrides.containsKey(name)) {
+            throw new EngineFailure(RESOLUTION_REQUIRED, name,
+                    "override of " + name + " is not applied during closure resolution");
+        }
         String deduped = Semver.maxSatisfying(chosen.getOrDefault(name, emptySet()), range, NODE);
         if (deduped != null) {
             return deduped;

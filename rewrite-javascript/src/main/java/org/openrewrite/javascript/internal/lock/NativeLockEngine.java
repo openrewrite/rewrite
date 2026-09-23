@@ -19,6 +19,7 @@ import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import org.openrewrite.javascript.internal.PackageJsonOverrides;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.RecipeRunException;
@@ -248,7 +249,8 @@ public final class NativeLockEngine {
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock))
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock),
+                        declaredOverrides(PackageManager.Npm, editedPackageJson))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = NpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Npm, packageJsonPath),
@@ -264,7 +266,8 @@ public final class NativeLockEngine {
                                                    @Nullable Path packageJsonPath, NodeRegistries registries,
                                                    NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBerry(existingLock))
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBerry(existingLock),
+                        declaredOverrides(PackageManager.YarnBerry, editedPackageJson))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
         for (LockEditSet.PackageEdit edit : edits) {
@@ -306,7 +309,8 @@ public final class NativeLockEngine {
                                                      @Nullable Path packageJsonPath, NodeRegistries registries,
                                                      NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsYarnClassic(existingLock))
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsYarnClassic(existingLock),
+                        declaredOverrides(PackageManager.YarnClassic, editedPackageJson))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnClassic, packageJsonPath),
@@ -341,7 +345,8 @@ public final class NativeLockEngine {
                                               @Nullable Path packageJsonPath, NodeRegistries registries,
                                               NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsPnpm(existingLock))
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsPnpm(existingLock),
+                        declaredOverrides(PackageManager.Pnpm, editedPackageJson))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = PnpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Pnpm, packageJsonPath),
@@ -375,12 +380,61 @@ public final class NativeLockEngine {
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock))
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock),
+                        declaredOverrides(PackageManager.Bun, editedPackageJson))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),
                 PackageManager.Bun, editedPackageJson, edits);
         return Result.success(new BunLockPatcher().patch(editSet));
+    }
+
+    /**
+     * The global overrides the root manifest declares, keyed by package name: {@code overrides} for npm and Bun,
+     * {@code resolutions} for either yarn, {@code pnpm.overrides} for pnpm.
+     * <p>
+     * Only plain {@code name -> range} entries are returned. Every other form is refused here rather than
+     * dropped, because a key the resolver cannot turn into a package name would never reach
+     * {@code NpmGraphBuilder.select} and would resolve to a closure that silently ignores it. That includes the
+     * path-scoped keys this recipe itself writes for a {@code dependencyPath} run: pnpm {@code "express>accepts"}
+     * and yarn {@code "express/accepts"}. {@link PackageJsonOverrides#parsePath} already separates those from a
+     * scoped name like {@code "@types/node"}, so reuse it rather than testing for {@code '/'}.
+     */
+    private static Map<String, String> declaredOverrides(PackageManager pm, String manifestJson) {
+        JsonNode node;
+        try {
+            JsonNode root = JSON.readTree(manifestJson);
+            node = pm == PackageManager.Pnpm
+                    ? (root.path("pnpm").isObject() ? root.path("pnpm").get("overrides") : null)
+                    : root.get(pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic
+                    ? "resolutions" : "overrides");
+        } catch (Exception e) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not parse manifest overrides");
+        }
+        if (node == null || !node.isObject() || node.isEmpty()) {
+            return emptyMap();
+        }
+        Map<String, String> overrides = new LinkedHashMap<>();
+        Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> f = fields.next();
+            String key = f.getKey();
+            JsonNode value = f.getValue();
+            if (!value.isTextual()) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                        "nested override of " + key + " is not supported");
+            }
+            if (value.asText().startsWith("$")) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                        "override of " + key + " references a declared dependency and is not supported");
+            }
+            if (key.indexOf('*') >= 0 || ".".equals(key) || PackageJsonOverrides.parsePath(key).size() > 1) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                        "path-scoped override " + key + " is not supported");
+            }
+            overrides.put(key, value.asText());
+        }
+        return overrides;
     }
 
     /** The versions the lock already installs, keyed by tree-slot name (an alias seeds under its slot). */
