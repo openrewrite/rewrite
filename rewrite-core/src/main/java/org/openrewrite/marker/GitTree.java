@@ -22,12 +22,6 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Every entry of the tree of the commit a repository's source files were parsed from,
- * including symlinks, submodules and files that have no source file. Enough to rebuild
- * the commit's tree objects without the repository, and to check the result against
- * {@link #treeId}.
- */
 @Value
 @With
 public class GitTree implements Marker {
