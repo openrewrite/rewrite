@@ -612,7 +612,7 @@ class ParserVisitor(ast.NodeVisitor):
                         hint_prefix,
                         Markers.EMPTY,
                         type_tree,
-                        self._type_mapping.type(node.annotation)
+                        getattr(type_tree, 'type', None)
                     ),
                     assigned_type
                 ),
@@ -624,19 +624,22 @@ class ParserVisitor(ast.NodeVisitor):
             )
         else:
             # No value - type annotation only (e.g., `x: int`)
+            target = self.__convert(node.target)
+            hint_prefix = self.__source_before(':')
+            type_tree = self.__convert_type(node.annotation)
             return py.ExpressionStatement(
                 random_id(),
                 py.TypeHintedExpression(
                     random_id(),
                     prefix,
                     Markers.EMPTY,
-                    self.__convert(node.target),
+                    target,
                     py.TypeHint(
                         random_id(),
-                        self.__source_before(':'),
+                        hint_prefix,
                         Markers.EMPTY,
-                        self.__convert_type(node.annotation),
-                        self._type_mapping.type(node.annotation)
+                        type_tree,
+                        getattr(type_tree, 'type', None)
                     ),
                     self._type_mapping.type(node)
                 )
@@ -2316,12 +2319,13 @@ class ParserVisitor(ast.NodeVisitor):
             return_type = None
         else:
             arrow = self.__source_before('->')
+            returns_tree = self.__convert_type(node.returns)
             return_type = py.TypeHint(
                 random_id(),
                 arrow,
                 Markers.EMPTY,
-                self.__convert_type(node.returns),
-                self._type_mapping.type(node.returns)
+                returns_tree,
+                getattr(returns_tree, 'type', None)
             )
         body = self.__convert_block(node.body)
 
