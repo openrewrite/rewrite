@@ -219,6 +219,37 @@ class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
+    void unresolvableEntryInADeclarativePreconditionFailsValidation() {
+        var guard = new DeclarativeRecipe("org.example.Guard", "Guard", "Test.", emptySet(),
+          null, URI.create("file:///guard.yaml"), false, emptyList());
+        guard.addUninitialized("org.example.Missing");
+        var outer = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("file:///outer.yaml"), false, emptyList());
+        outer.addPrecondition(guard);
+        outer.addUninitialized(new ChangeText("2"));
+        outer.initialize(key -> null);
+
+        assertThat(outer.validateAll())
+          .flatExtracting(Validated::failures)
+          .extracting(Validated.Invalid::getProperty)
+          .containsExactly("org.example.Guard.recipeList[0] (in file:///guard.yaml)");
+    }
+
+    @Test
+    void misconfiguredPreconditionFailsValidation() {
+        var dr = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("file:///outer.yaml"), false, emptyList());
+        dr.addPrecondition(new Find(null, null, null, null, null, null, null, null));
+        dr.addUninitialized(new ChangeText("2"));
+        dr.initialize(List.of());
+
+        assertThat(dr.validateAll())
+          .flatExtracting(Validated::failures)
+          .extracting(Validated.Invalid::getProperty)
+          .containsExactly("org.openrewrite.text.Find.find");
+    }
+
+    @Test
     void initializedRecipeReportsOnlyTheEntriesItCouldNotResolve() {
         var dr = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
           null, URI.create("file:///outer.yaml"), false, emptyList());

@@ -669,6 +669,15 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         return validated.and(validation).and(initValidation);
     }
 
+    @Override
+    public Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
+        super.validateAll(ctx, acc);
+        for (Recipe precondition : preconditions) {
+            precondition.validateAll(ctx, acc);
+        }
+        return acc;
+    }
+
     private Validated<Object> requireInitialized(List<Recipe> uninitialized, List<Recipe> resolved, String property) {
         if (uninitialized.isEmpty() || uninitialized.size() == resolved.size()) {
             return Validated.none();
