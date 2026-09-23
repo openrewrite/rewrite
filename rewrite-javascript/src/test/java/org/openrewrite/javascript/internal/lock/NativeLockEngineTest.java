@@ -784,6 +784,88 @@ class NativeLockEngineTest {
     }
 
     @Test
+    void nestedOverrideFailsLoud() {
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":{\"b\":\"1.0.0\"}}}",
+                npmLock("4.17.20"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("nested override");
+    }
+
+    /**
+     * pnpm writes a {@code dependencyPath} override as a flat {@code a>b} key. Extracted as a package name it
+     * would never reach {@link NpmGraphBuilder}, so the closure would silently ignore it.
+     */
+    @Test
+    void pnpmStylePathOverrideKeyFailsLoud() {
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"express>accepts\":\"^2.0.0\"}}",
+                npmLock("4.17.20"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("path-scoped override");
+    }
+
+    /** The yarn spelling of the same thing, {@code a/b}. */
+    @Test
+    void yarnStylePathOverrideKeyFailsLoud() {
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"express/accepts\":\"^2.0.0\"}}",
+                npmLock("4.17.20"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("path-scoped override");
+    }
+
+    /**
+     * A scoped name also contains a slash but is a plain package, so it must not be mistaken for a path. It
+     * names nothing in this closure, which makes it the no-op an override outside the tree should be.
+     */
+    @Test
+    void scopedOverrideNameIsNotAPath() {
+        routes.put("https://registry.npmjs.org/lodash",
+                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\"," +
+                        "\"integrity\":\"sha512-LODASH\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"@types/node\":\"^20.0.0\"}}",
+                npmLock("4.17.20"));
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+    }
+
+    @Test
+    void overrideReferencingADeclaredDependencyFailsLoud() {
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib\":\"$lodash\"}}",
+                npmLock("4.17.20"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("references a declared dependency");
+    }
+
+    /** Only npm applies overrides so far; the rest must refuse rather than emit an untested lock. */
+    @Test
+    void overridesAreNotAppliedForOtherPackageManagers() {
+        Result result = regen(PackageManager.Pnpm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"pnpm\":{\"overrides\":{\"tslib\":\"^2.0.0\"}}}",
+                "lockfileVersion: '9.0'\n");
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("not yet applied for Pnpm");
+    }
+
+    @Test
     void nullLockFailsLoud() {
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
