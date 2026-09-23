@@ -19,7 +19,7 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.Tree;
-import org.openrewrite.marker.Markup;
+import org.openrewrite.javascript.internal.lock.EngineFailure;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.json.JsonParser;
@@ -27,6 +27,8 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.semver.Semver;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
@@ -82,15 +84,26 @@ public class PackageJsonHelper {
     private static final String LIVE_PACKAGE_JSON_TREES =
             "org.openrewrite.javascript.livePackageJsonTrees";
 
-    @SuppressWarnings("unchecked")
+    private static class LivePackageJsonTrees {
+        @Nullable Object cycle;
+        final Map<Path, SourceFile> trees = new HashMap<>();
+    }
+
     public static @Nullable SourceFile getLiveTree(ExecutionContext ctx, Path packageJsonPath) {
-        Map<Path, SourceFile> map = (Map<Path, SourceFile>) ctx.getMessage(LIVE_PACKAGE_JSON_TREES);
-        return map == null ? null : map.get(packageJsonPath);
+        LivePackageJsonTrees live = ctx.getMessage(LIVE_PACKAGE_JSON_TREES);
+        // Chaining uses trees from this cycle only. The scheduler adds markers between cycles.
+        return live == null || live.cycle != ctx.getMessage(ExecutionContext.CURRENT_CYCLE) ?
+                null : live.trees.get(packageJsonPath);
     }
 
     public static void putLiveTree(ExecutionContext ctx, Path packageJsonPath, SourceFile tree) {
-        Map<Path, SourceFile> map = ctx.computeMessageIfAbsent(LIVE_PACKAGE_JSON_TREES, k -> new HashMap<>());
-        map.put(packageJsonPath, tree);
+        LivePackageJsonTrees live = ctx.computeMessageIfAbsent(LIVE_PACKAGE_JSON_TREES, k -> new LivePackageJsonTrees());
+        Object cycle = ctx.getMessage(ExecutionContext.CURRENT_CYCLE);
+        if (live.cycle != cycle) {
+            live.trees.clear();
+            live.cycle = cycle;
+        }
+        live.trees.put(packageJsonPath, tree);
     }
 
     // --- Reparse helpers (preserve identity + markers) ------------------
@@ -417,7 +430,7 @@ public class PackageJsonHelper {
     }
 
     /** The indent unit from {@code obj}'s first member, or two spaces when none can be detected. */
-    private static String detectIndentUnit(Json.JsonObject obj) {
+    static String detectIndentUnit(Json.JsonObject obj) {
         List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
         if (!members.isEmpty()) {
             String ws = members.get(0).getElement().getPrefix().getWhitespace();
@@ -480,6 +493,16 @@ public class PackageJsonHelper {
         return root.getPadding().withMembers(members);
     }
 
+    /** Reject references and tags before an edit can detach a dependency from its source. */
+    static void requireSemverRange(String name, @Nullable String version) {
+        if (version == null || version.trim().startsWith("latest.") ||
+                !Semver.validate(version, null, Semver.Ecosystem.NODE).isValid()) {
+            throw new EngineFailure(LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE, name,
+                    "Unsupported dependency version '" + version +
+                            "'; only protocol-free semver ranges are supported");
+        }
+    }
+
     public static Json.Document upgradeVersion(Json.Document doc, List<MatchedDependency> matched, String newVersion) {
         if (!(doc.getValue() instanceof Json.JsonObject) || matched.isEmpty()) {
             return doc;
@@ -512,8 +535,11 @@ public class PackageJsonHelper {
                 String name = literalString(depMember.getKey());
                 if (name == null || !targetNames.contains(name)) continue;
                 if (!(depMember.getValue() instanceof Json.Literal)) continue;
-                Json.Literal newLit = makeStringLiteral(newVersion);
                 Json.Literal oldLit = (Json.Literal) depMember.getValue();
+                if (newVersion.equals(oldLit.getValue())) continue;
+                requireSemverRange(name, literalString(oldLit));
+                requireSemverRange(name, newVersion);
+                Json.Literal newLit = makeStringLiteral(newVersion);
                 newLit = newLit.withPrefix(oldLit.getPrefix());
                 children.set(j, children.get(j).withElement(depMember.withValue(newLit)));
                 scopeChanged = true;
@@ -557,6 +583,10 @@ public class PackageJsonHelper {
                 Json.Member depMember = (Json.Member) child;
                 if (!oldName.equals(literalString(depMember.getKey()))) continue;
 
+                if (newVersion != null) {
+                    requireSemverRange(oldName, literalString(depMember.getValue()));
+                    requireSemverRange(newName, newVersion);
+                }
                 Json.Literal oldKeyLit = (Json.Literal) depMember.getKey();
                 Json.Literal newKeyLit = makeStringLiteral(newName).withPrefix(oldKeyLit.getPrefix());
 
@@ -643,7 +673,7 @@ public class PackageJsonHelper {
     }
 
     /** A member with {@code prefix}; a bare literal value gets a leading space so it prints {@code "key": "value"}. */
-    private static Json.Member makeMember(String key, JsonValue value, Space prefix) {
+    static Json.Member makeMember(String key, JsonValue value, Space prefix) {
         Json.Literal keyLit = makeStringLiteral(key);
         // Ensure there's a space between ':' and the value (standard JSON formatting).
         JsonValue spacedValue = value;
@@ -690,7 +720,13 @@ public class PackageJsonHelper {
             return EditAndRegenerateResult.unchanged();
         }
         Json.Document before = (Json.Document) packageJson;
-        Json.Document after = editFn.apply(before);
+        Json.Document after;
+        try {
+            after = editFn.apply(before);
+        } catch (EngineFailure e) {
+            // Reject the entire edit before publishing a live tree or regenerating the lock.
+            return EditAndRegenerateResult.changed(before, LockFileRegeneration.Result.failure(e.failure));
+        }
         if (after == before) {
             return EditAndRegenerateResult.unchanged();
         }

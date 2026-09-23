@@ -70,7 +70,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
         return "Upgrades the version constraint of matching npm dependencies in `package.json` and " +
                 "regenerates the lock file by running the package manager. Matching is by exact package " +
                 "name or glob pattern. " +
-                "v1 uses simple string inequality for the upgrade check (always overwrites). A future " +
+                "Only protocol-free semver ranges are updated; references such as `catalog:` and `workspace:` " +
+                "are reported as unsupported without changing the manifest. " +
+                "v1 uses simple string inequality for the upgrade check. A future " +
                 "version will use semver to skip already-up-to-date constraints. " +
                 "Not safe to use as a precondition: invokes the package manager and publishes per-project " +
                 "state shared with other dependency recipes.";
@@ -183,12 +185,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
-                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, p);
-                            return Markup.warn(out, new RuntimeException(
+                            out = Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
+                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         return out;
                     }
                 }

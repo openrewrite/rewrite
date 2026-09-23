@@ -136,6 +136,18 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "no existing lock file to update");
         }
 
+        if (pm == PackageManager.Pnpm) {
+            requireSupportedPnpmLock(existingLock);
+            Object pnpm = parseJsonObject(editedPackageJson, true).get("pnpm");
+            Object overrides = pnpm instanceof Map ? ((Map<?, ?>) pnpm).get("overrides") : null;
+            if (overrides != null && (!(overrides instanceof Map) || !((Map<?, ?>) overrides).isEmpty())) {
+                // Neither resolution path applies these rules. Resolving without them can report
+                // success while leaving the requested override completely unapplied.
+                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, null,
+                        "Native lock regeneration does not support pnpm overrides; regenerate the lock with pnpm");
+            }
+        }
+
         // Built once and shared by the per-dependency and whole-closure scopes.
         NodeRegistries registries = RegistryDiscovery.discover(ctx, marker, Environment.SYSTEM);
         NpmRegistryClient client = NodeExecutionContextView.view(ctx).getRegistryClient();
@@ -164,11 +176,6 @@ public final class NativeLockEngine {
         if (originalPackageJson == null) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                     "cannot scope the edit without the pre-edit package.json");
-        }
-
-        // pnpm lockfile-version gate before touching the network.
-        if (pm == PackageManager.Pnpm) {
-            requireSupportedPnpmVersion(existingLock);
         }
 
         List<DepChange> changes = diffDeclaredDeps(originalPackageJson, editedPackageJson);
@@ -3772,7 +3779,7 @@ public final class NativeLockEngine {
         return false;
     }
 
-    private static void requireSupportedPnpmVersion(String lock) {
+    private static void requireSupportedPnpmLock(String lock) {
         Object loaded;
         try {
             loaded = new Yaml().load(lock);
@@ -3781,6 +3788,11 @@ public final class NativeLockEngine {
         }
         if (!(loaded instanceof Map)) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "pnpm-lock.yaml is not a mapping");
+        }
+        Object overrides = ((Map<?, ?>) loaded).get("overrides");
+        if (overrides != null && (!(overrides instanceof Map) || !((Map<?, ?>) overrides).isEmpty())) {
+            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, null,
+                    "Native lock regeneration does not support pnpm overrides; regenerate the lock with pnpm");
         }
         Object version = ((Map<?, ?>) loaded).get("lockfileVersion");
         if (version == null) {
