@@ -229,6 +229,12 @@ public final class NpmGraphBuilder {
                 throw new EngineFailure(RESOLUTION_REQUIRED, name,
                         name + " aliases " + spec + " (only a registry-range alias is resolved)");
             }
+            // selectAlias keys the slot by the alias name and resolves the real package itself, so it never
+            // reaches select and an override would be skipped silently. Refuse rather than ignore it.
+            if (overrides.containsKey(name) || overrides.containsKey(alias.realName)) {
+                throw new EngineFailure(RESOLUTION_REQUIRED, name,
+                        "override of aliased dependency " + name + " (" + spec + ") is not supported");
+            }
             return selectAlias(name, alias.realName, alias.range, chosen, manifests, work);
         }
         return select(name, spec, chosen, manifests, work);

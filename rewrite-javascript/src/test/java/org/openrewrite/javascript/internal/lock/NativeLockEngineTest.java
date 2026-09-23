@@ -1112,6 +1112,37 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).contains("no longer resolved");
     }
 
+    /**
+     * An aliased dependency resolves through selectAlias, which keys the slot by the alias name and never
+     * reaches select, so an override naming it would be skipped without trace. Refuse instead.
+     */
+    @Test
+    void overrideOfAnAliasedDependencyFailsLoud() {
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/1.0.0",
+                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-TSLIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"foo\":\"npm:tslib@^1.0.0\"}}",
+                "{\"dependencies\":{\"foo\":\"npm:tslib@^1.0.0\"},\"overrides\":{\"foo\":\"^2.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"foo": "npm:tslib@^1.0.0"}},
+                    "node_modules/foo": {"name": "tslib", "version": "1.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz", "integrity": "sha512-TSLIB100"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("aliased");
+    }
+
     @Test
     void nullLockFailsLoud() {
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
