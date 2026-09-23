@@ -251,6 +251,44 @@ class NpmRegistryClientTest {
     }
 
     @Test
+    void skippedCredentialsRequestUnauthenticated() {
+        StubHttpSender sender = new StubHttpSender();
+        sender.enqueueJson(200, "{\"versions\":{}}");
+        var client = new NpmRegistryClient(sender);
+
+        client.getPackument(registry().withUnresolvedCredentialPlaceholders(singletonList("${NPM_TOKEN}")), "lodash");
+
+        assertThat(sender.last().getRequestHeaders()).doesNotContainKey("Authorization");
+    }
+
+    @Test
+    void rejectedUnauthenticatedRequestNamesSkippedPlaceholders() {
+        StubHttpSender sender = new StubHttpSender();
+        sender.enqueueJson(401, "{}");
+        var client = new NpmRegistryClient(sender);
+        var skipped = registry().withUnresolvedCredentialPlaceholders(List.of("${NPM_USER}", "${NPM_PASS}"));
+
+        assertThatThrownBy(() -> client.getPackument(skipped, "lodash"))
+                .isInstanceOfSatisfying(NodeRegistryException.class, e -> {
+                    assertThat(e.getReason()).isEqualTo(Reason.AUTH_FAILED);
+                    assertThat(e.getMessage())
+                            .startsWith("HTTP 401 from http://registry.test/lodash")
+                            .contains("${NPM_USER}, ${NPM_PASS} are not set");
+                });
+    }
+
+    @Test
+    void rejectedRequestWithoutSkippedCredentialsHasNoHint() {
+        StubHttpSender sender = new StubHttpSender();
+        sender.enqueueJson(403, "{}");
+        var client = new NpmRegistryClient(sender);
+
+        assertThatThrownBy(() -> client.getPackument(registry(), "lodash"))
+                .isInstanceOfSatisfying(NodeRegistryException.class,
+                        e -> assertThat(e.getMessage()).isEqualTo("HTTP 403 from http://registry.test/lodash"));
+    }
+
+    @Test
     void malformedManifestIsMalformed() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "not json {");

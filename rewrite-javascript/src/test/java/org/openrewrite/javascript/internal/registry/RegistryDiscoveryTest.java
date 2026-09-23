@@ -201,6 +201,34 @@ class RegistryDiscoveryTest {
     }
 
     @Test
+    void unresolvedNpmrcCredentialsAreSkippedAndRecorded() {
+        NodeRegistries registries = RegistryDiscovery.discover(ctx(),
+                marker(npmrc(Map.of(
+                        "registry", "https://corp.example/npm/",
+                        "//corp.example/npm/:_authToken", "${NPM_TOKEN}"))),
+                env(Map.of()));
+        NodeRegistry registry = registries.getDefaultRegistry();
+        assertThat(registry.getAuthToken()).isNull();
+        assertThat(registry.isUnresolvedPlaceholders()).as("the URL itself is usable").isFalse();
+        assertThat(registry.getUnresolvedCredentialPlaceholders()).containsExactly("${NPM_TOKEN}");
+    }
+
+    @Test
+    void unresolvedNpmrcCredentialsFallBackToViewCredentials() {
+        ExecutionContext ctx = ctx();
+        NodeExecutionContextView.view(ctx).setRegistryCredentials(List.of(
+                new NodeRegistryCredentials("corp.example", "vtok", null, null)));
+
+        NodeRegistries registries = RegistryDiscovery.discover(ctx,
+                marker(npmrc(Map.of(
+                        "registry", "https://corp.example/",
+                        "//corp.example/:_authToken", "${NPM_TOKEN}"))),
+                env(Map.of()));
+        assertThat(registries.getDefaultRegistry().getAuthToken()).isEqualTo("vtok");
+        assertThat(registries.getDefaultRegistry().getUnresolvedCredentialPlaceholders()).containsExactly("${NPM_TOKEN}");
+    }
+
+    @Test
     void npmrcAuthWinsOverViewCredentials() {
         ExecutionContext ctx = ctx();
         NodeExecutionContextView.view(ctx).setRegistryCredentials(List.of(
