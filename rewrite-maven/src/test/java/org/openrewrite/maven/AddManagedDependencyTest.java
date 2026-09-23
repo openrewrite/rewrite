@@ -24,9 +24,6 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -329,65 +326,16 @@ class AddManagedDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec2 -> spec2.after(actual -> {
-                Matcher matcher = Pattern.compile("<groupId>com\\.tngtech\\.archunit</groupId>\\s*" +
-                  "<artifactId>archunit</artifactId>\\s*<version>1\\.3\\.(\\d+)</version>").matcher(actual);
-                assertThat(matcher.find()).as("expected a managed com.tngtech.archunit:archunit version of the " +
-                  "form 1.3.x, but was:\n%s", actual).isTrue();
-                int patch = Integer.parseInt(matcher.group(1));
-                assertThat(patch).as("expected the managed archunit version's patch number to be >= 2 (i.e. " +
-                  "newer than the real current version 1.3.0), but was 1.3.%d:\n%s", patch, actual).isGreaterThanOrEqualTo(2);
-                return scope == null ?
-                  """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>com.tngtech.archunit</groupId>
-                          <artifactId>archunit</artifactId>
-                          <version>1.3.%d</version>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.tngtech.archunit</groupId>
-                        <artifactId>archunit-junit5</artifactId>
-                        <version>1.3.0</version>
-                        <scope>test</scope>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """.formatted(patch) :
-                  """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>com.tngtech.archunit</groupId>
-                          <artifactId>archunit</artifactId>
-                          <version>1.3.%d</version>
-                          <scope>%s</scope>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.tngtech.archunit</groupId>
-                        <artifactId>archunit-junit5</artifactId>
-                        <version>1.3.0</version>
-                        <scope>test</scope>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """.formatted(patch, scope);
-            })
+            spec2 -> spec2.after(actual -> assertThat(actual)
+              .as("expected archunit to be managed at 1.3.2 or later, as the current version lookup should " +
+                "ignore the scope tag rather than resolve 1.3.0 from archunit-junit5")
+              .containsPattern("<dependencyManagement>\\s*<dependencies>\\s*<dependency>\\s*" +
+                "<groupId>com\\.tngtech\\.archunit</groupId>\\s*<artifactId>archunit</artifactId>\\s*" +
+                "<version>1\\.3\\.(?:[2-9]|\\d\\d+)</version>\\s*" +
+                (scope == null ? "" : "<scope>" + scope + "</scope>\\s*") +
+                "</dependency>")
+              .containsPattern("<artifactId>archunit-junit5</artifactId>\\s*<version>1\\.3\\.0</version>")
+              .actual())
           )
         );
     }
@@ -413,41 +361,15 @@ class AddManagedDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec2 -> spec2.after(actual -> {
-                Matcher matcher = Pattern.compile("<groupId>com\\.tngtech\\.archunit</groupId>\\s*" +
-                  "<artifactId>archunit</artifactId>\\s*<version>1\\.3\\.(\\d+)</version>").matcher(actual);
-                assertThat(matcher.find()).as("expected a managed com.tngtech.archunit:archunit version of the " +
-                  "form 1.3.x, but was:\n%s", actual).isTrue();
-                int patch = Integer.parseInt(matcher.group(1));
-                assertThat(patch).as("expected the managed archunit version's patch number to be >= 2 (i.e. " +
-                  "newer than the real current version 1.3.0), but was 1.3.%d:\n%s", patch, actual).isGreaterThanOrEqualTo(2);
-                return """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>com.tngtech.archunit</groupId>
-                          <artifactId>archunit</artifactId>
-                          <version>1.3.%d</version>
-                          <type>pom</type>
-                          <scope>import</scope>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.tngtech.archunit</groupId>
-                        <artifactId>archunit-junit5</artifactId>
-                        <version>1.3.0</version>
-                        <scope>test</scope>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """.formatted(patch);
-            })
+            spec2 -> spec2.after(actual -> assertThat(actual)
+              .as("expected archunit to be managed at 1.3.2 or later, as the current version lookup should " +
+                "ignore the scope tag rather than resolve 1.3.0 from archunit-junit5")
+              .containsPattern("<dependencyManagement>\\s*<dependencies>\\s*<dependency>\\s*" +
+                "<groupId>com\\.tngtech\\.archunit</groupId>\\s*<artifactId>archunit</artifactId>\\s*" +
+                "<version>1\\.3\\.(?:[2-9]|\\d\\d+)</version>\\s*<type>pom</type>\\s*<scope>import</scope>\\s*" +
+                "</dependency>")
+              .containsPattern("<artifactId>archunit-junit5</artifactId>\\s*<version>1\\.3\\.0</version>")
+              .actual())
           )
         );
     }
