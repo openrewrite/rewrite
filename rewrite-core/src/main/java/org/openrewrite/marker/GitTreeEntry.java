@@ -42,7 +42,8 @@ public class GitTreeEntry implements Marker {
         IDENTICAL,
 
         /**
-         * Identical once CRLF line endings are converted to LF, as git does on commit with autocrlf.
+         * Identical once CRLF line endings are converted to LF, as git normalizes on the way in when
+         * {@code core.autocrlf} is {@code true} or {@code input}, or a {@code text} attribute says so.
          */
         CRLF,
 
