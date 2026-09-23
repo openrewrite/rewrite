@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public class TreeVisitorAdapter {
-    private static final Integer classCreationLock = 1;
+    private static final Object classCreationLock = new Object();
     private static final Map<ClassLoader, TreeVisitorAdapterClassLoader> classLoaders = new IdentityHashMap<>();
 
     private TreeVisitorAdapter() {
