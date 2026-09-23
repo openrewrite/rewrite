@@ -15,7 +15,6 @@
  */
 package org.openrewrite.marker;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
@@ -38,18 +37,6 @@ public class GitTreeEntry implements Marker {
      */
     @Nullable
     WorkingTreeMatch workingTreeMatch;
-
-    public GitTreeEntry(UUID id, String objectId, int fileMode) {
-        this(id, objectId, fileMode, null);
-    }
-
-    @JsonCreator
-    public GitTreeEntry(UUID id, String objectId, int fileMode, @Nullable WorkingTreeMatch workingTreeMatch) {
-        this.id = id;
-        this.objectId = objectId;
-        this.fileMode = fileMode;
-        this.workingTreeMatch = workingTreeMatch;
-    }
 
     public enum WorkingTreeMatch {
         IDENTICAL,
