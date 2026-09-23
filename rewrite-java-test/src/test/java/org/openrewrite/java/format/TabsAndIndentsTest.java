@@ -2742,6 +2742,36 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
+    void textBlockBlankLinesAreNotIndented() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces,
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+
+                    AND YES
+                    ""\";
+              }
+              """,
+            """
+              class Test {
+                  private final String foo = ""\"
+                          YES
+
+                          AND YES
+                          ""\";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void textBlocksNotAlignedTabs() {
         rewriteRun(
           autoFormat(
