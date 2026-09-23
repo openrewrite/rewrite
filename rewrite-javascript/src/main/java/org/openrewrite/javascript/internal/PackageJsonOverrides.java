@@ -17,7 +17,16 @@ package org.openrewrite.javascript.internal;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.util.DefaultIndenter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.json.tree.Space;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
@@ -185,76 +194,75 @@ public final class PackageJsonOverrides {
             return doc;
         }
         Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        String indent = PackageJsonHelper.detectIndentUnit(root);
         try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            com.fasterxml.jackson.databind.JsonNode rootNode = mapper.readTree(doc.printAll());
-            com.fasterxml.jackson.databind.node.ObjectNode overrides =
-                    rootNode.path("overrides").isObject() ?
-                            (com.fasterxml.jackson.databind.node.ObjectNode) rootNode.get("overrides") :
-                            mapper.createObjectNode();
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode rootNode = mapper.readTree(doc.printAll());
+            ObjectNode overrides = rootNode.path("overrides").isObject() ?
+                    (ObjectNode) rootNode.get("overrides") : mapper.createObjectNode();
 
-            com.fasterxml.jackson.databind.node.ObjectNode at = overrides;
+            ObjectNode at = overrides;
             for (DependencyPathSegment seg : path) {
                 String key = seg.getVersion() != null ? seg.getName() + "@" + seg.getVersion() : seg.getName();
-                at = at.path(key).isObject() ?
-                        (com.fasterxml.jackson.databind.node.ObjectNode) at.get(key) : at.putObject(key);
+                at = at.path(key).isObject() ? (ObjectNode) at.get(key) : at.putObject(key);
             }
             at.put(packageName, newVersion);
 
-            String indent = detectIndent(root);
-            String printed = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(overrides)
-                    .replace("\" : ", "\": ");
-            // Re-indent to the document's own unit and depth so the spliced value lines up with its neighbours.
-            StringBuilder sb = new StringBuilder();
-            String[] lines = printed.split("\n", -1);
-            for (int i = 0; i < lines.length; i++) {
-                String line = lines[i];
-                int spaces = 0;
-                while (spaces < line.length() && line.charAt(spaces) == ' ') {
-                    spaces++;
-                }
-                if (i > 0) {
-                    sb.append('\n').append(indent);
-                    for (int d = 0; d < spaces / 2; d++) {
-                        sb.append(indent);
-                    }
-                    sb.append(line.substring(spaces));
-                } else {
-                    sb.append(line);
-                }
-            }
-
-            Json.Document holder = PackageJsonHelper.reparseJson(doc, sb.toString());
-            if (!(holder.getValue() instanceof Json.JsonObject)) {
+            JsonValue value = parseFragment(doc, mapper, overrides, indent);
+            if (value == null) {
                 return doc;
             }
-            Json.JsonObject value = ((Json.JsonObject) holder.getValue())
-                    .withPrefix(org.openrewrite.json.tree.Space.build(" ", emptyList()));
-
-            // Reuse the existing formatting-preserving insert to create the member when it is absent, then
-            // swap in the object value: addDependency only writes string values.
-            Json.Document out = doc;
-            if (findObjectMember(root, "overrides") == null) {
-                out = PackageJsonHelper.addDependency(out, "__placeholder__", "", "overrides");
+            if (findObjectMember(root, "overrides") != null) {
+                return doc.withValue(replaceMemberValue(root, "overrides", value));
             }
-            Json.JsonObject outRoot = (Json.JsonObject) out.getValue();
-            return out.withValue(replaceMemberValue(outRoot, "overrides", value));
+            List<JsonRightPadded<Json>> members = new ArrayList<>(root.getPadding().getMembers());
+            // The last member's `after` holds the whitespace before the object's closing brace, so it moves to
+            // the new last member rather than being dropped.
+            Space closing = Space.EMPTY;
+            if (!members.isEmpty()) {
+                int last = members.size() - 1;
+                closing = members.get(last).getAfter();
+                members.set(last, members.get(last).withAfter(Space.EMPTY));
+            }
+            members.add(new JsonRightPadded<>(
+                    PackageJsonHelper.makeMember("overrides", value, Space.build("\n" + indent, emptyList())),
+                    closing, Markers.EMPTY));
+            return doc.withValue(root.getPadding().withMembers(members));
         } catch (Exception e) {
             return doc;
         }
     }
 
-    /** The document's indent unit, taken from the first root member's prefix; two spaces if unclear. */
-    private static String detectIndent(Json.JsonObject root) {
-        for (org.openrewrite.json.tree.Json m : root.getMembers()) {
-            String prefix = m.getPrefix().getWhitespace();
-            int nl = prefix.lastIndexOf('\n');
-            if (nl >= 0 && nl + 1 < prefix.length()) {
-                return prefix.substring(nl + 1);
+    /**
+     * Render {@code overrides} with the document's own indent unit and parse it on its own, so only this value
+     * is rebuilt. It sits one level in, so every line after the first carries an extra unit.
+     */
+    private static @Nullable JsonValue parseFragment(Json.Document doc, ObjectMapper mapper,
+                                                     ObjectNode overrides, String indent) throws Exception {
+        DefaultPrettyPrinter printer = new DefaultPrettyPrinter() {
+            @Override
+            public DefaultPrettyPrinter createInstance() {
+                return this;
             }
+
+            @Override
+            public void writeObjectFieldValueSeparator(JsonGenerator g) throws java.io.IOException {
+                g.writeRaw(": ");
+            }
+        };
+        printer.indentObjectsWith(new DefaultIndenter(indent, "\n"));
+        String printed = mapper.writer(printer).writeValueAsString(overrides);
+
+        StringBuilder sb = new StringBuilder();
+        String[] lines = printed.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            sb.append(i == 0 ? "" : "\n" + indent).append(lines[i]);
         }
-        return "  ";
+        Json.Document holder = PackageJsonHelper.reparseJson(doc, sb.toString());
+        return holder.getValue() instanceof Json.JsonObject ?
+                ((Json.JsonObject) holder.getValue()).withPrefix(Space.build(" ", emptyList())) : null;
     }
+
 
 
     /** The value {@code overrides} already holds at {@code path -> packageName}, or {@code null}. */
@@ -554,7 +562,7 @@ public final class PackageJsonOverrides {
     private static Json.Literal makeStringLiteral(String value) {
         return new Json.Literal(
                 org.openrewrite.Tree.randomId(),
-                org.openrewrite.json.tree.Space.EMPTY,
+                Space.EMPTY,
                 org.openrewrite.marker.Markers.EMPTY,
                 "\"" + value + "\"", value);
     }

@@ -417,7 +417,7 @@ public class PackageJsonHelper {
     }
 
     /** The indent unit from {@code obj}'s first member, or two spaces when none can be detected. */
-    private static String detectIndentUnit(Json.JsonObject obj) {
+    static String detectIndentUnit(Json.JsonObject obj) {
         List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
         if (!members.isEmpty()) {
             String ws = members.get(0).getElement().getPrefix().getWhitespace();
@@ -643,7 +643,7 @@ public class PackageJsonHelper {
     }
 
     /** A member with {@code prefix}; a bare literal value gets a leading space so it prints {@code "key": "value"}. */
-    private static Json.Member makeMember(String key, JsonValue value, Space prefix) {
+    static Json.Member makeMember(String key, JsonValue value, Space prefix) {
         Json.Literal keyLit = makeStringLiteral(key);
         // Ensure there's a space between ':' and the value (standard JSON formatting).
         JsonValue spacedValue = value;
