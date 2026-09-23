@@ -279,14 +279,14 @@ class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
                         """,
                         """
                         {
-                          "name" : "npm-transitive-override",
-                          "version" : "1.0.0",
-                          "dependencies" : {
-                            "is-odd" : "3.0.1"
+                          "name": "npm-transitive-override",
+                          "version": "1.0.0",
+                          "dependencies": {
+                            "is-odd": "3.0.1"
                           },
-                          "overrides" : {
-                            "is-odd" : {
-                              "is-number" : "^7.0.0"
+                          "overrides": {
+                            "is-odd": {
+                              "is-number": "^7.0.0"
                             }
                           }
                         }

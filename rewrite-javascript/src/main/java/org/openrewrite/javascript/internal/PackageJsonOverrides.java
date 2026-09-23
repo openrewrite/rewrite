@@ -18,9 +18,12 @@ package org.openrewrite.javascript.internal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Ports {@code parseDependencyPath} and {@code applyOverrideToPackageJson}
@@ -168,10 +171,91 @@ public final class PackageJsonOverrides {
             return doc;
         }
 
-        // Deep-nested case: build nested JSON string and reparse
-        String overrideValue = buildNpmNestedOverride(packageName, newVersion, path);
-        return mergeTopLevelObjectReparse(doc, "overrides", overrideValue);
+        return setNestedOverride(doc, path, packageName, newVersion);
     }
+
+    /**
+     * Set {@code overrides -> path... -> packageName} without reformatting the document. Only the
+     * {@code overrides} value is rebuilt and spliced back in; every other member keeps its original
+     * whitespace, which a whole-document reparse would discard.
+     */
+    private static Json.Document setNestedOverride(Json.Document doc, List<DependencyPathSegment> path,
+                                                   String packageName, String newVersion) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode rootNode = mapper.readTree(doc.printAll());
+            com.fasterxml.jackson.databind.node.ObjectNode overrides =
+                    rootNode.path("overrides").isObject() ?
+                            (com.fasterxml.jackson.databind.node.ObjectNode) rootNode.get("overrides") :
+                            mapper.createObjectNode();
+
+            com.fasterxml.jackson.databind.node.ObjectNode at = overrides;
+            for (DependencyPathSegment seg : path) {
+                String key = seg.getVersion() != null ? seg.getName() + "@" + seg.getVersion() : seg.getName();
+                at = at.path(key).isObject() ?
+                        (com.fasterxml.jackson.databind.node.ObjectNode) at.get(key) : at.putObject(key);
+            }
+            at.put(packageName, newVersion);
+
+            String indent = detectIndent(root);
+            String printed = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(overrides)
+                    .replace("\" : ", "\": ");
+            // Re-indent to the document's own unit and depth so the spliced value lines up with its neighbours.
+            StringBuilder sb = new StringBuilder();
+            String[] lines = printed.split("\n", -1);
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i];
+                int spaces = 0;
+                while (spaces < line.length() && line.charAt(spaces) == ' ') {
+                    spaces++;
+                }
+                if (i > 0) {
+                    sb.append('\n').append(indent);
+                    for (int d = 0; d < spaces / 2; d++) {
+                        sb.append(indent);
+                    }
+                    sb.append(line.substring(spaces));
+                } else {
+                    sb.append(line);
+                }
+            }
+
+            Json.Document holder = PackageJsonHelper.reparseJson(doc, sb.toString());
+            if (!(holder.getValue() instanceof Json.JsonObject)) {
+                return doc;
+            }
+            Json.JsonObject value = ((Json.JsonObject) holder.getValue())
+                    .withPrefix(org.openrewrite.json.tree.Space.build(" ", emptyList()));
+
+            // Reuse the existing formatting-preserving insert to create the member when it is absent, then
+            // swap in the object value: addDependency only writes string values.
+            Json.Document out = doc;
+            if (findObjectMember(root, "overrides") == null) {
+                out = PackageJsonHelper.addDependency(out, "__placeholder__", "", "overrides");
+            }
+            Json.JsonObject outRoot = (Json.JsonObject) out.getValue();
+            return out.withValue(replaceMemberValue(outRoot, "overrides", value));
+        } catch (Exception e) {
+            return doc;
+        }
+    }
+
+    /** The document's indent unit, taken from the first root member's prefix; two spaces if unclear. */
+    private static String detectIndent(Json.JsonObject root) {
+        for (org.openrewrite.json.tree.Json m : root.getMembers()) {
+            String prefix = m.getPrefix().getWhitespace();
+            int nl = prefix.lastIndexOf('\n');
+            if (nl >= 0 && nl + 1 < prefix.length()) {
+                return prefix.substring(nl + 1);
+            }
+        }
+        return "  ";
+    }
+
 
     /** The value {@code overrides} already holds at {@code path -> packageName}, or {@code null}. */
     private static @Nullable String nestedOverrideValue(Json.Document doc, List<DependencyPathSegment> path,
