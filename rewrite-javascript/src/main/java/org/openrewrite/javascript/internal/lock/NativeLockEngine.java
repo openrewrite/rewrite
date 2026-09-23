@@ -19,7 +19,6 @@ import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import org.openrewrite.javascript.internal.PackageJsonOverrides;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.RecipeRunException;
@@ -29,6 +28,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.PackageJsonOverrides;
 import org.openrewrite.javascript.internal.registry.AbbreviatedPackument;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
@@ -401,47 +401,51 @@ public final class NativeLockEngine {
      * scoped name like {@code "@types/node"}, so reuse it rather than testing for {@code '/'}.
      */
     private static Map<String, String> declaredOverrides(PackageManager pm, String manifestJson) {
-        JsonNode node;
         try {
             JsonNode root = JSON.readTree(manifestJson);
-            node = pm == PackageManager.Pnpm
-                    ? (root.path("pnpm").isObject() ? root.path("pnpm").get("overrides") : null)
-                    : root.get(pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic
-                    ? "resolutions" : "overrides");
+            JsonNode node = pm == PackageManager.Pnpm ?
+                    (root.path("pnpm").isObject() ? root.path("pnpm").get("overrides") : null) :
+                    root.get(pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic ?
+                            "resolutions" : "overrides");
+            if (node == null || !node.isObject() || node.isEmpty()) {
+                return emptyMap();
+            }
+            // Resolution is package-manager agnostic, but each manager renders its own lock format through its
+            // own patcher and only npm has a fixture covering an applied override. Refuse the rest rather than
+            // ship an untested lock: assuming a shared path works because it compiles is what produced this
+            // defect. Checked before the entries so the reason given is the same one whatever they contain.
+            if (pm != PackageManager.Npm) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "overrides are not yet applied for " + pm);
+            }
+            Map<String, String> overrides = new LinkedHashMap<>();
+            Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> f = fields.next();
+                String key = f.getKey();
+                JsonNode value = f.getValue();
+                if (!value.isTextual()) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                            "nested override of " + key + " is not supported");
+                }
+                if (value.asText().startsWith("$")) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                            "override of " + key + " references a declared dependency and is not supported");
+                }
+                if (key.indexOf('*') >= 0 || ".".equals(key) || PackageJsonOverrides.parsePath(key).size() > 1) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                            "path-scoped override " + key + " is not supported");
+                }
+                overrides.put(key, value.asText());
+            }
+            return overrides;
+        } catch (EngineFailure ef) {
+            throw ef;
         } catch (Exception e) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not parse manifest overrides");
+            // parsePath rejects malformed keys by throwing; a raw exception here would escape as a recipe crash
+            // rather than the warning the caller turns a failure into.
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest overrides");
         }
-        if (node == null || !node.isObject() || node.isEmpty()) {
-            return emptyMap();
-        }
-        Map<String, String> overrides = new LinkedHashMap<>();
-        Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
-        while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> f = fields.next();
-            String key = f.getKey();
-            JsonNode value = f.getValue();
-            if (!value.isTextual()) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
-                        "nested override of " + key + " is not supported");
-            }
-            if (value.asText().startsWith("$")) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
-                        "override of " + key + " references a declared dependency and is not supported");
-            }
-            if (key.indexOf('*') >= 0 || ".".equals(key) || PackageJsonOverrides.parsePath(key).size() > 1) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
-                        "path-scoped override " + key + " is not supported");
-            }
-            overrides.put(key, value.asText());
-        }
-        // Resolution is package-manager agnostic, but each manager renders its own lock format through its own
-        // patcher and only npm has a fixture covering an applied override. Refuse the rest rather than ship an
-        // untested lock: assuming a shared path works because it compiles is what produced this defect.
-        if (pm != PackageManager.Npm) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                    "overrides are not yet applied for " + pm);
-        }
-        return overrides;
     }
 
     /** The versions the lock already installs, keyed by tree-slot name (an alias seeds under its slot). */
