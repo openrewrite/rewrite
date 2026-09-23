@@ -434,6 +434,13 @@ public final class NativeLockEngine {
             }
             overrides.put(key, value.asText());
         }
+        // Resolution is package-manager agnostic, but each manager renders its own lock format through its own
+        // patcher and only npm has a fixture covering an applied override. Refuse the rest rather than ship an
+        // untested lock: assuming a shared path works because it compiles is what produced this defect.
+        if (pm != PackageManager.Npm) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                    "overrides are not yet applied for " + pm);
+        }
         return overrides;
     }
 

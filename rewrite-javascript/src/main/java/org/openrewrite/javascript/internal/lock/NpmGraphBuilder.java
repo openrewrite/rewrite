@@ -182,12 +182,12 @@ public final class NpmGraphBuilder {
     private String select(String name, String range,
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
                           Deque<String[]> work) {
-        // Every requirement funnels through here, so a name carrying an override is caught wherever it is
-        // reached from. A name nothing depends on is never selected, which is why an override naming a package
-        // outside the closure stays the no-op it is.
-        if (overrides.containsKey(name)) {
-            throw new EngineFailure(RESOLUTION_REQUIRED, name,
-                    "override of " + name + " is not applied during closure resolution");
+        // Must precede the dedupe below: an override applied after it would lose to an already-chosen version.
+        // Every requirement funnels through here, so rewriting the range once covers the whole closure, and a
+        // name nothing depends on is never selected, so an override outside the closure stays the no-op it is.
+        String override = overrides.get(name);
+        if (override != null) {
+            range = override;
         }
         String deduped = Semver.maxSatisfying(chosen.getOrDefault(name, emptySet()), range, NODE);
         if (deduped != null) {
