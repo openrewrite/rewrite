@@ -97,6 +97,21 @@ class NpmPeerForkLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
+    void removalOrphaningADuplicatedNameDefers() {
+        // Removing micromatch orphans its closure, including the top-level picomatch@2.3.2 while picomatch@4.0.7
+        // stays nested under tinyglobby; npm could hoist that copy into the freed slot, which is not reproduced, so
+        // it defers rather than emit a lock that may not match.
+        String original = resource("lock/npm/peer-fork/pkg-before");
+        String edited = original.replace("    \"micromatch\": \"4.0.8\",\n", "");
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm, edited, original,
+                resource("lock/npm/peer-fork/before"), null, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+    }
+
+    @Test
     void peerUnsatisfiedAtAPlacementDefers() {
         // A (hand-edited) layout where fdir sits at the top level, where the picomatch it sees is 2.3.2, outside
         // its peer range. npm would re-place fdir to satisfy the peer; that move is not reproduced, so it defers.

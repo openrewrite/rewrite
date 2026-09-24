@@ -39,7 +39,8 @@ import static org.openrewrite.semver.Semver.Ecosystem.NODE;
  * constraint already met and adds no node. A missing non-optional peer is npm's auto-install: when it is enabled
  * (npm only; see {@link #autoInstallPeers}) and the slice is cleanest — an all-prod closure, the peer
  * a single pure-leaf version required by a single package — the peer is added as a top-level node; every other
- * missing-peer shape fails loud. An {@code npm:<name>@<range>} alias resolves its real package but is keyed and
+ * missing-peer shape fails loud. An optional peer resolving to several versions is satisfied per placement, so
+ * for npm it is handed to the serializer to verify (see {@link #placedPeerForks}). An {@code npm:<name>@<range>} alias resolves its real package but is keyed and
  * placed by the alias name, reproduced unless it entangles the peer machinery (its real name required as a peer,
  * or the alias declaring peers). Version and constraint decisions are delegated entirely to node-semver.
  */
@@ -65,6 +66,14 @@ public final class NpmGraphBuilder {
      */
     private final Map<String, Set<String>> lockedVersions;
 
+    /**
+     * An optional peer whose name resolves to several versions is satisfied per placement: each placement of its
+     * requirer sees the nearest copy up its {@code node_modules} chain. Only a serializer that models placement can
+     * decide that, so when enabled (npm only) such a peer is recorded as a {@link ResolutionGraph.PlacedPeer} for it
+     * to verify; otherwise it defers.
+     */
+    private final boolean placedPeerForks;
+
     public NpmGraphBuilder(Registry registry) {
         this(registry, false);
     }
@@ -74,9 +83,15 @@ public final class NpmGraphBuilder {
     }
 
     public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions) {
+        this(registry, autoInstallPeers, lockedVersions, false);
+    }
+
+    public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions,
+                           boolean placedPeerForks) {
         this.registry = registry;
         this.autoInstallPeers = autoInstallPeers;
         this.lockedVersions = lockedVersions;
+        this.placedPeerForks = placedPeerForks;
     }
 
     public ResolutionGraph build(Map<String, String> importerManifests) {
@@ -112,7 +127,8 @@ public final class NpmGraphBuilder {
                     resolveEdges(manifest.getOptionalDependencies(), chosen, manifests, work));
         }
         requireResolvableAliases(deriveAliases(manifests), chosen, manifests);
-        Set<String> autoInstalledPeers = resolvePeers(manifests, chosen, declared);
+        List<ResolutionGraph.PlacedPeer> placedPeers = new ArrayList<>();
+        Set<String> autoInstalledPeers = resolvePeers(manifests, chosen, declared, placedPeers);
 
         List<ResolutionGraph.Importer> importers = new ArrayList<>();
         for (ImporterDecl decl : declared) {
@@ -145,7 +161,7 @@ public final class NpmGraphBuilder {
             nodes.put(nodeKey, new ResolvedNode(e.getValue(), edges,
                     flags.dev.contains(nodeKey), flags.optional.contains(nodeKey), flags.devOptional.contains(nodeKey)));
         }
-        return new ResolutionGraph(importers, nodes);
+        return new ResolutionGraph(importers, nodes, placedPeers);
     }
 
     private Map<String, String> resolveEdges(@Nullable Map<String, String> declaredEdges,
@@ -427,21 +443,24 @@ public final class NpmGraphBuilder {
      * @return the node keys of the auto-installed peers (they carry no dev/optional flag in the all-prod closure).
      */
     private Set<String> resolvePeers(Map<String, VersionManifest> manifests, Map<String, Set<String>> chosen,
-                                     List<ImporterDecl> declared) {
+                                     List<ImporterDecl> declared, List<ResolutionGraph.PlacedPeer> placedPeers) {
         List<String[]> missing = new ArrayList<>();  // {requirer, peerName, range}
-        for (VersionManifest m : new ArrayList<>(manifests.values())) {
+        for (Map.Entry<String, VersionManifest> e : new ArrayList<>(manifests.entrySet())) {
+            VersionManifest m = e.getValue();
             Map<String, String> peers = m.getPeerDependencies();
             if (peers == null) {
                 continue;
             }
             JsonNode meta = m.getPeerDependenciesMeta();
             for (Map.Entry<String, String> peer : peers.entrySet()) {
-                resolvePeer(m.getName(), peer.getKey(), peer.getValue(), meta, chosen, missing);
+                resolvePeer(m.getName(), e.getKey(), peer.getKey(), peer.getValue(), meta, chosen, missing,
+                        placedPeers);
             }
         }
         for (ImporterDecl decl : declared) {
             for (Map.Entry<String, String> peer : decl.peers.entrySet()) {
-                resolvePeer(rootRequirer(decl), peer.getKey(), peer.getValue(), null, chosen, missing);
+                resolvePeer(rootRequirer(decl), null, peer.getKey(), peer.getValue(), null, chosen, missing,
+                        placedPeers);
             }
         }
         return missing.isEmpty() ? emptySet() : installMissingPeers(missing, manifests, chosen, declared);
@@ -450,10 +469,13 @@ public final class NpmGraphBuilder {
     /**
      * Classify one {@code (requirer, peer, range)}: an unmet non-optional peer is collected for auto-install (or
      * defers when disabled), a present peer must resolve to a single satisfying version, and an optional absent peer
-     * is skipped.
+     * is skipped. An optional peer resolving to several versions is left to placement when {@link #placedPeerForks}.
+     *
+     * @param requirerKey the requiring node's key, or {@code null} for an importer
      */
-    private void resolvePeer(String requirer, String peerName, String range, @Nullable JsonNode meta,
-                             Map<String, Set<String>> chosen, List<String[]> missing) {
+    private void resolvePeer(String requirer, @Nullable String requirerKey, String peerName, String range,
+                             @Nullable JsonNode meta, Map<String, Set<String>> chosen, List<String[]> missing,
+                             List<ResolutionGraph.PlacedPeer> placedPeers) {
         Set<String> resolved = chosen.getOrDefault(peerName, emptySet());
         if (resolved.isEmpty()) {
             if (isOptionalPeer(meta, peerName)) {
@@ -466,6 +488,11 @@ public final class NpmGraphBuilder {
             return;
         }
         if (resolved.size() > 1) {
+            if (placedPeerForks && requirerKey != null && isOptionalPeer(meta, peerName) &&
+                    Semver.validate(range, null, NODE).isValid()) {
+                placedPeers.add(new ResolutionGraph.PlacedPeer(requirerKey, peerName, range, true));
+                return;
+            }
             throw new EngineFailure(RESOLUTION_REQUIRED, requirer, requirer + " peer " + peerName +
                     " resolves to multiple versions " + resolved + " (peer fork not yet resolved)");
         }

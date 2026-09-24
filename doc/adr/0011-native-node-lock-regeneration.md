@@ -92,8 +92,10 @@ lock, whose new version's `dependencies` are unchanged and already satisfied, wi
 `peerDependencies` / `peerDependenciesMeta` / `optionalDependencies` / `os` / `cpu` / `libc` /
 `bundleDependencies` / `hasInstallScript`. Non-layout metadata (`engines`, `license`, `deprecated`,
 entry flags) is patched in place rather than failing loud. Removals of leaf/orphan entries are
-supported. Everything else routes to the whole-closure scope, which itself fails loud on any
-difference its format's patcher cannot express byte-exact.
+supported; in a v3 lock, orphans are found by `node_modules` resolution, so nested placements elsewhere
+in the tree no longer block a removal (a removed or orphaned name placed elsewhere still defers).
+Everything else routes to the whole-closure scope, which itself fails loud on any difference its
+format's patcher cannot express byte-exact.
 
 ### Architecture
 
@@ -123,6 +125,10 @@ A shared, package-manager-agnostic orchestrator plus a per-format patcher:
   (`NpmLockDiff`, `PnpmLockDiff`, `BunLockDiff`, `YarnClassicLockDiff`, `YarnBerryLockDiff`) matches
   the graph to the lock's own keys — hoisted `node_modules` slots, `name@version` content addresses,
   flat selector blocks, or merged descriptors — and expresses the difference as `PackageEdit`s.
+  For npm, an optional peer that resolves to several versions (a peer fork) is verified per
+  placement by `NpmLockDiff`: each placement of its requirer must see a satisfying copy up its
+  `node_modules` chain, else it fails loud. Other formats still defer a peer fork. An edge already
+  met by the copy its requirer sees is left in place rather than re-hoisted, as npm does.
 - **`LockPatcher`** per format — `NpmLockPatcher` (v2 + v3, workspaces, via rewrite-json),
   `PnpmLockPatcher` (v9 + v6, workspaces, via rewrite-yaml; v5.4 fails loud), `YarnClassicLockPatcher`
   (targeted text patch with merged-header split), `BunLockPatcher` (JSONC via rewrite-json),

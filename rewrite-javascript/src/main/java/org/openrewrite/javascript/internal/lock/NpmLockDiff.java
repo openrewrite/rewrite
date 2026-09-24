@@ -22,10 +22,12 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
+import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
 import static java.util.Collections.*;
+import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
 /**
  * Diffs a freshly resolved {@link ResolutionGraph} against the existing {@code package-lock.json} and expresses
@@ -56,6 +58,7 @@ final class NpmLockDiff {
         Map<String, String> bindings = matched.bindings;
         Set<String> fresh = hoistUnbound(graph, root, bindings, matched.pinnedPlacements);
         requireReproducibleFreshPlacements(graph, root, bindings, fresh);
+        requirePlacedPeersSatisfied(graph, bindings, matched.pinnedPlacements);
 
         Set<String> peerProviders = peerProviderKeys(graph);
         List<PackageEdit> edits = new ArrayList<>();
@@ -208,6 +211,11 @@ final class NpmLockDiff {
     private static void resolveEdge(ResolutionGraph graph, String fromLocation, String depName, String depVersion,
                                     Map<String, String> bindings, Map<String, Map<String, String>> shelf,
                                     Set<String> visited, Deque<String[]> queue, Set<String> fresh) {
+        // Node resolution finds the nearest placement first. When that already holds the wanted version the edge is
+        // met where it is, as npm leaves a valid edge alone (e.g. a copy nested beside the peer it needs).
+        if (depVersion.equals(visibleVersion(shelf, fromLocation, depName))) {
+            return;
+        }
         for (String prefix : chainTopToBottom(fromLocation)) {
             Map<String, String> at = shelf.computeIfAbsent(prefix, k -> new HashMap<>());
             String existing = at.get(depName);
@@ -423,6 +431,64 @@ final class NpmLockDiff {
             }
         }
         return false;
+    }
+
+    // --- peer forks --------------------------------------------------------
+
+    /**
+     * A peer that resolves to several versions is met per placement: from each place its requirer is installed,
+     * the nearest copy up the {@code node_modules} chain must satisfy the peer's range (an optional peer may be
+     * absent). npm places the requirer so that holds; where the final layout leaves a placement unsatisfied, npm
+     * would have placed things differently, so it defers rather than emit that layout.
+     */
+    private static void requirePlacedPeersSatisfied(ResolutionGraph graph, Map<String, String> bindings,
+                                                    Map<String, String> pinnedPlacements) {
+        if (graph.getPlacedPeers().isEmpty()) {
+            return;
+        }
+        Map<String, Map<String, String>> placed = new HashMap<>();  // node_modules prefix -> name -> version
+        for (Map.Entry<String, String> b : bindings.entrySet()) {
+            placed.computeIfAbsent(prefixOf(b.getValue()), k -> new HashMap<>()).put(slotOf(b.getValue()), versionOf(b.getKey()));
+        }
+        for (Map.Entry<String, String> p : pinnedPlacements.entrySet()) {
+            placed.computeIfAbsent(prefixOf(p.getKey()), k -> new HashMap<>()).put(slotOf(p.getKey()), p.getValue());
+        }
+        for (ResolutionGraph.PlacedPeer peer : graph.getPlacedPeers()) {
+            String requirerSlot = slotOf(peer.getRequirer());
+            String requirerVersion = versionOf(peer.getRequirer());
+            List<String> locations = new ArrayList<>();
+            String primary = bindings.get(peer.getRequirer());
+            if (primary != null) {
+                locations.add(primary);
+            }
+            for (Map.Entry<String, String> p : pinnedPlacements.entrySet()) {
+                if (requirerSlot.equals(slotOf(p.getKey())) && requirerVersion.equals(p.getValue())) {
+                    locations.add(p.getKey());
+                }
+            }
+            for (String location : locations) {
+                String seen = visibleVersion(placed, location, peer.getPeerName());
+                if (seen == null ? !peer.isOptional() : !Semver.satisfies(seen, peer.getRange(), NODE)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, requirerSlot, peer.getRequirer() + " at " +
+                            location + " sees peer " + (seen == null ? peer.getPeerName() + " absent" :
+                            peer.getPeerName() + "@" + seen) + ", outside " + peer.getRange() +
+                            " (peer re-placement not yet reproduced)");
+                }
+            }
+        }
+    }
+
+    /** The version of {@code name} that node resolution finds from {@code location}: the nearest placement upward. */
+    private static @Nullable String visibleVersion(Map<String, Map<String, String>> placed, String location,
+                                                   String name) {
+        List<String> chain = chainTopToBottom(location);
+        for (int i = chain.size() - 1; i >= 0; i--) {
+            String version = placed.getOrDefault(chain.get(i), emptyMap()).get(name);
+            if (version != null) {
+                return version;
+            }
+        }
+        return null;
     }
 
     // --- edits -------------------------------------------------------------

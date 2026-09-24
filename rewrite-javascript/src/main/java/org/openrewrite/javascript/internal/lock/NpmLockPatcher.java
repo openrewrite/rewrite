@@ -1011,8 +1011,12 @@ public final class NpmLockPatcher implements LockPatcher {
     private Json.JsonObject applyRemovals(Json.JsonObject root, int lockfileVersion, List<PackageEdit> removals) {
         Json.JsonObject packages = requirePackages(root);
 
-        // GC-by-name is only sound for a flat, hoisted tree; reject nested/forked placements.
+        // A v2 lock's legacy dependencies tree is GC'd by name, only sound for a flat, hoisted tree; reject
+        // nested/forked placements there. A v3 lock is GC'd by placement below.
         for (Json member : packages.getMembers()) {
+            if (lockfileVersion >= 3) {
+                break;
+            }
             if (member instanceof Json.Member) {
                 String key = LockJson.memberKey((Json.Member) member);
                 if (key != null && key.indexOf("node_modules/") != key.lastIndexOf("node_modules/")) {
@@ -1044,6 +1048,20 @@ public final class NpmLockPatcher implements LockPatcher {
         Set<String> removedKeys = new LinkedHashSet<>();
         for (String name : removedNames) {
             removedKeys.add("node_modules/" + name);
+        }
+        if (lockfileVersion >= 3) {
+            // Another placement of a removed name could re-hoist into the freed top-level slot.
+            for (Json member : packages.getMembers()) {
+                String key = member instanceof Json.Member ? LockJson.memberKey((Json.Member) member) : null;
+                if (key != null && !removedKeys.contains(key) && key.contains("node_modules/") &&
+                        removedNames.contains(installedName(key))) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, installedName(key),
+                            "removing " + installedName(key) + " with another placement (" + key + ") may re-hoist; deferred");
+                }
+            }
+            packages = removeMembers(packages, removedKeys);
+            // Orphans are whatever npm's own node_modules resolution no longer reaches from an importer.
+            return gcOrphansAfterBump(LockJson.replaceValue(root, "packages", packages), lockfileVersion);
         }
         packages = removeMembers(packages, removedKeys);
 
