@@ -544,6 +544,39 @@ public class PackageJsonHelper {
         return root.getPadding().withMembers(members);
     }
 
+    /**
+     * The specifier protocol of a dependency value that is not a version constraint, or {@code null}
+     * when the value is an ordinary range.
+     * <p>
+     * A {@code package.json} version position can hold an indirection instead of a range: pnpm's
+     * {@code catalog:}, a {@code workspace:} link, Yarn's {@code patch:}, {@code portal:} and
+     * {@code npm:} aliases, or a plain {@code file:}, {@code link:}, {@code git:} or {@code https:}
+     * specifier. The constraint such a value refers to lives somewhere else, so overwriting it with a
+     * range silently discards what it pointed at. Recognised structurally, by a URI-style scheme
+     * prefix, because the set of protocols grows with each package manager release and skipping an
+     * unfamiliar one is always safer than overwriting it. No version range can be mistaken for one:
+     * ranges start with a digit, {@code ^}, {@code ~}, {@code >}, {@code <}, {@code =} or {@code *},
+     * and dist-tags like {@code latest} carry no colon.
+     */
+    public static @Nullable String dependencySpecifierProtocol(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        int colon = value.indexOf(':');
+        if (colon < 1) {
+            return null;
+        }
+        for (int i = 0; i < colon; i++) {
+            char c = value.charAt(i);
+            boolean schemeChar = c >= 'a' && c <= 'z' ||
+                    i > 0 && (c >= '0' && c <= '9' || c == '+' || c == '.' || c == '-');
+            if (!schemeChar) {
+                return null;
+            }
+        }
+        return value.substring(0, colon + 1);
+    }
+
     public static Json.Document upgradeVersion(Json.Document doc, List<MatchedDependency> matched, String newVersion) {
         if (!(doc.getValue() instanceof Json.JsonObject) || matched.isEmpty()) {
             return doc;
@@ -577,6 +610,11 @@ public class PackageJsonHelper {
                 if (name == null || !targetNames.contains(name)) continue;
                 if (!(depMember.getValue() instanceof Json.Literal)) continue;
                 Json.Literal oldLit = (Json.Literal) depMember.getValue();
+                // Callers already filter these out by marker, but this is the layer that does the
+                // overwriting and the only one that sees what the manifest actually says. A marker is
+                // free to report a resolved version where the manifest holds a reference, and the cost
+                // of being wrong here is a discarded constraint, so the check is repeated.
+                if (dependencySpecifierProtocol(literalString(oldLit)) != null) continue;
                 Json.Literal newLit = makeStringLiteral(newVersion).withPrefix(oldLit.getPrefix());
                 children.set(j, children.get(j).withElement(depMember.withValue(newLit)));
                 scopeChanged = true;

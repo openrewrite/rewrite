@@ -16,6 +16,9 @@
 package org.openrewrite.javascript.internal;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
@@ -508,5 +511,36 @@ class PackageJsonHelperTest {
                 null,
                 new InMemoryExecutionContext(Throwable::printStackTrace))
                 .findFirst().orElseThrow();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "catalog:,                       catalog:",
+            "catalog:react17,                catalog:",
+            "workspace:^,                    workspace:",
+            "workspace:1.4.1,                workspace:",
+            "npm:@acme/logger@^1.4.1,        npm:",
+            "patch:acme-logger@1.4.1#fix.patch, patch:",
+            "portal:../acme-logger,          portal:",
+            "file:../acme-logger,            file:",
+            "link:../acme-logger,            link:",
+            "github:acme/logger,             github:",
+            "https://example.com/acme.tgz,   https:",
+            "git+ssh://example.com/acme.git, git+ssh:"
+    })
+    void protocolSpecifiersAreRecognised(String value, String expectedProtocol) {
+        assertThat(PackageJsonHelper.dependencySpecifierProtocol(value)).isEqualTo(expectedProtocol);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"^1.4.1", "~1.4.1", "1.4.1", "1.x", "*", "", "latest", "next",
+            ">=1.0.0 <2.0.0", "1.2.3-beta.1", "1.2.3+build.4", "Catalog:", "-bad:"})
+    void versionConstraintsAreNotMistakenForProtocols(String value) {
+        assertThat(PackageJsonHelper.dependencySpecifierProtocol(value)).isNull();
+    }
+
+    @Test
+    void nullIsNotAProtocol() {
+        assertThat(PackageJsonHelper.dependencySpecifierProtocol(null)).isNull();
     }
 }
