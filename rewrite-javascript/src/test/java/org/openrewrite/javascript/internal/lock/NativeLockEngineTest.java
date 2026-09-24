@@ -1143,6 +1143,43 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).contains("aliased");
     }
 
+    /**
+     * npm auto-installs an unmet non-optional peer through installMissingPeers, which resolves straight off
+     * the registry and never reaches select, so an override naming that peer would be skipped without trace.
+     */
+    @Test
+    void overrideOfAnAutoInstalledPeerFailsLoud() {
+        routes.put("https://registry.npmjs.org/lodash",
+                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"peerDependencies\":{\"react\":\"^17.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\"integrity\":\"sha512-LODASH\"}}");
+        routes.put("https://registry.npmjs.org/react",
+                "{\"name\":\"react\",\"dist-tags\":{},\"versions\":{\"17.0.0\":{},\"18.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/react/17.0.0",
+                "{\"name\":\"react\",\"version\":\"17.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/react/-/react-17.0.0.tgz\",\"integrity\":\"sha512-REACT17\"}}");
+        routes.put("https://registry.npmjs.org/react/18.0.0",
+                "{\"name\":\"react\",\"version\":\"18.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/react/-/react-18.0.0.tgz\",\"integrity\":\"sha512-REACT18\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"react\":\"^18.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20"}},
+                    "node_modules/lodash": {"version": "4.17.20", "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz", "integrity": "sha512-LODASH"},
+                    "node_modules/react": {"version": "17.0.0", "resolved": "https://registry.npmjs.org/react/-/react-17.0.0.tgz", "integrity": "sha512-REACT17"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("auto-installed peer");
+    }
+
     @Test
     void nullLockFailsLoud() {
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,

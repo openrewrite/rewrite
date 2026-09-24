@@ -525,6 +525,12 @@ public final class NpmGraphBuilder {
         }
         Set<String> autoInstalled = new LinkedHashSet<>();
         for (String[] miss : missing) {
+            // resolveLeafPeer goes straight to the registry and never reaches select, so an override naming
+            // this peer would be skipped silently. Refuse rather than ignore it.
+            if (overrides.containsKey(miss[1])) {
+                throw new EngineFailure(RESOLUTION_REQUIRED, miss[1],
+                        "override of auto-installed peer " + miss[1] + " (required by " + miss[0] + ") is not supported");
+            }
             VersionManifest peerManifest = resolveLeafPeer(miss[1], miss[2]);
             if (peerManifest == null) {
                 throw peerNotInstalled(miss[0], miss[1]);
