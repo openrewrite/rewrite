@@ -140,8 +140,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
                         String scanVisitorName = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getScanVisitor() : null;
 
-                        if (scanVisitorName != null) {
-                            captureRpc(currentRpc, touched, refCheckpoints);
+                        RpcRecipe evictable = rpcRecipe(recipe);
+                        if (evictable != null && evictable.getScanVisitor() != null) {
+                            captureRpc(evictable.getRpc(), touched, refCheckpoints);
                         }
 
                         if (currentRpc != null && scanVisitorName != null) {
@@ -366,7 +367,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
 
             RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
-            captureRpc(currentRpc, touched, refCheckpoints);
+            RpcRecipe evictable = rpcRecipe(recipe);
+            captureRpc(evictable != null ? evictable.getRpc() : null, touched, refCheckpoints);
 
             // Flush batch if switching to a different RPC or non-RPC recipe
             if (batch.rpc != null && batch.rpc != currentRpc) {
@@ -848,6 +850,19 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
      */
     private static Recipe leaf(List<Recipe> recipeStack) {
         return recipeStack.get(recipeStack.size() - 1);
+    }
+
+    private static @Nullable RpcRecipe rpcRecipe(Recipe recipe) {
+        while (true) {
+            if (recipe instanceof RpcRecipe) {
+                return (RpcRecipe) recipe;
+            }
+            if (recipe instanceof Recipe.DelegatingRecipe) {
+                recipe = ((Recipe.DelegatingRecipe) recipe).getDelegate();
+            } else {
+                return null;
+            }
+        }
     }
 
     private static <S extends SourceFile> S addRecipesThatMadeChanges(List<Recipe> recipeStack, S afterFile) {
