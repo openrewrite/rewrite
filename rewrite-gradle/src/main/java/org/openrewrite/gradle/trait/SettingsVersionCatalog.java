@@ -416,7 +416,8 @@ class SettingsVersionCatalog implements VersionCatalog {
                     if (catalogName != null) {
                         return new SettingsVersionCatalog(cursor, catalogName);
                     }
-                } else if ("catalog".equals(m.getSimpleName()) && isBuildScript(cursor)) {
+                } else if ("catalog".equals(m.getSimpleName()) && m.getArguments().size() == 1 &&
+                           m.getArguments().get(0) instanceof J.Lambda && isBuildScript(cursor)) {
                     // The unnamed catalog { versionCatalog { ... } } of the version-catalog plugin,
                     // which only a build script can apply
                     return new SettingsVersionCatalog(cursor, null);

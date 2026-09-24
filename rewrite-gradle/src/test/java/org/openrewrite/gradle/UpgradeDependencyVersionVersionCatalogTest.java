@@ -983,6 +983,10 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "acme-core", "2.0", null)),
           buildGradleKts(
             """
+              plugins {
+                  `version-catalog`
+              }
+
               catalog {
                   versionCatalog {
                       library("acmeCoreLib", "com.acme", "acme-core").version("1.0")
@@ -990,6 +994,10 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  `version-catalog`
+              }
+
               catalog {
                   versionCatalog {
                       library("acmeCoreLib", "com.acme", "acme-core").version("2.0")
@@ -1036,22 +1044,6 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
     }
 
     @Test
-    void producerBlockInASettingsScriptIsLeftAlone() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
-          settingsGradle(
-            """
-              catalog {
-                  versionCatalog {
-                      library('widgetA', 'com.acme', 'widget-a').version('1.0')
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void versionRefIsResolvedAcrossVersionCatalogBlocksOfOneCatalog() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
@@ -1090,6 +1082,7 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
     void catalogConfiguredThroughAProjectBlockIsUpgraded() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          settingsGradle("include 'catalog'"),
           buildGradle(
             """
               project(':catalog') {

@@ -159,7 +159,7 @@ public interface VersionCatalog extends Trait<Tree> {
     }
 
     /**
-     * Matches a script catalog at its {@code libs { ... } } or {@code versionCatalog { ... } }
+     * Matches a script catalog at its {@code libs { ... } } or {@code catalog { ... } }
      * call, or a TOML catalog at the document of a {@code *.versions.toml} file.
      */
     class Matcher extends SimpleTraitMatcher<VersionCatalog> {

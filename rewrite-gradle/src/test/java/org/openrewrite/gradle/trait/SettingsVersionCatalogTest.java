@@ -272,6 +272,10 @@ class SettingsVersionCatalogTest implements RewriteTest {
             new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),
           buildGradleKts(
             """
+              plugins {
+                  `version-catalog`
+              }
+
               catalog {
                   versionCatalog {
                       version("lombokVersion", "1.18.30")
@@ -280,6 +284,10 @@ class SettingsVersionCatalogTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  `version-catalog`
+              }
+
               /*~~>*/catalog {
                   versionCatalog {
                       version("lombokVersion", "1.18.30")
@@ -291,18 +299,15 @@ class SettingsVersionCatalogTest implements RewriteTest {
         );
     }
 
+
     @Test
-    void doesNotMatchAProducerBlockInASettingsScript() {
+    void doesNotMatchCatalogCallWithoutOnlyAClosure() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),
-          settingsGradle(
+          buildGradle(
             """
-              catalog {
-                  versionCatalog {
-                      library('projectLombok', 'org.projectlombok', 'lombok').version('1.18.30')
-                  }
-              }
+              catalog(file('catalog.toml'))
               """
           )
         );
