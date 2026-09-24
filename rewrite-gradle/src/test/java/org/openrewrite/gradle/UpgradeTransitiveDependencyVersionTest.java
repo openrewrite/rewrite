@@ -817,6 +817,88 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void updateStrictlyVersionConstraintAddingBecause() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.0') {
+                          version {
+                              strictly('2.12.0')
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          version {
+                              strictly('2.12.5')
+                          }
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateConstraintAddingBecauseKeepsRejectedVersions() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.0') {
+                          version {
+                              reject('2.11.0')
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          version {
+                              reject('2.11.0')
+                          }
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addConstraintToNonTransitiveExtendingTransitiveConfiguration() {
         rewriteRun(
           buildGradle(
@@ -1375,6 +1457,49 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                           because("CVE-2024-BAD")
                       }
                       implementation("org.openrewrite:rewrite-xml:7.0.0")
+                  }
+
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslUpdateRequireVersionConstraintAddingBecause() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.0") {
+                          version {
+                              require("2.12.0")
+                              reject("2.11.0")
+                          }
+                      }
+                  }
+
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """,
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.5") {
+                          version {
+                              require("2.12.5")
+                              reject("2.11.0")
+                          }
+                          because("CVE-2024-BAD")
+                      }
                   }
 
                   implementation("org.openrewrite:rewrite-java:7.0.0")
