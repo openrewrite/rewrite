@@ -250,11 +250,10 @@ public final class NativeLockEngine {
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        Map<String, String> scopedParent = new LinkedHashMap<>();
-        Map<String, String> overrides = declaredOverrides(PackageManager.Npm, editedPackageJson, scopedParent);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock), overrides)
+        Overrides overrides = declaredOverrides(PackageManager.Npm, editedPackageJson);
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock), overrides.ranges)
                 .build(singletonMap("", editedPackageJson));
-        requireOverridesHold(graph, overrides, scopedParent);
+        requireOverridesHold(graph, overrides.ranges, overrides.scopedParent);
         List<LockEditSet.PackageEdit> edits = NpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Npm, packageJsonPath),
                 PackageManager.Npm, editedPackageJson, edits);
@@ -270,7 +269,7 @@ public final class NativeLockEngine {
                                                    NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsBerry(existingLock),
-                declaredOverrides(PackageManager.YarnBerry, editedPackageJson, new LinkedHashMap<>()));
+                declaredOverrides(PackageManager.YarnBerry, editedPackageJson).ranges);
         ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
         requireOverridesApplyOnlyOnNpm(PackageManager.YarnBerry, builder);
         List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
@@ -314,7 +313,7 @@ public final class NativeLockEngine {
                                                      NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsYarnClassic(existingLock),
-                declaredOverrides(PackageManager.YarnClassic, editedPackageJson, new LinkedHashMap<>()));
+                declaredOverrides(PackageManager.YarnClassic, editedPackageJson).ranges);
         ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
         requireOverridesApplyOnlyOnNpm(PackageManager.YarnClassic, builder);
         List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
@@ -351,7 +350,7 @@ public final class NativeLockEngine {
                                               NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsPnpm(existingLock),
-                declaredOverrides(PackageManager.Pnpm, editedPackageJson, new LinkedHashMap<>()));
+                declaredOverrides(PackageManager.Pnpm, editedPackageJson).ranges);
         ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
         requireOverridesApplyOnlyOnNpm(PackageManager.Pnpm, builder);
         List<LockEditSet.PackageEdit> edits = PnpmLockDiff.diff(graph, existingLock);
@@ -387,7 +386,7 @@ public final class NativeLockEngine {
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock),
-                declaredOverrides(PackageManager.Bun, editedPackageJson, new LinkedHashMap<>()));
+                declaredOverrides(PackageManager.Bun, editedPackageJson).ranges);
         ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
         requireOverridesApplyOnlyOnNpm(PackageManager.Bun, builder);
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
@@ -422,8 +421,8 @@ public final class NativeLockEngine {
      * {@code {"parent": {"child": range}}}, is what a {@code dependencyPath} run writes; it is applied globally
      * and {@code requireScopeHolds} proves the equivalence afterwards.
      */
-    private static Map<String, String> declaredOverrides(PackageManager pm, String manifestJson,
-                                                         Map<String, String> scopedParent) {
+    private static Overrides declaredOverrides(PackageManager pm, String manifestJson) {
+        Map<String, String> scopedParent = new LinkedHashMap<>();
         try {
             JsonNode root = JSON.readTree(manifestJson);
             JsonNode node = pm == PackageManager.Pnpm ?
@@ -431,11 +430,11 @@ public final class NativeLockEngine {
                     root.get(pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic ?
                             "resolutions" : "overrides");
             if (node == null || !node.isObject() || node.isEmpty()) {
-                return emptyMap();
+                return new Overrides(emptyMap(), emptyMap());
             }
             Map<String, String> overrides = new LinkedHashMap<>();
             collectOverrides(node, null, overrides, scopedParent);
-            return overrides;
+            return new Overrides(overrides, scopedParent);
         } catch (EngineFailure ef) {
             throw ef;
         } catch (Exception e) {
@@ -454,6 +453,17 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED,
                     builder.getAppliedOverrides().iterator().next(),
                     "overrides are not yet applied for " + pm);
+        }
+    }
+
+    /** What the manifest declares: the ranges to apply, and for a nested entry the parent it was scoped to. */
+    private static final class Overrides {
+        final Map<String, String> ranges;
+        final Map<String, String> scopedParent;
+
+        Overrides(Map<String, String> ranges, Map<String, String> scopedParent) {
+            this.ranges = ranges;
+            this.scopedParent = scopedParent;
         }
     }
 
