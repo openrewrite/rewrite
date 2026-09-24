@@ -1341,27 +1341,6 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
     }
 
-    /**
-     * PackageJsonOverrides writes a {@code name@version} parent key for a versioned dependencyPath segment.
-     * The allowlist rejects it as a selector rather than treating it as a package name, which previously gave
-     * a refusal naming the parent as its own other requirer.
-     */
-    @Test
-    void versionedParentKeyIsRefusedAsASelector() {
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"lodash@4.17.20\":{\"tslib\":\"1.0.0\"}}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("is not a plain package name");
-    }
-
-    /**
-     * The per-dependency path resolves an added dependency's own closure without reading overrides, so a
-     * project that already declares one could have a new transitive locked at the registry version while the
-     * manifest says otherwise -- a wrong lock reported as success, not merely an unapplied override.
-     */
     @Test
     void addingADependencyThatPullsInAnOverriddenPackageHonoursTheOverride() {
         routes.put("https://registry.npmjs.org/existing",
@@ -1398,6 +1377,40 @@ class NativeLockEngineTest {
         assertThat(result.getLockFileContent())
                 .as("the declared override must reach a package the add pulled in")
                 .contains("shared-2.0.0.tgz").doesNotContain("shared-1.5.0.tgz");
+    }
+
+    /**
+     * PackageJsonOverrides writes a {@code name@version} parent key when a dependencyPath segment carries a
+     * version, and npm applies such an override only while the parent resolves to that version. When it does,
+     * the selector adds nothing to the scoped case already handled.
+     */
+    @Test
+    void versionedParentKeyAppliesWhenTheParentMatches() {
+        versionedParentRoutes();
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"lodash@4.17.20\":{\"tslib\":\"^2.0.0\"}}}",
+                versionedParentLock());
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("tslib-2.0.0.tgz").doesNotContain("tslib-1.0.0.tgz");
+    }
+
+    /** The parent resolves to a different version, so npm would not apply it and neither can this. */
+    @Test
+    void versionedParentKeyRefusesWhenTheParentDiffers() {
+        versionedParentRoutes();
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"lodash@9.9.9\":{\"tslib\":\"^2.0.0\"}}}",
+                versionedParentLock());
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail())
+                .as("refused for the version mismatch, not for the selector shape")
+                .contains("resolved to 4.17.20");
     }
 
     @Test
@@ -1455,6 +1468,34 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail()).doesNotContain("s3cr3ttoken");
         assertThat(result.getErrorMessage()).doesNotContain("s3cr3ttoken");
+    }
+
+    private void versionedParentRoutes() {
+        routes.put("https://registry.npmjs.org/lodash",
+                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{\"tslib\":\"^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\"integrity\":\"sha512-LODASH\"}}");
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/1.0.0",
+                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-TSLIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
+    }
+
+    private static String versionedParentLock() {
+        return """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20"}},
+                    "node_modules/lodash": {"version": "4.17.20", "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz", "integrity": "sha512-LODASH", "dependencies": {"tslib": "^1.0.0"}},
+                    "node_modules/tslib": {"version": "1.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz", "integrity": "sha512-TSLIB100"}
+                  }
+                }
+                """;
     }
 
     private static String resource(String path) {

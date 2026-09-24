@@ -406,8 +406,9 @@ public final class NativeLockEngine {
      * A package name npm would accept: an optional {@code @scope/} then a plain name. Deliberately an
      * allowlist. A denylist has to enumerate every form the resolver cannot apply, and anything it misses
      * becomes a key that matches no package, resolves as if the override were absent, and reports success -
-     * which is the defect this engine exists to avoid. Range-bearing keys ({@code tslib@^2}), path selectors
-     * ({@code a>b}, {@code a/b}), globs and {@code .} all fail this by construction.
+     * which is the defect this engine exists to avoid. Path selectors ({@code a>b}, {@code a/b}), globs and
+     * {@code .} all fail this by construction, as does a range-bearing leaf key ({@code tslib@^2}). A parent
+     * key is matched on its name part only, so it may carry an {@code @version} selector.
      */
     private static final Pattern OVERRIDE_NAME = Pattern.compile("(?:@[A-Za-z0-9~][A-Za-z0-9._~-]*/)?[A-Za-z0-9~][A-Za-z0-9._~-]*");
 
@@ -415,7 +416,7 @@ public final class NativeLockEngine {
      * The global overrides the root manifest declares, keyed by package name: {@code overrides} for npm and
      * Bun, {@code resolutions} for either yarn, {@code pnpm.overrides} for pnpm. One level of nesting,
      * {@code {"parent": {"child": range}}}, is what a {@code dependencyPath} run writes; it is applied globally
-     * and {@code requireScopeHolds} proves the equivalence afterwards.
+     * and {@code requireOverridesHold} proves the equivalence afterwards.
      */
     private static Overrides declaredOverrides(PackageManager pm, String manifestJson) {
         Map<String, String> scopedParent = new LinkedHashMap<>();
@@ -471,7 +472,11 @@ public final class NativeLockEngine {
             Map.Entry<String, JsonNode> f = fields.next();
             String key = f.getKey();
             JsonNode value = f.getValue();
-            if (!OVERRIDE_NAME.matcher(key).matches()) {
+            // A parent may carry a version selector (PackageJsonOverrides writes one for a versioned
+            // dependencyPath segment); requireOverridesHold checks it against the resolved parent. A leaf
+            // key may not, because a range there selects which copies to override and this engine has no
+            // way to apply an override to only some of them.
+            if (!OVERRIDE_NAME.matcher(value.isObject() ? parentName(key) : key).matches()) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                         "override selector " + key + " is not a plain package name");
             }
@@ -496,6 +501,18 @@ public final class NativeLockEngine {
                 scopedParent.put(key, parent);
             }
         }
+    }
+
+    /** The name part of a parent key, which may carry an {@code @version} selector. */
+    private static String parentName(String key) {
+        int at = key.lastIndexOf('@');
+        return at > 0 ? key.substring(0, at) : key;
+    }
+
+    /** The version a parent key selects, or {@code null} when it selects every copy. */
+    private static @Nullable String parentVersion(String key) {
+        int at = key.lastIndexOf('@');
+        return at > 0 ? key.substring(at + 1) : null;
     }
 
     /**
@@ -526,7 +543,21 @@ public final class NativeLockEngine {
         }
         for (Map.Entry<String, String> e : scopedParent.entrySet()) {
             String child = e.getKey();
-            String parent = e.getValue();
+            String parent = parentName(e.getValue());
+            String wantVersion = parentVersion(e.getValue());
+            if (wantVersion != null) {
+                // npm applies a version-selected override only while the parent resolves to that version.
+                // When it does the selector adds nothing; when it does not the override should not have been
+                // applied at all, and it already has been, so refuse rather than resolve a second time.
+                for (ResolvedNode n : graph.getNodes().values()) {
+                    if (parent.equals(n.getManifest().getName()) &&
+                            !wantVersion.equals(n.getManifest().getVersion())) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, child,
+                                "override of " + child + " scoped to " + e.getValue() + " but " + parent +
+                                        " resolved to " + n.getManifest().getVersion());
+                    }
+                }
+            }
             for (ResolvedNode n : graph.getNodes().values()) {
                 // Peer edges are not in resolvedEdges, so a peer requirer would otherwise be invisible here
                 // and the global application would not have been equivalent after all.
