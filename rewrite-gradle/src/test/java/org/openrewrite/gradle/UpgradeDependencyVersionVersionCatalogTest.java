@@ -914,4 +914,206 @@ class UpgradeDependencyVersionVersionCatalogTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void versionCatalogProducerBlockIsUpgraded() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          buildGradle(
+            """
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      version('widgetVersion', '1.0')
+                      library('widgetA', 'com.acme', 'widget-a').versionRef('widgetVersion')
+                      plugin('widgetPlugin', 'com.acme.widget').versionRef('widgetVersion')
+                  }
+              }
+              """,
+            """
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      version('widgetVersion', '1.0')
+                      library('widgetA', 'com.acme', 'widget-a').version('2.0')
+                      plugin('widgetPlugin', 'com.acme.widget').versionRef('widgetVersion')
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionCatalogProducerBlockSharedVersionIsUpgradedInPlace() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)),
+          buildGradle(
+            """
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      version('widgetVersion', '1.0')
+                      library('widgetA', 'com.acme', 'widget-a').versionRef('widgetVersion')
+                      library('widgetB', 'com.acme', 'widget-b').versionRef('widgetVersion')
+                  }
+              }
+              """,
+            """
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      version('widgetVersion', '2.0')
+                      library('widgetA', 'com.acme', 'widget-a').versionRef('widgetVersion')
+                      library('widgetB', 'com.acme', 'widget-b').versionRef('widgetVersion')
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinVersionCatalogProducerBlockIsUpgraded() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "acme-core", "2.0", null)),
+          buildGradleKts(
+            """
+              catalog {
+                  versionCatalog {
+                      library("acmeCoreLib", "com.acme", "acme-core").version("1.0")
+                  }
+              }
+              """,
+            """
+              catalog {
+                  versionCatalog {
+                      library("acmeCoreLib", "com.acme", "acme-core").version("2.0")
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void entriesInEveryVersionCatalogBlockAreUpgraded() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-*", "2.0", null)),
+          buildGradle(
+            """
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      library('widgetA', 'com.acme', 'widget-a').version('1.0')
+                  }
+                  versionCatalog {
+                      version('widgetBVersion', '1.0')
+                      library('widgetB', 'com.acme', 'widget-b').versionRef('widgetBVersion')
+                  }
+              }
+              """,
+            """
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      library('widgetA', 'com.acme', 'widget-a').version('2.0')
+                  }
+                  versionCatalog {
+                      version('widgetBVersion', '2.0')
+                      library('widgetB', 'com.acme', 'widget-b').versionRef('widgetBVersion')
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void producerBlockInASettingsScriptIsLeftAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          settingsGradle(
+            """
+              catalog {
+                  versionCatalog {
+                      library('widgetA', 'com.acme', 'widget-a').version('1.0')
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionRefIsResolvedAcrossVersionCatalogBlocksOfOneCatalog() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          buildGradle(
+            """
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      version('shared', '1.0')
+                      library('widgetA', 'com.acme', 'widget-a').versionRef('shared')
+                  }
+                  versionCatalog {
+                      library('widgetB', 'com.acme', 'widget-b').versionRef('shared')
+                  }
+              }
+              """,
+            """
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      version('shared', '1.0')
+                      library('widgetA', 'com.acme', 'widget-a').version('2.0')
+                  }
+                  versionCatalog {
+                      library('widgetB', 'com.acme', 'widget-b').versionRef('shared')
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void catalogConfiguredThroughAProjectBlockIsUpgraded() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.acme", "widget-a", "2.0", null)),
+          buildGradle(
+            """
+              project(':catalog') {
+                  apply plugin: 'version-catalog'
+
+                  catalog {
+                      versionCatalog {
+                          library('widgetA', 'com.acme', 'widget-a').version('1.0')
+                      }
+                  }
+              }
+              """,
+            """
+              project(':catalog') {
+                  apply plugin: 'version-catalog'
+
+                  catalog {
+                      versionCatalog {
+                          library('widgetA', 'com.acme', 'widget-a').version('2.0')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
