@@ -24,6 +24,8 @@ import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
+import org.openrewrite.javascript.internal.MatchedDependency;
+import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
@@ -38,6 +40,7 @@ import java.util.List;
 public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumulator> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
+    transient NodeDependencyProtocolsSkipped protocolsSkipped = new NodeDependencyProtocolsSkipped(this);
 
     @Option(displayName = "Old package name",
             description = "The current name of the npm package to rename.",
@@ -123,6 +126,48 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
         return false;
     }
 
+    /**
+     * Record the matched dependency when its value is a specifier protocol, so the run reports that the
+     * declaration was left alone rather than renamed into a reference that no longer resolves.
+     */
+    private void collectProtocolSkip(SourceFile pkg, NodeDependencyScan.ProjectState ps) {
+        ps.skippedProtocols.clear();
+        NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+        if (marker == null) {
+            return;
+        }
+        for (String scopeName : new String[]{"dependencies", "devDependencies", "peerDependencies",
+                "optionalDependencies", "bundledDependencies"}) {
+            if (scope != null && !scope.equals(scopeName)) continue;
+            List<Dependency> deps = getScopeDeps(marker, scopeName);
+            if (deps == null) continue;
+            for (Dependency d : deps) {
+                if (!oldPackageName.equals(d.getName())) continue;
+                String constraint = d.getVersionConstraint() == null ? "" : d.getVersionConstraint();
+                if (PackageJsonHelper.dependencySpecifierProtocol(constraint) != null) {
+                    ps.skippedProtocols.add(new MatchedDependency(d.getName(), scopeName, constraint));
+                }
+            }
+        }
+    }
+
+    /** One row per matched dependency the rename could not safely touch, emitted once per project. */
+    private void reportProtocolSkips(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path packageJsonPath) {
+        if (ps.protocolsReported || ps.skippedProtocols.isEmpty()) {
+            return;
+        }
+        ps.protocolsReported = true;
+        for (MatchedDependency skipped : ps.skippedProtocols) {
+            protocolsSkipped.insertRow(ctx, new NodeDependencyProtocolsSkipped.Row(
+                    packageJsonPath.toString(),
+                    skipped.getPackageName(),
+                    skipped.getDependencyScope(),
+                    PackageJsonHelper.dependencySpecifierProtocol(skipped.getCurrentVersion()),
+                    skipped.getCurrentVersion(),
+                    newVersion == null ? "" : newVersion));
+        }
+    }
+
     private @Nullable List<Dependency> getScopeDeps(NodeResolutionResult marker, String scopeName) {
         switch (scopeName) {
             case "dependencies": return marker.getDependencies();
@@ -132,6 +177,33 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
             case "bundledDependencies": return marker.getBundledDependencies();
             default: return null;
         }
+    }
+
+    /**
+     * Mark the manifest with why the rename was refused. A warning rather than an error: the framework
+     * attaches {@link Markup.Error} when a recipe throws, so an error here would be indistinguishable
+     * from this recipe having crashed. Nothing is broken; a requested change was declined and the file
+     * is left valid. Attached once, because a marker is a new tree instance every time and re-marking
+     * each cycle would keep the recipe from ever stabilizing.
+     */
+    private SourceFile markProtocolSkips(SourceFile sf, NodeDependencyScan.ProjectState ps) {
+        if (ps.skippedProtocols.isEmpty() || sf.getMarkers().findFirst(Markup.Warn.class).isPresent()) {
+            return sf;
+        }
+        StringBuilder message = new StringBuilder();
+        for (MatchedDependency skipped : ps.skippedProtocols) {
+            if (message.length() > 0) {
+                message.append(' ');
+            }
+            message.append("`").append(skipped.getPackageName()).append("` is declared as `")
+                    .append(skipped.getCurrentVersion()).append("`, a ")
+                    .append(PackageJsonHelper.dependencySpecifierProtocol(skipped.getCurrentVersion()))
+                    .append(" reference whose constraint is held elsewhere and keyed on the current name.");
+        }
+        message.append(" Renaming it here would leave that reference dangling and the manifest would no")
+                .append(" longer install, so `").append(oldPackageName).append("` was left unchanged.")
+                .append(" Rename it in the file holding the constraint first.");
+        return Markup.warn(sf, new IllegalStateException(message.toString()));
     }
 
     @Override
@@ -147,6 +219,8 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 NodeDependencyScan.ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if (matchesChange(sf)) {
+                        collectProtocolSkip(sf, ps);
+                        reportProtocolSkips(ctx, ps, p);
                         ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
@@ -157,7 +231,10 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                             return Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
-                        return out;
+                        return markProtocolSkips(out, ps);
+                    }
+                    if (!ps.skippedProtocols.isEmpty()) {
+                        return markProtocolSkips(sf, ps);
                     }
                 }
 

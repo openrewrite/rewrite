@@ -661,6 +661,16 @@ public class PackageJsonHelper {
                 Json.Literal oldKeyLit = (Json.Literal) depMember.getKey();
                 Json.Literal newKeyLit = makeStringLiteral(newName).withPrefix(oldKeyLit.getPrefix());
 
+                // A protocol value is a reference into a pnpm catalog, a workspace member or a patch, and
+                // that reference is keyed on the name being changed. Renaming here without renaming it
+                // there yields a manifest that no longer installs, and overwriting the value discards the
+                // constraint outright. Neither is recoverable from the manifest alone, so the whole
+                // declaration is left as it is; the caller reports why.
+                if (depMember.getValue() instanceof Json.Literal &&
+                        dependencySpecifierProtocol(literalString(depMember.getValue())) != null) {
+                    continue;
+                }
+
                 JsonValue newValue = depMember.getValue();
                 if (newVersion != null && depMember.getValue() instanceof Json.Literal) {
                     Json.Literal oldValLit = (Json.Literal) depMember.getValue();
