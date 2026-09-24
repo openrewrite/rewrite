@@ -17,6 +17,8 @@ package org.openrewrite.python.internal.index;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,17 +55,20 @@ final class EnvExpansion {
     }
 
     /**
-     * An expanded URL plus whether any placeholder survived expansion, judged on the
-     * pre-encoding form (percent-encoding a partially expanded userinfo would
-     * otherwise mask its remaining placeholders).
+     * An expanded URL plus whether any placeholder survived expansion outside its userinfo, and
+     * the userinfo placeholders that did, verbatim (e.g. {@code ${INDEX_TOKEN}}). Userinfo with
+     * an unresolved placeholder is dropped from {@link #url}: it can never authenticate, and
+     * without it the index can still be reached with other credentials or none.
      */
     static final class Expansion {
         final String url;
         final boolean unresolvedPlaceholders;
+        final List<String> unresolvedCredentials;
 
-        Expansion(String url, boolean unresolvedPlaceholders) {
+        Expansion(String url, boolean unresolvedPlaceholders, List<String> unresolvedCredentials) {
             this.url = url;
             this.unresolvedPlaceholders = unresolvedPlaceholders;
+            this.unresolvedCredentials = unresolvedCredentials;
         }
     }
 
@@ -75,16 +80,22 @@ final class EnvExpansion {
      */
     static Expansion expand(String url, Environment env) {
         if (url.indexOf('$') < 0) {
-            return new Expansion(url, false);
+            return new Expansion(url, false, new ArrayList<>());
         }
         int[] range = Urls.userinfoRange(url);
         if (range == null) {
             String expanded = expandVars(url, env);
-            return new Expansion(expanded, hasPlaceholder(expanded));
+            return new Expansion(expanded, hasPlaceholder(expanded), new ArrayList<>());
         }
         String userinfo = url.substring(range[0], range[1]);
-        String expanded = expandUserinfo(userinfo, env);
+        List<String> unresolvedCredentials = new ArrayList<>();
+        String expanded = expandUserinfo(userinfo, env, unresolvedCredentials);
         String rest = expandVars(url.substring(range[1]), env);
+        if (!unresolvedCredentials.isEmpty()) {
+            // rest starts at the userinfo's '@'
+            String withoutUserinfo = url.substring(0, range[0]) + rest.substring(1);
+            return new Expansion(withoutUserinfo, hasPlaceholder(withoutUserinfo), unresolvedCredentials);
+        }
         String encoded;
         if (expanded.equals(userinfo)) {
             // untouched credentials keep their exact bytes, unresolved placeholders included
@@ -96,14 +107,14 @@ final class EnvExpansion {
                     quote(expanded.substring(0, colon)) + ":" + quote(expanded.substring(colon + 1));
         }
         return new Expansion(url.substring(0, range[0]) + encoded + rest,
-                hasPlaceholder(url.substring(0, range[0]) + expanded + rest));
+                hasPlaceholder(url.substring(0, range[0]) + rest), new ArrayList<>());
     }
 
     static String expandUrl(String url, Environment env) {
         return expand(url, env).url;
     }
 
-    private static String expandUserinfo(String s, Environment env) {
+    private static String expandUserinfo(String s, Environment env, List<String> unresolved) {
         Matcher m = USERINFO_VAR.matcher(s);
         StringBuffer sb = new StringBuffer();
         while (m.find()) {
@@ -115,6 +126,9 @@ final class EnvExpansion {
                 }
             }
             String value = env.getenv(name);
+            if (value == null) {
+                unresolved.add(m.group());
+            }
             m.appendReplacement(sb, Matcher.quoteReplacement(value == null ? m.group() : value));
         }
         m.appendTail(sb);

@@ -16,6 +16,9 @@
 package org.openrewrite.python.internal.index;
 
 import lombok.Getter;
+import org.openrewrite.python.PythonPackageIndex;
+
+import java.util.List;
 
 /**
  * A failure talking to a package index, carrying enough structure for the lock
@@ -43,5 +46,19 @@ public class PythonIndexException extends RuntimeException {
         super(message, cause);
         this.reason = reason;
         this.indexUrl = indexUrl;
+    }
+
+    /**
+     * An HTTP 401/403 from {@code url}, naming any source URL credentials that were not sent
+     * because their variables were unset where the lock was regenerated.
+     */
+    static PythonIndexException authFailed(PythonPackageIndex index, int code, String url) {
+        String message = "HTTP " + code + " from " + url;
+        List<String> placeholders = index.getUnresolvedCredentialPlaceholders();
+        if (!placeholders.isEmpty()) {
+            message += "; credentials in the index URL were not sent because " + String.join(", ", placeholders) +
+                    (placeholders.size() == 1 ? " is" : " are") + " not set in the environment the recipe runs in";
+        }
+        return new PythonIndexException(Reason.AUTH_FAILED, index.getUrl(), message);
     }
 }

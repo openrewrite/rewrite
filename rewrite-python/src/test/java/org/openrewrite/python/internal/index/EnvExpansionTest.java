@@ -61,9 +61,11 @@ class EnvExpansionTest {
     }
 
     @Test
-    void unchangedUserinfoKeptVerbatim() {
-        String url = "https://${UNSET}:${ALSO_UNSET}@host/simple";
-        assertThat(EnvExpansion.expandUrl(url, env(Map.of()))).isEqualTo(url);
+    void whollyUnresolvedUserinfoIsDropped() {
+        EnvExpansion.Expansion expansion = EnvExpansion.expand("https://${UNSET}:${ALSO_UNSET}@host/simple",
+          env(Map.of()));
+        assertThat(expansion.url).isEqualTo("https://host/simple");
+        assertThat(expansion.unresolvedCredentials).containsExactly("${UNSET}", "${ALSO_UNSET}");
     }
 
     @Test
@@ -95,11 +97,12 @@ class EnvExpansionTest {
     }
 
     @Test
-    void partiallyExpandedUserinfoEncodesRemainingPlaceholder() {
-        // pipenv percent-encodes whatever expansion produced, unresolved placeholders included
+    void partiallyExpandedUserinfoIsDropped() {
+        // pipenv would percent-encode the leftover placeholder and send it; it can never authenticate,
+        // so the credentials are dropped instead, leaving the index reachable by other means
         assertThat(EnvExpansion.expandUrl("https://${USER}:${PASS}@host/simple",
           env(Map.of("USER", "alice"))))
-          .isEqualTo("https://alice:%24%7BPASS%7D@host/simple");
+          .isEqualTo("https://host/simple");
     }
 
     @Test
@@ -110,12 +113,27 @@ class EnvExpansionTest {
     }
 
     @Test
-    void partiallyResolvedUserinfoIsFlaggedUnresolved() {
-        // percent-encoding turns ${PASS} into %24%7BPASS%7D; the flag is judged before that
+    void partiallyResolvedUserinfoRecordsUnresolvedCredentials() {
         EnvExpansion.Expansion expansion = EnvExpansion.expand("https://${USER}:${PASS}@host/simple",
           env(Map.of("USER", "alice")));
-        assertThat(expansion.url).isEqualTo("https://alice:%24%7BPASS%7D@host/simple");
+        assertThat(expansion.url).isEqualTo("https://host/simple");
+        assertThat(expansion.unresolvedPlaceholders).as("the URL without credentials is usable").isFalse();
+        assertThat(expansion.unresolvedCredentials).containsExactly("${PASS}");
+    }
+
+    @Test
+    void quotedUserinfoPlaceholderIsRecordedVerbatim() {
+        EnvExpansion.Expansion expansion = EnvExpansion.expand("https://'${TOKEN}'@host/simple", env(Map.of()));
+        assertThat(expansion.url).isEqualTo("https://host/simple");
+        assertThat(expansion.unresolvedCredentials).containsExactly("'${TOKEN}'");
+    }
+
+    @Test
+    void unresolvedHostIsStillFlaggedWhenCredentialsAreDropped() {
+        EnvExpansion.Expansion expansion = EnvExpansion.expand("https://${USER}@${HOST}/simple", env(Map.of()));
+        assertThat(expansion.url).isEqualTo("https://${HOST}/simple");
         assertThat(expansion.unresolvedPlaceholders).isTrue();
+        assertThat(expansion.unresolvedCredentials).containsExactly("${USER}");
     }
 
     @Test
@@ -124,5 +142,6 @@ class EnvExpansionTest {
           env(Map.of("USER", "alice", "PASS", "sekret")));
         assertThat(expansion.url).isEqualTo("https://alice:sekret@host/simple");
         assertThat(expansion.unresolvedPlaceholders).isFalse();
+        assertThat(expansion.unresolvedCredentials).isEmpty();
     }
 }
