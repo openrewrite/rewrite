@@ -182,16 +182,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                         ensureComputed(ps, effectiveSf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
-                        if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
-                            // A manifest edited without its lock does not install: npm ci reports EUSAGE for
-                            // the pair, whether the edit added a dependency or an override. Keep the edit out
-                            // of the tree and out of the shared live state, and leave only the warning.
-                            recordFailure(ctx, ps, p);
-                            return Markup.warn(sf, new RuntimeException(
-                                    "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
-                        }
                         SourceFile out = ps.modifiedPackageJson;
                         PackageJsonHelper.putLiveTree(ctx, p, out);
+                        if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
+                            recordFailure(ctx, ps, p);
+                            return Markup.warn(out, new RuntimeException(
+                                    "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
+                        }
                         return out;
                     }
                 }
@@ -213,10 +210,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                         }
                         if (pkg != null && ips.matchedDeps != null && !ips.matchedDeps.isEmpty()) {
                             ensureComputed(ips, pkg, ctx);
-                            // Same rule: a failed regeneration must not publish the edited manifest, or a
-                            // later recipe reads an edit that was never actually applied.
-                            if (ips.modifiedPackageJson != null &&
-                                    (ips.regenResult == null || ips.regenResult.isSuccess())) {
+                            if (ips.modifiedPackageJson != null) {
                                 PackageJsonHelper.putLiveTree(ctx, importer, ips.modifiedPackageJson);
                             }
                         }

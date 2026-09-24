@@ -143,10 +143,10 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
     }
 
     @Test
-    void bumpFailsLoudAndLeavesTheManifestAlone() {
+    void bumpFailsLoudAndWarnsWithTheEditKept() {
         // 4.18.0 pulls a transitive declaring a non-optional peer, which the resolver does not model, so
-        // regeneration defers. The manifest edit is dropped with it: a manifest whose lock lacks the entry
-        // does not install (npm ci reports EUSAGE), so a partial change is worse than none.
+        // regeneration defers. The manifest edit is kept and flagged: npm install reconciles the pair, so the
+        // attempted change is more useful to a reader than no change at all.
         routes.put("https://registry.npmjs.org/lodash",
                 "{\"versions\":{\"4.17.20\":{},\"4.18.0\":{}}}");
         routes.put("https://registry.npmjs.org/lodash/4.17.20",
@@ -182,7 +182,7 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
                 packageJson(pkgBefore, null,
                         nodeResolutionResult(PackageManager.Npm, dependency("lodash", "^4.17.20")),
                         s -> s.after(actual -> {
-                            assertThat(actual).doesNotContain("4.18.0");
+                            assertThat(actual).contains("4.18.0");
                             return actual;
                         }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                                 .as("manifest carries the lock-regen-failure warning").isPresent())),

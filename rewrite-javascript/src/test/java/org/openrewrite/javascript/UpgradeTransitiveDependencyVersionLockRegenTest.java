@@ -56,10 +56,8 @@ import static org.openrewrite.javascript.Assertions.packageLock;
  * {@link UpgradeDependencyVersionLockRegenTest} a byte-identical lock is the failure here, not the
  * expected outcome: the override moves the transitive resolution and the lock must follow it.
  * <p>
- * A fail-loud fix (warn, record a failure row, leave the lock at {@code 6.0.0}) would still fail
- * this test, deliberately: a recipe run has to be atomic. {@code npm install} is what a developer
- * runs <em>before</em> committing, so a run that needs it afterwards has not produced a
- * committable change.
+ * A fix that only made the unregenerated case fail loud, leaving the lock at {@code 6.0.0}, would
+ * still fail this test: the point is that the lock moves, not merely that the failure is reported.
  */
 class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
 
@@ -207,12 +205,12 @@ class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
     }
 
     /**
-     * A {@code dependencyPath} run writes a nested override the resolver cannot apply. Leaving the manifest
-     * edited while the lock contradicts it reproduces the broken state this recipe exists to prevent, so a
-     * refusal must change nothing and warn.
+     * A {@code dependencyPath} run deeper than one level writes an override the resolver cannot apply. The
+     * manifest edit is kept and flagged rather than dropped: {@code npm install} reconciles the pair, so the
+     * attempted change carries more information for a reader than no change at all.
      */
     @Test
-    void aRefusedOverrideChangesNothing() {
+    void aRefusedOverrideWarnsAndKeepsTheEdit() {
         rewriteRun(
                 spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("is-number", "^7.0.0", "a>is-odd")).executionContext(ctx),
                 packageJson(
@@ -229,6 +227,13 @@ class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
                           "name": "npm-transitive-override",
                           "dependencies": {
                             "is-odd": "3.0.1"
+                          },
+                          "overrides": {
+                            "a": {
+                              "is-odd": {
+                                "is-number": "^7.0.0"
+                              }
+                            }
                           }
                         }
                         """,
