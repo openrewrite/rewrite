@@ -269,9 +269,10 @@ public final class NativeLockEngine {
                                                    @Nullable Path packageJsonPath, NodeRegistries registries,
                                                    NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBerry(existingLock),
-                        declaredOverrides(PackageManager.YarnBerry, editedPackageJson, new LinkedHashMap<>()))
-                .build(singletonMap("", editedPackageJson));
+        NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsBerry(existingLock),
+                declaredOverrides(PackageManager.YarnBerry, editedPackageJson, new LinkedHashMap<>()));
+        ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
+        requireOverridesApplyOnlyOnNpm(PackageManager.YarnBerry, builder);
         List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
         for (LockEditSet.PackageEdit edit : edits) {
             if (edit.getNewResolved() != null) {
@@ -312,9 +313,10 @@ public final class NativeLockEngine {
                                                      @Nullable Path packageJsonPath, NodeRegistries registries,
                                                      NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsYarnClassic(existingLock),
-                        declaredOverrides(PackageManager.YarnClassic, editedPackageJson, new LinkedHashMap<>()))
-                .build(singletonMap("", editedPackageJson));
+        NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsYarnClassic(existingLock),
+                declaredOverrides(PackageManager.YarnClassic, editedPackageJson, new LinkedHashMap<>()));
+        ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
+        requireOverridesApplyOnlyOnNpm(PackageManager.YarnClassic, builder);
         List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnClassic, packageJsonPath),
                 PackageManager.YarnClassic, editedPackageJson, edits);
@@ -348,9 +350,10 @@ public final class NativeLockEngine {
                                               @Nullable Path packageJsonPath, NodeRegistries registries,
                                               NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsPnpm(existingLock),
-                        declaredOverrides(PackageManager.Pnpm, editedPackageJson, new LinkedHashMap<>()))
-                .build(singletonMap("", editedPackageJson));
+        NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsPnpm(existingLock),
+                declaredOverrides(PackageManager.Pnpm, editedPackageJson, new LinkedHashMap<>()));
+        ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
+        requireOverridesApplyOnlyOnNpm(PackageManager.Pnpm, builder);
         List<LockEditSet.PackageEdit> edits = PnpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Pnpm, packageJsonPath),
                 PackageManager.Pnpm, editedPackageJson, edits);
@@ -383,9 +386,10 @@ public final class NativeLockEngine {
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock),
-                        declaredOverrides(PackageManager.Bun, editedPackageJson, new LinkedHashMap<>()))
-                .build(singletonMap("", editedPackageJson));
+        NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock),
+                declaredOverrides(PackageManager.Bun, editedPackageJson, new LinkedHashMap<>()));
+        ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
+        requireOverridesApplyOnlyOnNpm(PackageManager.Bun, builder);
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),
                 PackageManager.Bun, editedPackageJson, edits);
@@ -429,13 +433,6 @@ public final class NativeLockEngine {
             if (node == null || !node.isObject() || node.isEmpty()) {
                 return emptyMap();
             }
-            // Resolution is package-manager agnostic, but each manager renders its own lock format through its
-            // own patcher and only npm has a fixture covering an applied override. Refuse the rest rather than
-            // ship an untested lock. Checked before the entries so the reason is the same whatever they hold.
-            if (pm != PackageManager.Npm) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                        "overrides are not yet applied for " + pm);
-            }
             Map<String, String> overrides = new LinkedHashMap<>();
             collectOverrides(node, null, overrides, scopedParent);
             return overrides;
@@ -443,6 +440,20 @@ public final class NativeLockEngine {
             throw ef;
         } catch (Exception e) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest overrides");
+        }
+    }
+
+    /**
+     * Resolution is package-manager agnostic, but each manager renders its own lock format through its own
+     * patcher and only npm has a fixture covering an applied override. Refuse the rest rather than ship an
+     * untested lock -- but only when an override actually reached the closure, so a project merely carrying a
+     * resolutions block keeps its lock regeneration.
+     */
+    private static void requireOverridesApplyOnlyOnNpm(PackageManager pm, NpmGraphBuilder builder) {
+        if (pm != PackageManager.Npm && !builder.getAppliedOverrides().isEmpty()) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED,
+                    builder.getAppliedOverrides().iterator().next(),
+                    "overrides are not yet applied for " + pm);
         }
     }
 

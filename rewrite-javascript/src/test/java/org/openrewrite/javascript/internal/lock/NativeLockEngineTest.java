@@ -856,13 +856,36 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).contains("is not a version range");
     }
 
-    /** Only npm applies overrides so far; the rest must refuse rather than emit an untested lock. */
+    /** Only npm applies overrides so far; the rest refuse rather than emit an untested lock. */
     @Test
-    void overridesAreNotAppliedForOtherPackageManagers() {
+    void anAppliedOverrideIsRefusedOnOtherPackageManagers() {
+        routes.put("https://registry.npmjs.org/alpha",
+                "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/alpha/1.0.0",
+                "{\"name\":\"alpha\",\"version\":\"1.0.0\",\"dependencies\":{\"shared\":\"^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\",\"integrity\":\"sha512-ALPHA1\"}}");
+        routes.put("https://registry.npmjs.org/shared",
+                "{\"name\":\"shared\",\"dist-tags\":{},\"versions\":{\"1.5.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/shared/1.5.0",
+                "{\"name\":\"shared\",\"version\":\"1.5.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/shared/-/shared-1.5.0.tgz\",\"integrity\":\"sha512-SHARED\"}}");
+        routes.put("https://registry.npmjs.org/shared/2.0.0",
+                "{\"name\":\"shared\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/shared/-/shared-2.0.0.tgz\",\"integrity\":\"sha512-SHARED2\"}}");
+
+        String lock = "lockfileVersion: '9.0'\n\n" +
+                "settings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\n" +
+                "importers:\n\n  .:\n    dependencies:\n" +
+                "      alpha:\n        specifier: ^1.0.0\n        version: 1.0.0\n\n" +
+                "packages:\n\n" +
+                "  alpha@1.0.0:\n    resolution: {integrity: sha512-ALPHA1}\n\n" +
+                "  shared@1.5.0:\n    resolution: {integrity: sha512-SHARED}\n\n" +
+                "snapshots:\n\n" +
+                "  alpha@1.0.0:\n    dependencies:\n      shared: 1.5.0\n\n" +
+                "  shared@1.5.0: {}\n";
+
         Result result = regen(PackageManager.Pnpm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"pnpm\":{\"overrides\":{\"tslib\":\"^2.0.0\"}}}",
-                "lockfileVersion: '9.0'\n");
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"pnpm\":{\"overrides\":{\"shared\":\"^2.0.0\"}}}",
+                lock);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail()).contains("not yet applied for Pnpm");
@@ -1287,6 +1310,35 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).as("npm itself refuses this with EOVERRIDE").isFalse();
         assertThat(result.getFailure().getDetail()).contains("direct dependency");
+    }
+
+    /**
+     * Only npm applies overrides, but refusing on their mere presence would strip lock regeneration from every
+     * pnpm or Yarn project carrying a resolutions block, including runs of the sibling recipes that never touch
+     * overrides. An override naming a package outside the closure changes nothing, so it must stay the no-op it
+     * is; only one that would actually move a resolution is refused.
+     */
+    @Test
+    void anOverrideOutsideTheClosureIsANoOpOnOtherPackageManagers() {
+        routes.put("https://registry.npmjs.org/alpha",
+                "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/alpha/1.0.0",
+                "{\"name\":\"alpha\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\",\"integrity\":\"sha512-ALPHA1\"}}");
+
+        String lock = "lockfileVersion: '9.0'\n\n" +
+                "settings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\n" +
+                "importers:\n\n  .:\n    dependencies:\n" +
+                "      alpha:\n        specifier: ^1.0.0\n        version: 1.0.0\n\n" +
+                "packages:\n\n" +
+                "  alpha@1.0.0:\n    resolution: {integrity: sha512-ALPHA1}\n\n" +
+                "snapshots:\n\n  alpha@1.0.0: {}\n";
+
+        Result result = regen(PackageManager.Pnpm,
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"pnpm\":{\"overrides\":{\"not-in-this-tree\":\"^9.0.0\"}}}",
+                lock);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
     }
 
     @Test

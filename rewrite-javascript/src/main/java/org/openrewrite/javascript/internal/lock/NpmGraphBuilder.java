@@ -72,6 +72,17 @@ public final class NpmGraphBuilder {
      */
     private final Map<String, String> overrides;
 
+    /**
+     * Override names that actually reached a package in the closure. An override for a package nothing
+     * depends on never reaches {@link #select} and stays the no-op it is, which is what lets a caller that
+     * cannot apply overrides tell a real one from a harmless leftover.
+     */
+    private final Set<String> appliedOverrides = new LinkedHashSet<>();
+
+    public Set<String> getAppliedOverrides() {
+        return appliedOverrides;
+    }
+
     public NpmGraphBuilder(Registry registry) {
         this(registry, false);
     }
@@ -187,6 +198,7 @@ public final class NpmGraphBuilder {
         // name nothing depends on is never selected, so an override outside the closure stays the no-op it is.
         String override = overrides.get(name);
         if (override != null) {
+            appliedOverrides.add(name);
             range = override;
         }
         String deduped = Semver.maxSatisfying(chosen.getOrDefault(name, emptySet()), range, NODE);
@@ -234,6 +246,7 @@ public final class NpmGraphBuilder {
             // the real package does not reach an aliased slot in npm either (verified against npm 11), so that
             // one is left to resolve normally rather than refused.
             if (overrides.containsKey(name)) {
+                appliedOverrides.add(name);
                 throw new EngineFailure(RESOLUTION_REQUIRED, name,
                         "override of aliased dependency " + name + " (" + spec + ") is not supported");
             }
@@ -530,6 +543,7 @@ public final class NpmGraphBuilder {
             // resolveLeafPeer goes straight to the registry and never reaches select, so an override naming
             // this peer would be skipped silently. Refuse rather than ignore it.
             if (overrides.containsKey(miss[1])) {
+                appliedOverrides.add(miss[1]);
                 throw new EngineFailure(RESOLUTION_REQUIRED, miss[1],
                         "override of auto-installed peer " + miss[1] + " (required by " + miss[0] + ") is not supported");
             }
