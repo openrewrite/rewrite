@@ -1180,6 +1180,39 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).contains("auto-installed peer");
     }
 
+    /**
+     * An override keyed on the real package does not reach a slot that installs it under an alias: npm leaves
+     * the aliased copy alone (verified against npm 11). Only an override keyed on the alias name itself is
+     * refused, since that one selectAlias would silently skip.
+     */
+    @Test
+    void overrideOfTheRealNameLeavesAnAliasedSlotAlone() {
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/1.0.0",
+                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-TSLIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"numcheck\":\"npm:tslib@^1.0.0\"}}",
+                "{\"dependencies\":{\"numcheck\":\"npm:tslib@^1.0.0\"},\"overrides\":{\"tslib\":\"^2.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"numcheck": "npm:tslib@^1.0.0"}},
+                    "node_modules/numcheck": {"name": "tslib", "version": "1.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz", "integrity": "sha512-TSLIB100"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("tslib-1.0.0.tgz");
+        assertThat(result.getLockFileContent()).doesNotContain("tslib-2.0.0.tgz");
+    }
+
     @Test
     void nullLockFailsLoud() {
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,

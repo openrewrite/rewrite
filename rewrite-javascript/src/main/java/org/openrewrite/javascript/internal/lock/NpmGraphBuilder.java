@@ -230,8 +230,10 @@ public final class NpmGraphBuilder {
                         name + " aliases " + spec + " (only a registry-range alias is resolved)");
             }
             // selectAlias keys the slot by the alias name and resolves the real package itself, so it never
-            // reaches select and an override would be skipped silently. Refuse rather than ignore it.
-            if (overrides.containsKey(name) || overrides.containsKey(alias.realName)) {
+            // reaches select and an override keyed on the alias would be skipped silently. An override keyed on
+            // the real package does not reach an aliased slot in npm either (verified against npm 11), so that
+            // one is left to resolve normally rather than refused.
+            if (overrides.containsKey(name)) {
                 throw new EngineFailure(RESOLUTION_REQUIRED, name,
                         "override of aliased dependency " + name + " (" + spec + ") is not supported");
             }
