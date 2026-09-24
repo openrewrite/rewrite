@@ -180,9 +180,8 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                     "change is outside declared dependencies (e.g. overrides/resolutions) and requires resolution");
         }
-        // This scope resolves an added dependency's own closure without consulting overrides, so a declared
-        // override could be ignored for a package the edit pulls in, leaving a lock that disagrees with the
-        // manifest. Hand those to the whole-closure scope, which is override-aware and equally byte-exact.
+        // This scope resolves an added dependency's closure without consulting overrides, so it can leave a
+        // lock that disagrees with the manifest. The whole-closure scope is override-aware and equally exact.
         if (!declaredOverrides(pm, editedPackageJson).ranges.isEmpty()) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                     "manifest declares overrides, which the per-dependency scope does not apply");
@@ -403,20 +402,15 @@ public final class NativeLockEngine {
     }
 
     /**
-     * A package name npm would accept: an optional {@code @scope/} then a plain name. Deliberately an
-     * allowlist. A denylist has to enumerate every form the resolver cannot apply, and anything it misses
-     * becomes a key that matches no package, resolves as if the override were absent, and reports success -
-     * which is the defect this engine exists to avoid. Path selectors ({@code a>b}, {@code a/b}), globs and
-     * {@code .} all fail this by construction, as does a range-bearing leaf key ({@code tslib@^2}). A parent
-     * key is matched on its name part only, so it may carry an {@code @version} selector.
+     * A package name npm would accept: an optional {@code @scope/} then a plain name. An allowlist, because
+     * anything a denylist misses becomes a key matching no package, resolving as if the override were absent,
+     * and reporting success - the defect this engine exists to avoid.
      */
     private static final Pattern OVERRIDE_NAME = Pattern.compile("(?:@[A-Za-z0-9~][A-Za-z0-9._~-]*/)?[A-Za-z0-9~][A-Za-z0-9._~-]*");
 
     /**
-     * The global overrides the root manifest declares, keyed by package name: {@code overrides} for npm and
-     * Bun, {@code resolutions} for either yarn, {@code pnpm.overrides} for pnpm. One level of nesting,
-     * {@code {"parent": {"child": range}}}, is what a {@code dependencyPath} run writes; it is applied globally
-     * and {@code requireOverridesHold} proves the equivalence afterwards.
+     * One level of nesting, {@code {"parent": {"child": range}}}, is what a {@code dependencyPath} run
+     * writes; it is applied globally and {@code requireOverridesHold} proves the equivalence afterwards.
      */
     private static Overrides declaredOverrides(PackageManager pm, String manifestJson) {
         Map<String, String> scopedParent = new LinkedHashMap<>();
@@ -440,10 +434,9 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Resolution is package-manager agnostic, but each manager renders its own lock format through its own
-     * patcher and only npm has a fixture covering an applied override. Refuse the rest rather than ship an
-     * untested lock -- but only when an override actually reached the closure, so a project merely carrying a
-     * resolutions block keeps its lock regeneration.
+     * Resolution is manager-agnostic but each manager renders its own lock format, and only npm has a fixture
+     * covering an applied override. Refuse the rest rather than ship an untested lock, but only once an
+     * override reaches the closure, so merely carrying a resolutions block still regenerates.
      */
     private static void requireOverridesApplyOnlyOnNpm(PackageManager pm, NpmGraphBuilder builder) {
         if (pm != PackageManager.Npm && !builder.getAppliedOverrides().isEmpty()) {
@@ -472,10 +465,8 @@ public final class NativeLockEngine {
             Map.Entry<String, JsonNode> f = fields.next();
             String key = f.getKey();
             JsonNode value = f.getValue();
-            // A parent may carry a version selector (PackageJsonOverrides writes one for a versioned
-            // dependencyPath segment); requireOverridesHold checks it against the resolved parent. A leaf
-            // key may not, because a range there selects which copies to override and this engine has no
-            // way to apply an override to only some of them.
+            // A parent key may carry a version selector, checked later against the resolved parent. A leaf
+            // key may not: a range there selects which copies to override, and this engine places only one.
             if (!OVERRIDE_NAME.matcher(value.isObject() ? parentName(key) : key).matches()) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                         "override selector " + key + " is not a plain package name");
@@ -503,28 +494,24 @@ public final class NativeLockEngine {
         }
     }
 
-    /** The name part of a parent key, which may carry an {@code @version} selector. */
+    /** The name part of a parent key; the {@code > 0} guard keeps a scoped name's leading {@code @}. */
     private static String parentName(String key) {
         int at = key.lastIndexOf('@');
         return at > 0 ? key.substring(0, at) : key;
     }
 
-    /** The version a parent key selects, or {@code null} when it selects every copy. */
     private static @Nullable String parentVersion(String key) {
         int at = key.lastIndexOf('@');
         return at > 0 ? key.substring(at + 1) : null;
     }
 
     /**
-     * Two checks the resolved graph can answer that the manifest alone cannot.
+     * npm rejects an override that disagrees with a directly-declared range ("EOVERRIDE"), and resolving it
+     * here would leave the importer on its declared range, so the diff would find nothing to change.
      * <p>
-     * An override that disagrees with a directly-declared range is rejected by npm itself ("EOVERRIDE -
-     * Override for is-number@^7.0.0 conflicts with direct dependency"), and resolving it here would leave the
-     * importer on its declared range so the diff finds nothing to change.
-     * <p>
-     * A nested override is scoped to one parent but was applied to the whole closure, which is only the same
-     * answer when the parent is the sole requirer, so prove it: any other requirer would have kept its own
-     * version and needed a second copy this engine does not place.
+     * A nested override is scoped to one parent but was applied to the whole closure. That is the same answer
+     * only when the parent is the sole requirer, so prove it: another requirer would have kept its own version
+     * and needed a second copy this engine does not place.
      */
     private static void requireOverridesHold(ResolutionGraph graph, Map<String, String> overrides,
                                              Map<String, String> scopedParent) {
@@ -547,8 +534,7 @@ public final class NativeLockEngine {
             String wantVersion = parentVersion(e.getValue());
             if (wantVersion != null) {
                 // npm applies a version-selected override only while the parent resolves to that version.
-                // When it does the selector adds nothing; when it does not the override should not have been
-                // applied at all, and it already has been, so refuse rather than resolve a second time.
+                // It has already been applied globally, so a mismatch must refuse rather than re-resolve.
                 for (ResolvedNode n : graph.getNodes().values()) {
                     if (parent.equals(n.getManifest().getName()) &&
                             !wantVersion.equals(n.getManifest().getVersion())) {

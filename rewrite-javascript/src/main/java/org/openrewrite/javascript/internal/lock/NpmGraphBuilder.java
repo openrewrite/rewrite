@@ -65,18 +65,9 @@ public final class NpmGraphBuilder {
      */
     private final Map<String, Set<String>> lockedVersions;
 
-    /**
-     * Global overrides declared by the root manifest, keyed by package name. The caller extracts these because
-     * only it knows the field ({@code overrides}, {@code resolutions} or {@code pnpm.overrides}) and which key
-     * forms it could translate into plain package names.
-     */
     private final Map<String, String> overrides;
 
-    /**
-     * Override names that actually reached a package in the closure. An override for a package nothing
-     * depends on never reaches {@link #select} and stays the no-op it is, which is what lets a caller that
-     * cannot apply overrides tell a real one from a harmless leftover.
-     */
+    /** Lets a caller that cannot apply overrides tell a real one from a leftover nothing depends on. */
     private final Set<String> appliedOverrides = new LinkedHashSet<>();
 
     public Set<String> getAppliedOverrides() {
@@ -194,8 +185,6 @@ public final class NpmGraphBuilder {
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
                           Deque<String[]> work) {
         // Must precede the dedupe below: an override applied after it would lose to an already-chosen version.
-        // Every requirement funnels through here, so rewriting the range once covers the whole closure, and a
-        // name nothing depends on is never selected, so an override outside the closure stays the no-op it is.
         String override = overrides.get(name);
         if (override != null) {
             appliedOverrides.add(name);
@@ -241,10 +230,8 @@ public final class NpmGraphBuilder {
                 throw new EngineFailure(RESOLUTION_REQUIRED, name,
                         name + " aliases " + spec + " (only a registry-range alias is resolved)");
             }
-            // selectAlias keys the slot by the alias name and resolves the real package itself, so it never
-            // reaches select and an override keyed on the alias would be skipped silently. An override keyed on
-            // the real package does not reach an aliased slot in npm either (verified against npm 11), so that
-            // one is left to resolve normally rather than refused.
+            // npm 11 does not apply an override keyed on the real name to an aliased slot, so only the alias
+            // name refuses here; selectAlias bypasses select, so it would otherwise be skipped in silence.
             if (overrides.containsKey(name)) {
                 appliedOverrides.add(name);
                 throw new EngineFailure(RESOLUTION_REQUIRED, name,
@@ -540,8 +527,7 @@ public final class NpmGraphBuilder {
         }
         Set<String> autoInstalled = new LinkedHashSet<>();
         for (String[] miss : missing) {
-            // resolveLeafPeer goes straight to the registry and never reaches select, so an override naming
-            // this peer would be skipped silently. Refuse rather than ignore it.
+            // resolveLeafPeer bypasses select, so an override naming this peer would be skipped silently.
             if (overrides.containsKey(miss[1])) {
                 appliedOverrides.add(miss[1]);
                 throw new EngineFailure(RESOLUTION_REQUIRED, miss[1],
