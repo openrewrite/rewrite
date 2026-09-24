@@ -251,10 +251,10 @@ public final class NativeLockEngine {
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         Map<String, String> scopedParent = new LinkedHashMap<>();
-        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock),
-                        declaredOverrides(PackageManager.Npm, editedPackageJson, scopedParent))
+        Map<String, String> overrides = declaredOverrides(PackageManager.Npm, editedPackageJson, scopedParent);
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock), overrides)
                 .build(singletonMap("", editedPackageJson));
-        requireScopeHolds(graph, scopedParent);
+        requireOverridesHold(graph, overrides, scopedParent);
         List<LockEditSet.PackageEdit> edits = NpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Npm, packageJsonPath),
                 PackageManager.Npm, editedPackageJson, edits);
@@ -482,20 +482,34 @@ public final class NativeLockEngine {
     }
 
     /**
-     * A nested override is scoped to one parent, but it was applied to the whole closure. That is only the same
-     * answer when the parent is the sole requirer, so prove it: any other requirer, or a direct declaration,
-     * would have kept its own version and needed a second copy this engine does not place.
+     * Two checks the resolved graph can answer that the manifest alone cannot.
+     * <p>
+     * An override that disagrees with a directly-declared range is rejected by npm itself ("EOVERRIDE -
+     * Override for is-number@^7.0.0 conflicts with direct dependency"), and resolving it here would leave the
+     * importer on its declared range so the diff finds nothing to change.
+     * <p>
+     * A nested override is scoped to one parent but was applied to the whole closure, which is only the same
+     * answer when the parent is the sole requirer, so prove it: any other requirer would have kept its own
+     * version and needed a second copy this engine does not place.
      */
-    private static void requireScopeHolds(ResolutionGraph graph, Map<String, String> scopedParent) {
+    private static void requireOverridesHold(ResolutionGraph graph, Map<String, String> overrides,
+                                             Map<String, String> scopedParent) {
+        for (Map.Entry<String, String> e : overrides.entrySet()) {
+            String name = e.getKey();
+            for (ResolutionGraph.Importer importer : graph.getImporters()) {
+                for (Map<String, String> scope : importer.getDeclared().values()) {
+                    String declared = scope.get(name);
+                    if (declared != null && !declared.equals(e.getValue())) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                                "override of " + name + " conflicts with it as a direct dependency (" +
+                                        declared + ")");
+                    }
+                }
+            }
+        }
         for (Map.Entry<String, String> e : scopedParent.entrySet()) {
             String child = e.getKey();
             String parent = e.getValue();
-            for (ResolutionGraph.Importer importer : graph.getImporters()) {
-                if (importer.getResolved().containsKey(child)) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, child,
-                            "override of " + child + " scoped to " + parent + " also applies to it as a direct dependency");
-                }
-            }
             for (ResolvedNode n : graph.getNodes().values()) {
                 if (n.getResolvedEdges().containsKey(child) && !parent.equals(n.getManifest().getName())) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, child,

@@ -1256,6 +1256,39 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).as("must not report success over an override it did not apply").isFalse();
     }
 
+    /**
+     * npm rejects an override that disagrees with a direct dependency: "EOVERRIDE - Override for
+     * is-number@^7.0.0 conflicts with direct dependency" (verified against npm 11). Resolving it here would
+     * pick the override while the importer keeps its declared range, so the diff finds nothing to change and
+     * the run reports success over an unchanged lock.
+     */
+    @Test
+    void globalOverrideDisagreeingWithADirectDependencyFailsLoud() {
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/1.0.0",
+                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-TSLIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"tslib\":\"^2.0.0\"}}",
+                "{\"dependencies\":{\"tslib\":\"^2.0.0\"},\"overrides\":{\"tslib\":\"1.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"tslib": "^2.0.0"}},
+                    "node_modules/tslib": {"version": "2.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz", "integrity": "sha512-TSLIB200"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).as("npm itself refuses this with EOVERRIDE").isFalse();
+        assertThat(result.getFailure().getDetail()).contains("direct dependency");
+    }
+
     @Test
     void nullLockFailsLoud() {
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
