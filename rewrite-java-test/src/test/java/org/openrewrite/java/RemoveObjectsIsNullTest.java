@@ -208,7 +208,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
             import java.util.Objects;
 
             class Hello {
-              public boolean hello(String abc) {
+              public void hello(String abc) {
                 if (Objects.isNull(abc) == false) {
                   return;
                 }
@@ -220,7 +220,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
             package com.helloworld;
 
             class Hello {
-              public boolean hello(String abc) {
+              public void hello(String abc) {
                 if (!(abc == null)) {
                   return;
                 }
