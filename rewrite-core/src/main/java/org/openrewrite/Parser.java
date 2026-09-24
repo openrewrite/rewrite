@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -242,19 +243,13 @@ public interface Parser {
         public abstract Parser build();
 
         /**
-         * Builders of different concrete types are never equal, even when they are configured identically;
-         * {@code XmlParser.Builder} and {@code MavenParser.Builder} would otherwise compare equal. Subclasses
-         * carrying distinguishing configuration extend this with {@code @EqualsAndHashCode(callSuper = true)}.
+         * Identifies the parses this builder would produce identically, for callers that cache parsed output.
+         * Subclasses carrying configuration that changes how a source parses — a classpath, a language level —
+         * override this to append it, copying any collection so a discriminator already handed out as a cache
+         * key cannot shift when this builder is reconfigured.
          */
-        @Override
-        public boolean equals(@Nullable Object o) {
-            return this == o || o != null && getClass() == o.getClass() &&
-                                sourceFileType.equals(((Builder) o).sourceFileType);
-        }
-
-        @Override
-        public int hashCode() {
-            return 31 * getClass().hashCode() + sourceFileType.hashCode();
+        public List<Object> discriminator() {
+            return new ArrayList<>(Arrays.asList(getClass(), sourceFileType));
         }
 
         /**
