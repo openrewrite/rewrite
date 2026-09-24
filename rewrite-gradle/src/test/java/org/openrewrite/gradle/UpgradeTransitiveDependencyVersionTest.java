@@ -1347,6 +1347,44 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void kotlinDslUpdateConstraintAddingBecause() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation("org.openrewrite:rewrite-core:7.0.0")
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.0")
+                      implementation("org.openrewrite:rewrite-xml:7.0.0")
+                  }
+
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """,
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation("org.openrewrite:rewrite-core:7.0.0")
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.5") {
+                          because("CVE-2024-BAD")
+                      }
+                      implementation("org.openrewrite:rewrite-xml:7.0.0")
+                  }
+
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void kotlinDslUseResolutionStrategyWhenSpringDependencyManagementPluginIsPresent() {
         rewriteRun(
           buildGradleKts(

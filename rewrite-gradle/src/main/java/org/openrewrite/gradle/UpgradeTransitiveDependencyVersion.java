@@ -1297,12 +1297,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
                         .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
                         .map(dependenciesClosure -> ((J.Block) dependenciesClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
+                        .map(constraints -> withoutImplicitReturn(constraints).getArguments().get(0))
                         .map(J.Lambda.class::cast)
                         .map(constraintsClosure -> ((J.Block) constraintsClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
+                        .map(implementation -> withoutImplicitReturn(implementation).getArguments().get(1))
                         .map(J.Lambda.class::cast)
                         .map(it -> (J.Lambda) new GroovyIsoVisitor<Integer>() {
                             @Override
@@ -1319,12 +1317,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(block -> (J.MethodInvocation) block.getStatements().get(1))
                         .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
                         .map(dependenciesClosure -> ((J.Block) dependenciesClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
+                        .map(constraints -> withoutImplicitReturn(constraints).getArguments().get(0))
                         .map(J.Lambda.class::cast)
                         .map(constraintsClosure -> ((J.Block) constraintsClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
+                        .map(implementation -> withoutImplicitReturn(implementation).getArguments().get(1))
                         .map(J.Lambda.class::cast)
                         .map(it -> (J.Lambda) new KotlinIsoVisitor<Integer>() {
                             @Override
@@ -1338,6 +1334,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             m = m.withArguments(ListUtils.concat(m.getArguments().subList(0, 1), becauseArg));
             return autoFormat(m, ctx, getCursor().getParentOrThrow());
         }
+    }
+
+    private static J.MethodInvocation withoutImplicitReturn(Statement statement) {
+        return (J.MethodInvocation) (statement instanceof J.Return ? requireNonNull(((J.Return) statement).getExpression()) : statement);
     }
 
     private static boolean withinBlock(Cursor cursor, String name) {
