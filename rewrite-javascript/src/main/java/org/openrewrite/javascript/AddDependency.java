@@ -131,13 +131,16 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
                         ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
-                        SourceFile out = ps.modifiedPackageJson;
-                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
+                            // A manifest edited without its lock does not install: npm ci reports EUSAGE for
+                            // the pair, whether the edit added a dependency or an override. Keep the edit out
+                            // of the tree and out of the shared live state, and leave only the warning.
                             recordFailure(ctx, ps, p);
-                            return Markup.warn(out, new RuntimeException(
+                            return Markup.warn(sf, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
+                        SourceFile out = ps.modifiedPackageJson;
+                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         return out;
                     }
                 }
@@ -155,7 +158,10 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
                         if (pkg == null) pkg = ips.capturedPackageJson;
                         if (pkg != null && matchesAdd(pkg)) {
                             ensureComputed(ips, pkg, ctx);
-                            if (ips.modifiedPackageJson != null) {
+                            // Same rule: a failed regeneration must not publish the edited manifest, or a
+                            // later recipe reads an edit that was never actually applied.
+                            if (ips.modifiedPackageJson != null &&
+                                    (ips.regenResult == null || ips.regenResult.isSuccess())) {
                                 PackageJsonHelper.putLiveTree(ctx, importer, ips.modifiedPackageJson);
                             }
                         }

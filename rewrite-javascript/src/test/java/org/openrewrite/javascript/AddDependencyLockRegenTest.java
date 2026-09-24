@@ -208,7 +208,10 @@ class AddDependencyLockRegenTest implements RewriteTest {
                 packageJson(pkgBefore, null,
                         nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),
                         s -> s.after(actual -> {
-                            assertThat(actual).contains("\"needs-transitive\": \"^1.0.0\"");
+                            // The edit is dropped, not kept: a manifest whose lock lacks the entry does not
+                            // install (npm ci reports EUSAGE), so a failed regeneration changes nothing and
+                            // reports the failure through the warning and the data table instead.
+                            assertThat(actual).doesNotContain("\"needs-transitive\": \"^1.0.0\"");
                             return actual;
                         }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                                 .as("manifest carries the lock-regen-failure warning").isPresent())),
