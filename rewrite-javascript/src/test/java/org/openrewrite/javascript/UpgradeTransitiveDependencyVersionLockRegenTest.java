@@ -223,7 +223,7 @@ class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
                         }
                         """,
                         """
-                        /*~~(lock regeneration failed: RESOLUTION_REQUIRED [a]: override nested under a is not supported)~~>*/{
+                        /*~~(lock regeneration failed: RESOLUTION_REQUIRED [is-odd]: override nested under a is not supported)~~>*/{
                           "name": "npm-transitive-override",
                           "dependencies": {
                             "is-odd": "3.0.1"
@@ -250,7 +250,7 @@ class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
                         }
                         """,
                         """
-                        /*~~(lock regeneration failed: RESOLUTION_REQUIRED [a]: override nested under a is not supported)~~>*/{
+                        /*~~(lock regeneration failed: RESOLUTION_REQUIRED [is-odd]: override nested under a is not supported)~~>*/{
                           "name": "npm-transitive-override",
                           "lockfileVersion": 3,
                           "packages": {

@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
@@ -807,7 +809,7 @@ class NativeLockEngineTest {
                 npmLock("4.17.20"));
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("path-scoped override");
+        assertThat(result.getFailure().getDetail()).contains("is not a plain package name");
     }
 
     /** The yarn spelling of the same thing, {@code a/b}. */
@@ -819,7 +821,7 @@ class NativeLockEngineTest {
                 npmLock("4.17.20"));
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("path-scoped override");
+        assertThat(result.getFailure().getDetail()).contains("is not a plain package name");
     }
 
     /**
@@ -851,7 +853,7 @@ class NativeLockEngineTest {
                 npmLock("4.17.20"));
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("references a declared dependency");
+        assertThat(result.getFailure().getDetail()).contains("is not a version range");
     }
 
     /** Only npm applies overrides so far; the rest must refuse rather than emit an untested lock. */
@@ -1211,6 +1213,47 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).contains("tslib-1.0.0.tgz");
         assertThat(result.getLockFileContent()).doesNotContain("tslib-2.0.0.tgz");
+    }
+
+    /**
+     * The four forms an allowlist must reject. Each reached select with a key that matches no package, so the
+     * closure resolved as if the override were absent and the engine reported success over an unchanged lock:
+     * the defect this class exists to pin, in forms a denylist did not enumerate.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"tslib@^2\":\"1.0.0\"}",
+            "{\"tslib\":{\".\":\"1.0.0\"}}",
+            "{\"lodash\":{\"tslib@^2\":\"1.0.0\"}}",
+            "{\"lodash\":{\"tslib\":\"1.0.0\"},\"tslib\":\"2.0.0\"}"
+    })
+    void unrecognisedOverrideFormFailsLoud(String overrides) {
+        routes.put("https://registry.npmjs.org/lodash",
+                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{\"tslib\":\"^2.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\"integrity\":\"sha512-LODASH\"}}");
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":" + overrides + "}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20"}},
+                    "node_modules/lodash": {"version": "4.17.20", "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz", "integrity": "sha512-LODASH", "dependencies": {"tslib": "^2.0.0"}},
+                    "node_modules/tslib": {"version": "2.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz", "integrity": "sha512-TSLIB200"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).as("must not report success over an override it did not apply").isFalse();
     }
 
     @Test

@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.*;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
@@ -402,6 +403,21 @@ public final class NativeLockEngine {
      * and yarn {@code "express/accepts"}. {@link PackageJsonOverrides#parsePath} already separates those from a
      * scoped name like {@code "@types/node"}, so reuse it rather than testing for {@code '/'}.
      */
+    /**
+     * A package name npm would accept: an optional {@code @scope/} then a plain name. Deliberately an
+     * allowlist. A denylist has to enumerate every form the resolver cannot apply, and anything it misses
+     * becomes a key that matches no package, resolves as if the override were absent, and reports success -
+     * which is the defect this engine exists to avoid. Range-bearing keys ({@code tslib@^2}), path selectors
+     * ({@code a>b}, {@code a/b}), globs and {@code .} all fail this by construction.
+     */
+    private static final Pattern OVERRIDE_NAME = Pattern.compile("(?:@[A-Za-z0-9][A-Za-z0-9._-]*/)?[A-Za-z0-9][A-Za-z0-9._-]*");
+
+    /**
+     * The global overrides the root manifest declares, keyed by package name: {@code overrides} for npm and
+     * Bun, {@code resolutions} for either yarn, {@code pnpm.overrides} for pnpm. One level of nesting,
+     * {@code {"parent": {"child": range}}}, is what a {@code dependencyPath} run writes; it is applied globally
+     * and {@code requireScopeHolds} proves the equivalence afterwards.
+     */
     private static Map<String, String> declaredOverrides(PackageManager pm, String manifestJson,
                                                          Map<String, String> scopedParent) {
         try {
@@ -415,57 +431,53 @@ public final class NativeLockEngine {
             }
             // Resolution is package-manager agnostic, but each manager renders its own lock format through its
             // own patcher and only npm has a fixture covering an applied override. Refuse the rest rather than
-            // ship an untested lock: assuming a shared path works because it compiles is what produced this
-            // defect. Checked before the entries so the reason given is the same one whatever they contain.
+            // ship an untested lock. Checked before the entries so the reason is the same whatever they hold.
             if (pm != PackageManager.Npm) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                         "overrides are not yet applied for " + pm);
             }
             Map<String, String> overrides = new LinkedHashMap<>();
-            Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
-            while (fields.hasNext()) {
-                Map.Entry<String, JsonNode> f = fields.next();
-                String key = f.getKey();
-                JsonNode value = f.getValue();
-                if (value.isObject()) {
-                    // One level of nesting, {"parent": {"child": range}}, is what a dependencyPath run writes.
-                    // It is applied globally and the equivalence is proved afterwards by requireScopeHolds:
-                    // if the parent is the only thing requiring the child, scoping changes nothing. Deeper
-                    // nesting stays refused.
-                    Iterator<Map.Entry<String, JsonNode>> inner = value.fields();
-                    while (inner.hasNext()) {
-                        Map.Entry<String, JsonNode> c = inner.next();
-                        if (!c.getValue().isTextual() || c.getValue().asText().startsWith("$") ||
-                                PackageJsonOverrides.parsePath(c.getKey()).size() > 1) {
-                            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
-                                    "override nested under " + key + " is not supported");
-                        }
-                        overrides.put(c.getKey(), c.getValue().asText());
-                        scopedParent.put(c.getKey(), key);
-                    }
-                    continue;
-                }
-                if (!value.isTextual()) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
-                            "override of " + key + " is not a version range");
-                }
-                if (value.asText().startsWith("$")) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
-                            "override of " + key + " references a declared dependency and is not supported");
-                }
-                if (key.indexOf('*') >= 0 || ".".equals(key) || PackageJsonOverrides.parsePath(key).size() > 1) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
-                            "path-scoped override " + key + " is not supported");
-                }
-                overrides.put(key, value.asText());
-            }
+            collectOverrides(node, null, overrides, scopedParent);
             return overrides;
         } catch (EngineFailure ef) {
             throw ef;
         } catch (Exception e) {
-            // parsePath rejects malformed keys by throwing; a raw exception here would escape as a recipe crash
-            // rather than the warning the caller turns a failure into.
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest overrides");
+        }
+    }
+
+    /** Accept {@code name -> range} and one level of {@code parent -> {name -> range}}; refuse anything else. */
+    private static void collectOverrides(JsonNode node, @Nullable String parent,
+                                         Map<String, String> overrides, Map<String, String> scopedParent) {
+        Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> f = fields.next();
+            String key = f.getKey();
+            JsonNode value = f.getValue();
+            if (!OVERRIDE_NAME.matcher(key).matches()) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                        "override selector " + key + " is not a plain package name");
+            }
+            if (value.isObject()) {
+                if (parent != null) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                            "override nested under " + parent + " is not supported");
+                }
+                collectOverrides(value, key, overrides, scopedParent);
+                continue;
+            }
+            if (!value.isTextual() || !Semver.validate(value.asText(), null, NODE).isValid()) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                        "override of " + key + " is not a version range");
+            }
+            // A name reachable twice (global and scoped, or under two parents) would resolve by key order.
+            if (overrides.put(key, value.asText()) != null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
+                        "override of " + key + " is declared more than once");
+            }
+            if (parent != null) {
+                scopedParent.put(key, parent);
+            }
         }
     }
 
