@@ -15,6 +15,7 @@
  */
 package org.openrewrite.scala;
 
+import lombok.EqualsAndHashCode;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
@@ -182,13 +183,20 @@ public class ScalaParser implements Parser {
     }
 
     @SuppressWarnings("unused")
+    @EqualsAndHashCode(callSuper = true)
     public static class Builder extends Parser.Builder {
         private @Nullable Collection<Path> classpath = Collections.emptyList();
 
         protected @Nullable Collection<String> artifactNames = Collections.emptyList();
 
+        /**
+         * Excluded from equality: mutable, accumulates during parsing, and meant to be shared across parsers
+         * rather than to distinguish them.
+         */
+        @EqualsAndHashCode.Exclude
         private JavaTypeCache typeCache = new JavaTypeCache();
 
+        @EqualsAndHashCode.Exclude
         @Nullable
         private JavaTypeFactory typeFactory;
 

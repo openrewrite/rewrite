@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.EqualsAndHashCode;
 import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -230,12 +231,16 @@ public interface JavaParser extends Parser {
     void setClasspath(Collection<Path> classpath);
 
     @SuppressWarnings("unchecked")
+    @EqualsAndHashCode(callSuper = true)
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {
         protected Collection<Path> classpath = emptyList();
         protected Collection<String> artifactNames = emptyList();
         protected Collection<byte[]> classBytesClasspath = emptyList();
+
+        @EqualsAndHashCode.Exclude
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
 
+        @EqualsAndHashCode.Exclude
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
 
