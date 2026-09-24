@@ -180,6 +180,13 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                     "change is outside declared dependencies (e.g. overrides/resolutions) and requires resolution");
         }
+        // This scope resolves an added dependency's own closure without consulting overrides, so a declared
+        // override could be ignored for a package the edit pulls in, leaving a lock that disagrees with the
+        // manifest. Hand those to the whole-closure scope, which is override-aware and equally byte-exact.
+        if (!declaredOverrides(pm, editedPackageJson).ranges.isEmpty()) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                    "manifest declares overrides, which the per-dependency scope does not apply");
+        }
 
         Path lockPath = lockPath(pm, packageJsonPath);
         String memberImporterDir = addImporterDir(pm, existingLock, packageJsonPath);
@@ -396,24 +403,13 @@ public final class NativeLockEngine {
     }
 
     /**
-     * The global overrides the root manifest declares, keyed by package name: {@code overrides} for npm and Bun,
-     * {@code resolutions} for either yarn, {@code pnpm.overrides} for pnpm.
-     * <p>
-     * Only plain {@code name -> range} entries are returned. Every other form is refused here rather than
-     * dropped, because a key the resolver cannot turn into a package name would never reach
-     * {@code NpmGraphBuilder.select} and would resolve to a closure that silently ignores it. That includes the
-     * path-scoped keys this recipe itself writes for a {@code dependencyPath} run: pnpm {@code "express>accepts"}
-     * and yarn {@code "express/accepts"}. {@link PackageJsonOverrides#parsePath} already separates those from a
-     * scoped name like {@code "@types/node"}, so reuse it rather than testing for {@code '/'}.
-     */
-    /**
      * A package name npm would accept: an optional {@code @scope/} then a plain name. Deliberately an
      * allowlist. A denylist has to enumerate every form the resolver cannot apply, and anything it misses
      * becomes a key that matches no package, resolves as if the override were absent, and reports success -
      * which is the defect this engine exists to avoid. Range-bearing keys ({@code tslib@^2}), path selectors
      * ({@code a>b}, {@code a/b}), globs and {@code .} all fail this by construction.
      */
-    private static final Pattern OVERRIDE_NAME = Pattern.compile("(?:@[A-Za-z0-9][A-Za-z0-9._-]*/)?[A-Za-z0-9][A-Za-z0-9._-]*");
+    private static final Pattern OVERRIDE_NAME = Pattern.compile("(?:@[A-Za-z0-9~][A-Za-z0-9._~-]*/)?[A-Za-z0-9~][A-Za-z0-9._~-]*");
 
     /**
      * The global overrides the root manifest declares, keyed by package name: {@code overrides} for npm and
@@ -532,7 +528,12 @@ public final class NativeLockEngine {
             String child = e.getKey();
             String parent = e.getValue();
             for (ResolvedNode n : graph.getNodes().values()) {
-                if (n.getResolvedEdges().containsKey(child) && !parent.equals(n.getManifest().getName())) {
+                // Peer edges are not in resolvedEdges, so a peer requirer would otherwise be invisible here
+                // and the global application would not have been equivalent after all.
+                boolean requires = n.getResolvedEdges().containsKey(child) ||
+                        (n.getManifest().getPeerDependencies() != null &&
+                                n.getManifest().getPeerDependencies().containsKey(child));
+                if (requires && !parent.equals(n.getManifest().getName())) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, child,
                             "override of " + child + " scoped to " + parent + " but " +
                                     n.getManifest().getName() + " also requires it");

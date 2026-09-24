@@ -1357,6 +1357,49 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).contains("is not a plain package name");
     }
 
+    /**
+     * The per-dependency path resolves an added dependency's own closure without reading overrides, so a
+     * project that already declares one could have a new transitive locked at the registry version while the
+     * manifest says otherwise -- a wrong lock reported as success, not merely an unapplied override.
+     */
+    @Test
+    void addingADependencyThatPullsInAnOverriddenPackageHonoursTheOverride() {
+        routes.put("https://registry.npmjs.org/existing",
+                "{\"name\":\"existing\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/existing/1.0.0",
+                "{\"name\":\"existing\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/existing/-/existing-1.0.0.tgz\",\"integrity\":\"sha512-EXISTING\"}}");
+        routes.put("https://registry.npmjs.org/alpha",
+                "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/alpha/1.0.0",
+                "{\"name\":\"alpha\",\"version\":\"1.0.0\",\"dependencies\":{\"shared\":\"^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\",\"integrity\":\"sha512-ALPHA\"}}");
+        routes.put("https://registry.npmjs.org/shared",
+                "{\"name\":\"shared\",\"dist-tags\":{},\"versions\":{\"1.5.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/shared/1.5.0",
+                "{\"name\":\"shared\",\"version\":\"1.5.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/shared/-/shared-1.5.0.tgz\",\"integrity\":\"sha512-SHARED15\"}}");
+        routes.put("https://registry.npmjs.org/shared/2.0.0",
+                "{\"name\":\"shared\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/shared/-/shared-2.0.0.tgz\",\"integrity\":\"sha512-SHARED20\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"existing\":\"^1.0.0\"},\"overrides\":{\"shared\":\"^2.0.0\"}}",
+                "{\"dependencies\":{\"existing\":\"^1.0.0\",\"alpha\":\"^1.0.0\"},\"overrides\":{\"shared\":\"^2.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"existing": "^1.0.0"}},
+                    "node_modules/existing": {"version": "1.0.0", "resolved": "https://registry.npmjs.org/existing/-/existing-1.0.0.tgz", "integrity": "sha512-EXISTING"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent())
+                .as("the declared override must reach a package the add pulled in")
+                .contains("shared-2.0.0.tgz").doesNotContain("shared-1.5.0.tgz");
+    }
+
     @Test
     void nullLockFailsLoud() {
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
