@@ -404,27 +404,12 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * Sets {@code pnpm.overrides[key] = value}, creating {@code pnpm} and/or
-     * {@code pnpm.overrides} objects as needed. Preserves formatting.
+     * Sets {@code pnpm.overrides[key] = value}, creating {@code pnpm} and/or {@code pnpm.overrides}
+     * as needed. Preserves formatting, and returns the document unchanged when the entry already holds
+     * that value, which is what keeps the calling recipe single-cycle.
      */
     private static Json.Document setPnpmOverridesEntry(Json.Document doc, String key, String value) {
-        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
-        Json.JsonObject root = (Json.JsonObject) doc.getValue();
-
-        Json.JsonObject pnpmObj = findObjectMember(root, "pnpm");
-        if (pnpmObj == null) {
-            // No pnpm object yet — create pnpm: { overrides: { key: value } }
-            // Use addDependency twice: first add the inner entry (to trigger scope creation),
-            // but we need a two-level nest. Use the reparse fallback for this edge case.
-            String newJson = buildPnpmSnippet(doc, key, value);
-            return PackageJsonHelper.reparseJson(doc, newJson);
-        }
-
-        // pnpm object exists — delegate to flat entry within the "overrides" sub-object
-        // We'll operate directly on the pnpm sub-object via reparse for simplicity.
-        // (The pnpm.overrides nesting is unusual enough that reparse is fine.)
-        String newJson = buildPnpmSnippet(doc, key, value);
-        return PackageJsonHelper.reparseJson(doc, newJson);
+        return PackageJsonHelper.setNestedEntry(doc, "pnpm", "overrides", key, value);
     }
 
     // -------------------------------------------------------------------------
@@ -479,34 +464,6 @@ public final class PackageJsonOverrides {
             }
         }
         return result;
-    }
-
-    /**
-     * Builds a new full JSON document string with the pnpm.overrides[key] = value set.
-     */
-    private static String buildPnpmSnippet(Json.Document doc, String key, String value) {
-        String serialized = doc.printAll();
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper =
-                    new com.fasterxml.jackson.databind.ObjectMapper();
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> root =
-                    mapper.readValue(serialized, java.util.Map.class);
-
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> pnpm =
-                    (java.util.Map<String, Object>) root.computeIfAbsent("pnpm",
-                            k -> new java.util.LinkedHashMap<>());
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> overrides =
-                    (java.util.Map<String, Object>) pnpm.computeIfAbsent("overrides",
-                            k -> new java.util.LinkedHashMap<>());
-            overrides.put(key, value);
-
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
-        } catch (Exception e) {
-            return serialized;
-        }
     }
 
     // -------------------------------------------------------------------------
