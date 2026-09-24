@@ -55,9 +55,37 @@ class NpmPeerForkLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
-    void peerSatisfiedAtEachPlacementRegeneratesV3() {
-        // Swapping ms for escape-string-regexp re-resolves the whole closure. Every placement of fdir sees a
-        // picomatch its peer range admits, so the fork is unaffected and only the swapped entries change.
+    void peerForkPreservedThroughWholeClosureV3() {
+        // An overrides edit forces whole-closure re-resolution. Every placement of fdir sees a picomatch its peer
+        // range admits, so the peer fork is kept exactly as npm laid it out.
+        String before = resource("lock/npm/peer-fork/before");
+        String original = resource("lock/npm/peer-fork/pkg-before");
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm, withOverride(original), original, before,
+                null, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(before);
+    }
+
+    @Test
+    void swapBesidePeerForkThroughWholeClosureV3() {
+        // Swapping ms for escape-string-regexp while re-resolving the whole closure (the path a package swap takes
+        // when its closure cannot be patched directly): only the swapped entries change, matching npm.
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                withOverride(resource("lock/npm/peer-fork/pkg-after")),
+                resource("lock/npm/peer-fork/pkg-before"),
+                resource("lock/npm/peer-fork/before"),
+                null, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/peer-fork/after"));
+    }
+
+    @Test
+    void swapBesidePeerForkV3() {
+        // The same swap without forcing whole-closure: removing ms from a lock that has nested placements elsewhere
+        // is garbage-collected by node_modules resolution, so it no longer needs a flat tree.
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
                 resource("lock/npm/peer-fork/pkg-after"),
                 resource("lock/npm/peer-fork/pkg-before"),
@@ -74,18 +102,20 @@ class NpmPeerForkLockRegenTest extends LockRegenTestSupport {
         // its peer range. npm would re-place fdir to satisfy the peer; that move is not reproduced, so it defers.
         String before = resource("lock/npm/peer-fork/before")
                 .replace("\"node_modules/tinyglobby/node_modules/fdir\"", "\"node_modules/fdir\"");
+        String original = resource("lock/npm/peer-fork/pkg-before");
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/peer-fork/pkg-after"),
-                resource("lock/npm/peer-fork/pkg-before"),
-                before,
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm, withOverride(original), original, before,
                 null, Paths.get("package.json"), ctx);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         assertThat(result.getFailure().getDetail())
-                .contains("fdir")
-                .contains("picomatch@2.3.2")
-                .contains("node_modules/fdir");
+                .contains("fdir@6.5.0 at node_modules/fdir")
+                .contains("picomatch@2.3.2");
+    }
+
+    /** An overrides entry naming no installed package: changes nothing, but forces whole-closure re-resolution. */
+    private static String withOverride(String packageJson) {
+        return packageJson.trim().replaceFirst("}$", ",\"overrides\":{\"z-nonexistent-xyz\":\"1.0.0\"}}");
     }
 }
