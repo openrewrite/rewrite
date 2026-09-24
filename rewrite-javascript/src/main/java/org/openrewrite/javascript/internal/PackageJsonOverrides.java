@@ -15,20 +15,21 @@
  */
 package org.openrewrite.javascript.internal;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.util.DefaultIndenter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -246,7 +247,7 @@ public final class PackageJsonOverrides {
             }
 
             @Override
-            public void writeObjectFieldValueSeparator(JsonGenerator g) throws java.io.IOException {
+            public void writeObjectFieldValueSeparator(JsonGenerator g) throws IOException {
                 g.writeRaw(": ");
             }
         };
@@ -262,8 +263,6 @@ public final class PackageJsonOverrides {
         return holder.getValue() instanceof Json.JsonObject ?
                 ((Json.JsonObject) holder.getValue()).withPrefix(Space.build(" ", emptyList())) : null;
     }
-
-
 
     /** The value {@code overrides} already holds at {@code path -> packageName}, or {@code null}. */
     private static @Nullable String nestedOverrideValue(Json.Document doc, List<DependencyPathSegment> path,
@@ -282,7 +281,7 @@ public final class PackageJsonOverrides {
         if (at == null) {
             return null;
         }
-        for (org.openrewrite.json.tree.Json m : at.getMembers()) {
+        for (Json m : at.getMembers()) {
             if (m instanceof Json.Member && packageName.equals(literalString(((Json.Member) m).getKey()))) {
                 return literalString(((Json.Member) m).getValue());
             }

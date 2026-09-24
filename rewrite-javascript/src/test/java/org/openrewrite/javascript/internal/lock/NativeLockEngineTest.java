@@ -1341,6 +1341,22 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
     }
 
+    /**
+     * PackageJsonOverrides writes a {@code name@version} parent key for a versioned dependencyPath segment.
+     * The allowlist rejects it as a selector rather than treating it as a package name, which previously gave
+     * a refusal naming the parent as its own other requirer.
+     */
+    @Test
+    void versionedParentKeyIsRefusedAsASelector() {
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"lodash@4.17.20\":{\"tslib\":\"1.0.0\"}}}",
+                npmLock("4.17.20"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("is not a plain package name");
+    }
+
     @Test
     void nullLockFailsLoud() {
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
