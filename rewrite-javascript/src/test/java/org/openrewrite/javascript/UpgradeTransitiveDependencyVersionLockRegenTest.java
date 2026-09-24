@@ -378,6 +378,56 @@ class UpgradeTransitiveDependencyVersionLockRegenTest implements RewriteTest {
         );
     }
 
+    /**
+     * A global override is appended in place: the existing entry, the block's own layout and the odd spacing
+     * elsewhere in the manifest all survive. Only the nested {@code dependencyPath} write re-renders the
+     * block, because it rebuilds the value rather than inserting a member.
+     */
+    @Test
+    void writingAGlobalOverridePreservesExistingFormatting() {
+        routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/transitive-override/http/is-odd-3.0.1"));
+        routes.put("https://registry.npmjs.org/is-number", resource("lock/npm/transitive-override/http/is-number"));
+        routes.put("https://registry.npmjs.org/is-number/6.0.0", resource("lock/npm/transitive-override/http/is-number-6.0.0"));
+        routes.put("https://registry.npmjs.org/is-number/7.0.0", resource("lock/npm/transitive-override/http/is-number-7.0.0"));
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("is-number", "^6.0.0", null)).executionContext(ctx),
+                packageJson(
+                        """
+                        {
+                          "name":    "npm-transitive-override",
+                          "overrides": { "already-here": "1.0.0" },
+                          "dependencies": {
+                            "is-odd": "3.0.1"
+                          }
+                        }
+                        """,
+                        """
+                        {
+                          "name":    "npm-transitive-override",
+                          "overrides": { "already-here": "1.0.0", "is-number": "^6.0.0" },
+                          "dependencies": {
+                            "is-odd": "3.0.1"
+                          }
+                        }
+                        """,
+                        isOddBringingIsNumber6()),
+                packageLock(
+                        """
+                        {
+                          "name": "npm-transitive-override",
+                          "lockfileVersion": 3,
+                          "packages": {
+                            "": {"name": "npm-transitive-override", "dependencies": {"is-odd": "3.0.1"}},
+                            "node_modules/is-number": {"version": "6.0.0", "resolved": "https://registry.npmjs.org/is-number/-/is-number-6.0.0.tgz", "integrity": "sha512-Wu1VHeILBK8KAWJUAiSZQX94GmOE45Rg6/538fKwiloUu21KncEkYGPqob2oSZ5mUT73vLGrHQjKw3KMPwfDzg==", "license": "MIT", "engines": {"node": ">=0.10.0"}},
+                            "node_modules/is-odd": {"version": "3.0.1", "resolved": "https://registry.npmjs.org/is-odd/-/is-odd-3.0.1.tgz", "integrity": "sha512-CQpnWPrDwmP1+SMHXZhtLtJv90yiyVfluGsX5iNCVkrhQtU3TQHsUWPG9wkdk9Lgd5yNpAg9jQEo90CBaXgWMA==", "license": "MIT", "dependencies": {"is-number": "^6.0.0"}, "engines": {"node": ">=4"}}
+                          }
+                        }
+                        """,
+                        null, s -> s.noTrim())
+        );
+    }
+
     private static NodeResolutionResult isOddBringingIsNumber6() {
         ResolvedDependency isNumber6 = new ResolvedDependency("is-number", "6.0.0",
                 emptyList(), emptyList(), emptyList(), emptyList(),

@@ -185,9 +185,14 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * Set {@code overrides -> path... -> packageName} without reformatting the document. Only the
-     * {@code overrides} value is rebuilt and spliced back in; every other member keeps its original
-     * whitespace, which a whole-document reparse would discard.
+     * Set {@code overrides -> path... -> packageName}. Only the {@code overrides} value is rebuilt and spliced
+     * back in, so every other member keeps its original whitespace, which a whole-document reparse discarded.
+     * <p>
+     * Members already inside {@code overrides} are re-rendered rather than preserved: an existing
+     * {@code "overrides": { "a": "1.0.0" }} comes back expanded over several lines. Only this nested path
+     * does that; the un-nested one appends through {@code setFlatEntry} and keeps the block as it was.
+     * Building the missing members directly with {@link PackageJsonHelper#makeMember} rather than re-rendering
+     * the value would close the gap.
      */
     private static Json.Document setNestedOverride(Json.Document doc, List<DependencyPathSegment> path,
                                                    String packageName, String newVersion) {
