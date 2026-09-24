@@ -42,8 +42,11 @@ public final class NodeDependencyScan {
         public @Nullable SourceFile modifiedPackageJson;
         public @Nullable Set<String> scopesContainingPackage;
         public @Nullable List<MatchedDependency> matchedDeps;
+        /** Matched dependencies left alone because their version position holds a specifier protocol. */
+        public final List<MatchedDependency> skippedProtocols = new ArrayList<>();
         public LockFileRegeneration.@Nullable Result regenResult;
         public boolean failureRecorded;
+        public boolean protocolsReported;
     }
 
     /**

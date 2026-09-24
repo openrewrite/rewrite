@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
+import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
@@ -44,6 +45,7 @@ import static java.util.Collections.emptyList;
 public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.Accumulator> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
+    transient NodeDependencyProtocolsSkipped protocolsSkipped = new NodeDependencyProtocolsSkipped(this);
 
     @Option(displayName = "Package name",
             description = "Exact package name to match. Mutually exclusive with `packagePattern`; " +
@@ -111,23 +113,29 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                     if (marker == null) return tree;
                     NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
-                    ps.matchedDeps = findMatches(sf);
+                    ps.matchedDeps = findMatches(sf, ps.skippedProtocols);
                 }
                 return tree;
             }
         };
     }
 
-    private List<MatchedDependency> findMatches(SourceFile pkg) {
+    /**
+     * The dependencies this recipe can upgrade, collecting into {@code skipped} those it matched but must
+     * leave alone because their version position holds a specifier protocol. {@code skipped} is cleared
+     * first, so recomputing against a live tree replaces rather than appends.
+     */
+    private List<MatchedDependency> findMatches(SourceFile pkg, List<MatchedDependency> skipped) {
+        skipped.clear();
         NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
         if (marker == null) return emptyList();
         Predicate<String> nameMatcher = buildNameMatcher();
         List<MatchedDependency> result = new ArrayList<>();
-        collectMatches(result, "dependencies", marker.getDependencies(), nameMatcher);
-        collectMatches(result, "devDependencies", marker.getDevDependencies(), nameMatcher);
-        collectMatches(result, "peerDependencies", marker.getPeerDependencies(), nameMatcher);
-        collectMatches(result, "optionalDependencies", marker.getOptionalDependencies(), nameMatcher);
-        collectMatches(result, "bundledDependencies", marker.getBundledDependencies(), nameMatcher);
+        collectMatches(result, skipped, "dependencies", marker.getDependencies(), nameMatcher);
+        collectMatches(result, skipped, "devDependencies", marker.getDevDependencies(), nameMatcher);
+        collectMatches(result, skipped, "peerDependencies", marker.getPeerDependencies(), nameMatcher);
+        collectMatches(result, skipped, "optionalDependencies", marker.getOptionalDependencies(), nameMatcher);
+        collectMatches(result, skipped, "bundledDependencies", marker.getBundledDependencies(), nameMatcher);
         return result;
     }
 
@@ -139,14 +147,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
         return s -> p.matcher(s).matches();
     }
 
-    private void collectMatches(List<MatchedDependency> out, String scopeName,
+    private void collectMatches(List<MatchedDependency> out, List<MatchedDependency> skipped, String scopeName,
                                 @Nullable List<Dependency> deps, Predicate<String> nameMatcher) {
         if (deps == null) return;
         for (Dependency d : deps) {
             if (nameMatcher.test(d.getName())) {
                 // TODO: add semver.gt check (matches TS shouldUpgrade); for v1 we always set the new version.
                 String currentVersion = d.getVersionConstraint() == null ? "" : d.getVersionConstraint();
-                if (!newVersion.equals(currentVersion)) {
+                if (PackageJsonHelper.dependencySpecifierProtocol(currentVersion) != null) {
+                    // The constraint lives behind the protocol, not here; writing the new version into this
+                    // position would drop the reference and take the package out of whatever holds it.
+                    skipped.add(new MatchedDependency(d.getName(), scopeName, currentVersion));
+                } else if (!newVersion.equals(currentVersion)) {
                     out.add(new MatchedDependency(d.getName(), scopeName, currentVersion));
                 }
             }
@@ -170,9 +182,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                     if (ps.matchedDeps != null && ps.matchedDeps.isEmpty()) {
                         SourceFile liveTree = PackageJsonHelper.getLiveTree(ctx, p);
                         if (liveTree != null) {
-                            ps.matchedDeps = findMatches(liveTree);
+                            ps.matchedDeps = findMatches(liveTree, ps.skippedProtocols);
                         }
                     }
+                    reportProtocolSkips(ctx, ps, p);
                     if (ps.matchedDeps != null && !ps.matchedDeps.isEmpty()) {
                         SourceFile effectiveSf = sf;
                         SourceFile liveTree = PackageJsonHelper.getLiveTree(ctx, p);
@@ -206,8 +219,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                         if (pkg == null) pkg = ips.capturedPackageJson;
                         // If the scanner found no matches on the original tree, recompute from the live tree.
                         if (ips.matchedDeps != null && ips.matchedDeps.isEmpty() && pkg != null) {
-                            ips.matchedDeps = findMatches(pkg);
+                            ips.matchedDeps = findMatches(pkg, ips.skippedProtocols);
                         }
+                        reportProtocolSkips(ctx, ips, importer);
                         if (pkg != null && ips.matchedDeps != null && !ips.matchedDeps.isEmpty()) {
                             ensureComputed(ips, pkg, ctx);
                             if (ips.modifiedPackageJson != null) {
@@ -242,6 +256,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 }
             }
         };
+    }
+
+    /** One row per matched dependency left alone for its specifier protocol, emitted once per project. */
+    private void reportProtocolSkips(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path packageJsonPath) {
+        if (ps.protocolsReported || ps.skippedProtocols.isEmpty()) {
+            return;
+        }
+        ps.protocolsReported = true;
+        for (MatchedDependency skipped : ps.skippedProtocols) {
+            protocolsSkipped.insertRow(ctx, new NodeDependencyProtocolsSkipped.Row(
+                    packageJsonPath.toString(),
+                    skipped.getPackageName(),
+                    skipped.getDependencyScope(),
+                    PackageJsonHelper.dependencySpecifierProtocol(skipped.getCurrentVersion()),
+                    skipped.getCurrentVersion(),
+                    newVersion));
+        }
     }
 
     private void recordFailure(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path packageJsonPath) {
