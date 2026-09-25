@@ -67,6 +67,7 @@ import org.openrewrite.java.tree.JavaType.*
 import org.openrewrite.java.tree.JavaType.Array
 import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.internal.JavaThrownExceptions
+import org.openrewrite.kotlin.internal.expandedAliasType
 import org.openrewrite.kotlin.internal.facadeFqn
 import org.openrewrite.kotlin.internal.isFromLibrary
 import org.openrewrite.kotlin.internal.namedClassSymbol
@@ -408,6 +409,7 @@ class KotlinTypeMapping(
         val firClass = when (type) {
             is FirClass -> type
             is FirResolvedQualifier -> {
+                type.expandedAliasType(firSession)?.let { return classType(it, parent, signature) }
                 if (type.typeArguments.isNotEmpty()) {
                     params = type.typeArguments
                 }

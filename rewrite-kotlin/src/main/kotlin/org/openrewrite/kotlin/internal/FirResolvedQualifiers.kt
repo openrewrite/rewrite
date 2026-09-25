@@ -17,9 +17,11 @@ package org.openrewrite.kotlin.internal
 
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
+import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeAliasSymbol
+import org.jetbrains.kotlin.fir.types.ConeClassLikeType
 import org.jetbrains.kotlin.fir.types.coneType
 
 // A qualifier's `resolvedType` is its companion object's type (or `kotlin.Unit`), not the class it names.
@@ -29,3 +31,9 @@ internal fun FirResolvedQualifier.namedClassSymbol(session: FirSession): FirRegu
         is FirTypeAliasSymbol -> symbol.resolvedExpandedTypeRef.coneType.toRegularClassSymbol(session)
         else -> null
     }
+
+// Without explicit type arguments, `StringBox` in `typealias StringBox = Box<String>` still means `Box<String>`.
+internal fun FirResolvedQualifier.expandedAliasType(session: FirSession): ConeClassLikeType? {
+    val alias = qualifierSymbol as? FirTypeAliasSymbol ?: return null
+    return if (typeArguments.isEmpty()) alias.resolvedExpandedTypeRef.coneType.fullyExpandedType(session) as? ConeClassLikeType else null
+}

@@ -45,6 +45,7 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
+import org.openrewrite.kotlin.internal.expandedAliasType
 import org.openrewrite.kotlin.internal.facadeFqn
 import org.openrewrite.kotlin.internal.isFromLibrary
 import org.openrewrite.kotlin.internal.namedClassSymbol
@@ -139,7 +140,12 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
 
             is FirResolvedQualifier -> {
-                if (type.typeArguments.isNotEmpty()) parameterizedSignature(type) else classSignature(type)
+                val aliased = type.expandedAliasType(firSession)
+                when {
+                    aliased != null -> signature(aliased)
+                    type.typeArguments.isNotEmpty() -> parameterizedSignature(type)
+                    else -> classSignature(type)
+                }
             }
 
             is FirStringConcatenationCall -> {
