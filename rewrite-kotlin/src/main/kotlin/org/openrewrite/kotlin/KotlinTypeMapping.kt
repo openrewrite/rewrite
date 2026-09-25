@@ -68,6 +68,7 @@ import org.openrewrite.java.tree.JavaType.*
 import org.openrewrite.java.tree.JavaType.Array
 import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.internal.JavaThrownExceptions
+import org.openrewrite.kotlin.internal.namedClassSymbol
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.methodName
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.variableName
@@ -399,21 +400,17 @@ class KotlinTypeMapping(
         }
     }
 
-    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class, ResolvedQualifierTypeAccess::class)
+    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class)
     private fun classType(type: Any, parent: Any?, signature: String): FullyQualified {
         val fqn = signatureBuilder.classSignature(type)
         var params: List<*>? = null
         val firClass = when (type) {
             is FirClass -> type
             is FirResolvedQualifier -> {
-                val ref = type.resolvedType.toRegularClassSymbol(firSession)
                 if (type.typeArguments.isNotEmpty()) {
                     params = type.typeArguments
                 }
-                if (ref == null) {
-                    return Unknown.getInstance()
-                }
-                ref.fir
+                (type.namedClassSymbol(firSession) ?: return Unknown.getInstance()).fir
             }
 
             is ConeClassLikeType -> {

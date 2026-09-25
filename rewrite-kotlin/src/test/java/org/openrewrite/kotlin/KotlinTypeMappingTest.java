@@ -33,7 +33,10 @@ import org.openrewrite.test.TypeValidation;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -2152,6 +2155,113 @@ class KotlinTypeMappingTest {
                 })
               )
             );
+        }
+
+        @Test
+        void qualifierOfCallableReferenceToInheritedMember() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a: Any = NoCompanion<Int>::bar
+                  val b: Any = WithCompanion<Int>::bar
+                  """,
+                spec -> spec.afterRecipe(cu -> assertQualifierTypes(cu, Map.of(
+                  "NoCompanion", "NoCompanion",
+                  "WithCompanion", "WithCompanion"
+                ), "Base"))
+              ),
+              kotlin(
+                """
+                  open class Base {
+                      fun bar() = 1
+                  }
+                  class NoCompanion<T> : Base()
+                  class WithCompanion<T> : Base() {
+                      companion object {
+                          fun create() = 2
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void qualifierOfStaticStyleCall() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = NoCompanion.valueOf("A")
+                  val b = WithCompanion.create()
+                  val c = Outer.Nested.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    assertQualifierTypes(cu, Map.of(
+                      "WithCompanion", "WithCompanion",
+                      "Nested", "Outer$Nested"
+                    ), "java.lang.Object");
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                            if ("NoCompanion".equals(identifier.getSimpleName())) {
+                                JavaType.FullyQualified type = TypeUtils.asFullyQualified(identifier.getType());
+                                assertThat(type.getFullyQualifiedName()).isEqualTo("NoCompanion");
+                                assertThat(type.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
+                                assertThat(type.getMembers()).extracting(JavaType.Variable::getName).containsExactly("A");
+                            }
+                            return super.visitIdentifier(identifier, p);
+                        }
+                    }.visit(cu, 0);
+                })
+              ),
+              kotlin(
+                """
+                  enum class NoCompanion {
+                      A
+                  }
+                  class WithCompanion {
+                      fun bar() = 1
+                      companion object {
+                          fun create() = 2
+                      }
+                  }
+                  class Outer {
+                      class Nested {
+                          fun bar() = 1
+                          companion object {
+                              fun create() = 2
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        private static void assertQualifierTypes(K.CompilationUnit cu, Map<String, String> expectedFqnBySimpleName, String supertype) {
+            Set<String> seen = new HashSet<>();
+            new KotlinIsoVisitor<Integer>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                    String expectedFqn = expectedFqnBySimpleName.get(identifier.getSimpleName());
+                    if (expectedFqn != null) {
+                        JavaType.FullyQualified type = TypeUtils.asFullyQualified(identifier.getType());
+                        if (type instanceof JavaType.Parameterized parameterized) {
+                            type = parameterized.getType();
+                        }
+                        assertThat(type).as(identifier.getSimpleName()).isNotNull();
+                        assertThat(type.getFullyQualifiedName()).as(identifier.getSimpleName()).isEqualTo(expectedFqn);
+                        assertThat(type.getKind()).as(identifier.getSimpleName()).isEqualTo(JavaType.FullyQualified.Kind.Class);
+                        assertThat(type.getSupertype().getFullyQualifiedName()).as(identifier.getSimpleName()).isEqualTo(supertype);
+                        assertThat(type.getMethods()).as(identifier.getSimpleName())
+                          .extracting(JavaType.Method::getName)
+                          .doesNotContain("create", "toString");
+                        seen.add(identifier.getSimpleName());
+                    }
+                    return super.visitIdentifier(identifier, p);
+                }
+            }.visit(cu, 0);
+            assertThat(seen).containsExactlyInAnyOrderElementsOf(expectedFqnBySimpleName.keySet());
         }
     }
 }

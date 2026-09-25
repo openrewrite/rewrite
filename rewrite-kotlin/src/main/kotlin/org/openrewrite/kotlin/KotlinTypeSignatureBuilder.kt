@@ -46,6 +46,7 @@ import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
+import org.openrewrite.kotlin.internal.namedClassSymbol
 import java.util.*
 
 @Suppress("DuplicatedCode")
@@ -217,7 +218,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             is FirClass -> convertClassIdToFqn(type.classId)
             is FirFile -> fileSignature(type)
             is FirResolvedTypeRef -> classSignature(type.coneType)
-            is FirResolvedQualifier -> convertClassIdToFqn(type.classId)
+            is FirResolvedQualifier -> convertClassIdToFqn(type.namedClassSymbol(firSession)?.classId ?: type.classId)
             else -> {
                 throw UnsupportedOperationException("Unsupported class type: ${type.javaClass.name}")
             }
