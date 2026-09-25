@@ -45,6 +45,8 @@ import static java.util.stream.Collectors.toList;
 public class JavaTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
 
+    private static final boolean PARSER_DISCRIMINATOR_AVAILABLE = isParserDiscriminatorAvailable();
+
     private static final String TEMPLATE_CACHE_MESSAGE_KEY = "__org.openrewrite.java.internal.template.JavaTemplateParser.cache__";
 
     @Language("java")
@@ -119,7 +121,7 @@ public class JavaTemplateParser {
     }
 
     public J parseExpression(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
-        List<J> result = cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), Expression.class, imports, statementTemplateGenerator.getBindType(), parser.discriminator()),
+        List<J> result = cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), Expression.class, imports, statementTemplateGenerator.getBindType(), parserDiscriminator()),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
@@ -156,7 +158,7 @@ public class JavaTemplateParser {
                                                         Space.Location location,
                                                         JavaCoordinates.Mode mode) {
         return cacheIfContextFree(cursor,
-                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), expected, imports, statementTemplateGenerator.getBindType(), parser.discriminator()),
+                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), expected, imports, statementTemplateGenerator.getBindType(), parserDiscriminator()),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, mode),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
@@ -364,6 +366,23 @@ public class JavaTemplateParser {
         }
 
         return ListUtils.map(js, j -> (J2) new RandomizeIdVisitor<Integer>().visit(j, 0));
+    }
+
+    /**
+     * A runtime whose rewrite-core predates {@link Parser.Builder#discriminator()} parent-loads that class while
+     * this one comes from a newer recipe jar, so fall back to builder identity: fewer cache hits, never a wrong one.
+     */
+    private Object parserDiscriminator() {
+        return PARSER_DISCRIMINATOR_AVAILABLE ? parser.discriminator() : parser;
+    }
+
+    private static boolean isParserDiscriminatorAvailable() {
+        try {
+            Parser.Builder.class.getMethod("discriminator");
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
     }
 
     @Value
