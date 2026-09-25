@@ -505,9 +505,6 @@ public class KotlinParser implements Parser {
                 VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
                 environment::createPackagePartProvider);
 
-        AbstractProjectFileSearchScope sourceScope = projectEnvironment.getSearchScopeByPsiFiles(ktFiles);
-        sourceScope.plus(projectEnvironment.getSearchScopeForProjectJavaSources());
-
         AbstractProjectFileSearchScope libraryScope = projectEnvironment.getSearchScopeForProjectLibraries();
 
         Name name = Name.identifier(moduleName);
