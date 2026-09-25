@@ -173,7 +173,9 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         return !classId.packageFqName.isRoot && psi.parent.text == classId.packageFqName.asString()
     }
 
-    private fun matchClassId(psi: PsiElement, classId: ClassId): ClassId {
+    private fun matchClassId(name: PsiElement, classId: ClassId): ClassId {
+        // `Outer.Nested<Int>` nests the name in a call carrying the type arguments
+        val psi = (name.parent as? KtCallExpression)?.takeIf { it.calleeExpression == name } ?: name
         if (psi.parent is KtDotQualifiedExpression) {
             val parent: KtDotQualifiedExpression = psi.parent as KtDotQualifiedExpression
             if (classId.packageFqName.isRoot && psi !is KtDotQualifiedExpression && psi == parent.receiverExpression) {
@@ -195,7 +197,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         //   - relative to an imported nested: `B.A` for `A.B.A` -> a trailing run of the nested names
         // The two multi-segment fallbacks require at least two segments so a single receiver name (e.g.
         // the outer `A` of `A.B.A.C`, whose leaf coincidentally repeats deeper) is not matched too deep.
-        val text = psi.text
+        val text = withoutTypeArguments(psi)
         if (text == classId.asFqNameString() || text == classId.relativeClassName.asString()) {
             return classId
         }
@@ -214,6 +216,13 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         }
 
         return classId
+    }
+
+    private fun withoutTypeArguments(psi: PsiElement): String = when (psi) {
+        is KtDotQualifiedExpression -> withoutTypeArguments(psi.receiverExpression) + "." +
+                (psi.selectorExpression?.let { withoutTypeArguments(it) } ?: "")
+        is KtCallExpression -> psi.calleeExpression?.text ?: psi.text
+        else -> psi.text
     }
 
     fun primary(psiElement: PsiElement?) =

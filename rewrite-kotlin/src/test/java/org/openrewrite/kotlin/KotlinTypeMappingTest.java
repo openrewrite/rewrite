@@ -2187,6 +2187,30 @@ class KotlinTypeMappingTest {
         }
 
         @Test
+        void qualifierOfParameterizedNestedCallableReference() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = Outer.Nested<Int>::bar
+                  val b = Outer.Nested<List<Int>>::bar
+                  """,
+                spec -> spec.afterRecipe(cu -> assertQualifierTypes(cu, Map.of(
+                  "Nested", "Outer$Nested"
+                ), "java.lang.Object"))
+              ),
+              kotlin(
+                """
+                  class Outer {
+                      class Nested<T> {
+                          fun bar() = 1
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
         void qualifierOfStaticStyleCall() {
             rewriteRun(
               kotlin(
