@@ -119,7 +119,7 @@ public class JavaTemplateParser {
     }
 
     public J parseExpression(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
-        List<J> result = cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), Expression.class, imports, statementTemplateGenerator.getBindType(), parser.discriminator()),
+        List<J> result = cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), Expression.class, imports, statementTemplateGenerator.getBindType(), parser.clone()),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
@@ -156,7 +156,7 @@ public class JavaTemplateParser {
                                                         Space.Location location,
                                                         JavaCoordinates.Mode mode) {
         return cacheIfContextFree(cursor,
-                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), expected, imports, statementTemplateGenerator.getBindType(), parser.discriminator()),
+                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), expected, imports, statementTemplateGenerator.getBindType(), parser.clone()),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, mode),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
@@ -377,9 +377,10 @@ public class JavaTemplateParser {
         String bindType;
 
         /**
-         * Prevents similar parsers with different configuration from being considered equivalent.
-         * @see Parser.Builder#discriminator()
+         * Discriminates both the stub's language and its classpath, since a Kotlin file may have both a
+         * {@code JavaTemplate} and a {@code KotlinTemplate} applied to it. A defensive clone is stored: the live
+         * builder mutates on first {@code build()}, changing the hash of a key already in the map.
          */
-        Object parserDiscriminator;
+        Parser.Builder parser;
     }
 }
