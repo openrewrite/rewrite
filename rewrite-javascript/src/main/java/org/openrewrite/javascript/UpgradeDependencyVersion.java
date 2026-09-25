@@ -215,6 +215,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                         }
                         ensureComputed(ps, effectiveSf, ctx);
                     }
+                    refuseStaleCatalogLock(ps);
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
                         PackageJsonHelper.putLiveTree(ctx, p, out);
@@ -287,16 +288,24 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
      * version, which pnpm does not report (pnpm/pnpm#9369).
      */
     private void refuseStaleCatalogLock(NodeDependencyScan.ProjectState ps) {
-        if (ps.regenResult != null || ps.catalogEntriesEdited.isEmpty() || ps.capturedLockContent == null) {
+        if (ps.catalogEntriesEdited.isEmpty() || ps.capturedLockContent == null) {
             return;
         }
-        NodeCatalogs.CatalogEntry entry = ps.catalogEntriesEdited.get(0);
+        // A regeneration that succeeded answered only for the manifest edits; it wrote a lock that still
+        // holds the old catalog version. Replace that success, or the stale lock ships reported as good.
+        if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
+            return;
+        }
+        StringBuilder detail = new StringBuilder("the catalog entry was updated but the lock cannot be:");
+        for (NodeCatalogs.CatalogEntry entry : ps.catalogEntriesEdited) {
+            detail.append(' ').append(entry.getPackageName()).append(" resolves through ")
+                    .append(NodeCatalogs.DEFAULT_CATALOG.equals(entry.getCatalogName()) ?
+                            "the default catalog" : "catalog " + entry.getCatalogName()).append(';');
+        }
         ps.regenResult = LockFileRegeneration.Result.failure(new LockFileRegeneration.Failure(
                 LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE,
-                entry.getPackageName(),
-                "the catalog entry was updated but the lock cannot be: " + entry.getPackageName() +
-                        " resolves through " + (NodeCatalogs.DEFAULT_CATALOG.equals(entry.getCatalogName()) ?
-                        "the default catalog" : "catalog " + entry.getCatalogName())));
+                ps.catalogEntriesEdited.get(0).getPackageName(),
+                detail.toString()));
     }
 
     /** One row per matched dependency left alone for its specifier protocol, emitted once per project. */

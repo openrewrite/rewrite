@@ -16,14 +16,18 @@
 package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
-import static java.util.Arrays.asList;
+import java.util.stream.Stream;
 
+import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.javascript.Assertions.dependency;
@@ -46,6 +50,19 @@ import static org.openrewrite.yaml.Assertions.yaml;
  */
 class UpgradeDependencyVersionCatalogTest implements RewriteTest {
 
+    private static final String OLD = "~1.4.1";
+    private static final String NEW = "~1.5.0";
+
+    /** One dependency, declared by reference; {@code %s} is that reference. */
+    private static final String MANIFEST = "{\n" +
+            "  \"name\": \"consumer\",\n" +
+            "  \"version\": \"1.0.0\",\n" +
+            "  \"dependencies\": {\n" +
+            "    \"acme-logger\": \"%s\"\n" +
+            "  }\n" +
+            "}\n";
+
+    /** A catalog reference beside a protocol that has no catalog to follow. */
     private static final String PACKAGE_JSON = "{\n" +
             "  \"name\": \"consumer\",\n" +
             "  \"version\": \"1.0.0\",\n" +
@@ -58,13 +75,20 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     private static final String WORKSPACE_YAML = "packages:\n" +
             "  - '.'\n" +
             "catalog:\n" +
-            "  acme-logger: '~1.4.1'\n";
+            "  acme-logger: '" + OLD + "'\n";
 
     private static final String NAMED_WORKSPACE_YAML = "packages:\n" +
             "  - '.'\n" +
             "catalogs:\n" +
-            "  strict:\n" +
-            "    acme-logger: '~1.4.1'\n";
+            "  stable:\n" +
+            "    acme-logger: '" + OLD + "'\n";
+
+    private static final String YARNRC = "catalog:\n" +
+            "  acme-logger: '" + OLD + "'\n";
+
+    private static final String NAMED_YARNRC = "catalogs:\n" +
+            "  stable:\n" +
+            "    acme-logger: '" + OLD + "'\n";
 
     private static final String ROOT_JSON = "{\n" +
             "  \"name\": \"root\",\n" +
@@ -83,61 +107,65 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     private static final String MEMBERS_WORKSPACE_YAML = "packages:\n" +
             "  - 'packages/*'\n" +
             "catalog:\n" +
-            "  acme-logger: '~1.4.1'\n";
+            "  acme-logger: '" + OLD + "'\n";
 
-    private static String referencing(String catalogReference) {
-        return PACKAGE_JSON.replace("\"catalog:\"", '"' + catalogReference + '"');
+    private static final String PNPM_LOCK = "lockfileVersion: '9.0'\n" +
+            "\n" +
+            "catalogs:\n" +
+            "  default:\n" +
+            "    acme-logger:\n" +
+            "      specifier: '" + OLD + "'\n" +
+            "      version: 1.4.1\n" +
+            "\n" +
+            "importers:\n" +
+            "\n" +
+            "  .:\n" +
+            "    dependencies:\n" +
+            "      acme-logger:\n" +
+            "        specifier: 'catalog:'\n" +
+            "        version: 1.4.1\n";
+
+    static Stream<Arguments> spellings() {
+        return Stream.of(
+                Arguments.of(PackageManager.Pnpm, "pnpm-workspace.yaml", "catalog:", WORKSPACE_YAML),
+                Arguments.of(PackageManager.Pnpm, "pnpm-workspace.yaml", "catalog:stable", NAMED_WORKSPACE_YAML),
+                Arguments.of(PackageManager.YarnBerry, ".yarnrc.yml", "catalog:", YARNRC),
+                Arguments.of(PackageManager.YarnBerry, ".yarnrc.yml", "catalog:stable", NAMED_YARNRC));
     }
 
-    @Test
-    void pnpmDefaultCatalogEntryIsUpgraded() {
+    @ParameterizedTest(name = "{0} {2}")
+    @MethodSource("spellings")
+    void catalogEntryIsUpgraded(PackageManager pm, String workspaceFile, String reference, String catalog) {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0")),
-                packageJson(PACKAGE_JSON, null,
-                        nodeResolutionResult(PackageManager.Pnpm,
-                                dependency("acme-logger", "catalog:"),
-                                dependency("acme-lib", "workspace:^"))),
-                yaml(WORKSPACE_YAML, WORKSPACE_YAML.replace("'~1.4.1'", "'~1.5.0'"),
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
+                packageJson(String.format(MANIFEST, reference), null,
+                        nodeResolutionResult(pm, dependency("acme-logger", reference))),
+                yaml(catalog, catalog.replace(OLD, NEW), s -> s.path(workspaceFile))
+        );
+    }
+
+    static Stream<Arguments> constraintsAndRenderings() {
+        return Stream.of(
+                Arguments.of("~1.5.0", "  acme-logger: ~1.5.0"),
+                Arguments.of(">=2.0.0", "  acme-logger: '>=2.0.0'"),
+                Arguments.of("*", "  acme-logger: '*'"));
+    }
+
+    /**
+     * An npm range can open with a character YAML reads as an indicator, so an entry that was unquoted
+     * has to gain quotes or the file stops parsing: {@code >=2.0.0} would read as a folded block scalar
+     * and {@code *} as an alias. A constraint that needs no quotes keeps the style it found.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("constraintsAndRenderings")
+    void anUnquotedEntryGainsQuotesOnlyWhenTheConstraintNeedsThem(String newVersion, String expectedEntry) {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, newVersion)),
+                packageJson(String.format(MANIFEST, "catalog:"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
+                yaml("catalog:\n  acme-logger: 1.4.1\n",
+                        "catalog:\n" + expectedEntry + "\n",
                         s -> s.path("pnpm-workspace.yaml"))
-        );
-    }
-
-    @Test
-    void pnpmNamedCatalogEntryIsUpgraded() {
-        rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0")),
-                packageJson(referencing("catalog:strict"), null,
-                        nodeResolutionResult(PackageManager.Pnpm,
-                                dependency("acme-logger", "catalog:strict"),
-                                dependency("acme-lib", "workspace:^"))),
-                yaml(NAMED_WORKSPACE_YAML, NAMED_WORKSPACE_YAML.replace("'~1.4.1'", "'~1.5.0'"),
-                        s -> s.path("pnpm-workspace.yaml"))
-        );
-    }
-
-    @Test
-    void yarnDefaultCatalogEntryIsUpgraded() {
-        rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0")),
-                packageJson(PACKAGE_JSON, null,
-                        nodeResolutionResult(PackageManager.YarnBerry,
-                                dependency("acme-logger", "catalog:"),
-                                dependency("acme-lib", "workspace:^"))),
-                yaml(WORKSPACE_YAML, WORKSPACE_YAML.replace("'~1.4.1'", "'~1.5.0'"),
-                        s -> s.path(".yarnrc.yml"))
-        );
-    }
-
-    @Test
-    void yarnNamedCatalogEntryIsUpgraded() {
-        rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0")),
-                packageJson(referencing("catalog:strict"), null,
-                        nodeResolutionResult(PackageManager.YarnBerry,
-                                dependency("acme-logger", "catalog:strict"),
-                                dependency("acme-lib", "workspace:^"))),
-                yaml(NAMED_WORKSPACE_YAML, NAMED_WORKSPACE_YAML.replace("'~1.4.1'", "'~1.5.0'"),
-                        s -> s.path(".yarnrc.yml"))
         );
     }
 
@@ -150,7 +178,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     @Test
     void aCatalogEntryIsLeftAloneWhenADeclaredMemberIsMissingFromTheSourceSet() {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0"))
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW))
                         .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
                                 assertThat(rows).extracting("sourcePath", "packageName", "protocol", "currentValue")
                                         .containsExactly(
@@ -169,12 +197,12 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     /**
      * Both members are present and both reference the entry, but only one of them resolved, so only one
      * can be matched and upgraded. Moving the entry would move the other member to a version nothing
-     * asked on its behalf, so the recipe refuses and both stay on `~1.4.1`.
+     * asked on its behalf, so the recipe refuses and both stay on the old constraint.
      */
     @Test
     void aSharedCatalogEntryIsLeftAloneWhenAConsumerIsNotBeingUpgraded() {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0"))
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW))
                         .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
                                 assertThat(rows).extracting("sourcePath", "packageName", "protocol", "currentValue")
                                         .containsExactly(
@@ -196,7 +224,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     @Test
     void aSharedCatalogEntryIsUpgradedWhenEveryConsumerIsBeingUpgraded() {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0")),
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
                 packageJson(ROOT_JSON, null,
                         nodeResolutionResult(PackageManager.Pnpm,
                                 asList("packages/a/package.json", "packages/b/package.json"))),
@@ -206,7 +234,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                 packageJson(MEMBER_JSON, null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:")),
                         s -> s.path("packages/b/package.json")),
-                yaml(MEMBERS_WORKSPACE_YAML, MEMBERS_WORKSPACE_YAML.replace("'~1.4.1'", "'~1.5.0'"),
+                yaml(MEMBERS_WORKSPACE_YAML, MEMBERS_WORKSPACE_YAML.replace(OLD, NEW),
                         s -> s.path("pnpm-workspace.yaml"))
         );
     }
@@ -214,25 +242,22 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     @Test
     void protocolsWithNothingToFollowAreLeftAloneAndReported() {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion(null, "acme-*", "~1.5.0"))
-                        .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows -> {
-                            assertThat(rows).hasSize(1);
-                            assertThat(rows).extracting("packageName", "protocol", "currentValue")
-                                    .containsExactly(tuple("acme-lib", "workspace:", "workspace:^"));
-                        }),
+                spec -> spec.recipe(new UpgradeDependencyVersion(null, "acme-*", NEW))
+                        .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
+                                assertThat(rows).extracting("packageName", "protocol", "currentValue")
+                                        .containsExactly(tuple("acme-lib", "workspace:", "workspace:^"))),
                 packageJson(PACKAGE_JSON, null,
                         nodeResolutionResult(PackageManager.Pnpm,
                                 dependency("acme-logger", "catalog:"),
                                 dependency("acme-lib", "workspace:^"))),
-                yaml(WORKSPACE_YAML, WORKSPACE_YAML.replace("'~1.4.1'", "'~1.5.0'"),
-                        s -> s.path("pnpm-workspace.yaml"))
+                yaml(WORKSPACE_YAML, WORKSPACE_YAML.replace(OLD, NEW), s -> s.path("pnpm-workspace.yaml"))
         );
     }
 
     @Test
     void aCatalogReferenceWithNoEntryToFollowIsLeftAlone() {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0")),
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
                 packageJson(PACKAGE_JSON, null,
                         nodeResolutionResult(PackageManager.Pnpm,
                                 dependency("acme-logger", "catalog:"),
@@ -240,23 +265,6 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                 yaml("packages:\n  - '.'\n", s -> s.path("pnpm-workspace.yaml"))
         );
     }
-
-
-    private static final String PNPM_LOCK = "lockfileVersion: '9.0'\n" +
-            "\n" +
-            "catalogs:\n" +
-            "  default:\n" +
-            "    acme-logger:\n" +
-            "      specifier: '~1.4.1'\n" +
-            "      version: 1.4.1\n" +
-            "\n" +
-            "importers:\n" +
-            "\n" +
-            "  .:\n" +
-            "    dependencies:\n" +
-            "      acme-logger:\n" +
-            "        specifier: 'catalog:'\n" +
-            "        version: 1.4.1\n";
 
     /**
      * The entry moves but the lock cannot follow, and pnpm does not report the disagreement: a
@@ -266,30 +274,21 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     @Test
     void aCatalogEditRefusesLoudlyWhenItLeavesALockBehind() {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0"))
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW))
                         .dataTable(NodeLockRegenerationFailures.Row.class, rows -> {
                             assertThat(rows).hasSize(1);
                             assertThat(rows.get(0).getSourcePath()).isEqualTo("package.json");
                             assertThat(rows.get(0).getPackageName()).isEqualTo("acme-logger");
                             assertThat(rows.get(0).getReason()).isEqualTo("UNSUPPORTED_ENTRY_TYPE");
                         }),
-                packageJson(LOCKED_PACKAGE_JSON, null,
+                packageJson(String.format(MANIFEST, "catalog:"), null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
-                yaml(WORKSPACE_YAML, WORKSPACE_YAML.replace("'~1.4.1'", "'~1.5.0'"),
-                        s -> s.path("pnpm-workspace.yaml")),
+                yaml(WORKSPACE_YAML, WORKSPACE_YAML.replace(OLD, NEW), s -> s.path("pnpm-workspace.yaml")),
                 pnpmLock(PNPM_LOCK, null,
                         s -> s.afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                                 .as("the lock left behind by the catalog edit carries the warning").isPresent()))
         );
     }
-
-    private static final String LOCKED_PACKAGE_JSON = "{\n" +
-            "  \"name\": \"consumer\",\n" +
-            "  \"version\": \"1.0.0\",\n" +
-            "  \"dependencies\": {\n" +
-            "    \"acme-logger\": \"catalog:\"\n" +
-            "  }\n" +
-            "}\n";
 
     @Test
     void aMarkerClaimingAResolvedVersionStillCannotOverwriteTheManifest() {
@@ -297,10 +296,10 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
         // the marker ever to resolve `catalog:` to the version behind it, filtering alone would stop
         // protecting; the manifest must still come back untouched.
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0")),
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
                 packageJson(PACKAGE_JSON, null,
                         nodeResolutionResult(PackageManager.Pnpm,
-                                dependency("acme-logger", "~1.4.1"),
+                                dependency("acme-logger", OLD),
                                 dependency("acme-lib", "workspace:^"))),
                 yaml(WORKSPACE_YAML, s -> s.path("pnpm-workspace.yaml"))
         );

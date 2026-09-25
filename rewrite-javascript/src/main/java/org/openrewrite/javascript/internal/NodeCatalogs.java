@@ -51,6 +51,9 @@ public class NodeCatalogs {
     private static final String DEFAULT_CATALOG_KEY = "catalog";
     private static final String NAMED_CATALOGS_KEY = "catalogs";
 
+    /** Characters YAML reads as an indicator when a plain scalar opens with one. */
+    private static final String PLAIN_SCALAR_INDICATORS = "-?:,[]{}#&*!|>'\"%@`";
+
     private static final String PNPM_WORKSPACE_FILE = "pnpm-workspace.yaml";
     private static final String YARN_WORKSPACE_FILE = ".yarnrc.yml";
 
@@ -206,9 +209,32 @@ public class NodeCatalogs {
             if (newVersion.equals(version.getValue())) {
                 return catalog;
             }
-            entries.set(i, entry.withValue(version.withValue(newVersion)));
+            Yaml.Scalar.Style style = version.getStyle();
+            if (style == Yaml.Scalar.Style.LITERAL || style == Yaml.Scalar.Style.FOLDED) {
+                // `withValue` cannot rewrite a block scalar's body without clobbering its envelope, and a
+                // constraint has no business being one. Decline rather than corrupt the file.
+                return catalog;
+            }
+            Yaml.Scalar rewritten = version.withValue(newVersion);
+            if (style == Yaml.Scalar.Style.PLAIN && !canBePlainScalar(newVersion)) {
+                rewritten = rewritten.withStyle(Yaml.Scalar.Style.SINGLE_QUOTED);
+            }
+            entries.set(i, entry.withValue(rewritten));
             return catalog.withEntries(entries);
         }
         return catalog;
+    }
+
+    /**
+     * Whether a value can stand unquoted where the old one did. An npm range may open with a character
+     * YAML reads as an indicator, so keeping the old scalar's style would emit something that no longer
+     * parses: `>=2.0.0` reads as a folded block scalar and `*` as an alias.
+     */
+    private static boolean canBePlainScalar(String value) {
+        if (value.isEmpty() || PLAIN_SCALAR_INDICATORS.indexOf(value.charAt(0)) >= 0) {
+            return false;
+        }
+        // `: ` opens a mapping value and ` #` a comment, wherever they appear.
+        return !value.contains(": ") && !value.contains(" #") && value.equals(value.trim());
     }
 }
