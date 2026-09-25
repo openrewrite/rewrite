@@ -458,16 +458,14 @@ public final class NativeLockEngine {
         if (node == null || !node.isObject()) {
             return true;
         }
-        Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
-        while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> f = fields.next();
-            Matcher m = OVERRIDE_KEY_NAME.matcher(f.getKey());
+        for (Map.Entry<String, JsonNode> property : node.properties()) {
+            Matcher m = OVERRIDE_KEY_NAME.matcher(property.getKey());
             boolean bounded = false;
             while (m.find()) {
                 names.add(m.group());
                 bounded = true;
             }
-            if (!bounded || !collectOverrideKeyNames(f.getValue(), names)) {
+            if (!bounded || !collectOverrideKeyNames(property.getValue(), names)) {
                 return false;
             }
         }
@@ -501,11 +499,9 @@ public final class NativeLockEngine {
     /** Accept {@code name -> range} and one level of {@code parent -> {name -> range}}; refuse anything else. */
     private static void collectOverrides(JsonNode node, @Nullable String parent,
                                          Map<String, String> overrides, Map<String, String> scopedParent) {
-        Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
-        while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> f = fields.next();
-            String key = f.getKey();
-            JsonNode value = f.getValue();
+        for (Map.Entry<String, JsonNode> property : node.properties()) {
+            String key = property.getKey();
+            JsonNode value = property.getValue();
             // A parent key may carry a version selector, checked later against the resolved parent. A leaf
             // key may not: a range there selects which copies to override, and this engine places only one.
             if (!OVERRIDE_NAME.matcher(value.isObject() ? parentName(key) : key).matches()) {
