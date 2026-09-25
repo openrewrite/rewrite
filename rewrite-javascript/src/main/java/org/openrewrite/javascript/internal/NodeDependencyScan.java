@@ -46,6 +46,8 @@ public final class NodeDependencyScan {
         public final Map<Path, Yaml.Documents> workspaceFiles = new HashMap<>();
         /** The catalog entries judged safe to edit in place, by the workspace file declaring them. */
         public final Map<Path, Set<NodeCatalogs.CatalogEntry>> catalogEdits = new HashMap<>();
+        /** Set whenever the inputs to {@link #decideCatalogEdits} change, so the verdict is recomputed. */
+        public boolean catalogEditsStale = true;
     }
 
     public static final class ProjectState {
@@ -106,11 +108,13 @@ public final class NodeDependencyScan {
      * manifest and the entry alone, which keeps every member in step at the cost of the upgrade.
      */
     public static void decideCatalogEdits(Accumulator acc) {
-        // Called once per source file, so the common case - a repository with no catalogs at all - has to
-        // cost nothing. Without a workspace file nothing can be decided anyway.
-        if (acc.workspaceFiles.isEmpty()) {
+        // Called once per source file, so a repository with catalogs must not pay for the whole verdict
+        // on every file it contains. Without a workspace file there is nothing to decide at all, and
+        // otherwise the verdict stands until something it reads changes.
+        if (acc.workspaceFiles.isEmpty() || !acc.catalogEditsStale) {
             return;
         }
+        acc.catalogEditsStale = false;
         acc.catalogEdits.clear();
         Map<Path, Boolean> complete = new HashMap<>();
         for (ProjectState ps : acc.projects.values()) {
