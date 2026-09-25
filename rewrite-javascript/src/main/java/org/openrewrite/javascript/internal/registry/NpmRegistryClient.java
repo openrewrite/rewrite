@@ -126,7 +126,7 @@ public class NpmRegistryClient {
             int code = response.getCode();
             if (code == 401 || code == 403) {
                 throw new NodeRegistryException(Reason.AUTH_FAILED, safeUrl(registry), name, version,
-                        "HTTP " + code + " from " + url, null);
+                        "HTTP " + code + " from " + url + unresolvedCredentialsHint(registry), null);
             }
             if (code == 404) {
                 Reason reason = packument ? Reason.PACKAGE_NOT_FOUND : Reason.VERSION_NOT_FOUND;
@@ -149,7 +149,7 @@ public class NpmRegistryClient {
     private void guard(NodeRegistry registry) {
         if (registry.isUnresolvedPlaceholders()) {
             throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry),
-                    "Registry URL or credentials contain unresolved environment placeholders: " + safeUrl(registry));
+                    "Registry URL contains unresolved environment placeholders: " + safeUrl(registry));
         }
         // The default sender cannot load a custom CA or disable strict SSL; fail loud rather than
         // ignore the config and later throw an opaque handshake error.
@@ -159,6 +159,19 @@ public class NpmRegistryClient {
                     "Registry " + safeUrl(registry) + " requires a custom CA (cafile/strict-ssl) but no " +
                             "TLS-capable HttpSender was injected");
         }
+    }
+
+    /**
+     * Why a rejected request may not have authenticated: its {@code .npmrc} credentials reference variables
+     * that were unset where the recipe ran. Empty when every placeholder resolved.
+     */
+    private static String unresolvedCredentialsHint(NodeRegistry registry) {
+        List<String> placeholders = registry.getUnresolvedCredentialPlaceholders();
+        if (placeholders.isEmpty()) {
+            return "";
+        }
+        return "; .npmrc credentials for this registry reference " + String.join(", ", placeholders) + ", which " +
+                (placeholders.size() == 1 ? "is" : "are") + " not set in the environment the recipe runs in";
     }
 
     private static void applyAuth(HttpSender.Request.Builder builder, NodeRegistry registry) {
