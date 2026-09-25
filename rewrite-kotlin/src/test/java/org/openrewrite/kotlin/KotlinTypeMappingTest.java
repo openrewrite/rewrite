@@ -2338,6 +2338,77 @@ class KotlinTypeMappingTest {
             );
         }
 
+        @Test
+        void typeAliasQualifierPreservesFixedTypeArguments() {
+            rewriteRun(
+              kotlin(
+                """
+                  class Box<T>(val value: T)
+                  typealias StringBox = Box<String>
+
+                  val value = StringBox::value
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, AtomicBoolean found) {
+                            JavaType.Parameterized type = TypeUtils.asParameterized(memberRef.getContaining().getType());
+                            assertThat(type).isNotNull();
+                            assertThat(type.getFullyQualifiedName()).isEqualTo("Box");
+                            assertThat(type.getTypeParameters())
+                              .extracting(JavaType::toString)
+                              .containsExactly("kotlin.String");
+                            found.set(true);
+                            return super.visitMemberReference(memberRef, found);
+                        }
+                    }.reduce(cu, new AtomicBoolean());
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Test
+        void packageSegmentOfQualifiedTypeAliasHasNoType() {
+            rewriteRun(
+              kotlin(
+                """
+                  val value = p.A.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> seen) {
+                            if ("p".equals(identifier.getSimpleName())) {
+                                assertThat(identifier.getType()).isNull();
+                                seen.add("p");
+                            } else if ("A".equals(identifier.getSimpleName())) {
+                                assertThat(TypeUtils.asFullyQualified(identifier.getType()).getFullyQualifiedName())
+                                  .isEqualTo("p.Foo");
+                                seen.add("A");
+                            }
+                            return super.visitIdentifier(identifier, seen);
+                        }
+                    }.reduce(cu, new HashSet<>());
+                    assertThat(seen).containsExactlyInAnyOrder("p", "A");
+                })
+              ),
+              kotlin(
+                """
+                  package p
+
+                  typealias A = Foo
+
+                  class Foo {
+                      companion object {
+                          fun create() = Foo()
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
         private static void assertQualifierTypes(K.CompilationUnit cu, Map<String, String> expectedFqnBySimpleName, String supertype) {
             Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
                 @Override
