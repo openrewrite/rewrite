@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -112,7 +113,7 @@ public final class NodeDependencyScan {
             if (ps.skippedProtocols.isEmpty()) {
                 continue;
             }
-            Path workspacePath = governingWorkspaceFile(acc, project.getKey());
+            Path workspacePath = governingWorkspaceFile(acc, project.getKey(), ps.capturedPackageJson);
             if (workspacePath == null) {
                 continue;
             }
@@ -145,7 +146,9 @@ public final class NodeDependencyScan {
         if (catalogName == null) {
             return false;
         }
-        Path workspacePath = governingWorkspaceFile(acc, packageJsonPath);
+        ProjectState ps = acc.projects.get(packageJsonPath);
+        Path workspacePath = governingWorkspaceFile(acc, packageJsonPath,
+                ps == null ? null : ps.capturedPackageJson);
         Map<NodeCatalogs.CatalogEntry, String> edits =
                 workspacePath == null ? null : acc.catalogEdits.get(workspacePath);
         return edits != null &&
@@ -198,11 +201,25 @@ public final class NodeDependencyScan {
         return false;
     }
 
-    /** The nearest workspace file at or above a manifest; catalogs are scoped to their own workspace. */
-    private static @Nullable Path governingWorkspaceFile(Accumulator acc, Path manifestPath) {
+    /**
+     * The nearest workspace file at or above a manifest, of the kind this manifest's package manager
+     * keeps catalogs in. Catalogs are scoped to their own workspace, and a repository can hold both a
+     * `pnpm-workspace.yaml` and a `.yarnrc.yml`, so the marker decides which is read.
+     */
+    private static @Nullable Path governingWorkspaceFile(Accumulator acc, Path manifestPath,
+                                                         @Nullable SourceFile packageJson) {
+        NodeResolutionResult marker = packageJson == null ? null :
+                packageJson.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+        String wanted = marker == null ? null : NodeCatalogs.workspaceFileFor(marker.getPackageManager());
+        if (wanted == null) {
+            return null;
+        }
         Path nearest = null;
         int nearestDepth = -1;
         for (Path candidate : acc.workspaceFiles.keySet()) {
+            if (!wanted.equals(candidate.getFileName().toString())) {
+                continue;
+            }
             Path root = candidate.getParent();
             int depth = root == null ? 0 : root.getNameCount();
             if (isUnder(manifestPath, root) && depth > nearestDepth) {

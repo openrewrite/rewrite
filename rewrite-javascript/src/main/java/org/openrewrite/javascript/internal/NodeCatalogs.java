@@ -19,6 +19,7 @@ import lombok.Value;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -50,12 +51,27 @@ public class NodeCatalogs {
     private static final String DEFAULT_CATALOG_KEY = "catalog";
     private static final String NAMED_CATALOGS_KEY = "catalogs";
 
+    private static final String PNPM_WORKSPACE_FILE = "pnpm-workspace.yaml";
+    private static final String YARN_WORKSPACE_FILE = ".yarnrc.yml";
+
     private static final Set<String> WORKSPACE_FILE_NAMES =
-            new LinkedHashSet<>(Arrays.asList("pnpm-workspace.yaml", ".yarnrc.yml"));
+            new LinkedHashSet<>(Arrays.asList(PNPM_WORKSPACE_FILE, YARN_WORKSPACE_FILE));
 
     /** True when the basename is a workspace file that can declare catalogs. */
     public static boolean isWorkspaceFile(String basename) {
         return WORKSPACE_FILE_NAMES.contains(basename);
+    }
+
+    /**
+     * The workspace file a manager keeps its catalogs in, or null for a manager that has none. A
+     * repository can contain both files, so the manager decides which one is read rather than whichever
+     * happens to be present.
+     */
+    public static @Nullable String workspaceFileFor(@Nullable PackageManager pm) {
+        if (pm == PackageManager.Pnpm) {
+            return PNPM_WORKSPACE_FILE;
+        }
+        return pm == PackageManager.YarnBerry ? YARN_WORKSPACE_FILE : null;
     }
 
     /**
