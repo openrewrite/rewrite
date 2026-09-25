@@ -295,6 +295,21 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
         );
     }
 
+    /**
+     * An entry that already holds the requested constraint is not an edit, so nothing is stale and there
+     * is nothing to report. Re-running an upgrade that has already landed is the ordinary case.
+     */
+    @Test
+    void aCatalogEntryAlreadyAtTheNewVersionIsLeftAlone() {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
+                packageJson(String.format(MANIFEST, "catalog:"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
+                yaml(WORKSPACE_YAML.replace(OLD, NEW), s -> s.path("pnpm-workspace.yaml")),
+                pnpmLock(PNPM_LOCK.replace(OLD, NEW), null)
+        );
+    }
+
     @Test
     void aMarkerClaimingAResolvedVersionStillCannotOverwriteTheManifest() {
         // The recipe filters by the marker, but the overwrite happens against the manifest literal. Were

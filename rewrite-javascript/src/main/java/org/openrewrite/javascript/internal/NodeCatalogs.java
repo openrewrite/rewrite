@@ -112,16 +112,17 @@ public class NodeCatalogs {
         return references;
     }
 
-    /** Whether the catalog declares this package at all; the version behind it is never needed. */
-    public static boolean hasEntry(Yaml.Documents workspaceFile, String catalogName, String packageName) {
+    /** The constraint a catalog declares for a package, or null when the catalog or the entry is absent. */
+    public static @Nullable String findEntry(Yaml.Documents workspaceFile, String catalogName, String packageName) {
         for (Yaml.Document document : workspaceFile.getDocuments()) {
             if (!(document.getBlock() instanceof Yaml.Mapping)) continue;
             Yaml.Mapping catalog = catalogMapping((Yaml.Mapping) document.getBlock(), catalogName);
-            if (catalog != null && childScalar(catalog, packageName) != null) {
-                return true;
+            Yaml.Scalar entry = catalog == null ? null : childScalar(catalog, packageName);
+            if (entry != null) {
+                return entry.getValue();
             }
         }
-        return false;
+        return null;
     }
 
     /**
