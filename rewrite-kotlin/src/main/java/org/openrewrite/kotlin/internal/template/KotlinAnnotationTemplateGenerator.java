@@ -17,9 +17,11 @@ package org.openrewrite.kotlin.internal.template;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.java.internal.template.AnnotationTemplateGenerator;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.kotlin.tree.K;
 
 import java.util.Set;
 
@@ -27,6 +29,16 @@ public class KotlinAnnotationTemplateGenerator extends AnnotationTemplateGenerat
 
     public KotlinAnnotationTemplateGenerator(Set<String> imports) {
         super(imports);
+    }
+
+    /**
+     * A use-site target such as {@code @get:Suppress(...)} nests the real annotation inside a
+     * {@link K.AnnotationType} belonging to an outer synthetic annotation. Without looking through it the
+     * generator never reaches the annotated declaration, and emits an annotation with nothing to attach to.
+     */
+    @Override
+    protected boolean isAnnotationWrapper(@Nullable J j) {
+        return super.isAnnotationWrapper(j) || j instanceof K.AnnotationType;
     }
 
     @Override

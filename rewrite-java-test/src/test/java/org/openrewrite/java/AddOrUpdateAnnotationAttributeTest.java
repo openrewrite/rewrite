@@ -544,7 +544,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               package org.junit;
               public @interface Test {
                   long other() default 0L;
-                  int value() default 0L;
+                  int value() default 0;
               }
               """
           ),

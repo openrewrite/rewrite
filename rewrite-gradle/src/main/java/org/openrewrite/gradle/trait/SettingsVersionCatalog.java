@@ -20,6 +20,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Expression;
@@ -38,15 +40,17 @@ import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 /**
- * A named catalog in a {@code dependencyResolutionManagement { versionCatalogs { ... } } } block,
- * either a Groovy {@code libs { ... } } closure or a Kotlin {@code create("libs") { ... } } call.
+ * A catalog declared in a Gradle script, either a named one in a
+ * {@code dependencyResolutionManagement { versionCatalogs { ... } } } block, written as a Groovy
+ * {@code libs { ... } } closure or a Kotlin {@code create("libs") { ... } } call, or the unnamed
+ * {@code catalog { versionCatalog { ... } } } block of the {@code version-catalog} plugin.
  */
 @Value
 class SettingsVersionCatalog implements VersionCatalog {
     private static final List<String> VERSION_CONSTRAINT_CALLS = Arrays.asList("strictly", "require", "prefer");
 
     Cursor cursor;
-    String catalogName;
+    @Nullable String catalogName;
 
     @Override
     public J.MethodInvocation getTree() {
@@ -132,6 +136,16 @@ class SettingsVersionCatalog implements VersionCatalog {
             parent = parent.getParentTreeCursor();
         }
         return !parent.isRoot() && parent.getValue() instanceof J.Block;
+    }
+
+    private static boolean isBuildScript(Cursor cursor) {
+        SourceFile sourceFile = cursor.firstEnclosing(SourceFile.class);
+        return sourceFile != null && IsBuildGradle.matches(sourceFile.getSourcePath());
+    }
+
+    private static boolean withinCatalogBlock(Cursor cursor) {
+        return GradleTraitMatcher.withinBlock(cursor, "versionCatalogs") ||
+               GradleTraitMatcher.withinBlock(cursor, "versionCatalog");
     }
 
     private static boolean isChained(J.MethodInvocation m, String name) {
@@ -327,7 +341,7 @@ class SettingsVersionCatalog implements VersionCatalog {
             @Override
             protected @Nullable Library test(Cursor cursor) {
                 Object value = cursor.getValue();
-                if (!(value instanceof J.MethodInvocation) || !isTopLevelStatement(cursor) || !withinBlock(cursor, "versionCatalogs")) {
+                if (!(value instanceof J.MethodInvocation) || !isTopLevelStatement(cursor) || !withinCatalogBlock(cursor)) {
                     return null;
                 }
                 J.MethodInvocation outer = (J.MethodInvocation) value;
@@ -377,7 +391,7 @@ class SettingsVersionCatalog implements VersionCatalog {
             @Override
             protected @Nullable Plugin test(Cursor cursor) {
                 Object value = cursor.getValue();
-                if (!(value instanceof J.MethodInvocation) || !isTopLevelStatement(cursor) || !withinBlock(cursor, "versionCatalogs")) {
+                if (!(value instanceof J.MethodInvocation) || !isTopLevelStatement(cursor) || !withinCatalogBlock(cursor)) {
                     return null;
                 }
                 J.MethodInvocation plugin = entryCall((J.MethodInvocation) value, "plugin");
@@ -427,7 +441,7 @@ class SettingsVersionCatalog implements VersionCatalog {
                 if (value instanceof J.MethodInvocation) {
                     J.MethodInvocation m = (J.MethodInvocation) value;
                     if ("version".equals(m.getSimpleName()) && m.getArguments().size() == 2 && m.getSelect() == null &&
-                            isTopLevelStatement(cursor) && withinBlock(cursor, "versionCatalogs")) {
+                        isTopLevelStatement(cursor) && withinCatalogBlock(cursor)) {
                         return new Version(cursor);
                     }
                 }
@@ -455,6 +469,11 @@ class SettingsVersionCatalog implements VersionCatalog {
                     if (catalogName != null) {
                         return new SettingsVersionCatalog(cursor, catalogName);
                     }
+                } else if ("catalog".equals(m.getSimpleName()) && m.getArguments().size() == 1 &&
+                           m.getArguments().get(0) instanceof J.Lambda && isBuildScript(cursor)) {
+                    // The unnamed catalog { versionCatalog { ... } } of the version-catalog plugin,
+                    // which only a build script can apply
+                    return new SettingsVersionCatalog(cursor, null);
                 }
             }
             return null;

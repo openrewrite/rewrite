@@ -38,7 +38,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class ScalaParser implements Parser {
@@ -207,6 +206,20 @@ public class ScalaParser implements Parser {
             this.typeFactory = base.typeFactory;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
+        }
+
+        /**
+         * The type cache and type factory are left out: they are mutable, accumulate during parsing, and are
+         * meant to be shared across parsers rather than to distinguish them.
+         */
+        @Override
+        public List<Object> discriminator() {
+            List<Object> discriminator = super.discriminator();
+            discriminator.add(classpath == null ? Collections.emptyList() : new ArrayList<>(classpath));
+            discriminator.add(artifactNames == null ? Collections.emptyList() : new ArrayList<>(artifactNames));
+            discriminator.add(logCompilationWarningsAndErrors);
+            discriminator.add(new ArrayList<>(styles));
+            return discriminator;
         }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {

@@ -23,6 +23,7 @@ import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.KotlinCompilerVersion
+import org.jetbrains.kotlin.config.MessageCollectorAccess
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 
 // Kotlin compiler plugin entry point for the recipe authoring DSL declared in
@@ -78,6 +79,7 @@ internal fun registerRecipeExtensions(configuration: CompilerConfiguration, regi
     }
 }
 
+@OptIn(MessageCollectorAccess::class)
 private fun reportKotlinVersionMismatch(configuration: CompilerConfiguration, cause: Throwable) {
     val message = kotlinVersionMismatchMessage(cause)
     try {

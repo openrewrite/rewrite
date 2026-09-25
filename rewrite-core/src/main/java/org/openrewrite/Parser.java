@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -240,6 +241,16 @@ public interface Parser {
         private final Class<? extends SourceFile> sourceFileType;
 
         public abstract Parser build();
+
+        /**
+         * Identifies the parses this builder would produce identically, for callers that cache parsed output.
+         * Subclasses carrying configuration that changes how a source parses — a classpath, a language level —
+         * override this to append it, copying any collection so a discriminator already handed out as a cache
+         * key cannot shift when this builder is reconfigured.
+         */
+        public List<Object> discriminator() {
+            return new ArrayList<>(Arrays.asList(getClass(), sourceFileType));
+        }
 
         /**
          * The name of the domain specific language this parser builder produces a parser for.

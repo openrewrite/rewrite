@@ -234,6 +234,7 @@ public interface JavaParser extends Parser {
         protected Collection<Path> classpath = emptyList();
         protected Collection<String> artifactNames = emptyList();
         protected Collection<byte[]> classBytesClasspath = emptyList();
+
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
 
         @Nullable
@@ -248,6 +249,23 @@ public interface JavaParser extends Parser {
 
         public Builder() {
             super(J.CompilationUnit.class);
+        }
+
+        /**
+         * The type cache and type factory are left out: they are mutable, accumulate during parsing, and are
+         * meant to be shared across parsers rather than to distinguish them.
+         */
+        @Override
+        public List<Object> discriminator() {
+            List<Object> discriminator = super.discriminator();
+            discriminator.add(new ArrayList<>(classpath));
+            discriminator.add(new ArrayList<>(artifactNames));
+            discriminator.add(new ArrayList<>(classBytesClasspath));
+            discriminator.add(dependsOn == null ? emptyList() : new ArrayList<>(dependsOn));
+            discriminator.add(charset);
+            discriminator.add(logCompilationWarningsAndErrors);
+            discriminator.add(new ArrayList<>(styles));
+            return discriminator;
         }
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {

@@ -156,8 +156,8 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             return null
         }
         if (psiElement != null && fir is FirResolvedQualifier && fir.source != null && (fir.source.psi is KtDotQualifiedExpression || fir.source.psi is KtNameReferenceExpression)) {
-            if (fir.symbol is FirRegularClassSymbol) {
-                val classId = (fir.symbol as FirRegularClassSymbol).classId
+            if (fir.qualifierSymbol is FirRegularClassSymbol) {
+                val classId = (fir.qualifierSymbol as FirRegularClassSymbol).classId
                 return if (isPackage(psiElement, classId)) {
                     null
                 } else {
@@ -408,6 +408,16 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     sym is FirNamedFunctionSymbol -> ExpressionType.METHOD_INVOCATION
                     else -> throw UnsupportedOperationException("Unsupported resolved symbol: ${fir.calleeReference.resolved?.resolvedSymbol?.javaClass}")
                 }
+            }
+            is FirPropertyAccessExpression -> {
+                // `X<T>.m()` is not valid Kotlin, so FIR resolves the qualifier as a property access; the
+                // type arguments still describe the parameterized type the author wrote.
+                if (psi is KtCallExpression && psi.valueArgumentList == null && psi.lambdaArguments.isEmpty() && psi.typeArgumentList != null)
+                    ExpressionType.QUALIFIER
+                else if (fir.source?.psi !== psi)
+                    null
+                else
+                    throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
             }
             is FirSafeCallExpression -> {
                 val selector = fir.selector

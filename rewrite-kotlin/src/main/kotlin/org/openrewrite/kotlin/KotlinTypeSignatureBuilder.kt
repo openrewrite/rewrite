@@ -273,6 +273,12 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 }
             }
 
+            is ConeIntegerLiteralType -> {
+                // An operator on an integer literal keeps this type until an expected type fixes it as Int or
+                // Long, and an unresolved surrounding call never supplies one.
+                signature(type.getApproximatedType())
+            }
+
             else -> throw UnsupportedOperationException("Unsupported ConeTypeProjection ${type.javaClass.name}")
         }
     }
@@ -315,7 +321,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         val s = StringBuilder(classSignature(type))
         val joiner = StringJoiner(", ", "<", ">")
         for (tp in type.typeArguments) {
-            joiner.add(signature(tp, type.symbol?.fir))
+            joiner.add(signature(tp, type.qualifierSymbol?.fir))
         }
         return s.append(joiner).toString()
     }
@@ -375,7 +381,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)?.fir != null
             ) {
                 declaringSig = signature(resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)!!.fir)
-            } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library) {
+            } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library || resolvedSymbol.origin == FirDeclarationOrigin.BuiltIns) {
                 if (resolvedSymbol.fir.containerSource is JvmPackagePartSource) {
                     val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
                     if (source != null) {

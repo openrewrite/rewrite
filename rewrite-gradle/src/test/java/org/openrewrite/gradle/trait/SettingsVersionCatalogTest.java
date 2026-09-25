@@ -233,4 +233,83 @@ class SettingsVersionCatalogTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void matchesVersionCatalogProducerBlock() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree(),
+              catalog.getVersion(new GroupArtifact("org.projectlombok", "lombok")))))),
+          buildGradle(
+            """
+              apply plugin: 'version-catalog'
+
+              catalog {
+                  versionCatalog {
+                      version('lombokVersion', '1.18.30')
+                      library('projectLombok', 'org.projectlombok', 'lombok').versionRef('lombokVersion')
+                  }
+              }
+              """,
+            """
+              apply plugin: 'version-catalog'
+
+              /*~~(1.18.30)~~>*/catalog {
+                  versionCatalog {
+                      version('lombokVersion', '1.18.30')
+                      library('projectLombok', 'org.projectlombok', 'lombok').versionRef('lombokVersion')
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinMatchesVersionCatalogProducerBlock() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),
+          buildGradleKts(
+            """
+              plugins {
+                  `version-catalog`
+              }
+
+              catalog {
+                  versionCatalog {
+                      version("lombokVersion", "1.18.30")
+                      library("projectLombok", "org.projectlombok", "lombok").versionRef("lombokVersion")
+                  }
+              }
+              """,
+            """
+              plugins {
+                  `version-catalog`
+              }
+
+              /*~~>*/catalog {
+                  versionCatalog {
+                      version("lombokVersion", "1.18.30")
+                      library("projectLombok", "org.projectlombok", "lombok").versionRef("lombokVersion")
+                  }
+              }
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void doesNotMatchCatalogCallWithoutOnlyAClosure() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new SettingsVersionCatalog.Matcher().asVisitor(catalog -> SearchResult.found(catalog.getTree())))),
+          buildGradle(
+            """
+              catalog(file('catalog.toml'))
+              """
+          )
+        );
+    }
 }

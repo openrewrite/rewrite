@@ -62,11 +62,6 @@ public class Environment {
         for (ResourceLoader r : resourceLoaders) {
             recipes.addAll(r.listRecipes());
         }
-        for (Recipe recipe : dependencyRecipes) {
-            if (recipe instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) recipe).initialize(dependencyRecipeMap::get);
-            }
-        }
 
         Map<String, Recipe> availableRecipeMap = new HashMap<>(dependencyRecipeMap);
         recipes.forEach(r -> availableRecipeMap.putIfAbsent(r.getName(), r));

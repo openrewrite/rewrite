@@ -142,6 +142,10 @@ class KotlinTypeMapping(
                 type(type.lowerBound, signature)
             }
 
+            is ConeIntegerLiteralType -> {
+                type(type.getApproximatedType(), parent, signature)
+            }
+
             is ConeTypeProjection -> {
                 coneTypeProjectionType(type, signature)
             }
@@ -395,7 +399,7 @@ class KotlinTypeMapping(
         }
     }
 
-    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class)
+    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class, ResolvedQualifierTypeAccess::class)
     private fun classType(type: Any, parent: Any?, signature: String): FullyQualified {
         val fqn = signatureBuilder.classSignature(type)
         var params: List<*>? = null
@@ -874,7 +878,7 @@ class KotlinTypeMapping(
                             resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)!!.fir
                         )
                     )
-                } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library) {
+                } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library || resolvedSymbol.origin == FirDeclarationOrigin.BuiltIns) {
                     if (resolvedSymbol.fir.containerSource is JvmPackagePartSource) {
                         val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
                         if (source != null) {

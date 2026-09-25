@@ -41,7 +41,7 @@ class FindCommentsTest implements RewriteTest {
               class Test {
                   int n = 123;
                   String s = "test";
-                  String s = "mytest";
+                  String t = "mytest";
               }
               """,
             """
@@ -52,7 +52,7 @@ class FindCommentsTest implements RewriteTest {
               class Test {
                   int n = /*~~>*/123;
                   String s = /*~~>*/"test";
-                  String s = /*~~>*/"mytest";
+                  String t = /*~~>*/"mytest";
               }
               """
           )

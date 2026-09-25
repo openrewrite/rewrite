@@ -295,6 +295,21 @@ public class GroovyParser implements Parser {
             super(G.CompilationUnit.class);
         }
 
+        /**
+         * The type cache and type factory are left out: they are mutable, accumulate during parsing, and are
+         * meant to be shared across parsers rather than to distinguish them.
+         */
+        @Override
+        public List<Object> discriminator() {
+            List<Object> discriminator = super.discriminator();
+            discriminator.add(classpath == null ? emptyList() : new ArrayList<>(classpath));
+            discriminator.add(artifactNames == null ? emptyList() : new ArrayList<>(artifactNames));
+            discriminator.add(logCompilationWarningsAndErrors);
+            discriminator.add(new ArrayList<>(styles));
+            discriminator.add(new ArrayList<>(compilerCustomizers));
+            return discriminator;
+        }
+
         public Builder(Builder base) {
             super(G.CompilationUnit.class);
             this.classpath = base.classpath;

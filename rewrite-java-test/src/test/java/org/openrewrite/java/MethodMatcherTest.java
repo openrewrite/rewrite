@@ -760,7 +760,7 @@ class MethodMatcherTest implements RewriteTest {
                       // simpler logging
                   }
               
-                  void log(int code, String level, String message, Object... params) {
+                  void log(Integer code, String level, String message, Object... params) {
                       // with error code
                   }
               }
@@ -796,7 +796,7 @@ class MethodMatcherTest implements RewriteTest {
                       // simpler logging
                   }
               
-                  void log(int code, String level, String message, Object... params) {
+                  void log(Integer code, String level, String message, Object... params) {
                       // with error code
                   }
               }
