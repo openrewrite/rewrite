@@ -26,7 +26,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.*;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.emptyMap;
+import static org.openrewrite.yaml.internal.StringUtils.quoteIfNeeded;
 
 /**
  * pnpm 9.5+ and Yarn 4.10+ let a workspace declare one version per package in a catalog and have every
@@ -51,18 +51,12 @@ public class NodeCatalogs {
     private static final String DEFAULT_CATALOG_KEY = "catalog";
     private static final String NAMED_CATALOGS_KEY = "catalogs";
 
-    /** Characters YAML reads as an indicator when a plain scalar opens with one. */
-    private static final String PLAIN_SCALAR_INDICATORS = "-?:,[]{}#&*!|>'\"%@`";
-
     private static final String PNPM_WORKSPACE_FILE = "pnpm-workspace.yaml";
     private static final String YARN_WORKSPACE_FILE = ".yarnrc.yml";
 
-    private static final Set<String> WORKSPACE_FILE_NAMES =
-            new LinkedHashSet<>(Arrays.asList(PNPM_WORKSPACE_FILE, YARN_WORKSPACE_FILE));
-
     /** True when the basename is a workspace file that can declare catalogs. */
     public static boolean isWorkspaceFile(String basename) {
-        return WORKSPACE_FILE_NAMES.contains(basename);
+        return PNPM_WORKSPACE_FILE.equals(basename) || YARN_WORKSPACE_FILE.equals(basename);
     }
 
     /**
@@ -82,9 +76,9 @@ public class NodeCatalogs {
      * {@link #DEFAULT_CATALOG} for the bare {@code catalog:} and the name for {@code catalog:<name>}.
      */
     public static @Nullable String catalogReference(@Nullable String value) {
-        return value == null || !value.startsWith(CATALOG_PROTOCOL) ?
-                null :
-                value.substring(CATALOG_PROTOCOL.length());
+        return CATALOG_PROTOCOL.equals(PackageJsonHelper.dependencySpecifierProtocol(value)) ?
+                value.substring(CATALOG_PROTOCOL.length()) :
+                null;
     }
 
     /**
@@ -92,49 +86,27 @@ public class NodeCatalogs {
      * rather than from {@code NodeResolutionResult}, so a member that never resolved still counts as a
      * consumer of the entry it references.
      */
-    public static Map<String, String> catalogReferences(SourceFile packageJson) {
-        if (!(packageJson instanceof Json.Document) ||
-                !(((Json.Document) packageJson).getValue() instanceof Json.JsonObject)) {
-            return emptyMap();
-        }
+    public static Map<String, String> catalogReferences(Json.Document packageJson) {
         Map<String, String> references = new LinkedHashMap<>();
-        for (Json rootMember : ((Json.JsonObject) ((Json.Document) packageJson).getValue()).getMembers()) {
-            if (!(rootMember instanceof Json.Member)) continue;
-            Json.Member scope = (Json.Member) rootMember;
-            String scopeKey = PackageJsonHelper.literalString(scope.getKey());
-            if (scopeKey == null || !PackageJsonHelper.isDeclaredScope(scopeKey) ||
-                    !(scope.getValue() instanceof Json.JsonObject)) {
-                continue;
-            }
-            for (Json child : ((Json.JsonObject) scope.getValue()).getMembers()) {
-                if (!(child instanceof Json.Member)) continue;
-                Json.Member dependency = (Json.Member) child;
-                String name = PackageJsonHelper.literalString(dependency.getKey());
-                String catalog = catalogReference(PackageJsonHelper.literalString(dependency.getValue()));
-                if (name != null && catalog != null) {
-                    references.put(name, catalog);
-                }
+        for (Map.Entry<String, String> declared : PackageJsonHelper.declaredVersions(packageJson).entrySet()) {
+            String catalog = catalogReference(declared.getValue());
+            if (catalog != null) {
+                references.put(declared.getKey(), catalog);
             }
         }
         return references;
     }
 
-    /** The version a catalog declares for a package, or null when the catalog or the entry is absent. */
-    public static @Nullable String findEntry(SourceFile workspaceFile, String catalogName, String packageName) {
-        if (!(workspaceFile instanceof Yaml.Documents)) {
-            return null;
-        }
-        for (Yaml.Document document : ((Yaml.Documents) workspaceFile).getDocuments()) {
+    /** Whether the catalog declares this package at all; the version behind it is never needed. */
+    public static boolean hasEntry(Yaml.Documents workspaceFile, String catalogName, String packageName) {
+        for (Yaml.Document document : workspaceFile.getDocuments()) {
             if (!(document.getBlock() instanceof Yaml.Mapping)) continue;
             Yaml.Mapping catalog = catalogMapping((Yaml.Mapping) document.getBlock(), catalogName);
-            if (catalog == null) continue;
-            for (Yaml.Mapping.Entry entry : catalog.getEntries()) {
-                if (packageName.equals(entry.getKey().getValue()) && entry.getValue() instanceof Yaml.Scalar) {
-                    return ((Yaml.Scalar) entry.getValue()).getValue();
-                }
+            if (catalog != null && childScalar(catalog, packageName) != null) {
+                return true;
             }
         }
-        return null;
+        return false;
     }
 
     /**
@@ -183,6 +155,15 @@ public class NodeCatalogs {
         return null;
     }
 
+    private static Yaml.@Nullable Scalar childScalar(Yaml.Mapping mapping, String key) {
+        for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+            if (key.equals(entry.getKey().getValue()) && entry.getValue() instanceof Yaml.Scalar) {
+                return (Yaml.Scalar) entry.getValue();
+            }
+        }
+        return null;
+    }
+
     /** Apply {@code f} to the mapping under {@code key}, returning {@code mapping} itself when nothing changed. */
     private static Yaml.Mapping withMapping(Yaml.Mapping mapping, String key, UnaryOperator<Yaml.Mapping> f) {
         List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
@@ -216,7 +197,7 @@ public class NodeCatalogs {
                 return catalog;
             }
             Yaml.Scalar rewritten = version.withValue(newVersion);
-            if (style == Yaml.Scalar.Style.PLAIN && !canBePlainScalar(newVersion)) {
+            if (style == Yaml.Scalar.Style.PLAIN && !newVersion.equals(quoteIfNeeded(newVersion))) {
                 rewritten = rewritten.withStyle(Yaml.Scalar.Style.SINGLE_QUOTED);
             }
             entries.set(i, entry.withValue(rewritten));
@@ -225,16 +206,4 @@ public class NodeCatalogs {
         return catalog;
     }
 
-    /**
-     * Whether a value can stand unquoted where the old one did. An npm range may open with a character
-     * YAML reads as an indicator, so keeping the old scalar's style would emit something that no longer
-     * parses: `>=2.0.0` reads as a folded block scalar and `*` as an alias.
-     */
-    private static boolean canBePlainScalar(String value) {
-        if (value.isEmpty() || PLAIN_SCALAR_INDICATORS.indexOf(value.charAt(0)) >= 0) {
-            return false;
-        }
-        // `: ` opens a mapping value and ` #` a comment, wherever they appear.
-        return !value.contains(": ") && !value.contains(" #") && value.equals(value.trim());
-    }
 }

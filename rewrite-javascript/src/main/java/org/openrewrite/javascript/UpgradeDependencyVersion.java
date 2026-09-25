@@ -37,6 +37,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -111,14 +112,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                     return tree;
                 }
                 if (NodeCatalogs.isWorkspaceFile(basename) && sf instanceof Yaml.Documents) {
-                    acc.workspaceFiles.put(p, sf);
+                    acc.workspaceFiles.put(p, (Yaml.Documents) sf);
                     return tree;
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     // Recorded before the marker check: a member that never resolved still consumes
                     // whatever catalog entry its manifest references.
                     acc.manifests.add(p);
-                    acc.catalogRefs.put(p, NodeCatalogs.catalogReferences(sf));
+                    Map<String, String> catalogRefs = NodeCatalogs.catalogReferences((Json.Document) sf);
+                    if (!catalogRefs.isEmpty()) {
+                        acc.catalogRefs.put(p, catalogRefs);
+                    }
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                     if (marker == null) return tree;
                     NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
@@ -178,7 +182,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyScan.Accumulator acc) {
         NodeDependencyScan.linkWorkspaceMembers(acc);
-        NodeDependencyScan.decideCatalogEdits(acc, newVersion);
+        NodeDependencyScan.decideCatalogEdits(acc);
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -186,12 +190,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
-                Map<NodeCatalogs.CatalogEntry, String> catalogEdits = acc.catalogEdits.get(p);
+                Set<NodeCatalogs.CatalogEntry> catalogEdits = acc.catalogEdits.get(p);
                 if (catalogEdits != null) {
                     SourceFile edited = sf;
-                    for (Map.Entry<NodeCatalogs.CatalogEntry, String> edit : catalogEdits.entrySet()) {
-                        edited = NodeCatalogs.updateEntry(edited, edit.getKey().getCatalogName(),
-                                edit.getKey().getPackageName(), edit.getValue());
+                    for (NodeCatalogs.CatalogEntry edit : catalogEdits) {
+                        edited = NodeCatalogs.updateEntry(edited, edit.getCatalogName(),
+                                edit.getPackageName(), newVersion);
                     }
                     return edited;
                 }
