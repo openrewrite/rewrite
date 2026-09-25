@@ -33,8 +33,8 @@ import static java.util.Collections.emptyList;
  * host-supplied indexes on the {@link PythonExecutionContextView}, then Pipfile
  * {@code [[source]]} blocks, then the existing lock's {@code _meta.sources}, then
  * {@code PIP_INDEX_URL}/{@code PIP_EXTRA_INDEX_URL}, then pip.conf, then pypi.org.
- * Source URL credentials whose {@code ${VAR}} placeholders cannot be resolved are dropped (and
- * recorded on the index), so host-supplied credentials, {@code .netrc}, or none apply instead.
+ * Source URL credentials whose {@code ${VAR}} placeholders cannot be resolved are sent as written,
+ * as pipenv does, and the placeholders are recorded on the index.
  */
 public final class IndexDiscovery {
     private static final String DEFAULT_INDEX_URL = "https://pypi.org/simple";

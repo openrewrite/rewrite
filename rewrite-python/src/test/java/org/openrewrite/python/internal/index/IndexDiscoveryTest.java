@@ -242,7 +242,7 @@ class IndexDiscoveryTest {
     }
 
     @Test
-    void partiallyResolvedUserinfoIsDroppedAndRecorded() {
+    void partiallyResolvedUserinfoIsSentAsWrittenAndRecorded() {
         Toml.Document doc = pipfile("""
           [[source]]
           name = "corp"
@@ -254,16 +254,17 @@ class IndexDiscoveryTest {
           env(Map.of("INDEX_USER", "alice"), home));
 
         assertThat(indexes).hasSize(1);
-        assertThat(indexes.get(0).getUrl()).isEqualTo("https://corp.example.com/simple");
+        assertThat(indexes.get(0).getUrl())
+          .isEqualTo("https://alice:%24%7BINDEX_PASS%7D@corp.example.com/simple");
         assertThat(indexes.get(0).isUnresolvedPlaceholders()).isFalse();
         assertThat(indexes.get(0).getUnresolvedCredentialPlaceholders()).containsExactly("${INDEX_PASS}");
-        // neither half of the credentials is sent, the placeholder least of all
-        assertThat(indexes.get(0).getUsername()).isNull();
-        assertThat(indexes.get(0).getPassword()).isNull();
+        // as pip would, the credentials are taken from the URL, the unexpanded placeholder included
+        assertThat(indexes.get(0).getUsername()).isEqualTo("alice");
+        assertThat(indexes.get(0).getPassword()).isEqualTo("${INDEX_PASS}");
     }
 
     @Test
-    void unsetCredentialVariableIsDroppedAndRecorded() {
+    void unsetCredentialVariableIsSentAsWrittenAndRecorded() {
         Toml.Document doc = pipfile("""
           [[source]]
           name = "corp"
@@ -273,14 +274,14 @@ class IndexDiscoveryTest {
 
         List<PythonPackageIndex> indexes = IndexDiscovery.discover(ctx(), doc, null, env(Map.of(), home));
         assertThat(indexes).hasSize(1);
-        assertThat(indexes.get(0).getUrl()).isEqualTo("https://corp.example.com/simple");
+        assertThat(indexes.get(0).getUrl()).isEqualTo("https://${UNSET_TOKEN}@corp.example.com/simple");
         assertThat(indexes.get(0).isUnresolvedPlaceholders()).isFalse();
         assertThat(indexes.get(0).getUnresolvedCredentialPlaceholders()).containsExactly("${UNSET_TOKEN}");
-        assertThat(indexes.get(0).getUsername()).isNull();
+        assertThat(indexes.get(0).getUsername()).isEqualTo("${UNSET_TOKEN}");
     }
 
     @Test
-    void unsetCredentialVariableFallsBackToViewCredentials() {
+    void unsetCredentialVariableStillWinsOverViewCredentials() {
         Toml.Document doc = pipfile("""
           [[source]]
           name = "corp"
@@ -292,9 +293,8 @@ class IndexDiscoveryTest {
           new PythonIndexCredentials("corp.example.com", "viewuser", "viewpass")));
 
         List<PythonPackageIndex> indexes = IndexDiscovery.discover(ctx, doc, null, env(Map.of(), home));
-        assertThat(indexes.get(0).getUsername()).isEqualTo("viewuser");
-        assertThat(indexes.get(0).getPassword()).isEqualTo("viewpass");
-        assertThat(indexes.get(0).getUnresolvedCredentialPlaceholders()).containsExactly("${UNSET_TOKEN}");
+        assertThat(indexes.get(0).getUsername()).isEqualTo("${UNSET_TOKEN}");
+        assertThat(indexes.get(0).getPassword()).isNull();
     }
 
     @Test

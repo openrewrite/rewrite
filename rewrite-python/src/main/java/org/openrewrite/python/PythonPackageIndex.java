@@ -51,9 +51,8 @@ public class PythonPackageIndex {
 
     /**
      * Placeholders, verbatim (e.g. {@code ${INDEX_TOKEN}}), in the credentials embedded in the
-     * source URL whose variables were unset at discovery time. Those credentials were dropped from
-     * {@link #url} rather than sent unexpanded; requests fall back to host-supplied credentials,
-     * {@code .netrc}, or none, and the placeholders are reported if the index then rejects them.
+     * source URL whose variables were unset at discovery time. Like pipenv, those credentials are
+     * still sent as written, and the placeholders are reported if the index rejects them.
      */
     List<String> unresolvedCredentialPlaceholders;
 

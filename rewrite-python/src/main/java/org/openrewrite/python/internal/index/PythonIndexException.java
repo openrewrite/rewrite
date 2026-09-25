@@ -49,15 +49,15 @@ public class PythonIndexException extends RuntimeException {
     }
 
     /**
-     * An HTTP 401/403 from {@code url}, naming any source URL credentials that were not sent
-     * because their variables were unset where the lock was regenerated.
+     * An HTTP 401/403 from {@code url}, naming any placeholders in the source URL credentials
+     * whose variables were unset where the lock was regenerated.
      */
     static PythonIndexException authFailed(PythonPackageIndex index, int code, String url) {
         String message = "HTTP " + code + " from " + url;
         List<String> placeholders = index.getUnresolvedCredentialPlaceholders();
         if (!placeholders.isEmpty()) {
-            message += "; credentials in the index URL were not sent because " + String.join(", ", placeholders) +
-                    (placeholders.size() == 1 ? " is" : " are") + " not set in the environment the recipe runs in";
+            message += "; credentials in the index URL reference " + String.join(", ", placeholders) + ", which " +
+                    (placeholders.size() == 1 ? "is" : "are") + " not set in the environment the recipe runs in";
         }
         return new PythonIndexException(Reason.AUTH_FAILED, index.getUrl(), message);
     }

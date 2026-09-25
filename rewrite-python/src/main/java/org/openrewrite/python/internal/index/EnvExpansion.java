@@ -56,9 +56,8 @@ final class EnvExpansion {
 
     /**
      * An expanded URL plus whether any placeholder survived expansion outside its userinfo, and
-     * the userinfo placeholders that did, verbatim (e.g. {@code ${INDEX_TOKEN}}). Userinfo with
-     * an unresolved placeholder is dropped from {@link #url}: it can never authenticate, and
-     * without it the index can still be reached with other credentials or none.
+     * the userinfo placeholders that did, verbatim (e.g. {@code ${INDEX_TOKEN}}). Like pipenv,
+     * userinfo with an unresolved placeholder is kept in {@link #url} and sent as written.
      */
     static final class Expansion {
         final String url;
@@ -91,11 +90,6 @@ final class EnvExpansion {
         List<String> unresolvedCredentials = new ArrayList<>();
         String expanded = expandUserinfo(userinfo, env, unresolvedCredentials);
         String rest = expandVars(url.substring(range[1]), env);
-        if (!unresolvedCredentials.isEmpty()) {
-            // rest starts at the userinfo's '@'
-            String withoutUserinfo = url.substring(0, range[0]) + rest.substring(1);
-            return new Expansion(withoutUserinfo, hasPlaceholder(withoutUserinfo), unresolvedCredentials);
-        }
         String encoded;
         if (expanded.equals(userinfo)) {
             // untouched credentials keep their exact bytes, unresolved placeholders included
@@ -107,7 +101,7 @@ final class EnvExpansion {
                     quote(expanded.substring(0, colon)) + ":" + quote(expanded.substring(colon + 1));
         }
         return new Expansion(url.substring(0, range[0]) + encoded + rest,
-                hasPlaceholder(url.substring(0, range[0]) + rest), new ArrayList<>());
+                hasPlaceholder(url.substring(0, range[0]) + rest), unresolvedCredentials);
     }
 
     static String expandUrl(String url, Environment env) {

@@ -30,6 +30,8 @@ import org.openrewrite.python.table.PythonLockRegenerationFailures;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,10 +43,10 @@ import static org.openrewrite.python.Assertions.pipfile;
 
 /**
  * A Pipfile {@code [[source]]} whose URL carries credentials as {@code ${VAR}} placeholders is
- * usually locked where the variables are unset (e.g. a hosted recipe run). Those credentials
- * cannot be used, so regeneration falls back to unauthenticated requests, which a registry
- * allowing anonymous reads (or a connector adding its own credentials) can still serve. When the
- * index rejects them, the failure names the placeholder that could not be resolved.
+ * usually locked where the variables are unset (e.g. a hosted recipe run). As pipenv would,
+ * regeneration still sends the credentials as written, so a proxy that authenticates on its own
+ * can replace them. When the index rejects them, the failure names the placeholder that could not
+ * be resolved.
  */
 class PipfileUnresolvedCredentialsLockRegenTest implements RewriteTest {
 
@@ -112,14 +114,16 @@ class PipfileUnresolvedCredentialsLockRegenTest implements RewriteTest {
 
     @Test
     @Timeout(120)
-    void unresolvedCredentialsFallBackToUnauthenticatedRequests() {
+    void unresolvedCredentialsAreSentAsWritten() {
+        String basic = "Basic " + Base64.getEncoder().encodeToString((UNSET_TOKEN + ":").getBytes(StandardCharsets.UTF_8));
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.32.0", null, null))
             .executionContext(ctx)
             .afterRecipe(run -> assertThat(requests)
-              .as("the index is contacted, without the unexpanded placeholder or any credential")
+              .filteredOn(r -> r.getPath() != null && r.getPath().startsWith("/simple/"))
+              .as("every index request carries the credentials as written, as pip would send them")
               .isNotEmpty()
-              .allSatisfy(r -> assertThat(r.getHeader("Authorization")).isNull())),
+              .allSatisfy(r -> assertThat(r.getHeader("Authorization")).isEqualTo(basic))),
           pipfile(pipfileWith(">=2.28.0"), pipfileWith(">=2.32.0")),
           json(lockBefore(),
             spec -> spec.path("Pipfile.lock").noTrim().after(actual -> {
@@ -131,7 +135,7 @@ class PipfileUnresolvedCredentialsLockRegenTest implements RewriteTest {
 
     @Test
     @Timeout(120)
-    void rejectedFallbackRecordsUnresolvedPlaceholder() {
+    void rejectedRequestRecordsUnresolvedPlaceholder() {
         rejectAll = true;
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.32.0", null, null))

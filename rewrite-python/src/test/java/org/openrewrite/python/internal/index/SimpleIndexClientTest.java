@@ -217,15 +217,15 @@ class SimpleIndexClientTest {
     }
 
     @Test
-    void rejectionNamesDroppedCredentialPlaceholders() {
+    void rejectionNamesUnresolvedCredentialPlaceholders() {
         server.enqueue(new MockResponse().setResponseCode(401));
-        PythonPackageIndex dropped = index().withUnresolvedCredentialPlaceholders(List.of("${INDEX_TOKEN}"));
-        assertThatThrownBy(() -> client.listFiles(dropped, "requests"))
+        PythonPackageIndex unresolved = index().withUnresolvedCredentialPlaceholders(List.of("${INDEX_TOKEN}"));
+        assertThatThrownBy(() -> client.listFiles(unresolved, "requests"))
           .isInstanceOfSatisfying(PythonIndexException.class, e -> {
               assertThat(e.getReason()).isEqualTo(PythonIndexException.Reason.AUTH_FAILED);
               assertThat(e.getMessage())
                 .startsWith("HTTP 401 from " + server.url("/simple/requests/"))
-                .contains("${INDEX_TOKEN} is not set");
+                .contains("reference ${INDEX_TOKEN}, which is not set");
           });
     }
 
