@@ -217,7 +217,7 @@ public class PackageJsonHelper {
         return null;
     }
 
-    private static @Nullable String literalString(@Nullable Object node) {
+    static @Nullable String literalString(@Nullable Object node) {
         if (node instanceof Json.Literal) {
             Object value = ((Json.Literal) node).getValue();
             return value == null ? null : value.toString();
@@ -738,7 +738,7 @@ public class PackageJsonHelper {
         return Pattern.compile(regex.toString());
     }
 
-    private static boolean isDeclaredScope(String name) {
+    static boolean isDeclaredScope(String name) {
         return "dependencies".equals(name)
                 || "devDependencies".equals(name)
                 || "peerDependencies".equals(name)

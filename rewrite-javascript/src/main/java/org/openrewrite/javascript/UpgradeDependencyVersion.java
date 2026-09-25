@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.MatchedDependency;
+import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
@@ -35,6 +36,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -108,7 +110,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                     }
                     return tree;
                 }
+                if (NodeCatalogs.isWorkspaceFile(basename) && sf instanceof Yaml.Documents) {
+                    acc.workspaceFiles.put(p, sf);
+                    return tree;
+                }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
+                    // Recorded before the marker check: a member that never resolved still consumes
+                    // whatever catalog entry its manifest references.
+                    acc.manifests.add(p);
+                    acc.catalogRefs.put(p, NodeCatalogs.catalogReferences(sf));
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                     if (marker == null) return tree;
                     NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
@@ -168,12 +178,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyScan.Accumulator acc) {
         NodeDependencyScan.linkWorkspaceMembers(acc);
+        NodeDependencyScan.decideCatalogEdits(acc, newVersion);
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 if (!(tree instanceof SourceFile)) return tree;
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
+
+                Map<NodeCatalogs.CatalogEntry, String> catalogEdits = acc.catalogEdits.get(p);
+                if (catalogEdits != null) {
+                    SourceFile edited = sf;
+                    for (Map.Entry<NodeCatalogs.CatalogEntry, String> edit : catalogEdits.entrySet()) {
+                        edited = NodeCatalogs.updateEntry(edited, edit.getKey().getCatalogName(),
+                                edit.getKey().getPackageName(), edit.getValue());
+                    }
+                    return edited;
+                }
 
                 NodeDependencyScan.ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
@@ -185,7 +206,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                             ps.matchedDeps = findMatches(liveTree, ps.skippedProtocols);
                         }
                     }
-                    reportProtocolSkips(ctx, ps, p);
+                    reportProtocolSkips(ctx, acc, ps, p);
                     if (ps.matchedDeps != null && !ps.matchedDeps.isEmpty()) {
                         SourceFile effectiveSf = sf;
                         SourceFile liveTree = PackageJsonHelper.getLiveTree(ctx, p);
@@ -221,7 +242,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                         if (ips.matchedDeps != null && ips.matchedDeps.isEmpty() && pkg != null) {
                             ips.matchedDeps = findMatches(pkg, ips.skippedProtocols);
                         }
-                        reportProtocolSkips(ctx, ips, importer);
+                        reportProtocolSkips(ctx, acc, ips, importer);
                         if (pkg != null && ips.matchedDeps != null && !ips.matchedDeps.isEmpty()) {
                             ensureComputed(ips, pkg, ctx);
                             if (ips.modifiedPackageJson != null) {
@@ -259,12 +280,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
     }
 
     /** One row per matched dependency left alone for its specifier protocol, emitted once per project. */
-    private void reportProtocolSkips(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path packageJsonPath) {
+    private void reportProtocolSkips(ExecutionContext ctx, NodeDependencyScan.Accumulator acc,
+                                     NodeDependencyScan.ProjectState ps, Path packageJsonPath) {
         if (ps.protocolsReported || ps.skippedProtocols.isEmpty()) {
             return;
         }
         ps.protocolsReported = true;
         for (MatchedDependency skipped : ps.skippedProtocols) {
+            if (NodeDependencyScan.isFollowedIntoCatalog(acc, packageJsonPath, skipped)) {
+                // Followed into its catalog entry, so nothing was skipped.
+                continue;
+            }
             protocolsSkipped.insertRow(ctx, new NodeDependencyProtocolsSkipped.Row(
                     packageJsonPath.toString(),
                     skipped.getPackageName(),
