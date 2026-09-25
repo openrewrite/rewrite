@@ -148,13 +148,18 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
         return Stream.of(
                 Arguments.of("~1.5.0", "  acme-logger: ~1.5.0"),
                 Arguments.of(">=2.0.0", "  acme-logger: '>=2.0.0'"),
-                Arguments.of("*", "  acme-logger: '*'"));
+                Arguments.of("*", "  acme-logger: '*'"),
+                Arguments.of("2", "  acme-logger: '2'"),
+                Arguments.of("2.0", "  acme-logger: '2.0'"));
     }
 
     /**
-     * An npm range can open with a character YAML reads as an indicator, so an entry that was unquoted
-     * has to gain quotes or the file stops parsing: {@code >=2.0.0} would read as a folded block scalar
-     * and {@code *} as an alias. A constraint that needs no quotes keeps the style it found.
+     * An unquoted entry has to gain quotes whenever YAML would read the new constraint as something
+     * other than a string. Two ways that happens: the value opens with an indicator, so the file stops
+     * parsing at all ({@code >=2.0.0} reads as a folded block scalar, {@code *} as an alias); or the
+     * value parses but resolves to another type, so the catalog holds a number where a version belongs
+     * ({@code 2} is a valid npm range and reads as an integer). A constraint YAML already reads as a
+     * string keeps the style it found.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("constraintsAndRenderings")

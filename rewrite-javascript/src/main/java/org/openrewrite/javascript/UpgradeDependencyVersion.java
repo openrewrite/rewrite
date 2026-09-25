@@ -219,7 +219,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                         }
                         ensureComputed(ps, effectiveSf, ctx);
                     }
-                    refuseStaleCatalogLock(ps);
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
                         PackageJsonHelper.putLiveTree(ctx, p, out);
@@ -255,14 +254,26 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                             }
                         }
                     }
-                    refuseStaleCatalogLock(ips);
-                    if (ips.regenResult != null) {
-                        if (ips.regenResult.isSuccess()) {
-                            return PackageJsonHelper.reparseLock(sf, ips.regenResult.getLockFileContent());
+                    // Two independent verdicts about one lock: what the manifest edits produced, and
+                    // whether a catalog edit left it behind. Reporting the second must not discard the
+                    // first, or a plain dependency bumped in the same run loses its regenerated lock.
+                    LockFileRegeneration.Result stale = staleCatalogLock(ips);
+                    if (ips.regenResult != null && ips.regenResult.isSuccess()) {
+                        SourceFile relocked = PackageJsonHelper.reparseLock(sf, ips.regenResult.getLockFileContent());
+                        if (stale == null) {
+                            return relocked;
                         }
+                        recordCatalogStaleness(ctx, ips, importer, stale);
+                        return warnOnce(relocked, "lock regeneration incomplete: " + stale.getErrorMessage());
+                    }
+                    if (ips.regenResult != null) {
                         recordFailure(ctx, ips, importer);
                         return Markup.warn(sf, new RuntimeException(
                                 "lock regeneration failed: " + ips.regenResult.getErrorMessage()));
+                    }
+                    if (stale != null) {
+                        recordCatalogStaleness(ctx, ips, importer, stale);
+                        return warnOnce(sf, "lock regeneration failed: " + stale.getErrorMessage());
                     }
                 }
                 return tree;
@@ -291,14 +302,19 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
      * block it has no model for. Refuse loudly rather than leave a lock that still installs the old
      * version, which pnpm does not report (pnpm/pnpm#9369).
      */
-    private void refuseStaleCatalogLock(NodeDependencyScan.ProjectState ps) {
+    /**
+     * A stale catalog is recomputed every cycle, but the warning must not be: a second marker on a tree
+     * that already carries one is a change, and the recipe would never settle.
+     */
+    private static SourceFile warnOnce(SourceFile sf, String message) {
+        return sf.getMarkers().findFirst(Markup.Warn.class).isPresent() ?
+                sf :
+                Markup.warn(sf, new RuntimeException(message));
+    }
+
+    private LockFileRegeneration.@Nullable Result staleCatalogLock(NodeDependencyScan.ProjectState ps) {
         if (ps.catalogEntriesEdited.isEmpty() || ps.capturedLockContent == null) {
-            return;
-        }
-        // A regeneration that succeeded answered only for the manifest edits; it wrote a lock that still
-        // holds the old catalog version. Replace that success, or the stale lock ships reported as good.
-        if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
-            return;
+            return null;
         }
         StringBuilder detail = new StringBuilder("the catalog entry was updated but the lock cannot be:");
         for (NodeCatalogs.CatalogEntry entry : ps.catalogEntriesEdited) {
@@ -306,10 +322,19 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                     .append(NodeCatalogs.DEFAULT_CATALOG.equals(entry.getCatalogName()) ?
                             "the default catalog" : "catalog " + entry.getCatalogName()).append(';');
         }
-        ps.regenResult = LockFileRegeneration.Result.failure(new LockFileRegeneration.Failure(
+        return LockFileRegeneration.Result.failure(new LockFileRegeneration.Failure(
                 LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE,
                 ps.catalogEntriesEdited.get(0).getPackageName(),
                 detail.toString()));
+    }
+
+    private void recordCatalogStaleness(ExecutionContext ctx, NodeDependencyScan.ProjectState ps,
+                                        Path packageJsonPath, LockFileRegeneration.Result stale) {
+        if (ps.catalogStalenessReported) {
+            return;
+        }
+        ps.catalogStalenessReported = true;
+        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, stale, packageName);
     }
 
     /** One row per matched dependency left alone for its specifier protocol, emitted once per project. */

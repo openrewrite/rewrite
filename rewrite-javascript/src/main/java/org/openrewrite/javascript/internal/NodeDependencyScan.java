@@ -61,6 +61,7 @@ public final class NodeDependencyScan {
         public LockFileRegeneration.@Nullable Result regenResult;
         public boolean failureRecorded;
         public boolean protocolsReported;
+        public boolean catalogStalenessReported;
     }
 
     /**
