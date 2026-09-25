@@ -754,9 +754,10 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 	}
 
 	// Parse each group; collect CUs by their original input index so the
-	// returned IDs land in input-order. Pre-filter against the parser's
-	// BuildContext so the post-parse `cus` slice aligns 1:1 with the
-	// `included` subset of the group.
+	// returned IDs land in input-order. Every file is parsed: those outside
+	// the parser's BuildContext keep their syntax and carry a BuildConstraint
+	// marker (ParsePackage type-checks only the matching subset), so the
+	// post-parse `cus` slice aligns 1:1 with the group.
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(resolvedInputs))
 	parseErrByIdx := make(map[int]error)
 	checkPrint := requirePrintEqualsInput(req.Options)
@@ -764,9 +765,6 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		included := make([]fileEntry, 0, len(group))
 		files := make([]goparser.FileInput, 0, len(group))
 		for _, g := range group {
-			if !goparser.MatchBuildContext(p.BuildContext, filepath.Base(g.input.Path), g.input.Content) {
-				continue
-			}
 			included = append(included, g)
 			files = append(files, g.input)
 		}
@@ -2766,10 +2764,10 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	}
 
 	// Parse each group; collect CUs by original input index so the
-	// returned IDs land in input-order. Files filtered out by the
-	// parser's BuildContext (`//go:build` / `_GOOS_GOARCH.go` suffixes)
-	// don't appear in the response — handled here so the post-parse
-	// `cus` slice aligns with the `included` subset of entries.
+	// returned IDs land in input-order. Every file is parsed: those outside
+	// the parser's BuildContext keep their syntax and carry a BuildConstraint
+	// marker (ParsePackage type-checks only the matching subset), so the
+	// post-parse `cus` slice aligns with the entries.
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(disc.goFiles))
 	parseErrByIdx := make(map[int]error)
 	checkPrint := requirePrintEqualsInput(req.Options)
@@ -2781,9 +2779,6 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		included := make([]fileEntry, 0, len(entries))
 		inputs := make([]goparser.FileInput, 0, len(entries))
 		for _, e := range entries {
-			if !goparser.MatchBuildContext(p.BuildContext, filepath.Base(e.sourcePath), e.content) {
-				continue
-			}
 			included = append(included, e)
 			inputs = append(inputs, goparser.FileInput{Path: e.sourcePath, Content: e.content})
 		}

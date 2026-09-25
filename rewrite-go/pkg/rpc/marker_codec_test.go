@@ -86,6 +86,25 @@ func TestPartialTypeAttributionMarkerRoundTrip(t *testing.T) {
 	assert.Equal(t, reason, got.Reason)
 }
 
+func TestBuildConstraintMarkerRoundTrip(t *testing.T) {
+	// given
+	id := uuid.MustParse("12121212-3434-5656-7878-9a9a9a9a9a9a")
+	bc := golang.BuildConstraint{Ident: id, Constraint: "//go:build linux && amd64", GOOS: "linux", GOARCH: "amd64"}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{bc}}
+
+	// when
+	after := roundTripMarkers(t, before)
+
+	// then
+	require.Len(t, after.Entries, 1, "entries")
+	got, ok := after.Entries[0].(golang.BuildConstraint)
+	require.Truef(t, ok, "entry is %T, want golang.BuildConstraint", after.Entries[0])
+	assert.Equal(t, id, got.Ident)
+	assert.Equal(t, "//go:build linux && amd64", got.Constraint)
+	assert.Equal(t, "linux", got.GOOS)
+	assert.Equal(t, "amd64", got.GOARCH)
+}
+
 func TestMarkupWarnMarkerRoundTrip(t *testing.T) {
 	// given
 	message := "Go module resolution was incomplete, so unused-require removal was skipped."
