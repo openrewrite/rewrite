@@ -698,21 +698,37 @@ public class PackageJsonHelper {
         String originalPackageJsonContent = before.printAll();
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
                 : regenerateLockContent(refreshed, originalPackageJsonContent, capturedLockContent, ctx);
-        SourceFile finalSource = refreshed;
-        if (regen != null && regen.isSuccess()) {
-            NodeResolutionResult marker = refreshed.getMarkers()
-                    .findFirst(NodeResolutionResult.class).orElse(null);
-            if (marker != null && isOverlaySupported(marker.getPackageManager())) {
-                try {
-                    finalSource = overlayResolvedDeps(refreshed,
-                            regen.getLockFileContent(), marker.getPackageManager());
-                } catch (RuntimeException e) {
-                    finalSource = Markup.warn(refreshed,
-                            new RuntimeException("lock parse failed: " + e.getMessage(), e));
-                }
-            }
+        return EditAndRegenerateResult.changed(withResolvedDeps(refreshed, regen), regen);
+    }
+
+    /**
+     * Apply an edit already made (and its lock already regenerated) to another revision of the
+     * package.json, such as one an earlier recipe in the same run changed after the edit was first
+     * computed. The declared dependencies are what the lock depends on, so {@code regen} still applies.
+     */
+    public static SourceFile reapplyEdit(SourceFile packageJson,
+                                         java.util.function.Function<Json.Document, Json.Document> editFn,
+                                         LockFileRegeneration.@Nullable Result regen) {
+        if (!(packageJson instanceof Json.Document)) {
+            return packageJson;
         }
-        return EditAndRegenerateResult.changed(finalSource, regen);
+        return withResolvedDeps(refreshMarker(editFn.apply((Json.Document) packageJson)), regen);
+    }
+
+    private static SourceFile withResolvedDeps(SourceFile refreshed, LockFileRegeneration.@Nullable Result regen) {
+        if (regen == null || !regen.isSuccess()) {
+            return refreshed;
+        }
+        NodeResolutionResult marker = refreshed.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElse(null);
+        if (marker == null || !isOverlaySupported(marker.getPackageManager())) {
+            return refreshed;
+        }
+        try {
+            return overlayResolvedDeps(refreshed, regen.getLockFileContent(), marker.getPackageManager());
+        } catch (RuntimeException e) {
+            return Markup.warn(refreshed, new RuntimeException("lock parse failed: " + e.getMessage(), e));
+        }
     }
 
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(

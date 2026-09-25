@@ -34,6 +34,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -182,7 +183,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                         ensureComputed(ps, effectiveSf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
-                        SourceFile out = ps.modifiedPackageJson;
+                        SourceFile out = NodeDependencyScan.modifiedFor(ps, sf);
                         PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, p);
@@ -231,14 +232,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 if (ps.modifiedPackageJson != null) return;
                 if (ps.matchedDeps == null || ps.matchedDeps.isEmpty()) return;
                 List<MatchedDependency> matches = ps.matchedDeps;
+                Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeVersion(doc, matches, newVersion);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg,
-                        doc -> PackageJsonHelper.upgradeVersion(doc, matches, newVersion),
-                        ps.capturedLockContent,
-                        ctx);
+                        pkg, edit, ps.capturedLockContent, ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();
+                    ps.editedFrom = pkg;
+                    ps.edit = edit;
                 }
             }
         };

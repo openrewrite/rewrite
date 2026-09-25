@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 import static java.util.Collections.singleton;
 
@@ -130,7 +131,7 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                         ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
-                        SourceFile out = ps.modifiedPackageJson;
+                        SourceFile out = NodeDependencyScan.modifiedFor(ps, sf);
                         PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, p);
@@ -175,14 +176,14 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 if (ps.modifiedPackageJson != null) return;
                 if (ps.scopesContainingPackage == null) return;
                 Set<String> scopes = ps.scopesContainingPackage;
+                Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.removeDependency(doc, packageName, scopes);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg,
-                        doc -> PackageJsonHelper.removeDependency(doc, packageName, scopes),
-                        ps.capturedLockContent,
-                        ctx);
+                        pkg, edit, ps.capturedLockContent, ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();
+                    ps.editedFrom = pkg;
+                    ps.edit = edit;
                 }
             }
         };

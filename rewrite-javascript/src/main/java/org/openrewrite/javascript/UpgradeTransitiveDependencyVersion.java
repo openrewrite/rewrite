@@ -33,6 +33,7 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Function;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -122,7 +123,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                         ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
-                        SourceFile out = ps.modifiedPackageJson;
+                        SourceFile out = NodeDependencyScan.modifiedFor(ps, sf);
                         PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, p);
@@ -172,14 +173,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                         ? null
                         : PackageJsonOverrides.parsePath(dependencyPath);
 
+                Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg,
-                        doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath),
-                        ps.capturedLockContent,
-                        ctx);
+                        pkg, edit, ps.capturedLockContent, ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();
+                    ps.editedFrom = pkg;
+                    ps.edit = edit;
                 }
             }
         };

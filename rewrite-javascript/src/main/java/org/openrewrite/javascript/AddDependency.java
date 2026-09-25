@@ -32,6 +32,7 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Function;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -131,7 +132,7 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
                         ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
-                        SourceFile out = ps.modifiedPackageJson;
+                        SourceFile out = NodeDependencyScan.modifiedFor(ps, sf);
                         PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, p);
@@ -174,14 +175,14 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
 
             private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
+                Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.addDependency(doc, packageName, version, targetScope());
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg,
-                        doc -> PackageJsonHelper.addDependency(doc, packageName, version, targetScope()),
-                        ps.capturedLockContent,
-                        ctx);
+                        pkg, edit, ps.capturedLockContent, ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();
+                    ps.editedFrom = pkg;
+                    ps.edit = edit;
                 }
             }
         };
