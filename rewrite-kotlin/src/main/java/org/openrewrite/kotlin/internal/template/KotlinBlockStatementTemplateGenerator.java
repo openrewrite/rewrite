@@ -86,6 +86,7 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
             before.append("var o : ").append(bindType).append(" = ");
             after.append(";\n}");
         } else if (j instanceof J.ClassDeclaration || j instanceof K.ClassDeclaration) {
+            System.out.println("here");
             // Unlike Java, Kotlin allows a class at file scope, so the template needs no enclosing declaration
             // to be parseable and the imports prepended below are sufficient context.
         } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
