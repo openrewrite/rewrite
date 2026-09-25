@@ -190,7 +190,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyScan.Accumulator acc) {
         NodeDependencyScan.linkWorkspaceMembers(acc);
-        NodeDependencyScan.decideCatalogEdits(acc);
+        NodeDependencyScan.decideCatalogEdits(acc, newVersion);
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();

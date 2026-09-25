@@ -107,7 +107,7 @@ public final class NodeDependencyScan {
      * manifest that references the entry but produced no match. The caller then leaves both the
      * manifest and the entry alone, which keeps every member in step at the cost of the upgrade.
      */
-    public static void decideCatalogEdits(Accumulator acc) {
+    public static void decideCatalogEdits(Accumulator acc, String newVersion) {
         // Called once per source file, so a repository with catalogs must not pay for the whole verdict
         // on every file it contains. Without a workspace file there is nothing to decide at all, and
         // otherwise the verdict stands until something it reads changes.
@@ -136,8 +136,13 @@ public final class NodeDependencyScan {
             Yaml.Documents workspaceFile = acc.workspaceFiles.get(workspacePath);
             for (MatchedDependency skipped : ps.skippedProtocols) {
                 String catalogName = NodeCatalogs.catalogReference(skipped.getCurrentVersion());
-                if (catalogName == null ||
-                        !NodeCatalogs.hasEntry(workspaceFile, catalogName, skipped.getPackageName())) {
+                if (catalogName == null) {
+                    continue;
+                }
+                // An entry already holding the constraint is not an edit: recording one would leave every
+                // consumer answering for a lock that nothing made stale.
+                String current = NodeCatalogs.findEntry(workspaceFile, catalogName, skipped.getPackageName());
+                if (current == null || newVersion.equals(current)) {
                     continue;
                 }
                 List<Path> consumers = consumersOf(acc, workspacePath, catalogName, skipped.getPackageName());
