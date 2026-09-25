@@ -73,6 +73,60 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void relocatesTomlVersionCatalogLibraryWhenVersionDoesNotChange() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "1.0.0",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version = "1.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibraryWhenLatestPatchHasNoUpgrade() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "latest.patch",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version = "999.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version = "999.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void changesTomlVersionCatalogLibraryVersion() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency(

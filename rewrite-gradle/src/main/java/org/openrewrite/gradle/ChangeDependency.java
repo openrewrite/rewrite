@@ -595,10 +595,11 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             GroupArtifact newCoordinates = new GroupArtifact(
                     StringUtils.isBlank(newGroupId) ? oldCoordinates.getGroupId() : newGroupId,
                     StringUtils.isBlank(newArtifactId) ? oldCoordinates.getArtifactId() : newArtifactId);
+            boolean coordinatesChanged = !oldCoordinates.equals(newCoordinates);
             String currentVersion = entry.getResolvedVersion(declarations);
             String selectedVersion = selectCatalogVersion(
                     versionSelector, newCoordinates, currentVersion, alias, blockedAliases, failures, ctx);
-            if (selectedVersion == null && shouldSelectCatalogVersion(currentVersion)) {
+            if (selectedVersion == null && shouldSelectCatalogVersion(currentVersion) && !coordinatesChanged) {
                 continue;
             }
 
