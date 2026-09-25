@@ -137,6 +137,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                     NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                     ps.matchedDeps = findMatches(sf, ps.skippedProtocols);
+                    acc.catalogEditsStale = true;
                 }
                 return tree;
             }
@@ -217,6 +218,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                         SourceFile liveTree = PackageJsonHelper.getLiveTree(ctx, p);
                         if (liveTree != null) {
                             ps.matchedDeps = findMatches(liveTree, ps.skippedProtocols);
+                            acc.catalogEditsStale = true;
                         }
                     }
                     reportProtocolSkips(ctx, acc, ps, p);
@@ -254,6 +256,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                         // If the scanner found no matches on the original tree, recompute from the live tree.
                         if (ips.matchedDeps != null && ips.matchedDeps.isEmpty() && pkg != null) {
                             ips.matchedDeps = findMatches(pkg, ips.skippedProtocols);
+                            acc.catalogEditsStale = true;
                         }
                         reportProtocolSkips(ctx, acc, ips, importer);
                         if (pkg != null && ips.matchedDeps != null && !ips.matchedDeps.isEmpty()) {
