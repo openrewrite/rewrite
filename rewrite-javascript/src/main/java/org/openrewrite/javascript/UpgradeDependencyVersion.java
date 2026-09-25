@@ -73,12 +73,19 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
 
     @Override public String getDescription() {
         return "Upgrades the version constraint of matching npm dependencies in `package.json` and " +
-                "regenerates the lock file by running the package manager. Matching is by exact package " +
-                "name or glob pattern. " +
+                "regenerates the lock file. Matching is by exact package name or glob pattern. " +
+                "A dependency declared as `catalog:` or `catalog:<name>` keeps its constraint in " +
+                "`pnpm-workspace.yaml` or `.yarnrc.yml`, so the catalog entry is updated in place and " +
+                "the manifest is left alone. That happens only when every consumer of the entry is also " +
+                "being upgraded, since moving the entry moves all of them; otherwise the entry and the " +
+                "manifest are both left alone and the skip is reported. The lock file cannot yet follow " +
+                "a catalog edit, so one is reported as a regeneration failure rather than written " +
+                "incorrectly. Other specifier protocols (`workspace:`, `patch:`, `portal:`, `npm:`) have " +
+                "no such declaration to follow and are always left alone. " +
                 "v1 uses simple string inequality for the upgrade check (always overwrites). A future " +
                 "version will use semver to skip already-up-to-date constraints. " +
-                "Not safe to use as a precondition: invokes the package manager and publishes per-project " +
-                "state shared with other dependency recipes.";
+                "Not safe to use as a precondition: publishes per-project state shared with other " +
+                "dependency recipes.";
     }
 
     @Override

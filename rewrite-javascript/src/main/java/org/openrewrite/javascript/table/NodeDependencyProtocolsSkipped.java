@@ -29,8 +29,10 @@ public class NodeDependencyProtocolsSkipped extends DataTable<NodeDependencyProt
         super(recipe, "Node.js dependencies skipped for a specifier protocol",
                 "Dependencies whose version position holds a specifier protocol rather than a version " +
                         "constraint, so the recipe left that value alone. The constraint lives behind the " +
-                        "protocol (in a pnpm catalog, a workspace member, a patch), and overwriting the " +
-                        "reference would discard it.");
+                        "protocol (in a workspace member, a patch, a catalog), and overwriting the " +
+                        "reference would discard it. A `catalog:` reference is followed into its catalog " +
+                        "entry instead, and appears here only when it could not be: the workspace file or " +
+                        "the entry is missing, or the entry has a consumer this run is not upgrading.");
     }
 
     @Value
