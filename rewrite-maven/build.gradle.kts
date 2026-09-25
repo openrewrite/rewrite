@@ -36,7 +36,7 @@ dependencies {
 
     // Align kotlin-stdlib-jdk7/-jdk8/-common with kotlin-stdlib
     // (maven-resolver and friends would otherwise pull mixed 1.8.21/1.9.x stdlibs).
-    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.10"))
+    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.20"))
 
     testImplementation(project(":rewrite-test"))
 
