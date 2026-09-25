@@ -697,7 +697,37 @@ public class PackageJsonHelper {
                                                    NodeResolutionResult.PackageManager pm,
                                                    String name, String newVersion,
                                                    @Nullable List<DependencyPathSegment> path) {
+        if (declaredProtocolReference(doc, name) != null) {
+            // The declaration holds a reference, not a version, so its real constraint lives elsewhere.
+            // An override beside it would silently win over whatever that is, and the next edit to the
+            // declaration would not move what is installed.
+            return doc;
+        }
         return PackageJsonOverrides.applyOverride(doc, pm, name, newVersion, path);
+    }
+
+    /** The specifier protocol this manifest declares {@code name} with, or null if it declares a version. */
+    static @Nullable String declaredProtocolReference(Json.Document doc, String name) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return null;
+        }
+        for (Json rootMember : ((Json.JsonObject) doc.getValue()).getMembers()) {
+            if (!(rootMember instanceof Json.Member)) continue;
+            Json.Member scope = (Json.Member) rootMember;
+            String scopeKey = literalString(scope.getKey());
+            if (scopeKey == null || !isDeclaredScope(scopeKey) ||
+                    !(scope.getValue() instanceof Json.JsonObject)) {
+                continue;
+            }
+            for (Json child : ((Json.JsonObject) scope.getValue()).getMembers()) {
+                if (!(child instanceof Json.Member)) continue;
+                Json.Member dependency = (Json.Member) child;
+                if (name.equals(literalString(dependency.getKey()))) {
+                    return dependencySpecifierProtocol(literalString(dependency.getValue()));
+                }
+            }
+        }
+        return null;
     }
 
     /**
