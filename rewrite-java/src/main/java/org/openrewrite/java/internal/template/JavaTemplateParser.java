@@ -369,8 +369,9 @@ public class JavaTemplateParser {
     }
 
     /**
-     * A runtime whose rewrite-core predates {@link Parser.Builder#discriminator()} parent-loads that class while
-     * this one comes from a newer recipe jar, so fall back to builder identity: fewer cache hits, never a wrong one.
+     * A runtime bundling rewrite-core 8.92.8 or earlier, which predates {@link Parser.Builder#discriminator()},
+     * parent-loads that class while this one comes from a newer recipe jar, so fall back to builder identity:
+     * fewer cache hits, never a wrong one.
      */
     private Object parserDiscriminator() {
         return PARSER_DISCRIMINATOR_AVAILABLE ? parser.discriminator() : parser;
