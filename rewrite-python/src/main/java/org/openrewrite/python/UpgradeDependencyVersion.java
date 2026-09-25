@@ -101,7 +101,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 "For `pyproject.toml`, `uv.lock`, `poetry.lock`, and `pdm.lock` are regenerated natively without executing the package manager. " +
                 "For `Pipfile`, `Pipfile.lock` is regenerated natively by consulting the project's " +
                 "package index over the network. " +
-                "Not safe to use as a precondition: invokes the package manager or the network and " +
+                "Not safe to use as a precondition: consults the package index over the network and " +
                 "publishes per-project state shared with other dependency recipes.";
     }
 

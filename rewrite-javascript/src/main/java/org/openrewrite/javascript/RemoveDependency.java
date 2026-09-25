@@ -60,7 +60,8 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
     @Override public String getInstanceNameSuffix() { return String.format("`%s`", packageName); }
 
     @Override public String getDescription() {
-        return "Remove an npm dependency from `package.json` and regenerate the lock file. " +
+        return "Remove an npm dependency from `package.json` and regenerate the lock file natively, without executing " +
+                "the package manager. " +
                 "If the dependency does not exist in any scope, the recipe is a no-op.";
     }
 
