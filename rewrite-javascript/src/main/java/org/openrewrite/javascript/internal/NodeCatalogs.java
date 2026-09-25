@@ -26,7 +26,6 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.*;
 import java.util.function.UnaryOperator;
 
-import static org.openrewrite.yaml.internal.StringUtils.quoteIfNeeded;
 
 /**
  * pnpm 9.5+ and Yarn 4.10+ let a workspace declare one version per package in a catalog and have every
@@ -50,6 +49,9 @@ public class NodeCatalogs {
     private static final String CATALOG_PROTOCOL = "catalog:";
     private static final String DEFAULT_CATALOG_KEY = "catalog";
     private static final String NAMED_CATALOGS_KEY = "catalogs";
+
+    /** Characters YAML reads as an indicator when a plain scalar opens with one. */
+    private static final String PLAIN_SCALAR_INDICATORS = "-?:,[]{}#&*!|>'\"%@`";
 
     private static final String PNPM_WORKSPACE_FILE = "pnpm-workspace.yaml";
     private static final String YARN_WORKSPACE_FILE = ".yarnrc.yml";
@@ -197,7 +199,7 @@ public class NodeCatalogs {
                 return catalog;
             }
             Yaml.Scalar rewritten = version.withValue(newVersion);
-            if (style == Yaml.Scalar.Style.PLAIN && !newVersion.equals(quoteIfNeeded(newVersion))) {
+            if (style == Yaml.Scalar.Style.PLAIN && !canBePlainScalar(newVersion)) {
                 rewritten = rewritten.withStyle(Yaml.Scalar.Style.SINGLE_QUOTED);
             }
             entries.set(i, entry.withValue(rewritten));
@@ -206,4 +208,31 @@ public class NodeCatalogs {
         return catalog;
     }
 
+    /**
+     * Whether a value can stand unquoted where the old one did. An npm range may open with a character
+     * YAML reads as an indicator, so keeping the old scalar's style would emit something that no longer
+     * parses: `>=2.0.0` reads as a folded block scalar and `*` as an alias.
+     * <p>
+     * rewrite-yaml knows this rule too, but only in its `internal` package, which is not API and may
+     * move without notice. The rule is short and stable enough to state here rather than couple to it.
+     */
+    private static boolean canBePlainScalar(String value) {
+        if (value.isEmpty() || "---".equals(value) || "...".equals(value)) {
+            return false;
+        }
+        if (PLAIN_SCALAR_INDICATORS.indexOf(value.charAt(0)) >= 0 || !value.equals(value.trim())) {
+            return false;
+        }
+        // `: ` opens a mapping value and ` #` a comment, wherever they appear.
+        if (value.contains(": ") || value.contains(" #")) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x20 || c == 0x7F) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
