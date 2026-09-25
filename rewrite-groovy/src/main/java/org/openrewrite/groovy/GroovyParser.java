@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy;
 
+import lombok.EqualsAndHashCode;
 import groovy.lang.GroovyClassLoader;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -275,6 +276,7 @@ public class GroovyParser implements Parser {
     }
 
     @SuppressWarnings("unused")
+    @EqualsAndHashCode(callSuper = true)
     public static class Builder extends Parser.Builder {
         @Nullable
         private Collection<Path> classpath = emptyList();
@@ -282,8 +284,14 @@ public class GroovyParser implements Parser {
         @Nullable
         protected Collection<String> artifactNames = emptyList();
 
+        /**
+         * Excluded from equality: mutable, accumulates during parsing, and meant to be shared across parsers
+         * rather than to distinguish them.
+         */
+        @EqualsAndHashCode.Exclude
         private JavaTypeCache typeCache = new JavaTypeCache();
 
+        @EqualsAndHashCode.Exclude
         @Nullable
         private JavaTypeFactory typeFactory;
 
@@ -293,21 +301,6 @@ public class GroovyParser implements Parser {
 
         public Builder() {
             super(G.CompilationUnit.class);
-        }
-
-        /**
-         * The type cache and type factory are left out: they are mutable, accumulate during parsing, and are
-         * meant to be shared across parsers rather than to distinguish them.
-         */
-        @Override
-        public List<Object> discriminator() {
-            List<Object> discriminator = super.discriminator();
-            discriminator.add(classpath == null ? emptyList() : new ArrayList<>(classpath));
-            discriminator.add(artifactNames == null ? emptyList() : new ArrayList<>(artifactNames));
-            discriminator.add(logCompilationWarningsAndErrors);
-            discriminator.add(new ArrayList<>(styles));
-            discriminator.add(new ArrayList<>(compilerCustomizers));
-            return discriminator;
         }
 
         public Builder(Builder base) {
