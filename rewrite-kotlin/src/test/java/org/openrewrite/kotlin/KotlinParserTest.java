@@ -20,9 +20,12 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -111,6 +114,31 @@ class KotlinParserTest implements RewriteTest {
         assertThat(results)
           .extracting(SourceFile::getSourcePath)
           .containsExactly(Paths.get("Bad.kt"));
+    }
+
+    @Test
+    void syntaxErrorIsNotLoggedWhenCompilationLoggingIsDisabled() {
+        PrintStream originalErr = System.err;
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        List<SourceFile> results;
+        try {
+            System.setErr(new PrintStream(err, true));
+            results = KotlinParser.builder()
+              .logCompilationWarningsAndErrors(false)
+              .build()
+              .parseInputs(singletonList(syntaxError()), null, new InMemoryExecutionContext(t -> {
+              }))
+              .collect(toList());
+        } finally {
+            System.setErr(originalErr);
+        }
+
+        assertThat(results).singleElement().isInstanceOf(ParseError.class);
+        assertThat(err.toString()).doesNotContain("SyntaxError.kt");
+    }
+
+    private static Parser.Input syntaxError() {
+        return Parser.Input.fromString(Paths.get("SyntaxError.kt"), "class A {\n    fun f( {\n}\n");
     }
 
     @Test

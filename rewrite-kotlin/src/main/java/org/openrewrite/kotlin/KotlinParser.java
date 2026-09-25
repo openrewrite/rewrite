@@ -198,7 +198,7 @@ public class KotlinParser implements Parser {
                     assert kotlinSource.getFirFile().getSource() != null;
                     PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
                     SyntaxErrorReporter.SyntaxErrorReport report =
-                            AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true));
+                            AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, compilationMessageCollector());
                     if (report.isHasErrors()) {
                         parsed.add(ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException()));
                         continue;
@@ -599,13 +599,17 @@ public class KotlinParser implements Parser {
         KOTLIN_2_4
     }
 
+    private MessageCollector compilationMessageCollector() {
+        return logCompilationWarningsAndErrors ?
+                new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
+                MessageCollector.Companion.getNONE();
+    }
+
     private CompilerConfiguration compilerConfiguration() {
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
 
         compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
-        compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
-                new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
-                MessageCollector.Companion.getNONE());
+        compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, compilationMessageCollector());
 
         compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(getLanguageVersion(languageLevel), getApiVersion(languageLevel)));
 
