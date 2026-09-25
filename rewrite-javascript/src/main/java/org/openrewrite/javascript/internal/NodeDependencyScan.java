@@ -54,6 +54,8 @@ public final class NodeDependencyScan {
         public @Nullable List<MatchedDependency> matchedDeps;
         /** Matched dependencies left alone because their version position holds a specifier protocol. */
         public final List<MatchedDependency> skippedProtocols = new ArrayList<>();
+        /** Catalog entries this manifest consumes that the recipe edited, leaving its lock stale. */
+        public final List<NodeCatalogs.CatalogEntry> catalogEntriesEdited = new ArrayList<>();
         public LockFileRegeneration.@Nullable Result regenResult;
         public boolean failureRecorded;
         public boolean protocolsReported;
@@ -102,6 +104,9 @@ public final class NodeDependencyScan {
      */
     public static void decideCatalogEdits(Accumulator acc, String newVersion) {
         acc.catalogEdits.clear();
+        for (ProjectState ps : acc.projects.values()) {
+            ps.catalogEntriesEdited.clear();
+        }
         for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
             ProjectState ps = project.getValue();
             if (ps.skippedProtocols.isEmpty()) {
@@ -119,8 +124,17 @@ public final class NodeDependencyScan {
                         !everyConsumerIsUpgraded(acc, workspacePath, catalogName, skipped.getPackageName())) {
                     continue;
                 }
+                NodeCatalogs.CatalogEntry entry =
+                        new NodeCatalogs.CatalogEntry(catalogName, skipped.getPackageName());
                 acc.catalogEdits.computeIfAbsent(workspacePath, k -> new LinkedHashMap<>())
-                        .put(new NodeCatalogs.CatalogEntry(catalogName, skipped.getPackageName()), newVersion);
+                        .put(entry, newVersion);
+                // Every consumer's lock now disagrees with the entry, so each needs to answer for it.
+                for (Path consumer : consumersOf(acc, workspacePath, catalogName, skipped.getPackageName())) {
+                    ProjectState consumerPs = acc.projects.get(consumer);
+                    if (consumerPs != null && !consumerPs.catalogEntriesEdited.contains(entry)) {
+                        consumerPs.catalogEntriesEdited.add(entry);
+                    }
+                }
             }
         }
     }
@@ -151,17 +165,27 @@ public final class NodeDependencyScan {
                 }
             }
         }
-        for (Map.Entry<Path, Map<String, String>> consumer : acc.catalogRefs.entrySet()) {
-            if (!isUnder(consumer.getKey(), root) ||
-                    !catalogName.equals(consumer.getValue().get(packageName))) {
-                continue;
-            }
-            ProjectState ps = acc.projects.get(consumer.getKey());
+        for (Path consumer : consumersOf(acc, workspacePath, catalogName, packageName)) {
+            ProjectState ps = acc.projects.get(consumer);
             if (ps == null || !isUpgrading(ps, catalogName, packageName)) {
                 return false;
             }
         }
         return true;
+    }
+
+    /** The manifests under a workspace file whose JSON references the given catalog entry. */
+    private static List<Path> consumersOf(Accumulator acc, Path workspacePath,
+                                          String catalogName, String packageName) {
+        Path root = workspacePath.getParent();
+        List<Path> consumers = new ArrayList<>();
+        for (Map.Entry<Path, Map<String, String>> manifest : acc.catalogRefs.entrySet()) {
+            if (isUnder(manifest.getKey(), root) &&
+                    catalogName.equals(manifest.getValue().get(packageName))) {
+                consumers.add(manifest.getKey());
+            }
+        }
+        return consumers;
     }
 
     private static boolean isUpgrading(ProjectState ps, String catalogName, String packageName) {

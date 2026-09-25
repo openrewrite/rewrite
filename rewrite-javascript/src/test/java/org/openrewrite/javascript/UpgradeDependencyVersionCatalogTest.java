@@ -18,6 +18,8 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
 import static java.util.Arrays.asList;
@@ -27,6 +29,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.javascript.Assertions.dependency;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
+import static org.openrewrite.javascript.Assertions.pnpmLock;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 /**
@@ -237,6 +240,56 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                 yaml("packages:\n  - '.'\n", s -> s.path("pnpm-workspace.yaml"))
         );
     }
+
+
+    private static final String PNPM_LOCK = "lockfileVersion: '9.0'\n" +
+            "\n" +
+            "catalogs:\n" +
+            "  default:\n" +
+            "    acme-logger:\n" +
+            "      specifier: '~1.4.1'\n" +
+            "      version: 1.4.1\n" +
+            "\n" +
+            "importers:\n" +
+            "\n" +
+            "  .:\n" +
+            "    dependencies:\n" +
+            "      acme-logger:\n" +
+            "        specifier: 'catalog:'\n" +
+            "        version: 1.4.1\n";
+
+    /**
+     * The entry moves but the lock cannot follow, and pnpm does not report the disagreement: a
+     * frozen-lockfile install still succeeds and still installs the old version (pnpm/pnpm#9369). So a
+     * silent stale lock would be a change that looks applied and is not. Refuse loudly instead.
+     */
+    @Test
+    void aCatalogEditRefusesLoudlyWhenItLeavesALockBehind() {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0"))
+                        .dataTable(NodeLockRegenerationFailures.Row.class, rows -> {
+                            assertThat(rows).hasSize(1);
+                            assertThat(rows.get(0).getSourcePath()).isEqualTo("package.json");
+                            assertThat(rows.get(0).getPackageName()).isEqualTo("acme-logger");
+                            assertThat(rows.get(0).getReason()).isEqualTo("UNSUPPORTED_ENTRY_TYPE");
+                        }),
+                packageJson(LOCKED_PACKAGE_JSON, null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
+                yaml(WORKSPACE_YAML, WORKSPACE_YAML.replace("'~1.4.1'", "'~1.5.0'"),
+                        s -> s.path("pnpm-workspace.yaml")),
+                pnpmLock(PNPM_LOCK, null,
+                        s -> s.afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                .as("the lock left behind by the catalog edit carries the warning").isPresent()))
+        );
+    }
+
+    private static final String LOCKED_PACKAGE_JSON = "{\n" +
+            "  \"name\": \"consumer\",\n" +
+            "  \"version\": \"1.0.0\",\n" +
+            "  \"dependencies\": {\n" +
+            "    \"acme-logger\": \"catalog:\"\n" +
+            "  }\n" +
+            "}\n";
 
     @Test
     void aMarkerClaimingAResolvedVersionStillCannotOverwriteTheManifest() {

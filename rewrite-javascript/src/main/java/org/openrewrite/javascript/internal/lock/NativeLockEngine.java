@@ -83,7 +83,8 @@ public final class NativeLockEngine {
 
     /** Constraint protocols the native engine cannot re-pin without repo/filesystem access. */
     private static final List<String> UNSUPPORTED_PROTOCOLS = Arrays.asList(
-            "git:", "git+", "github:", "file:", "link:", "portal:", "workspace:", "http://", "https://");
+            "git:", "git+", "github:", "file:", "link:", "portal:", "workspace:", "catalog:",
+            "http://", "https://");
 
     /** Manifest dependency scopes an importer entry can declare a dependency under. */
     private static final List<String> DECLARED_SCOPES = Arrays.asList(

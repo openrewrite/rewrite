@@ -250,6 +250,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                             }
                         }
                     }
+                    refuseStaleCatalogLock(ips);
                     if (ips.regenResult != null) {
                         if (ips.regenResult.isSuccess()) {
                             return PackageJsonHelper.reparseLock(sf, ips.regenResult.getLockFileContent());
@@ -277,6 +278,25 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 }
             }
         };
+    }
+
+    /**
+     * A catalog edit leaves this project's lock behind, and the native engine cannot update it: the lock
+     * records the reference verbatim under `importers` and keeps the resolved version in a `catalogs:`
+     * block it has no model for. Refuse loudly rather than leave a lock that still installs the old
+     * version, which pnpm does not report (pnpm/pnpm#9369).
+     */
+    private void refuseStaleCatalogLock(NodeDependencyScan.ProjectState ps) {
+        if (ps.regenResult != null || ps.catalogEntriesEdited.isEmpty() || ps.capturedLockContent == null) {
+            return;
+        }
+        NodeCatalogs.CatalogEntry entry = ps.catalogEntriesEdited.get(0);
+        ps.regenResult = LockFileRegeneration.Result.failure(new LockFileRegeneration.Failure(
+                LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE,
+                entry.getPackageName(),
+                "the catalog entry was updated but the lock cannot be: " + entry.getPackageName() +
+                        " resolves through " + (NodeCatalogs.DEFAULT_CATALOG.equals(entry.getCatalogName()) ?
+                        "the default catalog" : "catalog " + entry.getCatalogName())));
     }
 
     /** One row per matched dependency left alone for its specifier protocol, emitted once per project. */
