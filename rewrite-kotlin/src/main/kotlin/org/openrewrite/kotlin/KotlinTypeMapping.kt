@@ -56,7 +56,6 @@ import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.name.isOneSegmentFQN
-import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeMapping
@@ -68,6 +67,8 @@ import org.openrewrite.java.tree.JavaType.*
 import org.openrewrite.java.tree.JavaType.Array
 import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.internal.JavaThrownExceptions
+import org.openrewrite.kotlin.internal.facadeFqn
+import org.openrewrite.kotlin.internal.isFromLibrary
 import org.openrewrite.kotlin.internal.namedClassSymbol
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.methodName
@@ -875,22 +876,15 @@ class KotlinTypeMapping(
                             resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)!!.fir
                         )
                     )
-                } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library || resolvedSymbol.origin == FirDeclarationOrigin.BuiltIns) {
-                    if (resolvedSymbol.fir.containerSource is JvmPackagePartSource) {
-                        val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
-                        if (source != null) {
-                            // JvmPackagePartSource carries only the JVM facade class name
-                            // string — no FIR class to route through. Synthesize a
-                            // canonical Class for the facade so MethodMatcher works;
-                            // we can't enumerate its members from FIR.
-                            val facadeFqn = if (source.facadeClassName != null) {
-                                (source.facadeClassName as JvmClassName).fqNameForTopLevelClassMaybeWithDollars.asString()
-                            } else {
-                                source.className.fqNameForTopLevelClassMaybeWithDollars.asString()
-                            }
-                            declaringType = typeFactory.computeClass(facadeFqn, Flag.Public.getBitMask(), FullyQualified.Kind.Class) {
-                                // Synthetic library facade — body is not enumerable from FIR.
-                            }
+                } else if (resolvedSymbol.isFromLibrary) {
+                    val source = resolvedSymbol.fir.containerSource
+                    if (source is JvmPackagePartSource) {
+                        // JvmPackagePartSource carries only the JVM facade class name
+                        // string — no FIR class to route through. Synthesize a
+                        // canonical Class for the facade so MethodMatcher works;
+                        // we can't enumerate its members from FIR.
+                        declaringType = typeFactory.computeClass(source.facadeFqn, Flag.Public.getBitMask(), FullyQualified.Kind.Class) {
+                            // Synthetic library facade — body is not enumerable from FIR.
                         }
                     } else if (!resolvedSymbol.fir.origin.generated &&
                         !resolvedSymbol.fir.origin.fromSupertypes &&

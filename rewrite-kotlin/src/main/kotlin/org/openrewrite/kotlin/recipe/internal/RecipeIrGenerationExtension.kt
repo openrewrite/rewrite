@@ -89,6 +89,7 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.Variance
+import org.openrewrite.kotlin.internal.facadeFqn
 import java.io.File
 
 /**
@@ -1402,8 +1403,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     private fun computeJvmFacadeFqn(fn: IrSimpleFunction): String? {
         val containerSource = (fn as? IrMemberWithContainerSource)?.containerSource
         if (containerSource is JvmPackagePartSource) {
-            val jvmName = containerSource.facadeClassName ?: containerSource.className
-            return jvmName.fqNameForTopLevelClassMaybeWithDollars.asString()
+            return containerSource.facadeFqn
         }
         val file = fn.parent as? IrFile ?: return null
         val pkgFqn = file.packageFqName.asString()

@@ -42,10 +42,11 @@ import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaTypePa
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
+import org.openrewrite.kotlin.internal.facadeFqn
+import org.openrewrite.kotlin.internal.isFromLibrary
 import org.openrewrite.kotlin.internal.namedClassSymbol
 import java.util.*
 
@@ -382,16 +383,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)?.fir != null
             ) {
                 declaringSig = signature(resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)!!.fir)
-            } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library || resolvedSymbol.origin == FirDeclarationOrigin.BuiltIns) {
-                if (resolvedSymbol.fir.containerSource is JvmPackagePartSource) {
-                    val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
-                    if (source != null) {
-                        declaringSig = if (source.facadeClassName != null) {
-                            (source.facadeClassName as JvmClassName).fqNameForTopLevelClassMaybeWithDollars.asString()
-                        } else {
-                            source.className.fqNameForTopLevelClassMaybeWithDollars.asString()
-                        }
-                    }
+            } else if (resolvedSymbol.isFromLibrary) {
+                val source = resolvedSymbol.fir.containerSource
+                if (source is JvmPackagePartSource) {
+                    declaringSig = source.facadeFqn
                 } else if (!resolvedSymbol.fir.origin.generated &&
                     !resolvedSymbol.fir.origin.fromSupertypes &&
                     !resolvedSymbol.fir.origin.fromSource
