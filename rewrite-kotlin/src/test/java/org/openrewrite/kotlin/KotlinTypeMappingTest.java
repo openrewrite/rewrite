@@ -2238,6 +2238,81 @@ class KotlinTypeMappingTest {
             );
         }
 
+        @Test
+        void typeAliasQualifier() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = A.create()
+                  val b = O.bar()
+                  val c = N.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> assertQualifierTypes(cu, Map.of(
+                  "A", "WithCompanion",
+                  "O", "Obj",
+                  "N", "Outer$Nested"
+                ), "java.lang.Object"))
+              ),
+              kotlin(
+                """
+                  typealias A = WithCompanion
+                  typealias O = Obj
+                  typealias N = Outer.Nested
+
+                  class WithCompanion {
+                      fun bar() = 1
+                      companion object {
+                          fun create() = 2
+                      }
+                  }
+                  object Obj {
+                      fun bar() = 1
+                  }
+                  class Outer {
+                      class Nested {
+                          fun bar() = 1
+                          companion object {
+                              fun create() = 2
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void typeAliasToJavaClassQualifier() {
+            rewriteRun(
+              kotlin(
+                """
+                  typealias E = IllegalStateException
+                  val a = E::class
+                  val b = Exception::class
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    Map<String, String> expected = Map.of(
+                      "E", "java.lang.IllegalStateException",
+                      "Exception", "java.lang.Exception"
+                    );
+                    Set<String> seen = new HashSet<>();
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer p) {
+                            if (memberRef.getContaining() instanceof J.Identifier id) {
+                                assertThat(TypeUtils.asFullyQualified(id.getType()).getFullyQualifiedName())
+                                  .isEqualTo(expected.get(id.getSimpleName()));
+                                seen.add(id.getSimpleName());
+                            }
+                            return super.visitMemberReference(memberRef, p);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(seen).containsExactlyInAnyOrderElementsOf(expected.keySet());
+                })
+              )
+            );
+        }
+
         private static void assertQualifierTypes(K.CompilationUnit cu, Map<String, String> expectedFqnBySimpleName, String supertype) {
             Set<String> seen = new HashSet<>();
             new KotlinIsoVisitor<Integer>() {
