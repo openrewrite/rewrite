@@ -2409,6 +2409,58 @@ class KotlinTypeMappingTest {
             );
         }
 
+        @Test
+        void packageSegmentsOfQualifiedClassHaveNoType() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = p.Foo.create()
+                  val b = p.q.Bar.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> seen) {
+                            switch (identifier.getSimpleName()) {
+                                case "p", "q" -> assertThat(identifier.getType()).isNull();
+                                case "Foo" -> assertThat(TypeUtils.asFullyQualified(identifier.getType()).getFullyQualifiedName()).isEqualTo("p.Foo");
+                                case "Bar" -> assertThat(TypeUtils.asFullyQualified(identifier.getType()).getFullyQualifiedName()).isEqualTo("p.q.Bar");
+                                default -> {
+                                    return super.visitIdentifier(identifier, seen);
+                                }
+                            }
+                            seen.add(identifier.getSimpleName());
+                            return super.visitIdentifier(identifier, seen);
+                        }
+                    }.reduce(cu, new HashSet<>());
+                    assertThat(seen).containsExactlyInAnyOrder("p", "q", "Foo", "Bar");
+                })
+              ),
+              kotlin(
+                """
+                  package p
+
+                  class Foo {
+                      companion object {
+                          fun create() = Foo()
+                      }
+                  }
+                  """
+              ),
+              kotlin(
+                """
+                  package p.q
+
+                  class Bar {
+                      companion object {
+                          fun create() = Bar()
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
         private static void assertQualifierTypes(K.CompilationUnit cu, Map<String, String> expectedFqnBySimpleName, String supertype) {
             Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
                 @Override

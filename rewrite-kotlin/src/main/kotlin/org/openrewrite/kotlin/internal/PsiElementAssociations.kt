@@ -155,23 +155,28 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             // `primary` walked up to an enclosing declaration, whose type describes a different name
             return null
         }
-        if (psiElement != null && fir is FirResolvedQualifier && fir.source != null && (fir.source.psi is KtDotQualifiedExpression || fir.source.psi is KtNameReferenceExpression)) {
-            val classId = (fir.qualifierSymbol as? FirRegularClassSymbol)?.classId
-            if (classId != null) {
-                return if (isPackage(psiElement, classId)) {
-                    null
-                } else {
-                    val found = matchClassId(psiElement, classId)
-                    typeMapping.type(found, owner)
-                }
+        val qualifier = (fir as? FirResolvedQualifier)?.source?.psi
+        if (psiElement != null && fir is FirResolvedQualifier && (qualifier is KtDotQualifiedExpression || qualifier is KtNameReferenceExpression)) {
+            val symbol = fir.qualifierSymbol
+            if (symbol != null && isPackage(psiElement, qualifier, symbol.classId)) {
+                return null
+            }
+            if (symbol is FirRegularClassSymbol) {
+                return typeMapping.type(matchClassId(psiElement, symbol.classId), owner)
             }
         }
         return if (fir != null) typeMapping.type(fir, owner) else null
     }
 
-    private fun isPackage(psi: PsiElement, classId: ClassId): Boolean {
-        return !classId.packageFqName.isRoot && psi.parent.text == classId.packageFqName.asString()
+    private fun isPackage(psi: PsiElement, qualifier: PsiElement, classId: ClassId): Boolean {
+        val packageDepth = classId.packageFqName.pathSegments().size
+        val fullyQualified = segmentCount(qualifier) == packageDepth + classId.relativeClassName.pathSegments().size
+        val parent = psi.parent
+        val throughPsi = if (parent is KtDotQualifiedExpression && parent.selectorExpression == psi) parent else psi
+        return packageDepth > 0 && fullyQualified && segmentCount(throughPsi) <= packageDepth
     }
+
+    private fun segmentCount(psi: PsiElement): Int = withoutTypeArguments(psi).split('.').size
 
     private fun matchClassId(name: PsiElement, classId: ClassId): ClassId {
         // `Outer.Nested<Int>` nests the name in a call carrying the type arguments
