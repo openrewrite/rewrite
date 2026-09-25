@@ -24,11 +24,7 @@ import org.openrewrite.gradle.internal.AddDependencyVisitor;
 import org.openrewrite.gradle.internal.SpringBomProperty;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.trait.ExtraProperty;
-import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.GradleMultiDependency;
-import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
-import org.openrewrite.gradle.trait.VersionCatalog;
+import org.openrewrite.gradle.trait.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -66,7 +62,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
 
     @EqualsAndHashCode.Exclude
-    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -302,16 +298,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     // Resolve the new version if needed
                     if (!acc.gaToNewVersion.containsKey(ga)) {
                         try {
-                            String newVersion;
+                            String selectedVersion;
                             if (entry.getVersion() != null) {
                                 GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), entry.getVersion());
-                                newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                         .select(gav, "dependencyManagement", UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
                             } else {
-                                newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                         .select(ga, "dependencyManagement", UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
                             }
-                            acc.gaToNewVersion.put(ga, newVersion);
+                            acc.gaToNewVersion.put(ga, selectedVersion);
                         } catch (MavenDownloadingException e) {
                             acc.gaToNewVersion.put(ga, e);
                         }
@@ -323,11 +319,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
              * Scans a single dependency and records its information for later processing.
              */
             private void scanDependency(GradleDependency gradleDependency, ExecutionContext ctx) {
-                String groupId = gradleDependency.getGroupId();
-                String artifactId = gradleDependency.getArtifactId();
+                String declaredGroupId = gradleDependency.getGroupId();
+                String declaredArtifactId = gradleDependency.getArtifactId();
 
                 // Record the dependency and resolve its version if needed
-                GroupArtifact ga = new GroupArtifact(groupId, artifactId);
+                GroupArtifact ga = new GroupArtifact(declaredGroupId, declaredArtifactId);
                 String configName = gradleDependency.getConfigurationName();
 
                 if (gradleProject != null) {
@@ -337,7 +333,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             .add(configName);
                 }
 
-                if (!shouldResolveVersion(groupId, artifactId)) {
+                if (!shouldResolveVersion(declaredGroupId, declaredArtifactId)) {
                     return;
                 }
 
@@ -347,7 +343,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (!acc.gaToNewVersion.containsKey(ga)) {
                     try {
                         String versionVar = gradleDependency.getVersionVariable();
-                        String newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                        String selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                 .select(ga, configName, UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
 
                         if (versionVar != null) {
@@ -357,7 +353,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     .add(configName);
                         }
 
-                        acc.gaToNewVersion.put(ga, newVersion);
+                        acc.gaToNewVersion.put(ga, selectedVersion);
                     } catch (MavenDownloadingException e) {
                         acc.gaToNewVersion.put(ga, e);
                     }
@@ -417,13 +413,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 // A catalog file has no marker and a settings script no GradleProject, so fall back to a scanned project's repositories
                 @Nullable GradleProject gradleProject = catalog.getCursor().firstEnclosingOrThrow(SourceFile.class).getMarkers()
                         .findFirst(GradleProject.class).orElseGet(acc.gradleProject::get);
-                return upgradeCatalog(catalog, dependencyMatcher, new DependencyVersionSelector(metadataFailures, gradleProject, null), ctx);
+                return upgradeCatalog(catalog, dependencyMatcher,
+                        new DependencyVersionSelector(metadataFailures, gradleProject, null), ctx);
             });
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
                 return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx) ||
-                       updateVersionCatalog.isAcceptable(sf, ctx);
+                        updateVersionCatalog.isAcceptable(sf, ctx);
             }
 
             @Override
@@ -460,9 +457,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 }
 
                             } else {
-                                for (Map.Entry<GroupArtifact, @Nullable Object> newVersion : acc.gaToNewVersion.entrySet()) {
-                                    if (newVersion.getValue() instanceof String) {
-                                        GroupArtifactVersion gav = new GroupArtifactVersion(newVersion.getKey().getGroupId(), newVersion.getKey().getArtifactId(), (String) newVersion.getValue());
+                                for (Map.Entry<GroupArtifact, @Nullable Object> upgrade : acc.gaToNewVersion.entrySet()) {
+                                    if (upgrade.getValue() instanceof String) {
+                                        GroupArtifactVersion gav = new GroupArtifactVersion(upgrade.getKey().getGroupId(), upgrade.getKey().getArtifactId(), (String) upgrade.getValue());
                                         upgrades.add(gav);
                                     }
                                 }
@@ -528,7 +525,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         Map<String, String> declarations = catalog.getVersionDeclarations();
         Map<GroupArtifact, String> selected = new LinkedHashMap<>();
         List<MavenDownloadingException> failures = new ArrayList<>();
-        for (Map.Entry<GroupArtifact, ? extends VersionCatalog.Entry> library : catalog.getLibraryVersions().entrySet()) {
+        for (Map.Entry<GroupArtifact, VersionCatalog.Entry> library : catalog.getLibraryVersions().entrySet()) {
             GroupArtifact ga = library.getKey();
             String currentVersion = library.getValue().getResolvedVersion(declarations);
             if (currentVersion == null || !dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
@@ -926,11 +923,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 }
                                 VersionComparator versionComparator = getVersionComparator();
                                 if (versionComparator != null) {
-                                    Optional<String> finalVersion = versionComparator.upgrade(prop.getValue(), singletonList(selectedVersion));
-                                    if (!finalVersion.isPresent()) {
-                                        return prop.getTree();
-                                    }
-                                    selectedVersion = finalVersion.get();
+                                    selectedVersion = versionComparator
+                                            .upgrade(prop.getValue(), singletonList(selectedVersion))
+                                            .orElse(null);
+                                }
+                                if (selectedVersion == null) {
+                                    return prop.getTree();
                                 }
                                 return prop.withValue(selectedVersion).getTree();
                             })
@@ -964,12 +962,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     .artifactId(artifactId)
                     .get(getCursor())
                     .orElse(null);
-            if (bomEntry != null) {
-                // Only update literal versions; property-based versions are handled by UpdateProperties/UpdateVariable
-                if (bomEntry.getVersionVariable() == null) {
-                    m = updateBomEntry(bomEntry, ctx);
-                }
+            if (bomEntry != null && bomEntry.getVersionVariable() == null) {
+                m = updateBomEntry(bomEntry, ctx);
             }
+
 
             if ("ext".equals(method.getSimpleName()) && getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().endsWith("settings.gradle")) {
                 // rare case that gradle versions are set via settings.gradle ext block (only possible for Groovy DSL)
@@ -985,31 +981,28 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (!acc.versionPropNameToGA.containsKey(varName)) {
                             return a;
                         }
-                        String newVersion = safeUpdatedVersion(varName, dependencyMatcher, acc, gradleProject, executionContext);
-                        if (newVersion == null) {
+                        String selectedVersion = safeUpdatedVersion(varName, dependencyMatcher, acc, gradleProject, executionContext);
+                        if (selectedVersion == null) {
                             return a;
                         }
                         if (!(a.getAssignment() instanceof J.Literal)) {
                             return a;
                         }
                         J.Literal l = (J.Literal) a.getAssignment();
-                        if (J.Literal.isLiteralValue(l, newVersion)) {
+                        if (J.Literal.isLiteralValue(l, selectedVersion)) {
+                            return a;
+                        }
+                        VersionComparator versionComparator = getVersionComparator();
+                        String currentVersion = (String) l.getValue();
+                        //noinspection DataFlowIssue
+                        if (versionComparator != null &&
+                                !versionComparator.upgrade(currentVersion, singletonList(selectedVersion)).isPresent()) {
+                            // Would be a downgrade, don't change
                             return a;
                         }
 
-                        VersionComparator versionComparator = getVersionComparator();
-                        if (versionComparator != null) {
-                            String currentVersion = (String) l.getValue();
-                            //noinspection DataFlowIssue
-                            Optional<String> finalVersion = versionComparator.upgrade(currentVersion, singletonList(newVersion));
-                            if (!finalVersion.isPresent()) {
-                                // Would be a downgrade, don't change
-                                return a;
-                            }
-                        }
-
                         String quote = l.getValueSource() == null ? "\"" : l.getValueSource().substring(0, 1);
-                        return a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
+                        return a.withAssignment(l.withValue(selectedVersion).withValueSource(quote + selectedVersion + quote));
                     }
                 }.visitNonNull(m, ctx, getCursor().getParentTreeCursor());
             } else if ("ext".equals(m.getSimpleName())) {
@@ -1033,15 +1026,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         private J.MethodInvocation updateDependency(GradleDependency dependency, ExecutionContext ctx) {
             // Get the current version and coordinates
             String currentVersion = dependency.getDeclaredVersion();
-            String groupId = dependency.getDeclaredGroupId();
-            String artifactId = dependency.getDeclaredArtifactId();
+            String declaredGroupId = dependency.getDeclaredGroupId();
+            String declaredArtifactId = dependency.getDeclaredArtifactId();
 
-            if (groupId == null || artifactId == null) {
+            if (declaredGroupId == null || declaredArtifactId == null) {
                 return dependency.getTree();
             }
 
             // Check if we have a new version for this dependency
-            Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(groupId, artifactId));
+            Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(declaredGroupId, declaredArtifactId));
             if (scanResult instanceof Exception) {
                 // Can't mark warning on a synthetic tree, so just return unchanged
                 return dependency.getTree();
@@ -1074,7 +1067,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 String configName = dependency.getConfigurationName();
 
                 if (currentVersion == null) {
-                    GroupArtifact ga = new GroupArtifact(groupId, artifactId);
+                    GroupArtifact ga = new GroupArtifact(declaredGroupId, declaredArtifactId);
                     if (dependency.isPlatform()) {
                         selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                 .select(ga, configName, newVersion, versionPattern, ctx);
@@ -1085,7 +1078,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (managedVersion == null) {
                             return dependency.getTree();
                         }
-                        GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, managedVersion);
+                        GroupArtifactVersion gav = new GroupArtifactVersion(declaredGroupId, declaredArtifactId, managedVersion);
                         selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                 .select(gav, configName, newVersion, versionPattern, ctx);
                         if (managedVersion.equals(selectedVersion)) {
@@ -1093,7 +1086,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         }
                     }
                 } else {
-                    GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, currentVersion);
+                    GroupArtifactVersion gav = new GroupArtifactVersion(declaredGroupId, declaredArtifactId, currentVersion);
                     selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                             .select(gav, configName, newVersion, versionPattern, ctx);
                 }
@@ -1140,11 +1133,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return null;
             }
             GradleDependencyConfiguration configuration = gradleProject.getConfiguration(configName);
-            return configuration == null ? null :
-                    configuration.getPlatformManagedVersion(ga, gradleProject.getMavenRepositories(), ctx, bomGa -> {
-                        Object upgradedBomVersion = acc.gaToNewVersion.get(bomGa);
-                        return upgradedBomVersion instanceof String ? (String) upgradedBomVersion : null;
-                    });
+            if (configuration == null) {
+                return null;
+            }
+            return configuration.getPlatformManagedVersion(ga, gradleProject.getMavenRepositories(), ctx, bomGa -> {
+                Object upgradedBomVersion = acc.gaToNewVersion.get(bomGa);
+                if (upgradedBomVersion instanceof String) {
+                    return (String) upgradedBomVersion;
+                }
+                return null;
+            });
         }
 
         /**
