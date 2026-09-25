@@ -201,20 +201,33 @@ class RegistryDiscoveryTest {
     }
 
     @Test
-    void unresolvedNpmrcCredentialsAreSkippedAndRecorded() {
+    void unresolvedNpmrcCredentialsAreKeptAsWrittenAndRecorded() {
         NodeRegistries registries = RegistryDiscovery.discover(ctx(),
                 marker(npmrc(Map.of(
                         "registry", "https://corp.example/npm/",
                         "//corp.example/npm/:_authToken", "${NPM_TOKEN}"))),
                 env(Map.of()));
         NodeRegistry registry = registries.getDefaultRegistry();
-        assertThat(registry.getAuthToken()).isNull();
+        assertThat(registry.getAuthToken()).isEqualTo("${NPM_TOKEN}");
         assertThat(registry.isUnresolvedPlaceholders()).as("the URL itself is usable").isFalse();
         assertThat(registry.getUnresolvedCredentialPlaceholders()).containsExactly("${NPM_TOKEN}");
     }
 
     @Test
-    void unresolvedNpmrcCredentialsFallBackToViewCredentials() {
+    void unresolvedScopedNpmrcCredentialsAreKeptAsWritten() {
+        NodeRegistries registries = RegistryDiscovery.discover(ctx(),
+                marker(npmrc(Map.of(
+                        "@corp:registry", "https://corp.example/npm/",
+                        "//corp.example/npm/:_authToken", "${NPM_TOKEN}"))),
+                env(Map.of()));
+        NodeRegistry registry = registries.getByScope().get("@corp");
+        assertThat(registry.getAuthToken()).isEqualTo("${NPM_TOKEN}");
+        assertThat(registry.isUnresolvedPlaceholders()).isFalse();
+        assertThat(registry.getUnresolvedCredentialPlaceholders()).containsExactly("${NPM_TOKEN}");
+    }
+
+    @Test
+    void unresolvedNpmrcCredentialsStillWinOverViewCredentials() {
         ExecutionContext ctx = ctx();
         NodeExecutionContextView.view(ctx).setRegistryCredentials(List.of(
                 new NodeRegistryCredentials("corp.example", "vtok", null, null)));
@@ -224,8 +237,7 @@ class RegistryDiscoveryTest {
                         "registry", "https://corp.example/",
                         "//corp.example/:_authToken", "${NPM_TOKEN}"))),
                 env(Map.of()));
-        assertThat(registries.getDefaultRegistry().getAuthToken()).isEqualTo("vtok");
-        assertThat(registries.getDefaultRegistry().getUnresolvedCredentialPlaceholders()).containsExactly("${NPM_TOKEN}");
+        assertThat(registries.getDefaultRegistry().getAuthToken()).isEqualTo("${NPM_TOKEN}");
     }
 
     @Test

@@ -162,16 +162,16 @@ public class NpmRegistryClient {
     }
 
     /**
-     * Why a rejected request may have gone out without the {@code .npmrc} credentials: their variables
-     * were unset where the recipe ran. Empty when no credentials were skipped.
+     * Why a rejected request may not have authenticated: its {@code .npmrc} credentials reference variables
+     * that were unset where the recipe ran. Empty when every placeholder resolved.
      */
     private static String unresolvedCredentialsHint(NodeRegistry registry) {
         List<String> placeholders = registry.getUnresolvedCredentialPlaceholders();
         if (placeholders.isEmpty()) {
             return "";
         }
-        return "; .npmrc credentials for this registry were not sent because " + String.join(", ", placeholders) +
-                (placeholders.size() == 1 ? " is" : " are") + " not set in the environment the recipe runs in";
+        return "; .npmrc credentials for this registry reference " + String.join(", ", placeholders) + ", which " +
+                (placeholders.size() == 1 ? "is" : "are") + " not set in the environment the recipe runs in";
     }
 
     private static void applyAuth(HttpSender.Request.Builder builder, NodeRegistry registry) {

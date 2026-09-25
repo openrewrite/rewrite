@@ -91,9 +91,9 @@ public class NodeRegistry {
 
     /**
      * Placeholders, verbatim (e.g. {@code ${NPM_TOKEN}}), in {@code .npmrc} credentials for this registry
-     * whose variables were unset. Those credentials were skipped rather than sent half-expanded; requests
-     * fall back to host-supplied credentials or none, and the placeholders are reported if the registry
-     * then rejects them. Typical of an LST built where the variables were set and run where they are not.
+     * whose variables were unset. Like npm, those credentials are still sent as written, and the placeholders
+     * are reported if the registry rejects them. Typical of an LST built where the variables were set and run
+     * where they are not.
      */
     List<String> unresolvedCredentialPlaceholders;
 

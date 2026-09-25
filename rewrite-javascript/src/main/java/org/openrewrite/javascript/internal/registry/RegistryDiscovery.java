@@ -36,8 +36,8 @@ import static java.util.Collections.emptyList;
  * registries on the {@link NodeExecutionContextView} win outright; otherwise the marker's merged
  * {@code .npmrc} is parsed via {@link NpmConfig}, with credentials filled from the URL, then
  * host-supplied credentials, then {@code .netrc}. {@code .npmrc} credentials whose {@code ${VAR}}
- * placeholders cannot be resolved are skipped (and recorded on the registry) rather than sent.
- * Mirrors the Python {@code IndexDiscovery}.
+ * placeholders cannot be resolved are sent as written, as npm does, and the placeholders are recorded
+ * on the registry.
  */
 public final class RegistryDiscovery {
     private static final String DEFAULT_REGISTRY = "https://registry.npmjs.org/";
@@ -110,14 +110,11 @@ public final class RegistryDiscovery {
         } else {
             // 2. npmrc auth keyed by nerf-dart.
             NpmConfig.Auth auth = config.authFor(url);
-            if (auth != null && auth.unresolvedPlaceholders) {
-                // Variables set where the LST was built are usually unset where the recipe runs. Sending
-                // the literal placeholder can never authenticate, so skip these credentials and fall
-                // through to the host's, or to none if the registry allows unauthenticated reads.
-                unresolvedCredentials = auth.unresolved;
-                auth = null;
-            }
             if (auth != null) {
+                // Like npm, send the matched credentials as written even when a variable is unset where
+                // the recipe runs: a proxy may replace them, and otherwise the registry's rejection is
+                // reported with the placeholders that were not expanded.
+                unresolvedCredentials = auth.unresolved;
                 authToken = auth.authToken;
                 username = auth.username;
                 password = auth.password;

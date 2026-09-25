@@ -251,34 +251,36 @@ class NpmRegistryClientTest {
     }
 
     @Test
-    void skippedCredentialsRequestUnauthenticated() {
+    void unresolvedCredentialsAreSentAsWritten() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"versions\":{}}");
         var client = new NpmRegistryClient(sender);
+        var unresolved = new NodeRegistry(null, "https://registry.test/", "${NPM_TOKEN}", null, null, null,
+                false, null, true, false).withUnresolvedCredentialPlaceholders(singletonList("${NPM_TOKEN}"));
 
-        client.getPackument(registry().withUnresolvedCredentialPlaceholders(singletonList("${NPM_TOKEN}")), "lodash");
+        client.getPackument(unresolved, "lodash");
 
-        assertThat(sender.last().getRequestHeaders()).doesNotContainKey("Authorization");
+        assertThat(sender.last().getRequestHeaders()).containsEntry("Authorization", "Bearer ${NPM_TOKEN}");
     }
 
     @Test
-    void rejectedUnauthenticatedRequestNamesSkippedPlaceholders() {
+    void rejectedRequestNamesUnresolvedPlaceholders() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(401, "{}");
         var client = new NpmRegistryClient(sender);
-        var skipped = registry().withUnresolvedCredentialPlaceholders(List.of("${NPM_USER}", "${NPM_PASS}"));
+        var unresolved = registry().withUnresolvedCredentialPlaceholders(List.of("${NPM_USER}", "${NPM_PASS}"));
 
-        assertThatThrownBy(() -> client.getPackument(skipped, "lodash"))
+        assertThatThrownBy(() -> client.getPackument(unresolved, "lodash"))
                 .isInstanceOfSatisfying(NodeRegistryException.class, e -> {
                     assertThat(e.getReason()).isEqualTo(Reason.AUTH_FAILED);
                     assertThat(e.getMessage())
                             .startsWith("HTTP 401 from http://registry.test/lodash")
-                            .contains("${NPM_USER}, ${NPM_PASS} are not set");
+                            .contains("reference ${NPM_USER}, ${NPM_PASS}, which are not set");
                 });
     }
 
     @Test
-    void rejectedRequestWithoutSkippedCredentialsHasNoHint() {
+    void rejectedRequestWithoutUnresolvedPlaceholdersHasNoHint() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(403, "{}");
         var client = new NpmRegistryClient(sender);

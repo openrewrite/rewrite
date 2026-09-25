@@ -51,8 +51,9 @@ import static org.openrewrite.javascript.Assertions.packageLock;
 /**
  * An LST built where {@code .npmrc} credentials came from environment variables carries the
  * {@code ${VAR}} placeholders, not the secrets. Where the recipe runs, those variables are usually
- * unset, so the credentials cannot be used: regeneration falls back to unauthenticated requests
- * and, when the registry rejects them, reports the placeholder that could not be resolved.
+ * unset. As npm would, regeneration still sends the requests with the credentials as written, so a
+ * proxy that authenticates on its own can replace them, and when the registry rejects them it
+ * reports the placeholder that could not be resolved.
  */
 class NpmrcUnresolvedCredentialsLockRegenTest implements RewriteTest {
 
@@ -88,7 +89,7 @@ class NpmrcUnresolvedCredentialsLockRegenTest implements RewriteTest {
     }
 
     @Test
-    void unresolvedCredentialFallsBackToUnauthenticatedRequests() {
+    void unresolvedCredentialIsSentAsWritten() {
         routes.put("https://registry.npmjs.org/is-odd", resource("lock/npm/v3/http/is-odd"));
         routes.put("https://registry.npmjs.org/is-odd/3.0.0", resource("lock/npm/v3/http/is-odd-3.0.0"));
         routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/v3/http/is-odd-3.0.1"));
@@ -96,9 +97,10 @@ class NpmrcUnresolvedCredentialsLockRegenTest implements RewriteTest {
         rewriteRun(
                 spec -> spec.recipe(new UpgradeDependencyVersion("is-odd", null, "3.0.1")).executionContext(ctx)
                         .afterRecipe(run -> assertThat(requests)
-                                .as("no request carries the unexpanded placeholder or any credential")
+                                .as("every request carries the credential as written, as npm would send it")
                                 .isNotEmpty()
-                                .allSatisfy(r -> assertThat(r.getRequestHeaders()).doesNotContainKey("Authorization"))),
+                                .allSatisfy(r -> assertThat(r.getRequestHeaders())
+                                        .containsEntry("Authorization", "Bearer " + UNSET_TOKEN))),
                 packageJson(PKG_BEFORE, PKG_BEFORE.replace("\"is-odd\": \"3.0.0\"", "\"is-odd\": \"3.0.1\""),
                         markerWithUnresolvedToken()),
                 packageLock(resource("lock/npm/v3/before"), resource("lock/npm/v3/after"), s -> s.noTrim())
@@ -106,7 +108,7 @@ class NpmrcUnresolvedCredentialsLockRegenTest implements RewriteTest {
     }
 
     @Test
-    void rejectedFallbackRecordsUnresolvedPlaceholder() {
+    void rejectedRequestRecordsUnresolvedPlaceholder() {
         responder = request -> new HttpSender.Response(401,
                 new ByteArrayInputStream("Unauthorized".getBytes(StandardCharsets.UTF_8)), () -> {
         });
