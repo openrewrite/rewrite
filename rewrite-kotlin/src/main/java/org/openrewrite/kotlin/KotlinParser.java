@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
+import org.jetbrains.kotlin.cli.common.messages.MessageCollectorImpl;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.SyntaxErrorReporter;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
@@ -85,6 +86,7 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.jetbrains.kotlin.cli.FrontendConfigurationKeysKt.*;
@@ -197,10 +199,12 @@ public class KotlinParser implements Parser {
                     assert kotlinSource.getFirFile() != null;
                     assert kotlinSource.getFirFile().getSource() != null;
                     PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
+                    MessageCollectorImpl syntaxErrors = new MessageCollectorImpl();
                     SyntaxErrorReporter.SyntaxErrorReport report =
-                            AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, compilationMessageCollector());
+                            AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, syntaxErrors);
+                    syntaxErrors.forward(compilationMessageCollector());
                     if (report.isHasErrors()) {
-                        parsed.add(ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException()));
+                        parsed.add(ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new KotlinSyntaxException(syntaxErrors)));
                         continue;
                     }
 
@@ -568,6 +572,14 @@ public class KotlinParser implements Parser {
         configureKlibPaths(compilerConfiguration, arguments);
         configureContentRootsFromClassPath(compilerConfiguration, arguments);
         configureJdkClasspathRoots(compilerConfiguration);
+    }
+
+    private static class KotlinSyntaxException extends RuntimeException {
+        KotlinSyntaxException(MessageCollectorImpl syntaxErrors) {
+            super(syntaxErrors.getErrors().stream()
+                    .map(error -> PLAIN_FULL_PATHS.render(error.getSeverity(), error.getMessage(), error.getLocation()))
+                    .collect(joining("\n")));
+        }
     }
 
     private static String buildFilename(Input source, int index) {

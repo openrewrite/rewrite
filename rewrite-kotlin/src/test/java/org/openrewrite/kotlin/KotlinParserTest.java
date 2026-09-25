@@ -18,6 +18,7 @@ package org.openrewrite.kotlin;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.tree.ParseError;
@@ -135,6 +136,21 @@ class KotlinParserTest implements RewriteTest {
 
         assertThat(results).singleElement().isInstanceOf(ParseError.class);
         assertThat(err.toString()).doesNotContain("SyntaxError.kt");
+    }
+
+    @Test
+    void syntaxErrorsAreReportedOnParseError() {
+        List<SourceFile> results = KotlinParser.builder()
+          .build()
+          .parseInputs(singletonList(syntaxError()), null, new InMemoryExecutionContext(t -> {
+          }))
+          .collect(toList());
+
+        assertThat(results).singleElement().isInstanceOf(ParseError.class);
+        ParseExceptionResult result = results.getFirst().getMarkers().findFirst(ParseExceptionResult.class).orElseThrow();
+        assertThat(result.getMessage())
+          .contains("SyntaxError.kt:2:11: error: expecting ')'")
+          .contains("SyntaxError.kt:3:2: error: missing '}");
     }
 
     private static Parser.Input syntaxError() {
