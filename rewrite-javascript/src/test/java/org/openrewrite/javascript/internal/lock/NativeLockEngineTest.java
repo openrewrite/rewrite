@@ -858,6 +858,79 @@ class NativeLockEngineTest {
 
     /** Only npm applies overrides so far; the rest refuse rather than emit an untested lock. */
     @Test
+    void unrelatedAddIsUnaffectedByAnExistingPnpmOverride() {
+        assertUnrelatedAddSucceeds(PackageManager.Pnpm, "\"pnpm\":{\"overrides\":{\"shared\":\"^2.0.0\"}}",
+                """
+                lockfileVersion: '9.0'
+
+                settings:
+                  autoInstallPeers: true
+                  excludeLinksFromLockfile: false
+
+                importers:
+
+                  .:
+                    dependencies:
+                      alpha:
+                        specifier: ^1.0.0
+                        version: 1.0.0
+
+                packages:
+
+                  alpha@1.0.0:
+                    resolution: {integrity: sha512-ALPHA1}
+
+                  shared@2.0.0:
+                    resolution: {integrity: sha512-SHARED2}
+
+                snapshots:
+
+                  alpha@1.0.0:
+                    dependencies:
+                      shared: 2.0.0
+
+                  shared@2.0.0: {}
+                """);
+    }
+
+    @Test
+    void unrelatedAddIsUnaffectedByAnExistingYarnResolution() {
+        assertUnrelatedAddSucceeds(PackageManager.YarnClassic, "\"resolutions\":{\"shared\":\"^2.0.0\"}",
+                yarnClassicLock());
+    }
+
+    /** Refusing to parse a glob must not sink an edit it has nothing to do with: this add never touches shared. */
+    @Test
+    void unrelatedAddIsUnaffectedByAGlobResolution() {
+        assertUnrelatedAddSucceeds(PackageManager.YarnClassic, "\"resolutions\":{\"**/shared\":\"^2.0.0\"}",
+                yarnClassicLock());
+    }
+
+    @Test
+    void unrelatedAddIsUnaffectedByAnExistingBunOverride() {
+        assertUnrelatedAddSucceeds(PackageManager.Bun, "\"overrides\":{\"shared\":\"^2.0.0\"}",
+                """
+                {
+                  "lockfileVersion": 1,
+                  "configVersion": 1,
+                  "workspaces": {
+                    "": {
+                      "name": "x",
+                      "dependencies": {
+                        "alpha": "^1.0.0",
+                      },
+                    },
+                  },
+                  "packages": {
+                    "alpha": ["alpha@1.0.0", "", { "dependencies": { "shared": "^1.0.0" } }, "sha512-ALPHA1"],
+
+                    "shared": ["shared@2.0.0", "", {}, "sha512-SHARED2"],
+                  }
+                }
+                """);
+    }
+
+    @Test
     void anAppliedOverrideIsRefusedOnOtherPackageManagers() {
         routes.put("https://registry.npmjs.org/alpha",
                 "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
@@ -1497,6 +1570,91 @@ class NativeLockEngineTest {
                 }
                 """;
     }
+
+    /**
+     * Add beta to a project whose override is already applied in the lock. The override does not name beta,
+     * so diverting this would trade a correct in-place patch for a refusal on the managers that cannot resolve
+     * overrides at all. Yarn Berry is absent: its checksums come from the real tarball, which routes cannot serve.
+     */
+    private void assertUnrelatedAddSucceeds(PackageManager pm, String overrides, String lock) {
+        unrelatedAddRoutes();
+        Result result = regen(pm,
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}," + overrides + "}",
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\",\"beta\":\"^1.0.0\"}," + overrides + "}",
+                lock);
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("beta");
+    }
+
+    /** The other direction: a glob that does name what the edit adds still routes to the scope that refuses it. */
+    @Test
+    void addReachingAGlobResolutionStillFailsLoud() {
+        unrelatedAddRoutes();
+        String ov = "\"resolutions\":{\"**/beta\":\"^1.0.0\"}";
+        Result result = regen(PackageManager.YarnClassic,
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}," + ov + "}",
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\",\"beta\":\"^1.0.0\"}," + ov + "}",
+                yarnClassicLock());
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("**/beta is not a plain package name");
+    }
+
+    /** A selector bounding no name could select anything, so no edit can be shown to be unrelated to it. */
+    @Test
+    void addUnderAnUnboundedResolutionFailsLoud() {
+        unrelatedAddRoutes();
+        String ov = "\"resolutions\":{\"*\":\"^2.0.0\"}";
+        Result result = regen(PackageManager.YarnClassic,
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}," + ov + "}",
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\",\"beta\":\"^1.0.0\"}," + ov + "}",
+                yarnClassicLock());
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("* is not a plain package name");
+    }
+
+    private static String yarnClassicLock() {
+        return """
+                # THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.
+                # yarn lockfile v1
+
+
+                alpha@^1.0.0:
+                  version "1.0.0"
+                  resolved "https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz"
+                  integrity sha512-ALPHA1
+                  dependencies:
+                    shared "^1.0.0"
+
+                shared@^1.0.0:
+                  version "2.0.0"
+                  resolved "https://registry.npmjs.org/shared/-/shared-2.0.0.tgz"
+                  integrity sha512-SHARED2
+                """;
+    }
+
+    private void unrelatedAddRoutes() {
+        routes.put("https://registry.npmjs.org/alpha",
+                "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/alpha/1.0.0",
+                "{\"name\":\"alpha\",\"version\":\"1.0.0\",\"dependencies\":{\"shared\":\"^1.0.0\"},\"dist\":{" +
+                        "\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\"," +
+                        "\"integrity\":\"sha512-ALPHA1\",\"shasum\":\"aaaa111111111111111111111111111111111111\"}}");
+        routes.put("https://registry.npmjs.org/beta",
+                "{\"name\":\"beta\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/beta/1.0.0",
+                "{\"name\":\"beta\",\"version\":\"1.0.0\",\"dist\":{" +
+                        "\"tarball\":\"https://registry.npmjs.org/beta/-/beta-1.0.0.tgz\"," +
+                        "\"integrity\":\"sha512-BETA1\",\"shasum\":\"bbbb222222222222222222222222222222222222\"}}");
+        routes.put("https://registry.npmjs.org/shared",
+                "{\"name\":\"shared\",\"dist-tags\":{},\"versions\":{\"1.5.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/shared/2.0.0",
+                "{\"name\":\"shared\",\"version\":\"2.0.0\",\"dist\":{" +
+                        "\"tarball\":\"https://registry.npmjs.org/shared/-/shared-2.0.0.tgz\"," +
+                        "\"integrity\":\"sha512-SHARED2\",\"shasum\":\"cccc333333333333333333333333333333333333\"}}");
+    }
+
 
     private static String resource(String path) {
         try (InputStream in = NativeLockEngineTest.class.getClassLoader().getResourceAsStream(path)) {

@@ -28,7 +28,6 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
-import org.openrewrite.javascript.internal.PackageJsonOverrides;
 import org.openrewrite.javascript.internal.registry.AbbreviatedPackument;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
@@ -55,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.*;
@@ -180,13 +180,6 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                     "change is outside declared dependencies (e.g. overrides/resolutions) and requires resolution");
         }
-        // This scope resolves an added dependency's closure without consulting overrides, so it can leave a
-        // lock that disagrees with the manifest. The whole-closure scope is override-aware and equally exact.
-        if (!declaredOverrides(pm, editedPackageJson).ranges.isEmpty()) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                    "manifest declares overrides, which the per-dependency scope does not apply");
-        }
-
         Path lockPath = lockPath(pm, packageJsonPath);
         String memberImporterDir = addImporterDir(pm, existingLock, packageJsonPath);
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
@@ -195,6 +188,15 @@ public final class NativeLockEngine {
         }
         if (pm == PackageManager.YarnBerry) {
             edits = enrichBerryChecksums(edits, existingLock, registries, client);
+        }
+        // resolveEdit does not consult overrides, so an edit that reaches an overridden package would lock it
+        // at its registry version. One the edit never touches is left alone: diverting it only loses a patch.
+        Set<String> overridden = overriddenNames(pm, editedPackageJson);
+        for (LockEditSet.PackageEdit edit : edits) {
+            if (overridden == null || overridden.contains(edit.getName())) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
+                        "the edit reaches " + edit.getName() + ", which the manifest overrides");
+            }
         }
 
         LockEditSet editSet = new LockEditSet(existingLock, lockPath, pm, editedPackageJson, edits);
@@ -413,24 +415,63 @@ public final class NativeLockEngine {
      * writes; it is applied globally and {@code requireOverridesHold} proves the equivalence afterwards.
      */
     private static Overrides declaredOverrides(PackageManager pm, String manifestJson) {
+        JsonNode node = overridesNode(pm, manifestJson);
+        if (node == null) {
+            return new Overrides(emptyMap(), emptyMap());
+        }
+        Map<String, String> overrides = new LinkedHashMap<>();
         Map<String, String> scopedParent = new LinkedHashMap<>();
+        collectOverrides(node, null, overrides, scopedParent);
+        return new Overrides(overrides, scopedParent);
+    }
+
+    /** The manifest's override object for {@code pm}, or {@code null} when it declares none usable. */
+    private static @Nullable JsonNode overridesNode(PackageManager pm, String manifestJson) {
         try {
             JsonNode root = JSON.readTree(manifestJson);
             JsonNode node = pm == PackageManager.Pnpm ?
                     (root.path("pnpm").isObject() ? root.path("pnpm").get("overrides") : null) :
                     root.get(pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic ?
                             "resolutions" : "overrides");
-            if (node == null || !node.isObject() || node.isEmpty()) {
-                return new Overrides(emptyMap(), emptyMap());
-            }
-            Map<String, String> overrides = new LinkedHashMap<>();
-            collectOverrides(node, null, overrides, scopedParent);
-            return new Overrides(overrides, scopedParent);
-        } catch (EngineFailure ef) {
-            throw ef;
+            return node == null || !node.isObject() || node.isEmpty() ? null : node;
         } catch (Exception e) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest overrides");
         }
+    }
+
+    /** A name a key could be selecting. Globs and separators match nothing; a version selector yields a token of its own. */
+    private static final Pattern OVERRIDE_KEY_NAME = Pattern.compile("(?:@[A-Za-z0-9._~-]+/)?[A-Za-z0-9._~-]+");
+
+    /**
+     * Every package name the declared override keys might be selecting, including the glob and path forms
+     * {@link #collectOverrides} refuses to apply. Only routes the edit, never applies anything, so it reads
+     * keys without judging them and errs broad: a spurious name costs one diversion, a missed one costs a
+     * lock patched without its override. {@code null} once a key bounds no name, so nothing can be ruled out.
+     */
+    private static @Nullable Set<String> overriddenNames(PackageManager pm, String manifestJson) {
+        Set<String> names = new LinkedHashSet<>();
+        return collectOverrideKeyNames(overridesNode(pm, manifestJson), names) ? names : null;
+    }
+
+    /** @return false once a key bounds no name at all, since it could then be selecting any package. */
+    private static boolean collectOverrideKeyNames(@Nullable JsonNode node, Set<String> names) {
+        if (node == null || !node.isObject()) {
+            return true;
+        }
+        Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> f = fields.next();
+            Matcher m = OVERRIDE_KEY_NAME.matcher(f.getKey());
+            boolean bounded = false;
+            while (m.find()) {
+                names.add(m.group());
+                bounded = true;
+            }
+            if (!bounded || !collectOverrideKeyNames(f.getValue(), names)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
