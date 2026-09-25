@@ -217,7 +217,7 @@ public class PackageJsonHelper {
         return null;
     }
 
-    static @Nullable String literalString(@Nullable Object node) {
+    private static @Nullable String literalString(@Nullable Object node) {
         if (node instanceof Json.Literal) {
             Object value = ((Json.Literal) node).getValue();
             return value == null ? null : value.toString();
@@ -708,8 +708,18 @@ public class PackageJsonHelper {
 
     /** The specifier protocol this manifest declares {@code name} with, or null if it declares a version. */
     static @Nullable String declaredProtocolReference(Json.Document doc, String name) {
+        return dependencySpecifierProtocol(declaredVersions(doc).get(name));
+    }
+
+    /**
+     * Every dependency this manifest declares, as name to raw value, across all declared scopes. The
+     * value is whatever the manifest says: a version constraint, or a specifier protocol standing in for
+     * one. A name declared in more than one scope keeps its first declaration.
+     */
+    static Map<String, String> declaredVersions(Json.Document doc) {
+        Map<String, String> declared = new LinkedHashMap<>();
         if (!(doc.getValue() instanceof Json.JsonObject)) {
-            return null;
+            return declared;
         }
         for (Json rootMember : ((Json.JsonObject) doc.getValue()).getMembers()) {
             if (!(rootMember instanceof Json.Member)) continue;
@@ -722,12 +732,14 @@ public class PackageJsonHelper {
             for (Json child : ((Json.JsonObject) scope.getValue()).getMembers()) {
                 if (!(child instanceof Json.Member)) continue;
                 Json.Member dependency = (Json.Member) child;
-                if (name.equals(literalString(dependency.getKey()))) {
-                    return dependencySpecifierProtocol(literalString(dependency.getValue()));
+                String name = literalString(dependency.getKey());
+                String value = literalString(dependency.getValue());
+                if (name != null && value != null) {
+                    declared.putIfAbsent(name, value);
                 }
             }
         }
-        return null;
+        return declared;
     }
 
     /**
@@ -768,7 +780,7 @@ public class PackageJsonHelper {
         return Pattern.compile(regex.toString());
     }
 
-    static boolean isDeclaredScope(String name) {
+    private static boolean isDeclaredScope(String name) {
         return "dependencies".equals(name)
                 || "devDependencies".equals(name)
                 || "peerDependencies".equals(name)
