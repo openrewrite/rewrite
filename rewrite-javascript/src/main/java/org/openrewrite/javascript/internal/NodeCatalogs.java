@@ -25,6 +25,7 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
 import java.util.function.UnaryOperator;
+import java.util.regex.Pattern;
 
 
 /**
@@ -49,6 +50,18 @@ public class NodeCatalogs {
     private static final String CATALOG_PROTOCOL = "catalog:";
     private static final String DEFAULT_CATALOG_KEY = "catalog";
     private static final String NAMED_CATALOGS_KEY = "catalogs";
+
+    /**
+     * Plain scalars YAML resolves to something other than a string. A bare-major or major.minor npm
+     * range (`2`, `2.0`) is the reachable case; the rest are here so the rule is the general one rather
+     * than the cases that happened to come up.
+     */
+    private static final Pattern YAML_NON_STRING = Pattern.compile(
+            "[-+]?(\\.[0-9][0-9_]*|[0-9][0-9_]*(\\.[0-9_]*)?)([eE][-+]?[0-9]+)?" +
+                    "|[-+]?0[xXbBoO][0-9a-fA-F_]+" +
+                    "|[-+]?\\.(inf|Inf|INF)|\\.(nan|NaN|NAN)" +
+                    "|~|[nN]ull|NULL" +
+                    "|[tT]rue|TRUE|[fF]alse|FALSE|[yY]es|YES|[nN]o|NO|[oO]n|ON|[oO]ff|OFF");
 
     /** Characters YAML reads as an indicator when a plain scalar opens with one. */
     private static final String PLAIN_SCALAR_INDICATORS = "-?:,[]{}#&*!|>'\"%@`";
@@ -211,7 +224,8 @@ public class NodeCatalogs {
     /**
      * Whether a value can stand unquoted where the old one did. An npm range may open with a character
      * YAML reads as an indicator, so keeping the old scalar's style would emit something that no longer
-     * parses: `>=2.0.0` reads as a folded block scalar and `*` as an alias.
+     * parses: `>=2.0.0` reads as a folded block scalar and `*` as an alias. It can also be a value YAML
+     * parses but resolves to another type, leaving a number where the catalog wants a version.
      * <p>
      * rewrite-yaml knows this rule too, but only in its `internal` package, which is not API and may
      * move without notice. The rule is short and stable enough to state here rather than couple to it.
@@ -224,7 +238,7 @@ public class NodeCatalogs {
             return false;
         }
         // `: ` opens a mapping value and ` #` a comment, wherever they appear.
-        if (value.contains(": ") || value.contains(" #")) {
+        if (value.contains(": ") || value.contains(" #") || YAML_NON_STRING.matcher(value).matches()) {
             return false;
         }
         for (int i = 0; i < value.length(); i++) {
