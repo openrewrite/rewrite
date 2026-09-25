@@ -123,6 +123,22 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
     @Nullable ResolutionStatus resolutionStatus;
 
     /**
+     * Non-standard import paths the toolchain could not map to a providing module.
+     * Populated when {@link #resolutionStatus} is {@link ResolutionStatus#INCOMPLETE};
+     * empty otherwise. Names the offending imports so a recipe that must skip
+     * graph-dependent work (e.g. go mod tidy) can report exactly what blocked it.
+     * Null when read from an LST serialized before this field existed.
+     */
+    @Nullable List<String> unresolvedImports;
+
+    /**
+     * The toolchain/network failure reason when the build list could not be obtained
+     * at all. Populated when {@link #resolutionStatus} is {@link ResolutionStatus#GO_SUM_ONLY};
+     * it names the offending modules when the toolchain reported them. Null otherwise.
+     */
+    @Nullable String resolutionError;
+
+    /**
      * Whether the resolved build list is trustworthy.
      */
     public enum ResolutionStatus {
@@ -195,6 +211,9 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                 PackageModule::getImportPath,
                 pm -> pm.rpcSend(pm, q));
         q.getAndSend(after, r -> r.getResolutionStatus() == null ? null : r.getResolutionStatus().name());
+        q.getAndSendList(after, r -> r.getUnresolvedImports() != null ? r.getUnresolvedImports() : emptyList(),
+                s -> s, s -> q.getAndSend(s, x -> x));
+        q.getAndSend(after, GoResolutionResult::getResolutionError);
     }
 
     @Override
@@ -212,7 +231,10 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                 .withResolvedDependencies(q.receiveList(before.resolvedDependencies, r -> r.rpcReceive(r, q)))
                 .withPackageModules(q.receiveList(before.packageModules, pm -> pm.rpcReceive(pm, q)))
                 .withResolutionStatus(q.receiveAndGet(before.resolutionStatus,
-                        (String s) -> s == null || s.isEmpty() ? null : ResolutionStatus.valueOf(s)));
+                        (String s) -> s == null || s.isEmpty() ? null : ResolutionStatus.valueOf(s)))
+                .withUnresolvedImports(q.receiveList(before.unresolvedImports,
+                        s -> q.<String, String>receiveAndGet(s, java.util.function.Function.identity())))
+                .withResolutionError(q.receive(before.resolutionError));
     }
 
     /**

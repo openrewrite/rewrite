@@ -62,6 +62,16 @@ type GoResolutionResult struct {
 	// Graph-dependent recipes (e.g. go mod tidy) must treat any value other than
 	// GoResolutionResolved as a signal that ResolvedDependencies is unreliable.
 	ResolutionStatus GoResolutionStatus
+	// UnresolvedImports lists the non-standard import paths the toolchain could not
+	// map to a providing module. Populated when ResolutionStatus is
+	// GoResolutionIncomplete; empty otherwise. It names the offending imports so a
+	// recipe that must skip graph-dependent work can report exactly what blocked it.
+	UnresolvedImports []string
+	// ResolutionError is the toolchain/network failure reason when the build list
+	// could not be obtained at all. Populated when ResolutionStatus is
+	// GoResolutionGoSumOnly; it names the offending modules when the toolchain
+	// reported them. Empty otherwise.
+	ResolutionError string
 }
 
 func (m GoResolutionResult) ID() uuid.UUID { return m.Ident }
