@@ -2224,18 +2224,20 @@ class KotlinTypeMappingTest {
                       "WithCompanion", "WithCompanion",
                       "Nested", "Outer$Nested"
                     ), "java.lang.Object");
-                    new KotlinIsoVisitor<Integer>() {
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
                         @Override
-                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                        public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean found) {
                             if ("NoCompanion".equals(identifier.getSimpleName())) {
                                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(identifier.getType());
                                 assertThat(type.getFullyQualifiedName()).isEqualTo("NoCompanion");
                                 assertThat(type.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
                                 assertThat(type.getMembers()).extracting(JavaType.Variable::getName).containsExactly("A");
+                                found.set(true);
                             }
-                            return super.visitIdentifier(identifier, p);
+                            return super.visitIdentifier(identifier, found);
                         }
-                    }.visit(cu, 0);
+                    }.reduce(cu, new AtomicBoolean());
+                    assertThat(found.get()).isTrue();
                 })
               ),
               kotlin(
@@ -2319,18 +2321,17 @@ class KotlinTypeMappingTest {
                       "E", "java.lang.IllegalStateException",
                       "Exception", "java.lang.Exception"
                     );
-                    Set<String> seen = new HashSet<>();
-                    new KotlinIsoVisitor<Integer>() {
+                    Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
                         @Override
-                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer p) {
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<String> seen) {
                             if (memberRef.getContaining() instanceof J.Identifier id) {
                                 assertThat(TypeUtils.asFullyQualified(id.getType()).getFullyQualifiedName())
                                   .isEqualTo(expected.get(id.getSimpleName()));
                                 seen.add(id.getSimpleName());
                             }
-                            return super.visitMemberReference(memberRef, p);
+                            return super.visitMemberReference(memberRef, seen);
                         }
-                    }.visit(cu, 0);
+                    }.reduce(cu, new HashSet<>());
                     assertThat(seen).containsExactlyInAnyOrderElementsOf(expected.keySet());
                 })
               )
@@ -2338,10 +2339,9 @@ class KotlinTypeMappingTest {
         }
 
         private static void assertQualifierTypes(K.CompilationUnit cu, Map<String, String> expectedFqnBySimpleName, String supertype) {
-            Set<String> seen = new HashSet<>();
-            new KotlinIsoVisitor<Integer>() {
+            Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
                 @Override
-                public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> seen) {
                     String expectedFqn = expectedFqnBySimpleName.get(identifier.getSimpleName());
                     if (expectedFqn != null) {
                         JavaType.FullyQualified type = TypeUtils.asFullyQualified(identifier.getType());
@@ -2357,9 +2357,9 @@ class KotlinTypeMappingTest {
                           .doesNotContain("create", "toString");
                         seen.add(identifier.getSimpleName());
                     }
-                    return super.visitIdentifier(identifier, p);
+                    return super.visitIdentifier(identifier, seen);
                 }
-            }.visit(cu, 0);
+            }.reduce(cu, new HashSet<>());
             assertThat(seen).containsExactlyInAnyOrderElementsOf(expectedFqnBySimpleName.keySet());
         }
     }
