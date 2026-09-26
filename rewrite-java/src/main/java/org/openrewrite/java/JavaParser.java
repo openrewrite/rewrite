@@ -249,6 +249,7 @@ public interface JavaParser extends Parser {
 
         protected Charset charset = Charset.defaultCharset();
         protected boolean logCompilationWarningsAndErrors = false;
+        protected boolean typeAttribution = true;
         protected final List<NamedStyles> styles = new ArrayList<>();
 
         public Builder() {
@@ -257,6 +258,15 @@ public interface JavaParser extends Parser {
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
+            return (B) this;
+        }
+
+        /**
+         * When false, javac stops after entering symbols: declarations are typed, but expressions are not.
+         * Attributing code whose dependencies are missing can take hours in javac's error recovery.
+         */
+        public B typeAttribution(boolean typeAttribution) {
+            this.typeAttribution = typeAttribution;
             return (B) this;
         }
 
