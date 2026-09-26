@@ -21,7 +21,6 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.service.SourcePositionService;
@@ -31,7 +30,6 @@ import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
@@ -58,7 +56,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public WrappingAndBracesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
+        this(StyleHelper.getStyle(SpacesStyle.class, styles, (Supplier<SpacesStyle>) IntelliJ::spaces), StyleHelper.getStyle(WrappingAndBracesStyle.class, styles, (Supplier<WrappingAndBracesStyle>) IntelliJ::wrappingAndBraces), stopAfter);
     }
 
     public WrappingAndBracesVisitor(SpacesStyle spacesStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {
@@ -660,14 +658,5 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             // Handle newly introduced method calls on style that are not part of lst yet
             return defaultValue;
         }
-    }
-
-    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return StyleHelper.merge(defaultStyle.get(), style);
-        }
-        return defaultStyle.get();
     }
 }

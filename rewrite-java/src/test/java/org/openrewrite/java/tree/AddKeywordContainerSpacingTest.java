@@ -171,7 +171,7 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
                   J.VariableDeclarations decl = new J.VariableDeclarations(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY,
                           emptyList(), emptyList(),
-                          acType, null, emptyList(),
+                          acType, null,
                           singletonList(new JRightPadded<>(namedVar, Space.EMPTY, Markers.EMPTY)));
                   J.Try.Resource resource = new J.Try.Resource(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY, decl, false);
