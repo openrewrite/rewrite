@@ -117,21 +117,6 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		return nil, nil
 	}
 
-	// Filter out files excluded by the build context — `//go:build` /
-	// `// +build` constraints and OS/arch filename suffixes. Skipped
-	// files don't appear in the output at all (they're as if they
-	// weren't passed in).
-	filtered := make([]FileInput, 0, len(files))
-	for _, f := range files {
-		if MatchBuildContext(gp.BuildContext, filepath.Base(f.Path), f.Content) {
-			filtered = append(filtered, f)
-		}
-	}
-	files = filtered
-	if len(files) == 0 {
-		return nil, nil
-	}
-
 	fset := token.NewFileSet()
 	asts := make([]*ast.File, 0, len(files))
 	for _, f := range files {
@@ -140,6 +125,22 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 			return nil, &PackageParseError{Path: f.Path, Err: err}
 		}
 		asts = append(asts, a)
+	}
+
+	// Every file is mapped to a CompilationUnit, but only the files matching
+	// the build context form the set type-checking sees. Two files selected
+	// by mutually exclusive constraints (foo_linux.go / foo_windows.go) both
+	// declare the package's symbols; feeding both to go/types would report
+	// them as redeclared. Files outside the primary context keep their syntax
+	// and carry a BuildConstraint marker, but their identifiers stay
+	// unattributed.
+	primary := make([]bool, len(files))
+	primaryAsts := make([]*ast.File, 0, len(files))
+	for i, f := range files {
+		if MatchBuildContext(gp.BuildContext, filepath.Base(f.Path), f.Content) {
+			primary[i] = true
+			primaryAsts = append(primaryAsts, asts[i])
+		}
 	}
 
 	typeInfo := &types.Info{
@@ -154,7 +155,7 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 	}
 	// Reasons the package lost part of its type attribution.
 	var partial []string
-	if !gp.ParseOnly {
+	if !gp.ParseOnly && len(primaryAsts) > 0 {
 		// types.Config reads a nil Importer as resolving nothing. Wrapping one
 		// would hand it an interface holding a nil pointer, which reads as set.
 		imp := gp.Importer
@@ -170,17 +171,17 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 			Error: func(error) {},
 		}
 
-		// Use the first file's package name as the type-checker hint;
+		// Use the first primary file's package name as the type-checker hint;
 		// types.Config.Check validates that all files agree.
 		pkgName := "main"
-		if asts[0].Name != nil {
-			pkgName = asts[0].Name.Name
+		if primaryAsts[0].Name != nil {
+			pkgName = primaryAsts[0].Name.Name
 		}
-		recovered := checkTypes(&conf, pkgName, fset, asts, typeInfo)
+		recovered := checkTypes(&conf, pkgName, fset, primaryAsts, typeInfo)
 		if resilient != nil {
 			partial = append(partial, resilient.failures...)
 		}
-		partial = append(partial, degradedImports(gp.Importer, asts)...)
+		partial = append(partial, degradedImports(gp.Importer, primaryAsts)...)
 		if recovered != nil {
 			partial = append(partial, fmt.Sprintf("type check ended early: %v", recovered))
 		}
@@ -189,6 +190,11 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 	// Every compilation unit of the package shares one string: they say the
 	// same thing, and each holds it for as long as the tree lives.
 	reason := strings.Join(partial, "; ")
+	// Files outside the primary context are not type-checked at all; the marker
+	// tells a recipe an absent type there means "not resolved" rather than
+	// "no such type".
+	excludedReason := fmt.Sprintf("file excluded from the %s/%s build context; not type-checked",
+		gp.BuildContext.GOOS, gp.BuildContext.GOARCH)
 
 	mapper := newTypeMapper()
 	cus := make([]*golang.CompilationUnit, 0, len(files))
@@ -203,8 +209,17 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 			mapper:   mapper,
 		}
 		cu := ctx.mapFile(asts[i], f.Path)
-		if reason != "" {
-			cu.Markers = java.AddMarker(cu.Markers, golang.NewPartialTypeAttribution(reason))
+		if bc := FileBuildConstraints(filepath.Base(f.Path), f.Content); !bc.IsEmpty() {
+			cu.Markers = java.AddMarker(cu.Markers, golang.NewBuildConstraint(bc.Constraint, bc.GOOS, bc.GOARCH))
+		}
+		if !gp.ParseOnly {
+			if primary[i] {
+				if reason != "" {
+					cu.Markers = java.AddMarker(cu.Markers, golang.NewPartialTypeAttribution(reason))
+				}
+			} else {
+				cu.Markers = java.AddMarker(cu.Markers, golang.NewPartialTypeAttribution(excludedReason))
+			}
 		}
 		cus = append(cus, cu)
 	}

@@ -21,24 +21,37 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// parsedNames returns the file names included by ParsePackage for the
-// given build context — the names of files that survived `//go:build`
-// and filename-suffix constraint evaluation.
-func parsedNames(t *testing.T, buildCtx build.Context, files []parser.FileInput) []string {
+// parsePackage parses files under a build context and returns the resulting
+// CompilationUnits keyed by source path. Every input file is kept, so this
+// map has one entry per input.
+func parsePackage(t *testing.T, buildCtx build.Context, files []parser.FileInput) map[string]*golang.CompilationUnit {
 	t.Helper()
 	p := parser.NewGoParserWithBuildContext(buildCtx)
 	cus, err := p.ParsePackage(files)
 	require.NoError(t, err, "ParsePackage")
-	out := make([]string, 0, len(cus))
+	byPath := make(map[string]*golang.CompilationUnit, len(cus))
 	for _, cu := range cus {
-		out = append(out, cu.SourcePath)
+		byPath[cu.SourcePath] = cu
+	}
+	return byPath
+}
+
+// parsedNames returns the file names ParsePackage produced, sorted. With
+// cross-platform parsing no file is dropped, so this is every input.
+func parsedNames(t *testing.T, buildCtx build.Context, files []parser.FileInput) []string {
+	t.Helper()
+	byPath := parsePackage(t, buildCtx, files)
+	out := make([]string, 0, len(byPath))
+	for path := range byPath {
+		out = append(out, path)
 	}
 	sort.Strings(out)
 	return out
@@ -51,109 +64,87 @@ func ctx(goos, goarch string) build.Context {
 	return c
 }
 
-// Case 1: //go:build linux — included on Linux, excluded on macOS.
-func TestBuildTags_GoBuildLinuxOnly(t *testing.T) {
+func buildConstraint(t *testing.T, cu *golang.CompilationUnit) *golang.BuildConstraint {
+	t.Helper()
+	require.NotNil(t, cu, "compilation unit")
+	return java.FindMarker[golang.BuildConstraint](cu.Markers)
+}
+
+// Every input is parsed regardless of build context; nothing is dropped.
+func TestBuildTags_KeepsEveryFile(t *testing.T) {
+	files := []parser.FileInput{
+		{Path: "main.go", Content: "package p\n\nfunc Main() {}\n"},
+		{Path: "lin.go", Content: "//go:build linux\n\npackage p\n\nfunc Lin() {}\n"},
+		{Path: "win.go", Content: "//go:build windows\n\npackage p\n\nfunc Win() {}\n"},
+	}
+	want := []string{"lin.go", "main.go", "win.go"}
+	assert.Equal(t, want, parsedNames(t, ctx("linux", "amd64"), files), "on linux")
+	assert.Equal(t, want, parsedNames(t, ctx("darwin", "arm64"), files), "on darwin")
+}
+
+// A `//go:build` constraint is recorded verbatim on the file that declares it;
+// an unconstrained file carries no marker.
+func TestBuildTags_GoBuildRecorded(t *testing.T) {
 	files := []parser.FileInput{
 		{Path: "main.go", Content: "package p\n\nfunc Main() {}\n"},
 		{Path: "lin.go", Content: "//go:build linux\n\npackage p\n\nfunc Lin() {}\n"},
 	}
-	if got := parsedNames(t, ctx("linux", "amd64"), files); !equal(got, []string{"lin.go", "main.go"}) {
-		t.Errorf("on linux: got %v, want [lin.go main.go]", got)
-	}
-	if got := parsedNames(t, ctx("darwin", "amd64"), files); !equal(got, []string{"main.go"}) {
-		t.Errorf("on darwin: got %v, want [main.go]", got)
-	}
+	byPath := parsePackage(t, ctx("linux", "amd64"), files)
+
+	assert.Nil(t, buildConstraint(t, byPath["main.go"]), "unconstrained file")
+	lin := buildConstraint(t, byPath["lin.go"])
+	require.NotNil(t, lin, "constrained file")
+	assert.Contains(t, lin.Constraint, "//go:build linux")
 }
 
-// Case 2: filename suffix matching. `_linux.go`, `_amd64.go`, and
-// `_linux_amd64.go` exclude themselves on the wrong platform.
-func TestBuildTags_FilenameSuffix(t *testing.T) {
+// Filename suffixes are captured as GOOS/GOARCH: `_linux.go`, `_amd64.go`,
+// and `_linux_amd64.go`.
+func TestBuildTags_FilenameSuffixRecorded(t *testing.T) {
 	files := []parser.FileInput{
-		{Path: "main.go", Content: "package p\n\nfunc Main() {}\n"},
 		{Path: "extra_linux.go", Content: "package p\n\nfunc Lin() {}\n"},
 		{Path: "extra_amd64.go", Content: "package p\n\nfunc Amd() {}\n"},
 		{Path: "extra_linux_amd64.go", Content: "package p\n\nfunc Both() {}\n"},
 	}
-	got := parsedNames(t, ctx("linux", "amd64"), files)
-	want := []string{"extra_amd64.go", "extra_linux.go", "extra_linux_amd64.go", "main.go"}
-	assert.True(t, equal(got, want), "on linux/amd")
+	byPath := parsePackage(t, ctx("darwin", "arm64"), files)
 
-	got = parsedNames(t, ctx("darwin", "arm64"), files)
-	want = []string{"main.go"}
-	assert.True(t, equal(got, want), "on darwin/arm")
+	os := buildConstraint(t, byPath["extra_linux.go"])
+	require.NotNil(t, os)
+	assert.Equal(t, "linux", os.GOOS)
+	assert.Empty(t, os.GOARCH)
+
+	arch := buildConstraint(t, byPath["extra_amd64.go"])
+	require.NotNil(t, arch)
+	assert.Empty(t, arch.GOOS)
+	assert.Equal(t, "amd64", arch.GOARCH)
+
+	both := buildConstraint(t, byPath["extra_linux_amd64.go"])
+	require.NotNil(t, both)
+	assert.Equal(t, "linux", both.GOOS)
+	assert.Equal(t, "amd64", both.GOARCH)
 }
 
-// Case 3: combined constraints — `//go:build linux && amd64`.
-func TestBuildTags_CombinedConstraint(t *testing.T) {
+// Legacy `// +build` syntax is recognized and recorded like `//go:build`.
+func TestBuildTags_LegacyPlusBuildRecorded(t *testing.T) {
 	files := []parser.FileInput{
-		{Path: "main.go", Content: "package p\n\nfunc Main() {}\n"},
-		{Path: "both.go", Content: "//go:build linux && amd64\n\npackage p\n\nfunc Both() {}\n"},
-	}
-	if got := parsedNames(t, ctx("linux", "amd64"), files); !equal(got, []string{"both.go", "main.go"}) {
-		t.Errorf("linux/amd64: got %v", got)
-	}
-	if got := parsedNames(t, ctx("linux", "arm64"), files); !equal(got, []string{"main.go"}) {
-		t.Errorf("linux/arm64: got %v", got)
-	}
-	if got := parsedNames(t, ctx("darwin", "amd64"), files); !equal(got, []string{"main.go"}) {
-		t.Errorf("darwin/amd64: got %v", got)
-	}
-}
-
-// Case 4: negated constraints — `//go:build !windows`.
-func TestBuildTags_NegatedConstraint(t *testing.T) {
-	files := []parser.FileInput{
-		{Path: "main.go", Content: "package p\n\nfunc Main() {}\n"},
-		{Path: "nowin.go", Content: "//go:build !windows\n\npackage p\n\nfunc NoWin() {}\n"},
-	}
-	if got := parsedNames(t, ctx("windows", "amd64"), files); !equal(got, []string{"main.go"}) {
-		t.Errorf("on windows: got %v", got)
-	}
-	if got := parsedNames(t, ctx("linux", "amd64"), files); !equal(got, []string{"main.go", "nowin.go"}) {
-		t.Errorf("on linux: got %v", got)
-	}
-}
-
-// Case 5: legacy `// +build` syntax — still recognized.
-func TestBuildTags_LegacyPlusBuild(t *testing.T) {
-	files := []parser.FileInput{
-		{Path: "main.go", Content: "package p\n\nfunc Main() {}\n"},
 		{Path: "lin.go", Content: "// +build linux\n\npackage p\n\nfunc Lin() {}\n"},
 	}
-	if got := parsedNames(t, ctx("linux", "amd64"), files); !equal(got, []string{"lin.go", "main.go"}) {
-		t.Errorf("on linux: got %v", got)
-	}
-	if got := parsedNames(t, ctx("darwin", "amd64"), files); !equal(got, []string{"main.go"}) {
-		t.Errorf("on darwin: got %v", got)
-	}
+	byPath := parsePackage(t, ctx("darwin", "amd64"), files)
+	lin := buildConstraint(t, byPath["lin.go"])
+	require.NotNil(t, lin)
+	assert.Contains(t, lin.Constraint, "+build linux")
 }
 
-// Case 6: mixed filename + //go:build. Filename says linux, content
-// constraint says amd64; the file is included only when BOTH match.
-func TestBuildTags_MixedFilenameAndGoBuild(t *testing.T) {
+// A file matching the build context is type-checked; a file the context
+// excludes keeps its syntax but is left unattributed and marked accordingly.
+func TestBuildTags_OnlyMatchingFilesAreTypeChecked(t *testing.T) {
 	files := []parser.FileInput{
-		{Path: "main.go", Content: "package p\n\nfunc Main() {}\n"},
-		{Path: "x_linux.go", Content: "//go:build amd64\n\npackage p\n\nfunc Both() {}\n"},
+		{Path: "run_linux.go", Content: "package p\n\nfunc plat() int { return 1 }\n"},
+		{Path: "run_windows.go", Content: "package p\n\nfunc plat() string { return \"\" }\n"},
 	}
-	if got := parsedNames(t, ctx("linux", "amd64"), files); !equal(got, []string{"main.go", "x_linux.go"}) {
-		t.Errorf("linux/amd64: got %v", got)
-	}
-	if got := parsedNames(t, ctx("linux", "arm64"), files); !equal(got, []string{"main.go"}) {
-		t.Errorf("linux/arm64 (filename matches, constraint does not): got %v", got)
-	}
-	if got := parsedNames(t, ctx("darwin", "amd64"), files); !equal(got, []string{"main.go"}) {
-		t.Errorf("darwin/amd64 (constraint matches, filename does not): got %v", got)
-	}
-}
+	byPath := parsePackage(t, ctx("linux", "amd64"), files)
 
-func equal(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
+	assert.Nil(t, java.FindMarker[golang.PartialTypeAttribution](byPath["run_linux.go"].Markers),
+		"matching file is type-checked")
+	assert.NotNil(t, java.FindMarker[golang.PartialTypeAttribution](byPath["run_windows.go"].Markers),
+		"excluded file is marked as not type-checked")
 }

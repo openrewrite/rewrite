@@ -240,6 +240,12 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		// PartialTypeAttribution.rpcSend sends: id (UUID string), reason (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.PartialTypeAttribution).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.PartialTypeAttribution).Reason }, nil)
+	case golang.BuildConstraint:
+		// BuildConstraint.rpcSend sends: id (UUID string), constraint, goos, goarch
+		q.GetAndSend(m, func(x any) any { return x.(golang.BuildConstraint).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.BuildConstraint).Constraint }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.BuildConstraint).GOOS }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.BuildConstraint).GOARCH }, nil)
 	case golang.StructTagQuote:
 		// StructTagQuote.rpcSend sends: id (UUID string), quote (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTagQuote).Ident.String() }, nil)
@@ -506,6 +512,17 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 				}
 			}
 			m.Reason = receiveScalar[string](q, m.Reason)
+			return m
+		case golang.BuildConstraint:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.Constraint = receiveScalar[string](q, m.Constraint)
+			m.GOOS = receiveScalar[string](q, m.GOOS)
+			m.GOARCH = receiveScalar[string](q, m.GOARCH)
 			return m
 		case golang.StructTagQuote:
 			idStr := receiveScalar[string](q, m.Ident.String())
