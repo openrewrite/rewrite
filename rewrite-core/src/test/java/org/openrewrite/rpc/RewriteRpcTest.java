@@ -29,7 +29,9 @@ import org.openrewrite.*;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -44,6 +46,7 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +54,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -255,6 +259,35 @@ class RewriteRpcTest implements RewriteTest {
         }
         assertThat(server.localObjects).doesNotContainKey(id);
         assertThat(server.remoteObjects).doesNotContainKey(id);
+    }
+
+    @Test
+    void wrappedRpcRecipeStillEvicts() {
+        // given
+        Recipe changeText = client.prepareRecipe("org.openrewrite.text.ChangeText",
+          Map.of("toText", "changed"));
+
+        DeclarativeRecipe declarative = new DeclarativeRecipe(
+          "org.openrewrite.rpc.WrappedEngine", "Wrapped engine", "", emptySet(),
+          null, URI.create("test:rpc"), false, List.of());
+        declarative.setPreconditions(List.of(new AlwaysApplicable()));
+        declarative.setRecipeList(List.of(changeText));
+
+        PlainText source = PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build();
+        String id = source.getId().toString();
+
+        // when
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          declarative, new InMemoryLargeSourceSet(List.of(source)), new InMemoryExecutionContext(), 1, 1);
+
+        // then
+        assertThat(run.getChangeset().getAllResults())
+          .describedAs("The wrapped RPC recipe must actually visit and change the file")
+          .singleElement()
+          .satisfies(r -> assertThat(((PlainText) requireNonNull(r.getAfter())).getText()).isEqualTo("changed"));
+        assertThat(client.localObjects)
+          .describedAs("A DelegatingRecipe-wrapped RpcRecipe leaf must still be evicted after the file is visited")
+          .doesNotContainKey(id);
     }
 
     @DocumentExample
@@ -679,6 +712,29 @@ class RewriteRpcTest implements RewriteTest {
         public PlainText visitText(PlainText text, Integer p) {
             RewriteRpc serving = requireNonNull(RewriteRpc.current(), "expected the serving RewriteRpc to be discoverable");
             return (PlainText) requireNonNull(serving.visit(text, ChangeText.class.getName(), p));
+        }
+    }
+
+    @SuppressWarnings("unused")
+    static class AlwaysApplicable extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Always applicable";
+        }
+
+        @Override
+        public String getDescription() {
+            return "A precondition that matches every source file.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new PlainTextVisitor<ExecutionContext>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return SearchResult.found(text);
+                }
+            };
         }
     }
 
