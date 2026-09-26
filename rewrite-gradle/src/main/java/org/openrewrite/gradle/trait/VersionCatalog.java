@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
+
 /**
  * A Gradle version catalog, declared in {@code settings.gradle(.kts)}, in a
  * {@code gradle/libs.versions.toml} file, or in the {@code catalog { versionCatalog { ... } } }
@@ -54,7 +56,7 @@ public interface VersionCatalog extends Trait<Tree> {
         @Nullable String getVersionRef();
 
         /**
-         * @return the version this comes to given the catalog's declarations, or {@code null} if
+         * @return the version this comes to give the catalog's declarations, or {@code null} if
          * it has none or refers to a declaration that is not there.
          */
         default @Nullable String getResolvedVersion(Map<String, String> declarations) {
@@ -70,17 +72,22 @@ public interface VersionCatalog extends Trait<Tree> {
     /**
      * @return every library whose coordinates parse, in declaration order.
      */
-    Map<GroupArtifact, ? extends Entry> getLibraryVersions();
+    Map<GroupArtifact, Entry> getLibraryVersions();
 
     /**
      * @return every plugin, by plugin id, in declaration order.
      */
-    Map<String, ? extends Entry> getPluginVersions();
+    Map<String, Entry> getPluginVersions();
 
     /**
      * @return the value of each named version declaration, by alias.
      */
     Map<String, String> getVersionDeclarations();
+
+    /**
+     * Replaces a library's coordinates while preserving its version declaration.
+     */
+    VersionCatalog withLibraryCoordinates(GroupArtifact ga, String newGroupId, String newArtifactId);
 
     VersionCatalog withLibraryVersion(GroupArtifact ga, String newVersion);
 
@@ -90,6 +97,12 @@ public interface VersionCatalog extends Trait<Tree> {
     VersionCatalog withDetachedLibraryVersion(GroupArtifact ga, String newVersion);
 
     VersionCatalog withVersionDeclarationValue(String alias, String newVersion);
+
+    /**
+     * Updates direct versions for all matching plugin entries. Entries using a version reference
+     * are left to {@link #withPluginVersions(Map)} so shared declarations can be handled safely.
+     */
+    VersionCatalog withPluginVersion(String pluginId, String newVersion);
 
     default @Nullable String getVersion(GroupArtifact ga) {
         Entry library = getLibraryVersions().get(ga);
@@ -107,11 +120,11 @@ public interface VersionCatalog extends Trait<Tree> {
         if (newVersions.isEmpty()) {
             return this;
         }
-        Map<GroupArtifact, ? extends Entry> libraries = getLibraryVersions();
+        Map<GroupArtifact, Entry> libraries = getLibraryVersions();
         Map<String, String> declarations = getVersionDeclarations();
 
         Map<String, List<GroupArtifact>> referrersByAlias = new LinkedHashMap<>();
-        for (Map.Entry<GroupArtifact, ? extends Entry> library : libraries.entrySet()) {
+        for (Map.Entry<GroupArtifact, Entry> library : libraries.entrySet()) {
             String alias = library.getValue().getVersionRef();
             if (alias != null) {
                 referrersByAlias.computeIfAbsent(alias, k -> new ArrayList<>()).add(library.getKey());
@@ -159,6 +172,58 @@ public interface VersionCatalog extends Trait<Tree> {
     }
 
     /**
+     * Moves matching plugins to their selected versions. A shared version declaration is changed
+     * only when every plugin referring to it is moving to the same version and no library refers
+     * to it.
+     */
+    default VersionCatalog withPluginVersions(Map<String, String> newVersions) {
+        if (newVersions.isEmpty()) {
+            return this;
+        }
+        Map<String, Entry> plugins = getPluginVersions();
+        Map<String, String> declarations = getVersionDeclarations();
+        Set<String> libraryAliases = new HashSet<>();
+        for (Entry library : getLibraryVersions().values()) {
+            if (library.getVersionRef() != null) {
+                libraryAliases.add(library.getVersionRef());
+            }
+        }
+        Map<String, List<String>> pluginIdsByAlias = new LinkedHashMap<>();
+        for (Map.Entry<String, Entry> plugin : plugins.entrySet()) {
+            String alias = plugin.getValue().getVersionRef();
+            if (alias != null) {
+                pluginIdsByAlias.computeIfAbsent(alias, k -> new ArrayList<>()).add(plugin.getKey());
+            }
+        }
+
+        VersionCatalog catalog = this;
+        Set<String> changedAliases = new HashSet<>();
+        for (Map.Entry<String, String> update : newVersions.entrySet()) {
+            Entry plugin = plugins.get(update.getKey());
+            if (plugin == null) {
+                continue;
+            }
+            String alias = plugin.getVersionRef();
+            if (alias == null) {
+                catalog = catalog.withPluginVersion(update.getKey(), update.getValue());
+            } else if (!update.getValue().equals(declarations.get(alias)) && !changedAliases.contains(alias)) {
+                boolean movingTogether = !libraryAliases.contains(alias);
+                for (String pluginId : pluginIdsByAlias.getOrDefault(alias, emptyList())) {
+                    if (!update.getValue().equals(newVersions.get(pluginId))) {
+                        movingTogether = false;
+                        break;
+                    }
+                }
+                if (movingTogether) {
+                    catalog = catalog.withVersionDeclarationValue(alias, update.getValue());
+                    changedAliases.add(alias);
+                }
+            }
+        }
+        return catalog;
+    }
+
+    /**
      * Matches a script catalog at its {@code libs { ... } } or {@code catalog { ... } }
      * call, or a TOML catalog at the document of a {@code *.versions.toml} file.
      */
@@ -173,8 +238,8 @@ public interface VersionCatalog extends Trait<Tree> {
                 public boolean isAcceptable(SourceFile sourceFile, P p) {
                     String path = sourceFile.getSourcePath().toString();
                     return (sourceFile instanceof G.CompilationUnit && path.endsWith(".gradle")) ||
-                           (sourceFile instanceof K.CompilationUnit && path.endsWith(".gradle.kts")) ||
-                           TomlVersionCatalog.isVersionCatalog(sourceFile);
+                            (sourceFile instanceof K.CompilationUnit && path.endsWith(".gradle.kts")) ||
+                            TomlVersionCatalog.isVersionCatalog(sourceFile);
                 }
 
                 @Override
