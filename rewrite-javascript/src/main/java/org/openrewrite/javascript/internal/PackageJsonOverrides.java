@@ -16,17 +16,31 @@
 package org.openrewrite.javascript.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.EngineFailure;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.Tree;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.json.tree.Space;
+import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 /**
  * Ports {@code parseDependencyPath} and {@code applyOverrideToPackageJson}
  * from {@code dependency-manager.ts}.
  */
 public final class PackageJsonOverrides {
+
+    private static final Pattern BARE_PACKAGE_NAME =
+            Pattern.compile("(?:@[a-zA-Z0-9_~-][a-zA-Z0-9._~-]*/)?[a-zA-Z0-9_~-][a-zA-Z0-9._~-]*");
 
     private PackageJsonOverrides() {
     }
@@ -212,7 +226,7 @@ public final class PackageJsonOverrides {
     }
 
     // -------------------------------------------------------------------------
-    // pnpm: "pnpm.overrides" nested field with flat > path keys
+    // pnpm <= 10: "pnpm.overrides" nested field with bare package keys
     // -------------------------------------------------------------------------
 
     private static Json.Document applyPnpmOverride(Json.Document doc,
@@ -220,19 +234,23 @@ public final class PackageJsonOverrides {
                                                     String newVersion,
                                                     @Nullable List<DependencyPathSegment> path,
                                                     boolean hasPath) {
-        String key;
-        if (!hasPath) {
-            key = packageName;
-        } else {
-            StringBuilder sb = new StringBuilder();
-            for (DependencyPathSegment seg : path) {
-                if (sb.length() > 0) sb.append(">");
-                sb.append(seg.getVersion() != null ? seg.getName() + "@" + seg.getVersion() : seg.getName());
-            }
-            sb.append(">").append(packageName);
-            key = sb.toString();
+        requireBarePackageName(packageName);
+        PackageJsonHelper.requireSemverRange(packageName, newVersion);
+        if (hasPath) {
+            throw unsupported(packageName, "pnpm override dependency paths are not supported");
         }
-        return setPnpmOverridesEntry(doc, key, newVersion);
+        return setPnpmOverridesEntry(doc, packageName, newVersion);
+    }
+
+    private static void requireBarePackageName(String name) {
+        if (!BARE_PACKAGE_NAME.matcher(name).matches()) {
+            throw unsupported(name, "Unsupported pnpm override selector '" + name +
+                    "'; only bare package names are supported");
+        }
+    }
+
+    private static EngineFailure unsupported(String name, String detail) {
+        return new EngineFailure(LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE, name, detail);
     }
 
     // -------------------------------------------------------------------------
@@ -284,20 +302,86 @@ public final class PackageJsonOverrides {
         if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
         Json.JsonObject root = (Json.JsonObject) doc.getValue();
 
-        Json.JsonObject pnpmObj = findObjectMember(root, "pnpm");
-        if (pnpmObj == null) {
-            // No pnpm object yet — create pnpm: { overrides: { key: value } }
-            // Use addDependency twice: first add the inner entry (to trigger scope creation),
-            // but we need a two-level nest. Use the reparse fallback for this edge case.
-            String newJson = buildPnpmSnippet(doc, key, value);
-            return PackageJsonHelper.reparseJson(doc, newJson);
+        for (Json member : root.getMembers()) {
+            if (member instanceof Json.Member && "packageManager".equals(literalString(((Json.Member) member).getKey()))) {
+                String manager = literalString(((Json.Member) member).getValue());
+                if (manager != null && manager.matches("pnpm@(?:1[1-9]|[2-9][0-9]|[1-9][0-9]{2,})\\..*")) {
+                    throw unsupported(key, "pnpm 11 and newer require overrides in pnpm-workspace.yaml; " +
+                            "package.json pnpm.overrides is ignored");
+                }
+            }
         }
+        Json.JsonObject pnpm = objectMember(root, "pnpm", key);
+        Json.JsonObject overrides = objectMember(pnpm, "overrides", key);
+        for (Json entry : overrides.getMembers()) {
+            if (entry instanceof Json.Member) {
+                Json.Member member = (Json.Member) entry;
+                String selector = literalString(member.getKey());
+                if (selector == null) throw unsupported(key, "Unsupported pnpm override selector");
+                requireBarePackageName(selector);
+                PackageJsonHelper.requireSemverRange(selector, literalString(member.getValue()));
+            }
+        }
+        String indent = PackageJsonHelper.detectIndentUnit(root);
+        Json.JsonObject updated = setEntry(overrides, key, makeStringLiteral(value), indent, 3);
+        if (updated == overrides) return doc;
+        pnpm = setEntry(pnpm, "overrides", updated, indent, 2);
+        return doc.withValue(setEntry(root, "pnpm", pnpm, indent, 1));
+    }
 
-        // pnpm object exists — delegate to flat entry within the "overrides" sub-object
-        // We'll operate directly on the pnpm sub-object via reparse for simplicity.
-        // (The pnpm.overrides nesting is unusual enough that reparse is fine.)
-        String newJson = buildPnpmSnippet(doc, key, value);
-        return PackageJsonHelper.reparseJson(doc, newJson);
+    private static Json.JsonObject objectMember(Json.JsonObject parent, String key, String packageName) {
+        for (Json entry : parent.getMembers()) {
+            if (entry instanceof Json.Member && key.equals(literalString(((Json.Member) entry).getKey()))) {
+                JsonValue value = ((Json.Member) entry).getValue();
+                if (value instanceof Json.JsonObject) return (Json.JsonObject) value;
+                throw unsupported(packageName, "Expected pnpm " + key + " to be an object");
+            }
+        }
+        return new Json.JsonObject(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, emptyList());
+    }
+
+    private static Json.JsonObject setEntry(Json.JsonObject obj, String key, JsonValue value,
+                                            String indent, int depth) {
+        for (Json entry : obj.getMembers()) {
+            if (entry instanceof Json.Member && key.equals(literalString(((Json.Member) entry).getKey()))) {
+                JsonValue oldValue = ((Json.Member) entry).getValue();
+                if (value == oldValue || value instanceof Json.Literal &&
+                        Objects.equals(literalString(value), literalString(oldValue))) return obj;
+                return replaceMemberValue(obj, key, value);
+            }
+        }
+        Json.Member member = PackageJsonHelper.makeMember(key, value, Space.EMPTY);
+        if (obj.getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
+            String memberIndent = String.join("", java.util.Collections.nCopies(depth, indent));
+            String closingIndent = String.join("", java.util.Collections.nCopies(depth - 1, indent));
+            Space closing = Space.build("\n" + closingIndent, emptyList());
+            if (!obj.getPadding().getMembers().isEmpty()) {
+                Space existingClosing = obj.getPadding().getMembers().get(0).getAfter();
+                if (!existingClosing.getComments().isEmpty()) closing = existingClosing;
+            }
+            return obj.getPadding().withMembers(singletonList(JsonRightPadded.build((Json) member
+                            .withPrefix(Space.build("\n" + memberIndent, emptyList())))
+                    .withAfter(closing)));
+        }
+        List<JsonRightPadded<Json>> members = new ArrayList<>(obj.getPadding().getMembers());
+        int last = members.size() - 1;
+        boolean trailingComma = members.get(last).getElement() instanceof Json.Empty;
+        int previous = trailingComma ? last - 1 : last;
+        JsonRightPadded<Json> sibling = members.get(previous);
+        Space prefix = sibling.getElement().getPrefix();
+        if (prefix.isEmpty() && sibling.getElement() instanceof Json.Member) {
+            prefix = ((Json.Member) sibling.getElement()).getKey().getPrefix();
+        }
+        // Copy indentation, never duplicate a sibling's comments.
+        member = member.withPrefix(Space.build(prefix.getWhitespace(), emptyList()));
+        JsonRightPadded<Json> added = JsonRightPadded.build((Json) member);
+        if (trailingComma) {
+            members.add(last, added);
+        } else {
+            members.set(last, sibling.withAfter(Space.EMPTY));
+            members.add(added.withAfter(sibling.getAfter()));
+        }
+        return obj.getPadding().withMembers(members);
     }
 
     // -------------------------------------------------------------------------
@@ -352,34 +436,6 @@ public final class PackageJsonOverrides {
             }
         }
         return result;
-    }
-
-    /**
-     * Builds a new full JSON document string with the pnpm.overrides[key] = value set.
-     */
-    private static String buildPnpmSnippet(Json.Document doc, String key, String value) {
-        String serialized = doc.printAll();
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper =
-                    new com.fasterxml.jackson.databind.ObjectMapper();
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> root =
-                    mapper.readValue(serialized, java.util.Map.class);
-
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> pnpm =
-                    (java.util.Map<String, Object>) root.computeIfAbsent("pnpm",
-                            k -> new java.util.LinkedHashMap<>());
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> overrides =
-                    (java.util.Map<String, Object>) pnpm.computeIfAbsent("overrides",
-                            k -> new java.util.LinkedHashMap<>());
-            overrides.put(key, value);
-
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
-        } catch (Exception e) {
-            return serialized;
-        }
     }
 
     // -------------------------------------------------------------------------

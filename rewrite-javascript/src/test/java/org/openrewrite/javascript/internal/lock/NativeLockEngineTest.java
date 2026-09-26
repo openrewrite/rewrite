@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
@@ -83,6 +85,27 @@ class NativeLockEngineTest {
                 "    \"node_modules/lodash\": {\"version\": \"" + lockedVersion + "\"}\n" +
                 "  }\n" +
                 "}\n";
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"foo", "foo@1>bar", "bar@^2.1.0", "form-data@"})
+    void pnpmOverridesFailBeforeResolutionRatherThanBeingIgnored(String selector) {
+        String original = "{\"name\":\"x\"}";
+        String edited = "{\"name\":\"x\",\"pnpm\":{\"overrides\":{\"" + selector + "\":\"2.0.0\"}}}";
+        Result result = regen(PackageManager.Pnpm, original, edited, "lockfileVersion: '9.0'\n");
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_ENTRY_TYPE);
+        assertThat(result.getFailure().getDetail()).contains("pnpm overrides");
+    }
+
+    @Test
+    void pnpmWorkspaceOverridesInLockFailRatherThanBeingIgnored() {
+        Result result = regen(PackageManager.Pnpm, "{\"name\":\"x\"}", "{\"name\":\"x\"}",
+                "lockfileVersion: '9.0'\noverrides:\n  'foo@1>bar': '2.0.0'\n");
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_ENTRY_TYPE);
+        assertThat(result.getFailure().getDetail()).contains("pnpm overrides");
     }
 
     @Test

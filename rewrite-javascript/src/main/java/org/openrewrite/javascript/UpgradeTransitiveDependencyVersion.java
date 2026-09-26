@@ -63,7 +63,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
     @Override public String getDescription() {
         return "Pins or upgrades a transitive npm dependency by adding an override entry to `package.json` " +
                 "and regenerating the lock file. For npm and Bun, adds to the `overrides` field; " +
-                "for Yarn, adds to `resolutions`; for pnpm, adds to `pnpm.overrides`. " +
+                "for Yarn, adds to `resolutions`; for pnpm before version 11, adds to `pnpm.overrides`. " +
+                "Only bare package names and protocol-free semver ranges are supported for pnpm overrides; " +
+                "their lock files must currently be regenerated with pnpm. " +
+                "pnpm 11 and newer require `pnpm-workspace.yaml`, which this recipe does not edit. " +
                 "The override is idempotent — if the entry already exists with the same version, no change is made. " +
                 "Not safe to use as a precondition: invokes the package manager and publishes per-project " +
                 "state shared with other dependency recipes.";
@@ -123,12 +126,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
-                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, p);
-                            return Markup.warn(out, new RuntimeException(
+                            out = Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
+                        PackageJsonHelper.putLiveTree(ctx, p, out);
                         return out;
                     }
                 }
