@@ -2607,6 +2607,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		var unresolved []string
 		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
 			mrr.ResolutionStatus = golang.GoResolutionGoSumOnly
+			mrr.ResolutionError = rerr.Error()
 			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
 		} else {
 			buildList = resolved
@@ -2616,6 +2617,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			// no-op (its gate is len(PackageModules)==0) rather than break the build.
 			if pkgs.Incomplete {
 				mrr.ResolutionStatus = golang.GoResolutionIncomplete
+				mrr.UnresolvedImports = pkgs.Unresolved
 				unresolved = pkgs.Unresolved
 				s.logger.Printf("ParseProject: incomplete module resolution for %s; withholding package->module map to avoid unsafe require removal (unresolved imports: %v)", moduleDir, pkgs.Unresolved)
 			} else {
@@ -2898,7 +2900,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			if m.mrr.ResolutionStatus == golang.GoResolutionGoSumOnly {
 				gm.Markers = java.AddMarkupWarn(gm.Markers,
 					"Go module resolution failed, so dependencies were derived from go.sum alone. go.sum records every version ever seen rather than the selected build list, so the dependency set is incomplete and may name older versions. Recipes that depend on the resolved module graph (e.g. go mod tidy) must not be trusted for this module until resolution succeeds.",
-					"")
+					m.mrr.ResolutionError)
 			} else if len(m.unresolved) > 0 {
 				gm.Markers = java.AddMarkupWarn(gm.Markers,
 					"Go module resolution was incomplete, so unused-require removal was skipped to avoid dropping a still-used dependency. Re-run once the modules below can be resolved.",
