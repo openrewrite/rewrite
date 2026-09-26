@@ -16,15 +16,17 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from rewrite.java import J
+from rewrite.visitor import TreeVisitor
 from .capture import Capture
 from .coordinates import PythonCoordinates
 from .engine import TemplateEngine, TemplateOptions
 
 if TYPE_CHECKING:
     from rewrite.visitor import Cursor
+    from .bindings import ContextBinding
     from .pattern import MatchResult
 
 
@@ -38,17 +40,17 @@ class Template:
     Examples:
         # Simple template
         tmpl = template("x + 1")
-        result = tmpl.apply(cursor)
+        result = tmpl.apply(self.cursor)
 
         # Template with capture from pattern match
         expr = capture('expr')
         tmpl = template(f"print({expr})")
-        result = tmpl.apply(cursor, values=match_result)
+        result = tmpl.apply(self.cursor, values=match_result)
 
-        # Template with imports
+        # Template whose context types it and is imported into the file it lands in
         tmpl = template(
             "datetime.now()",
-            imports=["from datetime import datetime"]
+            context=["from datetime import datetime"]
         )
     """
 
@@ -80,6 +82,7 @@ class Template:
             dependencies=tuple(sorted(dependencies.items())) if dependencies else (),
         )
         self._cached_tree: Optional[J] = None
+        self._context_bindings: Optional[Tuple['ContextBinding', ...]] = None
 
     @property
     def code(self) -> str:
@@ -106,10 +109,23 @@ class Template:
             )
         return self._cached_tree
 
+    def context_bindings(self) -> Tuple['ContextBinding', ...]:
+        """The modules this template's code reads through its context, which the file it is
+        spliced into has to bind too for that code to run there. Context that only types a
+        capture is read by nothing the template splices, so it binds nothing here."""
+        if self._context_bindings is None:
+            from .bindings import context_bindings, names_read
+            read = names_read(self.get_tree())
+            self._context_bindings = tuple(
+                b for b in context_bindings(self._options.imports + self._options.context)
+                if b.name in read)
+        return self._context_bindings
+
     def apply(
         self,
-        cursor: 'Cursor',
+        cursor: Optional['Cursor'],
         *,
+        visitor: Optional[TreeVisitor] = None,
         values: Optional[Union['MatchResult', Dict[str, Any]]] = None,
         coordinates: Optional[PythonCoordinates] = None,
         format: bool = True,
@@ -118,7 +134,10 @@ class Template:
         Apply this template, returning the generated AST node.
 
         Args:
-            cursor: Current position in the AST.
+            cursor: Where the result lands, which for a recipe rewriting what it is visiting
+                is ``self.cursor``.
+            visitor: The visitor doing the edit. A template whose context imports a module needs
+                it: the module reaches the file through the visitor, not through the cursor.
             values: Captured values from a pattern match, or a dict of values.
             coordinates: Where/how to insert (default: replace current).
             format: Whether the result is fitted to where it lands. Pass False to assemble
@@ -130,16 +149,34 @@ class Template:
 
         Examples:
             # Simple application
-            result = tmpl.apply(cursor)
+            result = tmpl.apply(self.cursor)
 
             # With values from pattern match
-            result = tmpl.apply(cursor, values=match)
+            result = tmpl.apply(self.cursor, visitor=self, values=match)
 
             # With explicit coordinates
-            result = tmpl.apply(cursor, coordinates=PythonCoordinates.after(node))
+            result = tmpl.apply(self.cursor, coordinates=PythonCoordinates.after(node))
         """
+        renames: Dict[str, str] = {}
+        if self.context_bindings():
+            if visitor is None:
+                raise ValueError(
+                    f"Template imports {', '.join(sorted({b.module for b in self.context_bindings()}))} "
+                    "in its context, so applying it has to bind those modules in the file it is "
+                    "spliced into. Name the visitor — apply(self.cursor, visitor=self, ...).")
+            from .bindings import bind_context
+            # The splice site decides which names are in scope, which is where the visitor stands
+            # only for a recipe rewriting what it is visiting.
+            renames = bind_context(visitor, cursor or visitor.cursor, self.context_bindings())
+
         # Get the template tree
         template_tree = self.get_tree()
+
+        # A name the file already binds is the one the spliced code has to use, and renaming ahead
+        # of substitution keeps the rename off the values, which are the target file's own code.
+        if renames:
+            from .bindings import RenameBindings
+            template_tree = RenameBindings(renames).visit(template_tree, None)
 
         # Convert MatchResult to dict if needed
         values_dict: Dict[str, Union[J, List[J]]] = {}
