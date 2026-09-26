@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
+import org.openrewrite.json.tree.Json;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,6 +25,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+
+import static java.util.Objects.requireNonNull;
 
 /** Shared per-project scan-state for the Node dependency {@code ScanningRecipe}s. */
 public final class NodeDependencyScan {
@@ -40,6 +44,9 @@ public final class NodeDependencyScan {
         public @Nullable SourceFile capturedPackageJson;
         public @Nullable String capturedLockContent;
         public @Nullable SourceFile modifiedPackageJson;
+        /** The package.json revision {@link #edit} was applied to when computing {@link #modifiedPackageJson}. */
+        public @Nullable SourceFile editedFrom;
+        public @Nullable Function<Json.Document, Json.Document> edit;
         public @Nullable Set<String> scopesContainingPackage;
         public @Nullable List<MatchedDependency> matchedDeps;
         public LockFileRegeneration.@Nullable Result regenResult;
@@ -63,6 +70,20 @@ public final class NodeDependencyScan {
                 }
             }
         }
+    }
+
+    /**
+     * The modified package.json to return when visiting {@code visited}. Visiting the lock first computes
+     * the edit from the package.json captured at scan time; when an earlier recipe in the same run has
+     * changed the package.json since, the edit is applied again on top of that change rather than
+     * reverting it.
+     */
+    public static SourceFile modifiedFor(ProjectState ps, SourceFile visited) {
+        SourceFile modified = requireNonNull(ps.modifiedPackageJson);
+        if (ps.edit == null || ps.editedFrom == visited) {
+            return modified;
+        }
+        return PackageJsonHelper.reapplyEdit(visited, ps.edit, ps.regenResult);
     }
 
     /** The manifests that can regenerate this lock: the sibling manifest first, then any workspace members it covers. */
