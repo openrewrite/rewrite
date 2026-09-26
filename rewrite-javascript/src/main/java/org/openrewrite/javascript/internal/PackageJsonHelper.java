@@ -19,6 +19,7 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.Tree;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
@@ -360,6 +361,69 @@ public class PackageJsonHelper {
     }
 
     /**
+     * Sets {@code doc[outerKey][innerKey][entryKey] = entryValue}, creating the outer and inner objects
+     * when absent, and returning {@code doc} <em>unchanged</em> when the entry already holds that value.
+     * <p>
+     * Both properties matter to callers. Formatting is preserved throughout, so setting one nested entry
+     * does not reprint the whole manifest; and the unchanged return is what keeps a recipe built on this
+     * single-cycle, since {@link #editAndRegenerate} decides whether anything changed by reference identity.
+     */
+    public static Json.Document setNestedEntry(Json.Document doc, String outerKey, String innerKey,
+                                               String entryKey, String entryValue) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        String indent = detectIndentUnit(root);
+
+        Json.JsonObject outer = findObjectMember(root, outerKey);
+        if (outer == null) {
+            Json.JsonObject inner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
+            Json.JsonObject outerObj = newObjectHolding(makeMember(innerKey, inner,
+                    Space.build("\n" + indent + indent, emptyList())), indent);
+            return doc.withValue(appendMember(root, makeMember(outerKey, outerObj, Space.EMPTY)));
+        }
+
+        Json.JsonObject inner = findObjectMember(outer, innerKey);
+        if (inner == null) {
+            Json.JsonObject innerObj = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
+            return doc.withValue(replaceMember(root, outerKey,
+                    appendMember(outer, makeMember(innerKey, innerObj, Space.EMPTY))));
+        }
+
+        for (Json m : inner.getMembers()) {
+            if (!(m instanceof Json.Member)) continue;
+            Json.Member member = (Json.Member) m;
+            if (!entryKey.equals(literalString(member.getKey()))) continue;
+            if (entryValue.equals(literalString(member.getValue()))) {
+                return doc;
+            }
+            Json.Literal newLit = makeStringLiteral(entryValue).withPrefix(member.getValue().getPrefix());
+            return doc.withValue(replaceMember(root, outerKey,
+                    replaceMember(outer, innerKey, replaceMember(inner, entryKey, newLit))));
+        }
+
+        // The TypeScript JSON parser represents {} as a single Json.Empty member.
+        Json.JsonObject updatedInner;
+        if (inner.getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
+            updatedInner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent)
+                    .withPrefix(inner.getPrefix());
+        } else {
+            updatedInner = appendMember(inner, makeMember(entryKey, makeStringLiteral(entryValue), Space.EMPTY));
+        }
+        return doc.withValue(replaceMember(root, outerKey,
+                replaceMember(outer, innerKey, updatedInner)));
+    }
+
+    /** A new object holding exactly {@code member}, with {@code closingIndent} before its closing brace. */
+    private static Json.JsonObject newObjectHolding(Json.Member member, String closingIndent) {
+        return new Json.JsonObject(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                singletonList(JsonRightPadded.build((Json) member)
+                        .withAfter(Space.build("\n" + closingIndent, emptyList()))));
+    }
+
+    /**
      * Remove {@code name} from each of {@code scopes} in {@code doc}, dropping a scope that ends up
      * empty; a no-op when no matching member is found.
      */
@@ -480,6 +544,39 @@ public class PackageJsonHelper {
         return root.getPadding().withMembers(members);
     }
 
+    /**
+     * The specifier protocol of a dependency value that is not a version constraint, or {@code null}
+     * when the value is an ordinary range.
+     * <p>
+     * A {@code package.json} version position can hold an indirection instead of a range: pnpm's
+     * {@code catalog:}, a {@code workspace:} link, Yarn's {@code patch:}, {@code portal:} and
+     * {@code npm:} aliases, or a plain {@code file:}, {@code link:}, {@code git:} or {@code https:}
+     * specifier. The constraint such a value refers to lives somewhere else, so overwriting it with a
+     * range silently discards what it pointed at. Recognised structurally, by a URI-style scheme
+     * prefix, because the set of protocols grows with each package manager release and skipping an
+     * unfamiliar one is always safer than overwriting it. No version range can be mistaken for one:
+     * ranges start with a digit, {@code ^}, {@code ~}, {@code >}, {@code <}, {@code =} or {@code *},
+     * and dist-tags like {@code latest} carry no colon.
+     */
+    public static @Nullable String dependencySpecifierProtocol(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        int colon = value.indexOf(':');
+        if (colon < 1) {
+            return null;
+        }
+        for (int i = 0; i < colon; i++) {
+            char c = value.charAt(i);
+            boolean schemeChar = c >= 'a' && c <= 'z' ||
+                    i > 0 && (c >= '0' && c <= '9' || c == '+' || c == '.' || c == '-');
+            if (!schemeChar) {
+                return null;
+            }
+        }
+        return value.substring(0, colon + 1);
+    }
+
     public static Json.Document upgradeVersion(Json.Document doc, List<MatchedDependency> matched, String newVersion) {
         if (!(doc.getValue() instanceof Json.JsonObject) || matched.isEmpty()) {
             return doc;
@@ -512,9 +609,13 @@ public class PackageJsonHelper {
                 String name = literalString(depMember.getKey());
                 if (name == null || !targetNames.contains(name)) continue;
                 if (!(depMember.getValue() instanceof Json.Literal)) continue;
-                Json.Literal newLit = makeStringLiteral(newVersion);
                 Json.Literal oldLit = (Json.Literal) depMember.getValue();
-                newLit = newLit.withPrefix(oldLit.getPrefix());
+                // Callers already filter these out by marker, but this is the layer that does the
+                // overwriting and the only one that sees what the manifest actually says. A marker is
+                // free to report a resolved version where the manifest holds a reference, and the cost
+                // of being wrong here is a discarded constraint, so the check is repeated.
+                if (dependencySpecifierProtocol(literalString(oldLit)) != null) continue;
+                Json.Literal newLit = makeStringLiteral(newVersion).withPrefix(oldLit.getPrefix());
                 children.set(j, children.get(j).withElement(depMember.withValue(newLit)));
                 scopeChanged = true;
             }
@@ -560,6 +661,16 @@ public class PackageJsonHelper {
                 Json.Literal oldKeyLit = (Json.Literal) depMember.getKey();
                 Json.Literal newKeyLit = makeStringLiteral(newName).withPrefix(oldKeyLit.getPrefix());
 
+                // A protocol value is a reference into a pnpm catalog, a workspace member or a patch, and
+                // that reference is keyed on the name being changed. Renaming here without renaming it
+                // there yields a manifest that no longer installs, and overwriting the value discards the
+                // constraint outright. Neither is recoverable from the manifest alone, so the whole
+                // declaration is left as it is; the caller reports why.
+                if (depMember.getValue() instanceof Json.Literal &&
+                        dependencySpecifierProtocol(literalString(depMember.getValue())) != null) {
+                    continue;
+                }
+
                 JsonValue newValue = depMember.getValue();
                 if (newVersion != null && depMember.getValue() instanceof Json.Literal) {
                     Json.Literal oldValLit = (Json.Literal) depMember.getValue();
@@ -586,7 +697,49 @@ public class PackageJsonHelper {
                                                    NodeResolutionResult.PackageManager pm,
                                                    String name, String newVersion,
                                                    @Nullable List<DependencyPathSegment> path) {
+        if (declaredProtocolReference(doc, name) != null) {
+            // The declaration holds a reference, not a version, so its real constraint lives elsewhere.
+            // An override beside it would silently win over whatever that is, and the next edit to the
+            // declaration would not move what is installed.
+            return doc;
+        }
         return PackageJsonOverrides.applyOverride(doc, pm, name, newVersion, path);
+    }
+
+    /** The specifier protocol this manifest declares {@code name} with, or null if it declares a version. */
+    static @Nullable String declaredProtocolReference(Json.Document doc, String name) {
+        return dependencySpecifierProtocol(declaredVersions(doc).get(name));
+    }
+
+    /**
+     * Every dependency this manifest declares, as name to raw value, across all declared scopes. The
+     * value is whatever the manifest says: a version constraint, or a specifier protocol standing in for
+     * one. A name declared in more than one scope keeps its first declaration.
+     */
+    static Map<String, String> declaredVersions(Json.Document doc) {
+        Map<String, String> declared = new LinkedHashMap<>();
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return declared;
+        }
+        for (Json rootMember : ((Json.JsonObject) doc.getValue()).getMembers()) {
+            if (!(rootMember instanceof Json.Member)) continue;
+            Json.Member scope = (Json.Member) rootMember;
+            String scopeKey = literalString(scope.getKey());
+            if (scopeKey == null || !isDeclaredScope(scopeKey) ||
+                    !(scope.getValue() instanceof Json.JsonObject)) {
+                continue;
+            }
+            for (Json child : ((Json.JsonObject) scope.getValue()).getMembers()) {
+                if (!(child instanceof Json.Member)) continue;
+                Json.Member dependency = (Json.Member) child;
+                String name = literalString(dependency.getKey());
+                String value = literalString(dependency.getValue());
+                if (name != null && value != null) {
+                    declared.putIfAbsent(name, value);
+                }
+            }
+        }
+        return declared;
     }
 
     /**
