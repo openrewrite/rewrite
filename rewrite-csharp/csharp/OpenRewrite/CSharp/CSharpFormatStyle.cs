@@ -255,7 +255,7 @@ public sealed class CSharpFormatStyle : Marker, IRpcCodec<CSharpFormatStyle>, IE
 
     /// <summary>Default style matching Roslyn/Visual Studio defaults (Allman style).</summary>
     public static CSharpFormatStyle Default { get; } = new(
-        Guid.NewGuid(), DefaultFlags, indentSize: 4, tabSize: 4, newLine: "\n",
+        Tree.RandomId(), DefaultFlags, indentSize: 4, tabSize: 4, newLine: "\n",
         labelPositioning: 1, spacingAroundBinaryOperator: 0);
 
     public CSharpFormatStyle WithId(Guid id) =>

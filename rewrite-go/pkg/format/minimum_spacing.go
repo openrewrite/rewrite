@@ -314,16 +314,19 @@ func (v *MinimumViableSpacingVisitor) VisitIf(ifStmt *java.If, p any) java.J {
 
 func (v *MinimumViableSpacingVisitor) VisitSwitch(sw *java.Switch, p any) java.J {
 	out := v.GoVisitor.VisitSwitch(sw, p).(*java.Switch)
-	if out.Tag == nil {
+	if out.Selector == nil {
+		return out
+	}
+	if _, isEmpty := out.Selector.Tree.Element.(*java.Empty); isEmpty {
 		return out
 	}
 	if v.followsAnInit() {
 		return out
 	}
 	copied := *out
-	tag := *out.Tag
-	tag.Element = separateFrom("switch", tag.Element)
-	copied.Tag = &tag
+	selector := *out.Selector
+	selector.Tree.Element = separateFrom("switch", selector.Tree.Element, selector.Prefix)
+	copied.Selector = &selector
 	return &copied
 }
 

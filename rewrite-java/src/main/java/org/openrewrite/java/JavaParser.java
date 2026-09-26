@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.EqualsAndHashCode;
 import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -230,12 +231,16 @@ public interface JavaParser extends Parser {
     void setClasspath(Collection<Path> classpath);
 
     @SuppressWarnings("unchecked")
+    @EqualsAndHashCode(callSuper = true)
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {
         protected Collection<Path> classpath = emptyList();
         protected Collection<String> artifactNames = emptyList();
         protected Collection<byte[]> classBytesClasspath = emptyList();
+
+        @EqualsAndHashCode.Exclude
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
 
+        @EqualsAndHashCode.Exclude
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
 
@@ -244,6 +249,7 @@ public interface JavaParser extends Parser {
 
         protected Charset charset = Charset.defaultCharset();
         protected boolean logCompilationWarningsAndErrors = false;
+        protected boolean typeAttribution = true;
         protected final List<NamedStyles> styles = new ArrayList<>();
 
         public Builder() {
@@ -252,6 +258,15 @@ public interface JavaParser extends Parser {
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
+            return (B) this;
+        }
+
+        /**
+         * When false, javac stops after entering symbols: declarations are typed, but expressions are not.
+         * Attributing code whose dependencies are missing can take hours in javac's error recovery.
+         */
+        public B typeAttribution(boolean typeAttribution) {
+            this.typeAttribution = typeAttribution;
             return (B) this;
         }
 

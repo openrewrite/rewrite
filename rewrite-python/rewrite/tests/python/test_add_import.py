@@ -179,6 +179,21 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_only_if_referenced_adds_a_dotted_module_read_through_its_root(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'os.path', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                x = os.path.join('a', 'b')
+                """,
+                """
+                import os.path
+                x = os.path.join('a', 'b')
+                """,
+            )
+        )
+
     @pytest.mark.parametrize('annotation_position, source', [
         ('variable', 'm: "Dict[Any, Any]" = {}'),
         ('parameter', 'def f(m: "Dict[Any, Any]") -> None: ...'),
@@ -197,6 +212,22 @@ class TestMaybeAddImport:
                 f"""
                 from typing import Any
                 {source}
+                """,
+            )
+        )
+
+    def test_only_if_referenced_finds_a_reference_nested_inside_a_string_annotation(self, arm):
+        """A forward reference nested in another one names the symbol just the same."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'typing', 'Any', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                m: "'Dict[str, Any]'" = {}
+                """,
+                """
+                from typing import Any
+                m: "'Dict[str, Any]'" = {}
                 """,
             )
         )

@@ -115,6 +115,19 @@ class PrintOutputCapture:
         return None
 
 
+def _quotes_around(tree: Union[Py, J]) -> Optional[str]:
+    """The quotes to print around ``tree``, or None when its own text carries them.
+
+    A literal's ``value_source`` holds its delimiters, so there the marker records the
+    style and nothing more.
+    """
+    quoted = tree.markers.find_first(Quoted)
+    if quoted is None:
+        return None
+    from rewrite.java import tree as j
+    return None if isinstance(tree, j.Literal) else quoted.style.quote
+
+
 class PythonPrinter:
     """
     Python printer for generating source code from LST.
@@ -269,9 +282,18 @@ class PythonPrinter:
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
             ))
 
+        if markers.markers:
+            quotes = _quotes_around(tree)
+            if quotes:
+                p.append(quotes)
+
     def _after_syntax(self, tree: Union[Py, J], p: PrintOutputCapture) -> None:
         """Handle marker printing after syntax."""
         markers = tree.markers
+        if markers.markers:
+            quotes = _quotes_around(tree)
+            if quotes:
+                p.append(quotes)
         for marker in markers.markers:
             p.append(p.get_marker_printer().after_syntax(
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
@@ -1028,9 +1050,18 @@ class PythonJavaPrinter:
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
             ))
 
+        if markers.markers:
+            quotes = _quotes_around(tree)
+            if quotes:
+                p.append(quotes)
+
     def _after_syntax(self, tree: J, p: PrintOutputCapture) -> None:
         """Handle marker printing after syntax."""
         markers = tree.markers
+        if markers.markers:
+            quotes = _quotes_around(tree)
+            if quotes:
+                p.append(quotes)
         for marker in markers.markers:
             p.append(p.get_marker_printer().after_syntax(
                 marker, Cursor(self.get_cursor(), marker), self._java_marker_wrapper
@@ -1470,12 +1501,7 @@ class PythonJavaPrinter:
     def visit_identifier(self, ident: 'j.Identifier', p: PrintOutputCapture) -> J:
         """Visit an identifier."""
         self._before_syntax(ident, p)
-        quoted = ident.markers.find_first(Quoted)
-        if quoted:
-            p.append(quoted.style.quote)
         p.append(ident.simple_name)
-        if quoted:
-            p.append(quoted.style.quote)
         self._after_syntax(ident, p)
         return ident
 
@@ -1545,22 +1571,20 @@ class PythonJavaPrinter:
         unicode_escapes = literal.unicode_escapes
         if unicode_escapes is None:
             p.append(value_source)
-        elif value_source:
-            # Handle unicode escapes
+        elif value_source is not None:
+            # Indices are positions in value_source, which excludes the escapes themselves.
             surrogate_iter = iter(unicode_escapes)
             surrogate = next(surrogate_iter, None)
-            i = 0
 
-            if surrogate and surrogate.value_source_index == 0:
-                p.append(f"\\u{surrogate.code_point}")
-                surrogate = next(surrogate_iter, None)
-
-            for c in value_source:
-                p.append(c)
-                i += 1
+            for i, c in enumerate(value_source):
                 while surrogate and surrogate.value_source_index == i:
                     p.append(f"\\u{surrogate.code_point}")
                     surrogate = next(surrogate_iter, None)
+                p.append(c)
+
+            while surrogate:
+                p.append(f"\\u{surrogate.code_point}")
+                surrogate = next(surrogate_iter, None)
 
         self._after_syntax(literal, p)
         return literal

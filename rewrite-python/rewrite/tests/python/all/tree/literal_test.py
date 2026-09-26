@@ -10,7 +10,7 @@ T = TypeVar('T', bound=Tree)
 
 def test_none():
     # language=python
-    RecipeSpec().rewrite_run(python("assert None", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
+    RecipeSpec().rewrite_run(python("assert None", after_recipe=check_first_literal_type(JavaType.Primitive.Null)))
 
 
 def test_boolean():
@@ -39,9 +39,11 @@ def test_fraction_leading_dot():
     RecipeSpec().rewrite_run(python("assert .0", after_recipe=check_first_literal_type(JavaType.Primitive.Double)))
 
 
-def test_large_int():
+def test_int_above_int32_is_long():
     # language=python
-    RecipeSpec().rewrite_run(python("assert 0xC03A0019", after_recipe=check_first_literal_type(JavaType.Primitive.Int)))
+    RecipeSpec().rewrite_run(python("assert 2147483647", after_recipe=check_first_literal_type(JavaType.Primitive.Int)))
+    # language=python
+    RecipeSpec().rewrite_run(python("assert 2147483648", after_recipe=check_first_literal_type(JavaType.Primitive.Long)))
 
 
 def test_byte_string_concatenation():
@@ -49,9 +51,11 @@ def test_byte_string_concatenation():
     RecipeSpec().rewrite_run(python("assert b'hello' b'world'", after_recipe=check_first_literal_type(JavaType.Primitive.String)))
 
 
-def test_bigint():
+def test_int_above_int64_has_no_primitive():
     # language=python
-    RecipeSpec().rewrite_run(python("assert 9223372036854775808", after_recipe=check_first_literal_type(JavaType.Primitive.Int)))
+    RecipeSpec().rewrite_run(python("assert 9223372036854775807", after_recipe=check_first_literal_type(JavaType.Primitive.Long)))
+    # language=python
+    RecipeSpec().rewrite_run(python("assert 9223372036854775808", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
 
 
 def test_single_quoted_string():
@@ -148,12 +152,12 @@ def test_double_quoted_string():
 
 def test_complex_number_lowercase():
     # language=python
-    RecipeSpec().rewrite_run(python("assert 1j", after_recipe=check_first_literal_is_complex()))
+    RecipeSpec().rewrite_run(python("assert 1j", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
 
 
 def test_complex_number_uppercase():
     # language=python
-    RecipeSpec().rewrite_run(python("assert 1J", after_recipe=check_first_literal_is_complex()))
+    RecipeSpec().rewrite_run(python("assert 1J", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
 
 
 def test_complex_number_uppercase_in_subscript():
@@ -277,13 +281,5 @@ def find_first(tree: Tree, clazz: Type[T]) -> T:
 def check_first_literal_type(expected_type):
     def after_recipe(cu):
         assert find_first(cu, Literal).type == expected_type
-    return after_recipe
-
-
-def check_first_literal_is_complex():
-    def after_recipe(cu):
-        literal_type = find_first(cu, Literal).type
-        assert isinstance(literal_type, JavaType.Class)
-        assert literal_type.fully_qualified_name == 'complex'
     return after_recipe
 

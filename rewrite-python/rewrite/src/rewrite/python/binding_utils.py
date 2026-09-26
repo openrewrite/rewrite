@@ -101,8 +101,8 @@ class ImportBindings:
     def reference(self, cursor: Cursor, ident: Identifier) -> Optional[Binding]:
         """The binding ``ident`` reads, or None where it reads something else: a name in
         member position, a name nothing imports, or one an enclosing scope rebinds. None is not
-        "unused": a quoted forward reference holds an expression, so a use census composes
-        :func:`is_reference` with :func:`referenced_names` rather than calling this. Check
+        "unused": a forward reference can name a symbol the identifier does not spell, so a
+        use census composes :func:`is_reference` with :func:`referenced_names`, not this. Check
         :attr:`Binding.guarded` before emitting a runtime reference."""
         binding = self._by_name.get(ident.simple_name)
         if binding is None or not is_reference(cursor, ident):

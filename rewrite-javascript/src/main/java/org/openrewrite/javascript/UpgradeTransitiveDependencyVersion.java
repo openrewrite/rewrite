@@ -33,6 +33,7 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Function;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -62,10 +63,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
 
     @Override public String getDescription() {
         return "Pins or upgrades a transitive npm dependency by adding an override entry to `package.json` " +
-                "and regenerating the lock file. For npm and Bun, adds to the `overrides` field; " +
+                "and regenerating the lock file natively, without executing the package manager. For npm and Bun, adds to the `overrides` field; " +
                 "for Yarn, adds to `resolutions`; for pnpm, adds to `pnpm.overrides`. " +
                 "The override is idempotent — if the entry already exists with the same version, no change is made. " +
-                "Not safe to use as a precondition: invokes the package manager and publishes per-project " +
+                "Not safe to use as a precondition: consults the package registry over the network and publishes per-project " +
                 "state shared with other dependency recipes.";
     }
 
@@ -122,7 +123,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                         ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
-                        SourceFile out = ps.modifiedPackageJson;
+                        SourceFile out = NodeDependencyScan.modifiedFor(ps, sf);
                         PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, p);
@@ -172,14 +173,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                         ? null
                         : PackageJsonOverrides.parsePath(dependencyPath);
 
+                Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg,
-                        doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath),
-                        ps.capturedLockContent,
-                        ctx);
+                        pkg, edit, ps.capturedLockContent, ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();
+                    ps.editedFrom = pkg;
+                    ps.edit = edit;
                 }
             }
         };

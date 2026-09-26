@@ -33,6 +33,8 @@ import static java.util.Collections.emptyList;
  * host-supplied indexes on the {@link PythonExecutionContextView}, then Pipfile
  * {@code [[source]]} blocks, then the existing lock's {@code _meta.sources}, then
  * {@code PIP_INDEX_URL}/{@code PIP_EXTRA_INDEX_URL}, then pip.conf, then pypi.org.
+ * Source URL credentials whose {@code ${VAR}} placeholders cannot be resolved are sent as written,
+ * as pipenv does, and the placeholders are recorded on the index.
  */
 public final class IndexDiscovery {
     private static final String DEFAULT_INDEX_URL = "https://pypi.org/simple";
@@ -118,7 +120,7 @@ public final class IndexDiscovery {
                 verifySslText == null || !"false".equalsIgnoreCase(EnvExpansion.expandVars(verifySslText, env).trim());
         String expandedName = name != null ? EnvExpansion.expandVars(name, env) : defaultName(expanded.url);
         return new PythonPackageIndex(expandedName, expanded.url, ssl, null, null,
-                expanded.unresolvedPlaceholders);
+                expanded.unresolvedPlaceholders, expanded.unresolvedCredentials);
     }
 
     private static List<PythonPackageIndex> fromLockSources(@Nullable List<Map<String, Object>> lockMetaSources,
@@ -142,7 +144,8 @@ public final class IndexDiscovery {
                     !(verifySsl instanceof Boolean) || (Boolean) verifySsl,
                     null,
                     null,
-                    expanded.unresolvedPlaceholders));
+                    expanded.unresolvedPlaceholders,
+                    expanded.unresolvedCredentials));
         }
         return sources;
     }
@@ -172,7 +175,11 @@ public final class IndexDiscovery {
 
     private static PythonPackageIndex fillCredentials(PythonPackageIndex index,
                                                       List<PythonIndexCredentials> credentials, Environment env) {
-        if (index.getUsername() != null || index.isUnresolvedPlaceholders()) {
+        if (index.isUnresolvedPlaceholders()) {
+            // Never requested, but still reported in failures
+            return index.withUrl(Urls.stripUserinfo(index.getUrl()));
+        }
+        if (index.getUsername() != null) {
             return index;
         }
         return fillFromUrlOrHost(index, credentials, env);
@@ -180,7 +187,8 @@ public final class IndexDiscovery {
 
     /**
      * Shared credential fill: URL-embedded userinfo, then host-matched view
-     * credentials, then netrc. Also used by {@link UvIndexDiscovery}.
+     * credentials, then netrc. Also used by {@link UvIndexDiscovery}. URL-embedded
+     * credentials move out of the URL, which reaches lock files and failure reports.
      */
     static PythonPackageIndex fillFromUrlOrHost(PythonPackageIndex index,
                                                 List<PythonIndexCredentials> credentials, Environment env) {
@@ -190,7 +198,8 @@ public final class IndexDiscovery {
             int colon = raw.indexOf(':');
             String username = colon < 0 ? raw : raw.substring(0, colon);
             String password = colon < 0 ? null : raw.substring(colon + 1);
-            return index.withUsername(EnvExpansion.percentDecode(username))
+            return index.withUrl(Urls.stripUserinfo(index.getUrl()))
+                    .withUsername(EnvExpansion.percentDecode(username))
                     .withPassword(password == null ? null : EnvExpansion.percentDecode(password));
         }
         String host = Urls.host(index.getUrl());

@@ -93,7 +93,7 @@ class UnwrapParenthesesTest implements RewriteTest {
           java(
             """
               public class A {
-                  static boolean count = 0;
+                  static int count = 0;
                   static {
                     ++(count);
                   }
@@ -101,7 +101,7 @@ class UnwrapParenthesesTest implements RewriteTest {
               """,
             """
               public class A {
-                  static boolean count = 0;
+                  static int count = 0;
                   static {
                     ++count;
                   }
@@ -117,7 +117,7 @@ class UnwrapParenthesesTest implements RewriteTest {
           java(
             """
               public class A {
-                  static boolean count = 0;
+                  static int count = 0;
                   static {
                     (count)++;
                   }
@@ -125,7 +125,7 @@ class UnwrapParenthesesTest implements RewriteTest {
               """,
             """
               public class A {
-                  static boolean count = 0;
+                  static int count = 0;
                   static {
                     count++;
                   }
@@ -141,7 +141,7 @@ class UnwrapParenthesesTest implements RewriteTest {
           java(
             """
               public class A {
-                  static boolean count = 0;
+                  static int count = 0;
                   static {
                     --(count);
                   }
@@ -149,7 +149,7 @@ class UnwrapParenthesesTest implements RewriteTest {
               """,
             """
               public class A {
-                  static boolean count = 0;
+                  static int count = 0;
                   static {
                     --count;
                   }
@@ -165,7 +165,7 @@ class UnwrapParenthesesTest implements RewriteTest {
           java(
             """
               public class A {
-                  static boolean count = 0;
+                  static int count = 0;
                   static {
                     (count)--;
                   }
@@ -173,7 +173,7 @@ class UnwrapParenthesesTest implements RewriteTest {
               """,
             """
               public class A {
-                  static boolean count = 0;
+                  static int count = 0;
                   static {
                     count--;
                   }

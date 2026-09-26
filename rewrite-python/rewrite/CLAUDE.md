@@ -15,7 +15,7 @@ From `rewrite-python/rewrite/`:
 uv pip install -e ".[dev]"
 ```
 
-Requires Python 3.10+ (`pyproject.toml` specifies `>=3.10`).
+Requires Python 3.12+ (`pyproject.toml` specifies `>=3.12`).
 
 ## Running Tests
 
@@ -84,9 +84,11 @@ rewrite-python/rewrite/
 
 ## Development Patterns
 
-### Frozen Dataclasses with Padding
+### Read-only Dataclasses with Padding
 
-All LST nodes are immutable frozen dataclasses. Private fields (prefixed `_`) store padded versions; public `@property` accessors return unwrapped values.
+LST nodes are read-only to a type checker and plain dataclasses to the interpreter: `@lst_dataclass` is a `dataclass_transform` carrying `frozen_default=True`. Nothing raises on assignment, and `Space.build`/`Markers.build` return shared instances, so one in-place write can rewrite every node holding that instance.
+
+Private fields (prefixed `_`) store padded versions; public `@property` accessors return unwrapped values.
 
 ```python
 # Updating a node
@@ -122,7 +124,7 @@ When inserting after existing imports, the new import needs `prefix=Space([], '\
 - `JLeftPadded[T]`: before-space + element T (used for operators like `=`)
 - `JContainer[T]`: leading `(`, elements, trailing `)` with full padding control
 - Always access public properties (`.statements`, `.names`); use `.padding` for modifications
-- All tree nodes are frozen. Use `replace_if_changed()` or `.padding.replace()` for modifications.
+- Never assign to a node's field. Use `replace_if_changed()` or `.padding.replace()` for modifications.
 
 ### Recipe Pattern
 

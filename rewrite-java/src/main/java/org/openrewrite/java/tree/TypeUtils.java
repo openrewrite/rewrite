@@ -282,6 +282,11 @@ public class TypeUtils {
         } else if (value2 instanceof JavaType.Annotation.ArrayElementValue) {
             JavaType.Annotation.ArrayElementValue arrayValue1 = (JavaType.Annotation.ArrayElementValue) value1;
             JavaType.Annotation.ArrayElementValue arrayValue2 = (JavaType.Annotation.ArrayElementValue) value2;
+            // `@Foo({})` parses to an empty `constantValues`, while a peer can send an empty
+            // array as neither slot set. With no elements there is no distinction to draw.
+            if (isEmptyArray(arrayValue1) || isEmptyArray(arrayValue2)) {
+                return isEmptyArray(arrayValue1) && isEmptyArray(arrayValue2);
+            }
             if (arrayValue1.getConstantValues() != null) {
                 Object[] constantValues1 = arrayValue1.getConstantValues();
                 if (arrayValue2.getConstantValues() == null || arrayValue2.getConstantValues().length != constantValues1.length) {
@@ -310,6 +315,13 @@ public class TypeUtils {
             return isOfTypeAnnotationElement(value2, value1);
         }
         return false;
+    }
+
+    private static boolean isEmptyArray(JavaType.Annotation.ArrayElementValue value) {
+        Object[] constantValues = value.getConstantValues();
+        JavaType[] referenceValues = value.getReferenceValues();
+        return (constantValues == null || constantValues.length == 0) &&
+                (referenceValues == null || referenceValues.length == 0);
     }
 
     private static boolean isOfTypeCore(@Nullable JavaType to, @Nullable JavaType from, ComparisonContext context) {

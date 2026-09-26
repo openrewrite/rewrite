@@ -76,7 +76,7 @@ internal static class CSharpPrecedences
     {
         if (expr is Parentheses<Expression> p) return p;
         return new Parentheses<Expression>(
-            Guid.NewGuid(), expr.Prefix, Markers.Empty,
+            Tree.RandomId(), expr.Prefix, Markers.Empty,
             new JRightPadded<Expression>(J.SetPrefix(expr, Space.Empty), Space.Empty, Markers.Empty));
     }
 

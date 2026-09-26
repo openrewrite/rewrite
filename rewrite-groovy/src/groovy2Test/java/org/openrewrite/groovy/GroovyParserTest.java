@@ -16,12 +16,36 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyParserTest implements RewriteTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8958")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "a[0,1]",
+      "a[0,1][2]",
+      "a[[0,1], [2,3]]",
+      "a[(0),1]",
+      "a[*xs]",
+      "a[0]",
+      "a[[0,1]]",
+      "a[[*xs]]",
+      "a[ /* first */ 0 /* before comma */, /* second */ 1 /* end */ ]",
+      "commandLine ['cmd', '/c'] + azCmd",
+      "commandLine(['cmd', '/c'] + azCmd)"
+    })
+    void multiIndexAccess(String source) {
+        rewriteRun(
+          groovy(source)
+        );
+    }
 
     @Test
     void groovyRuntimeIsVersion2() throws Exception {

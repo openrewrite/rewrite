@@ -18,6 +18,25 @@ package golang
 
 import "github.com/google/uuid"
 
+// GoResolutionStatus records how much of the module graph the parser resolved.
+// It mirrors org.openrewrite.golang.marker.GoResolutionResult.ResolutionStatus.
+type GoResolutionStatus string
+
+const (
+	// GoResolutionResolved: the toolchain produced the MVS build list and a
+	// complete package->module map.
+	GoResolutionResolved GoResolutionStatus = "RESOLVED"
+	// GoResolutionIncomplete: the build list resolved, but the package->module
+	// map was incomplete (some imports resolved to no module) and was withheld.
+	GoResolutionIncomplete GoResolutionStatus = "INCOMPLETE"
+	// GoResolutionGoSumOnly: the toolchain build list could not be obtained
+	// (network/proxy/toolchain failure), so dependencies were derived from
+	// go.sum alone. go.sum records every version ever seen rather than the MVS
+	// selection, so the dependency set is incomplete and may be wrong; recipes
+	// that depend on the resolved module graph must not trust this result.
+	GoResolutionGoSumOnly GoResolutionStatus = "GO_SUM_ONLY"
+)
+
 // GoResolutionResult mirrors org.openrewrite.golang.marker.GoResolutionResult
 // on the Java side: the metadata parsed from a Go module's go.mod file.
 // Attached as a Marker to a source representing a go.mod (in tests, to the
@@ -39,6 +58,10 @@ type GoResolutionResult struct {
 	// coordinate, so this mapping requires toolchain resolution. Empty unless
 	// the parse-time resolution gate is on.
 	PackageModules []GoPackageModule
+	// ResolutionStatus records whether the resolved build list is trustworthy.
+	// Graph-dependent recipes (e.g. go mod tidy) must treat any value other than
+	// GoResolutionResolved as a signal that ResolvedDependencies is unreliable.
+	ResolutionStatus GoResolutionStatus
 }
 
 func (m GoResolutionResult) ID() uuid.UUID { return m.Ident }
@@ -153,5 +176,6 @@ func NewGoResolutionResult(modulePath, goVersion, toolchain, path string) GoReso
 		Retracts:             []GoRetract{},
 		ResolvedDependencies: []GoResolvedDependency{},
 		PackageModules:       []GoPackageModule{},
+		ResolutionStatus:     GoResolutionGoSumOnly,
 	}
 }

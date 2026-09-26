@@ -17,6 +17,7 @@
 package rpc
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -67,19 +68,27 @@ func (q *ReceiveQueue) PeekBatch() []RpcObjectData {
 	return q.batch
 }
 
-func (q *ReceiveQueue) Take() RpcObjectData {
+// fill leaves a message in the batch for Take and peek to index.
+func (q *ReceiveQueue) fill() {
 	if len(q.batch) == 0 {
 		q.batch = q.pull()
+		if len(q.batch) == 0 {
+			// Every object terminates with END_OF_OBJECT, so a pull that yields nothing
+			// means the transfer broke or a reader asked past this object's end.
+			panic(errors.New("RPC receive: no more data for this object"))
+		}
 	}
+}
+
+func (q *ReceiveQueue) Take() RpcObjectData {
+	q.fill()
 	msg := q.batch[0]
 	q.batch = q.batch[1:]
 	return msg
 }
 
 func (q *ReceiveQueue) peek() RpcObjectData {
-	if len(q.batch) == 0 {
-		q.batch = q.pull()
-	}
+	q.fill()
 	return q.batch[0]
 }
 
@@ -333,6 +342,16 @@ func receiveTypedList[T any](q *ReceiveQueue, before []T, onChange func(any) any
 				q.Take()
 				after[i] = before[pos]
 				continue
+			}
+			if !hasBefore && q.peek().State == NoChange {
+				// The sender diffed the edited tree against a baseline it believes
+				// this side holds and shipped this element as NO_CHANGE — but our
+				// baseline has nothing at this position, so its content never came
+				// over the wire and cannot be reconstructed. Fail with the cause
+				// named rather than letting the zero element nil-deref downstream in
+				// coerceToStatementRP/coerceToExpressionRP (openrewrite/rewrite#8424).
+				q.Take()
+				panic(fmt.Sprintf("RPC baseline desync: NO_CHANGE list element at position %d has no baseline (before holds %d element(s)); the sender diffed against a tree this receiver never received", pos, len(before)))
 			}
 			var beforeItem any
 			if hasBefore {

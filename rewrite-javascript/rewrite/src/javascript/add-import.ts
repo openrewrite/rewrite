@@ -1,8 +1,8 @@
 import {JavaScriptVisitor} from "./visitor";
-import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, Type} from "../java";
+import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, TrailingComma, Type} from "../java";
 import {JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
-import {emptyMarkers, markers} from "../markers";
+import {emptyMarkers, findMarker, markers} from "../markers";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
 import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
@@ -940,7 +940,14 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         // - trailingSpace: space before } (from last element's after)
                         const firstElementPrefix = existingElements[0]?.element?.prefix ?? emptySpace;
                         const lastIndex = existingElements.length - 1;
-                        const trailingSpace = existingElements[lastIndex].after;
+                        // What separates one element from the next after its comma: the space in front of
+                        // the second element, or for a lone element on its own line, that line break.
+                        const separator = existingElements[1]?.element?.prefix ??
+                            (firstElementPrefix.whitespace.includes('\n') ? firstElementPrefix : singleSpace);
+                        // A trailing comma is a marker on the last element rather than padding, so with
+                        // one present the space before `}` lives in the marker's suffix, not in `after`.
+                        const trailingComma = findMarker<TrailingComma>(existingElements[lastIndex], J.Markers.TrailingComma);
+                        const trailingSpace = trailingComma ? trailingComma.suffix : existingElements[lastIndex].after;
 
                         // Build the new elements array with proper spacing
                         const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
@@ -953,17 +960,26 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                         // Insert new element here
                                         // First element gets the same prefix as the original first element
                                         // Other positions get a single space (separator after comma)
-                                        const prefix = j === 0 ? firstElementPrefix : singleSpace;
+                                        const prefix = j === 0 ? firstElementPrefix : separator;
                                         results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
                                     }
                                     // Adjust existing element: if inserting before first, give it space prefix
                                     let adjusted = elem;
                                     if (j === 0 && insertIndex === 0 && elem.element) {
-                                        adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
+                                        adjusted = {...elem, element: {...elem.element, prefix: separator}};
                                     }
-                                    // Last element before a new trailing element loses its trailing space
+                                    // Last element before a new trailing element loses its trailing space,
+                                    // and hands off its trailing comma to the element that becomes last.
                                     if (j === lastIndex && insertIndex > lastIndex) {
-                                        adjusted = {...adjusted, after: emptySpace};
+                                        adjusted = trailingComma ?
+                                            {
+                                                ...adjusted,
+                                                markers: {
+                                                    ...adjusted.markers,
+                                                    markers: adjusted.markers.markers.filter(m => m !== trailingComma)
+                                                }
+                                            } :
+                                            {...adjusted, after: emptySpace};
                                     }
                                     results.push(adjusted);
                                     return results;
@@ -971,7 +987,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
                                 // Append at end if inserting after all existing elements
                                 if (insertIndex > lastIndex) {
-                                    newElements.push(rightPadded({...newSpecifier, prefix: singleSpace}, trailingSpace));
+                                    const appended = rightPadded(
+                                        {...newSpecifier, prefix: separator},
+                                        trailingComma ? emptySpace : trailingSpace);
+                                    newElements.push(trailingComma ?
+                                        {...appended, markers: markers(trailingComma)} :
+                                        appended);
                                 }
 
                                 namedDraft.elements = {...namedImports.elements, elements: newElements};
@@ -2090,7 +2111,9 @@ class MovedTypes extends TypeVisitor<undefined> {
     /**
      * A type reached while it is still being visited is a cycle — a class holds a method whose
      * declaring type is that class — and answers with itself, which is what ends the walk. Every
-     * reference to a binding shares one type, so a completed walk is remembered for the next.
+     * type visited is remembered by its answer, so a graph whose references fan out or rejoin is
+     * walked once rather than once per path that reaches into it. An answer settled inside a cycle
+     * stands for the path it was on, so a walk reusing it can leave a rename unapplied.
      */
     override async visit<T extends Type>(type: T | undefined, p: undefined): Promise<T | undefined> {
         if (type === undefined || this.onPath.has(type)) {
@@ -2102,11 +2125,7 @@ class MovedTypes extends TypeVisitor<undefined> {
         this.onPath.add(type);
         try {
             const answer = await super.visit(type, p);
-            // Only the type a walk entered at is remembered: one reached inside it may have met
-            // a back edge, which answers with the type itself and so stands for the path it was on.
-            if (this.onPath.size === 1) {
-                this.answered.set(type, answer);
-            }
+            this.answered.set(type, answer);
             return answer;
         } finally {
             this.onPath.delete(type);

@@ -132,7 +132,7 @@ public static class CsDocCommentParser
             var body = new List<CsDocComment>();
             var first = true;
             MapContent(doc.Content, body, ref first);
-            var docComment = new CsDocComment.DocComment(Guid.NewGuid(), Markers.Empty, body, suffix);
+            var docComment = new CsDocComment.DocComment(Tree.RandomId(), Markers.Empty, body, suffix);
             if (Print(docComment) == fullText)
             {
                 return docComment;
@@ -142,9 +142,9 @@ public static class CsDocCommentParser
         // Fallback: keep the whole body as literal text after the leading "///".
         var flat = new List<CsDocComment>
         {
-            new CsDocComment.XmlText(Guid.NewGuid(), Markers.Empty, fullText.Substring(3))
+            new CsDocComment.XmlText(Tree.RandomId(), Markers.Empty, fullText.Substring(3))
         };
-        return new CsDocComment.DocComment(Guid.NewGuid(), Markers.Empty, flat, suffix);
+        return new CsDocComment.DocComment(Tree.RandomId(), Markers.Empty, flat, suffix);
     }
 
     private static string Print(CsDocComment.DocComment docComment)
@@ -223,7 +223,7 @@ public static class CsDocCommentParser
         var innerFirst = false;
         MapContent(element.Content, content, ref innerFirst);
         return new CsDocComment.XmlElement(
-            Guid.NewGuid(), Markers.Empty,
+            Tree.RandomId(), Markers.Empty,
             start.Name.ToString(),
             MapAttributes(start.Attributes),
             LeadingAsList(start.GreaterThanToken),
@@ -233,7 +233,7 @@ public static class CsDocCommentParser
 
     private static CsDocComment MapEmptyElement(XmlEmptyElementSyntax element) =>
         new CsDocComment.XmlEmptyElement(
-            Guid.NewGuid(), Markers.Empty,
+            Tree.RandomId(), Markers.Empty,
             element.Name.ToString(),
             MapAttributes(element.Attributes),
             LeadingAsList(element.SlashGreaterThanToken));
@@ -256,14 +256,14 @@ public static class CsDocCommentParser
         {
             case XmlNameAttributeSyntax name:
                 return new CsDocComment.XmlNameAttribute(
-                    Guid.NewGuid(), Markers.Empty,
+                    Tree.RandomId(), Markers.Empty,
                     SpaceBeforeEquals(name.EqualsToken),
                     ValueList(name.StartQuoteToken.ToFullString() + name.Identifier.ToFullString() +
                               name.EndQuoteToken.ToFullString()),
                     null);
             case XmlCrefAttributeSyntax cref:
                 return new CsDocComment.XmlCrefAttribute(
-                    Guid.NewGuid(), Markers.Empty,
+                    Tree.RandomId(), Markers.Empty,
                     SpaceBeforeEquals(cref.EqualsToken),
                     ValueList(cref.StartQuoteToken.ToFullString() + cref.Cref.ToFullString() +
                               cref.EndQuoteToken.ToFullString()),
@@ -276,7 +276,7 @@ public static class CsDocCommentParser
                 }
                 valueText.Append(textAttr.EndQuoteToken.ToFullString());
                 return new CsDocComment.XmlAttribute(
-                    Guid.NewGuid(), Markers.Empty,
+                    Tree.RandomId(), Markers.Empty,
                     textAttr.Name.ToString(),
                     SpaceBeforeEquals(textAttr.EqualsToken),
                     ValueList(valueText.ToString()));
@@ -344,8 +344,8 @@ public static class CsDocCommentParser
     }
 
     private static CsDocComment.XmlText Text(string text) =>
-        new(Guid.NewGuid(), Markers.Empty, text);
+        new(Tree.RandomId(), Markers.Empty, text);
 
     private static CsDocComment.LineBreak LineBreak(string margin) =>
-        new(Guid.NewGuid(), margin, Markers.Empty);
+        new(Tree.RandomId(), margin, Markers.Empty);
 }
