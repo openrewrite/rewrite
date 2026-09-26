@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.emptyMap;
+
 /**
  * A Gradle version catalog, declared in {@code settings.gradle(.kts)}, in a
  * {@code gradle/libs.versions.toml} file, or in the {@code catalog { versionCatalog { ... } } }
@@ -52,6 +54,24 @@ public interface VersionCatalog extends Trait<Tree> {
         @Nullable String getVersion();
 
         @Nullable String getVersionRef();
+
+        /** @return the script variable this entry's version is written as, or {@code null}. */
+        default @Nullable String getVersionVariable() {
+            return null;
+        }
+
+        /**
+         * @return the script variable this comes to given the catalog's declarations, or
+         * {@code null} if neither it nor the declaration it refers to is written as one.
+         */
+        default @Nullable String getResolvedVersionVariable(Map<String, String> declarationVariables) {
+            String variable = getVersionVariable();
+            if (variable != null) {
+                return variable;
+            }
+            String versionRef = getVersionRef();
+            return versionRef == null ? null : declarationVariables.get(versionRef);
+        }
 
         /**
          * @return the version this comes to given the catalog's declarations, or {@code null} if
@@ -78,9 +98,17 @@ public interface VersionCatalog extends Trait<Tree> {
     Map<String, ? extends Entry> getPluginVersions();
 
     /**
-     * @return the value of each named version declaration, by alias.
+     * @return the value of each named version declaration, by alias. One written as a script
+     * variable is in {@link #getVersionDeclarationVariables()} instead.
      */
     Map<String, String> getVersionDeclarations();
+
+    /**
+     * @return the script variable each named version declaration takes its value from, by alias.
+     */
+    default Map<String, String> getVersionDeclarationVariables() {
+        return emptyMap();
+    }
 
     VersionCatalog withLibraryVersion(GroupArtifact ga, String newVersion);
 
