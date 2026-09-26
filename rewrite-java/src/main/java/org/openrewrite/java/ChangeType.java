@@ -267,17 +267,11 @@ public class ChangeType extends Recipe {
                 }
 
                 JavaType.FullyQualified fullyQualifiedTarget = TypeUtils.asFullyQualified(targetType);
-                if (fullyQualifiedTarget != null) {
-                    JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
-                    if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName())) {
-                        if (hasNoConflictingImport(sf)) {
-                            if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                                addImport(owningClass);
-                            }
-                            if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                                addImport(fullyQualifiedTarget);
-                            }
-                        }
+                if (fullyQualifiedTarget != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
+                    if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName()) &&
+                            hasNoConflictingImport(sf)) {
+                        // An alias binds the nested type; otherwise the outermost class binds the reference.
+                        addImport(importAlias == null ? getTopLevelClassName(fullyQualifiedTarget) : fullyQualifiedTarget);
                     }
                 }
 
@@ -448,6 +442,8 @@ public class ChangeType extends Recipe {
                     return typeTree.withType(updateType(targetType));
                 }
 
+                boolean inImport = getCursor().firstEnclosing(J.Import.class) != null;
+
                 Stack<Expression> typeStack = new Stack<>();
                 typeStack.push(typeTree);
 
@@ -483,8 +479,11 @@ public class ChangeType extends Recipe {
                         }
                     } else if (e instanceof J.FieldAccess) {
                         if (attrStack.size() == typeStack.size() + 1) {
-                            attributed = ((J.FieldAccess) e).withTarget(attributed)
-                                    .withType(attrStack.pop());
+                            JavaType.FullyQualified segmentType = attrStack.pop();
+                            J.FieldAccess fa = ((J.FieldAccess) e).withTarget(attributed)
+                                    .withType(segmentType);
+                            // Attributing the name makes the outer classes visible as referenced; an import is not a usage.
+                            attributed = inImport ? fa : fa.withName(fa.getName().withType(segmentType));
                         } else {
                             attributed = ((J.FieldAccess) e).withTarget(attributed);
                         }
