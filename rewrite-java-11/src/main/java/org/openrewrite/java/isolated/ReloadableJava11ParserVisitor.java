@@ -94,6 +94,9 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
     private int cursor = 0;
 
+    @Nullable
+    private Throwable reportedException;
+
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava11ParserVisitor(Path sourcePath,
@@ -1700,6 +1703,13 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
             return j;
         } catch (Throwable ex) {
+            // Rethrown through every enclosing convert(), so describe it once. A stack overflow's
+            // path is too deep to describe at all: the line numbers alone take hours to compute.
+            if (ex == reportedException || ex instanceof StackOverflowError) {
+                throw ex;
+            }
+            reportedException = ex;
+
             // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
             StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
             message.append("--- BEGIN PATH ---\n");
