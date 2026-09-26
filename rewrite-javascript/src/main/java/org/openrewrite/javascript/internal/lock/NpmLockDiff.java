@@ -58,7 +58,7 @@ final class NpmLockDiff {
         Map<String, String> bindings = matched.bindings;
         Set<String> fresh = hoistUnbound(graph, root, bindings, matched.pinnedPlacements);
         requireReproducibleFreshPlacements(graph, root, bindings, fresh);
-        requirePlacedPeersSatisfied(graph, bindings, matched.pinnedPlacements);
+        requirePlacedPeersSatisfied(graph, lock, bindings, matched.pinnedPlacements);
 
         Set<String> peerProviders = peerProviderKeys(graph);
         List<PackageEdit> edits = new ArrayList<>();
@@ -439,12 +439,22 @@ final class NpmLockDiff {
      * A peer that resolves to several versions is met per placement: from each place its requirer is installed,
      * the nearest copy up the {@code node_modules} chain must satisfy the peer's range (an optional peer may be
      * absent). npm places the requirer so that holds; where the final layout leaves a placement unsatisfied, npm
-     * would have placed things differently, so it defers rather than emit that layout.
+     * would have placed things differently, so it defers rather than emit that layout. A copy npm flagged
+     * {@code peer} exists only for a peer edge, which the graph does not model, so it defers too.
      */
-    private static void requirePlacedPeersSatisfied(ResolutionGraph graph, Map<String, String> bindings,
+    private static void requirePlacedPeersSatisfied(ResolutionGraph graph, Lock lock, Map<String, String> bindings,
                                                     Map<String, String> pinnedPlacements) {
         if (graph.getPlacedPeers().isEmpty()) {
             return;
+        }
+        for (ResolutionGraph.PlacedPeer peer : graph.getPlacedPeers()) {
+            for (String key : lock.keysBySlot.getOrDefault(peer.getPeerName(), emptyList())) {
+                if (lock.entries.get(key).path("peer").asBoolean(false)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, peer.getPeerName(), key +
+                            " is installed as a peer of a package whose peer resolves to several versions" +
+                            " (peer-only provider not yet reproduced)");
+                }
+            }
         }
         Map<String, Map<String, String>> placed = new HashMap<>();  // node_modules prefix -> name -> version
         for (Map.Entry<String, String> b : bindings.entrySet()) {
@@ -845,6 +855,26 @@ final class NpmLockDiff {
             } else if (!prunes) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, slot,
                         slot + " is installed but no longer resolved, and no edit prunes it");
+            }
+        }
+        // No longer declared but still resolved: another package needs it, so only the root's edge goes.
+        for (String key : bindings.values()) {
+            String slot = slotOf(key);
+            if (depthOf(key) != 1 || root.getResolved().get(slot) != null) {
+                continue;
+            }
+            for (String scope : DECLARED_SCOPES) {
+                if (inRootScope(lock, scope, slot)) {
+                    removals.add(PackageEdit.builder()
+                            .name(slot)
+                            .oldVersion(lock.versions.get(key))
+                            .newVersion(null)
+                            .scope(scope)
+                            .importerDir(null)
+                            .retainsEntry(true)
+                            .build());
+                    break;
+                }
             }
         }
         return removals;

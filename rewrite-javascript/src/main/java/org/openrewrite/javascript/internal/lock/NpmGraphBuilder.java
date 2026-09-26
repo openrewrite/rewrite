@@ -39,10 +39,11 @@ import static org.openrewrite.semver.Semver.Ecosystem.NODE;
  * constraint already met and adds no node. A missing non-optional peer is npm's auto-install: when it is enabled
  * (npm only; see {@link #autoInstallPeers}) and the slice is cleanest — an all-prod closure, the peer
  * a single pure-leaf version required by a single package — the peer is added as a top-level node; every other
- * missing-peer shape fails loud. An optional peer resolving to several versions is satisfied per placement, so
- * for npm it is handed to the serializer to verify (see {@link #placedPeerForks}). An {@code npm:<name>@<range>} alias resolves its real package but is keyed and
- * placed by the alias name, reproduced unless it entangles the peer machinery (its real name required as a peer,
- * or the alias declaring peers). Version and constraint decisions are delegated entirely to node-semver.
+ * missing-peer shape fails loud. A present peer resolving to several versions is satisfied per placement, so for
+ * npm it is handed to the serializer to verify (see {@link #placedPeerForks}). An {@code npm:<name>@<range>} alias
+ * resolves its real package but is keyed and placed by the alias name, reproduced unless it entangles the peer
+ * machinery (its real name required as a peer, or the alias declaring peers). Version and constraint decisions are
+ * delegated entirely to node-semver.
  */
 public final class NpmGraphBuilder {
 
@@ -67,7 +68,7 @@ public final class NpmGraphBuilder {
     private final Map<String, Set<String>> lockedVersions;
 
     /**
-     * An optional peer whose name resolves to several versions is satisfied per placement: each placement of its
+     * A peer whose name resolves to several versions is satisfied per placement: each placement of its
      * requirer sees the nearest copy up its {@code node_modules} chain. Only a serializer that models placement can
      * decide that, so when enabled (npm only) such a peer is recorded as a {@link ResolutionGraph.PlacedPeer} for it
      * to verify; otherwise it defers.
@@ -469,7 +470,7 @@ public final class NpmGraphBuilder {
     /**
      * Classify one {@code (requirer, peer, range)}: an unmet non-optional peer is collected for auto-install (or
      * defers when disabled), a present peer must resolve to a single satisfying version, and an optional absent peer
-     * is skipped. An optional peer resolving to several versions is left to placement when {@link #placedPeerForks}.
+     * is skipped. A peer resolving to several versions is left to placement when {@link #placedPeerForks}.
      *
      * @param requirerKey the requiring node's key, or {@code null} for an importer
      */
@@ -488,9 +489,9 @@ public final class NpmGraphBuilder {
             return;
         }
         if (resolved.size() > 1) {
-            if (placedPeerForks && requirerKey != null && isOptionalPeer(meta, peerName) &&
-                    Semver.validate(range, null, NODE).isValid()) {
-                placedPeers.add(new ResolutionGraph.PlacedPeer(requirerKey, peerName, range, true));
+            if (placedPeerForks && requirerKey != null && Semver.validate(range, null, NODE).isValid()) {
+                placedPeers.add(new ResolutionGraph.PlacedPeer(requirerKey, peerName, range,
+                        isOptionalPeer(meta, peerName)));
                 return;
             }
             throw new EngineFailure(RESOLUTION_REQUIRED, requirer, requirer + " peer " + peerName +
