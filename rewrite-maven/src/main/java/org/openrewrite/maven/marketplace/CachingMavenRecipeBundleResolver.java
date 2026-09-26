@@ -15,16 +15,20 @@
  */
 package org.openrewrite.maven.marketplace;
 
-import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleReader;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeClassLoaderFactory;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Deduplicates {@link MavenRecipeBundleResolver} instances per package coordinate so that
@@ -49,12 +53,33 @@ import java.util.Map;
  * Consumers that need deterministic cleanup must close the {@link RecipeBundleReader}s they
  * retain (or rely on JVM exit for one-shot processes).
  */
-@RequiredArgsConstructor
 public class CachingMavenRecipeBundleResolver implements RecipeBundleResolver {
     private final ExecutionContext ctx;
     private final MavenArtifactDownloader downloader;
     private final RecipeClassLoaderFactory classLoaderFactory;
+
+    /** Null resolves {@code recipeList} entries off the bundle's classpath only, as before. */
+    private final @Nullable RecipeMarketplace marketplace;
+
+    private final Collection<RecipeBundleResolver> resolvers;
+
     private final Map<String, MavenRecipeBundleResolver> resolverCache = new HashMap<>();
+
+    public CachingMavenRecipeBundleResolver(ExecutionContext ctx, MavenArtifactDownloader downloader,
+                                            RecipeClassLoaderFactory classLoaderFactory) {
+        this(ctx, downloader, classLoaderFactory, null, emptyList());
+    }
+
+    public CachingMavenRecipeBundleResolver(ExecutionContext ctx, MavenArtifactDownloader downloader,
+                                            RecipeClassLoaderFactory classLoaderFactory,
+                                            @Nullable RecipeMarketplace marketplace,
+                                            Collection<RecipeBundleResolver> resolvers) {
+        this.ctx = ctx;
+        this.downloader = downloader;
+        this.classLoaderFactory = classLoaderFactory;
+        this.marketplace = marketplace;
+        this.resolvers = resolvers;
+    }
 
     @Override
     public String getEcosystem() {
@@ -81,7 +106,7 @@ public class CachingMavenRecipeBundleResolver implements RecipeBundleResolver {
         // that need version pinning resolve into separate resolverKey()s (different
         // packageNames) already.
         return resolverCache.computeIfAbsent(resolverKey(bundle),
-                k -> new MavenRecipeBundleResolver(ctx, downloader, classLoaderFactory));
+                k -> new MavenRecipeBundleResolver(ctx, downloader, classLoaderFactory, marketplace, resolvers));
     }
 
     @Override

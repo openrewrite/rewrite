@@ -176,9 +176,9 @@ public class JavaRewriteRpc {
                 ctx // Share the session auth cache with POM resolution
         );
 
-        // Set up resolvers
+        // The list is read at resolve time, once every ecosystem's resolver has been added to it.
         List<RecipeBundleResolver> resolvers = new ArrayList<>();
-        resolvers.add(new MavenRecipeBundleResolver(ctx, downloader, RecipeClassLoader::new));
+        resolvers.add(new MavenRecipeBundleResolver(ctx, downloader, RecipeClassLoader::new, marketplace, resolvers));
 
         if (logStream != null) {
             logStream.println("Configured Maven recipe bundle resolver");
