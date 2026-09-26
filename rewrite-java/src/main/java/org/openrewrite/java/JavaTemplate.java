@@ -205,7 +205,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         protected final String code;
         protected final Set<String> imports = new HashSet<>();
-        protected final Set<String> genericTypes = new HashSet<>();
+        private final Set<String> genericTypes = new HashSet<>();
 
         private boolean contextSensitive;
         private String bindType = "Object";

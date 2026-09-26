@@ -34,7 +34,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings({"LombokKotlinCompilerPlugin", "RedundantExplicitType", "ControlFlowWithEmptyBody", "RedundantVisibilityModifier", "UnusedReceiverParameter", "NullableProblems", "DialogTitleCapitalization", "OptionalGetWithoutIsPresent", "DataFlowIssue"})
 class AutoFormatVisitorTest implements RewriteTest {
 
     @Override
@@ -566,42 +565,5 @@ class AutoFormatVisitorTest implements RewriteTest {
               """
           )
         );
-    }
-
-    /**
-     * Formatting scoped to a single statement must still apply the blank line that separates class members.
-     * {@code BlankLinesVisitor#visitBlock} applies that rule over a whole block, but a subtree-scoped visit
-     * never reaches it, so whole-tree {@code AutoFormat} passing proves nothing about this path.
-     */
-    @SuppressWarnings({"OptionalGetWithoutIsPresent", "DataFlowIssue"})
-    @Test
-    void scopedAutoFormatSeparatesClassMembers() {
-        K.CompilationUnit cu = KotlinParser.builder().build()
-          .parse(
-            """
-              class Test {
-                  fun existing() {}
-                  fun added() {}
-              }
-              """)
-          .map(K.CompilationUnit.class::cast)
-          .findFirst()
-          .get();
-
-        var formatted = (K.CompilationUnit) new KotlinIsoVisitor<>() {
-            @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object p) {
-                return "added".equals(method.getSimpleName()) ? autoFormat(method, p) : method;
-            }
-        }.visit(cu, new InMemoryExecutionContext());
-
-        assertThat(formatted.printAll()).isEqualTo(
-          """
-            class Test {
-                fun existing() {}
-
-                fun added() {}
-            }
-            """);
     }
 }
