@@ -175,7 +175,11 @@ public final class IndexDiscovery {
 
     private static PythonPackageIndex fillCredentials(PythonPackageIndex index,
                                                       List<PythonIndexCredentials> credentials, Environment env) {
-        if (index.getUsername() != null || index.isUnresolvedPlaceholders()) {
+        if (index.isUnresolvedPlaceholders()) {
+            // Never requested, but still reported in failures
+            return index.withUrl(Urls.stripUserinfo(index.getUrl()));
+        }
+        if (index.getUsername() != null) {
             return index;
         }
         return fillFromUrlOrHost(index, credentials, env);
@@ -183,7 +187,8 @@ public final class IndexDiscovery {
 
     /**
      * Shared credential fill: URL-embedded userinfo, then host-matched view
-     * credentials, then netrc. Also used by {@link UvIndexDiscovery}.
+     * credentials, then netrc. Also used by {@link UvIndexDiscovery}. URL-embedded
+     * credentials move out of the URL, which reaches lock files and failure reports.
      */
     static PythonPackageIndex fillFromUrlOrHost(PythonPackageIndex index,
                                                 List<PythonIndexCredentials> credentials, Environment env) {
@@ -193,7 +198,8 @@ public final class IndexDiscovery {
             int colon = raw.indexOf(':');
             String username = colon < 0 ? raw : raw.substring(0, colon);
             String password = colon < 0 ? null : raw.substring(colon + 1);
-            return index.withUsername(EnvExpansion.percentDecode(username))
+            return index.withUrl(Urls.stripUserinfo(index.getUrl()))
+                    .withUsername(EnvExpansion.percentDecode(username))
                     .withPassword(password == null ? null : EnvExpansion.percentDecode(password));
         }
         String host = Urls.host(index.getUrl());
