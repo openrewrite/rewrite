@@ -84,13 +84,13 @@ public class Java11Parser implements JavaParser {
                 Class<?> parserImplementation = Class.forName("org.openrewrite.java.isolated.ReloadableJava11Parser", true, moduleClassLoader);
 
                 Constructor<?> parserConstructor = parserImplementation
-                        .getDeclaredConstructor(Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
+                        .getDeclaredConstructor(Boolean.TYPE, Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
                                 Collection.class, JavaTypeCache.class, JavaTypeFactory.class);
 
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, resolvedTypeFactory());
+                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, resolvedTypeFactory());
 
                 return new Java11Parser(delegate);
             } catch (Exception e) {

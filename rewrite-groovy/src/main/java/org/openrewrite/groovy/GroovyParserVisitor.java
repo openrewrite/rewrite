@@ -1737,7 +1737,27 @@ public class GroovyParserVisitor {
                 }
 
                 cursor += binary.getOperation().getText().length();
-                Expression right = doVisit(binary.getRightExpression());
+                boolean multiIndex = false;
+                Expression right;
+                if (gBinaryOp == G.Binary.Type.Access && binary.getRightExpression() instanceof ListExpression) {
+                    ListExpression indices = (ListExpression) binary.getRightExpression();
+                    // A lone spread index is also wrapped in a synthetic list, but Groovy does not
+                    // set its wrapped flag or source position.
+                    multiIndex = indices.isWrapped() || Boolean.TRUE.equals(indices.getNodeMetaData(NoInlineAnnotationTransformationResolveVisitor.WRAPPED_LIST)) ||
+                            indices.getLineNumber() < 0 &&
+                            indices.getExpressions().size() == 1 && indices.getExpression(0) instanceof SpreadExpression;
+                    if (multiIndex) {
+                        // The access expression owns the brackets. Visiting the synthetic list itself
+                        // would consume delimiters or parentheses belonging to its first index.
+                        right = new G.ListLiteral(randomId(), EMPTY, Markers.EMPTY,
+                                JContainer.build(visitRightPadded(indices.getExpressions().toArray(new ASTNode[0]), null)),
+                                typeMapping.type(indices.getType()));
+                    } else {
+                        right = doVisit(indices);
+                    }
+                } else {
+                    right = doVisit(binary.getRightExpression());
+                }
 
                 if (assignment) {
                     return new J.Assignment(randomId(), fmt, Markers.EMPTY,
@@ -1760,7 +1780,7 @@ public class GroovyParserVisitor {
                     if (gBinaryOp == G.Binary.Type.Access) {
                         after = sourceBefore("]");
                     }
-                    return new G.Binary(randomId(), fmt, Markers.EMPTY,
+                    return new G.Binary(randomId(), fmt, multiIndex ? Markers.EMPTY.add(new MultiIndexAccess(randomId())) : Markers.EMPTY,
                             left, JLeftPadded.build(gBinaryOp).withBefore(opPrefix),
                             right, after, typeMapping.type(binary.getType()));
                 }

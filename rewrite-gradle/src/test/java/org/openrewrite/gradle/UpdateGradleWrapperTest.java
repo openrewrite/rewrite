@@ -1038,6 +1038,137 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
+    void allowDistributionMatchingWrapperUri() {
+        assertThat(new UpdateGradleWrapper(null, "all", null, "https://company.com/repo/gradle-8.14.5-all.zip", wrapperJarChecksum).validate().isValid()).isTrue();
+    }
+
+    @Test
+    void failRecipeIfDistributionContradictsWrapperUri() {
+        assertThat(new UpdateGradleWrapper(null, "bin", null, "https://company.com/repo/gradle-8.14.5-all.zip", null).validate().isInvalid()).isTrue();
+    }
+
+    @Test
+    void addChecksumDuringMigrationToCustomDistributionUri() {
+        HttpSender customDistributionHost = request -> {
+            if (request.getUrl().toString().contains("company.com")) {
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper(null, "all", null, "https://company.com/repo/gradle-8.10-all.zip", wrapperJarChecksum))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.com/repo/gradle-8.10-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void addChecksumToWrapperAlreadyOnCustomDistributionUri() {
+        HttpSender customDistributionHost = request -> {
+            if (request.getUrl().toString().contains("company.com")) {
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.10-all.zip", wrapperJarChecksum))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "8.10")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.com/repo/gradle-8.10-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.com/repo/gradle-8.10-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          )
+        );
+    }
+
+    @Test
+    void replaceDifferentChecksumOnWrapperAlreadyOnCustomDistributionUri() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.10-all.zip", wrapperJarChecksum))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "8.10"))),
+          properties(
+            """
+              distributionUrl=https\\://company.com/repo/gradle-8.10-all.zip
+              distributionSha256Sum=0000000000000000000000000000000000000000000000000000000000000000
+              """,
+            """
+              distributionUrl=https\\://company.com/repo/gradle-8.10-all.zip
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          )
+        );
+    }
+
+    @Test
+    void addChecksumToEachWrapperAlreadyOnCustomDistributionUri() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.10-all.zip", wrapperJarChecksum))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "8.10"))),
+          properties(
+            """
+              distributionUrl=https\\://company.com/repo/gradle-8.10-all.zip
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          properties(
+            """
+              distributionUrl=https\\://company.com/repo/gradle-8.10-all.zip
+              """,
+            """
+              distributionUrl=https\\://company.com/repo/gradle-8.10-all.zip
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("subproject/gradle/wrapper/gradle-wrapper.properties")
+          )
+        );
+    }
+
+    @Test
     void supportsSemverAgainstJFrogArtifactory() {
         HttpSender customDistributionHost = request -> {
             String url = request.getUrl().toString();

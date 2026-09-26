@@ -105,6 +105,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
     private int cursor = 0;
 
+    @Nullable
+    private Throwable reportedException;
+
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava25ParserVisitor(Path sourcePath,
@@ -442,7 +445,8 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             Map<String, List<J.Annotation>> recordParams = new HashMap<>();
             Space prefix = sourceBefore("(");
             List<JRightPadded<J.VariableDeclarations>> varDecls = new ArrayList<>();
-            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = ((JCClassDecl) node).sym.getRecordComponents().stream()
+            Symbol.ClassSymbol recordSymbol = ((JCClassDecl) node).sym;
+            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = recordSymbol == null ? new HashMap<>() : recordSymbol.getRecordComponents().stream()
                     .collect(toMap(
                             Symbol::getSimpleName,
                             rc -> mapAnnotations(extractRecordComponentAnnotations(rc), new HashMap<>())
@@ -1217,7 +1221,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                     emptyList(), node.getName().toString(), null, null), returnType == null ? returnTypeAnnotations : emptyList());
         }
 
-        boolean isCompactConstructor = nodeSym != null && (nodeSym.flags() & Flags.COMPACT_RECORD_CONSTRUCTOR) != 0;
+        boolean isCompactConstructor = hasFlag(node.getModifiers(), Flags.COMPACT_RECORD_CONSTRUCTOR);
         JContainer<Statement> params = JContainer.empty();
         if (!isCompactConstructor) {
             Space paramFmt = sourceBefore("(");
@@ -1804,9 +1808,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = convert(vartype);
         }
 
-        if (typeExpr == null && (node.declaredUsingVar() ||
-                ((node.sym.flags() & Flags.MATCH_BINDING) != 0 && source.startsWith("var", indexOfNextNonWhitespace(cursor, source))))) {
-            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", vartype != null ? typeMapping.type(vartype) : typeMapping.type(node.sym.type), null);
+        // A pattern binding written with `var` is untyped and not declaredUsingVar(), but javac starts it at the keyword
+        if (typeExpr == null && (node.declaredUsingVar() || node.getStartPosition() < node.pos)) {
+            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", vartype != null ? typeMapping.type(vartype) : typeMapping.type(node.sym == null ? null : node.sym.type), null);
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
@@ -1933,6 +1937,13 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private void reportJavaParsingException(Throwable ex) {
+        // Rethrown through every enclosing convert(), so describe it once. A stack overflow's
+        // path is too deep to describe at all: the line numbers alone take hours to compute.
+        if (ex == reportedException || ex instanceof StackOverflowError) {
+            return;
+        }
+        reportedException = ex;
+
         // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
         StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
         message.append("--- BEGIN PATH ---\n");
