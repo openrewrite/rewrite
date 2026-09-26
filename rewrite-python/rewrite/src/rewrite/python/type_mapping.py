@@ -78,14 +78,15 @@ def compute_source_line_data(
 # Shared Unknown singleton to avoid creating duplicate instances
 _UNKNOWN = JavaType.Unknown()
 
-# Mapping of Python builtin types to JavaType.Primitive
+# Mapping of Python builtin types to JavaType.Primitive. Python's ``None`` is a null
+# literal, which is what Null names; None_ stands for a value no member names.
 _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
     'str': JavaType.Primitive.String,
     'int': JavaType.Primitive.Int,
     'float': JavaType.Primitive.Double,
     'bool': JavaType.Primitive.Boolean,
-    'None': JavaType.Primitive.None_,
-    'NoneType': JavaType.Primitive.None_,
+    'None': JavaType.Primitive.Null,
+    'NoneType': JavaType.Primitive.Null,
     'bytes': JavaType.Primitive.String,  # Close enough for matching
     'LiteralString': JavaType.Primitive.String,
 }
@@ -94,9 +95,10 @@ _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
 PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
     JavaType.Primitive.String: 'str',
     JavaType.Primitive.Int: 'int',
+    JavaType.Primitive.Long: 'int',
     JavaType.Primitive.Double: 'float',
     JavaType.Primitive.Boolean: 'bool',
-    JavaType.Primitive.None_: 'None',
+    JavaType.Primitive.Null: 'None',
 }
 
 # ty-types descriptor kinds that map to JavaType.Method
@@ -965,13 +967,20 @@ class PythonTypeMapping:
         elif isinstance(node.value, bool):
             return JavaType.Primitive.Boolean
         elif isinstance(node.value, int):
-            return JavaType.Primitive.Int
+            # A Python int is arbitrary precision, so magnitude alone decides the box a
+            # consumer receives the value in, and a cast on the type only holds if the
+            # type names that box.
+            if -2 ** 31 <= node.value < 2 ** 31:
+                return JavaType.Primitive.Int
+            return JavaType.Primitive.Long if -2 ** 63 <= node.value < 2 ** 63 else JavaType.Primitive.None_
         elif isinstance(node.value, float):
             return JavaType.Primitive.Double
         elif isinstance(node.value, complex):
-            return self._create_class_type('complex')
-        elif node.value is None:
+            # A literal's type slot holds a JavaType.Primitive, and J.Literal#withType
+            # drops a class type put there.
             return JavaType.Primitive.None_
+        elif node.value is None:
+            return JavaType.Primitive.Null
         return None
 
     def _is_variable_descriptor(self, descriptor: Dict[str, Any]) -> bool:
