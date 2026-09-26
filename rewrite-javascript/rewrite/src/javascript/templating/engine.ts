@@ -105,7 +105,11 @@ function templateParser(workspaceDir?: string, types?: string[]): JavaScriptPars
     const key = `${workspaceDir ?? ""}::${JSON.stringify(types ?? null)}`;
     let parser = templateParsers.get(key);
     if (!parser) {
-        parser = new JavaScriptParser({relativeTo: workspaceDir, sourceFileCache: templateSourceFileCache, types});
+        // An empty list names nothing, which is the one way to load nothing.
+        const named = types === undefined || types.length === 0 ? types : ["*", ...types];
+        parser = new JavaScriptParser({
+            relativeTo: workspaceDir, sourceFileCache: templateSourceFileCache, types: named
+        });
         templateParsers.set(key, parser);
     }
     return parser;
