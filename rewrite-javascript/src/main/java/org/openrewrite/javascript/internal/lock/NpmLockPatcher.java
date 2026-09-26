@@ -110,7 +110,7 @@ public final class NpmLockPatcher implements LockPatcher {
             root = applyBump(root, lockfileVersion, editedManifest, edit);
         }
         if (!removals.isEmpty()) {
-            root = applyRemovals(root, lockfileVersion, removals);
+            root = applyRemovals(root, lockfileVersion, editedManifest, removals);
         }
         // An orphan-prune bump dropped a dependency edge; GC every installed entry it left unreachable.
         boolean prunes = false;
@@ -1008,11 +1008,16 @@ public final class NpmLockPatcher implements LockPatcher {
 
     // --- removals + orphan GC --------------------------------------------
 
-    private Json.JsonObject applyRemovals(Json.JsonObject root, int lockfileVersion, List<PackageEdit> removals) {
+    private Json.JsonObject applyRemovals(Json.JsonObject root, int lockfileVersion, JsonNode editedManifest,
+                                          List<PackageEdit> removals) {
         Json.JsonObject packages = requirePackages(root);
 
-        // GC-by-name is only sound for a flat, hoisted tree; reject nested/forked placements.
+        // A v2 lock's legacy dependencies tree is GC'd by name, only sound for a flat, hoisted tree; reject
+        // nested/forked placements there. A v3 lock is GC'd by placement below.
         for (Json member : packages.getMembers()) {
+            if (lockfileVersion >= 3) {
+                break;
+            }
             if (member instanceof Json.Member) {
                 String key = LockJson.memberKey((Json.Member) member);
                 if (key != null && key.indexOf("node_modules/") != key.lastIndexOf("node_modules/")) {
@@ -1024,26 +1029,56 @@ public final class NpmLockPatcher implements LockPatcher {
 
         Set<String> removedNames = new LinkedHashSet<>();
         for (PackageEdit removal : removals) {
-            removedNames.add(removal.getName());
+            if (!removal.isRetainsEntry()) {
+                removedNames.add(removal.getName());
+            }
             String importerKey = removal.getImporterDir() == null ? "" : removal.getImporterDir();
             Json.JsonObject importer = LockJson.objectMember(packages, importerKey);
             if (importer != null) {
                 Json.JsonObject scope = LockJson.objectMember(importer, removal.getScope());
                 if (scope != null && LockJson.member(scope, removal.getName()) != null) {
                     Json.JsonObject trimmed = removeMembers(scope, singleton(removal.getName()));
-                    if (isEmptyObject(trimmed)) {
+                    if (!isEmptyObject(trimmed)) {
+                        importer = LockJson.replaceValue(importer, removal.getScope(), trimmed);
+                    } else if (!editedManifest.has(removal.getScope())) {
+                        // npm omits a scope the manifest no longer declares.
+                        importer = removeMembers(importer, singleton(removal.getScope()));
+                    } else {
                         throw new EngineFailure(Reason.RESOLUTION_REQUIRED, removal.getName(),
                                 "removing " + removal.getName() + " empties the " + removal.getScope() + " scope");
                     }
-                    importer = LockJson.replaceValue(importer, removal.getScope(), trimmed);
                     packages = LockJson.replaceValue(packages, importerKey, importer);
                 }
+            }
+        }
+
+        // Still required (e.g. by a package added in the same edit), it stays installed with flags this patcher does
+        // not recompute; whole-closure resolution does.
+        Set<String> stillReachable = lockfileVersion >= 3 ? reachableInstalledKeys(packages) : reachableNames(packages);
+        for (String name : removedNames) {
+            if (stillReachable.contains(lockfileVersion >= 3 ? "node_modules/" + name : name)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        "removed dependency " + name + " is still required by another package (not yet patched)");
             }
         }
 
         Set<String> removedKeys = new LinkedHashSet<>();
         for (String name : removedNames) {
             removedKeys.add("node_modules/" + name);
+        }
+        if (lockfileVersion >= 3) {
+            // Another placement of a removed name could re-hoist into the freed top-level slot.
+            for (Json member : packages.getMembers()) {
+                String key = member instanceof Json.Member ? LockJson.memberKey((Json.Member) member) : null;
+                if (key != null && !removedKeys.contains(key) && key.contains("node_modules/") &&
+                        removedNames.contains(installedName(key))) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, installedName(key),
+                            "removing " + installedName(key) + " with another placement (" + key + ") may re-hoist; deferred");
+                }
+            }
+            packages = removeMembers(packages, removedKeys);
+            // Orphans are whatever npm's own node_modules resolution no longer reaches from an importer.
+            return gcOrphansAfterBump(LockJson.replaceValue(root, "packages", packages), lockfileVersion);
         }
         packages = removeMembers(packages, removedKeys);
 
@@ -1106,7 +1141,7 @@ public final class NpmLockPatcher implements LockPatcher {
             }
             enqueueNames(LockJson.objectMember(entry, "dependencies"), reachable, queue);
             enqueueNames(LockJson.objectMember(entry, "optionalDependencies"), reachable, queue);
-            enqueueNames(LockJson.objectMember(entry, "peerDependencies"), reachable, queue);
+            enqueueNames(requiredPeers(entry), reachable, queue);
         }
         return reachable;
     }
@@ -1228,7 +1263,7 @@ public final class NpmLockPatcher implements LockPatcher {
             }
             enqueueResolved(keys, key, LockJson.objectMember(entry, "dependencies"), reachable, queue);
             enqueueResolved(keys, key, LockJson.objectMember(entry, "optionalDependencies"), reachable, queue);
-            enqueueResolved(keys, key, LockJson.objectMember(entry, "peerDependencies"), reachable, queue);
+            enqueueResolved(keys, key, requiredPeers(entry), reachable, queue);
         }
         return reachable;
     }
@@ -1320,6 +1355,27 @@ public final class NpmLockPatcher implements LockPatcher {
             throw new EngineFailure(Reason.UNSUPPORTED_LOCKFILE_VERSION, null,
                     "unrecognised lockfileVersion: " + source);
         }
+    }
+
+    /** An entry's peers minus those {@code peerDependenciesMeta} marks optional, which npm does not keep installed. */
+    private static Json.@Nullable JsonObject requiredPeers(Json.JsonObject entry) {
+        Json.JsonObject peers = LockJson.objectMember(entry, "peerDependencies");
+        Json.JsonObject meta = LockJson.objectMember(entry, "peerDependenciesMeta");
+        if (peers == null || meta == null) {
+            return peers;
+        }
+        Set<String> optional = new LinkedHashSet<>();
+        for (Json member : meta.getMembers()) {
+            if (member instanceof Json.Member) {
+                String name = LockJson.memberKey((Json.Member) member);
+                Json.JsonObject peerMeta = name == null ? null : LockJson.objectMember(meta, name);
+                Json.Member flag = peerMeta == null ? null : LockJson.member(peerMeta, "optional");
+                if (flag != null && "true".equals(literalSource(flag.getValue()))) {
+                    optional.add(name);
+                }
+            }
+        }
+        return optional.isEmpty() ? peers : removeMembers(peers, optional);
     }
 
     private static boolean isLink(Json.JsonObject entry) {
