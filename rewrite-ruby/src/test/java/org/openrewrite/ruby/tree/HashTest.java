@@ -156,4 +156,17 @@ public class HashTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void hashKey() {
+        rewriteRun(
+          ruby(
+            """
+              expect(metrics[0].data).to eq({} => 0)
+              expect(metrics[0].data).to eq({a: 1} => 0)
+              x = {{} => 0}
+              """
+          )
+        );
+    }
 }
