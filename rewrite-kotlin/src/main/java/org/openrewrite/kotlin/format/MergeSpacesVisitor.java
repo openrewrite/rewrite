@@ -280,6 +280,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return m.withAnnotations(visitContainer(m.getAnnotations(), newMultiAnnotationType.getAnnotations()));
     }
 
+    @Override
     @SuppressWarnings("DataFlowIssue")
     public J visitProperty(K.Property property, @Nullable Object ctx) {
         if (property == ctx || !(ctx instanceof K.Property)) {
@@ -1752,10 +1753,11 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, @Nullable Object ctx) {
-        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
-        if (parens == newParens) {
+        if (parens == ctx || !(ctx instanceof J.Parentheses)) {
             return parens;
         }
+        //noinspection unchecked
+        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
         J.Parentheses<T> pa = parens;
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), Space.Location.PARENTHESES_PREFIX, newParens.getPrefix()));
         pa = pa.withMarkers(visitMarkers(pa.getMarkers(), newParens.getMarkers()));

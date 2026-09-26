@@ -73,78 +73,118 @@ func TestIsError(t *testing.T) {
 	assert.False(t, IsError(&java.JavaTypeClass{FullyQualifiedName: "string"}), "expected false for non-error type")
 }
 
+// goType names a Go basic type the way the type mapper attributes it.
+func goType(name string) java.JavaType {
+	return &java.JavaTypeClass{FullyQualifiedName: name, Kind: "Class"}
+}
+
+func litType(keyword string) java.JavaType {
+	return &java.JavaTypePrimitive{Keyword: keyword}
+}
+
+func TestClassifiesALiteralsPrimitiveKeyword(t *testing.T) {
+	assert.True(t, IsString(litType("String")), "a string literal is a string")
+	assert.True(t, IsBool(litType("boolean")), "a bool literal is a bool")
+	for _, kw := range []string{"byte", "short", "int", "long", "char"} {
+		assert.Truef(t, IsInt(litType(kw)), "IsInt(%q) = false, want true", kw)
+		assert.Truef(t, IsNumeric(litType(kw)), "IsNumeric(%q) = false, want true", kw)
+	}
+	for _, kw := range []string{"float", "double"} {
+		assert.Truef(t, IsNumeric(litType(kw)), "IsNumeric(%q) = false, want true", kw)
+		assert.Falsef(t, IsInt(litType(kw)), "IsInt(%q) = true, want false", kw)
+	}
+	assert.False(t, IsNumeric(litType("String")), "a string literal is not numeric")
+	assert.False(t, IsInt(litType("boolean")), "a bool literal is not an integer")
+}
+
+func TestALiteralsKeywordEstablishesNoIdentity(t *testing.T) {
+	assert.False(t, IsSameGoType(litType("int"), goType("int")))
+	assert.False(t, IsSameGoType(litType("int"), litType("int")))
+}
+
+func TestMatchesALiteralArgumentAgainstItsGoTypeName(t *testing.T) {
+	for _, tc := range []struct{ pattern, keyword string }{
+		{"string", "String"},
+		{"bool", "boolean"},
+		{"int", "int"},
+		{"int32", "int"},
+		{"int64", "long"},
+		{"int8", "byte"},
+		{"byte", "byte"},
+		{"rune", "char"},
+		{"float32", "float"},
+		{"float64", "double"},
+	} {
+		m := &typeArgMatcher{pattern: globToRegexp(canonicalGoType(tc.pattern)), raw: tc.pattern}
+		assert.Truef(t, m.matches(litType(tc.keyword)),
+			"pattern %q does not match a literal typed %q", tc.pattern, tc.keyword)
+	}
+}
+
+func TestDoesNotMatchALiteralOfAnotherType(t *testing.T) {
+	for _, tc := range []struct{ pattern, keyword string }{
+		{"string", "int"},
+		{"int", "long"},
+		{"int64", "int"},
+		{"float64", "float"},
+		{"rune", "byte"},
+	} {
+		m := &typeArgMatcher{pattern: globToRegexp(canonicalGoType(tc.pattern)), raw: tc.pattern}
+		assert.Falsef(t, m.matches(litType(tc.keyword)),
+			"pattern %q matches a literal typed %q", tc.pattern, tc.keyword)
+	}
+}
+
 func TestIsString(t *testing.T) {
-	assert.True(t, IsString(&java.JavaTypePrimitive{Keyword: "String"}), "expected true for String primitive")
-	assert.False(t, IsString(&java.JavaTypePrimitive{Keyword: "int"}), "expected false for int")
+	assert.True(t, IsString(goType("string")), "expected true for string")
+	assert.True(t, IsString(goType("untyped string")), "expected true for an untyped string constant")
+	assert.False(t, IsString(goType("int")), "expected false for int")
+	assert.False(t, IsString(nil), "expected false for an unattributed type")
 }
 
 func TestIsInt(t *testing.T) {
-	// Signed widths map to primitive keywords; unsigned widths to named types.
-	intLike := []java.JavaType{
-		&java.JavaTypePrimitive{Keyword: "int"},   // int, int32
-		&java.JavaTypePrimitive{Keyword: "long"},  // int64
-		&java.JavaTypePrimitive{Keyword: "short"}, // int16
-		&java.JavaTypePrimitive{Keyword: "byte"},  // int8, byte
-		&java.JavaTypeClass{FullyQualifiedName: "uint"},
-		&java.JavaTypeClass{FullyQualifiedName: "uint8"},
-		&java.JavaTypeClass{FullyQualifiedName: "uint16"},
-		&java.JavaTypeClass{FullyQualifiedName: "uint32"},
-		&java.JavaTypeClass{FullyQualifiedName: "uint64"},
-		&java.JavaTypeClass{FullyQualifiedName: "uintptr"},
+	for _, name := range []string{
+		"int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
+		"byte", "rune", "untyped int", "untyped rune",
+	} {
+		assert.Truef(t, IsInt(goType(name)), "IsInt(%q) = false, want true", name)
 	}
-	for _, typ := range intLike {
-		assert.Truef(t, IsInt(typ), "IsInt(%q) = false, want true", GetFullyQualifiedName(typ))
+	for _, name := range []string{"float64", "complex128", "string", "bool", "untyped nil", "main.Point"} {
+		assert.Falsef(t, IsInt(goType(name)), "IsInt(%q) = true, want false", name)
 	}
-	notInt := []java.JavaType{
-		&java.JavaTypePrimitive{Keyword: "double"},
-		&java.JavaTypePrimitive{Keyword: "String"},
-		&java.JavaTypePrimitive{Keyword: "boolean"},
-		nil,
-	}
-	for _, typ := range notInt {
-		assert.Falsef(t, IsInt(typ), "IsInt(%q) = true, want false", GetFullyQualifiedName(typ))
-	}
+	assert.False(t, IsInt(nil), "IsInt(nil) = true, want false")
 }
 
 func TestIsNumeric(t *testing.T) {
-	numeric := []java.JavaType{
-		// Signed widths, floats, and rune map to primitive keywords.
-		&java.JavaTypePrimitive{Keyword: "int"},    // int, int32
-		&java.JavaTypePrimitive{Keyword: "long"},   // int64
-		&java.JavaTypePrimitive{Keyword: "short"},  // int16
-		&java.JavaTypePrimitive{Keyword: "byte"},   // int8, byte
-		&java.JavaTypePrimitive{Keyword: "float"},  // float32
-		&java.JavaTypePrimitive{Keyword: "double"}, // float64
-		&java.JavaTypePrimitive{Keyword: "char"},   // rune
-		// Unsigned widths have no Java primitive, so they are named types.
-		&java.JavaTypeClass{FullyQualifiedName: "uint"},
-		&java.JavaTypeClass{FullyQualifiedName: "uint8"},
-		&java.JavaTypeClass{FullyQualifiedName: "uint16"},
-		&java.JavaTypeClass{FullyQualifiedName: "uint32"},
-		&java.JavaTypeClass{FullyQualifiedName: "uint64"},
-		&java.JavaTypeClass{FullyQualifiedName: "uintptr"},
+	for _, name := range []string{
+		"int", "int64", "uint64", "byte", "rune",
+		"float32", "float64", "complex64", "complex128",
+		"untyped int", "untyped float", "untyped complex",
+	} {
+		assert.Truef(t, IsNumeric(goType(name)), "IsNumeric(%q) = false, want true", name)
 	}
-	for _, typ := range numeric {
-		assert.Truef(t, IsNumeric(typ), "IsNumeric(%q) = false, want true", GetFullyQualifiedName(typ))
+	for _, name := range []string{"string", "bool", "untyped nil", "main.Point"} {
+		assert.Falsef(t, IsNumeric(goType(name)), "IsNumeric(%q) = true, want false", name)
 	}
-	assert.False(t, IsNumeric(&java.JavaTypePrimitive{Keyword: "String"}), "IsNumeric(String) = true, want false")
 	assert.False(t, IsNumeric(nil), "IsNumeric(nil) = true, want false")
 }
 
-// Pattern type names must resolve to the same signature the type mapper
-// produces, so int64 patterns match "long" and uint stays "uint".
-func TestResolveGoType(t *testing.T) {
-	tests := map[string]string{
-		"int": "int", "int32": "int", "int16": "short", "int8": "byte", "int64": "long",
-		"uint": "uint", "uint64": "uint64", "uintptr": "uintptr",
-		"float32": "float", "float64": "double",
-		"string": "String", "bool": "boolean", "byte": "byte", "rune": "char", "error": "error",
-	}
-	for in, want := range tests {
-		if got := resolveGoType(in); got != want {
-			t.Errorf("resolveGoType(%q) = %q, want %q", in, got, want)
-		}
-	}
+func TestIsBool(t *testing.T) {
+	assert.True(t, IsBool(goType("bool")), "expected true for bool")
+	assert.True(t, IsBool(goType("untyped bool")), "expected true for an untyped bool constant")
+	assert.False(t, IsBool(goType("int")), "expected false for int")
+	assert.False(t, IsBool(nil), "expected false for an unattributed type")
+}
+
+func TestIsSameGoType(t *testing.T) {
+	assert.True(t, IsSameGoType(goType("byte"), goType("uint8")), "byte and uint8 are one type")
+	assert.True(t, IsSameGoType(goType("rune"), goType("int32")), "rune and int32 are one type")
+	assert.True(t, IsSameGoType(goType("int"), goType("int")))
+	assert.False(t, IsSameGoType(goType("int"), goType("int32")), "int is its own type, distinct from int32")
+	assert.False(t, IsSameGoType(goType("byte"), goType("int8")), "byte is unsigned, int8 signed")
+	assert.False(t, IsSameGoType(goType("int"), goType("untyped int")), "an untyped constant is not yet an int")
+	assert.False(t, IsSameGoType(goType("int"), nil), "an unattributed type is not known to match")
 }
 
 func TestAsClass(t *testing.T) {

@@ -76,7 +76,7 @@ func TestGoProjectThirdPartyImportResolves(t *testing.T) {
 		// identifier should now have a non-nil Type. Without require-driven
 		// stubbing this would be nil.
 		ids := collectIdentTypes(cu)
-		assert.NotNil(t,ids["y"], "expected `y` import identifier to have a non-nil Type via the require stub; got nil")
+		assert.NotNil(t, ids["y"], "expected `y` import identifier to have a non-nil Type via the require stub; got nil")
 	}
 
 	spec := test.NewRecipeSpec()

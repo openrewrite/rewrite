@@ -249,9 +249,8 @@ class PropertiesParserTest implements RewriteTest {
               foo=C:\\
 
               """,
-            spec -> spec.afterRecipe(file -> {
-                assertThat(file).isInstanceOf(Properties.File.class);
-            })
+            spec -> spec.afterRecipe(file ->
+                assertThat(file).isInstanceOf(Properties.File.class))
           )
         );
     }

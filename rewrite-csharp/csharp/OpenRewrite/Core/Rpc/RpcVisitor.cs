@@ -15,6 +15,8 @@
  */
 using OpenRewrite.CSharp.Rpc;
 
+using OpenRewrite.Core;
+
 namespace OpenRewrite.Core.Rpc;
 
 /// <summary>
@@ -45,7 +47,7 @@ public class RpcVisitor : TreeVisitor<Tree, ExecutionContext>
         var treeId = sf.Id.ToString();
         _rpc.StoreLocalObject(treeId, sf);
 
-        var ctxId = Guid.NewGuid().ToString();
+        var ctxId = Tree.RandomId().ToString();
         _rpc.StoreLocalObject(ctxId, ctx);
 
         var sourceFileType = RpcSendQueue.ToJavaTypeName(sf.GetType())

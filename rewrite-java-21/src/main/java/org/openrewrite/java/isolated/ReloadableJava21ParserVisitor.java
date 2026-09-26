@@ -104,6 +104,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
     private int cursor = 0;
 
+    @Nullable
+    private Throwable reportedException;
+
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava21ParserVisitor(Path sourcePath,
@@ -135,9 +138,10 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             List<JRightPadded<Expression>> expressions;
             if (node.getArguments().size() == 1) {
                 ExpressionTree arg = node.getArguments().get(0);
-                if (arg instanceof JCAssign) {
-                    if (endPos(arg) < 0) {
-                        expressions = singletonList(convert(((JCAssign) arg).rhs, t -> sourceBefore(")")));
+                if (arg instanceof JCAssign assign && assign.lhs instanceof JCIdent) {
+                    // javac's `Annotate#enterAnnotation` builds an elided `value =` with `make.at(rhs.pos)`
+                    if (assign.lhs.pos == assign.rhs.pos) {
+                        expressions = singletonList(convert(assign.rhs, t -> sourceBefore(")")));
                     } else {
                         expressions = singletonList(convert(arg, t -> sourceBefore(")")));
                     }
@@ -431,7 +435,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             Map<String, List<J.Annotation>> recordParams = new HashMap<>();
             Space prefix = sourceBefore("(");
             List<JRightPadded<J.VariableDeclarations>> varDecls = new ArrayList<>();
-            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = ((JCClassDecl) node).sym.getRecordComponents().stream()
+            Symbol.ClassSymbol recordSymbol = ((JCClassDecl) node).sym;
+            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = recordSymbol == null ? new HashMap<>() : recordSymbol.getRecordComponents().stream()
                     .collect(toMap(
                             Symbol::getSimpleName,
                             rc -> mapAnnotations(extractRecordComponentAnnotations(rc), new HashMap<>())
@@ -1158,7 +1163,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         Symbol.MethodSymbol nodeSym = jcMethod.sym;
 
         J.MethodDeclaration.IdentifierWithAnnotations name;
-        if ("<init>".equals(node.getName().toString())) {
+        if ("<init>".contentEquals(node.getName())) {
             String owner = null;
             if (nodeSym == null) {
                 for (Tree tree : getCurrentPath()) {
@@ -1181,7 +1186,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                     emptyList(), node.getName().toString(), null, null), returnType == null ? returnTypeAnnotations : emptyList());
         }
 
-        boolean isCompactConstructor = nodeSym != null && (nodeSym.flags() & Flags.COMPACT_RECORD_CONSTRUCTOR) != 0;
+        boolean isCompactConstructor = hasFlag(node.getModifiers(), Flags.COMPACT_RECORD_CONSTRUCTOR);
         JContainer<Statement> params = JContainer.empty();
         if (!isCompactConstructor) {
             Space paramFmt = sourceBefore("(");
@@ -1735,8 +1740,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         if (vartype == null) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
-            if ((node.sym.flags() & Flags.PARAMETER) > 0) {
-                // this is a lambda parameter with an inferred type expression
+            if (!hasLombokGeneratedSymbol(node)) {
+                // Inferred lambda parameter types and unresolved types have no source representation.
                 typeExpr = null;
             } else {
                 Space space = whitespace();
@@ -1768,9 +1773,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = convert(vartype);
         }
 
-        if (typeExpr == null && (node.declaredUsingVar() ||
-                ((node.sym.flags() & Flags.MATCH_BINDING) != 0 && source.startsWith("var", indexOfNextNonWhitespace(cursor, source))))) {
-            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", vartype != null ? typeMapping.type(vartype) : typeMapping.type(node.sym.type), null);
+        // A pattern binding written with `var` is untyped and not declaredUsingVar(), but javac starts it at the keyword
+        if (typeExpr == null && (node.declaredUsingVar() || node.getStartPosition() < node.pos)) {
+            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", vartype != null ? typeMapping.type(vartype) : typeMapping.type(node.sym == null ? null : node.sym.type), null);
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
@@ -1900,6 +1905,13 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private void reportJavaParsingException(Throwable ex) {
+        // Rethrown through every enclosing convert(), so describe it once. A stack overflow's
+        // path is too deep to describe at all: the line numbers alone take hours to compute.
+        if (ex == reportedException || ex instanceof StackOverflowError) {
+            return;
+        }
+        reportedException = ex;
+
         // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
         StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
         message.append("--- BEGIN PATH ---\n");
@@ -2379,6 +2391,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         boolean afterFirstModifier = false;
         boolean inComment = false;
         boolean inMultilineComment = false;
+        int multilineCommentStart = -1;
         int afterLastModifierPosition = cursor;
         int lastAnnotationPosition = cursor;
 
@@ -2400,16 +2413,18 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             char c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1) {
+            if (c == '/' && source.length() > i + 1 && !inComment && !inMultilineComment) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
                     inMultilineComment = true;
+                    multilineCommentStart = i;
                 } else if (next == '/') {
                     inComment = true;
                 }
             }
 
-            if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
+            // The closing `/` cannot be part of the opener, so `/*/` does not terminate a block comment.
+            if (inMultilineComment && c == '/' && i >= multilineCommentStart + 3 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
@@ -2511,6 +2526,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> annotations = new ArrayList<>();
         boolean inComment = false;
         boolean inMultilineComment = false;
+        int multilineCommentStart = -1;
         for (int i = cursor; i <= maxAnnotationPosition && i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
@@ -2523,16 +2539,18 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             char c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1) {
+            if (c == '/' && source.length() > i + 1 && !inComment && !inMultilineComment) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
                     inMultilineComment = true;
+                    multilineCommentStart = i;
                 } else if (next == '/') {
                     inComment = true;
                 }
             }
 
-            if (inMultilineComment && c == '/' && i > 0 && source.charAt(i - 1) == '*') {
+            // The closing `/` cannot be part of the opener, so `/*/` does not terminate a block comment.
+            if (inMultilineComment && c == '/' && i >= multilineCommentStart + 3 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;

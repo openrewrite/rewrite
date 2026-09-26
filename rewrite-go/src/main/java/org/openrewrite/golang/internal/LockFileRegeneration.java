@@ -22,10 +22,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.stream.Stream;
+
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonMap;
 
 /**
  * Regenerates a Go module's {@code go.sum} by running {@code go mod download all}
@@ -67,11 +69,11 @@ public final class LockFileRegeneration {
     }
 
     public Result regenerate(String manifestContent) {
-        return regenerate(manifestContent, null, Collections.emptyMap());
+        return regenerate(manifestContent, null, emptyMap());
     }
 
     public Result regenerate(String manifestContent, @Nullable String existingLockContent) {
-        return regenerate(manifestContent, existingLockContent, Collections.emptyMap());
+        return regenerate(manifestContent, existingLockContent, emptyMap());
     }
 
     /**
@@ -86,7 +88,7 @@ public final class LockFileRegeneration {
      * dependencies), or an error message
      */
     public Result regenerate(String manifestContent, @Nullable String existingLockContent, Map<String, String> environment) {
-        return regenerate(Collections.singletonMap(manifestFile, manifestContent), "", existingLockContent, environment);
+        return regenerate(singletonMap(manifestFile, manifestContent), "", existingLockContent, environment);
     }
 
     public Result regenerate(Map<String, String> filesByPath, String workSubdir, @Nullable String existingLockContent, Map<String, String> environment) {

@@ -24,6 +24,8 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.util.*;
 
+import static java.util.Collections.emptyMap;
+
 /**
  * Diffs a freshly resolved {@link ResolutionGraph} against the existing Yarn Berry {@code yarn.lock} and expresses
  * the difference as {@link PackageEdit}s for {@link YarnBerryLockPatcher}. Berry's lock is flat — one entry per
@@ -155,7 +157,7 @@ final class YarnBerryLockDiff {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, name,
                     name + "@" + m.getVersion() + " has no registry tarball to checksum");
         }
-        Map<String, String> newDeps = m.getDependencies() == null ? Collections.emptyMap() : m.getDependencies();
+        Map<String, String> newDeps = m.getDependencies() == null ? emptyMap() : m.getDependencies();
         boolean dropped = !newDeps.keySet().containsAll(entry.depNames);
         if (moves && !entry.depNames.containsAll(newDeps.keySet())) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
@@ -180,7 +182,7 @@ final class YarnBerryLockDiff {
 
     /** The berry bump rewrites resolution and dependencies but never the peer blocks; a peer delta defers. */
     private static void requirePeersUnchanged(String name, VersionManifest m, Lock.Entry entry) {
-        Map<String, String> peers = m.getPeerDependencies() == null ? Collections.emptyMap() : m.getPeerDependencies();
+        Map<String, String> peers = m.getPeerDependencies() == null ? emptyMap() : m.getPeerDependencies();
         if (!peers.equals(entry.peerDependencies)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + "'s peerDependencies changed (berry peer rewrite not yet patched)");

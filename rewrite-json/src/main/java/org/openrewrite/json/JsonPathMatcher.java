@@ -155,7 +155,7 @@ public class JsonPathMatcher {
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
             if (ctx.ROOT() != null || "[".equals(ctx.start.getText())) {
                 scope = cursorPath.stream()
-                        .filter(t -> t instanceof Json.JsonObject)
+                        .filter(Json.JsonObject.class::isInstance)
                         .findFirst()
                         .orElseGet(() -> cursorPath.stream()
                                 .filter(t -> t instanceof Json.Document && ((Json.Document) t).getValue() instanceof Json.JsonObject)
@@ -546,8 +546,8 @@ public class JsonPathMatcher {
                         if (member.getValue() instanceof Json.Array) {
                             Json.Array array = (Json.Array) ((Json.Member) lhs).getValue();
                             if (array.getValues().stream()
-                                    .filter(o -> o instanceof Json.Literal)
-                                    .map(o -> (Json.Literal) o)
+                                    .filter(Json.Literal.class::isInstance)
+                                    .map(Json.Literal.class::cast)
                                     .anyMatch(o -> String.valueOf(o.getValue()).contains(String.valueOf(rhs)))) {
                                 return originalScope;
                             }

@@ -24,6 +24,8 @@ import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static org.openrewrite.javascript.internal.LockFileRegeneration.Reason.RESOLUTION_REQUIRED;
 import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
@@ -37,9 +39,11 @@ import static org.openrewrite.semver.Semver.Ecosystem.NODE;
  * constraint already met and adds no node. A missing non-optional peer is npm's auto-install: when it is enabled
  * (npm only; see {@link #autoInstallPeers}) and the slice is cleanest — an all-prod closure, the peer
  * a single pure-leaf version required by a single package — the peer is added as a top-level node; every other
- * missing-peer shape fails loud. An {@code npm:<name>@<range>} alias resolves its real package but is keyed and
- * placed by the alias name, reproduced only when self-contained (no un-aliased copy of the same package, no peer
- * entanglement). Version and constraint decisions are delegated entirely to node-semver.
+ * missing-peer shape fails loud. A present peer resolving to several versions is satisfied per placement, so for
+ * npm it is handed to the serializer to verify (see {@link #placedPeerForks}). An {@code npm:<name>@<range>} alias
+ * resolves its real package but is keyed and placed by the alias name, reproduced unless it entangles the peer
+ * machinery (its real name required as a peer, or the alias declaring peers). Version and constraint decisions are
+ * delegated entirely to node-semver.
  */
 public final class NpmGraphBuilder {
 
@@ -63,18 +67,32 @@ public final class NpmGraphBuilder {
      */
     private final Map<String, Set<String>> lockedVersions;
 
+    /**
+     * A peer whose name resolves to several versions is satisfied per placement: each placement of its
+     * requirer sees the nearest copy up its {@code node_modules} chain. Only a serializer that models placement can
+     * decide that, so when enabled (npm only) such a peer is recorded as a {@link ResolutionGraph.PlacedPeer} for it
+     * to verify; otherwise it defers.
+     */
+    private final boolean placedPeerForks;
+
     public NpmGraphBuilder(Registry registry) {
         this(registry, false);
     }
 
     public NpmGraphBuilder(Registry registry, boolean autoInstallPeers) {
-        this(registry, autoInstallPeers, Collections.emptyMap());
+        this(registry, autoInstallPeers, emptyMap());
     }
 
     public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions) {
+        this(registry, autoInstallPeers, lockedVersions, false);
+    }
+
+    public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions,
+                           boolean placedPeerForks) {
         this.registry = registry;
         this.autoInstallPeers = autoInstallPeers;
         this.lockedVersions = lockedVersions;
+        this.placedPeerForks = placedPeerForks;
     }
 
     public ResolutionGraph build(Map<String, String> importerManifests) {
@@ -110,7 +128,8 @@ public final class NpmGraphBuilder {
                     resolveEdges(manifest.getOptionalDependencies(), chosen, manifests, work));
         }
         requireResolvableAliases(deriveAliases(manifests), chosen, manifests);
-        Set<String> autoInstalledPeers = resolvePeers(manifests, chosen, declared);
+        List<ResolutionGraph.PlacedPeer> placedPeers = new ArrayList<>();
+        Set<String> autoInstalledPeers = resolvePeers(manifests, chosen, declared, placedPeers);
 
         List<ResolutionGraph.Importer> importers = new ArrayList<>();
         for (ImporterDecl decl : declared) {
@@ -138,12 +157,12 @@ public final class NpmGraphBuilder {
         Map<String, ResolvedNode> nodes = new LinkedHashMap<>();
         for (Map.Entry<String, VersionManifest> e : manifests.entrySet()) {
             String nodeKey = e.getKey();
-            Map<String, String> edges = new LinkedHashMap<>(nodeEdges.getOrDefault(nodeKey, Collections.emptyMap()));
-            edges.putAll(nodeOptionalEdges.getOrDefault(nodeKey, Collections.emptyMap()));
+            Map<String, String> edges = new LinkedHashMap<>(nodeEdges.getOrDefault(nodeKey, emptyMap()));
+            edges.putAll(nodeOptionalEdges.getOrDefault(nodeKey, emptyMap()));
             nodes.put(nodeKey, new ResolvedNode(e.getValue(), edges,
                     flags.dev.contains(nodeKey), flags.optional.contains(nodeKey), flags.devOptional.contains(nodeKey)));
         }
-        return new ResolutionGraph(importers, nodes);
+        return new ResolutionGraph(importers, nodes, placedPeers);
     }
 
     private Map<String, String> resolveEdges(@Nullable Map<String, String> declaredEdges,
@@ -167,7 +186,7 @@ public final class NpmGraphBuilder {
     private String select(String name, String range,
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
                           Deque<String[]> work) {
-        String deduped = Semver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range, NODE);
+        String deduped = Semver.maxSatisfying(chosen.getOrDefault(name, emptySet()), range, NODE);
         if (deduped != null) {
             return deduped;
         }
@@ -190,7 +209,7 @@ public final class NpmGraphBuilder {
 
     /** The highest already-locked version of {@code name} that {@code range} admits, or {@code null}. */
     private @Nullable String lockedSatisfying(String name, String range) {
-        return Semver.maxSatisfying(lockedVersions.getOrDefault(name, Collections.emptySet()), range, NODE);
+        return Semver.maxSatisfying(lockedVersions.getOrDefault(name, emptySet()), range, NODE);
     }
 
     /**
@@ -219,7 +238,7 @@ public final class NpmGraphBuilder {
      */
     private String selectAlias(String aliasName, String realName, String range, Map<String, Set<String>> chosen,
                                Map<String, VersionManifest> manifests, Deque<String[]> work) {
-        String deduped = Semver.maxSatisfying(chosen.getOrDefault(aliasName, Collections.emptySet()), range, NODE);
+        String deduped = Semver.maxSatisfying(chosen.getOrDefault(aliasName, emptySet()), range, NODE);
         if (deduped != null) {
             return deduped;
         }
@@ -248,7 +267,7 @@ public final class NpmGraphBuilder {
                 range = alias.range;
             }
         }
-        return Semver.maxSatisfying(chosen.getOrDefault(name, Collections.emptySet()), range, NODE);
+        return Semver.maxSatisfying(chosen.getOrDefault(name, emptySet()), range, NODE);
     }
 
     /** Parse an {@code npm:<name>@<range>} alias, or {@code null} when the target is not a registry range. */
@@ -282,28 +301,17 @@ public final class NpmGraphBuilder {
     }
 
     /**
-     * Only a self-contained alias is reproduced byte-exact: the real package must not also resolve un-aliased (nor
-     * be aliased more than once), and it must not entangle the peer machinery (which keys by real name). An alias
-     * that forks with a non-aliased copy, whose real name is required as a peer, or that itself declares peers,
-     * defers with the classic message.
+     * Guard the alias shapes the serializer cannot yet place byte-exact. Every alias lands at its own top-level
+     * slot, so any number of aliases of a package, with or without an un-aliased copy, are reproduced. An alias
+     * whose real name is required as a peer, or that declares peers of its own, still defers because the peer
+     * machinery keys by real name.
      */
     private static void requireResolvableAliases(Map<String, String> aliases, Map<String, Set<String>> chosen,
                                                  Map<String, VersionManifest> manifests) {
         if (aliases.isEmpty()) {
             return;
         }
-        Map<String, Integer> targetCount = new LinkedHashMap<>();
-        for (String realName : aliases.values()) {
-            targetCount.merge(realName, 1, Integer::sum);
-        }
         Set<String> aliasedReal = new HashSet<>(aliases.values());
-        for (Map.Entry<String, String> alias : aliases.entrySet()) {
-            String realName = alias.getValue();
-            if (chosen.containsKey(realName) || targetCount.get(realName) > 1) {
-                throw new EngineFailure(RESOLUTION_REQUIRED, realName, alias.getKey() + " aliases " + realName +
-                        " which also resolves un-aliased (alias fork not yet resolved)");
-            }
-        }
         for (VersionManifest m : manifests.values()) {
             Map<String, String> peers = m.getPeerDependencies();
             if (peers == null) {
@@ -317,7 +325,7 @@ public final class NpmGraphBuilder {
             }
         }
         for (Map.Entry<String, String> alias : aliases.entrySet()) {
-            for (String version : chosen.getOrDefault(alias.getKey(), Collections.emptySet())) {
+            for (String version : chosen.getOrDefault(alias.getKey(), emptySet())) {
                 VersionManifest m = manifests.get(ResolutionGraph.key(alias.getKey(), version));
                 if (m != null && notEmpty(m.getPeerDependencies())) {
                     throw new EngineFailure(RESOLUTION_REQUIRED, alias.getValue(), alias.getValue() +
@@ -436,34 +444,40 @@ public final class NpmGraphBuilder {
      * @return the node keys of the auto-installed peers (they carry no dev/optional flag in the all-prod closure).
      */
     private Set<String> resolvePeers(Map<String, VersionManifest> manifests, Map<String, Set<String>> chosen,
-                                     List<ImporterDecl> declared) {
+                                     List<ImporterDecl> declared, List<ResolutionGraph.PlacedPeer> placedPeers) {
         List<String[]> missing = new ArrayList<>();  // {requirer, peerName, range}
-        for (VersionManifest m : new ArrayList<>(manifests.values())) {
+        for (Map.Entry<String, VersionManifest> e : new ArrayList<>(manifests.entrySet())) {
+            VersionManifest m = e.getValue();
             Map<String, String> peers = m.getPeerDependencies();
             if (peers == null) {
                 continue;
             }
             JsonNode meta = m.getPeerDependenciesMeta();
             for (Map.Entry<String, String> peer : peers.entrySet()) {
-                resolvePeer(m.getName(), peer.getKey(), peer.getValue(), meta, chosen, missing);
+                resolvePeer(m.getName(), e.getKey(), peer.getKey(), peer.getValue(), meta, chosen, missing,
+                        placedPeers);
             }
         }
         for (ImporterDecl decl : declared) {
             for (Map.Entry<String, String> peer : decl.peers.entrySet()) {
-                resolvePeer(rootRequirer(decl), peer.getKey(), peer.getValue(), null, chosen, missing);
+                resolvePeer(rootRequirer(decl), null, peer.getKey(), peer.getValue(), null, chosen, missing,
+                        placedPeers);
             }
         }
-        return missing.isEmpty() ? Collections.emptySet() : installMissingPeers(missing, manifests, chosen, declared);
+        return missing.isEmpty() ? emptySet() : installMissingPeers(missing, manifests, chosen, declared);
     }
 
     /**
      * Classify one {@code (requirer, peer, range)}: an unmet non-optional peer is collected for auto-install (or
      * defers when disabled), a present peer must resolve to a single satisfying version, and an optional absent peer
-     * is skipped.
+     * is skipped. A peer resolving to several versions is left to placement when {@link #placedPeerForks}.
+     *
+     * @param requirerKey the requiring node's key, or {@code null} for an importer
      */
-    private void resolvePeer(String requirer, String peerName, String range, @Nullable JsonNode meta,
-                             Map<String, Set<String>> chosen, List<String[]> missing) {
-        Set<String> resolved = chosen.getOrDefault(peerName, Collections.emptySet());
+    private void resolvePeer(String requirer, @Nullable String requirerKey, String peerName, String range,
+                             @Nullable JsonNode meta, Map<String, Set<String>> chosen, List<String[]> missing,
+                             List<ResolutionGraph.PlacedPeer> placedPeers) {
+        Set<String> resolved = chosen.getOrDefault(peerName, emptySet());
         if (resolved.isEmpty()) {
             if (isOptionalPeer(meta, peerName)) {
                 return;
@@ -475,6 +489,11 @@ public final class NpmGraphBuilder {
             return;
         }
         if (resolved.size() > 1) {
+            if (placedPeerForks && requirerKey != null && Semver.validate(range, null, NODE).isValid()) {
+                placedPeers.add(new ResolutionGraph.PlacedPeer(requirerKey, peerName, range,
+                        isOptionalPeer(meta, peerName)));
+                return;
+            }
             throw new EngineFailure(RESOLUTION_REQUIRED, requirer, requirer + " peer " + peerName +
                     " resolves to multiple versions " + resolved + " (peer fork not yet resolved)");
         }

@@ -79,7 +79,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         setCursor(new Cursor(getCursor(), container));
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
-        int size = container.getElements().stream().allMatch(it -> it instanceof J.Empty) ? 0 : container.getElements().size();
+        int size = container.getElements().stream().allMatch(J.Empty.class::isInstance) ? 0 : container.getElements().size();
         AtomicBoolean hasNewLinedElement = new AtomicBoolean(false);
         List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), (index, right) -> {
             J jElement = right.getElement();
@@ -404,7 +404,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     }
                     break;
                 case IMPORT_PREFIX:
-                    space = withWhitespace(space, space.getWhitespace().replaceAll(" ", ""));
+                    space = withWhitespace(space, space.getWhitespace().replace(" ", ""));
                 default:
                     if (getCursor().getValue() instanceof TypeTree && Boolean.TRUE.equals(getCursor().getParentTreeCursor().pollMessage("annotations-wrapped"))) {
                         space = withWhitespace(space, "\n");

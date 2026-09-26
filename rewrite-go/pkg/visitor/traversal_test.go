@@ -175,6 +175,8 @@ func TestSelectClausesAreTraversed(t *testing.T) {
 	kinds := reachedKinds(t, src)
 
 	// then
+	require.Equal(t, 1, kinds["golang.Select"], "the select itself")
+	require.Equal(t, 0, kinds["java.Switch"], "select is not a java.Switch")
 	require.Equal(t, 1, kinds["golang.CommClause"], "comm clause")
 	require.Equal(t, 1, kinds["golang.Unary"], "receive expression")
 }

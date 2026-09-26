@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PackageJsonHelperTest {
@@ -148,7 +149,7 @@ class PackageJsonHelperTest {
                 "}\n");
         Json.Document modified = PackageJsonHelper.upgradeVersion(
                 doc,
-                java.util.Collections.singletonList(new MatchedDependency("lodash", "dependencies", "^4.17.20")),
+                singletonList(new MatchedDependency("lodash", "dependencies", "^4.17.20")),
                 "^4.17.21");
         assertThat(modified.printAll()).isEqualTo(
                 "{\n" +
@@ -502,7 +503,7 @@ class PackageJsonHelperTest {
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(
-                Collections.singletonList(
+                singletonList(
                         org.openrewrite.Parser.Input.fromString(Paths.get("package.json"), content)),
                 null,
                 new InMemoryExecutionContext(Throwable::printStackTrace))

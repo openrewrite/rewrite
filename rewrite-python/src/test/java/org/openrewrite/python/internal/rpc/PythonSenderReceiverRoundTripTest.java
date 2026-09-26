@@ -33,13 +33,13 @@ import org.openrewrite.rpc.RpcSendQueue;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.UUID;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PythonSenderReceiverRoundTripTest {
@@ -114,7 +114,7 @@ class PythonSenderReceiverRoundTripTest {
         // PEP 695 `type X[T] = int` — all four codecs previously dropped TypeAlias.typeParameters.
         J.TypeParameter typeParam = new J.TypeParameter(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                Collections.emptyList(), Collections.emptyList(), ident("T"), null);
+                emptyList(), emptyList(), ident("T"), null);
         Py.TypeAlias after = new Py.TypeAlias(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY, ident("X"),
                 JContainer.build(Space.EMPTY, List.of(JRightPadded.build(typeParam)), Markers.EMPTY),
@@ -137,7 +137,7 @@ class PythonSenderReceiverRoundTripTest {
 
     private static J.Identifier ident(String name) {
         return new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                Collections.emptyList(), name, null, null);
+                emptyList(), name, null, null);
     }
 
     private static Py.ExpressionStatement expressionStatementOfAwait(String name, Space awaitPrefix) {
@@ -146,7 +146,7 @@ class PythonSenderReceiverRoundTripTest {
         UUID identId = Tree.randomId();
         J.Identifier identifier = new J.Identifier(
                 identId, Space.EMPTY, Markers.EMPTY,
-                Collections.emptyList(), name, null, null
+                emptyList(), name, null, null
         );
         Py.Await await = new Py.Await(awaitId, awaitPrefix, Markers.EMPTY, identifier, (JavaType) null);
         return new Py.ExpressionStatement(esId, await);

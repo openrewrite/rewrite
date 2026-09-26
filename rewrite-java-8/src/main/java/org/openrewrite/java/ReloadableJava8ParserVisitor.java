@@ -90,6 +90,9 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     private int cursor = 0;
 
+    @Nullable
+    private Throwable reportedException;
+
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava8ParserVisitor(Path sourcePath,
@@ -974,7 +977,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         Symbol.MethodSymbol nodeSym = jcMethod.sym;
 
         J.MethodDeclaration.IdentifierWithAnnotations name;
-        if ("<init>".equals(node.getName().toString())) {
+        if ("<init>".contentEquals(node.getName())) {
             String owner = null;
             if (nodeSym == null) {
                 for (Tree tree : getCurrentPath()) {
@@ -1672,6 +1675,13 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
             return j;
         } catch (Throwable ex) {
+            // Rethrown through every enclosing convert(), so describe it once. A stack overflow's
+            // path is too deep to describe at all: the line numbers alone take hours to compute.
+            if (ex == reportedException || ex instanceof StackOverflowError) {
+                throw ex;
+            }
+            reportedException = ex;
+
             // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
             StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
             message.append("--- BEGIN PATH ---\n");
@@ -2168,6 +2178,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         boolean afterFirstModifier = false;
         boolean inComment = false;
         boolean inMultilineComment = false;
+        int multilineCommentStart = -1;
         final AtomicReference<String> word = new AtomicReference<>("");
         int afterLastModifierPosition = cursor;
         int lastAnnotationPosition = cursor;
@@ -2190,16 +2201,18 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             char c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1) {
+            if (c == '/' && source.length() > i + 1 && !inComment && !inMultilineComment) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
                     inMultilineComment = true;
+                    multilineCommentStart = i;
                 } else if (next == '/') {
                     inComment = true;
                 }
             }
 
-            if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
+            // The closing `/` cannot be part of the opener, so `/*/` does not terminate a block comment.
+            if (inMultilineComment && c == '/' && i >= multilineCommentStart + 3 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
@@ -2303,6 +2316,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> annotations = new ArrayList<>();
         boolean inComment = false;
         boolean inMultilineComment = false;
+        int multilineCommentStart = -1;
         for (int i = cursor; i <= maxAnnotationPosition && i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
@@ -2315,16 +2329,18 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             char c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1) {
+            if (c == '/' && source.length() > i + 1 && !inComment && !inMultilineComment) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
                     inMultilineComment = true;
+                    multilineCommentStart = i;
                 } else if (next == '/') {
                     inComment = true;
                 }
             }
 
-            if (inMultilineComment && c == '/' && i > 0 && source.charAt(i - 1) == '*') {
+            // The closing `/` cannot be part of the opener, so `/*/` does not terminate a block comment.
+            if (inMultilineComment && c == '/' && i >= multilineCommentStart + 3 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
             } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;

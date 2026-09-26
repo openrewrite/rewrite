@@ -75,6 +75,36 @@ func TestAssignmentOperationRoundTrip_OperatorPreserved(t *testing.T) {
 	}
 }
 
+func TestBinaryOperatorChange_AppliedOnReceive(t *testing.T) {
+	// A recipe that flips `==` to `!=` mutates only the Binary operator element,
+	// producing a CHANGE (not a fresh ADD) diffed against the Equal baseline. The
+	// receiver must apply the new operator; if it re-uses the before value it drops
+	// the change and prints `==` unchanged (the EmptyBlock/Go corruption).
+	id := uuid.New()
+	before := &java.Binary{
+		ID:       id,
+		Left:     makeIdent("a"),
+		Operator: java.LeftPadded[java.BinaryOperator]{Element: java.Equal, Markers: java.Markers{}},
+		Right:    makeIdent("b"),
+	}
+	after := &java.Binary{
+		ID:       id,
+		Left:     makeIdent("a"),
+		Operator: java.LeftPadded[java.BinaryOperator]{Element: java.NotEqual, Markers: java.Markers{}},
+		Right:    makeIdent("b"),
+	}
+	seed := &java.Binary{
+		ID:       id,
+		Operator: java.LeftPadded[java.BinaryOperator]{Element: java.Equal, Markers: java.Markers{}},
+	}
+
+	got := roundTripNodeWithBefore(t, after, before, seed).(*java.Binary)
+
+	if got.Operator.Element != java.NotEqual {
+		t.Errorf("Operator: want NotEqual (!=) after CHANGE, got %v", got.Operator.Element)
+	}
+}
+
 func TestBinaryRoundTrip_OperatorPreserved(t *testing.T) {
 	// Sibling sanity check: a real BinaryOperator must still resolve to Binary,
 	// not be poached by the assignment parser.

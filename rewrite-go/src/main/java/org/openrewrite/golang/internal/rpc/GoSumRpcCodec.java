@@ -91,8 +91,7 @@ public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSum> {
         t = t.withChecksum(q.receive(t.getChecksum()));
         t = t.withFileAttributes(q.receive(t.getFileAttributes()));
         t = t.withLines(q.receiveList(t.getLines(), rp -> receiveRightPadded(receiver, rp, q)));
-        t = t.withEof(q.receive(t.getEof(), space -> receiver.visitSpace(space, q)));
-        return t;
+        return t.withEof(q.receive(t.getEof(), space -> receiver.visitSpace(space, q)));
     }
 
     private static JRightPadded<GoSum.Line> receiveRightPadded(GolangReceiver receiver,

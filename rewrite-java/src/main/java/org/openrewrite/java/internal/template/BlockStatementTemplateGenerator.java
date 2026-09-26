@@ -17,10 +17,7 @@ package org.openrewrite.java.internal.template;
 
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
-import lombok.AllArgsConstructor;
-import lombok.RequiredArgsConstructor;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
@@ -45,12 +42,18 @@ import static org.openrewrite.java.tree.JavaCoordinates.Mode.REPLACEMENT;
  */
 @RequiredArgsConstructor
 public class BlockStatementTemplateGenerator {
-    private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
-    private static final String STOP_COMMENT = "__TEMPLATE_STOP__";
+    protected static final String TEMPLATE_COMMENT = "__TEMPLATE__";
+    protected static final String STOP_COMMENT = "__TEMPLATE_STOP__";
     protected static final String TEMPLATE_INTERNAL_IMPORTS = "import org.openrewrite.java.internal.template.__M__;\nimport org.openrewrite.java.internal.template.__P__;\n";
 
     protected final Set<String> imports;
     private final boolean contextSensitive;
+    /**
+     * -- GETTER --
+     *  The declared type of the synthetic binding a context-free expression template is assigned to. Part of the
+     *  stub's identity, so it has to participate in the template cache key.
+     */
+    @Getter
     private final String bindType;
 
     public BlockStatementTemplateGenerator(Set<String> imports, boolean contextSensitive) {
@@ -126,6 +129,7 @@ public class BlockStatementTemplateGenerator {
                         }
                     }
                 }
+                //noinspection DataFlowIssue
                 return right;
             }
 
@@ -152,6 +156,7 @@ public class BlockStatementTemplateGenerator {
                         }
                     }
                 }
+                //noinspection DataFlowIssue
                 return left;
             }
 

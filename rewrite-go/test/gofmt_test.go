@@ -72,6 +72,28 @@ func TestGofmt_NormalizesSpacingAndIndent(t *testing.T) {
 		"package p\n\nfunc f(a int, b int) int {\n\tif a > b {\n\t\treturn a\n\t}\n\treturn b\n}\n")
 }
 
+// The format corpus parses without type attribution, where a conversion reads
+// as a call, so the conversion indent rule is reachable only from tests like
+// these.
+
+func TestGofmt_IndentsAWrappedConversionOperand(t *testing.T) {
+	assertGofmt(t,
+		"package p\n\nimport \"time\"\n\nfunc f(n int64) {\nif true {\n_ = time.Duration(\nn,\n)\n}\n}\n",
+		"package p\n\nimport \"time\"\n\nfunc f(n int64) {\n\tif true {\n\t\t_ = time.Duration(\n\t\t\tn,\n\t\t)\n\t}\n}\n")
+}
+
+func TestGofmt_IndentsAConversionToAnUnnamedType(t *testing.T) {
+	assertGofmt(t,
+		"package p\n\nfunc f(s string) {\nif true {\n_ = []byte(\ns,\n)\n}\n}\n",
+		"package p\n\nfunc f(s string) {\n\tif true {\n\t\t_ = []byte(\n\t\t\ts,\n\t\t)\n\t}\n}\n")
+}
+
+func TestGofmt_ContinuesABinaryOperandInsideAConversion(t *testing.T) {
+	assertGofmt(t,
+		"package p\n\nimport \"time\"\n\nfunc f(n int64) {\nfor i := 0; i < 1; i++ {\n_ = time.Duration(\nn +\n1,\n)\n}\n}\n",
+		"package p\n\nimport \"time\"\n\nfunc f(n int64) {\n\tfor i := 0; i < 1; i++ {\n\t\t_ = time.Duration(\n\t\t\tn +\n\t\t\t\t1,\n\t\t)\n\t}\n}\n")
+}
+
 func TestGofmt_AlreadyFormattedIsUnchanged(t *testing.T) {
 	src := "package p\n\nimport \"fmt\"\n\nfunc f() {\n\tfmt.Println(\"hi\")\n}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)

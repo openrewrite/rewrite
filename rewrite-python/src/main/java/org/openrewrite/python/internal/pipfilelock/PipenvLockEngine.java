@@ -1279,7 +1279,7 @@ public final class PipenvLockEngine {
 
         private List<PackageFile> filesOfVersion(PackageListing listing, String pkg, PythonVersion version) {
             List<PackageFile> files = groupByVersion(listing, pkg).get(version);
-            return files != null ? files : Collections.emptyList();
+            return files != null ? files : emptyList();
         }
 
         private void rebuildMeta(Set<String> pipfileCategories) {

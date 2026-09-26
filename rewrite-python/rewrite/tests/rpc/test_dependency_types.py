@@ -384,12 +384,9 @@ class TestExportedTypes:
         # The class stays under its own FQN, not on the module type.
         assert "Thing" not in {m._name for m in (module_type._methods or [])}
 
-    def test_module_type_includes_reexports_under_binding_names(self, tmp_path):
+    def test_reexports_are_declared_where_they_are_defined(self, tmp_path):
         # click-style layout: the API is defined in a submodule and re-exported by
-        # the package __init__. Parse-time attribution declares `relib.echo(...)`
-        # under the *package* module type, so the enumeration must surface the
-        # re-exported bindings there (under the imported-as name), while a
-        # re-exported class keeps its defining FQN.
+        # the package __init__.
         pkg = tmp_path / "relib"
         pkg.mkdir()
         (pkg / "utils.py").write_text(
@@ -399,17 +396,13 @@ class TestExportedTypes:
             "class Widget:\n"
             "    def draw(self) -> None:\n        ...\n")
         (pkg / "__init__.py").write_text(
-            "from relib.utils import echo, SEP, Widget\n"
-            "from relib.utils import echo as shout\n")
+            "from relib.utils import echo, SEP, Widget\n")
 
         by_fqn = self._enumerate(tmp_path, pkg)
 
         package_type = by_fqn.get("relib")
         assert isinstance(package_type, JavaType.Class)
-        method_names = {m._name for m in (package_type._methods or [])}
-        assert "echo" in method_names
-        assert "shout" in method_names  # aliased re-export binds under its alias
-        assert "Widget" not in method_names
+        assert not (package_type._methods or [])
         assert "SEP" in {v._name for v in (package_type._members or [])}
 
         # The defining submodule gets its own module type; the class its own FQN.

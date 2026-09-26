@@ -30,8 +30,8 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
-import java.util.Collections;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -79,7 +79,7 @@ class LockPatcherTest {
                 .newResolved("https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz")
                 .newShasum("7535345b896734d5f80c4d06c50955527a14f12b")
                 .newIntegrity("sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==")
-                .newDependencies(Collections.emptyMap())
+                .newDependencies(emptyMap())
                 .scope("dependencies")
                 .build();
 

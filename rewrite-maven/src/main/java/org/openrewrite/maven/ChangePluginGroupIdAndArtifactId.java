@@ -22,7 +22,13 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.semver.ExactVersion;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
@@ -56,8 +62,11 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     String newArtifactId;
 
     @Option(displayName = "New version",
-            description = "An exact version number.",
-            example = "29.0",
+            description = "An exact version number or node-style semver selector used to select the version number. " +
+                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors)",
+            example = "29.X",
             required = false)
     @Nullable
     String newVersion;
@@ -69,25 +78,41 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
         return String.format("`%s:%s`", newGroupId, newArtifactId);
     }
 
-    String description = "Change the groupId and/or the artifactId of a specified Maven plugin. Optionally update the plugin version. " +
-                "This recipe does not perform any validation and assumes all values passed are valid.";
+    String description = "Change the groupId and/or the artifactId of a specified Maven plugin. Optionally update the plugin version, " +
+                "which may be given as an exact version or as a node-style semver selector resolved against the new plugin's available versions.";
+
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
+        if (newVersion != null) {
+            validated = validated.and(Semver.validate(newVersion, null));
+        }
+        return validated;
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        VersionComparator versionComparator = newVersion == null ? null : Semver.validate(newVersion, null).getValue();
 
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (isPluginTag(oldGroupId, oldArtifactId)) {
+                    String resolvedVersion;
+                    try {
+                        resolvedVersion = resolveVersion(t, ctx);
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(t);
+                    }
                     if (newGroupId != null) {
                         t = changeChildTagValue(t, "groupId", newGroupId, ctx);
                     }
                     if (newArtifactId != null) {
                         t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
                     }
-                    if (newVersion != null) {
-                        t = changeChildTagValue(t, "version", newVersion, ctx);
+                    if (resolvedVersion != null) {
+                        t = changeChildTagValue(t, "version", resolvedVersion, ctx);
                     }
                     if (t != tag) {
                         maybeUpdateModel();
@@ -95,6 +120,33 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                 }
                 //noinspection ConstantConditions
                 return t;
+            }
+
+            private @Nullable String resolveVersion(Xml.Tag tag, ExecutionContext ctx) throws MavenDownloadingException {
+                if (newVersion == null || versionComparator == null || versionComparator instanceof ExactVersion) {
+                    return newVersion;
+                }
+
+                ResolvedPom resolvedPom = getResolutionResult().getPom();
+                // A plugin tag without a `groupId` is implicitly `org.apache.maven.plugins`; `oldGroupId` may be a glob.
+                String groupId = resolvedPom.getValue(newGroupId != null ? newGroupId :
+                        tag.getChildValue("groupId").orElse("org.apache.maven.plugins"));
+                String artifactId = resolvedPom.getValue(newArtifactId != null ? newArtifactId :
+                        tag.getChildValue("artifactId").orElse(oldArtifactId));
+                if (groupId == null || artifactId == null) {
+                    return null;
+                }
+
+                String currentVersion = tag.getChildValue("version").map(resolvedPom::getValue).orElse(null);
+                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadPluginMetadata(groupId, artifactId, ctx));
+                String selected = null;
+                for (String v : mavenMetadata.getVersioning().getVersions()) {
+                    if (versionComparator.isValid(currentVersion, v) &&
+                            (selected == null || versionComparator.compare(currentVersion, v, selected) > 0)) {
+                        selected = v;
+                    }
+                }
+                return selected;
             }
         };
     }

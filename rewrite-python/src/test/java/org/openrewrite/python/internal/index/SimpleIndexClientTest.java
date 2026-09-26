@@ -217,6 +217,19 @@ class SimpleIndexClientTest {
     }
 
     @Test
+    void rejectionNamesUnresolvedCredentialPlaceholders() {
+        server.enqueue(new MockResponse().setResponseCode(401));
+        PythonPackageIndex unresolved = index().withUnresolvedCredentialPlaceholders(List.of("${INDEX_TOKEN}"));
+        assertThatThrownBy(() -> client.listFiles(unresolved, "requests"))
+          .isInstanceOfSatisfying(PythonIndexException.class, e -> {
+              assertThat(e.getReason()).isEqualTo(PythonIndexException.Reason.AUTH_FAILED);
+              assertThat(e.getMessage())
+                .startsWith("HTTP 401 from " + server.url("/simple/requests/"))
+                .contains("reference ${INDEX_TOKEN}, which is not set");
+          });
+    }
+
+    @Test
     void forbiddenMapsToAuthFailed() {
         server.enqueue(new MockResponse().setResponseCode(403));
         assertThatThrownBy(() -> client.listFiles(index(), "requests"))

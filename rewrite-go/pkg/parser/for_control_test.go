@@ -57,9 +57,10 @@ func TestConditionOnlyForHasEmptyInitAndUpdate(t *testing.T) {
 	require.NotNil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers), "expected golang.ImplicitForClauses marker on the control")
 }
 
-// An infinite `for {}` has no condition, but its init/update placeholders must
-// still be present and marked implicit.
-func TestInfiniteForHasEmptyInitAndUpdate(t *testing.T) {
+// An infinite `for {}` has no source-level clauses, but Java models `for (;;)`
+// with J.Empty in all three slots so the fields are never null. All three must
+// therefore be present and marked implicit.
+func TestInfiniteForHasEmptyInitConditionAndUpdate(t *testing.T) {
 	// given
 	src := "package main\n\nfunc f() {\n\tfor {\n\t}\n}\n"
 
@@ -72,7 +73,13 @@ func TestInfiniteForHasEmptyInitAndUpdate(t *testing.T) {
 		t.Fatalf("Init element must be *java.Empty, got %T", control.Init.Element)
 	}
 	require.NotNil(t, control.Update, "Update must not be nil for an infinite for")
-	require.Nil(t, control.Condition, "infinite for must have no condition")
+	if _, ok := control.Update.Element.(*java.Empty); !ok {
+		t.Fatalf("Update element must be *java.Empty, got %T", control.Update.Element)
+	}
+	require.NotNil(t, control.Condition, "Condition must not be nil for an infinite for")
+	if _, ok := control.Condition.Element.(*java.Empty); !ok {
+		t.Fatalf("Condition element must be *java.Empty, got %T", control.Condition.Element)
+	}
 	require.NotNil(t, java.FindMarker[golang.ImplicitForClauses](control.Markers), "expected golang.ImplicitForClauses marker on the control")
 }
 

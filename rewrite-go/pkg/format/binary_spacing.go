@@ -346,27 +346,37 @@ func walkBinary(e binaryOperands) (has4, has5 bool, maxProblem int) {
 }
 
 // unaryOperator reports the token a unary expression writes ahead of its
-// operand, which can join the binary operator to its left.
+// operand, which can join the binary operator to its left. Go parses `&`, `*`
+// and `<-` into a golang.Unary; the java.Unary spellings reach here from a
+// synthesized tree, which the printer accepts just the same.
 func unaryOperator(e java.Expression) (string, bool) {
-	u, ok := e.(*java.Unary)
-	if !ok {
-		return "", false
-	}
-	switch u.Operator.Element {
-	case java.Positive:
-		return "+", true
-	case java.Negate:
-		return "-", true
-	case java.Not:
-		return "!", true
-	case java.BitwiseNot:
-		return "^", true
-	case java.Deref:
-		return "*", true
-	case java.AddressOf:
-		return "&", true
-	case java.Receive:
-		return "<-", true
+	switch u := e.(type) {
+	case *java.Unary:
+		switch u.Operator.Element {
+		case java.Positive:
+			return "+", true
+		case java.Negate:
+			return "-", true
+		case java.Not:
+			return "!", true
+		case java.BitwiseNot:
+			return "^", true
+		case java.Deref:
+			return "*", true
+		case java.AddressOf:
+			return "&", true
+		case java.Receive:
+			return "<-", true
+		}
+	case *golang.Unary:
+		switch u.Operator.Element {
+		case golang.AddressOf:
+			return "&", true
+		case golang.Indirection:
+			return "*", true
+		case golang.Receive:
+			return "<-", true
+		}
 	}
 	return "", false
 }

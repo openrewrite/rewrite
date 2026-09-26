@@ -51,10 +51,11 @@ dependencies {
     api(project(":rewrite-kotlin"))
     api(project(":rewrite-maven"))
     api("org.jetbrains:annotations:latest.release")
-    compileOnly(project(":rewrite-test"))
-    implementation(project(":rewrite-properties"))
-    implementation(project(":rewrite-toml"))
+    api(project(":rewrite-toml"))
 
+    implementation(project(":rewrite-properties"))
+
+    compileOnly(project(":rewrite-test"))
     compileOnly("org.apache.groovy:groovy:4.+")
     compileOnly(gradleApi())
     // No particular reason to hold back upgrading this beyond 3.x, but it takes some effort: https://github.com/openrewrite/rewrite/issues/5270
@@ -62,14 +63,13 @@ dependencies {
 
     // Align kotlin-stdlib-jdk7/-jdk8/-common with kotlin-stdlib
     // (mockwebserver 4.x would otherwise pin them to 1.9.10 transitively).
-    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.3.20"))
+    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.20"))
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
         exclude("org.slf4j", "slf4j-nop")
     }
-    testImplementation(project(":rewrite-toml"))
     testImplementation(project(":rewrite-gradle-tooling-model:model"))
     "pluginLocalTestClasspath"(project(mapOf("path" to ":rewrite-gradle-tooling-model:model", "configuration" to "pluginLocalTestClasspath")))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")

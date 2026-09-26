@@ -51,20 +51,6 @@ func NewGoProject(projectName, modulePath string) GoProject {
 	return GoProject{Ident: uuid.New(), ProjectName: projectName, ModulePath: modulePath}
 }
 
-// Conversion marks a J.MethodInvocation whose callee is a type rather than a
-// function — `[]byte(s)`, `string(b)`, `MyInt(3)`. Go spells a conversion
-// exactly like a call and there is no method to attribute, so the marker is
-// what identifies one. Mirrors org.openrewrite.golang.marker.Conversion.
-type Conversion struct {
-	Ident uuid.UUID
-}
-
-func (m Conversion) ID() uuid.UUID { return m.Ident }
-
-func NewConversion() Conversion {
-	return Conversion{Ident: uuid.New()}
-}
-
 // Builtin marks a J.MethodInvocation of one of Go's predeclared functions
 // (`len`, `copy`, `append`, ...). They have no signature to attribute, so the
 // marker is what separates them from a call to a user-defined function of the
@@ -90,4 +76,19 @@ func (m ImplicitForClauses) ID() uuid.UUID { return m.Ident }
 
 func NewImplicitForClauses() ImplicitForClauses {
 	return ImplicitForClauses{Ident: uuid.New()}
+}
+
+// PartialTypeAttribution marks a CompilationUnit whose package did not
+// type-check completely, so an absent type means "not resolved here" rather
+// than "no such type". Reason names what was lost. Mirrors
+// org.openrewrite.golang.marker.PartialTypeAttribution.
+type PartialTypeAttribution struct {
+	Ident  uuid.UUID
+	Reason string
+}
+
+func (m PartialTypeAttribution) ID() uuid.UUID { return m.Ident }
+
+func NewPartialTypeAttribution(reason string) PartialTypeAttribution {
+	return PartialTypeAttribution{Ident: uuid.New(), Reason: reason}
 }

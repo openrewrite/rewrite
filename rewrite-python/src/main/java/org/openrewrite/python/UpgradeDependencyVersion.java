@@ -78,11 +78,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         if ("project.optional-dependencies".equals(scope) || "dependency-groups".equals(scope)) {
             v = v.and(Validated.required("groupName", groupName));
         }
-        v = v.and(Validated.test("newVersion",
+        return v.and(Validated.test("newVersion",
                 "must be a PEP 440 version or version specifier", newVersion,
                 nv -> nv != null && !nv.trim().isEmpty() &&
                         PythonVersionSpecifierSet.parse(PyProjectHelper.normalizeVersionConstraint(nv)) != null));
-        return v;
     }
 
     @Override
@@ -102,7 +101,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 "For `pyproject.toml`, `uv.lock`, `poetry.lock`, and `pdm.lock` are regenerated natively without executing the package manager. " +
                 "For `Pipfile`, `Pipfile.lock` is regenerated natively by consulting the project's " +
                 "package index over the network. " +
-                "Not safe to use as a precondition: invokes the package manager or the network and " +
+                "Not safe to use as a precondition: consults the package index over the network and " +
                 "publishes per-project state shared with other dependency recipes.";
     }
 

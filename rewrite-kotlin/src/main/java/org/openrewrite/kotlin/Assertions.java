@@ -57,6 +57,9 @@ public final class Assertions {
     public static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
         if (source instanceof JavaSourceFile) {
             assertValidTypes(typeValidation, (JavaSourceFile) source);
+            if (typeValidation.unknown()) {
+                assertNoUnknownElements(source);
+            }
         }
         return source;
     }
@@ -216,6 +219,24 @@ public final class Assertions {
         };
     }
 
+    private static void assertNoUnknownElements(SourceFile source) {
+        List<J.Unknown> unknowns = new KotlinIsoVisitor<List<J.Unknown>>() {
+            @Override
+            public J visitUnknown(J.Unknown unknown, List<J.Unknown> unknowns) {
+                unknowns.add(unknown);
+                return super.visitUnknown(unknown, unknowns);
+            }
+        }.reduce(source, new ArrayList<>());
+        if (!unknowns.isEmpty()) {
+            throw new IllegalStateException("LST contains unknown elements\n" + unknowns.stream()
+                    .map(unknown -> unknown.getSource().getMarkers()
+                            .findFirst(ParseExceptionResult.class)
+                            .map(ParseExceptionResult::getMessage)
+                            .orElse("") + unknown.getSource().getText())
+                    .collect(joining("\n\n")));
+        }
+    }
+
     private static void assertValidTypes(TypeValidation typeValidation, J sf) {
         if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations() ||
                 typeValidation.constructorInvocations()) {
@@ -347,6 +368,11 @@ public final class Assertions {
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
             if (v == variable) {
+                if (!(v.getDeclarator() instanceof J.Identifier)) {
+                    // A destructuring pattern names its variables through its own identifiers, which carry and are
+                    // checked against their own types; the declaration itself names no single variable.
+                    return v;
+                }
                 JavaType.Variable variableType = v.getVariableType();
                 if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType()) {
                     if (isValidated(variable)) {

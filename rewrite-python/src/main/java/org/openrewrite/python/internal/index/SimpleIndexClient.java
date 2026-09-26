@@ -93,8 +93,7 @@ public class SimpleIndexClient {
         try (HttpSender.Response response = httpSender.send(request)) {
             int code = response.getCode();
             if (code == 401 || code == 403) {
-                throw new PythonIndexException(Reason.AUTH_FAILED, index.getUrl(),
-                        "HTTP " + code + " from " + pageUrl);
+                throw PythonIndexException.authFailed(index, code, pageUrl);
             }
             if (code == 404) {
                 throw new PythonIndexException(Reason.NOT_FOUND, index.getUrl(),
@@ -119,7 +118,7 @@ public class SimpleIndexClient {
 
     private static @Nullable String contentType(HttpSender.Response response) {
         for (Map.Entry<String, List<String>> header : response.getHeaders().entrySet()) {
-            if (header.getKey() != null && "content-type".equalsIgnoreCase(header.getKey()) &&
+            if ("content-type".equalsIgnoreCase(header.getKey()) &&
                     !header.getValue().isEmpty()) {
                 return header.getValue().get(0);
             }

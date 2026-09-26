@@ -104,3 +104,31 @@ func stripAllSpaces(v reflect.Value) reflect.Value {
 		return v
 	}
 }
+
+func TestFusesWith(t *testing.T) {
+	tests := map[string]struct {
+		before, after string
+		want          bool
+	}{
+		"keyword and name":        {"var", "x", true},
+		"keyword and literal":     {"return", "0", true},
+		"keyword and punctuation": {"return", "(x)", false},
+		"already separated":       {"var", " x", false},
+		"plus and plus":           {"+", "+x", true},
+		"minus and minus":         {"-", "-x", true},
+		"and and and":             {"&", "&x", true},
+		"and and complement":      {"&", "^x", true},
+		"complement and self":     {"^", "^x", false},
+		"not and self":            {"!", "!x", false},
+		"star and self":           {"*", "*x", false},
+		"receive and minus":       {"<-", "-x", false},
+		"plus and name":           {"+", "x", false},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := fusesWith(tc.before, tc.after); got != tc.want {
+				t.Errorf("fusesWith(%q, %q) = %v, want %v", tc.before, tc.after, got, tc.want)
+			}
+		})
+	}
+}

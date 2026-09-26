@@ -29,11 +29,12 @@ import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+
+import static java.util.Collections.singletonList;
 
 /**
  * Shared utilities for Python dependency recipes operating on pyproject.toml files.
@@ -113,7 +114,7 @@ public class PyProjectHelper {
         JsonParser parser = new JsonParser();
         Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
         List<SourceFile> parsed = new ArrayList<>();
-        parser.parseInputs(Collections.singletonList(input), null,
+        parser.parseInputs(singletonList(input), null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)).forEach(parsed::add);
         if (!parsed.isEmpty() && parsed.get(0) instanceof Json.Document) {
             Json.Document newDoc = (Json.Document) parsed.get(0);
@@ -131,7 +132,7 @@ public class PyProjectHelper {
         TomlParser parser = new TomlParser();
         Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
         List<SourceFile> parsed = new ArrayList<>();
-        parser.parseInputs(Collections.singletonList(input), null,
+        parser.parseInputs(singletonList(input), null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)).forEach(parsed::add);
         if (!parsed.isEmpty() && parsed.get(0) instanceof Toml.Document) {
             Toml.Document newDoc = (Toml.Document) parsed.get(0);

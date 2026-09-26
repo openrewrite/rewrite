@@ -22,8 +22,7 @@ import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.util.*;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonMap;
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
@@ -254,7 +253,7 @@ class YarnClassicLockDiffTest {
     void missingLocatorDefers() {
         VersionManifest noDist = vm("a", "1.0.0", emptyMap(), null, null, null);
         ResolutionGraph graph = new ResolutionGraph(
-                Collections.singletonList(new ResolutionGraph.Importer("", "app", "1.0.0",
+                singletonList(new ResolutionGraph.Importer("", "app", "1.0.0",
                         singletonMap("dependencies", singletonMap("a", "^1.0.0")), singletonMap("a", "1.0.0"))),
                 singletonMap("a@1.0.0", new ResolvedNode(noDist, emptyMap())));
         assertThatExceptionOfType(EngineFailure.class)
@@ -265,7 +264,7 @@ class YarnClassicLockDiffTest {
     @Test
     void workspaceImporterDefers() {
         ResolutionGraph graph = new ResolutionGraph(
-                Collections.singletonList(new ResolutionGraph.Importer("packages/app", "app", "1.0.0",
+                singletonList(new ResolutionGraph.Importer("packages/app", "app", "1.0.0",
                         emptyMap(), emptyMap())),
                 emptyMap());
         assertThatExceptionOfType(EngineFailure.class)
@@ -326,7 +325,7 @@ class YarnClassicLockDiffTest {
 
         @Override
         public Set<String> versions(String name) {
-            return versionsByName.getOrDefault(name, Collections.emptySet());
+            return versionsByName.getOrDefault(name, emptySet());
         }
 
         @Override

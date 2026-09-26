@@ -353,17 +353,7 @@ class ScalaASTConverter {
    * This should return the source text after the last parsed element.
    */
   def getRemainingSource(parseResult: ScalaParseResult, source: String, lastCursorPosition: Int): String = {
-    // If tree is empty (parse error), don't return any remaining source
-    // The Unknown node will handle the entire source
-    if (parseResult.tree.isEmpty) {
-      return ""
-    }
-
-    // Return any remaining source after the last cursor position
-    if (lastCursorPosition < source.length) {
-      source.substring(lastCursorPosition)
-    } else {
-      ""
-    }
+    val start = Math.max(lastCursorPosition, 0)
+    if (start < source.length) source.substring(start) else ""
   }
 }

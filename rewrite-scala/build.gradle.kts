@@ -8,8 +8,8 @@ dependencies {
     api(project(":rewrite-java"))
 
     // Scala 3 compiler (dotty) and library
-    implementation("org.scala-lang:scala3-compiler_3:latest.release")
-    implementation("org.scala-lang:scala3-library_3:latest.release")
+    implementation("org.scala-lang:scala3-compiler_3:3.+")
+    implementation("org.scala-lang:scala3-library_3:3.+")
 
     compileOnly(project(":rewrite-test"))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
@@ -28,6 +28,23 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
+}
+
+// Scala publishes release candidates as full Maven Central releases (3.10.0-RC1 today), with a
+// compiler API that `ScalaCompilerBridge` does not compile against. `latest.release` would defeat
+// this rule: on a Maven repo it evaluates only the `<release>` version, which is the RC.
+val scalaPreRelease = Regex("-(RC|M|NIGHTLY|ALPHA|BETA)", RegexOption.IGNORE_CASE)
+
+configurations.all {
+    resolutionStrategy {
+        componentSelection {
+            all {
+                if (candidate.group == "org.scala-lang" && scalaPreRelease.containsMatchIn(candidate.version)) {
+                    reject("pre-release")
+                }
+            }
+        }
+    }
 }
 
 // Configure Scala source sets and compilation order

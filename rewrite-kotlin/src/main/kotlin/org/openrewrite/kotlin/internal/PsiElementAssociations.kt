@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.internal
 
 import org.jetbrains.kotlin.KtRealPsiSourceElement
+import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.fir.FirElement
@@ -32,12 +33,14 @@ import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
+import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi
 import org.jetbrains.kotlin.psi.*
 import org.openrewrite.java.tree.JavaType
@@ -147,25 +150,37 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             return typeMapping.type(typeMap[parent], owner)
         }
         val fir = primary(psiElement)
-        if (psiElement != null && fir is FirResolvedQualifier && fir.source != null && (fir.source.psi is KtDotQualifiedExpression || fir.source.psi is KtNameReferenceExpression)) {
-            if (fir.symbol is FirRegularClassSymbol) {
-                val classId = (fir.symbol as FirRegularClassSymbol).classId
-                return if (isPackage(psiElement, classId)) {
-                    null
-                } else {
-                    val found = matchClassId(psiElement, classId)
-                    typeMapping.type(found, owner)
-                }
+        if (fir is FirVariable && psiElement is KtSimpleNameExpression &&
+            fir.name.asString() != psiElement.getReferencedName()) {
+            // `primary` walked up to an enclosing declaration, whose type describes a different name
+            return null
+        }
+        val qualifier = (fir as? FirResolvedQualifier)?.source?.psi
+        if (psiElement != null && fir is FirResolvedQualifier && (qualifier is KtDotQualifiedExpression || qualifier is KtNameReferenceExpression)) {
+            val symbol = fir.qualifierSymbol
+            if (symbol != null && isPackage(psiElement, qualifier, symbol.classId)) {
+                return null
+            }
+            if (symbol is FirRegularClassSymbol) {
+                return typeMapping.type(matchClassId(psiElement, symbol.classId), owner)
             }
         }
         return if (fir != null) typeMapping.type(fir, owner) else null
     }
 
-    private fun isPackage(psi: PsiElement, classId: ClassId): Boolean {
-        return !classId.packageFqName.isRoot && psi.parent.text == classId.packageFqName.asString()
+    private fun isPackage(psi: PsiElement, qualifier: PsiElement, classId: ClassId): Boolean {
+        val packageDepth = classId.packageFqName.pathSegments().size
+        val fullyQualified = segmentCount(qualifier) == packageDepth + classId.relativeClassName.pathSegments().size
+        val parent = psi.parent
+        val throughPsi = if (parent is KtDotQualifiedExpression && parent.selectorExpression == psi) parent else psi
+        return packageDepth > 0 && fullyQualified && segmentCount(throughPsi) <= packageDepth
     }
 
-    private fun matchClassId(psi: PsiElement, classId: ClassId): ClassId {
+    private fun segmentCount(psi: PsiElement): Int = withoutTypeArguments(psi).split('.').size
+
+    private fun matchClassId(name: PsiElement, classId: ClassId): ClassId {
+        // `Outer.Nested<Int>` nests the name in a call carrying the type arguments
+        val psi = (name.parent as? KtCallExpression)?.takeIf { it.calleeExpression == name } ?: name
         if (psi.parent is KtDotQualifiedExpression) {
             val parent: KtDotQualifiedExpression = psi.parent as KtDotQualifiedExpression
             if (classId.packageFqName.isRoot && psi !is KtDotQualifiedExpression && psi == parent.receiverExpression) {
@@ -187,7 +202,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         //   - relative to an imported nested: `B.A` for `A.B.A` -> a trailing run of the nested names
         // The two multi-segment fallbacks require at least two segments so a single receiver name (e.g.
         // the outer `A` of `A.B.A.C`, whose leaf coincidentally repeats deeper) is not matched too deep.
-        val text = psi.text
+        val text = withoutTypeArguments(psi)
         if (text == classId.asFqNameString() || text == classId.relativeClassName.asString()) {
             return classId
         }
@@ -206,6 +221,13 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         }
 
         return classId
+    }
+
+    private fun withoutTypeArguments(psi: PsiElement): String = when (psi) {
+        is KtDotQualifiedExpression -> withoutTypeArguments(psi.receiverExpression) + "." +
+                (psi.selectorExpression?.let { withoutTypeArguments(it) } ?: "")
+        is KtCallExpression -> psi.calleeExpression?.text ?: psi.text
+        else -> psi.text
     }
 
     fun primary(psiElement: PsiElement?) =
@@ -259,11 +281,25 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     }
 
                     else -> {
-                        null
+                        if (psi is KtCallExpression) resolvedAwayCallType(psi) else null
                     }
                 }
             }
         }
+    }
+
+    @OptIn(SymbolInternals::class)
+    private fun resolvedAwayCallType(psi: KtCallExpression): JavaType.Method? {
+        // Since Kotlin 2.3 `suspend { }` resolves to a suspending lambda, leaving no FIR for the call itself
+        val name = (psi.calleeExpression as? KtNameReferenceExpression)?.getReferencedName()
+        if (elementMap.containsKey(psi) || name != "suspend" ||
+            psi.valueArgumentList != null || psi.lambdaArguments.size != 1) {
+            return null
+        }
+        val symbol = typeMapping.firSession.symbolProvider
+            .getTopLevelFunctionSymbols(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, Name.identifier(name))
+            .firstOrNull() ?: return null
+        return typeMapping.methodDeclarationType(symbol.fir, null)
     }
 
     fun primitiveType(psi: PsiElement): JavaType.Primitive {
@@ -387,6 +423,16 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     else -> throw UnsupportedOperationException("Unsupported resolved symbol: ${fir.calleeReference.resolved?.resolvedSymbol?.javaClass}")
                 }
             }
+            is FirPropertyAccessExpression -> {
+                // `X<T>.m()` is not valid Kotlin, so FIR resolves the qualifier as a property access; the
+                // type arguments still describe the parameterized type the author wrote.
+                if (psi is KtCallExpression && psi.valueArgumentList == null && psi.lambdaArguments.isEmpty() && psi.typeArgumentList != null)
+                    ExpressionType.QUALIFIER
+                else if (fir.source?.psi !== psi)
+                    null
+                else
+                    throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+            }
             is FirSafeCallExpression -> {
                 val selector = fir.selector
                 when (selector) {
@@ -399,7 +445,11 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     else -> null
                 }
             }
-            else -> throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+            else -> {
+                // `primary` walked up to an enclosing element, so the compiler resolved this call away
+                if (fir.source?.psi !== psi) null
+                else throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+            }
         }
     }
 

@@ -51,20 +51,48 @@ func TestCompositeTypeSurvivesRpcRoundTrip(t *testing.T) {
 		"the elided inner literal has only its own type slot to carry the type")
 }
 
-func TestConversionAndBuiltinMarkersSurviveRpcRoundTrip(t *testing.T) {
+func TestConversionAndBuiltinSurviveRpcRoundTrip(t *testing.T) {
 	c := collectRoundTripped(t, "package main\n\nfunc f(b []byte) {\n\t_ = string(b)\n\t_ = len(b)\n}\n")
 
-	var conversions, builtins int
+	require.Len(t, c.Conversions, 1, "conversion lost on round-trip")
+	assert.Equal(t, "string", matcher.GetFullyQualifiedName(matcher.TypeOfExpression(c.Conversions[0])))
+
+	var builtins int
 	for _, mi := range c.Invocations {
-		if java.FindMarker[golang.Conversion](mi.Markers) != nil {
-			conversions++
-		}
 		if java.FindMarker[golang.Builtin](mi.Markers) != nil {
 			builtins++
 		}
 	}
-	assert.Equal(t, 1, conversions, "Conversion marker lost on round-trip")
 	assert.Equal(t, 1, builtins, "Builtin marker lost on round-trip")
+}
+
+func TestBuiltinMethodTypeSurvivesRpcRoundTrip(t *testing.T) {
+	c := collectRoundTripped(t, "package main\n\nfunc f(b []byte) {\n\t_ = len(b)\n}\n")
+
+	var lens *java.MethodInvocation
+	for _, mi := range c.Invocations {
+		if mi.Name != nil && mi.Name.Name == "len" {
+			lens = mi
+		}
+	}
+	require.NotNil(t, lens, "len call lost on round-trip")
+	require.NotNil(t, lens.MethodType, "len lost its MethodType on round-trip")
+	assert.Equal(t, "builtin", matcher.GetFullyQualifiedName(lens.MethodType.DeclaringType))
+	assert.Equal(t, "int", matcher.GetFullyQualifiedName(lens.MethodType.ReturnType))
+}
+
+func TestAnyTypeSurvivesRpcRoundTrip(t *testing.T) {
+	c := collectRoundTripped(t, "package main\n\nfunc f(a any) {\n\t_ = []any{a}\n}\n")
+
+	require.Len(t, c.Composites, 1)
+	assert.Equal(t, "any[]", matcher.GetFullyQualifiedName(c.Composites[0].Type))
+}
+
+func TestTypeAssertionSurvivesRpcRoundTrip(t *testing.T) {
+	c := collectRoundTripped(t, "package main\n\nfunc f(a any) {\n\ts, ok := a.(string)\n\t_, _ = s, ok\n}\n")
+
+	require.Len(t, c.TypeAssertions, 1)
+	assert.Equal(t, "string", matcher.GetFullyQualifiedName(c.TypeAssertions[0].Type))
 }
 
 func TestResultTypesSurviveRpcRoundTrip(t *testing.T) {

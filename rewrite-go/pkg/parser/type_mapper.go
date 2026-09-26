@@ -138,9 +138,30 @@ func (m *typeMapper) doMapType(t types.Type) java.JavaType {
 	}
 }
 
-// mapBasic maps Go basic types to JavaTypePrimitive.
+// mapBasic keys a Go basic type on its own Go type name (as with map/chan).
+// Java's JavaType.Primitive is a fixed enum of 12 keywords, which cannot hold
+// int, int32 and untyped int apart, nor float64 from complex128. `byte` and
+// `rune` are Basic instances distinct from `uint8` and `int32`, so the name also
+// keeps the spelling the checker resolved.
 func (m *typeMapper) mapBasic(b *types.Basic) java.JavaType {
-	// Handle aliases by name first (Byte=Uint8, Rune=Int32 share constant values)
+	switch b.Kind() {
+	case types.Invalid:
+		// A type the checker could not resolve names nothing to key on.
+		return java.UnknownType
+	case types.UnsafePointer:
+		// The only basic type whose Go name ("Pointer") is not how source spells it.
+		return &java.JavaTypeClass{FullyQualifiedName: "unsafe.Pointer", Kind: "Class"}
+	default:
+		return &java.JavaTypeClass{FullyQualifiedName: b.Name(), Kind: "Class"}
+	}
+}
+
+// literalPrimitive is the JavaType.Primitive keyword a Go basic type's literal
+// carries, which is the one slot not keyed on the Go type name. See
+// doc/recipe-authoring.md: The names types carry.
+func literalPrimitive(b *types.Basic) *java.JavaTypePrimitive {
+	// byte shares Uint8's kind and rune Int32's, so the name is what tells
+	// them apart and has to be consulted first.
 	switch b.Name() {
 	case "byte":
 		return &java.JavaTypePrimitive{Keyword: "byte"}
@@ -159,28 +180,18 @@ func (m *typeMapper) mapBasic(b *types.Basic) java.JavaType {
 		return &java.JavaTypePrimitive{Keyword: "long"}
 	case types.Int, types.Int32, types.UntypedInt:
 		return &java.JavaTypePrimitive{Keyword: "int"}
-	case types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64, types.Uintptr:
-		// Go's unsigned integer widths have no Java primitive equivalent, so they map to
-		// synthetic named types keyed by their Go type name (as with map/chan).
-		return &java.JavaTypeClass{FullyQualifiedName: b.Name(), Kind: "Class"}
 	case types.Float32:
 		return &java.JavaTypePrimitive{Keyword: "float"}
 	case types.Float64, types.UntypedFloat:
-		return &java.JavaTypePrimitive{Keyword: "double"}
-	case types.Complex64, types.Complex128, types.UntypedComplex:
 		return &java.JavaTypePrimitive{Keyword: "double"}
 	case types.String, types.UntypedString:
 		return &java.JavaTypePrimitive{Keyword: "String"}
 	case types.UntypedRune:
 		return &java.JavaTypePrimitive{Keyword: "char"}
-	case types.UntypedNil:
-		return &java.JavaTypePrimitive{Keyword: "void"}
-	case types.UnsafePointer:
-		// No Java primitive exists for it, so map it to a synthetic named type.
-		return &java.JavaTypeClass{FullyQualifiedName: "unsafe.Pointer", Kind: "Class"}
-	default:
-		return java.UnknownType
 	}
+	// The unsigned widths and the complex types have no Java primitive, and a
+	// complex literal's value crosses as its source text (`3i`) besides.
+	return nil
 }
 
 // mapShallow mints an FQN-only reference to a type the enumerated modules don't define.
@@ -284,23 +295,11 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 
 	// Return type
 	results := sig.Results()
-	if results.Len() == 0 {
-		mt.ReturnType = &java.JavaTypePrimitive{Keyword: "void"}
-	} else if results.Len() == 1 {
-		mt.ReturnType = m.mapType(results.At(0).Type())
-	} else {
-		tupleParams := make([]java.JavaType, 0, results.Len())
-		for i := 0; i < results.Len(); i++ {
-			tupleParams = append(tupleParams, m.mapType(results.At(i).Type()))
-		}
-		mt.ReturnType = &java.JavaTypeParameterized{
-			Type: &java.JavaTypeClass{
-				FullyQualifiedName: "go.tuple",
-				Kind:               "Class",
-			},
-			TypeParameters: tupleParams,
-		}
+	resultTypes := make([]java.JavaType, 0, results.Len())
+	for i := 0; i < results.Len(); i++ {
+		resultTypes = append(resultTypes, m.mapType(results.At(i).Type()))
 	}
+	mt.ReturnType = tupleType(resultTypes)
 	params := sig.Params()
 	for i := 0; i < params.Len(); i++ {
 		p := params.At(i)
@@ -311,8 +310,30 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 	return mt
 }
 
-// mapInterface maps an anonymous interface type.
+// tupleType is what a Go result list yields: nothing, the one type it names,
+// or the several it names bundled under `go.tuple`.
+func tupleType(results []java.JavaType) java.JavaType {
+	switch len(results) {
+	case 0:
+		return &java.JavaTypePrimitive{Keyword: "void"}
+	case 1:
+		return results[0]
+	default:
+		return &java.JavaTypeParameterized{
+			Type:           &java.JavaTypeClass{FullyQualifiedName: "go.tuple", Kind: "Class"},
+			TypeParameters: results,
+		}
+	}
+}
+
+// mapInterface maps an anonymous interface type. The empty one takes the Go
+// name `any`, as map and chan take theirs: it is the type `any` aliases and one
+// of the most-used in Go, so a name is what makes it matchable. A non-empty
+// anonymous interface has a method set but nothing to name it.
 func (m *typeMapper) mapInterface(iface *types.Interface, fqn string) *java.JavaTypeClass {
+	if fqn == "" && iface.Empty() {
+		fqn = "any"
+	}
 	cls := &java.JavaTypeClass{
 		FullyQualifiedName: fqn,
 		Kind:               "Interface",
@@ -365,13 +386,24 @@ func (m *typeMapper) mapChanType(ch *types.Chan) java.JavaType {
 	}
 }
 
+// isNamedClass reports whether a mapped type is a class Go gave a name.
+func isNamedClass(t java.JavaType) bool {
+	cls, ok := t.(*java.JavaTypeClass)
+	return ok && cls.FullyQualifiedName != ""
+}
+
 // structMembers extracts fields from a struct as JavaTypeVariable,
 // recording each field's owner for ownerType to find later.
 func (m *typeMapper) structMembers(s *types.Struct, owner java.JavaType) []*java.JavaTypeVariable {
 	var members []*java.JavaTypeVariable
 	for i := 0; i < s.NumFields(); i++ {
 		f := s.Field(i)
-		m.fieldOwner[f] = owner
+		// A named struct type and the `*types.Struct` it wraps share their field
+		// objects, and a recipe asks a field's owner for the name. An unnamed
+		// spelling therefore claims only a field no named type has claimed.
+		if _, claimed := m.fieldOwner[f]; !claimed || isNamedClass(owner) {
+			m.fieldOwner[f] = owner
+		}
 		members = append(members, &java.JavaTypeVariable{
 			Name:        f.Name(),
 			Owner:       owner,

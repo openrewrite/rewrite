@@ -22,9 +22,9 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Collections;
 import java.util.Set;
 
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
@@ -162,10 +162,10 @@ class TypesInUseTest implements RewriteTest {
               public class Foo {}
               """,
             spec -> spec.afterRecipe(cu -> {
-                Set<JavaType> types = Collections.emptySet();
-                Set<JavaType.Method> declaredMethods = Collections.emptySet();
-                Set<JavaType.Method> usedMethods = Collections.emptySet();
-                Set<JavaType.Variable> variables = Collections.emptySet();
+                Set<JavaType> types = emptySet();
+                Set<JavaType.Method> declaredMethods = emptySet();
+                Set<JavaType.Method> usedMethods = emptySet();
+                Set<JavaType.Variable> variables = emptySet();
 
                 TypesInUse tiu = TypesInUse.of(cu, types, declaredMethods, usedMethods, variables);
 

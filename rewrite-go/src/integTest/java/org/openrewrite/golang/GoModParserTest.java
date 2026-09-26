@@ -285,9 +285,8 @@ class GoModParserTest implements RewriteTest {
                         """
                                 go 1.21
                                 """,
-                        spec -> spec.afterRecipe(doc -> {
-                            assertThat(doc.getMarkers().findFirst(GoResolutionResult.class)).isEmpty();
-                        })
+                        spec -> spec.afterRecipe(doc ->
+                            assertThat(doc.getMarkers().findFirst(GoResolutionResult.class)).isEmpty())
                 )
         );
     }

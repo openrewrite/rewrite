@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import lombok.EqualsAndHashCode;
 import kotlin.Pair;
 import kotlin.annotation.AnnotationTarget;
 import lombok.AccessLevel;
@@ -24,8 +25,9 @@ import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
+import org.jetbrains.kotlin.cli.common.messages.MessageCollectorImpl;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
-import org.jetbrains.kotlin.cli.jvm.compiler.CliCompilerUtilsKt;
+import org.jetbrains.kotlin.cli.common.messages.SyntaxErrorReporter;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
@@ -42,7 +44,9 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiManager;
 import org.jetbrains.kotlin.com.intellij.psi.SingleRootFileViewProvider;
 import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile;
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar;
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar.ExtensionStorage;
 import org.jetbrains.kotlin.config.*;
+import org.jetbrains.kotlin.diagnostics.KtRegisteredDiagnosticFactoriesStorage;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
@@ -52,7 +56,6 @@ import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
-import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.utils.PathUtil;
@@ -83,12 +86,15 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
+import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
+import static org.jetbrains.kotlin.cli.FrontendConfigurationKeysKt.*;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.JvmArgumentsKt.*;
-import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
 import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
+import static org.jetbrains.kotlin.compiler.plugin.ExtensionRegistrationUtilsKt.registerInProject;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.LINK_VIA_SIGNATURES;
@@ -194,10 +200,12 @@ public class KotlinParser implements Parser {
                     assert kotlinSource.getFirFile() != null;
                     assert kotlinSource.getFirFile().getSource() != null;
                     PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
-                    AnalyzerWithCompilerReport.SyntaxErrorReport report =
-                            AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true));
+                    MessageCollectorImpl syntaxErrors = new MessageCollectorImpl();
+                    SyntaxErrorReporter.SyntaxErrorReport report =
+                            AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, syntaxErrors);
+                    syntaxErrors.forward(compilationMessageCollector());
                     if (report.isHasErrors()) {
-                        parsed.add(ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException()));
+                        parsed.add(ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new KotlinSyntaxException(syntaxErrors)));
                         continue;
                     }
 
@@ -271,6 +279,7 @@ public class KotlinParser implements Parser {
     }
 
     @SuppressWarnings("unused")
+    @EqualsAndHashCode(callSuper = true)
     public static class Builder extends Parser.Builder {
         @Nullable
         private Collection<String> artifactNames = emptyList();
@@ -279,8 +288,14 @@ public class KotlinParser implements Parser {
         private Collection<Path> classpath = emptyList();
 
         private List<Input> dependsOn = emptyList();
+
+        /**
+         * Excluded from equality: mutable and shared, see {@link JavaParser.Builder}.
+         */
+        @EqualsAndHashCode.Exclude
         private JavaTypeCache typeCache = new JavaTypeCache();
 
+        @EqualsAndHashCode.Exclude
         @Nullable
         private JavaTypeFactory typeFactory;
 
@@ -440,12 +455,16 @@ public class KotlinParser implements Parser {
 
     public CompiledSource parse(List<Parser.Input> sources, Disposable disposable, ExecutionContext ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
-        Module module = buildModule(compilerConfiguration);
+        configureJvmRoots(compilerConfiguration);
 
         KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
                 disposable,
                 compilerConfiguration,
                 EnvironmentConfigFiles.JVM_CONFIG_FILES);
+
+        ExtensionStorage extensionsStorage = requireNonNull(getExtensionsStorage(compilerConfiguration), "extensions storage was not set in compilerConfiguration()");
+
+        registerInProject(extensionsStorage, environment.getProject(), ext -> "Failed to register " + ext);
 
         List<KtFile> ktFiles = new ArrayList<>(sources.size());
         List<KotlinSource> kotlinSources = new ArrayList<>(sources.size());
@@ -473,14 +492,11 @@ public class KotlinParser implements Parser {
                 VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
                 environment::createPackagePartProvider);
 
-        AbstractProjectFileSearchScope sourceScope = projectEnvironment.getSearchScopeByPsiFiles(ktFiles);
-        sourceScope.plus(projectEnvironment.getSearchScopeForProjectJavaSources());
-
         AbstractProjectFileSearchScope libraryScope = projectEnvironment.getSearchScopeForProjectLibraries();
 
-        Name name = Name.identifier(module.getModuleName());
-        DependencyListForCliModule libraryList = CliCompilerUtilsKt.createLibraryListForJvm(
-                module.getModuleName(),
+        Name name = Name.identifier(moduleName);
+        DependencyListForCliModule libraryList = JvmFrontendPipelinePhase.INSTANCE.createLibraryListForJvm(
+                moduleName,
                 compilerConfiguration,
                 compilerConfiguration.get(JVMConfigurationKeys.FRIEND_PATHS, emptyList())
         );
@@ -496,7 +512,7 @@ public class KotlinParser implements Parser {
                         ktFile -> false,
                         KtFile::isScript,
                         (ktFile, mn) -> true,
-                        files -> null
+                        null
                 )
                 .stream()
                 .findFirst()
@@ -519,7 +535,7 @@ public class KotlinParser implements Parser {
 
     }
 
-    private Module buildModule(CompilerConfiguration compilerConfiguration) {
+    private void configureJvmRoots(CompilerConfiguration compilerConfiguration) {
         if (classpath != null) {
             for (Path path : classpath) {
                 File file;
@@ -540,8 +556,14 @@ public class KotlinParser implements Parser {
         configureKlibPaths(compilerConfiguration, arguments);
         configureContentRootsFromClassPath(compilerConfiguration, arguments);
         configureJdkClasspathRoots(compilerConfiguration);
+    }
 
-        return configureModuleChunk(compilerConfiguration, arguments, null).getModules().get(0);
+    private static class KotlinSyntaxException extends RuntimeException {
+        KotlinSyntaxException(MessageCollectorImpl syntaxErrors) {
+            super(syntaxErrors.getErrors().stream()
+                    .map(error -> PLAIN_FULL_PATHS.render(error.getSeverity(), error.getMessage(), error.getLocation()))
+                    .collect(joining("\n")));
+        }
     }
 
     private static String buildFilename(Input source, int index) {
@@ -568,16 +590,22 @@ public class KotlinParser implements Parser {
         KOTLIN_1_9,
         KOTLIN_2_0,
         KOTLIN_2_1,
-        KOTLIN_2_2
+        KOTLIN_2_2,
+        KOTLIN_2_3,
+        KOTLIN_2_4
+    }
+
+    private MessageCollector compilationMessageCollector() {
+        return logCompilationWarningsAndErrors ?
+                new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
+                MessageCollector.Companion.getNONE();
     }
 
     private CompilerConfiguration compilerConfiguration() {
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
 
         compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
-        compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
-                new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
-                MessageCollector.Companion.getNONE());
+        compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, compilationMessageCollector());
 
         compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(getLanguageVersion(languageLevel), getApiVersion(languageLevel)));
 
@@ -596,7 +624,19 @@ public class KotlinParser implements Parser {
 
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
 
+        addExtensionStorage(compilerConfiguration);
+
         return compilerConfiguration;
+    }
+
+    private static void addExtensionStorage(CompilerConfiguration compilerConfiguration) {
+        ExtensionStorage extensionStorage = new ExtensionStorage();
+        List<CompilerPluginRegistrar> registrars = compilerConfiguration.getList(CompilerPluginRegistrar.Companion.getCOMPILER_PLUGIN_REGISTRARS());
+        for (CompilerPluginRegistrar registrar : registrars) {
+            registrar.registerExtensions(extensionStorage, compilerConfiguration);
+        }
+        setExtensionsStorage(compilerConfiguration, extensionStorage);
+        setDiagnosticFactoriesStorage(compilerConfiguration, new KtRegisteredDiagnosticFactoriesStorage());
     }
 
     private LanguageVersion getLanguageVersion(KotlinLanguageLevel languageLevel) {
@@ -627,6 +667,10 @@ public class KotlinParser implements Parser {
                 return LanguageVersion.KOTLIN_2_1;
             case KOTLIN_2_2:
                 return LanguageVersion.KOTLIN_2_2;
+            case KOTLIN_2_3:
+                return LanguageVersion.KOTLIN_2_3;
+            case KOTLIN_2_4:
+                return LanguageVersion.KOTLIN_2_4;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
@@ -660,6 +704,10 @@ public class KotlinParser implements Parser {
                 return ApiVersion.KOTLIN_2_1;
             case KOTLIN_2_2:
                 return ApiVersion.KOTLIN_2_2;
+            case KOTLIN_2_3:
+                return ApiVersion.KOTLIN_2_3;
+            case KOTLIN_2_4:
+                return ApiVersion.KOTLIN_2_4;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }

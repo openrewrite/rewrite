@@ -93,6 +93,13 @@ func indentDelta(parent, child java.Tree) int {
 		return listDelta(p.Elements.Elements, child)
 	case *java.MethodInvocation:
 		return listDelta(p.Arguments.Elements, child)
+	case *java.TypeCast:
+		if p.Clazz == nil {
+			return 0
+		}
+		return listDelta([]java.RightPadded[java.Expression]{
+			{Element: p.Expr, After: p.Clazz.Tree.After},
+		}, child)
 	}
 	return 0
 }
@@ -347,6 +354,27 @@ func (v *TabsAndIndentsVisitor) VisitMethodInvocation(mi *java.MethodInvocation,
 			out.Select = &selected
 		}
 	}
+	return &out
+}
+
+// VisitTypeCast indents a conversion's operand that wraps onto its own line,
+// the way a wrapped argument indents.
+func (v *TabsAndIndentsVisitor) VisitTypeCast(tc *java.TypeCast, p any) java.J {
+	if tc.Clazz == nil {
+		return v.GoVisitor.VisitTypeCast(tc, p)
+	}
+	out := *tc
+	if clazz, ok := v.Visit(tc.Clazz, p).(*java.ControlParentheses); ok {
+		out.Clazz = clazz
+	}
+	operand := indentSubtrees(v, []java.RightPadded[java.Expression]{
+		{Element: out.Expr, After: out.Clazz.Tree.After},
+	}, p)
+	clazz := *out.Clazz
+	clazz.Tree.After = operand[0].After
+	out.Clazz = &clazz
+	out.Expr = operand[0].Element
+	out.Markers = v.reindentTrailingComma(tc.Markers)
 	return &out
 }
 

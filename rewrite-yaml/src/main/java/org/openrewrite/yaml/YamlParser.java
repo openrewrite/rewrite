@@ -32,6 +32,7 @@ import org.openrewrite.yaml.tree.YamlKey;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.events.*;
 import org.yaml.snakeyaml.parser.Parser;
+import org.yaml.snakeyaml.parser.ParserException;
 import org.yaml.snakeyaml.parser.ParserImpl;
 import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
@@ -57,6 +58,8 @@ public class YamlParser implements org.openrewrite.Parser {
     // Match single-brace placeholder templates like {C App} that contain at least one space
     // These are invalid YAML but used by some tools as placeholders
     private static final Pattern SINGLE_BRACE_TEMPLATE_PATTERN = Pattern.compile("\\{[A-Za-z][^{}\\n\\r]*\\s[^{}\\n\\r]*}");
+    // Match an anchor or alias token, i.e. a `&` or `*` opening a node rather than sitting inside a scalar
+    private static final Pattern ANCHOR_OR_ALIAS_PATTERN = Pattern.compile("[\\[{,:\\s][&*][^\\s\\[\\]{},]");
     // Match placeholder values starting with multiple asterisks like "*** REMOVED ***"
     // These are invalid YAML aliases but used as credential placeholders
     private static final Pattern ASTERISK_PLACEHOLDER_PATTERN = Pattern.compile(":\\s+(\\*{2,}[^\n\r]*)");
@@ -99,6 +102,21 @@ public class YamlParser implements org.openrewrite.Parser {
                 });
     }
 
+    /**
+     * A brace group carrying an anchor or alias and standing alone as a value or element is flow
+     * syntax rather than a placeholder. SnakeYAML has to see it, or the anchor never registers and
+     * an alias to it resolves to nothing.
+     */
+    private static boolean isFlowMappingWithAnchor(String source, int start, int end) {
+        if (!ANCHOR_OR_ALIAS_PATTERN.matcher(source.substring(start, end)).find()) {
+            return false;
+        }
+        char before = start == 0 ? '\n' : source.charAt(start - 1);
+        char after = end == source.length() ? '\n' : source.charAt(end);
+        return (Character.isWhitespace(before) || before == '[' || before == '{' || before == ',') &&
+               (Character.isWhitespace(after) || after == ']' || after == '}' || after == ',' || after == '#');
+    }
+
     private Yaml.Documents parseFromInput(Path sourceFile, EncodingDetectingInputStream source) {
         String yamlSource = source.readFully();
         Map<String, String> variableByUuid = new HashMap<>();
@@ -119,13 +137,17 @@ public class YamlParser implements org.openrewrite.Parser {
 
         // Convert standalone Helm template lines (lines where a UUID is the only content)
         // to YAML comments so they don't create structurally invalid YAML
+        Set<String> commentedHelmUuids = new HashSet<>();
         processedSource = convertStandaloneHelmLinesToComments(
-                processedSource, helmTemplateByUuid.keySet());
+                processedSource, helmTemplateByUuid.keySet(), commentedHelmUuids);
 
         // Then, replace single-brace templates like {C App} with UUIDs
         Matcher singleBraceMatcher = SINGLE_BRACE_TEMPLATE_PATTERN.matcher(processedSource);
         StringBuffer singleBraceBuffer = new StringBuffer();
         while (singleBraceMatcher.find()) {
+            if (isFlowMappingWithAnchor(processedSource, singleBraceMatcher.start(), singleBraceMatcher.end())) {
+                continue;
+            }
             String uuid = UUID.randomUUID().toString();
             singleBraceTemplateByUuid.put(uuid, singleBraceMatcher.group());
             singleBraceMatcher.appendReplacement(singleBraceBuffer, uuid);
@@ -340,7 +362,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         // embed another UUID (e.g. an asterisk placeholder wrapping a Helm
                         // expression like `**${{ ... }}**`), so this resolves to a fixpoint.
                         scalarValue = restorePlaceholders(scalarValue, helmTemplateByUuid,
-                                singleBraceTemplateByUuid, variableByUuid);
+                                commentedHelmUuids, singleBraceTemplateByUuid, variableByUuid);
 
                         Yaml.Scalar.Style style;
                         switch (scalar.getScalarStyle()) {
@@ -431,12 +453,17 @@ public class YamlParser implements org.openrewrite.Parser {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, sse.getAnchor(), nextLastEnd, false);
                             anchors.put(sse.getAnchor(), anchor);
 
+                            // The sequence's prefix keeps the delimiter: the enclosing builder locates it there to
+                            // split the prefix and to decide whether a sequence entry has a dash.
+                            int delimiterIndex = anchorPrefixStart(fmt);
+                            String prefixThroughDelimiter = delimiterIndex == -1 ? fmt : fmt.substring(0, delimiterIndex + 1);
                             lastEnd = lastEnd + sse.getAnchor().length() + fmt.length() + 1;
                             fmt = reader.readStringFromBuffer(lastEnd, nextLastEnd);
                             int dashPrefixIndex = commentAwareIndexOf('-', fmt);
                             if (dashPrefixIndex > -1) {
                                 fmt = fmt.substring(0, dashPrefixIndex);
                             }
+                            fmt = prefixThroughDelimiter + fmt;
                         }
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, nextLastEnd);
                         String startBracketPrefix = null;
@@ -484,7 +511,8 @@ public class YamlParser implements org.openrewrite.Parser {
                         AliasEvent alias = (AliasEvent) event;
                         Yaml.Anchor anchor = anchors.get(alias.getAnchor());
                         if (anchor == null) {
-                            throw new UnsupportedOperationException("Unknown anchor: " + alias.getAnchor());
+                            throw new ParserException(null, null,
+                                    "found undefined alias " + alias.getAnchor(), event.getStartMark());
                         }
                         BlockBuilder builder = blockStack.peek();
                         builder.push(new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor));
@@ -524,7 +552,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         return text;
                     }
                     return restorePlaceholders(text, helmTemplateByUuid,
-                            singleBraceTemplateByUuid, variableByUuid);
+                            commentedHelmUuids, singleBraceTemplateByUuid, variableByUuid);
                 }
 
                 @Override
@@ -622,13 +650,19 @@ public class YamlParser implements org.openrewrite.Parser {
 
         String prefix = "";
         if (!isForScalar) {
-            int prefixStart = commentAwareIndexOf(':', eventPrefix);
-            if (prefixStart == -1) {
-                prefixStart = commentAwareIndexOf('-', eventPrefix);
-            }
+            int prefixStart = anchorPrefixStart(eventPrefix);
             prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
         }
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
+    }
+
+    /**
+     * The index within an event prefix of the delimiter introducing the anchored block: a mapping entry's colon or a
+     * sequence entry's dash, or -1 when it has neither. Whatever follows the delimiter is the anchor's own prefix.
+     */
+    private static int anchorPrefixStart(String eventPrefix) {
+        int colonIndex = commentAwareIndexOf(':', eventPrefix);
+        return colonIndex == -1 ? commentAwareIndexOf('-', eventPrefix) : colonIndex;
     }
 
     private static int commentAwareIndexOf(char target, String s) {
@@ -658,11 +692,13 @@ public class YamlParser implements org.openrewrite.Parser {
     /**
      * After Helm templates have been replaced with UUIDs, lines consisting entirely
      * of a UUID are standalone control flow directives. A bare UUID on its own line
-     * creates invalid YAML, so we prepend # to make it a YAML comment.
+     * creates invalid YAML, so we prepend # to make it a YAML comment. {@code commentedUuids}
+     * receives those UUIDs, so restoration can tell that # from one the source already had.
      */
     private static String convertStandaloneHelmLinesToComments(
             String source,
-            Set<String> helmUuids) {
+            Set<String> helmUuids,
+            Set<String> commentedUuids) {
         if (helmUuids.isEmpty()) {
             return source;
         }
@@ -697,6 +733,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 result.append(lineContent, 0, indent);
                 result.append('#');
                 result.append(trimmed);
+                commentedUuids.add(trimmed);
             } else {
                 result.append(lineContent);
                 if (isBlockScalarIndicator(trimmed)) {
@@ -724,16 +761,16 @@ public class YamlParser implements org.openrewrite.Parser {
     }
 
     /**
-     * Restore template/variable UUID placeholders to their original text. The Helm
-     * placeholder may appear in its comment-wrapped form ({@code #uuid}, produced for
-     * standalone control-flow lines) or bare. Because a restored value can itself embed
-     * another UUID (e.g. an asterisk placeholder capturing {@code **${{ ... }}**}, whose
-     * value contains a Helm UUID), the replacements are repeated until they reach a
-     * fixpoint.
+     * Restore template/variable UUID placeholders to their original text. A Helm placeholder
+     * listed in {@code commentedHelmUuids} also consumes the {@code #} that made its
+     * standalone line a comment. Because a restored value can itself embed another UUID
+     * (e.g. an asterisk placeholder capturing {@code **${{ ... }}**}, whose value contains a
+     * Helm UUID), the replacements are repeated until they reach a fixpoint.
      */
     private static String restorePlaceholders(
             String text,
             Map<String, String> helmTemplateByUuid,
+            Set<String> commentedHelmUuids,
             Map<String, String> singleBraceTemplateByUuid,
             Map<String, String> variableByUuid) {
         String result = text;
@@ -741,12 +778,9 @@ public class YamlParser implements org.openrewrite.Parser {
         do {
             previous = result;
             for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
-                // Check comment-wrapped form first (standalone Helm lines converted to #uuid)
-                String commentKey = "#" + entry.getKey();
-                if (result.contains(commentKey)) {
-                    result = result.replace(commentKey, entry.getValue());
-                } else if (result.contains(entry.getKey())) {
-                    result = result.replace(entry.getKey(), entry.getValue());
+                String key = commentedHelmUuids.contains(entry.getKey()) ? "#" + entry.getKey() : entry.getKey();
+                if (result.contains(key)) {
+                    result = result.replace(key, entry.getValue());
                 }
             }
             for (Map.Entry<String, String> entry : singleBraceTemplateByUuid.entrySet()) {
@@ -770,7 +804,7 @@ public class YamlParser implements org.openrewrite.Parser {
         // a document. Strip any leading sequence-entry dashes, then any mapping key,
         // to isolate the value portion.
         String value = trimmedLine;
-        while (value.equals("-") || value.startsWith("- ")) {
+        while ("-".equals(value) || value.startsWith("- ")) {
             value = value.length() == 1 ? "" : value.substring(2).trim();
         }
         int colonIndex = value.indexOf(':');
@@ -1162,7 +1196,7 @@ public class YamlParser implements org.openrewrite.Parser {
             char c = input.charAt(i);
 
             if (!inDirective) {
-                if (c == '%') {
+                if (c == '%' && (i == 0 || input.charAt(i - 1) == '\n' || input.charAt(i - 1) == '\r')) {
                     inDirective = true;
                     i++;
                 } else {
@@ -1247,6 +1281,12 @@ public class YamlParser implements org.openrewrite.Parser {
                     inDirective = false;
                 } else {
                     value.append(c);
+                    i++;
+                }
+            } else if (c == '#') {
+                // A comment line may precede directives, so treat it as prefix rather than as content
+                while (i < source.length() && source.charAt(i) != '\n' && source.charAt(i) != '\r') {
+                    prefix.append(source.charAt(i));
                     i++;
                 }
             } else if (c == '-' && i + 2 < source.length() &&

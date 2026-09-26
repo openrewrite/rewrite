@@ -160,11 +160,10 @@ class ClassDeclarationTest implements RewriteTest {
                   }
               }
               """,
-                spec -> spec.afterRecipe(cu -> {
+                spec -> spec.afterRecipe(cu ->
                     assertThat(cu.getStatements().stream()
                             .anyMatch(it -> it instanceof J.ClassDeclaration cd &&
-                                    cd.getKind() == J.ClassDeclaration.Kind.Type.Interface)).isTrue();
-                })
+                                    cd.getKind() == J.ClassDeclaration.Kind.Type.Interface)).isTrue())
           )
         );
     }
@@ -180,11 +179,10 @@ class ClassDeclarationTest implements RewriteTest {
     void annotationClass() {
         rewriteRun(
           kotlin("annotation class A",
-            spec -> spec.afterRecipe(cu -> {
+            spec -> spec.afterRecipe(cu ->
                 assertThat(cu.getStatements().stream()
                   .anyMatch(it -> it instanceof J.ClassDeclaration cd &&
-                    cd.getKind() == J.ClassDeclaration.Kind.Type.Annotation)).isTrue();
-            }))
+                    cd.getKind() == J.ClassDeclaration.Kind.Type.Annotation)).isTrue()))
           );
     }
 
@@ -192,11 +190,10 @@ class ClassDeclarationTest implements RewriteTest {
     void enumClass() {
         rewriteRun(
           kotlin("enum  class A",
-            spec -> spec.afterRecipe(cu -> {
+            spec -> spec.afterRecipe(cu ->
               assertThat(cu.getStatements().stream()
                 .anyMatch(it -> it instanceof J.ClassDeclaration cd &&
-                  cd.getKind() == J.ClassDeclaration.Kind.Type.Enum)).isTrue();
-          }))
+                  cd.getKind() == J.ClassDeclaration.Kind.Type.Enum)).isTrue()))
         );
     }
 
@@ -589,7 +586,7 @@ class ClassDeclarationTest implements RewriteTest {
                   constructor(message: String?, cause: Throwable?) : super(message, cause)
               }
               """,
-              spec -> spec.afterRecipe(cu -> {
+              spec -> spec.afterRecipe(cu ->
                   assertThat(cu.getStatements()).satisfiesExactly(stmt -> {
                       var clazz = (J.ClassDeclaration) stmt;
                       assertThat(clazz.getBody().getStatements()).satisfiesExactly(decl -> {
@@ -604,8 +601,7 @@ class ClassDeclarationTest implements RewriteTest {
                               cause -> assertThat(cause).isInstanceOf(J.Identifier.class)
                           );
                       });
-                  });
-              })
+                  }))
           )
         );
     }

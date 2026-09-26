@@ -69,9 +69,9 @@ func (v *removeImportVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p
 	if v.cfg.PackagePath == "" || cu.Imports == nil {
 		return cu
 	}
-	var refs, quals map[string]bool
+	var uses internal.ImportUses
 	if !v.cfg.Force {
-		refs, quals = internal.ReferencedImports(cu)
+		uses = internal.UsesOf(cu)
 	}
 	for _, rp := range cu.Imports.Elements {
 		imp := rp.Element
@@ -82,7 +82,7 @@ func (v *removeImportVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p
 			if alias := internal.AliasName(imp); alias == "_" || alias == "." {
 				continue
 			}
-			if internal.IsReferenced(imp, refs, quals) {
+			if uses.Referenced(imp) {
 				continue
 			}
 		}

@@ -19,10 +19,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
+
+import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -1058,5 +1064,50 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void doNotFailOnNumericComparisonWhenLiteralTypeMissing() {
+        rewriteRun(
+          spec -> spec.recipe(new StripLiteralTypesThenSimplify())
+            .expectedCyclesThatMakeChanges(1)
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              class A {
+                  boolean a = 1906 >= 8521;
+              }
+              """
+          )
+        );
+    }
+
+    private static class StripLiteralTypesThenSimplify extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Strip numeric literal types, then simplify boolean expressions";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Mimics a non-Java LST (e.g. an untyped Go constant) where a numeric literal carries no type.";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return List.of(
+              toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+                  @Override
+                  public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                      if (literal.getValue() instanceof Integer && literal.getType() != null) {
+                          return new J.Literal(literal.getId(), literal.getPrefix(), literal.getMarkers(),
+                            literal.getValue(), literal.getValueSource(), null, null);
+                      }
+                      return literal;
+                  }
+              }),
+              toRecipe(SimplifyBooleanExpressionVisitor::new)
+            );
+        }
     }
 }

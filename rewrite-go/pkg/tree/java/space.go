@@ -19,19 +19,15 @@ package java
 import "strings"
 
 type Comment struct {
-	Kind      CommentKind
-	Text      string
-	Suffix    string // whitespace after the comment, before the next token
+	// Multiline reports whether this is a block comment (/* */) rather than a
+	// line comment (//). Named to match Java's TextComment.multiline (and the
+	// JS/Python/C# equivalents), where the flag likewise means "is a block
+	// comment", not "spans more than one line".
 	Multiline bool
+	Text      string // content between the delimiters, delimiter-free (like Java's TextComment)
+	Suffix    string // whitespace after the comment, before the next token
 	Markers   Markers
 }
-
-type CommentKind int
-
-const (
-	LineComment CommentKind = iota
-	BlockComment
-)
 
 // This is the fundamental unit of formatting preservation in OpenRewrite.
 type Space struct {
@@ -63,7 +59,8 @@ func (s Space) Indent() string {
 //   - Space.Whitespace = whitespace BEFORE the first comment
 //   - Comment.Suffix = whitespace AFTER each comment
 //
-// The printer emits: Whitespace + (Comment.Text + Comment.Suffix)* to reconstruct the original text.
+// The printer emits Whitespace, then each comment (its `//` or `/* */` delimiters
+// wrapped around Comment.Text) followed by Comment.Suffix, to reconstruct the original text.
 func ParseSpace(raw string) Space {
 	if raw == "" {
 		return EmptySpace
@@ -83,31 +80,30 @@ func ParseSpace(raw string) Space {
 			end := strings.IndexByte(raw[i:], '\n')
 			var text string
 			if end < 0 {
-				text = raw[i:]
+				text = raw[i+2:]
 				i = len(raw)
 			} else {
-				text = raw[i : i+end]
+				text = raw[i+2 : i+end]
 				i = i + end // i now points at \n
 			}
 			suffixEnd := findCommentStart(raw, i)
 			suffix := raw[i:suffixEnd]
 			i = suffixEnd
-			comments = append(comments, Comment{Kind: LineComment, Text: text, Suffix: suffix})
+			comments = append(comments, Comment{Text: text, Suffix: suffix})
 		} else if i+1 < len(raw) && raw[i] == '/' && raw[i+1] == '*' {
 			end := strings.Index(raw[i+2:], "*/")
 			var text string
 			if end < 0 {
-				text = raw[i:]
+				text = raw[i+2:]
 				i = len(raw)
 			} else {
-				text = raw[i : i+2+end+2]
+				text = raw[i+2 : i+2+end]
 				i = i + 2 + end + 2
 			}
-			multiline := strings.Contains(text, "\n")
 			suffixEnd := findCommentStart(raw, i)
 			suffix := raw[i:suffixEnd]
 			i = suffixEnd
-			comments = append(comments, Comment{Kind: BlockComment, Text: text, Suffix: suffix, Multiline: multiline})
+			comments = append(comments, Comment{Multiline: true, Text: text, Suffix: suffix})
 		} else {
 			// Should not happen if findCommentStart works correctly
 			i++

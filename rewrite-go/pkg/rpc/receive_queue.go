@@ -17,6 +17,7 @@
 package rpc
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -67,19 +68,27 @@ func (q *ReceiveQueue) PeekBatch() []RpcObjectData {
 	return q.batch
 }
 
-func (q *ReceiveQueue) Take() RpcObjectData {
+// fill leaves a message in the batch for Take and peek to index.
+func (q *ReceiveQueue) fill() {
 	if len(q.batch) == 0 {
 		q.batch = q.pull()
+		if len(q.batch) == 0 {
+			// Every object terminates with END_OF_OBJECT, so a pull that yields nothing
+			// means the transfer broke or a reader asked past this object's end.
+			panic(errors.New("RPC receive: no more data for this object"))
+		}
 	}
+}
+
+func (q *ReceiveQueue) Take() RpcObjectData {
+	q.fill()
 	msg := q.batch[0]
 	q.batch = q.batch[1:]
 	return msg
 }
 
 func (q *ReceiveQueue) peek() RpcObjectData {
-	if len(q.batch) == 0 {
-		q.batch = q.pull()
-	}
+	q.fill()
 	return q.batch[0]
 }
 
@@ -146,6 +155,9 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		} else if !isNilValue(before) && getValueType(before) != nil {
 			if t, ok := before.(java.Tree); ok {
 				after = defaultReceiver.Visit(t, q)
+			} else if msg.Value != nil {
+				// A codec-less value-typed scalar (e.g. an operator enum)
+				after = msg.Value
 			} else if codecExpected {
 				panic(missingCodec(*msg.ValueType))
 			} else {
@@ -260,15 +272,30 @@ func convertTo[T any](v any) T {
 	if t, ok := v.(T); ok {
 		return t
 	}
-	// Handle float64 -> int64 conversion (common with JSON)
+	// A number arrives in the Go type its JSON shape implies (see decodeNumber),
+	// which need not be the one the field it fills holds.
 	var zero T
 	switch any(zero).(type) {
 	case int64:
 		switch n := v.(type) {
-		case float64:
-			return any(int64(n)).(T)
 		case int:
 			return any(int64(n)).(T)
+		case float64:
+			return any(int64(n)).(T)
+		}
+	case int:
+		switch n := v.(type) {
+		case int64:
+			return any(int(n)).(T)
+		case float64:
+			return any(int(n)).(T)
+		}
+	case float64:
+		switch n := v.(type) {
+		case int:
+			return any(float64(n)).(T)
+		case int64:
+			return any(float64(n)).(T)
 		}
 	case string:
 		if s, ok := v.(string); ok {
@@ -315,6 +342,16 @@ func receiveTypedList[T any](q *ReceiveQueue, before []T, onChange func(any) any
 				q.Take()
 				after[i] = before[pos]
 				continue
+			}
+			if !hasBefore && q.peek().State == NoChange {
+				// The sender diffed the edited tree against a baseline it believes
+				// this side holds and shipped this element as NO_CHANGE — but our
+				// baseline has nothing at this position, so its content never came
+				// over the wire and cannot be reconstructed. Fail with the cause
+				// named rather than letting the zero element nil-deref downstream in
+				// coerceToStatementRP/coerceToExpressionRP (openrewrite/rewrite#8424).
+				q.Take()
+				panic(fmt.Sprintf("RPC baseline desync: NO_CHANGE list element at position %d has no baseline (before holds %d element(s)); the sender diffed against a tree this receiver never received", pos, len(before)))
 			}
 			var beforeItem any
 			if hasBefore {

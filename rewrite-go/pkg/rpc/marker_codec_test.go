@@ -72,6 +72,38 @@ func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	assert.Equalf(t, "example.com/foo", got.ModulePath, "ModulePath: want %q", "example.com/foo")
 }
 
+func TestPartialTypeAttributionMarkerRoundTrip(t *testing.T) {
+	id := uuid.MustParse("66666666-7777-8888-9999-aaaaaaaaaaaa")
+	reason := `could not resolve import "strings": cannot decode "strings", export data version 4 is greater than maximum supported version 2`
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{
+		golang.PartialTypeAttribution{Ident: id, Reason: reason}}}
+
+	after := roundTripMarkers(t, before)
+	require.Len(t, after.Entries, 1, "entries")
+	got, ok := after.Entries[0].(golang.PartialTypeAttribution)
+	require.Truef(t, ok, "entry is %T, want golang.PartialTypeAttribution", after.Entries[0])
+	assert.Equal(t, id, got.Ident)
+	assert.Equal(t, reason, got.Reason)
+}
+
+func TestMarkupWarnMarkerRoundTrip(t *testing.T) {
+	// given
+	message := "Go module resolution was incomplete, so unused-require removal was skipped."
+	detail := "unresolved imports: github.com/cof-primary/go-shared-libraries/gotel"
+	before := java.AddMarkupWarn(java.Markers{ID: uuid.New()}, message, detail)
+
+	// when
+	after := roundTripMarkers(t, before)
+
+	// then
+	require.Len(t, after.Entries, 1, "entries")
+	got, ok := after.Entries[0].(java.GenericMarker)
+	require.Truef(t, ok, "entry is %T, want java.GenericMarker", after.Entries[0])
+	assert.Equal(t, "org.openrewrite.marker.Markup$Warn", got.JavaType)
+	assert.Equal(t, message, got.Data["message"])
+	assert.Equal(t, detail, got.Data["detail"])
+}
+
 func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 	id := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	mrr := golang.GoResolutionResult{
@@ -114,6 +146,7 @@ func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 			{ImportPath: "fmt", Standard: true},
 			{ImportPath: "github.com/google/uuid", ModulePath: "github.com/google/uuid", Version: "v1.6.0"},
 		},
+		ResolutionStatus: golang.GoResolutionResolved,
 	}
 	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
 
@@ -143,6 +176,30 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 	after := roundTripMarkers(t, before)
 	got := after.Entries[0].(golang.GoResolutionResult)
 	assert.Equalf(t, "example.com/empty", got.ModulePath, "ModulePath: want %q", "example.com/empty")
+}
+
+// TestGoResolutionResultUnsetStatusRoundTrip pins the old-LST case: a marker whose
+// ResolutionStatus is unset (as when deserialized from an LST serialized before the
+// field existed) must round-trip as empty and travel as null on the wire, so the
+// Java receive side never feeds an empty string to Enum.valueOf.
+func TestGoResolutionResultUnsetStatusRoundTrip(t *testing.T) {
+	id := uuid.MustParse("77777777-0000-0000-0000-000000000000")
+	mrr := golang.GoResolutionResult{
+		Ident:      id,
+		ModulePath: "example.com/old-lst",
+		Path:       "go.mod",
+		Requires:   []golang.GoRequire{},
+		Replaces:   []golang.GoReplace{},
+		Excludes:   []golang.GoExclude{},
+		Retracts:   []golang.GoRetract{},
+		// ResolutionStatus intentionally left unset ("").
+	}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
+
+	after := roundTripMarkers(t, before)
+	got := after.Entries[0].(golang.GoResolutionResult)
+	assert.Equalf(t, golang.GoResolutionStatus(""), got.ResolutionStatus,
+		"unset status must stay empty, got %q", got.ResolutionStatus)
 }
 
 // diffRoundTripMarkers serializes `after` as a delta against `before` and
@@ -188,5 +245,36 @@ func TestChangedCodecLessMarkerRoundTrip(t *testing.T) {
 	require.Truef(t, ok, "entry is %T, want java.GenericMarker", got.Entries[0])
 	if gm.Data["version"] != "8.0" {
 		t.Errorf("version: want %q, got %v", "8.0", gm.Data["version"])
+	}
+}
+
+func TestTrailingCommaMarkerRoundTripKeepsComments(t *testing.T) {
+	id := uuid.MustParse("cccccccc-dddd-eeee-ffff-000000000000")
+	tc := golang.TrailingComma{
+		Ident:  id,
+		Before: java.Space{Whitespace: " "},
+		After: java.Space{
+			Whitespace: " ",
+			Comments:   []java.Comment{{Text: " third", Suffix: "\n\t\t"}},
+		},
+	}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{tc}}
+
+	after := roundTripMarkers(t, before)
+	got, ok := after.Entries[0].(golang.TrailingComma)
+	if !ok {
+		t.Fatalf("entry is %T, want golang.TrailingComma", after.Entries[0])
+	}
+	if got.Before.Whitespace != tc.Before.Whitespace {
+		t.Errorf("Before.Whitespace: want %q, got %q", tc.Before.Whitespace, got.Before.Whitespace)
+	}
+	if got.After.Whitespace != tc.After.Whitespace {
+		t.Errorf("After.Whitespace: want %q, got %q", tc.After.Whitespace, got.After.Whitespace)
+	}
+	if len(got.After.Comments) != 1 {
+		t.Fatalf("After.Comments: want 1, got %d", len(got.After.Comments))
+	}
+	if got.After.Comments[0].Text != " third" || got.After.Comments[0].Suffix != "\n\t\t" {
+		t.Errorf("After.Comments[0]: want %#v, got %#v", tc.After.Comments[0], got.After.Comments[0])
 	}
 }

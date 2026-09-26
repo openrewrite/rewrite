@@ -26,8 +26,9 @@ import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
 import org.openrewrite.python.table.PythonLockRegenerationFailures;
 
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.Map;
+
+import static java.util.Collections.emptyMap;
 
 /**
  * Regenerates a lock file from an edited dependencies file. Both {@code uv}
@@ -136,13 +137,13 @@ public abstract class LockFileRegeneration {
     }
 
     public final Result regenerate(String dependenciesContent, @Nullable String existingLockContent, ExecutionContext ctx) {
-        return regenerate(dependenciesContent, null, existingLockContent, Collections.emptyMap(), ctx);
+        return regenerate(dependenciesContent, null, existingLockContent, emptyMap(), ctx);
     }
 
     public final Result regenerate(String dependenciesContent, @Nullable String originalDependenciesContent,
                                    @Nullable String existingLockContent, ExecutionContext ctx) {
         return regenerate(dependenciesContent, originalDependenciesContent, existingLockContent,
-                Collections.emptyMap(), ctx);
+                emptyMap(), ctx);
     }
 
     /**

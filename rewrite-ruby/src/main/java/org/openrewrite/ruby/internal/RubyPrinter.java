@@ -66,6 +66,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         }
     }
 
+    @Override
     public Rb visitCompilationUnit(Rb.CompilationUnit compilationUnit, PrintOutputCapture<P> p) {
         visitSpace(compilationUnit.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p);
         visitMarkers(compilationUnit.getMarkers(), p);

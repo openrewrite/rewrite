@@ -39,6 +39,9 @@ func Maybe(e java.Expression, site *visitor.Cursor) java.Expression {
 	if !Needed(e, site) {
 		return e
 	}
+	if isConversionType(site) {
+		return WrapType(e)
+	}
 	return Wrap(e)
 }
 
@@ -53,6 +56,20 @@ func Wrap(e java.Expression) java.Expression {
 		ID:     uuid.New(),
 		Prefix: format.PrefixOf(e),
 		Tree:   java.RightPadded[java.Expression]{Element: inner},
+	}
+}
+
+// WrapType puts e in parentheses as a type, which is what a type position such
+// as the one a conversion names admits.
+func WrapType(e java.Expression) java.Expression {
+	parens, ok := Wrap(e).(*java.Parentheses)
+	if !ok {
+		return e
+	}
+	return &java.ParenthesizedTypeTree{
+		ID:     uuid.New(),
+		Prefix: parens.Prefix,
+		Type:   parens.WithPrefix(java.Space{}),
 	}
 }
 
@@ -81,10 +98,11 @@ func Needed(e java.Expression, site *visitor.Cursor) bool {
 		return any(parent.Indexed) == any(replaced) && needsDelimiting(e)
 	case *golang.TypeAssertion:
 		return any(parent.Left.Element) == any(replaced) && needsDelimiting(e)
-	// The callee slot holds the type a conversion names, which is subject to
-	// the same rule.
 	case *java.MethodInvocation:
 		return parent.Select != nil && any(parent.Select.Element) == any(replaced) && needsDelimiting(e)
+	// The type a conversion names leads it, so it is subject to the same rule.
+	case *java.ControlParentheses:
+		return isConversionType(site) && needsDelimiting(e)
 	default:
 		prec, _, _, isBinary := format.BinaryOperands(e)
 		if !isBinary {
@@ -110,15 +128,26 @@ func Needed(e java.Expression, site *visitor.Cursor) bool {
 	}
 }
 
+// isConversionType reports whether site holds the type a conversion names,
+// which the cursor reaches through the parentheses TypeCast carries.
+func isConversionType(site *visitor.Cursor) bool {
+	grandparent := site.Parent().Parent()
+	if grandparent == nil {
+		return false
+	}
+	tc, ok := grandparent.Value().(*java.TypeCast)
+	return ok && any(tc.Clazz) == any(site.Parent().Value())
+}
+
 // needsDelimiting reports whether e is a form Go's grammar does not admit where
 // a primary expression belongs: anything built from operators, and the pointer,
 // channel and func type spellings, which a conversion names in that position.
 // Slice, array and map types open with a bracket and read unambiguously.
 func needsDelimiting(e java.Expression) bool {
 	switch e.(type) {
-	case *java.Binary, *golang.Binary, *java.Unary, *golang.Unary, *java.TypeCast:
+	case *java.Binary, *golang.Binary, *java.Unary, *golang.Unary:
 		return true
-	case *golang.Channel, *golang.FuncType:
+	case *golang.Channel, *golang.FuncType, *golang.PointerType:
 		return true
 	}
 	return false
@@ -144,6 +173,10 @@ func bracesReadAsABlock(e java.Expression, site *visitor.Cursor) bool {
 			return false
 		case *java.MethodInvocation:
 			if parent.Select == nil || any(parent.Select.Element) != any(child) {
+				return false
+			}
+		case *java.TypeCast:
+			if parent.Clazz == nil || any(parent.Clazz) != any(child) {
 				return false
 			}
 		case *java.ArrayAccess:
@@ -186,8 +219,5 @@ func (v *Visitor) Visit(t java.Tree, p any) java.Tree {
 	}
 	// The cursor has popped back to the parent by now, and the parent still
 	// holds t, so t is the node out is replacing.
-	if Needed(expr, visitor.NewCursor(v.Cursor(), t)) {
-		return Wrap(expr)
-	}
-	return out
+	return Maybe(expr, visitor.NewCursor(v.Cursor(), t))
 }

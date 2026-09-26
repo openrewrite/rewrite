@@ -51,6 +51,10 @@ public class LockEditSet {
     public static class PackageEdit {
         String name;
 
+        /** For an {@code npm:} alias, the real package name written as the entry's {@code name} field; else {@code null}. */
+        @Nullable
+        String aliasName;
+
         String oldVersion;
 
         /** The resolved target version, or {@code null} for a removal. */
@@ -117,6 +121,9 @@ public class LockEditSet {
 
         /** An add-during-bump: this bump's entry gains new dependency edges whose subtrees are placed as fresh ADDs. */
         boolean addsDependencyEdges;
+
+        /** A removal of the importer's edge only: the package stays installed as another package's dependency. */
+        boolean retainsEntry;
 
         /**
          * ADD is a brand-new dependency; ADD with a {@link #nestedUnder} is a fresh nested add. FORCED_MOVE is a

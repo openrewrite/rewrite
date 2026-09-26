@@ -17,10 +17,14 @@ import org.gradle.plugin.use.PluginDependenciesSpec
 import org.gradle.plugin.use.PluginDependencySpec
 
 interface PluginSpec extends PluginDependenciesSpec {
+    @Override
     Plugin id(String i)
 }
 
 interface Plugin extends PluginDependencySpec {
+    @Override
     Plugin version(String v)
+
+    @Override
     Plugin apply(boolean a)
 }

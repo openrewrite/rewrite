@@ -20,33 +20,33 @@
 # Data source: https://endoflife.date/
 #
 - imageName: debian
+  tagPatterns: [squeeze, "squeeze-*", "6", "6.*"]
+  eolDate: "2016-02-29"
+  suggestedReplacement: trixie (13)
+
+- imageName: debian
   tagPatterns: [wheezy, "wheezy-*", "7", "7.*"]
-  eolDate: "2016-04-25"
+  eolDate: "2018-05-31"
   suggestedReplacement: trixie (13)
 
 - imageName: debian
   tagPatterns: [jessie, "jessie-*", "8", "8.*"]
-  eolDate: "2018-06-17"
+  eolDate: "2020-06-30"
   suggestedReplacement: trixie (13)
 
 - imageName: debian
   tagPatterns: [stretch, "stretch-*", "9", "9.*"]
-  eolDate: "2020-07-18"
+  eolDate: "2022-07-01"
   suggestedReplacement: trixie (13)
 
 - imageName: debian
   tagPatterns: [buster, "buster-*", "10", "10.*"]
-  eolDate: "2022-09-10"
+  eolDate: "2024-06-30"
   suggestedReplacement: trixie (13)
 
 - imageName: debian
   tagPatterns: [bullseye, "bullseye-*", "11", "11.*"]
-  eolDate: "2024-08-14"
-  suggestedReplacement: trixie (13)
-
-- imageName: debian
-  tagPatterns: [bookworm, "bookworm-*", "12", "12.*"]
-  eolDate: "2026-07-11"
+  eolDate: "2026-08-31"
   suggestedReplacement: trixie (13)
 
 - imageName: ubuntu
@@ -460,6 +460,11 @@
   eolDate: "2025-09-16"
   suggestedReplacement: 25 or 21 (LTS)
 
+- imageName: eclipse-temurin
+  tagPatterns: ["26", "26-*", "26.*"]
+  eolDate: "2026-09-15"
+  suggestedReplacement: 25 or 21 (LTS)
+
 # Amazon Corretto
 - imageName: amazoncorretto
   tagPatterns: ["15", "15-*", "15.*"]
@@ -763,6 +768,11 @@
 - imageName: golang
   tagPatterns: ["1.24", "1.24.*", "1.24-*"]
   eolDate: "2026-02-10"
+  suggestedReplacement: 
+
+- imageName: golang
+  tagPatterns: ["1.25", "1.25.*", "1.25-*"]
+  eolDate: "2026-08-19"
   suggestedReplacement: 
 
 # Official OpenJDK image (deprecated in 2022, recommends eclipse-temurin)

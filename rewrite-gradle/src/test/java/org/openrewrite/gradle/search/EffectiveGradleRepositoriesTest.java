@@ -193,14 +193,13 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new EffectiveGradleRepositories(false))
-            .dataTable(Row.class, rows -> {
+            .dataTable(Row.class, rows ->
                 assertThat(rows).contains(
                   new Row("build.gradle", "https://repo.spring.io/milestone"),
                   new Row("build.gradle", "https://repo.maven.apache.org/maven2/"),
                   new Row("module/build.gradle", "https://repo.spring.io/milestone"),
                   new Row("module/build.gradle", "https://repo.maven.apache.org/maven2/")
-                );
-            }),
+                )),
           settingsGradle(
             """
               pluginManagement {

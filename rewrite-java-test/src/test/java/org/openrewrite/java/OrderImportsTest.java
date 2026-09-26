@@ -720,7 +720,7 @@ class OrderImportsTest implements RewriteTest {
                   JRightPadded<JavaType> myRightPadded = null;
                   JContainer<JavaType> myContainer = null;
                   Space mySpace = null;
-                  JavaType.Variable myVariable = null;
+                  JavaType.Variable myQualifiedVariable = null;
               }
               """,
             """
@@ -733,7 +733,7 @@ class OrderImportsTest implements RewriteTest {
                   JRightPadded<JavaType> myRightPadded = null;
                   JContainer<JavaType> myContainer = null;
                   Space mySpace = null;
-                  JavaType.Variable myVariable = null;
+                  JavaType.Variable myQualifiedVariable = null;
               }
               """
           )

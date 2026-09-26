@@ -15,11 +15,14 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
+
+import static java.util.Collections.emptyList;
 
 /**
  * The resolved dependency closure, a plain value model {@link NpmGraphBuilder} produces and each package
@@ -29,12 +32,24 @@ import java.util.Map;
  * computed from this graph by each serializer.
  */
 @Value
+@AllArgsConstructor
 public class ResolutionGraph {
 
     List<Importer> importers;
 
     /** Every resolved package instance, keyed by {@link #key(String, String)} ({@code name@version}). */
     Map<String, ResolvedNode> nodes;
+
+    /**
+     * Peers whose name resolves to several versions, so whether each is satisfied depends on where its requirer is
+     * placed: each placement sees the nearest copy up its {@code node_modules} chain. Only a serializer that models
+     * placement (npm) receives these; it must verify every one before emitting a layout.
+     */
+    List<PlacedPeer> placedPeers;
+
+    public ResolutionGraph(List<Importer> importers, Map<String, ResolvedNode> nodes) {
+        this(importers, nodes, emptyList());
+    }
 
     public static String key(String name, String version) {
         return name + "@" + version;
@@ -64,5 +79,19 @@ public class ResolutionGraph {
 
         /** The version each directly-declared dependency of this importer resolved to. */
         Map<String, String> resolved;
+    }
+
+    /** A requirer's peer ({@code peerName@range}) to verify against the requirer's placement(s). */
+    @Value
+    public static class PlacedPeer {
+        /** The requiring node's {@link #key(String, String)}. */
+        String requirer;
+
+        String peerName;
+
+        String range;
+
+        /** An optional peer (per {@code peerDependenciesMeta}) may be absent from a placement's view. */
+        boolean optional;
     }
 }

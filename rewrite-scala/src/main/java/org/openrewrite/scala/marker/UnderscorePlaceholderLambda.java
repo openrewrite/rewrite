@@ -29,11 +29,11 @@ import java.util.UUID;
 @With
 public class UnderscorePlaceholderLambda implements Marker {
     UUID id;
-    
+
     public UnderscorePlaceholderLambda() {
         this.id = UUID.randomUUID();
     }
-    
+
     public UnderscorePlaceholderLambda(UUID id) {
         this.id = id;
     }

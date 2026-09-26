@@ -18,9 +18,9 @@ package org.openrewrite.python.internal.uvlock;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
-import java.util.Collections;
 
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -107,7 +107,7 @@ class UvLockWriterTest {
     @Test
     void emptyMetadataEmitsBareHeader() {
         UvLockPackage pkg = minimalPackage().withMetadata(UvLockMetadata.builder()
-          .requiresDev(Collections.singletonMap("dev", singletonList(
+          .requiresDev(singletonMap("dev", singletonList(
             UvLockRequirement.builder().name("iniconfig").specifier(">=2.0").build())))
           .build());
         assertThat(write(pkg)).contains(

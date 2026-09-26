@@ -24,6 +24,7 @@ import org.openrewrite.ruby.tree.Rb;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -35,7 +36,7 @@ class RubyParserTest {
     @Test
     void sourcePathIsRelativeToTheRoot() {
         Path root = Paths.get("/repo");
-        SourceFile cu = parse(root.resolve("app/models/user.rb"), root, "puts 1\n", Charset.forName("UTF-8"));
+        SourceFile cu = parse(root.resolve("app/models/user.rb"), root, "puts 1\n", StandardCharsets.UTF_8);
         assertThat(cu.getSourcePath()).isEqualTo(Paths.get("app/models/user.rb"));
     }
 

@@ -29,11 +29,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.emptyList;
+
 /**
  * Resolves the npm registries (and their credentials) a project locks against: host-supplied
  * registries on the {@link NodeExecutionContextView} win outright; otherwise the marker's merged
  * {@code .npmrc} is parsed via {@link NpmConfig}, with credentials filled from the URL, then
- * host-supplied credentials, then {@code .netrc}. Mirrors the Python {@code IndexDiscovery}.
+ * host-supplied credentials, then {@code .netrc}. {@code .npmrc} credentials whose {@code ${VAR}}
+ * placeholders cannot be resolved are sent as written, as npm does, and the placeholders are recorded
+ * on the registry.
  */
 public final class RegistryDiscovery {
     private static final String DEFAULT_REGISTRY = "https://registry.npmjs.org/";
@@ -88,7 +92,7 @@ public final class RegistryDiscovery {
     private static NodeRegistry buildRegistry(@Nullable String scope, String url, boolean urlUnresolved,
                                               NpmConfig config, List<NodeRegistryCredentials> credentials,
                                               Environment env) {
-        boolean unresolved = urlUnresolved;
+        List<String> unresolvedCredentials = emptyList();
         String authToken = null;
         String username = null;
         String password = null;
@@ -107,12 +111,15 @@ public final class RegistryDiscovery {
             // 2. npmrc auth keyed by nerf-dart.
             NpmConfig.Auth auth = config.authFor(url);
             if (auth != null) {
+                // Like npm, send the matched credentials as written even when a variable is unset where
+                // the recipe runs: a proxy may replace them, and otherwise the registry's rejection is
+                // reported with the placeholders that were not expanded.
+                unresolvedCredentials = auth.unresolved;
                 authToken = auth.authToken;
                 username = auth.username;
                 password = auth.password;
                 authBase64 = auth.authBase64;
                 alwaysAuth |= auth.alwaysAuth;
-                unresolved |= auth.unresolvedPlaceholders;
             } else {
                 // 3. Host-supplied credentials, then 4. .netrc.
                 String host = Urls.host(url);
@@ -134,7 +141,7 @@ public final class RegistryDiscovery {
         }
 
         return new NodeRegistry(scope, url, authToken, username, password, authBase64,
-                alwaysAuth, config.getCafile(), config.isStrictSsl(), unresolved);
+                alwaysAuth, config.getCafile(), config.isStrictSsl(), urlUnresolved, unresolvedCredentials);
     }
 
     private static @Nullable NodeRegistryCredentials matchByHost(List<NodeRegistryCredentials> credentials, String host) {
