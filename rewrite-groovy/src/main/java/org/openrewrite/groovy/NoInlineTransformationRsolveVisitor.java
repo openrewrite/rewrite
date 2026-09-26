@@ -43,8 +43,19 @@ import java.util.Map;
  * @implNote Extension of {@link ResolveVisitor}, except for `transformInlineConstants()` which doesn't call `ExpressionUtils.transformInlineConstants()`
  */
 class NoInlineAnnotationTransformationResolveVisitor extends ResolveVisitor {
+    static final String WRAPPED_LIST = "org.openrewrite.groovy.WrappedList";
+
     public NoInlineAnnotationTransformationResolveVisitor(CompilationUnit compilationUnit) {
         super(compilationUnit);
+    }
+
+    @Override
+    public Expression transform(Expression expression) {
+        if (expression instanceof ListExpression && ((ListExpression) expression).isWrapped()) {
+            // ListExpression.transformExpression copies metadata but loses the wrapped flag.
+            expression.putNodeMetaData(WRAPPED_LIST, true);
+        }
+        return super.transform(expression);
     }
 
     @Override
