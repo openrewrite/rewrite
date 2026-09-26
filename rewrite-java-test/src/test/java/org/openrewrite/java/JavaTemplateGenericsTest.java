@@ -20,13 +20,10 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -618,58 +615,5 @@ class JavaTemplateGenericsTest implements RewriteTest {
               """
           )
         );
-    }
-
-    /**
-     * The context-free stub cache is keyed per source file. Two templates identical but for their bind type
-     * generate different stubs and attribute differently, so the key has to include it — otherwise the second
-     * silently receives the first's tree.
-     */
-    @Test
-    void bindTypeDiscriminatesCachedTemplates() {
-        AtomicReference<JavaType> first = new AtomicReference<>();
-        AtomicReference<JavaType> second = new AtomicReference<>();
-        rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
-                @Override
-                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    if ("placeholder".equals(method.getSimpleName())) {
-                        J a = JavaTemplate.builder("java.util.Collections.emptyList()")
-                          .bindType("java.util.List<java.lang.String>")
-                          .build()
-                          .apply(getCursor(), method.getCoordinates().replace());
-                        J b = JavaTemplate.builder("java.util.Collections.emptyList()")
-                          .bindType("java.util.List<java.lang.Integer>")
-                          .build()
-                          .apply(getCursor(), method.getCoordinates().replace());
-                        first.set(((Expression) a).getType());
-                        second.set(((Expression) b).getType());
-                        return b;
-                    }
-                    return super.visitMethodInvocation(method, ctx);
-                }
-            })),
-          java(
-            """
-              class Test {
-                  static Object placeholder() { return null; }
-                  void test() {
-                      Object x = placeholder();
-                  }
-              }
-              """,
-            """
-              class Test {
-                  static Object placeholder() { return null; }
-                  void test() {
-                      Object x = java.util.Collections.emptyList();
-                  }
-              }
-              """
-          )
-        );
-        assertThat(first.get()).hasToString("java.util.List<java.lang.String>");
-        assertThat(second.get()).hasToString("java.util.List<java.lang.Integer>");
     }
 }

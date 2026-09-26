@@ -20,15 +20,14 @@ import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypedTree;
 
-import java.util.Set;
-
+import static java.util.Collections.emptySet;
 import static java.util.Collections.nCopies;
 
 public class KotlinSubstitutions extends Substitutions {
     private final Object[] parameters;
 
-    public KotlinSubstitutions(String code, Set<String> genericTypes, Object[] parameters) {
-        super(code, genericTypes, parameters);
+    public KotlinSubstitutions(String code, Object[] parameters) {
+        super(code, emptySet(), parameters);
         this.parameters = parameters;
     }
 
