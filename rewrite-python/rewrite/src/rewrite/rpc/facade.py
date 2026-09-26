@@ -16,9 +16,10 @@ _LOCAL = object()  # stands in for a bundle when the facade runs a visitor itsel
 
 
 class Facade:
-    def __init__(self, children, hub_pull=None, local_visit=None, is_local_visitor=None):
+    def __init__(self, children, hub_pull=None, local_visit=None, is_local_visitor=None, hub_drop=None):
         self._children = children
         self._hub_pull = hub_pull
+        self._hub_drop = hub_drop
         # Built-in visitors (auto-format, add-import) belong to no recipe bundle, so the facade runs
         # them itself against the working tree it holds rather than failing to route them.
         self._local_visit = local_visit
@@ -96,7 +97,8 @@ class Facade:
         result = self._children.request(bundle, "Visit", params)
         tree_id = params.get("treeId")
         if self._hub_pull is not None and tree_id is not None and result.get("modified"):
-            self._hub_pull(self._children, bundle, tree_id, params.get("sourceFileType"))
+            # A single Visit reports only "modified", so a deletion is only visible on the pull.
+            self._hub_pull(self._children, bundle, tree_id, params.get("sourceFileType"), may_delete=True)
         return result
 
     def batch_visit(self, params: dict) -> dict:
@@ -124,11 +126,14 @@ class Facade:
             response = self._children.request(owner, "BatchVisit", {**params, "visitors": sub_visitors})
             sub_results = response.get("results", [])
             results.extend(sub_results)
+            if any(r.get("deleted") for r in sub_results):
+                # The result already says so; pulling would get DELETE, which a lost tree also answers.
+                if self._hub_drop is not None and tree_id is not None:
+                    self._hub_drop(tree_id)
+                break
             if (self._hub_pull is not None and tree_id is not None and
                     any(r.get("modified") for r in sub_results)):
                 self._hub_pull(self._children, owner, tree_id, source_file_type)
-            if any(r.get("deleted") for r in sub_results):
-                break
         return {"results": results}
 
     def evict(self, params: dict) -> bool:
