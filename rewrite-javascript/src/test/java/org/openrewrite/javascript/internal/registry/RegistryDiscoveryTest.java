@@ -138,6 +138,21 @@ class RegistryDiscoveryTest {
     }
 
     @Test
+    void nerfDartAuthTokenMatchesRegistryWithExplicitDefaultPort() {
+        NodeRegistries registries = RegistryDiscovery.discover(ctx(),
+                marker(new Npmrc(NpmrcScope.User, Map.of(
+                                "registry", "https://artifactory.example.com/artifactory/api/npm/npm-internalfacing/",
+                                "//artifactory.example.com/artifactory/api/npm/npm-internalfacing/:_authToken", "${ARTIFACTORY_IDENTITY_TOKEN}")),
+                        new Npmrc(NpmrcScope.Project, Map.of(
+                                "always-auth", "false",
+                                "registry", "https://artifactory.example.com:443/artifactory/api/npm/npm-internalfacing/"))),
+                env(Map.of("ARTIFACTORY_IDENTITY_TOKEN", "s3cret")));
+        assertThat(registries.getDefaultRegistry().getUrl())
+                .isEqualTo("https://artifactory.example.com:443/artifactory/api/npm/npm-internalfacing/");
+        assertThat(registries.getDefaultRegistry().getAuthToken()).isEqualTo("s3cret");
+    }
+
+    @Test
     void base64PasswordDecodedOntoRegistry() {
         NodeRegistries registries = RegistryDiscovery.discover(ctx(),
                 marker(npmrc(Map.of(
