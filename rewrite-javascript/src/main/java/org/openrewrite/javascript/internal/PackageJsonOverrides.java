@@ -15,12 +15,25 @@
  */
 package org.openrewrite.javascript.internal;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.util.DefaultIndenter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.json.tree.Space;
+import org.openrewrite.marker.Markers;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Ports {@code parseDependencyPath} and {@code applyOverrideToPackageJson}
@@ -162,9 +175,121 @@ public final class PackageJsonOverrides {
             return setFlatEntry(doc, "overrides", packageName, newVersion);
         }
 
-        // Deep-nested case: build nested JSON string and reparse
-        String overrideValue = buildNpmNestedOverride(packageName, newVersion, path);
-        return mergeTopLevelObjectReparse(doc, "overrides", overrideValue);
+        // The reparse below rebuilds the whole document, so without this the entry is rewritten on every cycle
+        // and the recipe never stabilises. Same guard setFlatEntry applies to the un-nested case.
+        if (newVersion.equals(nestedOverrideValue(doc, path, packageName))) {
+            return doc;
+        }
+
+        return setNestedOverride(doc, path, packageName, newVersion);
+    }
+
+    /**
+     * Set {@code overrides -> path... -> packageName}. Only the {@code overrides} value is rebuilt and spliced
+     * back in, so every other member keeps its original whitespace, which a whole-document reparse discarded.
+     * <p>
+     * Members already inside {@code overrides} are re-rendered rather than preserved: an existing
+     * {@code "overrides": { "a": "1.0.0" }} comes back expanded over several lines. Only this nested path
+     * does that; the un-nested one appends through {@code setFlatEntry} and keeps the block as it was.
+     */
+    private static Json.Document setNestedOverride(Json.Document doc, List<DependencyPathSegment> path,
+                                                   String packageName, String newVersion) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        String indent = PackageJsonHelper.detectIndentUnit(root);
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode rootNode = mapper.readTree(doc.printAll());
+            ObjectNode overrides = rootNode.path("overrides").isObject() ?
+                    (ObjectNode) rootNode.get("overrides") : mapper.createObjectNode();
+
+            ObjectNode at = overrides;
+            for (DependencyPathSegment seg : path) {
+                String key = seg.getVersion() != null ? seg.getName() + "@" + seg.getVersion() : seg.getName();
+                at = at.path(key).isObject() ? (ObjectNode) at.get(key) : at.putObject(key);
+            }
+            at.put(packageName, newVersion);
+
+            JsonValue value = parseFragment(doc, mapper, overrides, indent);
+            if (value == null) {
+                return doc;
+            }
+            if (findObjectMember(root, "overrides") != null) {
+                return doc.withValue(replaceMemberValue(root, "overrides", value));
+            }
+            List<JsonRightPadded<Json>> members = new ArrayList<>(root.getPadding().getMembers());
+            // The last member's `after` holds the whitespace before the object's closing brace, so it moves to
+            // the new last member rather than being dropped.
+            Space closing = Space.EMPTY;
+            if (!members.isEmpty()) {
+                int last = members.size() - 1;
+                closing = members.get(last).getAfter();
+                members.set(last, members.get(last).withAfter(Space.EMPTY));
+            }
+            members.add(new JsonRightPadded<>(
+                    PackageJsonHelper.makeMember("overrides", value, Space.build("\n" + indent, emptyList())),
+                    closing, Markers.EMPTY));
+            return doc.withValue(root.getPadding().withMembers(members));
+        } catch (Exception e) {
+            return doc;
+        }
+    }
+
+    /**
+     * Render {@code overrides} with the document's own indent unit and parse it on its own, so only this value
+     * is rebuilt. It sits one level in, so every line after the first carries an extra unit.
+     */
+    private static @Nullable JsonValue parseFragment(Json.Document doc, ObjectMapper mapper,
+                                                     ObjectNode overrides, String indent) throws Exception {
+        DefaultPrettyPrinter printer = new DefaultPrettyPrinter() {
+            @Override
+            public DefaultPrettyPrinter createInstance() {
+                return this;
+            }
+
+            @Override
+            public void writeObjectFieldValueSeparator(JsonGenerator g) throws IOException {
+                g.writeRaw(": ");
+            }
+        };
+        printer.indentObjectsWith(new DefaultIndenter(indent, "\n"));
+        String printed = mapper.writer(printer).writeValueAsString(overrides);
+
+        StringBuilder sb = new StringBuilder();
+        String[] lines = printed.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            sb.append(i == 0 ? "" : "\n" + indent).append(lines[i]);
+        }
+        Json.Document holder = PackageJsonHelper.reparseJson(doc, sb.toString());
+        return holder.getValue() instanceof Json.JsonObject ?
+                ((Json.JsonObject) holder.getValue()).withPrefix(Space.build(" ", emptyList())) : null;
+    }
+
+    /** The value {@code overrides} already holds at {@code path -> packageName}, or {@code null}. */
+    private static @Nullable String nestedOverrideValue(Json.Document doc, List<DependencyPathSegment> path,
+                                                        String packageName) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return null;
+        }
+        Json.JsonObject at = findObjectMember((Json.JsonObject) doc.getValue(), "overrides");
+        for (DependencyPathSegment seg : path) {
+            if (at == null) {
+                return null;
+            }
+            at = findObjectMember(at, seg.getVersion() != null ?
+                    seg.getName() + "@" + seg.getVersion() : seg.getName());
+        }
+        if (at == null) {
+            return null;
+        }
+        for (Json m : at.getMembers()) {
+            if (m instanceof Json.Member && packageName.equals(literalString(((Json.Member) m).getKey()))) {
+                return literalString(((Json.Member) m).getValue());
+            }
+        }
+        return null;
     }
 
     /**
@@ -277,27 +402,12 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * Sets {@code pnpm.overrides[key] = value}, creating {@code pnpm} and/or
-     * {@code pnpm.overrides} objects as needed. Preserves formatting.
+     * Sets {@code pnpm.overrides[key] = value}, creating {@code pnpm} and/or {@code pnpm.overrides}
+     * as needed. Preserves formatting, and returns the document unchanged when the entry already holds
+     * that value, which is what keeps the calling recipe single-cycle.
      */
     private static Json.Document setPnpmOverridesEntry(Json.Document doc, String key, String value) {
-        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
-        Json.JsonObject root = (Json.JsonObject) doc.getValue();
-
-        Json.JsonObject pnpmObj = findObjectMember(root, "pnpm");
-        if (pnpmObj == null) {
-            // No pnpm object yet — create pnpm: { overrides: { key: value } }
-            // Use addDependency twice: first add the inner entry (to trigger scope creation),
-            // but we need a two-level nest. Use the reparse fallback for this edge case.
-            String newJson = buildPnpmSnippet(doc, key, value);
-            return PackageJsonHelper.reparseJson(doc, newJson);
-        }
-
-        // pnpm object exists — delegate to flat entry within the "overrides" sub-object
-        // We'll operate directly on the pnpm sub-object via reparse for simplicity.
-        // (The pnpm.overrides nesting is unusual enough that reparse is fine.)
-        String newJson = buildPnpmSnippet(doc, key, value);
-        return PackageJsonHelper.reparseJson(doc, newJson);
+        return PackageJsonHelper.setNestedEntry(doc, "pnpm", "overrides", key, value);
     }
 
     // -------------------------------------------------------------------------
@@ -352,34 +462,6 @@ public final class PackageJsonOverrides {
             }
         }
         return result;
-    }
-
-    /**
-     * Builds a new full JSON document string with the pnpm.overrides[key] = value set.
-     */
-    private static String buildPnpmSnippet(Json.Document doc, String key, String value) {
-        String serialized = doc.printAll();
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper =
-                    new com.fasterxml.jackson.databind.ObjectMapper();
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> root =
-                    mapper.readValue(serialized, java.util.Map.class);
-
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> pnpm =
-                    (java.util.Map<String, Object>) root.computeIfAbsent("pnpm",
-                            k -> new java.util.LinkedHashMap<>());
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> overrides =
-                    (java.util.Map<String, Object>) pnpm.computeIfAbsent("overrides",
-                            k -> new java.util.LinkedHashMap<>());
-            overrides.put(key, value);
-
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
-        } catch (Exception e) {
-            return serialized;
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -439,7 +521,7 @@ public final class PackageJsonOverrides {
     private static Json.Literal makeStringLiteral(String value) {
         return new Json.Literal(
                 org.openrewrite.Tree.randomId(),
-                org.openrewrite.json.tree.Space.EMPTY,
+                Space.EMPTY,
                 org.openrewrite.marker.Markers.EMPTY,
                 "\"" + value + "\"", value);
     }

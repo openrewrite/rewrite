@@ -22,6 +22,7 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
@@ -138,6 +139,57 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
                         nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.2"))),
                 pnpmLock(resource("lock/pnpm/v9/before"), resource("lock/pnpm/v9/after"),
                         s -> s.noTrim())
+        );
+    }
+
+    @Test
+    void bumpFailsLoudAndWarnsWithTheEditKept() {
+        // 4.18.0 pulls a transitive declaring a non-optional peer, which the resolver does not model, so
+        // regeneration defers. The manifest edit is kept and flagged: npm install reconciles the pair, so the
+        // attempted change is more useful to a reader than no change at all.
+        routes.put("https://registry.npmjs.org/lodash",
+                "{\"versions\":{\"4.17.20\":{},\"4.18.0\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
+        routes.put("https://registry.npmjs.org/lodash/4.18.0",
+                "{\"name\":\"lodash\",\"version\":\"4.18.0\",\"dependencies\":{\"tslib\":\"^2.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.18.0.tgz\",\"integrity\":\"sha512-LODASH\"}}");
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"peerDependencies\":{\"react\":\">=17\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB\"}}");
+
+        String pkgBefore = "{\n" +
+                "  \"name\": \"npm-lock-v3\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"dependencies\": {\n" +
+                "    \"lodash\": \"^4.17.20\"\n" +
+                "  }\n" +
+                "}\n";
+        String lock = "{\n" +
+                "  \"name\": \"npm-lock-v3\",\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"name\": \"npm-lock-v3\", \"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/lodash\": {\"version\": \"4.17.20\", \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\", \"integrity\": \"sha512-L0\"}\n" +
+                "  }\n" +
+                "}\n";
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("lodash", null, "4.18.0")).executionContext(ctx)
+                        .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).hasSize(1)),
+                packageJson(pkgBefore, null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("lodash", "^4.17.20")),
+                        s -> s.after(actual -> {
+                            assertThat(actual).contains("4.18.0");
+                            return actual;
+                        }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                .as("manifest carries the lock-regen-failure warning").isPresent())),
+                packageLock(lock, null, s -> s.noTrim().after(actual -> {
+                    assertThat(actual).doesNotContain("node_modules/tslib");
+                    return actual;
+                }))
         );
     }
 
