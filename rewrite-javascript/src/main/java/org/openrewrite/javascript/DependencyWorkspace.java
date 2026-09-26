@@ -171,11 +171,11 @@ class DependencyWorkspace {
     }
 
     /**
-     * Per-PM full install (produces both lockfile and node_modules). The args
-     * differ from {@link org.openrewrite.javascript.internal.LockFileRegeneration},
-     * which uses lock-only flags ({@code --package-lock-only}, {@code --lockfile-only});
-     * here we want a full install so that downstream tests have node_modules
-     * available for type attribution and recipe round-trips.
+     * Per-PM full install (produces both lockfile and node_modules). Unlike
+     * {@link org.openrewrite.javascript.internal.LockFileRegeneration}, which updates
+     * lock files natively without executing the package manager, here we want a full
+     * install so that downstream tests have node_modules available for type attribution
+     * and recipe round-trips.
      */
     private static void runInstall(Path workingDir, PackageManager pm)
             throws IOException, InterruptedException {

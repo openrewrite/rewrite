@@ -1,0 +1,1 @@
+{"name":"is-number","version":"7.0.0","license":"MIT","engines":{"node":">=0.12.0"},"scripts":{"test":"mocha"},"_hasShrinkwrap":false,"dist":{"tarball":"https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz","shasum":"7535345b896734d5f80c4d06c50955527a14f12b","integrity":"sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng=="}}

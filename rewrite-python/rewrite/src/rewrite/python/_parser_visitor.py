@@ -120,6 +120,9 @@ class _EmbeddedTypeMapping:
         return line + self._line_offset, (col + self._col_offset) if line == 1 else col
 
 
+_BARE_QUALIFIERS = frozenset({'typing.Final', 'typing_extensions.Final'})
+
+
 def _with_type(node: T, resolved: Optional[JavaType]) -> T:
     """``node`` carrying ``resolved``, unless it has a type already or no slot for one."""
     if getattr(node, 'type', None) is not None or not hasattr(node, '_type'):
@@ -578,45 +581,65 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__whitespace()
 
         if node.value:
+            target_prefix = self.__whitespace()
+            target = self.__convert(node.target)
+            hint_prefix = self.__source_before(':')
+            type_tree = self.__convert_type(node.annotation)
+            if self._type_mapping.is_field_specifier_call(node.value):
+                assigned_type = getattr(type_tree, 'type', None)
+                if isinstance(assigned_type, JavaType.FullyQualified) and \
+                        assigned_type.fully_qualified_name in _BARE_QUALIFIERS:
+                    # The type is the value's, which ty hides behind its field marker.
+                    assigned_type = JavaType.Unknown()
+                if isinstance(target, j.Identifier):
+                    target = target.replace(
+                        type=assigned_type,
+                        field_type=dataclasses.replace(target.field_type, _type=assigned_type)
+                        if target.field_type is not None else None)
+            else:
+                assigned_type = self._type_mapping.type(node)
             return j.Assignment(
                 random_id(),
                 prefix,
                 Markers.EMPTY,
                 py.TypeHintedExpression(
                     random_id(),
-                    self.__whitespace(),
+                    target_prefix,
                     Markers.EMPTY,
-                    self.__convert(node.target),
+                    target,
                     py.TypeHint(
                         random_id(),
-                        self.__source_before(':'),
+                        hint_prefix,
                         Markers.EMPTY,
-                        self.__convert_type(node.annotation),
-                        self._type_mapping.type(node.annotation)
+                        type_tree,
+                        getattr(type_tree, 'type', None)
                     ),
-                    self._type_mapping.type(node)
+                    assigned_type
                 ),
                 self.__pad_left(
                     self.__source_before('='),
                     self.__convert(node.value)
-                ) if node.value else None,
-                self._type_mapping.type(node)
+                ),
+                assigned_type
             )
         else:
             # No value - type annotation only (e.g., `x: int`)
+            target = self.__convert(node.target)
+            hint_prefix = self.__source_before(':')
+            type_tree = self.__convert_type(node.annotation)
             return py.ExpressionStatement(
                 random_id(),
                 py.TypeHintedExpression(
                     random_id(),
                     prefix,
                     Markers.EMPTY,
-                    self.__convert(node.target),
+                    target,
                     py.TypeHint(
                         random_id(),
-                        self.__source_before(':'),
+                        hint_prefix,
                         Markers.EMPTY,
-                        self.__convert_type(node.annotation),
-                        self._type_mapping.type(node.annotation)
+                        type_tree,
+                        getattr(type_tree, 'type', None)
                     ),
                     self._type_mapping.type(node)
                 )
@@ -2296,12 +2319,13 @@ class ParserVisitor(ast.NodeVisitor):
             return_type = None
         else:
             arrow = self.__source_before('->')
+            returns_tree = self.__convert_type(node.returns)
             return_type = py.TypeHint(
                 random_id(),
                 arrow,
                 Markers.EMPTY,
-                self.__convert_type(node.returns),
-                self._type_mapping.type(node.returns)
+                returns_tree,
+                getattr(returns_tree, 'type', None)
             )
         body = self.__convert_block(node.body)
 

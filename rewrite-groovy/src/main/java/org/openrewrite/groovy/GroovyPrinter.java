@@ -108,8 +108,12 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitListLiteral(G.ListLiteral listLiteral, PrintOutputCapture<P> p) {
         beforeSyntax(listLiteral, GSpace.Location.LIST_LITERAL, p);
-        visitContainer("[", listLiteral.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS,
-                ",", "]", p);
+        Object parent = getCursor().getParentOrThrow().getValue();
+        boolean multiIndex = parent instanceof G.Binary && ((G.Binary) parent).getOperator() == G.Binary.Type.Access &&
+                ((G.Binary) parent).getRight() == listLiteral &&
+                ((G.Binary) parent).getMarkers().findFirst(MultiIndexAccess.class).isPresent();
+        visitContainer(multiIndex ? "" : "[", listLiteral.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS,
+                ",", multiIndex ? "" : "]", p);
         afterSyntax(listLiteral, p);
         return listLiteral;
     }

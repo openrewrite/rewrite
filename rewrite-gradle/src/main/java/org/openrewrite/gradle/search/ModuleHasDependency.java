@@ -71,6 +71,13 @@ public class ModuleHasDependency extends ScanningRecipe<ModuleHasDependency.Accu
     @Nullable
     String configuration;
 
+    @Option(displayName = "Only direct",
+            description = "If enabled, transitive dependencies will not be considered. All dependencies are searched by default.",
+            required = false,
+            example = "true")
+    @Nullable
+    Boolean onlyDirect;
+
     @Value
     public static class Accumulator {
         Set<JavaProject> projectsWithDependency;
@@ -112,13 +119,24 @@ public class ModuleHasDependency extends ScanningRecipe<ModuleHasDependency.Accu
                 continue;
             }
             for (ResolvedDependency resolvedDependency : c.getDirectResolved()) {
-                ResolvedDependency found = resolvedDependency.findDependency(groupIdPattern, artifactIdPattern);
+                ResolvedDependency found = findMatching(resolvedDependency);
                 if (found != null && (versionComparator == null || versionComparator.isValid(null, found.getVersion()))) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    private @Nullable ResolvedDependency findMatching(ResolvedDependency root) {
+        if (Boolean.TRUE.equals(onlyDirect)) {
+            if (StringUtils.matchesGlob(root.getGroupId(), groupIdPattern) &&
+                    StringUtils.matchesGlob(root.getArtifactId(), artifactIdPattern)) {
+                return root;
+            }
+            return null;
+        }
+        return root.findDependency(groupIdPattern, artifactIdPattern);
     }
 
     @Override
