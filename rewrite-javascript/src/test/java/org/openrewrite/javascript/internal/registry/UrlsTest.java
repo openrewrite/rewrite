@@ -50,6 +50,16 @@ class UrlsTest {
 
     @ParameterizedTest
     @CsvSource({
+            "https://HOST.Example/npm/, //host.example/npm/",
+            "https://HOST.Example:443/Npm/, //host.example/Npm/",
+            "https://HOST.Example:8443/npm/, //host.example:8443/npm/"
+    })
+    void nerfDartLowercasesHostButNotPath(String url, String expected) {
+        assertThat(Urls.nerfDart(url)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
             "https://[::1]:443/npm/, //[::1]/npm/",
             "http://[::1]:80/npm/, //[::1]/npm/",
             "https://[::443]/npm/, //[::443]/npm/",

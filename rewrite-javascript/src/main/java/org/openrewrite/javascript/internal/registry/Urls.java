@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.registry;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 final class Urls {
 
@@ -77,12 +78,14 @@ final class Urls {
      * npm's "nerf dart" key for a registry URL: scheme and userinfo dropped, then the
      * final non-directory path segment removed (as {@code url.resolve(".")} does), leaving
      * a {@code //host[:port]/path/} prefix that auth keys ({@code :_authToken}, …) hang off.
-     * The scheme's default port is omitted, as it is by npm's URL normalization.
+     * The host is lowercased and the scheme's default port omitted, as npm's URL normalization does.
      */
     static String nerfDart(String url) {
         String noUserinfo = stripUserinfo(url);
         int schemeEnd = noUserinfo.indexOf("://");
         String rest = schemeEnd < 0 ? noUserinfo : noUserinfo.substring(schemeEnd + 3);
+        int authorityEnd = authorityEnd(rest, 0);
+        rest = rest.substring(0, authorityEnd).toLowerCase(Locale.ROOT) + rest.substring(authorityEnd);
         String defaultPort = null;
         if (schemeEnd >= 0) {
             String scheme = noUserinfo.substring(0, schemeEnd);
@@ -93,7 +96,6 @@ final class Urls {
             }
         }
         if (defaultPort != null) {
-            int authorityEnd = authorityEnd(rest, 0);
             int colon = rest.lastIndexOf(':', authorityEnd - 1);
             if (colon >= 0) {
                 int portStart = colon + 1;
