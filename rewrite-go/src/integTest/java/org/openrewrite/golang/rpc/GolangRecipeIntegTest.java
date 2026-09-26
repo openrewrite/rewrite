@@ -34,9 +34,11 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -278,6 +280,34 @@ class GolangRecipeIntegTest implements RewriteTest {
         assertThat(result).isNotSameAs(cu);
         String printed = GoRewriteRpc.getOrStart().print((SourceFile) result);
         assertThat(printed).contains("var flag = true").contains("_ = flag");
+    }
+
+    @Test
+    void booleanRecipeOptionArrivingAsAString() {
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source = "package main\n\nfunc f() {\n}\n";
+
+        SourceFile cu = GolangParser.builder().build().parse(source).findFirst().orElseThrow();
+        var unconditional = rpc.prepareRecipe("org.openrewrite.golang.AddImport",
+          Map.of("packagePath", "strings", "onlyIfReferenced", "false"));
+        Tree added = unconditional.getVisitor().visit(cu, new InMemoryExecutionContext());
+        assertThat(rpc.print((SourceFile) added)).contains("import \"strings\"");
+
+        cu = GolangParser.builder().build().parse(source).findFirst().orElseThrow();
+        var gated = rpc.prepareRecipe("org.openrewrite.golang.AddImport",
+          Map.of("packagePath", "strings", "onlyIfReferenced", "true"));
+        Tree untouched = gated.getVisitor().visit(cu, new InMemoryExecutionContext());
+        assertThat(rpc.print((SourceFile) untouched)).doesNotContain("strings");
+    }
+
+    @Test
+    void unbindableRecipeOptionNamesTheOption() {
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        assertThatThrownBy(() -> rpc.prepareRecipe("org.openrewrite.golang.AddImport",
+          Map.of("packagePath", "strings", "onlyIfReferenced", "yes")))
+          .hasMessageContaining("org.openrewrite.golang.AddImport")
+          .hasMessageContaining("onlyIfReferenced")
+          .hasMessageContaining("bool");
     }
 
     /**

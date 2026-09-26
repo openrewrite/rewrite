@@ -18,7 +18,6 @@ package recipe
 
 import (
 	"reflect"
-	"strings"
 	"sync"
 )
 
@@ -27,7 +26,9 @@ type CategoryDescriptor struct {
 	Description string
 }
 
-type RecipeConstructor func(options map[string]any) Recipe
+// An error means an option value could not be bound to its declared field
+// type; see OptionBindError.
+type RecipeConstructor func(options map[string]any) (Recipe, error)
 
 type Registration struct {
 	Descriptor  RecipeDescriptor
@@ -83,13 +84,8 @@ func NewRegistry() *Registry {
 	}
 }
 
-// The prototype is used to extract the recipe descriptor. A constructor is
-// automatically derived via reflection: it creates a new instance of the
-// prototype's type and sets exported fields from the options map. Option
-// names are mapped to field names by capitalizing the first letter
-// (e.g., option "oldName" sets field "OldName").
-//
-// For recipes without options, the prototype itself is returned.
+// The prototype supplies the recipe descriptor and the concrete type that
+// newReflectConstructor instantiates, zero-valued, once per prepared run.
 func (r *Registry) Register(prototype Recipe, categories ...CategoryDescriptor) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -132,7 +128,7 @@ func (r *Registry) registerSubRecipes(rec Recipe) {
 			child := sub
 			r.subByName[name] = &Registration{
 				Descriptor:  Describe(child),
-				Constructor: func(map[string]any) Recipe { return child },
+				Constructor: func(map[string]any) (Recipe, error) { return child, nil },
 			}
 			r.registerSubRecipes(child)
 		}
@@ -151,8 +147,8 @@ func (r *Registry) RegisterWithCategories(desc RecipeDescriptor, categories []Ca
 	// (e.g., registered via Activate in the custom binary) with a nil
 	// constructor from the installer's descriptor-only registration.
 	if existing, ok := r.byName[desc.Name]; ok && existing.Constructor != nil {
-		testInstance := existing.Constructor(nil)
-		if testInstance != nil {
+		testInstance, err := existing.Constructor(nil)
+		if err == nil && testInstance != nil {
 			// Existing registration has a real implementation — keep it,
 			// just update categories if provided.
 			if len(categories) > 0 {
@@ -163,7 +159,7 @@ func (r *Registry) RegisterWithCategories(desc RecipeDescriptor, categories []Ca
 	}
 	reg := &Registration{
 		Descriptor:  desc,
-		Constructor: func(options map[string]any) Recipe { return nil },
+		Constructor: func(map[string]any) (Recipe, error) { return nil, nil },
 		Categories:  categories,
 	}
 	r.byName[desc.Name] = reg
@@ -231,8 +227,8 @@ func (r *Registry) findOrCreateSubcategory(parent *Category, desc CategoryDescri
 
 // newReflectConstructor creates a RecipeConstructor that instantiates new
 // copies of the prototype's concrete type via reflection. Option names are
-// mapped to exported struct fields by capitalizing the first letter
-// (e.g., "oldName" → "OldName").
+// mapped to exported struct fields by optionField, and each value is coerced
+// to the field's declared type by coerceOption.
 func newReflectConstructor(prototype Recipe) RecipeConstructor {
 	t := reflect.TypeOf(prototype)
 	isPtr := t.Kind() == reflect.Ptr
@@ -240,21 +236,27 @@ func newReflectConstructor(prototype Recipe) RecipeConstructor {
 		t = t.Elem()
 	}
 
-	return func(options map[string]any) Recipe {
+	return func(options map[string]any) (Recipe, error) {
 		v := reflect.New(t)
 		elem := v.Elem()
 
 		for name, val := range options {
-			fieldName := strings.ToUpper(name[:1]) + name[1:]
-			f := elem.FieldByName(fieldName)
-			if f.IsValid() && f.CanSet() {
-				f.Set(reflect.ValueOf(val))
+			f := optionField(elem, name)
+			// An option that names no field is ignored, matching the Java host
+			// (Jackson with FAIL_ON_UNKNOWN_PROPERTIES disabled) and the C# server.
+			if !f.IsValid() || !f.CanSet() {
+				continue
 			}
+			cv, ok := coerceOption(val, f.Type())
+			if !ok {
+				return nil, &OptionBindError{Recipe: prototype.Name(), Option: name, Target: f.Type(), Value: val}
+			}
+			f.Set(cv)
 		}
 
 		if isPtr {
-			return v.Interface().(Recipe)
+			return v.Interface().(Recipe), nil
 		}
-		return v.Elem().Interface().(Recipe)
+		return v.Elem().Interface().(Recipe), nil
 	}
 }
