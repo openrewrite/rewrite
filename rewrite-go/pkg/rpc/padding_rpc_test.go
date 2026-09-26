@@ -69,7 +69,7 @@ func TestCoerceToStatementRP_AcceptsExpressionVariant(t *testing.T) {
 	var wire any = java.RightPadded[java.Expression]{
 		Element: mi,
 		After:   java.EmptySpace,
-		Markers: java.Markers{},
+		Markers: java.EmptyMarkers,
 	}
 
 	// when: the receiver coerces it to RightPadded[Statement]
@@ -87,7 +87,7 @@ func TestRawCastPanics_RightPaddedStatementFromExpression(t *testing.T) {
 	// Lock that panic in as a regression sentinel.
 	var wire any = java.RightPadded[java.Expression]{
 		Element: makeMethodInvocation(),
-		Markers: java.Markers{},
+		Markers: java.EmptyMarkers,
 	}
 	expectPanic(t, "raw cast RP[Expression]->RP[Statement]", func() {
 		_ = wire.(java.RightPadded[java.Statement])
@@ -101,7 +101,7 @@ func TestCoerceLeftPaddedIdent_AcceptsExpressionVariant(t *testing.T) {
 	var wire any = java.LeftPadded[java.Expression]{
 		Before:  java.EmptySpace,
 		Element: id,
-		Markers: java.Markers{},
+		Markers: java.EmptyMarkers,
 	}
 
 	// when
@@ -116,7 +116,7 @@ func TestCoerceLeftPaddedIdent_AcceptsExpressionVariant(t *testing.T) {
 func TestRawCastPanics_LeftPaddedIdentFromExpression(t *testing.T) {
 	var wire any = java.LeftPadded[java.Expression]{
 		Element: makeIdent("Foo"),
-		Markers: java.Markers{},
+		Markers: java.EmptyMarkers,
 	}
 	expectPanic(t, "raw cast LP[Expression]->LP[*Identifier]", func() {
 		_ = wire.(java.LeftPadded[*java.Identifier])
@@ -132,7 +132,7 @@ func TestCoerceRightPaddedTyped_StatementFromExpressionVariant(t *testing.T) {
 	// given: a RightPadded[Expression] wrapping a *MethodInvocation (also a
 	// Statement). Java ships VisitCase bodies and parameter lists this way.
 	mi := makeMethodInvocation()
-	var wire any = java.RightPadded[java.Expression]{Element: mi, Markers: java.Markers{}}
+	var wire any = java.RightPadded[java.Expression]{Element: mi, Markers: java.EmptyMarkers}
 
 	// when: a Statement-typed field coerces it.
 	got := coerceRightPaddedTyped[java.Statement](wire)
@@ -146,7 +146,7 @@ func TestCoerceRightPaddedTyped_StatementFromExpressionVariant(t *testing.T) {
 func TestCoerceRightPaddedTyped_ExpressionFromStatementVariant(t *testing.T) {
 	// given: a RightPadded[Statement] wrapping a *MethodInvocation (also Expression).
 	mi := makeMethodInvocation()
-	var wire any = java.RightPadded[java.Statement]{Element: mi, Markers: java.Markers{}}
+	var wire any = java.RightPadded[java.Statement]{Element: mi, Markers: java.EmptyMarkers}
 
 	// when
 	got := coerceRightPaddedTyped[java.Expression](wire)
@@ -170,7 +170,7 @@ func TestCoerceRightPaddedTyped_StatementOnlyElementSurvives(t *testing.T) {
 	// element (truncated Go source after a round trip); a Statement-typed field
 	// must preserve it.
 	ret := makeReturnStatement()
-	var wire any = java.RightPadded[java.J]{Element: ret, Markers: java.Markers{}}
+	var wire any = java.RightPadded[java.J]{Element: ret, Markers: java.EmptyMarkers}
 
 	// when
 	got := coerceRightPaddedTyped[java.Statement](wire)

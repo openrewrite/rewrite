@@ -142,7 +142,7 @@ func TestDirective_DirectivePrecedingRegularComment(t *testing.T) {
 	if got := len(md.LeadingAnnotations); got != 1 {
 		t.Fatalf("LeadingAnnotations: got %d, want 1", got)
 	}
-	if got := len(md.Prefix.Comments); got != 1 {
+	if got := len(md.Prefix.Comments()); got != 1 {
 		t.Errorf("Prefix.Comments: got %d, want 1 (the regular doc)", got)
 	}
 }

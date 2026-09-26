@@ -1442,8 +1442,8 @@ func (p *GoPrinter) VisitEmpty(empty *java.Empty, param any) java.J {
 // Convention: Whitespace (before comments) is emitted first, then each comment
 // with its suffix. This matches Java OpenRewrite's Space model.
 func (p *GoPrinter) visitSpace(space java.Space, out *PrintOutputCapture) {
-	out.Append(space.Whitespace)
-	for _, comment := range space.Comments {
+	out.Append(space.Whitespace())
+	for _, comment := range space.Comments() {
 		printComment(comment, out)
 		out.Append(comment.Suffix)
 	}

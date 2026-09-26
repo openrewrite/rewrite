@@ -591,7 +591,7 @@ func (r *JavaReceiver) VisitArrayType(at *java.ArrayType, p any) java.J {
 	at = &c
 	at.ElementType = receiveValue(q, at.ElementType, func(e java.Expression) any { return r.Visit(e, q) })
 	q.ReceiveList(nil, nil) // annotations
-	if result := q.Receive(at.Dimension, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
+	if result := q.Receive(at.Dimension, func(v any) any { return receiveLeftPaddedSpaceVal(r, q, v) }); result != nil {
 		at.Dimension = result.(java.LeftPadded[java.Space])
 	}
 	at.Type = r.receiveType(at.Type, q)

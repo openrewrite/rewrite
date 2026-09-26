@@ -52,10 +52,10 @@ func (v *RemoveTrailingWhitespaceVisitor) Visit(t java.Tree, p any) java.Tree {
 }
 
 func (v *RemoveTrailingWhitespaceVisitor) VisitSpace(s java.Space, p any) java.Space {
-	if s.Whitespace == "" || !strings.ContainsAny(s.Whitespace, " \t") {
+	if s.Whitespace() == "" || !strings.ContainsAny(s.Whitespace(), " \t") {
 		return s
 	}
-	s.Whitespace = stripTrailingPerLine(s.Whitespace)
+	s = java.MakeSpace(s.Comments(), stripTrailingPerLine(s.Whitespace()))
 	return s
 }
 

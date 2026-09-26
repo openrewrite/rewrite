@@ -247,20 +247,20 @@ func (v *BinarySpacingVisitor) operandList(elements []java.RightPadded[java.Expr
 func (v *BinarySpacingVisitor) spaceOperands(operands binaryOperands, prec int, before java.Space, right java.Expression) (java.Space, java.Expression) {
 	blank := prec < cutoff(operands, v.depth)
 	before = spaceOrNothing(before, blank)
-	if strings.Contains(getPrefix(right).Whitespace, "\n") {
+	if strings.Contains(getPrefix(right).Whitespace(), "\n") {
 		return before, right
 	}
 	return before, withPrefix(right, spaceOrNothing(getPrefix(right), blank))
 }
 
 func spaceOrNothing(s java.Space, blank bool) java.Space {
-	if len(s.Comments) > 0 || strings.Contains(s.Whitespace, "\n") {
+	if len(s.Comments()) > 0 || strings.Contains(s.Whitespace(), "\n") {
 		return s
 	}
 	if blank {
-		s.Whitespace = " "
+		s = java.MakeSpace(s.Comments(), " ")
 	} else {
-		s.Whitespace = ""
+		s = java.MakeSpace(s.Comments(), "")
 	}
 	return s
 }

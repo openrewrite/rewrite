@@ -97,13 +97,13 @@ func prefixOperator(op java.UnaryOperator) (string, bool) {
 // newline (deliberate multi-line layout), otherwise normalizes any
 // 0-or-many-spaces to exactly one space.
 func ensureSingleSpace(s java.Space) java.Space {
-	if strings.Contains(s.Whitespace, "\n") {
+	if strings.Contains(s.Whitespace(), "\n") {
 		return s
 	}
-	if s.Whitespace == " " {
+	if s.Whitespace() == " " {
 		return s
 	}
-	s.Whitespace = " "
+	s = java.MakeSpace(s.Comments(), " ")
 	return s
 }
 
@@ -126,12 +126,12 @@ func clearExpressionLeadingSpace(e java.Expression) java.Expression {
 		return e
 	}
 	prefix := getPrefix(e)
-	if strings.Contains(prefix.Whitespace, "\n") {
+	if strings.Contains(prefix.Whitespace(), "\n") {
 		return e
 	}
-	if prefix.Whitespace == "" {
+	if prefix.Whitespace() == "" {
 		return e
 	}
-	prefix.Whitespace = ""
+	prefix = java.MakeSpace(prefix.Comments(), "")
 	return withPrefix(e, prefix)
 }

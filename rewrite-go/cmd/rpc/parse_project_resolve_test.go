@@ -162,7 +162,7 @@ func TestParseProjectDegradesToGoSumOnlyWhenModuleUnresolvable(t *testing.T) {
 	// and the degradation is visible as a warning, not just a server log line
 	gm := findGoMod(t, s)
 	assert.Truef(t, hasGoSumOnlyWarning(gm),
-		"expected a Markup.Warn about go.sum-only resolution: %+v", gm.Markers.Entries)
+		"expected a Markup.Warn about go.sum-only resolution: %+v", gm.Markers.Entries())
 }
 
 func findGoMod(t *testing.T, s *server) *golang.GoMod {
@@ -177,7 +177,7 @@ func findGoMod(t *testing.T, s *server) *golang.GoMod {
 }
 
 func hasGoSumOnlyWarning(gm *golang.GoMod) bool {
-	for _, m := range gm.Markers.Entries {
+	for _, m := range gm.Markers.Entries() {
 		gmk, ok := m.(java.GenericMarker)
 		if !ok || gmk.JavaType != "org.openrewrite.marker.Markup$Warn" {
 			continue
@@ -196,7 +196,7 @@ func findGoResolutionResult(t *testing.T, s *server) golang.GoResolutionResult {
 		if !ok {
 			continue
 		}
-		for _, m := range gm.Markers.Entries {
+		for _, m := range gm.Markers.Entries() {
 			if mrr, ok := m.(golang.GoResolutionResult); ok {
 				return mrr
 			}

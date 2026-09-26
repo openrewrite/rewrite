@@ -104,8 +104,8 @@ func init() {
 	RegisterValueType(reflect.TypeOf((*java.ParseError)(nil)), "org.openrewrite.tree.ParseError")
 
 	// Non-tree types that Java needs valueType for
-	RegisterValueType(reflect.TypeOf(java.Space{}), "org.openrewrite.java.tree.Space")
-	RegisterValueType(reflect.TypeOf(java.Markers{}), "org.openrewrite.marker.Markers")
+	RegisterValueType(reflect.TypeOf(java.EmptySpace), "org.openrewrite.java.tree.Space")
+	RegisterValueType(reflect.TypeOf(java.EmptyMarkers), "org.openrewrite.marker.Markers")
 	RegisterValueType(reflect.TypeOf(java.Comment{}), "org.openrewrite.java.tree.TextComment")
 
 	// Go-specific marker valueType registrations (for send-side type resolution)
@@ -281,8 +281,8 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$ModuleRef", func() any { return golang.GoModuleRef{} })
 	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$PackageModule", func() any { return golang.GoPackageModule{} })
 
-	RegisterFactory("org.openrewrite.java.tree.Space", func() any { return java.Space{} })
-	RegisterFactory("org.openrewrite.marker.Markers", func() any { return java.Markers{} })
+	RegisterFactory("org.openrewrite.java.tree.Space", func() any { return java.EmptySpace })
+	RegisterFactory("org.openrewrite.marker.Markers", func() any { return java.EmptyMarkers })
 	RegisterFactory("org.openrewrite.java.tree.TextComment", func() any { return java.Comment{} })
 
 	// Padding types — needed when Java sends ADD messages for new padding

@@ -815,7 +815,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if mrr, err := goparser.ParseGoMod(r.sourcePath, r.source); err == nil && mrr != nil && mrr.ModulePath != "" {
-			gm.Markers.Entries = append(gm.Markers.Entries, *mrr)
+			gm.Markers = java.AddMarker(gm.Markers, *mrr)
 		}
 		goModByIdx[r.idx] = gm
 	}
@@ -823,8 +823,8 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 	// Index each go.mod's GoResolutionResult by directory for sibling go.sum.
 	mrrByDir := make(map[string]*golang.GoResolutionResult, len(goModByIdx))
 	for _, gm := range goModByIdx {
-		for i := range gm.Markers.Entries {
-			if mrr, ok := gm.Markers.Entries[i].(golang.GoResolutionResult); ok {
+		for _, entry := range gm.Markers.Entries() {
+			if mrr, ok := entry.(golang.GoResolutionResult); ok {
 				mrrByDir[filepath.Dir(gm.SourcePath)] = &mrr
 				break
 			}
@@ -842,7 +842,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if mrr, ok := mrrByDir[filepath.Dir(r.sourcePath)]; ok && mrr != nil {
-			gs.Markers.Entries = append(gs.Markers.Entries, *mrr)
+			gs.Markers = java.AddMarker(gs.Markers, *mrr)
 		}
 		goSumByIdx[r.idx] = gs
 	}
@@ -2894,7 +2894,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
-			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr, m.goProject)
+			gm.Markers = java.AddMarker(java.AddMarker(gm.Markers, *m.mrr), m.goProject)
 			if m.mrr.ResolutionStatus == golang.GoResolutionGoSumOnly {
 				gm.Markers = java.AddMarkupWarn(gm.Markers,
 					"Go module resolution failed, so dependencies were derived from go.sum alone. go.sum records every version ever seen rather than the selected build list, so the dependency set is incomplete and may name older versions. Recipes that depend on the resolved module graph (e.g. go mod tidy) must not be trusted for this module until resolution succeeds.",
@@ -2933,7 +2933,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
-			gs.Markers.Entries = append(gs.Markers.Entries, *m.mrr, m.goProject)
+			gs.Markers = java.AddMarker(java.AddMarker(gs.Markers, *m.mrr), m.goProject)
 		}
 		id := gs.Ident.String()
 		s.localObjects[id] = gs

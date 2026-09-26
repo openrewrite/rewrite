@@ -94,7 +94,7 @@ func TestGoProjectMixesWithBareGolangSpecs(t *testing.T) {
 // findGoProject is a small lookup helper that mirrors what real recipes
 // would do: scan a tree's Markers for a GoProject and return it.
 func findGoProject(m java.Markers) (golang.GoProject, bool) {
-	for _, e := range m.Entries {
+	for _, e := range m.Entries() {
 		if p, ok := e.(golang.GoProject); ok {
 			return p, true
 		}
