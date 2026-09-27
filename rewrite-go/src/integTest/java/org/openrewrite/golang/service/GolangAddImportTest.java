@@ -130,6 +130,29 @@ class GolangAddImportTest implements RewriteTest {
     }
 
     @Test
+    void addsLoneAliasedImportUngrouped() {
+        rewriteRun(
+          spec -> spec.recipe(recipeCalling(v -> v.maybeAddImport("net/http/pprof", "Handler", null, "_", false))),
+          go(
+            """
+              package main
+
+              func main() {
+              }
+              """,
+            """
+              package main
+
+              import _ "net/http/pprof"
+
+              func main() {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void separatesThirdPartyGroup() {
         rewriteRun(
           spec -> spec.recipe(recipeCalling(v -> v.maybeAddImport("github.com/x/y", "Client", null, null, false))),

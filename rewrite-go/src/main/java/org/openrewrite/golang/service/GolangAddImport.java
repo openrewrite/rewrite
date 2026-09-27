@@ -79,13 +79,12 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
             return cu.withImportsContainer(addToBlock(container, newImport, modulePath));
         }
 
-        // No existing imports — create import section with grouped style
-        List<JRightPadded<J.Import>> imports = new ArrayList<>();
-        imports.add(new JRightPadded<>(newImport, Space.format("\n"), Markers.EMPTY));
-        Markers containerMarkers = Markers.build(singletonList(
-                new GroupedImport(Tree.randomId(), Space.SINGLE_SPACE)));
-        return cu.withImportsContainer(JContainer.build(
-                Space.format("\n\n"), imports, containerMarkers));
+        // No existing imports: gofmt writes a lone import as `import "path"`
+        J.Import first = alias == null ?
+                newImport.withQualid(newImport.getQualid().withPrefix(Space.SINGLE_SPACE)) :
+                newImport.withPrefix(Space.SINGLE_SPACE);
+        return cu.withImportsContainer(JContainer.build(Space.format("\n\n"),
+                singletonList(new JRightPadded<>(first, Space.EMPTY, Markers.EMPTY)), Markers.EMPTY));
     }
 
     /**
@@ -361,7 +360,7 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
 
         return new J.Import(
                 Tree.randomId(),
-                Space.format("\n\t"),     // indent with newline + tab
+                Space.EMPTY,
                 Markers.EMPTY,
                 new JLeftPadded<>(Space.EMPTY, false, Markers.EMPTY),  // not static
                 qualid,
