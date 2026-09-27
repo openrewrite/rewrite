@@ -236,10 +236,16 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         Stream<SourceFile> rpcStream = StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
+            private @Nullable String handedOver;
             private @Nullable ParseProjectResponse response;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                // Evicted once the next file is asked for, so the caller can still print this one against the peer's copy.
+                if (handedOver != null) {
+                    evict(handedOver);
+                    handedOver = null;
+                }
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
                     response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath, parseOptions(ctx)), ParseProjectResponse.class);
@@ -283,6 +289,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                             null
                     );
                 }
+                handedOver = item.getId();
                 action.accept(sourceFile);
                 return true;
             }
@@ -357,10 +364,16 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
+            private @Nullable String handedOver;
             private @Nullable List<String> ids;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                // Evicted once the next file is asked for, so the caller can still print this one against the peer's copy.
+                if (handedOver != null) {
+                    evict(handedOver);
+                    handedOver = null;
+                }
                 if (ids == null) {
                     parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputs.size()));
                     ids = send("Parse", request, ParseResponse.class);
@@ -396,6 +409,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                             null
                     );
                 }
+                handedOver = id;
                 action.accept(sourceFile);
                 return true;
             }
