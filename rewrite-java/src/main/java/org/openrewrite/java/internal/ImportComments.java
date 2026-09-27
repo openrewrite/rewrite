@@ -16,31 +16,32 @@
 package org.openrewrite.java.internal;
 
 import lombok.Getter;
-import lombok.Value;
-import lombok.With;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Marker;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
 
 /**
- * Keeps the import-section header in place and temporarily attaches end-of-line comments to their import.
- * The markers travel with imports through sorting and unused-import removal, and are removed by {@link #restore}.
+ * Keeps the import-section header in place and associates end-of-line comments with their import.
+ * This state is shared through cursor messaging for one source-file visit, without changing tree markers.
  */
 public final class ImportComments {
+    public static final String CURSOR_MESSAGE_KEY = "org.openrewrite.java.internal.ImportComments";
+
     private final Space header;
+    private final Map<UUID, Space> trailingComments = new HashMap<>();
     @Getter
     private final J.CompilationUnit prepared;
 
@@ -61,7 +62,7 @@ public final class ImportComments {
             }
             J.Import anImport = imports.get(i);
             Space trailing = Space.build(next.getWhitespace(), next.getComments().subList(0, count));
-            imports.set(i, anImport.withMarkers(anImport.getMarkers().add(new Trailing(randomId(), trailing))));
+            trailingComments.put(anImport.getId(), trailing);
             Space remaining = Space.build(whitespace, next.getComments().subList(count, next.getComments().size()));
             if (i + 1 < imports.size()) {
                 imports.set(i + 1, imports.get(i + 1).withPrefix(remaining));
@@ -75,22 +76,15 @@ public final class ImportComments {
     public J.CompilationUnit restore(J.CompilationUnit cu) {
         List<J.Import> imports = new ArrayList<>(cu.getImports());
         Space following = following(cu);
-        Set<UUID> restored = new HashSet<>();
-        // Unfolding copies the marker to each replacement. Only the last replacement gets the trailing comment.
         for (int i = imports.size() - 1; i >= 0; i--) {
-            J.Import anImport = imports.get(i);
-            Trailing trailing = anImport.getMarkers().findFirst(Trailing.class).orElse(null);
+            Space trailing = trailingComments.get(imports.get(i).getId());
             if (trailing == null) {
                 continue;
             }
-            imports.set(i, anImport.withMarkers(anImport.getMarkers().removeByType(Trailing.class)));
-            if (!restored.add(trailing.getId())) {
-                continue;
-            }
             Space next = i + 1 < imports.size() ? imports.get(i + 1).getPrefix() : following;
-            List<Comment> comments = ListUtils.mapLast(trailing.getSpace().getComments(),
+            List<Comment> comments = ListUtils.mapLast(trailing.getComments(),
                     comment -> comment.withSuffix(next.getWhitespace()));
-            Space prefix = trailing.getSpace().withComments(ListUtils.concatAll(comments, next.getComments()));
+            Space prefix = trailing.withComments(ListUtils.concatAll(comments, next.getComments()));
             if (i + 1 < imports.size()) {
                 imports.set(i + 1, imports.get(i + 1).withPrefix(prefix));
             } else {
@@ -108,16 +102,16 @@ public final class ImportComments {
     }
 
     /** Move comments from imports being folded above the surviving wildcard. */
-    public static J.Import foldComments(List<JRightPadded<J.Import>> imports) {
+    public static J.Import foldComments(List<JRightPadded<J.Import>> imports, @Nullable ImportComments importComments) {
         J.Import first = imports.get(0).getElement();
         List<Comment> comments = first.getComments();
         for (int i = 1; i < imports.size(); i++) {
             JRightPadded<J.Import> padded = imports.get(i);
             J.Import anImport = padded.getElement();
             List<Comment> moved = ListUtils.concatAll(anImport.getComments(), padded.getAfter().getComments());
-            Trailing trailing = anImport.getMarkers().findFirst(Trailing.class).orElse(null);
+            Space trailing = importComments == null ? null : importComments.trailingComments.get(anImport.getId());
             if (trailing != null) {
-                moved = ListUtils.concatAll(moved, trailing.getSpace().getComments());
+                moved = ListUtils.concatAll(moved, trailing.getComments());
             }
             String newline = first.getPrefix().getWhitespace().contains("\r\n") ||
                     anImport.getPrefix().getWhitespace().contains("\r\n") ? "\r\n" : "\n";
@@ -127,8 +121,19 @@ public final class ImportComments {
         return first.withPrefix(first.getPrefix().withComments(comments));
     }
 
-    public static boolean hasTrailingComments(J.Import anImport) {
-        return anImport.getMarkers().findFirst(Trailing.class).isPresent();
+    /** Associate a wildcard's trailing comment with its last replacement import. */
+    public static void unfoldComments(Cursor cursor, J.Import original, List<JRightPadded<J.Import>> unfolded) {
+        ImportComments comments = cursor.getNearestMessage(CURSOR_MESSAGE_KEY);
+        if (comments != null && !unfolded.isEmpty()) {
+            Space trailing = comments.trailingComments.remove(original.getId());
+            if (trailing != null) {
+                comments.trailingComments.put(unfolded.get(unfolded.size() - 1).getElement().getId(), trailing);
+            }
+        }
+    }
+
+    public boolean hasTrailingComments(J.Import anImport) {
+        return trailingComments.containsKey(anImport.getId());
     }
 
     private static Space following(J.CompilationUnit cu) {
@@ -141,12 +146,5 @@ public final class ImportComments {
         }
         return cu.getClasses().isEmpty() ? cu.withEof(space) :
                 cu.withClasses(ListUtils.mapFirst(cu.getClasses(), cd -> cd.withPrefix(space)));
-    }
-
-    @Value
-    @With
-    private static class Trailing implements Marker {
-        UUID id;
-        Space space;
     }
 }

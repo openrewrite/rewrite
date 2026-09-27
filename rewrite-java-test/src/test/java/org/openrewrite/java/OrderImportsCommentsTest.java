@@ -20,11 +20,20 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
@@ -37,6 +46,31 @@ class OrderImportsCommentsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new OrderImports(false, null));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void preserveMarkerInstancesWhenOrderingImports(boolean existingMarker) {
+        Map<UUID, Markers> markersByImport = new HashMap<>();
+        rewriteRun(
+          java(
+            """
+              import java.util.List; // Lists
+              import java.io.File; // Files
+              """,
+            """
+              import java.io.File; // Files
+              import java.util.List; // Lists
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> cu.withImports(ListUtils.map(cu.getImports(), anImport -> {
+                Markers markers = existingMarker ? Markers.build(singletonList(new NamedStyles(
+                  randomId(), "test", "Test", "Test", emptySet(), emptyList()))) : anImport.getMarkers();
+                markersByImport.put(anImport.getId(), markers);
+                return anImport.withMarkers(markers);
+            }))).afterRecipe(cu -> assertThat(cu.getImports()).allSatisfy(anImport ->
+              assertThat(anImport.getMarkers()).isSameAs(markersByImport.get(anImport.getId()))))
+          )
+        );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/6143")
@@ -193,9 +227,12 @@ class OrderImportsCommentsTest implements RewriteTest {
         );
     }
 
-    @Test
-    void preserveCommentsOnAlreadyOrderedImports() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void preserveCommentsOnAlreadyOrderedImports(boolean removeUnused) {
+        AtomicReference<J.CompilationUnit> original = new AtomicReference<>();
         rewriteRun(
+          spec -> spec.recipe(new OrderImports(removeUnused, null)),
           java(
             """
               package com.example;
@@ -206,7 +243,47 @@ class OrderImportsCommentsTest implements RewriteTest {
               import java.util.List; /* Lists */
 
               /** The application. */
+              class A {
+                  List<File> files;
+              }
+              """,
+            spec -> spec.beforeRecipe(original::set)
+              .afterRecipe(cu -> assertThat(cu).isSameAs(original.get()))
+          )
+        );
+    }
+
+    @Test
+    void keepCommentStateSeparateBetweenSourceFiles() {
+        rewriteRun(
+          java(
+            """
+              // First file
+              import java.util.List; // Lists
+              import java.io.File; // Files
               class A {}
+              """,
+            """
+              // First file
+              import java.io.File; // Files
+              import java.util.List; // Lists
+
+              class A {}
+              """
+          ),
+          java(
+            """
+              // Second file
+              import java.util.Set; // Sets
+              import java.nio.file.Path; // Paths
+              class B {}
+              """,
+            """
+              // Second file
+              import java.nio.file.Path; // Paths
+              import java.util.Set; // Sets
+
+              class B {}
               """
           )
         );

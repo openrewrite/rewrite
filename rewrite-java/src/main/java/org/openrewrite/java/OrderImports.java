@@ -98,13 +98,23 @@ public class OrderImports extends Recipe {
                     return super.visit(tree, ctx);
                 }
                 ImportComments comments = new ImportComments((J.CompilationUnit) tree);
-                // Include scheduled unused-import removal and formatting before restoring comment positions.
-                J result = super.visit(comments.getPrepared(), ctx);
-                if (result == comments.getPrepared()) {
-                    // Temporary comment attachment must not turn an unchanged file into a recipe change.
-                    return (J.CompilationUnit) tree;
+                // The parent cursor is shared with after-visitors. Limit the message to this source-file visit.
+                Cursor parent = getCursor();
+                ImportComments previous = parent.getMessage(ImportComments.CURSOR_MESSAGE_KEY);
+                parent.putMessage(ImportComments.CURSOR_MESSAGE_KEY, comments);
+                try {
+                    J result = super.visit(comments.getPrepared(), ctx);
+                    if (result == comments.getPrepared()) {
+                        return (J.CompilationUnit) tree;
+                    }
+                    return result instanceof J.CompilationUnit ? comments.restore((J.CompilationUnit) result) : result;
+                } finally {
+                    if (previous == null) {
+                        parent.pollMessage(ImportComments.CURSOR_MESSAGE_KEY);
+                    } else {
+                        parent.putMessage(ImportComments.CURSOR_MESSAGE_KEY, previous);
+                    }
                 }
-                return result instanceof J.CompilationUnit ? comments.restore((J.CompilationUnit) result) : result;
             }
 
             @Override
@@ -114,7 +124,7 @@ public class OrderImports extends Recipe {
                 boolean classpathDirty = JavaSourceSet.isDirty(ctx, cu);
 
                 ImportLayoutStyle importLayoutStyle = importLayoutStyle(cu, namedStyles);
-                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath, classpathDirty);
+                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath, classpathDirty, getCursor());
 
                 boolean changed = false;
                 if (orderedImports.size() != cu.getImports().size()) {
@@ -131,7 +141,13 @@ public class OrderImports extends Recipe {
                 }
 
                 if (Boolean.TRUE.equals(removeUnused)) {
-                    doAfterVisit(new RemoveUnusedImports().getVisitor());
+                    doAfterVisit(new TreeVisitor<Tree, ExecutionContext>() {
+                        @Override
+                        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                            // Pass the cursor through the precondition wrapper to the cleanup visitor.
+                            return new RemoveUnusedImports().getVisitor().visit(tree, ctx, getCursor());
+                        }
+                    });
                 } else if (changed) {
                     doAfterVisit(new FormatFirstClassPrefix<>());
                 }

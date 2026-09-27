@@ -33,6 +33,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
@@ -350,7 +351,12 @@ public class ImportLayoutStyle implements JavaStyle {
     }
 
     public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Collection<JavaType.FullyQualified> classpath, boolean classpathDirty) {
+        return orderImports(originalImports, classpath, classpathDirty, null);
+    }
+
+    public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Collection<JavaType.FullyQualified> classpath, boolean classpathDirty, @Nullable Cursor cursor) {
         LayoutState layoutState = new LayoutState();
+        layoutState.importComments = cursor == null ? null : cursor.getNearestMessage(ImportComments.CURSOR_MESSAGE_KEY);
         ImportLayoutConflictDetection importLayoutConflictDetection = new ImportLayoutConflictDetection(classpath, originalImports, classpathDirty);
         List<JRightPadded<J.Import>> orderedImports = new ArrayList<>();
 
@@ -532,6 +538,8 @@ public class ImportLayoutStyle implements JavaStyle {
      */
     public static class LayoutState {
         Map<Block, List<JRightPadded<J.Import>>> imports = new HashMap<>();
+        @Nullable
+        ImportComments importComments;
 
         public void claimImport(Block block, JRightPadded<J.Import> import_) {
             imports.computeIfAbsent(block, b -> new ArrayList<>()).add(import_);
@@ -770,7 +778,7 @@ public class ImportLayoutStyle implements JavaStyle {
                                 .findAny();
 
                         if (starImportExists || !oneOfTheTypesIsInAnotherGroupToo.isPresent()) {
-                            ordered.add(toStar.withElement(ImportComments.foldComments(importGroup)
+                            ordered.add(toStar.withElement(ImportComments.foldComments(importGroup, layoutState.importComments)
                                     .withQualid(qualid.withName(name.withSimpleName("*")))));
                             continue;
                         }
@@ -778,7 +786,8 @@ public class ImportLayoutStyle implements JavaStyle {
 
                     Predicate<JRightPadded<J.Import>> predicate = distinctBy(t -> t.getElement().printTrimmed(new JavaPrinter<>()));
                     for (JRightPadded<J.Import> importJRightPadded : importGroup) {
-                        if (predicate.test(importJRightPadded) || ImportComments.hasTrailingComments(importJRightPadded.getElement())) {
+                        if (predicate.test(importJRightPadded) || layoutState.importComments != null &&
+                                layoutState.importComments.hasTrailingComments(importJRightPadded.getElement())) {
                             ordered.add(importJRightPadded);
                         }
                     }
