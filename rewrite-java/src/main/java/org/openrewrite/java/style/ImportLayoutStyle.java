@@ -37,6 +37,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.java.internal.ImportComments;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.Style;
@@ -393,7 +394,8 @@ public class ImportLayoutStyle implements JavaStyle {
                     boolean whitespaceContainsCRLF = orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n");
                     Space prefix;
                     if (importIndex == 0) {
-                        prefix = originalImports.get(0).getElement().getPrefix();
+                        prefix = orderedImport.getElement().getPrefix()
+                                .withWhitespace(originalImports.get(0).getElement().getPrefix().getWhitespace());
                     } else {
                         // Preserve the existing newline character type of either CRLF or LF.
                         // Classic Mac OS new line return '\r' is replaced by '\n'.
@@ -768,14 +770,15 @@ public class ImportLayoutStyle implements JavaStyle {
                                 .findAny();
 
                         if (starImportExists || !oneOfTheTypesIsInAnotherGroupToo.isPresent()) {
-                            ordered.add(toStar.withElement(toStar.getElement().withQualid(qualid.withName(name.withSimpleName("*")))));
+                            ordered.add(toStar.withElement(ImportComments.foldComments(importGroup)
+                                    .withQualid(qualid.withName(name.withSimpleName("*")))));
                             continue;
                         }
                     }
 
                     Predicate<JRightPadded<J.Import>> predicate = distinctBy(t -> t.getElement().printTrimmed(new JavaPrinter<>()));
                     for (JRightPadded<J.Import> importJRightPadded : importGroup) {
-                        if (predicate.test(importJRightPadded)) {
+                        if (predicate.test(importJRightPadded) || ImportComments.hasTrailingComments(importJRightPadded.getElement())) {
                             ordered.add(importJRightPadded);
                         }
                     }

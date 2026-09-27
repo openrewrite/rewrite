@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
+import org.openrewrite.java.internal.ImportComments;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -91,6 +92,21 @@ public class OrderImports extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<NamedStyles> namedStyles = styleFromYaml(style);
         return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof J.CompilationUnit) || ((J.CompilationUnit) tree).getImports().isEmpty()) {
+                    return super.visit(tree, ctx);
+                }
+                ImportComments comments = new ImportComments((J.CompilationUnit) tree);
+                // Include scheduled unused-import removal and formatting before restoring comment positions.
+                J result = super.visit(comments.getPrepared(), ctx);
+                if (result == comments.getPrepared()) {
+                    // Temporary comment attachment must not turn an unchanged file into a recipe change.
+                    return (J.CompilationUnit) tree;
+                }
+                return result instanceof J.CompilationUnit ? comments.restore((J.CompilationUnit) result) : result;
+            }
+
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
