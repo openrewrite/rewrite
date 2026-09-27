@@ -27,7 +27,6 @@ dependencies {
     compileOnly(project(":rewrite-test"))
 
     implementation("org.antlr:antlr4-runtime:4.13.2")
-    implementation("io.micrometer:micrometer-core:1.+")
 
     antlrGeneration("org.antlr:antlr4:4.13.2"){
         exclude(group = "com.ibm.icu", module = "icu4j")

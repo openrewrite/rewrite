@@ -51,8 +51,6 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
-    api("io.micrometer:micrometer-core:1.+")
-
     api("org.jetbrains:annotations:latest.release")
 
     api("com.fasterxml.jackson.core:jackson-annotations")

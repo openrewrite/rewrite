@@ -31,7 +31,6 @@ dependencies {
         exclude(group = "com.ibm.icu", module = "icu4j")
     }
     implementation("org.antlr:antlr4-runtime:4.13.2")
-    implementation("io.micrometer:micrometer-core:1.+")
 
     testImplementation(project(":rewrite-test"))
 }

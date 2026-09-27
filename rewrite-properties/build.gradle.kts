@@ -13,7 +13,5 @@ dependencies {
 
     compileOnly(project(":rewrite-test"))
 
-    implementation("io.micrometer:micrometer-core:1.+")
-
     testImplementation(project(":rewrite-test"))
 }
