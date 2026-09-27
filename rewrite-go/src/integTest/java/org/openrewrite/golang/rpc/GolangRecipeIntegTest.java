@@ -606,9 +606,7 @@ class GolangRecipeIntegTest implements RewriteTest {
             """
               package main
 
-              import (
-              \t"net/http"
-              )
+              import "net/http"
 
               func world() {
               }
