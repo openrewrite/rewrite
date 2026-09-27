@@ -2773,10 +2773,16 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(disc.goFiles))
 	parseErrByIdx := make(map[int]error)
 	checkPrint := requirePrintEqualsInput(req.Options)
+	// One parser per module, since packages of a module share its importer and so its types.
+	parserByModule := make(map[string]*goparser.GoParser, len(mods))
 	for key, entries := range groups {
-		p := goparser.NewGoParser()
-		if pi, ok := piByModule[key.moduleDir]; ok {
-			p.Importer = pi
+		p, ok := parserByModule[key.moduleDir]
+		if !ok {
+			p = goparser.NewGoParser()
+			if pi, ok := piByModule[key.moduleDir]; ok {
+				p.Importer = pi
+			}
+			parserByModule[key.moduleDir] = p
 		}
 		included := make([]fileEntry, 0, len(entries))
 		inputs := make([]goparser.FileInput, 0, len(entries))
