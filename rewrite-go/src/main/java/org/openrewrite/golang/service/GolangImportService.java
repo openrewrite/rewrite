@@ -28,6 +28,7 @@ import org.openrewrite.java.service.ImportService;
  *   <li>{@code "main.Point"} → packageName="main", typeName="Point" → same-package, no import needed</li>
  *   <li>{@code "fmt.Stringer"} → packageName="fmt", typeName="Stringer" → add {@code import "fmt"}</li>
  *   <li>{@code "net/http.Handler"} → packageName="net/http", typeName="Handler" → add {@code import "net/http"}</li>
+ *   <li>{@code "github.com/x/y"} → packageName="github", typeName="com/x/y" → add {@code import "github.com/x/y"}</li>
  * </ul>
  */
 public class GolangImportService extends ImportService {
@@ -38,9 +39,20 @@ public class GolangImportService extends ImportService {
                                                @Nullable String member,
                                                @Nullable String alias,
                                                boolean onlyIfReferenced) {
+        return new GolangAddImport<>(importPath(packageName, typeName), alias, onlyIfReferenced);
+    }
+
+    /**
+     * {@code maybeAddImport(fqn)} splits at the last dot, which leaves no package for {@code "net/http"} and
+     * lands inside {@code "github.com/x/y"} or {@code "gopkg.in/yaml.v3"}; rejoin those.
+     */
+    private static String importPath(@Nullable String packageName, String typeName) {
         if (packageName == null) {
-            return new JavaVisitor<P>() {};
+            return typeName;
         }
-        return new GolangAddImport<>(packageName, alias, onlyIfReferenced);
+        if (typeName.indexOf('/') >= 0 || GolangAddImport.isVersionElement(typeName)) {
+            return packageName + "." + typeName;
+        }
+        return packageName;
     }
 }

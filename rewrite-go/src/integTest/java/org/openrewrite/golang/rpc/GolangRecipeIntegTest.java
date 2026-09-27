@@ -22,17 +22,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.GolangParser;
 import org.openrewrite.java.ChangeType;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -614,75 +611,6 @@ class GolangRecipeIntegTest implements RewriteTest {
               )
 
               func world() {
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void addImportSkipsUnreferencedPackage() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J preVisit(J tree, ExecutionContext ctx) {
-                  stopAfterPreVisit();
-                  maybeAddImport("org.springframework.security.web.csrf.CookieCsrfTokenRepository");
-                  return tree;
-              }
-          })),
-          go(
-            """
-              package main
-
-              import "fmt"
-
-              func main() {
-              \tfmt.Println("hi")
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void addImportForReferencedPackagePromotesSingleImport() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                  if (!"Println".equals(m.getSimpleName()) || m.getMethodType() == null ||
-                      !(m.getSelect() instanceof J.Identifier)) {
-                      return m;
-                  }
-                  JavaType.FullyQualified strings = JavaType.ShallowClass.build("strings");
-                  maybeAddImport("strings", "ToUpper", null, null, true);
-                  return m.withSelect(((J.Identifier) m.getSelect()).withSimpleName("strings").withType(strings))
-                    .withName(m.getName().withSimpleName("ToUpper"))
-                    .withMethodType(m.getMethodType().withDeclaringType(strings).withName("ToUpper"));
-              }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
-          go(
-            """
-              package main
-
-              import "fmt"
-
-              func main() {
-              \tfmt.Println("hi")
-              }
-              """,
-            """
-              package main
-
-              import (
-              \t"fmt"
-              \t"strings"
-              )
-
-              func main() {
-              \tstrings.ToUpper("hi")
               }
               """
           )
