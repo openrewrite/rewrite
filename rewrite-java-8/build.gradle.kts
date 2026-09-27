@@ -29,7 +29,7 @@ dependencies {
     implementation(project(":rewrite-java-lombok"))
     implementation("org.ow2.asm:asm:latest.release")
 
-    implementation("io.micrometer:micrometer-core:1.9.+")
+    implementation("io.micrometer:micrometer-core:1.+")
 
     testImplementation(project(":rewrite-test"))
     "javaTck"(project(":rewrite-java-tck"))

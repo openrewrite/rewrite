@@ -27,6 +27,17 @@ subprojects {
         }
     }
 
+    // Micrometer publishes milestones and release candidates to Maven Central, where Gradle cannot
+    // tell them from releases, so a dynamic version would otherwise select one and every module's
+    // published POM would declare it.
+    configurations.configureEach {
+        resolutionStrategy.componentSelection.all {
+            if (candidate.group == "io.micrometer" && candidate.version.contains(Regex("-(M|RC)\\d+$"))) {
+                reject("Micrometer pre-release")
+            }
+        }
+    }
+
     tasks.withType<JavaExec>().configureEach {
         if (name == "generateAntlrSources") {
             doLast {

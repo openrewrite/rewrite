@@ -30,7 +30,7 @@ dependencies {
     compileOnly(project(":rewrite-yaml"))
     implementation(project(":rewrite-properties"))
 
-    implementation("io.micrometer:micrometer-core:1.9.+")
+    implementation("io.micrometer:micrometer-core:1.+")
 
     implementation("org.apache.commons:commons-text:latest.release")
 

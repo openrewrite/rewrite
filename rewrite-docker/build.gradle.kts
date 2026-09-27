@@ -31,7 +31,7 @@ tasks.register<JavaExec>("syncEolImages") {
 dependencies {
     implementation(project(":rewrite-core"))
     implementation("org.antlr:antlr4-runtime:4.13.2")
-    implementation("io.micrometer:micrometer-core:1.9.+")
+    implementation("io.micrometer:micrometer-core:1.+")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
 
     antlrGeneration("org.antlr:antlr4:4.13.2"){

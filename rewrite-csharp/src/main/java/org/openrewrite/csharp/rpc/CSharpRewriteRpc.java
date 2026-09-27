@@ -449,14 +449,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd, Path dotnetPath) {
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
-
-            if (workingDirectory != null) {
-                process.setWorkingDirectory(workingDirectory);
-            }
-            process.setStderrRedirect(log);
-
-            process.environment().putAll(environment);
+            Map<String, String> env = new LinkedHashMap<>(environment);
 
             // The tool is launched as a self-contained apphost (not via the `dotnet`
             // muxer), so it must locate the shared runtime itself. When DOTNET_ROOT is
@@ -466,15 +459,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
             // (e.g. Homebrew, where the binary is under bin/ but the runtime under
             // libexec/), and on arm64 machines using an x64 dotnet. Derive DOTNET_ROOT
             // from the resolved dotnet and set it if the caller hasn't.
-            if (!process.environment().containsKey("DOTNET_ROOT")) {
+            if (!env.containsKey("DOTNET_ROOT")) {
                 Path dotnetRoot = resolveDotnetRoot(dotnetPath);
                 if (dotnetRoot != null) {
-                    process.environment().put("DOTNET_ROOT", dotnetRoot.toString());
+                    env.put("DOTNET_ROOT", dotnetRoot.toString());
                 }
             }
 
             if (profileOutputPath != null) {
-                Map<String, String> env = process.environment();
                 env.put("DOTNET_EnableEventPipe", "1");
                 env.put("DOTNET_EventPipeOutputPath", profileOutputPath.toAbsolutePath().normalize().toString());
                 env.put("DOTNET_EventPipeOutputStreaming", "1");
@@ -485,6 +477,12 @@ public class CSharpRewriteRpc extends RewriteRpc {
                         "System.Runtime:0:4");
             }
 
+            RewriteRpcProcess process = RewriteRpcProcess.forLanguage("csharp")
+                    .command(cmdArr)
+                    .workingDirectory(workingDirectory)
+                    .stderrRedirect(log)
+                    .environment(env)
+                    .build();
             process.start();
 
             try {

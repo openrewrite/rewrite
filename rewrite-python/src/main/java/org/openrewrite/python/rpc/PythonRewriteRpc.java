@@ -866,17 +866,10 @@ public class PythonRewriteRpc extends RewriteRpc {
             );
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
-
-            if (workingDirectory != null) {
-                process.setWorkingDirectory(workingDirectory);
-            }
-            process.setStderrRedirect(log);
-
-            process.environment().putAll(environment);
+            Map<String, String> env = new LinkedHashMap<>(environment);
 
             // Set the Python version for the parser
-            process.environment().put("REWRITE_PYTHON_VERSION", pythonVersion);
+            env.put("REWRITE_PYTHON_VERSION", pythonVersion);
 
             // Set up PYTHONPATH for the rewrite package
             List<String> pythonPathParts = new ArrayList<>();
@@ -921,9 +914,15 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
 
             if (!pythonPathParts.isEmpty()) {
-                process.environment().put("PYTHONPATH", String.join(File.pathSeparator, pythonPathParts));
+                env.put("PYTHONPATH", String.join(File.pathSeparator, pythonPathParts));
             }
 
+            RewriteRpcProcess process = RewriteRpcProcess.forLanguage("python")
+                    .command(cmdArr)
+                    .workingDirectory(workingDirectory)
+                    .stderrRedirect(log)
+                    .environment(env)
+                    .build();
             process.start();
 
             try {

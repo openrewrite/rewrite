@@ -115,11 +115,12 @@ class RewriteRpcProcessTest {
             for (int i = 0; i < parallel; i++) {
                 Path log = Files.createTempFile("rpc-stderr-drain-test-" + i, ".log");
                 logs.add(log);
-                RewriteRpcProcess process = new RewriteRpcProcess(
-                        System.getProperty("java.home") + "/bin/java",
-                        "-cp", System.getProperty("java.class.path"),
-                        StderrFlooderEntryPoint.class.getName());
-                process.setStderrRedirect(log);
+                RewriteRpcProcess process = RewriteRpcProcess.forLanguage("test")
+                        .command(System.getProperty("java.home") + "/bin/java",
+                                "-cp", System.getProperty("java.class.path"),
+                                StderrFlooderEntryPoint.class.getName())
+                        .stderrRedirect(log)
+                        .build();
                 process.start();
                 processes.add(process);
             }
@@ -165,7 +166,7 @@ class RewriteRpcProcessTest {
     void startFailsFastWhenBinaryMissing() {
         // given: a command pointing at a binary that does not exist anywhere
         String missing = "definitely-no-such-binary-7a3f9e2c";
-        RewriteRpcProcess process = new RewriteRpcProcess(missing);
+        RewriteRpcProcess process = RewriteRpcProcess.forLanguage("test").command(missing).build();
 
         // when / then: start() must surface the failure within a bounded time, not hang
         assertTimeoutPreemptively(Duration.ofSeconds(5), () ->
@@ -304,12 +305,12 @@ class RewriteRpcProcessTest {
     void memoryLimitLaunchesUnderUlimit() {
         RewriteRpcProcess.setMemoryLimit(6L << 30);
         try {
-            assertThat(new RewriteRpcProcess("noop", "--flag").launchCommand())
+            assertThat(RewriteRpcProcess.forLanguage("test").command("noop", "--flag").build().launchCommand())
                     .containsExactly("/bin/sh", "-c", "ulimit -d 6291456; exec \"$@\"", "sh", "noop", "--flag");
         } finally {
             RewriteRpcProcess.setMemoryLimit(0);
         }
-        assertThat(new RewriteRpcProcess("noop", "--flag").launchCommand()).containsExactly("noop", "--flag");
+        assertThat(RewriteRpcProcess.forLanguage("test").command("noop", "--flag").build().launchCommand()).containsExactly("noop", "--flag");
     }
 
     @Test
@@ -317,7 +318,7 @@ class RewriteRpcProcessTest {
     void memoryLimitOnlyAppliesOnLinux() {
         RewriteRpcProcess.setMemoryLimit(6L << 30);
         try {
-            assertThat(new RewriteRpcProcess("noop", "--flag").launchCommand()).containsExactly("noop", "--flag");
+            assertThat(RewriteRpcProcess.forLanguage("test").command("noop", "--flag").build().launchCommand()).containsExactly("noop", "--flag");
         } finally {
             RewriteRpcProcess.setMemoryLimit(0);
         }
@@ -325,7 +326,7 @@ class RewriteRpcProcessTest {
 
     /** An unstarted {@link RewriteRpcProcess} whose {@code process} field is the given spawned tree. */
     private static RewriteRpcProcess peerWrapping(Process process) {
-        RewriteRpcProcess peer = new RewriteRpcProcess("noop");
+        RewriteRpcProcess peer = RewriteRpcProcess.forLanguage("test").command("noop").build();
         peer.process = process;
         return peer;
     }
@@ -348,7 +349,7 @@ class RewriteRpcProcessTest {
      */
     public static class ForkedJvmEntryPoint {
         public static void main(String[] args) throws Exception {
-            RewriteRpcProcess proc = new RewriteRpcProcess("sleep", "30");
+            RewriteRpcProcess proc = RewriteRpcProcess.forLanguage("test").command("sleep", "30").build();
             proc.start();
 
             Field f = RewriteRpcProcess.class.getDeclaredField("process");
