@@ -153,11 +153,9 @@ public class DotNetBuildContext
                 try
                 {
                     var content = File.ReadAllText(file);
-                    // Normalize to forward slashes for consistency with SourcePath
-                    var normalizedPath = relativePath.Replace(Path.DirectorySeparatorChar, '/');
                     lock (_lock)
                     {
-                        _diskFiles.TryAdd(normalizedPath, content);
+                        _diskFiles.TryAdd(relativePath, content);
                     }
                 }
                 catch (Exception ex)
