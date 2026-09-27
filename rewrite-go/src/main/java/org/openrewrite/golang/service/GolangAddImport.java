@@ -25,6 +25,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -70,12 +71,20 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
             }
         }
 
+        if (onlyIfReferenced && !isReferenced(cu)) {
+            return cu;
+        }
+
         // Build the new J.Import with FieldAccess qualid (matching Go RPC receiver format)
         J.Import newImport = buildGoImport(importPath, alias);
 
         // Add to existing imports or create new import section
         JContainer<J.Import> container = cu.getImportsContainer();
         if (container != null && !container.getPadding().getElements().isEmpty()) {
+            if (container.getPadding().getElements().size() == 1 &&
+                !container.getMarkers().findFirst(GroupedImport.class).isPresent()) {
+                container = promoteToGrouped(container);
+            }
             List<JRightPadded<J.Import>> updated = new ArrayList<>(container.getPadding().getElements());
             // The last element's After holds the closing paren space in grouped imports.
             // Move it to the new last element.
@@ -92,6 +101,84 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
             return cu.withImportsContainer(JContainer.build(
                     Space.format("\n\n"), imports, containerMarkers));
         }
+    }
+
+    /**
+     * Whether the parser's type attribution names {@code importPath} outside the import declarations,
+     * mirroring the Go-side AddImport's {@code ReferencedPackages}.
+     */
+    private boolean isReferenced(Go.CompilationUnit cu) {
+        AtomicBoolean referenced = new AtomicBoolean();
+        new GolangVisitor<AtomicBoolean>() {
+            @Override
+            public J visitImport(J.Import anImport, AtomicBoolean found) {
+                return anImport;
+            }
+
+            @Override
+            public J visitIdentifier(J.Identifier identifier, AtomicBoolean found) {
+                if (identifier.getType() instanceof JavaType.FullyQualified &&
+                    importPath.equals(packagePathOf(((JavaType.FullyQualified) identifier.getType()).getFullyQualifiedName()))) {
+                    found.set(true);
+                }
+                return identifier;
+            }
+
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
+                JavaType.Method type = method.getMethodType();
+                if (type != null && importPath.equals(packagePathOf(type.getDeclaringType().getFullyQualifiedName()))) {
+                    found.set(true);
+                }
+                return super.visitMethodInvocation(method, found);
+            }
+        }.visit(cu, referenced);
+        return referenced.get();
+    }
+
+    /**
+     * The import path a Go type-attribution FQN belongs to: {@code "<path>"} for a package alias or
+     * {@code "<path>.<Name>"} for a member, where a gopkg.in-style {@code .vN} is part of the path.
+     */
+    private static String packagePathOf(String fqn) {
+        int lastSlash = fqn.lastIndexOf('/');
+        if (lastSlash >= 0) {
+            String[] elements = fqn.substring(lastSlash + 1).split("\\.", -1);
+            int end = lastSlash + 1 + elements[0].length();
+            for (int i = 1; i < elements.length && isVersionElement(elements[i]); i++) {
+                end += 1 + elements[i].length();
+            }
+            return fqn.substring(0, end);
+        }
+        int dot = fqn.indexOf('.');
+        return dot >= 0 ? fqn.substring(0, dot) : fqn;
+    }
+
+    private static boolean isVersionElement(String element) {
+        if (element.length() < 2 || element.charAt(0) != 'v') {
+            return false;
+        }
+        for (int i = 1; i < element.length(); i++) {
+            char c = element.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@code import "fmt"} can only hold one path, so move its lone import inside {@code import ( ... )}.
+     */
+    private static JContainer<J.Import> promoteToGrouped(JContainer<J.Import> imports) {
+        JRightPadded<J.Import> only = imports.getPadding().getElements().get(0);
+        J.Import imp = only.getElement().withPrefix(Space.format("\n\t"));
+        if (imp.getAlias() == null) {
+            imp = imp.withQualid(imp.getQualid().withPrefix(Space.EMPTY));
+        }
+        return imports.getPadding()
+                .withElements(singletonList(only.withElement(imp).withAfter(Space.format("\n"))))
+                .withMarkers(imports.getMarkers().add(new GroupedImport(Tree.randomId(), Space.SINGLE_SPACE)));
     }
 
     /**
