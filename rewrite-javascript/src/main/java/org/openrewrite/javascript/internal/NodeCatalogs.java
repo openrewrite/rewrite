@@ -20,7 +20,6 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
-import org.openrewrite.json.tree.Json;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
@@ -94,22 +93,6 @@ public class NodeCatalogs {
         return CATALOG_PROTOCOL.equals(PackageJsonHelper.dependencySpecifierProtocol(value)) ?
                 value.substring(CATALOG_PROTOCOL.length()) :
                 null;
-    }
-
-    /**
-     * Every catalog reference a manifest makes, as package name to catalog name. Read from the JSON
-     * rather than from {@code NodeResolutionResult}, so a member that never resolved still counts as a
-     * consumer of the entry it references.
-     */
-    public static Map<String, String> catalogReferences(Json.Document packageJson) {
-        Map<String, String> references = new LinkedHashMap<>();
-        for (Map.Entry<String, String> declared : PackageJsonHelper.declaredVersions(packageJson).entrySet()) {
-            String catalog = catalogReference(declared.getValue());
-            if (catalog != null) {
-                references.put(declared.getKey(), catalog);
-            }
-        }
-        return references;
     }
 
     /** The constraint a catalog declares for a package, or null when the catalog or the entry is absent. */

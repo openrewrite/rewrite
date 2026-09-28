@@ -24,7 +24,6 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,10 +41,6 @@ public final class NodeDependencyScan {
     public static final class Accumulator {
         public final Map<Path, ProjectState> projects = new HashMap<>();
         public final Map<Path, Path> lockToPackage = new HashMap<>();
-        /** Every {@code package.json} the scan saw, whether or not it carried a resolution result. */
-        public final Set<Path> manifests = new HashSet<>();
-        /** Only the manifests that reference a catalog, as package name to catalog name. */
-        public final Map<Path, Map<String, String>> catalogRefs = new HashMap<>();
         /** Workspace files that can declare catalogs, by path. */
         public final Map<Path, Yaml.Documents> workspaceFiles = new HashMap<>();
         /** The catalog entries judged safe to edit in place, by the workspace file declaring them. */
@@ -121,12 +116,10 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * Decide which catalog entries may be edited in place rather than followed by overwriting the
-     * reference in a manifest. An entry is safe only when every consumer of it is one the recipe is
-     * upgrading, because moving the entry moves all of them. Anything that cannot be accounted for
-     * disqualifies it: a member the workspace declares whose manifest never reached the scan, or a
-     * manifest that references the entry but produced no match. The caller then leaves both the
-     * manifest and the entry alone, which keeps every member in step at the cost of the upgrade.
+     * Decide which catalog entries to edit. A manifest that says {@code catalog:} has delegated its
+     * version to the catalog, so moving the entry is what it asked for, and moving it for every member
+     * at once is the point of having one. An entry is edited when it exists and does not already hold
+     * the constraint, and left alone with the skip reported otherwise.
      */
     public static void decideCatalogEdits(Accumulator acc, String newVersion) {
         // Called once per source file, so a repository with catalogs must not pay for the whole verdict
@@ -137,7 +130,6 @@ public final class NodeDependencyScan {
         }
         acc.catalogEditsStale = false;
         acc.catalogEdits.clear();
-        Map<Path, Boolean> complete = new HashMap<>();
         for (ProjectState ps : acc.projects.values()) {
             ps.catalogEntriesEdited.clear();
         }
@@ -148,10 +140,6 @@ public final class NodeDependencyScan {
             }
             Path workspacePath = governingWorkspaceFile(acc, project.getKey(), ps.capturedPackageJson);
             if (workspacePath == null) {
-                continue;
-            }
-            // Depends only on the workspace, so it is decided once rather than per dependency.
-            if (!complete.computeIfAbsent(workspacePath, w -> everyDeclaredMemberWasScanned(acc, w))) {
                 continue;
             }
             Yaml.Documents workspaceFile = acc.workspaceFiles.get(workspacePath);
@@ -166,17 +154,13 @@ public final class NodeDependencyScan {
                 if (current == null || newVersion.equals(current)) {
                     continue;
                 }
-                List<Path> consumers = consumersOf(acc, workspacePath, catalogName, skipped.getPackageName());
-                if (!everyConsumerIsUpgraded(acc, consumers, catalogName, skipped.getPackageName())) {
-                    continue;
-                }
                 NodeCatalogs.CatalogEntry entry =
                         new NodeCatalogs.CatalogEntry(catalogName, skipped.getPackageName());
                 acc.catalogEdits.computeIfAbsent(workspacePath, k -> new LinkedHashSet<>()).add(entry);
                 // Every consumer's lock now disagrees with the entry, so each needs to answer for it.
-                for (Path consumer : consumers) {
+                for (Path consumer : consumersOf(acc, workspacePath, entry)) {
                     ProjectState consumerPs = acc.projects.get(consumer);
-                    if (consumerPs != null && !consumerPs.catalogEntriesEdited.contains(entry)) {
+                    if (!consumerPs.catalogEntriesEdited.contains(entry)) {
                         consumerPs.catalogEntriesEdited.add(entry);
                     }
                 }
@@ -199,58 +183,23 @@ public final class NodeDependencyScan {
                 edits.contains(new NodeCatalogs.CatalogEntry(catalogName, skipped.getPackageName()));
     }
 
-    /**
-     * A member the workspace declares but whose manifest never reached the scan may well reference an
-     * entry; nothing here can tell, so no entry under that workspace can be promised safe.
-     */
-    private static boolean everyDeclaredMemberWasScanned(Accumulator acc, Path workspacePath) {
-        Path root = workspacePath.getParent();
-        for (ProjectState ps : acc.projects.values()) {
-            if (ps.capturedPackageJson == null) {
+    /** The manifests under this workspace file that reference the entry, whose locks go stale with it. */
+    private static List<Path> consumersOf(Accumulator acc, Path workspacePath, NodeCatalogs.CatalogEntry entry) {
+        List<Path> consumers = new ArrayList<>();
+        for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
+            ProjectState ps = project.getValue();
+            if (!workspacePath.equals(governingWorkspaceFile(acc, project.getKey(), ps.capturedPackageJson))) {
                 continue;
             }
-            for (Path member : PackageJsonHelper.workspaceMemberPaths(ps.capturedPackageJson)) {
-                if (isUnder(member, root) && !acc.manifests.contains(member)) {
-                    return false;
+            for (MatchedDependency skipped : ps.skippedProtocols) {
+                if (entry.getPackageName().equals(skipped.getPackageName()) &&
+                        entry.getCatalogName().equals(NodeCatalogs.catalogReference(skipped.getCurrentVersion()))) {
+                    consumers.add(project.getKey());
+                    break;
                 }
             }
         }
-        return true;
-    }
-
-    private static boolean everyConsumerIsUpgraded(Accumulator acc, List<Path> consumers,
-                                                   String catalogName, String packageName) {
-        for (Path consumer : consumers) {
-            ProjectState ps = acc.projects.get(consumer);
-            if (ps == null || !isUpgrading(ps, catalogName, packageName)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /** The manifests under a workspace file whose JSON references the given catalog entry. */
-    private static List<Path> consumersOf(Accumulator acc, Path workspacePath,
-                                          String catalogName, String packageName) {
-        Path root = workspacePath.getParent();
-        List<Path> consumers = new ArrayList<>();
-        for (Map.Entry<Path, Map<String, String>> manifest : acc.catalogRefs.entrySet()) {
-            if (isUnder(manifest.getKey(), root) &&
-                    catalogName.equals(manifest.getValue().get(packageName))) {
-                consumers.add(manifest.getKey());
-            }
-        }
         return consumers;
-    }
-
-    private static boolean isUpgrading(ProjectState ps, String catalogName, String packageName) {
-        for (MatchedDependency skipped : ps.skippedProtocols) {
-            if (packageName.equals(skipped.getPackageName()) &&
-                    catalogName.equals(NodeCatalogs.catalogReference(skipped.getCurrentVersion()))) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**

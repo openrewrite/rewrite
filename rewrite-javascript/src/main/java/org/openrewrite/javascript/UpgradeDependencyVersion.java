@@ -78,9 +78,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 "name or glob pattern. " +
                 "A dependency declared as `catalog:` or `catalog:<name>` keeps its constraint in " +
                 "`pnpm-workspace.yaml` or `.yarnrc.yml`, so the catalog entry is updated in place and " +
-                "the manifest is left alone. That happens only when every consumer of the entry is also " +
-                "being upgraded, since moving the entry moves all of them; otherwise the entry and the " +
-                "manifest are both left alone and the skip is reported. The lock file cannot yet follow " +
+                "the manifest is left alone, so every member sharing that entry moves together. The " +
+                "entry is left alone and the skip reported when there is none to follow. The lock file cannot yet follow " +
                 "a catalog edit, so one is reported as a regeneration failure rather than written " +
                 "incorrectly. Other specifier protocols (`workspace:`, `patch:`, `portal:`, `npm:`) have " +
                 "no such declaration to follow and are always left alone. " +
@@ -125,13 +124,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                     return tree;
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
-                    // Recorded before the marker check: a member that never resolved still consumes
-                    // whatever catalog entry its manifest references.
-                    acc.manifests.add(p);
-                    Map<String, String> catalogRefs = NodeCatalogs.catalogReferences((Json.Document) sf);
-                    if (!catalogRefs.isEmpty()) {
-                        acc.catalogRefs.put(p, catalogRefs);
-                    }
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                     if (marker == null) return tree;
                     NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());

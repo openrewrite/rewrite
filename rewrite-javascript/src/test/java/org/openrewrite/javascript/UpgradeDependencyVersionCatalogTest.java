@@ -42,11 +42,10 @@ import static org.openrewrite.yaml.Assertions.yaml;
  * manifest. Writing a version over that reference takes the package out of the catalog: this member
  * moves and every other member stays, and the one declaration that kept them in step is gone.
  * <p>
- * So the recipe follows the reference and edits the catalog entry instead, but only when it can
- * account for every consumer of that entry. When it cannot, it leaves the manifest and the entry
- * alone and reports the skip, which keeps every member in step at the cost of the upgrade. Protocols
- * with no such declaration to follow ({@code workspace:}, {@code patch:}, {@code portal:},
- * {@code npm:}) are always left alone.
+ * So the recipe follows the reference and edits the catalog entry instead, which moves every member
+ * sharing it at once. Where there is no entry to follow it leaves the manifest alone and reports the
+ * skip, as it does for protocols with no such declaration behind them ({@code workspace:},
+ * {@code patch:}, {@code portal:}, {@code npm:}).
  */
 class UpgradeDependencyVersionCatalogTest implements RewriteTest {
 
@@ -169,59 +168,11 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     }
 
     /**
-     * The case that separates a real implementation from one that hardcodes the safe branch: with a
-     * single consumer there is nothing to protect and any implementation passes. Here the workspace
-     * declares a second member whose manifest never reached the recipe, so it cannot know whether that
-     * member also references the entry. Moving the entry might move it; the recipe refuses instead.
+     * One entry, two members, one edit. Moving the entry moves both, which is the point of a catalog and
+     * the reason the reference is followed rather than replaced member by member.
      */
     @Test
-    void aCatalogEntryIsLeftAloneWhenADeclaredMemberIsMissingFromTheSourceSet() {
-        rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW))
-                        .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
-                                assertThat(rows).extracting("sourcePath", "packageName", "protocol", "currentValue")
-                                        .containsExactly(
-                                                tuple("packages/a/package.json", "acme-logger", "catalog:", "catalog:"))),
-                packageJson(ROOT_JSON, null,
-                        nodeResolutionResult(PackageManager.Pnpm,
-                                asList("packages/a/package.json", "packages/b/package.json"))),
-                packageJson(MEMBER_JSON, null,
-                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:")),
-                        s -> s.path("packages/a/package.json")),
-                // packages/b/package.json is declared above but not supplied.
-                yaml(MEMBERS_WORKSPACE_YAML, s -> s.path("pnpm-workspace.yaml"))
-        );
-    }
-
-    /**
-     * Both members are present and both reference the entry, but only one of them resolved, so only one
-     * can be matched and upgraded. Moving the entry would move the other member to a version nothing
-     * asked on its behalf, so the recipe refuses and both stay on the old constraint.
-     */
-    @Test
-    void aSharedCatalogEntryIsLeftAloneWhenAConsumerIsNotBeingUpgraded() {
-        rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW))
-                        .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
-                                assertThat(rows).extracting("sourcePath", "packageName", "protocol", "currentValue")
-                                        .containsExactly(
-                                                tuple("packages/a/package.json", "acme-logger", "catalog:", "catalog:"))),
-                packageJson(ROOT_JSON, null,
-                        nodeResolutionResult(PackageManager.Pnpm,
-                                asList("packages/a/package.json", "packages/b/package.json"))),
-                packageJson(MEMBER_JSON, null,
-                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:")),
-                        s -> s.path("packages/a/package.json")),
-                packageJson(MEMBER_JSON, null,
-                        nodeResolutionResult(PackageManager.Pnpm),
-                        s -> s.path("packages/b/package.json")),
-                yaml(MEMBERS_WORKSPACE_YAML, s -> s.path("pnpm-workspace.yaml"))
-        );
-    }
-
-    /** Both members reference the entry and both are matched, so the entry can move and take both with it. */
-    @Test
-    void aSharedCatalogEntryIsUpgradedWhenEveryConsumerIsBeingUpgraded() {
+    void aSharedCatalogEntryMovesEveryMemberAtOnce() {
         rewriteRun(
                 spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
                 packageJson(ROOT_JSON, null,

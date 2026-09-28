@@ -31,8 +31,8 @@ public class NodeDependencyProtocolsSkipped extends DataTable<NodeDependencyProt
                         "constraint, so the recipe left that value alone. The constraint lives behind the " +
                         "protocol (in a workspace member, a patch, a catalog), and overwriting the " +
                         "reference would discard it. A `catalog:` reference is followed into its catalog " +
-                        "entry instead, and appears here only when it could not be: the workspace file or " +
-                        "the entry is missing, or the entry has a consumer this run is not upgrading.");
+                        "entry instead, and appears here only when it could not be: the workspace file is " +
+                        "not in the source set, or it declares no entry for this package.");
     }
 
     @Value
