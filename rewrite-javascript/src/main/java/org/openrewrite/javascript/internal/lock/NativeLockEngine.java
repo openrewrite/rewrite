@@ -679,7 +679,8 @@ public final class NativeLockEngine {
             String spec = value.isTextual() ? value.asText() : null;
             if (spec != null && spec.startsWith("$")) {
                 spec = directSpecs.get(spec.substring(1));
-                if (spec == null) {
+                // Leniently, an unresolved reference is just an unreadable spec, bounded below like any other.
+                if (spec == null && unmodelled == null) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key, "override of " + key + " references " +
                             value.asText() + ", which is not a direct dependency");
                 }

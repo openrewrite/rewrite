@@ -1586,6 +1586,15 @@ class NativeLockEngineTest {
         assertThat(result.getLockFileContent()).contains("beta@^1.0.0");
     }
 
+    /** Yarn has no {@code $name} syntax, so to this engine the value is just a spec it cannot read. */
+    @Test
+    void anUnresolvableReferenceOutsideTheClosureKeepsWholeClosureRegeneration() {
+        Result result = regenWholeClosureUnderResolution("\"resolutions\":{\"nowhere\":\"$nowhere\"}");
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("beta@^1.0.0");
+    }
+
     @Test
     void aGlobResolutionInsideTheClosureRefusesOnTheClosurePath() {
         Result result = regenWholeClosureUnderResolution("\"resolutions\":{\"**/shared\":\"^2.0.0\"}");
