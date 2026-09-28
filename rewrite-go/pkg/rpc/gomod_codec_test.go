@@ -23,6 +23,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // TestGoModRPCRoundTrip parses go.mod into a GoMod, ships it Go→wire→Go through
@@ -67,17 +68,17 @@ func TestGoModRPCPreservesResolutionMarker(t *testing.T) {
 	require.NoError(t, err, "parse error")
 	mrr, err := parser.ParseGoMod("go.mod", content)
 	require.NoError(t, err, "marker parse error")
-	before.Markers.Entries = append(before.Markers.Entries, *mrr)
+	before.Markers = java.AddMarker(before.Markers, *mrr)
 
 	seed := &golang.GoMod{Ident: before.Ident}
 	got := roundTripNode(t, before, seed).(*golang.GoMod)
 
 	var found *golang.GoResolutionResult
-	for i := range got.Markers.Entries {
-		if r, ok := got.Markers.Entries[i].(golang.GoResolutionResult); ok {
+	for i := range got.Markers.Entries() {
+		if r, ok := got.Markers.Entries()[i].(golang.GoResolutionResult); ok {
 			found = &r
 		}
 	}
-	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries)
+	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries())
 	require.False(t, found.ModulePath != "example.com/foo" || len(found.Requires) != 1, "marker fields not preserved")
 }

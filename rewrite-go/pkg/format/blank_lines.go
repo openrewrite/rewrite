@@ -58,10 +58,10 @@ func (v *BlankLinesVisitor) Visit(t java.Tree, p any) java.Tree {
 }
 
 func (v *BlankLinesVisitor) VisitSpace(s java.Space, p any) java.Space {
-	if !strings.Contains(s.Whitespace, "\n\n\n") {
+	if !strings.Contains(s.Whitespace(), "\n\n\n") {
 		return s
 	}
-	s.Whitespace = capInternalBlankLines(s.Whitespace, 1)
+	s = java.MakeSpace(s.Comments(), capInternalBlankLines(s.Whitespace(), 1))
 	return s
 }
 
@@ -70,12 +70,12 @@ func (v *BlankLinesVisitor) VisitBlock(block *java.Block, p any) java.J {
 	if !v.isDeclarationList() {
 		return out
 	}
-	if len(out.End.Comments) == 0 {
+	if len(out.End.Comments()) == 0 {
 		out = out.WithEnd(adjustSpace(out.End, stripLeadingBlankLines))
 	}
 
 	if len(out.Statements) > 0 && out.Statements[0].Element != nil &&
-		len(getPrefix(out.Statements[0].Element).Comments) == 0 {
+		len(getPrefix(out.Statements[0].Element).Comments()) == 0 {
 		first := out.Statements[0]
 		if updated, ok := transformPrefix(first.Element, stripLeadingBlankLinesSpace).(java.Statement); ok {
 			first.Element = updated
@@ -101,17 +101,15 @@ func (v *BlankLinesVisitor) isDeclarationList() bool {
 }
 
 func stripLeadingBlankLinesSpace(s java.Space) java.Space {
-	s.Whitespace = stripLeadingBlankLines(s.Whitespace)
-	return s
+	return java.MakeSpace(s.Comments(), stripLeadingBlankLines(s.Whitespace()))
 }
 
 func adjustSpace(s java.Space, f func(string) string) java.Space {
-	updated := f(s.Whitespace)
-	if updated == s.Whitespace {
+	updated := f(s.Whitespace())
+	if updated == s.Whitespace() {
 		return s
 	}
-	s.Whitespace = updated
-	return s
+	return java.MakeSpace(s.Comments(), updated)
 }
 
 // stripLeadingBlankLines collapses the first run of newlines in ws to a single

@@ -215,13 +215,13 @@ func (v *TabsAndIndentsVisitor) reindentTrailingComma(m java.Markers) java.Marke
 	}
 	updated := *comma
 	updated.After = after
-	entries := append([]java.Marker(nil), m.Entries...)
+	entries := append([]java.Marker(nil), m.Entries()...)
 	for i, e := range entries {
 		if _, isComma := e.(golang.TrailingComma); isComma {
 			entries[i] = updated
 		}
 	}
-	return java.Markers{ID: m.ID, Entries: entries}
+	return java.MakeMarkers(m.GetID(), entries)
 }
 
 // indentSpecs indents the body of a parenthesized declaration group.
@@ -466,9 +466,9 @@ func (v *TabsAndIndentsVisitor) reindentClauseLeadIn(s java.Space) java.Space {
 	body := strings.Repeat("\t", v.depth)
 	keyword := strings.Repeat("\t", reduceIndentDepth(v.depth))
 
-	segments := make([]string, 0, len(s.Comments)+1)
-	segments = append(segments, s.Whitespace)
-	for _, c := range s.Comments {
+	segments := make([]string, 0, len(s.Comments())+1)
+	segments = append(segments, s.Whitespace())
+	for _, c := range s.Comments() {
 		segments = append(segments, c.Suffix)
 	}
 	for i, segment := range segments {
@@ -481,16 +481,14 @@ func (v *TabsAndIndentsVisitor) reindentClauseLeadIn(s java.Space) java.Space {
 		segments[i] = reindentTail(segment, want)
 	}
 
-	out := s
-	out.Whitespace = segments[0]
-	if len(s.Comments) > 0 {
-		comments := append([]java.Comment(nil), s.Comments...)
+	comments := s.Comments()
+	if len(comments) > 0 {
+		comments = append([]java.Comment(nil), comments...)
 		for i := range comments {
 			comments[i].Suffix = segments[i+1]
 		}
-		out.Comments = comments
 	}
-	return out
+	return java.MakeSpace(comments, segments[0])
 }
 
 // indentOf reports the whitespace after the last line break in ws, which is the
@@ -519,7 +517,7 @@ func (v *TabsAndIndentsVisitor) reindentClosing(s java.Space) java.Space {
 // reindentClosingAt re-indents a closing delimiter that sits at the given
 // depth, whatever level the elements ahead of it reached.
 func (v *TabsAndIndentsVisitor) reindentClosingAt(s java.Space, depth int) java.Space {
-	if len(s.Comments) == 0 {
+	if len(s.Comments()) == 0 {
 		saved := v.depth
 		v.depth = depth
 		out := v.reindentSpace(s)
@@ -529,8 +527,8 @@ func (v *TabsAndIndentsVisitor) reindentClosingAt(s java.Space, depth int) java.
 	inner := strings.Repeat("\t", depth+1)
 	outer := strings.Repeat("\t", depth)
 
-	s.Whitespace = reindentTail(s.Whitespace, inner)
-	comments := append([]java.Comment(nil), s.Comments...)
+	whitespace := reindentTail(s.Whitespace(), inner)
+	comments := append([]java.Comment(nil), s.Comments()...)
 	for i := range comments {
 		indent := inner
 		if i == len(comments)-1 {
@@ -538,8 +536,7 @@ func (v *TabsAndIndentsVisitor) reindentClosingAt(s java.Space, depth int) java.
 		}
 		comments[i].Suffix = reindentTail(comments[i].Suffix, indent)
 	}
-	s.Comments = comments
-	return s
+	return java.MakeSpace(comments, whitespace)
 }
 
 // reindentSpace rewrites to `\t × v.depth` the indent of everything s
@@ -548,33 +545,34 @@ func (v *TabsAndIndentsVisitor) reindentClosingAt(s java.Space, depth int) java.
 // those segments ends in the indent of whatever comes next.
 func (v *TabsAndIndentsVisitor) reindentSpace(s java.Space) java.Space {
 	want := strings.Repeat("\t", v.depth)
-	s.Whitespace = reindentTail(s.Whitespace, want)
+	whitespace := reindentTail(s.Whitespace(), want)
 
-	var comments []java.Comment
-	for i, c := range s.Comments {
+	comments := s.Comments()
+	var newComments []java.Comment
+	for i, c := range comments {
 		suffix := reindentTail(c.Suffix, want)
 		if suffix == c.Suffix {
 			continue
 		}
-		if comments == nil {
-			comments = append([]java.Comment(nil), s.Comments...)
+		if newComments == nil {
+			newComments = append([]java.Comment(nil), comments...)
 		}
-		comments[i].Suffix = suffix
+		newComments[i].Suffix = suffix
 	}
-	if comments != nil {
-		s.Comments = comments
+	if newComments != nil {
+		comments = newComments
 	}
-	return s
+	return java.MakeSpace(comments, whitespace)
 }
 
 // breaksLine reports whether s puts what follows it on a new line. The break
 // can sit in the whitespace or in the suffix of a comment s carries, as it does
 // when the previous line ends in a trailing comment.
 func breaksLine(s java.Space) bool {
-	if strings.Contains(s.Whitespace, "\n") {
+	if strings.Contains(s.Whitespace(), "\n") {
 		return true
 	}
-	for _, c := range s.Comments {
+	for _, c := range s.Comments() {
 		if strings.Contains(c.Suffix, "\n") {
 			return true
 		}

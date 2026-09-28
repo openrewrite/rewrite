@@ -149,6 +149,19 @@ func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 	return leftPaddedFromElement(beforeSpace, elem, markers)
 }
 
+// receiveLeftPaddedSpaceVal receives a Space-valued JLeftPadded, type-directed rather
+// than inferred: a Space is a *spaceData and an empty one erases to a nil interface, so
+// leftPaddedFromElement would mis-build it as LeftPadded[J]. Every LeftPadded[java.Space]
+// slot (array dimension, `:=`/`=` operator, type-assertion) must receive through here.
+func receiveLeftPaddedSpaceVal(r Receiver, q *ReceiveQueue, before any) any {
+	beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, before)
+	var sp java.Space
+	if elem != nil {
+		sp = elem.(java.Space)
+	}
+	return java.LeftPadded[java.Space]{Before: beforeSpace, Element: sp, Markers: markers}
+}
+
 // receiveLeftPaddedEnum receives an enum-valued JLeftPadded field, returning the typed
 // LeftPadded[T] directly — it wraps the q.Receive call, the deserialization closure, and
 // the result assertion so call sites are a single typed assignment.
@@ -260,7 +273,7 @@ func rightPaddedMarkers(rp any) any {
 	case java.RightPadded[*java.Import]:
 		return v.Markers
 	default:
-		return java.Markers{}
+		return java.EmptyMarkers
 	}
 }
 
@@ -461,7 +474,7 @@ func leftPaddedMarkers(lp any) any {
 	case java.LeftPadded[bool]:
 		return v.Markers
 	default:
-		return java.Markers{}
+		return java.EmptyMarkers
 	}
 }
 
@@ -567,7 +580,7 @@ func containerMarkers(c any) any {
 	case java.Container[*java.Import]:
 		return v.Markers
 	default:
-		return java.Markers{}
+		return java.EmptyMarkers
 	}
 }
 

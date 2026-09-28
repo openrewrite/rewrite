@@ -162,7 +162,76 @@ func TestParseProjectDegradesToGoSumOnlyWhenModuleUnresolvable(t *testing.T) {
 	// and the degradation is visible as a warning, not just a server log line
 	gm := findGoMod(t, s)
 	assert.Truef(t, hasGoSumOnlyWarning(gm),
-		"expected a Markup.Warn about go.sum-only resolution: %+v", gm.Markers.Entries)
+		"expected a Markup.Warn about go.sum-only resolution: %+v", gm.Markers.Entries())
+}
+
+// TestParseProjectRecordsUnresolvedImportsWhenIncomplete pins that an INCOMPLETE
+// resolution (build list resolves, but an import maps to no module) names the
+// offending import paths on the marker, so a recipe skipping graph-dependent work
+// can report exactly what blocked it rather than a bare "no changes". A self-import
+// of a non-existent package reproduces this with no network.
+func TestParseProjectRecordsUnresolvedImportsWhenIncomplete(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not on PATH")
+	}
+	// given: the build list resolves (no external requires), but main.go imports a
+	// package that does not exist, so the package->module map is incomplete
+	t.Setenv("GOPROXY", "off")
+	s, _ := newTestServer(t)
+	projectDir := t.TempDir()
+	writeFile(t, filepath.Join(projectDir, "go.mod"), "module example.com/foo\n\ngo 1.21\n")
+	writeFile(t, filepath.Join(projectDir, "main.go"),
+		"package main\n\nimport \"example.com/foo/nonexistent\"\n\nfunc main() { _ = nonexistent.X }\n")
+
+	relativeTo := projectDir
+	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
+	require.NoError(t, err, "marshal params")
+
+	// when
+	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
+		t.Fatalf("handleParseProject: %v", rpcErr.Message)
+	}
+
+	// then
+	mrr := findGoResolutionResult(t, s)
+	require.Equalf(t, golang.GoResolutionIncomplete, mrr.ResolutionStatus,
+		"expected INCOMPLETE resolution, got %q", mrr.ResolutionStatus)
+	assert.Containsf(t, mrr.UnresolvedImports, "example.com/foo/nonexistent",
+		"unresolved import must be recorded on the marker: %+v", mrr.UnresolvedImports)
+}
+
+// TestParseProjectRecordsResolutionErrorWhenGoSumOnly pins that a GO_SUM_ONLY
+// fallback records the toolchain failure reason on the marker (not only in a
+// server log line), so a recipe can surface why the module could not be tidied.
+func TestParseProjectRecordsResolutionErrorWhenGoSumOnly(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not on PATH")
+	}
+	// given: every module fetch fails (no network, no cache entry for this module)
+	t.Setenv("GOPROXY", "off")
+	s, _ := newTestServer(t)
+	projectDir := t.TempDir()
+	writeFile(t, filepath.Join(projectDir, "go.mod"),
+		"module example.com/foo\n\ngo 1.21\n\nrequire example.com/does/not/exist/xyz v1.2.3\n")
+	writeFile(t, filepath.Join(projectDir, "main.go"), "package main\n\nfunc main() {}\n")
+	writeFile(t, filepath.Join(projectDir, "go.sum"),
+		"example.com/does/not/exist/xyz v1.2.3 h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n"+
+			"example.com/does/not/exist/xyz v1.2.3/go.mod h1:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=\n")
+
+	relativeTo := projectDir
+	params, err := json.Marshal(parseProjectRequest{ProjectPath: projectDir, RelativeTo: &relativeTo})
+	require.NoError(t, err, "marshal params")
+
+	// when
+	if _, rpcErr := s.handleParseProject(params); rpcErr != nil {
+		t.Fatalf("handleParseProject: %v", rpcErr.Message)
+	}
+
+	// then
+	mrr := findGoResolutionResult(t, s)
+	require.Equalf(t, golang.GoResolutionGoSumOnly, mrr.ResolutionStatus,
+		"expected GO_SUM_ONLY fallback, got %q", mrr.ResolutionStatus)
+	assert.NotEmpty(t, mrr.ResolutionError, "the toolchain failure reason must be recorded on the marker")
 }
 
 func findGoMod(t *testing.T, s *server) *golang.GoMod {
@@ -177,7 +246,7 @@ func findGoMod(t *testing.T, s *server) *golang.GoMod {
 }
 
 func hasGoSumOnlyWarning(gm *golang.GoMod) bool {
-	for _, m := range gm.Markers.Entries {
+	for _, m := range gm.Markers.Entries() {
 		gmk, ok := m.(java.GenericMarker)
 		if !ok || gmk.JavaType != "org.openrewrite.marker.Markup$Warn" {
 			continue
@@ -196,7 +265,7 @@ func findGoResolutionResult(t *testing.T, s *server) golang.GoResolutionResult {
 		if !ok {
 			continue
 		}
-		for _, m := range gm.Markers.Entries {
+		for _, m := range gm.Markers.Entries() {
 			if mrr, ok := m.(golang.GoResolutionResult); ok {
 				return mrr
 			}
