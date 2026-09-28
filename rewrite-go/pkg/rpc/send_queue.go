@@ -110,6 +110,7 @@ func (q *SendQueue) getAndSendList(parent any, getter func(any) []any, id func(a
 }
 
 func (q *SendQueue) Send(after, before any, onChange func(any)) {
+	after, before = nonNilSpace(after), nonNilSpace(before)
 	afterVal := GetValue(after)
 	beforeVal := GetValue(before)
 
@@ -265,6 +266,14 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 			defaultSender.Visit(t, q)
 		}
 	}
+}
+
+// nonNilSpace maps a nil Space to EmptySpace, which Java expects in place of null.
+func nonNilSpace(v any) any {
+	if sp, ok := v.(java.Space); ok && sp == nil {
+		return java.EmptySpace
+	}
+	return v
 }
 
 func sameIdentity(a, b any) bool {
