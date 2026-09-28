@@ -243,6 +243,9 @@ public class PythonRewriteRpc extends RewriteRpc {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
                     response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath, parseOptions(ctx)), ParseProjectResponse.class);
+                    // A setup.py-only project's resolution rides on setup.py, so it leads like any other manifest.
+                    response.sort(Comparator.comparing((ParseProjectResponse.Item item) ->
+                            !"setup.py".equals(Paths.get(item.getSourcePath()).getFileName().toString())));
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -321,7 +324,8 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, dependencyPath, ctx);
-        return Stream.concat(rpcStream, manifestStream);
+        // Manifests first, so a consumer can read the resolved dependencies before the sources.
+        return Stream.concat(manifestStream, rpcStream);
     }
 
     /**

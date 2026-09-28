@@ -33,7 +33,10 @@ import org.openrewrite.test.TypeValidation;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -929,9 +932,10 @@ class KotlinTypeMappingTest {
                         var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
-                            public K.DestructuringDeclaration visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, AtomicBoolean found) {
+                            public K.DestructuringPattern visitDestructuringPattern(K.DestructuringPattern pattern, AtomicBoolean found) {
                                 found.set(true);
-                                return super.visitDestructuringDeclaration(destructuringDeclaration, found);
+                                assertThat(pattern.getType().toString()).isEqualTo("kotlin.Triple<int, int, int>");
+                                return super.visitDestructuringPattern(pattern, found);
                             }
 
                             @Override
@@ -945,9 +949,14 @@ class KotlinTypeMappingTest {
 
                             @Override
                             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, AtomicBoolean found) {
+                                if (variable.getDeclarator() instanceof K.DestructuringPattern) {
+                                    // The declaration names no variable of its own; it is typed by the synthetic
+                                    // receiver the component calls are made on.
+                                    assertThat(variable.getVariableType().toString())
+                                            .isEqualTo("openRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=<destruct>,type=kotlin.Triple<int, int, int>}");
+                                    return super.visitVariable(variable, found);
+                                }
                                 switch (variable.getSimpleName()) {
-                                    case "<destruct>" -> assertThat(variable.getName().getType().toString())
-                                            .isEqualTo("kotlin.Triple<int, int, int>");
                                     case "a" -> {
                                         assertThat(variable.getVariableType().toString())
                                                 .isEqualTo("openRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=a,type=int}");
@@ -2146,6 +2155,335 @@ class KotlinTypeMappingTest {
                 })
               )
             );
+        }
+
+        @Test
+        void qualifierOfCallableReferenceToInheritedMember() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a: Any = NoCompanion<Int>::bar
+                  val b: Any = WithCompanion<Int>::bar
+                  """,
+                spec -> spec.afterRecipe(cu -> assertQualifierTypes(cu, Map.of(
+                  "NoCompanion", "NoCompanion",
+                  "WithCompanion", "WithCompanion"
+                ), "Base"))
+              ),
+              kotlin(
+                """
+                  open class Base {
+                      fun bar() = 1
+                  }
+                  class NoCompanion<T> : Base()
+                  class WithCompanion<T> : Base() {
+                      companion object {
+                          fun create() = 2
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void qualifierOfParameterizedNestedCallableReference() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = Outer.Nested<Int>::bar
+                  val b = Outer.Nested<List<Int>>::bar
+                  """,
+                spec -> spec.afterRecipe(cu -> assertQualifierTypes(cu, Map.of(
+                  "Nested", "Outer$Nested"
+                ), "java.lang.Object"))
+              ),
+              kotlin(
+                """
+                  class Outer {
+                      class Nested<T> {
+                          fun bar() = 1
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void qualifierOfStaticStyleCall() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = NoCompanion.valueOf("A")
+                  val b = WithCompanion.create()
+                  val c = Outer.Nested.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    assertQualifierTypes(cu, Map.of(
+                      "WithCompanion", "WithCompanion",
+                      "Nested", "Outer$Nested"
+                    ), "java.lang.Object");
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean found) {
+                            if ("NoCompanion".equals(identifier.getSimpleName())) {
+                                JavaType.FullyQualified type = TypeUtils.asFullyQualified(identifier.getType());
+                                assertThat(type.getFullyQualifiedName()).isEqualTo("NoCompanion");
+                                assertThat(type.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
+                                assertThat(type.getMembers()).extracting(JavaType.Variable::getName).containsExactly("A");
+                                found.set(true);
+                            }
+                            return super.visitIdentifier(identifier, found);
+                        }
+                    }.reduce(cu, new AtomicBoolean());
+                    assertThat(found.get()).isTrue();
+                })
+              ),
+              kotlin(
+                """
+                  enum class NoCompanion {
+                      A
+                  }
+                  class WithCompanion {
+                      fun bar() = 1
+                      companion object {
+                          fun create() = 2
+                      }
+                  }
+                  class Outer {
+                      class Nested {
+                          fun bar() = 1
+                          companion object {
+                              fun create() = 2
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void typeAliasQualifier() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = A.create()
+                  val b = O.bar()
+                  val c = N.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> assertQualifierTypes(cu, Map.of(
+                  "A", "WithCompanion",
+                  "O", "Obj",
+                  "N", "Outer$Nested"
+                ), "java.lang.Object"))
+              ),
+              kotlin(
+                """
+                  typealias A = WithCompanion
+                  typealias O = Obj
+                  typealias N = Outer.Nested
+
+                  class WithCompanion {
+                      fun bar() = 1
+                      companion object {
+                          fun create() = 2
+                      }
+                  }
+                  object Obj {
+                      fun bar() = 1
+                  }
+                  class Outer {
+                      class Nested {
+                          fun bar() = 1
+                          companion object {
+                              fun create() = 2
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void typeAliasToJavaClassQualifier() {
+            rewriteRun(
+              kotlin(
+                """
+                  typealias E = IllegalStateException
+                  val a = E::class
+                  val b = Exception::class
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    Map<String, String> expected = Map.of(
+                      "E", "java.lang.IllegalStateException",
+                      "Exception", "java.lang.Exception"
+                    );
+                    Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
+                        @Override
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<String> seen) {
+                            if (memberRef.getContaining() instanceof J.Identifier id) {
+                                assertThat(TypeUtils.asFullyQualified(id.getType()).getFullyQualifiedName())
+                                  .isEqualTo(expected.get(id.getSimpleName()));
+                                seen.add(id.getSimpleName());
+                            }
+                            return super.visitMemberReference(memberRef, seen);
+                        }
+                    }.reduce(cu, new HashSet<>());
+                    assertThat(seen).containsExactlyInAnyOrderElementsOf(expected.keySet());
+                })
+              )
+            );
+        }
+
+        @Test
+        void typeAliasQualifierPreservesFixedTypeArguments() {
+            rewriteRun(
+              kotlin(
+                """
+                  class Box<T>(val value: T)
+                  typealias StringBox = Box<String>
+
+                  val value = StringBox::value
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, AtomicBoolean found) {
+                            JavaType.Parameterized type = TypeUtils.asParameterized(memberRef.getContaining().getType());
+                            assertThat(type).isNotNull();
+                            assertThat(type.getFullyQualifiedName()).isEqualTo("Box");
+                            assertThat(type.getTypeParameters())
+                              .extracting(JavaType::toString)
+                              .containsExactly("kotlin.String");
+                            found.set(true);
+                            return super.visitMemberReference(memberRef, found);
+                        }
+                    }.reduce(cu, new AtomicBoolean());
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Test
+        void packageSegmentOfQualifiedTypeAliasHasNoType() {
+            rewriteRun(
+              kotlin(
+                """
+                  val value = p.A.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> seen) {
+                            if ("p".equals(identifier.getSimpleName())) {
+                                assertThat(identifier.getType()).isNull();
+                                seen.add("p");
+                            } else if ("A".equals(identifier.getSimpleName())) {
+                                assertThat(TypeUtils.asFullyQualified(identifier.getType()).getFullyQualifiedName())
+                                  .isEqualTo("p.Foo");
+                                seen.add("A");
+                            }
+                            return super.visitIdentifier(identifier, seen);
+                        }
+                    }.reduce(cu, new HashSet<>());
+                    assertThat(seen).containsExactlyInAnyOrder("p", "A");
+                })
+              ),
+              kotlin(
+                """
+                  package p
+
+                  typealias A = Foo
+
+                  class Foo {
+                      companion object {
+                          fun create() = Foo()
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void packageSegmentsOfQualifiedClassHaveNoType() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = p.Foo.create()
+                  val b = p.q.Bar.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> seen) {
+                            switch (identifier.getSimpleName()) {
+                                case "p", "q" -> assertThat(identifier.getType()).isNull();
+                                case "Foo" -> assertThat(TypeUtils.asFullyQualified(identifier.getType()).getFullyQualifiedName()).isEqualTo("p.Foo");
+                                case "Bar" -> assertThat(TypeUtils.asFullyQualified(identifier.getType()).getFullyQualifiedName()).isEqualTo("p.q.Bar");
+                                default -> {
+                                    return super.visitIdentifier(identifier, seen);
+                                }
+                            }
+                            seen.add(identifier.getSimpleName());
+                            return super.visitIdentifier(identifier, seen);
+                        }
+                    }.reduce(cu, new HashSet<>());
+                    assertThat(seen).containsExactlyInAnyOrder("p", "q", "Foo", "Bar");
+                })
+              ),
+              kotlin(
+                """
+                  package p
+
+                  class Foo {
+                      companion object {
+                          fun create() = Foo()
+                      }
+                  }
+                  """
+              ),
+              kotlin(
+                """
+                  package p.q
+
+                  class Bar {
+                      companion object {
+                          fun create() = Bar()
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        private static void assertQualifierTypes(K.CompilationUnit cu, Map<String, String> expectedFqnBySimpleName, String supertype) {
+            Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> seen) {
+                    String expectedFqn = expectedFqnBySimpleName.get(identifier.getSimpleName());
+                    if (expectedFqn != null) {
+                        JavaType.FullyQualified type = TypeUtils.asFullyQualified(identifier.getType());
+                        if (type instanceof JavaType.Parameterized parameterized) {
+                            type = parameterized.getType();
+                        }
+                        assertThat(type).as(identifier.getSimpleName()).isNotNull();
+                        assertThat(type.getFullyQualifiedName()).as(identifier.getSimpleName()).isEqualTo(expectedFqn);
+                        assertThat(type.getKind()).as(identifier.getSimpleName()).isEqualTo(JavaType.FullyQualified.Kind.Class);
+                        assertThat(type.getSupertype().getFullyQualifiedName()).as(identifier.getSimpleName()).isEqualTo(supertype);
+                        assertThat(type.getMethods()).as(identifier.getSimpleName())
+                          .extracting(JavaType.Method::getName)
+                          .doesNotContain("create", "toString");
+                        seen.add(identifier.getSimpleName());
+                    }
+                    return super.visitIdentifier(identifier, seen);
+                }
+            }.reduce(cu, new HashSet<>());
+            assertThat(seen).containsExactlyInAnyOrderElementsOf(expectedFqnBySimpleName.keySet());
         }
     }
 }

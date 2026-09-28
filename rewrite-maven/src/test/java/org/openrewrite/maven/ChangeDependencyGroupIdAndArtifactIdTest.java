@@ -22,6 +22,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
 import org.openrewrite.java.ChangePackage;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -3872,7 +3873,17 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               false
             ),
             new ChangePackage("javax.activation", "jakarta.activation", true)
-          ).executionContext(ctx),
+          ).executionContext(ctx)
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package javax.activation;
+                public class DataHandler {}
+                """,
+              """
+                package javax.activation;
+                public class MimeType {}
+                """
+            )),
           mavenProject("project",
             srcMainJava(
               java(

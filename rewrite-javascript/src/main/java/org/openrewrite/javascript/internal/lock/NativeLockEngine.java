@@ -248,7 +248,7 @@ public final class NativeLockEngine {
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock))
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock), true)
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = NpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Npm, packageJsonPath),

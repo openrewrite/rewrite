@@ -17,17 +17,19 @@ def test_changed_ref_slot_is_re_added_instead_of_changed():
     assert q.q[2] == {'state': 'ADD', 'ref': 2}
 
 
-def test_complex_value_serializes_as_paren_free_string():
-    # given
+def test_complex_value_has_no_wire_form():
     q = RpcSendQueue()
 
-    # when
-    value = q._get_primitive_value(1j)
-    value_type = q._get_value_type(1j)
+    assert q._get_primitive_value(1j) is None
+    assert q._get_value_type(1j) is None
 
-    # then
-    assert value == "1j"
-    assert value_type is None
+
+def test_int_value_serializes_as_a_number_at_any_magnitude():
+    q = RpcSendQueue()
+
+    assert q._get_primitive_value(2 ** 63) == 2 ** 63
+    # Past Jackson's 1000-character cap on a JSON number there is no wire form.
+    assert q._get_primitive_value(10 ** 1000) is None
 
 
 def test_changed_ref_list_item_is_re_added_instead_of_changed():

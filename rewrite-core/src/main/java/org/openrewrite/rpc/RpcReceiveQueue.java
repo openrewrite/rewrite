@@ -53,6 +53,13 @@ public class RpcReceiveQueue {
         return batch.remove();
     }
 
+    public RpcObjectData peek() {
+        if (batch.isEmpty()) {
+            batch.addAll(pull.get());
+        }
+        return batch.element();
+    }
+
     /**
      * Receive a value from the queue and apply a function to it to convert it to the required
      * type.

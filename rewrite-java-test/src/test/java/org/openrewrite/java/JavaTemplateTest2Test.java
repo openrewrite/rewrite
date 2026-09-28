@@ -207,7 +207,7 @@ class JavaTemplateTest2Test implements RewriteTest {
 
                   void doSomething() {
                       String sout = "";
-                      try (BufferedReader br = new BufferedReader(new FileReader(null))) {
+                      try (BufferedReader br = new BufferedReader(new FileReader("file.txt"))) {
                           new ByteArrayInputStream("bytes".getBytes(StandardCharsets.UTF_8));
                       } catch (IOException e) {
                           e.printStackTrace();
@@ -226,7 +226,7 @@ class JavaTemplateTest2Test implements RewriteTest {
 
                   void doSomething() {
                       String sout = "";
-                      try (BufferedReader br = new BufferedReader(new FileReader(null))) {
+                      try (BufferedReader br = new BufferedReader(new FileReader("file.txt"))) {
                           createBis("bytes".getBytes(StandardCharsets.UTF_8));
                       } catch (IOException e) {
                           e.printStackTrace();
