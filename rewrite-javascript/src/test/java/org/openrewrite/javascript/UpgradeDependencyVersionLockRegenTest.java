@@ -22,6 +22,7 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
@@ -41,12 +42,14 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.javascript.Assertions.packageLock;
 import static org.openrewrite.javascript.Assertions.pnpmLock;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 /**
  * PM-free end-to-end tests of native lock regeneration for a closure-unchanged version bump. No
  * package manager is executed: the registry is stubbed over the run's {@link HttpSender} with
  * recorded packument/manifest responses, and the regenerated lock is asserted byte-identical to a
- * golden recorded from a real {@code npm}/{@code pnpm} install.
+ * golden recorded from a real {@code npm}/{@code pnpm} install. The last also covers a run that both
+ * regenerates and leaves a catalog behind, where the two verdicts must not cancel out.
  */
 class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
 
@@ -138,6 +141,51 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
                         nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.2"))),
                 pnpmLock(resource("lock/pnpm/v9/before"), resource("lock/pnpm/v9/after"),
                         s -> s.noTrim())
+        );
+    }
+
+    private static final String CATALOG_MANIFEST = "{\n" +
+            "  \"name\": \"g1\",\n" +
+            "  \"version\": \"1.0.0\",\n" +
+            "  \"dependencies\": {\n" +
+            "    \"ms\": \"%s\",\n" +
+            "    \"ms-logger\": \"catalog:\"\n" +
+            "  }\n" +
+            "}\n";
+
+    private static final String CATALOG_WORKSPACE_YAML = "packages:\n" +
+            "  - '.'\n" +
+            "catalog:\n" +
+            "  ms-logger: '%s'\n";
+
+    /**
+     * The pattern matches a plain dependency and a catalog-backed one. The manifest bump regenerates the
+     * lock cleanly; the catalog bump cannot be written to it at all. Reporting the second must not throw
+     * away the first, or the plain dependency ends up worse off than if the catalog were never followed.
+     */
+    @Test
+    void aStaleCatalogIsReportedWithoutDiscardingTheRegeneratedLock() {
+        routes.put("https://registry.npmjs.org/ms", resource("lock/pnpm/v9/http/ms"));
+        routes.put("https://registry.npmjs.org/ms/2.1.2", resource("lock/pnpm/v9/http/ms-2.1.2"));
+        routes.put("https://registry.npmjs.org/ms/2.1.3", resource("lock/pnpm/v9/http/ms-2.1.3"));
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion(null, "ms*", "2.1.3")).executionContext(ctx)
+                        .dataTable(NodeLockRegenerationFailures.Row.class, rows -> {
+                            assertThat(rows).as("the catalog staleness is still reported").hasSize(1);
+                            assertThat(rows.get(0).getPackageName()).isEqualTo("ms-logger");
+                            assertThat(rows.get(0).getReason()).isEqualTo("UNSUPPORTED_ENTRY_TYPE");
+                        }),
+                packageJson(String.format(CATALOG_MANIFEST, "2.1.2"), String.format(CATALOG_MANIFEST, "2.1.3"),
+                        nodeResolutionResult(PackageManager.Pnpm,
+                                dependency("ms", "2.1.2"),
+                                dependency("ms-logger", "catalog:"))),
+                yaml(String.format(CATALOG_WORKSPACE_YAML, "~1.4.1"), String.format(CATALOG_WORKSPACE_YAML, "2.1.3"),
+                        s -> s.path("pnpm-workspace.yaml")),
+                pnpmLock(resource("lock/pnpm/v9/before"), resource("lock/pnpm/v9/after"),
+                        s -> s.noTrim().afterRecipe(doc ->
+                                assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                        .as("the lock carries the stale-catalog warning").isPresent()))
         );
     }
 
