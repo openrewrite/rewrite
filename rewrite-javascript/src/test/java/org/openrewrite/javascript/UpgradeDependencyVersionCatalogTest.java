@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
@@ -148,6 +149,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     static Stream<Arguments> spellings() {
         return Stream.of(
                 Arguments.of(PackageManager.Pnpm, "pnpm-workspace.yaml", "catalog:", WORKSPACE_YAML),
+                Arguments.of(PackageManager.Pnpm, "pnpm-workspace.yaml", "catalog:default", WORKSPACE_YAML),
                 Arguments.of(PackageManager.Pnpm, "pnpm-workspace.yaml", "catalog:stable", NAMED_WORKSPACE_YAML),
                 Arguments.of(PackageManager.YarnBerry, ".yarnrc.yml", "catalog:", YARNRC),
                 Arguments.of(PackageManager.YarnBerry, ".yarnrc.yml", "catalog:stable", NAMED_YARNRC));
@@ -279,13 +281,10 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
         );
     }
 
-    /**
-     * An entry written as a block scalar cannot be rewritten without clobbering its envelope, so it is
-     * declined. Declining is a skip and has to be reported: the alternative is a run that changes nothing
-     * and says nothing.
-     */
-    @Test
-    void aCatalogEntryThatCannotBeRewrittenIsReported() {
+    /** A block scalar or an entry that is itself a reference is declined, and a decline is a skip to report. */
+    @ParameterizedTest
+    @ValueSource(strings = {">\n    ~1.4.1", "'npm:@acme/logger-fork@^1.4.1'"})
+    void aCatalogEntryThatCannotBeRewrittenIsReported(String entry) {
         rewriteRun(
                 spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW))
                         .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
@@ -293,7 +292,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                                         .containsExactly(tuple("acme-logger", "catalog:"))),
                 packageJson(MANIFEST.formatted("catalog:"), null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
-                yaml("catalog:\n  acme-logger: >\n    ~1.4.1\n", s -> s.path("pnpm-workspace.yaml"))
+                yaml("catalog:\n  acme-logger: " + entry + "\n", s -> s.path("pnpm-workspace.yaml"))
         );
     }
 

@@ -47,6 +47,7 @@ public class NodeCatalogs {
 
     private static final String CATALOG_PROTOCOL = "catalog:";
     private static final String DEFAULT_CATALOG_KEY = "catalog";
+    private static final String DEFAULT_CATALOG_NAME = "default";
     private static final String NAMED_CATALOGS_KEY = "catalogs";
 
     /** Plain scalars YAML resolves to something other than a string; `2` and `2.0` are valid npm ranges. */
@@ -74,11 +75,16 @@ public class NodeCatalogs {
         return pm == PackageManager.YarnBerry ? YARN_WORKSPACE_FILE : null;
     }
 
-    /** The catalog a version position refers to, {@link #DEFAULT_CATALOG} for a bare {@code catalog:}. */
+    /**
+     * The catalog a version position refers to, {@link #DEFAULT_CATALOG} for {@code catalog:} and for
+     * {@code catalog:default}, which pnpm treats as the same catalog.
+     */
     public static @Nullable String catalogReference(@Nullable String value) {
-        return CATALOG_PROTOCOL.equals(PackageJsonHelper.dependencySpecifierProtocol(value)) ?
-                value.substring(CATALOG_PROTOCOL.length()) :
-                null;
+        if (!CATALOG_PROTOCOL.equals(PackageJsonHelper.dependencySpecifierProtocol(value))) {
+            return null;
+        }
+        String name = value.substring(CATALOG_PROTOCOL.length());
+        return DEFAULT_CATALOG_NAME.equals(name) ? DEFAULT_CATALOG : name;
     }
 
     /**
@@ -139,9 +145,11 @@ public class NodeCatalogs {
             if (!packageName.equals(entry.getKey().getValue()) || !(entry.getValue() instanceof Yaml.Scalar)) continue;
             Yaml.Scalar version = (Yaml.Scalar) entry.getValue();
             Yaml.Scalar.Style style = version.getStyle();
-            if (style == Yaml.Scalar.Style.LITERAL || style == Yaml.Scalar.Style.FOLDED) {
-                // `withValue` cannot rewrite a block scalar's body without clobbering its envelope. Leave
-                // `found` unset, so an entry that cannot be written reads as one that was not followed.
+            // `withValue` cannot rewrite a block scalar's body without clobbering its envelope, and an entry
+            // that is itself a reference has no range to replace. Leave `found` unset, so an entry that
+            // cannot be written reads as one that was not followed.
+            if (style == Yaml.Scalar.Style.LITERAL || style == Yaml.Scalar.Style.FOLDED ||
+                    PackageJsonHelper.dependencySpecifierProtocol(version.getValue()) != null) {
                 return catalog;
             }
             found[0] = true;

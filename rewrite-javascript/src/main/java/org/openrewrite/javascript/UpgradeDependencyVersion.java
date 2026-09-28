@@ -36,7 +36,6 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -242,6 +241,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 NodeDependencyScan.ProjectState rootPs = acc.projects.get(packagePath);
                 if (rootPs == null) return tree;
 
+                // Every importer shares this lock: each one's stale catalog is recorded, and none of them
+                // discards the first regeneration, or a plain dependency bumped in the same run loses its lock.
+                NodeDependencyScan.ProjectState regenPs = null;
+                Path regenImporter = null;
+                String staleMessage = null;
                 for (Path importer : NodeDependencyScan.lockImporters(acc, packagePath, rootPs)) {
                     NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
                     if (ips == null) continue;
@@ -261,28 +265,29 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                             }
                         }
                     }
-                    // Two verdicts about one lock. Reporting the catalog one must not discard the
-                    // regeneration, or a plain dependency bumped in the same run loses its lock.
+                    if (regenPs == null && ips.regenResult != null) {
+                        regenPs = ips;
+                        regenImporter = importer;
+                    }
                     LockFileRegeneration.Result stale = staleCatalogLock(ips);
-                    if (ips.regenResult != null && ips.regenResult.isSuccess()) {
-                        SourceFile relocked = PackageJsonHelper.reparseLock(sf, ips.regenResult.getLockFileContent());
-                        if (stale == null) {
-                            return relocked;
-                        }
-                        recordCatalogStaleness(ctx, ips, importer, stale);
-                        return warnOnce(relocked, "lock regeneration incomplete: " + stale.getErrorMessage());
-                    }
-                    if (ips.regenResult != null) {
-                        recordFailure(ctx, ips, importer);
-                        return Markup.warn(sf, new RuntimeException(
-                                "lock regeneration failed: " + ips.regenResult.getErrorMessage()));
-                    }
                     if (stale != null) {
                         recordCatalogStaleness(ctx, ips, importer, stale);
-                        return warnOnce(sf, "lock regeneration failed: " + stale.getErrorMessage());
+                        if (staleMessage == null) {
+                            staleMessage = stale.getErrorMessage();
+                        }
                     }
                 }
-                return tree;
+                if (regenPs != null && regenPs.regenResult != null && regenPs.regenResult.isSuccess()) {
+                    SourceFile relocked = PackageJsonHelper.reparseLock(sf, regenPs.regenResult.getLockFileContent());
+                    return staleMessage == null ? relocked :
+                            warnOnce(relocked, "lock regeneration incomplete: " + staleMessage);
+                }
+                if (regenPs != null && regenPs.regenResult != null) {
+                    recordFailure(ctx, regenPs, regenImporter);
+                    return Markup.warn(sf, new RuntimeException(
+                            "lock regeneration failed: " + regenPs.regenResult.getErrorMessage()));
+                }
+                return staleMessage == null ? tree : warnOnce(sf, "lock regeneration failed: " + staleMessage);
             }
 
             private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
@@ -302,11 +307,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
         };
     }
 
-    /**
-     * The engine cannot update a lock for a catalog edit: the resolved version lives in a `catalogs:`
-     * block it has no model for. Refuse loudly, because a stale lock still installs the old version and
-     * pnpm does not report the disagreement (pnpm/pnpm#9369).
-     */
     /** A second marker on a tree that already carries one is a change, and the recipe would never settle. */
     private static SourceFile warnOnce(SourceFile sf, String message) {
         return sf.getMarkers().findFirst(Markup.Warn.class).isPresent() ?
@@ -314,6 +314,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 Markup.warn(sf, new RuntimeException(message));
     }
 
+    /**
+     * The engine cannot update a lock for a catalog edit: the resolved version lives in a `catalogs:`
+     * block it has no model for. Refuse loudly, because a stale lock still installs the old version and
+     * pnpm does not report the disagreement (pnpm/pnpm#9369).
+     */
     private LockFileRegeneration.@Nullable Result staleCatalogLock(NodeDependencyScan.ProjectState ps) {
         if (ps.catalogEntriesEdited.isEmpty() || ps.capturedLockContent == null) {
             return null;

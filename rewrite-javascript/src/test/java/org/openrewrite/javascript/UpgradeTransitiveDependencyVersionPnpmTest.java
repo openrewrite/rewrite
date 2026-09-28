@@ -17,6 +17,7 @@ package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.javascript.Assertions.dependency;
@@ -24,19 +25,19 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 
 /**
- * An override that is already in place is a no-op for npm ({@code overrides}) and Yarn
- * ({@code resolutions}), which both compare the existing entry and return the document untouched.
- * The pnpm dialect ({@code pnpm.overrides}) has no such comparison: every pass re-serializes the
- * manifest through Jackson and reparses it, so the recipe hands back a fresh tree on every cycle and
- * never reaches a fixed point. The reparse is also why the manifest comes back reprinted in Jackson's
- * pretty-printer style rather than edited in place.
+ * The pnpm dialect nests its overrides under {@code pnpm.overrides}; the entry is edited in place and left
+ * untouched once it holds the requested value, so the recipe settles in one cycle.
  */
 class UpgradeTransitiveDependencyVersionPnpmTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new UpgradeTransitiveDependencyVersion("acme-transitive", "~2.0.0", null));
+    }
 
     @Test
     void pnpmOverrideConvergesInOneCycle() {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("acme-transitive", "~2.0.0", null)),
                 packageJson(
                         """
                         {
@@ -62,6 +63,56 @@ class UpgradeTransitiveDependencyVersionPnpmTest implements RewriteTest {
                         }
                         """,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "~1.4.1")))
+        );
+    }
+
+    @Test
+    void anEmptyPnpmObjectGainsTheOverrides() {
+        rewriteRun(
+                packageJson(
+                        """
+                        {
+                          "name": "consumer",
+                          "dependencies": {
+                            "acme-logger": "~1.4.1"
+                          },
+                          "pnpm": {}
+                        }
+                        """,
+                        """
+                        {
+                          "name": "consumer",
+                          "dependencies": {
+                            "acme-logger": "~1.4.1"
+                          },
+                          "pnpm": {
+                            "overrides": {
+                              "acme-transitive": "~2.0.0"
+                            }
+                          }
+                        }
+                        """,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "~1.4.1")))
+        );
+    }
+
+    @Test
+    void aReferenceInALaterScopeStillBlocksTheOverride() {
+        rewriteRun(
+                packageJson(
+                        """
+                        {
+                          "name": "consumer",
+                          "peerDependencies": {
+                            "acme-transitive": "^1.0.0"
+                          },
+                          "devDependencies": {
+                            "acme-transitive": "catalog:"
+                          }
+                        }
+                        """,
+                        null,
+                        nodeResolutionResult(PackageManager.Pnpm))
         );
     }
 }

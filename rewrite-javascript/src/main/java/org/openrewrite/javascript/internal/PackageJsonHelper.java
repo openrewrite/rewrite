@@ -387,8 +387,12 @@ public class PackageJsonHelper {
         if (inner == null) {
             Json.JsonObject innerObj = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
                     Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
-            return doc.withValue(replaceMember(root, outerKey,
-                    appendMember(outer, makeMember(innerKey, innerObj, Space.EMPTY))));
+            // The JSON parser represents {} as a single Json.Empty member, which an append would print as {,}.
+            Json.JsonObject updatedOuter = outer.getMembers().stream().allMatch(m -> m instanceof Json.Empty) ?
+                    newObjectHolding(makeMember(innerKey, innerObj, Space.build("\n" + indent + indent, emptyList())),
+                            indent).withPrefix(outer.getPrefix()) :
+                    appendMember(outer, makeMember(innerKey, innerObj, Space.EMPTY));
+            return doc.withValue(replaceMember(root, outerKey, updatedOuter));
         }
 
         for (Json m : inner.getMembers()) {
@@ -403,7 +407,6 @@ public class PackageJsonHelper {
                     replaceMember(outer, innerKey, replaceMember(inner, entryKey, newLit))));
         }
 
-        // The TypeScript JSON parser represents {} as a single Json.Empty member.
         Json.JsonObject updatedInner;
         if (inner.getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
             updatedInner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
@@ -706,20 +709,10 @@ public class PackageJsonHelper {
         return PackageJsonOverrides.applyOverride(doc, pm, name, newVersion, path);
     }
 
-    /** The specifier protocol this manifest declares {@code name} with, or null if it declares a version. */
+    /** The specifier protocol any scope of this manifest declares {@code name} with, or null if none does. */
     static @Nullable String declaredProtocolReference(Json.Document doc, String name) {
-        return dependencySpecifierProtocol(declaredVersions(doc).get(name));
-    }
-
-    /**
-     * Every dependency this manifest declares, as name to raw value, across all declared scopes. The
-     * value is whatever the manifest says: a version constraint, or a specifier protocol standing in for
-     * one. A name declared in more than one scope keeps its first declaration.
-     */
-    static Map<String, String> declaredVersions(Json.Document doc) {
-        Map<String, String> declared = new LinkedHashMap<>();
         if (!(doc.getValue() instanceof Json.JsonObject)) {
-            return declared;
+            return null;
         }
         for (Json rootMember : ((Json.JsonObject) doc.getValue()).getMembers()) {
             if (!(rootMember instanceof Json.Member)) continue;
@@ -732,14 +725,14 @@ public class PackageJsonHelper {
             for (Json child : ((Json.JsonObject) scope.getValue()).getMembers()) {
                 if (!(child instanceof Json.Member)) continue;
                 Json.Member dependency = (Json.Member) child;
-                String name = literalString(dependency.getKey());
-                String value = literalString(dependency.getValue());
-                if (name != null && value != null) {
-                    declared.putIfAbsent(name, value);
+                String protocol = name.equals(literalString(dependency.getKey())) ?
+                        dependencySpecifierProtocol(literalString(dependency.getValue())) : null;
+                if (protocol != null) {
+                    return protocol;
                 }
             }
         }
-        return declared;
+        return null;
     }
 
     /**

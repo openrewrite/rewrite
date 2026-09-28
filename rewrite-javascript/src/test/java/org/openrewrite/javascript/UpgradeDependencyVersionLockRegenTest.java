@@ -35,8 +35,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.javascript.Assertions.dependency;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
@@ -190,6 +192,73 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
                         s -> s.noTrim().afterRecipe(doc ->
                                 assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                                         .as("the lock carries the stale-catalog warning").isPresent()))
+        );
+    }
+
+    @Test
+    void everyImporterSharingTheLockReportsItsStaleCatalog() {
+        routes.put("https://registry.npmjs.org/ms", resource("lock/pnpm/v9/http/ms"));
+        routes.put("https://registry.npmjs.org/ms/2.1.2", resource("lock/pnpm/v9/http/ms-2.1.2"));
+        routes.put("https://registry.npmjs.org/ms/2.1.3", resource("lock/pnpm/v9/http/ms-2.1.3"));
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion(null, "ms*", "2.1.3")).executionContext(ctx)
+                        .dataTable(NodeLockRegenerationFailures.Row.class, rows ->
+                                assertThat(rows).extracting("sourcePath", "packageName").containsExactlyInAnyOrder(
+                                        tuple("package.json", "ms-logger"),
+                                        tuple("packages/lib/package.json", "ms-logger"))),
+                packageJson(
+                        """
+                        {
+                          "name": "root",
+                          "version": "1.0.0",
+                          "private": true,
+                          "dependencies": {
+                            "ms-logger": "catalog:"
+                          }
+                        }
+                        """,
+                        null,
+                        nodeResolutionResult(PackageManager.Pnpm,
+                                asList("packages/app/package.json", "packages/lib/package.json"),
+                                dependency("ms-logger", "catalog:"))),
+                packageJson(resource("lock/pnpm/v9-ws/pkg-app-before"), resource("lock/pnpm/v9-ws/pkg-app-after"),
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.2")),
+                        s -> s.path("packages/app/package.json")),
+                packageJson(
+                        """
+                        {
+                          "name": "@ws/lib",
+                          "version": "1.0.0",
+                          "dependencies": {
+                            "is-buffer": "1.1.6",
+                            "ms-logger": "catalog:"
+                          }
+                        }
+                        """,
+                        null,
+                        nodeResolutionResult(PackageManager.Pnpm,
+                                dependency("is-buffer", "1.1.6"),
+                                dependency("ms-logger", "catalog:")),
+                        s -> s.path("packages/lib/package.json")),
+                yaml(
+                        """
+                        packages:
+                          - 'packages/*'
+                        catalog:
+                          ms-logger: '~1.4.1'
+                        """,
+                        """
+                        packages:
+                          - 'packages/*'
+                        catalog:
+                          ms-logger: '2.1.3'
+                        """,
+                        s -> s.path("pnpm-workspace.yaml")),
+                pnpmLock(resource("lock/pnpm/v9-ws/before"), resource("lock/pnpm/v9-ws/after"),
+                        s -> s.noTrim().afterRecipe(doc ->
+                                assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                        .as("the regenerated lock carries the stale-catalog warning").isPresent()))
         );
     }
 
