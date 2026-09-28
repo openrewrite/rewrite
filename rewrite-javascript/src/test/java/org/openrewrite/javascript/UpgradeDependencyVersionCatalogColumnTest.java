@@ -42,24 +42,30 @@ class UpgradeDependencyVersionCatalogColumnTest implements RewriteTest {
     private static final String PKG = "acme-logger";
     private static final String NEW_VERSION = "~1.4.2-osera-00001";
 
-    private static final String MANIFEST = "{\n" +
-            "  \"name\": \"consumer\",\n" +
-            "  \"version\": \"1.0.0\",\n" +
-            "  \"dependencies\": {\n" +
-            "    \"" + PKG + "\": \"%s\"\n" +
-            "  }\n" +
-            "}\n";
+    private static final String MANIFEST = """
+            {
+              "name": "consumer",
+              "version": "1.0.0",
+              "dependencies": {
+                "acme-logger": "%s"
+              }
+            }
+            """;
 
-    private static final String DEFAULT_CATALOG = "packages:\n" +
-            "  - '.'\n" +
-            "catalog:\n" +
-            "  " + PKG + ": '%s'\n";
+    private static final String DEFAULT_CATALOG = """
+            packages:
+              - '.'
+            catalog:
+              acme-logger: '%s'
+            """;
 
-    private static final String NAMED_CATALOG = "packages:\n" +
-            "  - '.'\n" +
-            "catalogs:\n" +
-            "  stable:\n" +
-            "    " + PKG + ": '%s'\n";
+    private static final String NAMED_CATALOG = """
+            packages:
+              - '.'
+            catalogs:
+              stable:
+                acme-logger: '%s'
+            """;
 
     static Stream<Arguments> spellings() {
         return Stream.of(

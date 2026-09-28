@@ -54,76 +54,96 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     private static final String NEW = "~1.5.0";
 
     /** One dependency, declared by reference; {@code %s} is that reference. */
-    private static final String MANIFEST = "{\n" +
-            "  \"name\": \"consumer\",\n" +
-            "  \"version\": \"1.0.0\",\n" +
-            "  \"dependencies\": {\n" +
-            "    \"acme-logger\": \"%s\"\n" +
-            "  }\n" +
-            "}\n";
+    private static final String MANIFEST = """
+            {
+              "name": "consumer",
+              "version": "1.0.0",
+              "dependencies": {
+                "acme-logger": "%s"
+              }
+            }
+            """;
 
     /** A catalog reference beside a protocol that has no catalog to follow. */
-    private static final String PACKAGE_JSON = "{\n" +
-            "  \"name\": \"consumer\",\n" +
-            "  \"version\": \"1.0.0\",\n" +
-            "  \"dependencies\": {\n" +
-            "    \"acme-logger\": \"catalog:\",\n" +
-            "    \"acme-lib\": \"workspace:^\"\n" +
-            "  }\n" +
-            "}\n";
+    private static final String PACKAGE_JSON = """
+            {
+              "name": "consumer",
+              "version": "1.0.0",
+              "dependencies": {
+                "acme-logger": "catalog:",
+                "acme-lib": "workspace:^"
+              }
+            }
+            """;
 
-    private static final String WORKSPACE_YAML = "packages:\n" +
-            "  - '.'\n" +
-            "catalog:\n" +
-            "  acme-logger: '" + OLD + "'\n";
+    private static final String WORKSPACE_YAML = """
+            packages:
+              - '.'
+            catalog:
+              acme-logger: '~1.4.1'
+            """;
 
-    private static final String NAMED_WORKSPACE_YAML = "packages:\n" +
-            "  - '.'\n" +
-            "catalogs:\n" +
-            "  stable:\n" +
-            "    acme-logger: '" + OLD + "'\n";
+    private static final String NAMED_WORKSPACE_YAML = """
+            packages:
+              - '.'
+            catalogs:
+              stable:
+                acme-logger: '~1.4.1'
+            """;
 
-    private static final String YARNRC = "catalog:\n" +
-            "  acme-logger: '" + OLD + "'\n";
+    private static final String YARNRC = """
+            catalog:
+              acme-logger: '~1.4.1'
+            """;
 
-    private static final String NAMED_YARNRC = "catalogs:\n" +
-            "  stable:\n" +
-            "    acme-logger: '" + OLD + "'\n";
+    private static final String NAMED_YARNRC = """
+            catalogs:
+              stable:
+                acme-logger: '~1.4.1'
+            """;
 
-    private static final String ROOT_JSON = "{\n" +
-            "  \"name\": \"root\",\n" +
-            "  \"version\": \"1.0.0\",\n" +
-            "  \"private\": true\n" +
-            "}\n";
+    private static final String ROOT_JSON = """
+            {
+              "name": "root",
+              "version": "1.0.0",
+              "private": true
+            }
+            """;
 
-    private static final String MEMBER_JSON = "{\n" +
-            "  \"name\": \"member\",\n" +
-            "  \"version\": \"1.0.0\",\n" +
-            "  \"dependencies\": {\n" +
-            "    \"acme-logger\": \"catalog:\"\n" +
-            "  }\n" +
-            "}\n";
+    private static final String MEMBER_JSON = """
+            {
+              "name": "member",
+              "version": "1.0.0",
+              "dependencies": {
+                "acme-logger": "catalog:"
+              }
+            }
+            """;
 
-    private static final String MEMBERS_WORKSPACE_YAML = "packages:\n" +
-            "  - 'packages/*'\n" +
-            "catalog:\n" +
-            "  acme-logger: '" + OLD + "'\n";
+    private static final String MEMBERS_WORKSPACE_YAML = """
+            packages:
+              - 'packages/*'
+            catalog:
+              acme-logger: '~1.4.1'
+            """;
 
-    private static final String PNPM_LOCK = "lockfileVersion: '9.0'\n" +
-            "\n" +
-            "catalogs:\n" +
-            "  default:\n" +
-            "    acme-logger:\n" +
-            "      specifier: '" + OLD + "'\n" +
-            "      version: 1.4.1\n" +
-            "\n" +
-            "importers:\n" +
-            "\n" +
-            "  .:\n" +
-            "    dependencies:\n" +
-            "      acme-logger:\n" +
-            "        specifier: 'catalog:'\n" +
-            "        version: 1.4.1\n";
+    private static final String PNPM_LOCK = """
+            lockfileVersion: '9.0'
+
+            catalogs:
+              default:
+                acme-logger:
+                  specifier: '~1.4.1'
+                  version: 1.4.1
+
+            importers:
+
+              .:
+                dependencies:
+                  acme-logger:
+                    specifier: 'catalog:'
+                    version: 1.4.1
+            """;
 
     static Stream<Arguments> spellings() {
         return Stream.of(

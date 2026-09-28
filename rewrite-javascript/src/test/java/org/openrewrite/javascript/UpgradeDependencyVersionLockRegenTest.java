@@ -144,19 +144,23 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
         );
     }
 
-    private static final String CATALOG_MANIFEST = "{\n" +
-            "  \"name\": \"g1\",\n" +
-            "  \"version\": \"1.0.0\",\n" +
-            "  \"dependencies\": {\n" +
-            "    \"ms\": \"%s\",\n" +
-            "    \"ms-logger\": \"catalog:\"\n" +
-            "  }\n" +
-            "}\n";
+    private static final String CATALOG_MANIFEST = """
+            {
+              "name": "g1",
+              "version": "1.0.0",
+              "dependencies": {
+                "ms": "%s",
+                "ms-logger": "catalog:"
+              }
+            }
+            """;
 
-    private static final String CATALOG_WORKSPACE_YAML = "packages:\n" +
-            "  - '.'\n" +
-            "catalog:\n" +
-            "  ms-logger: '%s'\n";
+    private static final String CATALOG_WORKSPACE_YAML = """
+            packages:
+              - '.'
+            catalog:
+              ms-logger: '%s'
+            """;
 
     /**
      * The pattern matches a plain dependency and a catalog-backed one. The manifest bump regenerates the

@@ -35,30 +35,32 @@ class UpgradeTransitiveDependencyVersionPnpmTest implements RewriteTest {
 
     @Test
     void pnpmOverrideConvergesInOneCycle() {
-        String before = "{\n" +
-                "  \"name\": \"consumer\",\n" +
-                "  \"version\": \"1.0.0\",\n" +
-                "  \"dependencies\": {\n" +
-                "    \"acme-logger\": \"~1.4.1\"\n" +
-                "  }\n" +
-                "}\n";
-
-        String after = "{\n" +
-                "  \"name\": \"consumer\",\n" +
-                "  \"version\": \"1.0.0\",\n" +
-                "  \"dependencies\": {\n" +
-                "    \"acme-logger\": \"~1.4.1\"\n" +
-                "  },\n" +
-                "  \"pnpm\": {\n" +
-                "    \"overrides\": {\n" +
-                "      \"acme-transitive\": \"~2.0.0\"\n" +
-                "    }\n" +
-                "  }\n" +
-                "}\n";
-
         rewriteRun(
                 spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("acme-transitive", "~2.0.0", null)),
-                packageJson(before, after,
+                packageJson(
+                        """
+                        {
+                          "name": "consumer",
+                          "version": "1.0.0",
+                          "dependencies": {
+                            "acme-logger": "~1.4.1"
+                          }
+                        }
+                        """,
+                        """
+                        {
+                          "name": "consumer",
+                          "version": "1.0.0",
+                          "dependencies": {
+                            "acme-logger": "~1.4.1"
+                          },
+                          "pnpm": {
+                            "overrides": {
+                              "acme-transitive": "~2.0.0"
+                            }
+                          }
+                        }
+                        """,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "~1.4.1")))
         );
     }

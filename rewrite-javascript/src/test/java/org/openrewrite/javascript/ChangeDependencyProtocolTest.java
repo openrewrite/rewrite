@@ -39,13 +39,15 @@ import static org.openrewrite.javascript.Assertions.packageJson;
  */
 class ChangeDependencyProtocolTest implements RewriteTest {
 
-    private static final String CATALOG_MANIFEST = "{\n" +
-            "  \"name\": \"consumer\",\n" +
-            "  \"version\": \"1.0.0\",\n" +
-            "  \"dependencies\": {\n" +
-            "    \"acme-logger\": \"catalog:\"\n" +
-            "  }\n" +
-            "}\n";
+    private static final String CATALOG_MANIFEST = """
+            {
+              "name": "consumer",
+              "version": "1.0.0",
+              "dependencies": {
+                "acme-logger": "catalog:"
+              }
+            }
+            """;
 
     @ParameterizedTest
     @NullSource
@@ -82,13 +84,15 @@ class ChangeDependencyProtocolTest implements RewriteTest {
 
     @Test
     void anOrdinaryConstraintIsStillReplaced() {
-        String before = "{\n" +
-                "  \"name\": \"consumer\",\n" +
-                "  \"version\": \"1.0.0\",\n" +
-                "  \"dependencies\": {\n" +
-                "    \"acme-logger\": \"~1.4.1\"\n" +
-                "  }\n" +
-                "}\n";
+        String before = """
+                {
+                  "name": "consumer",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "acme-logger": "~1.4.1"
+                  }
+                }
+                """;
         String after = before.replace("\"acme-logger\": \"~1.4.1\"", "\"acme-log\": \"^2.0.0\"");
 
         rewriteRun(
