@@ -258,9 +258,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                             }
                         }
                     }
-                    // Two independent verdicts about one lock: what the manifest edits produced, and
-                    // whether a catalog edit left it behind. Reporting the second must not discard the
-                    // first, or a plain dependency bumped in the same run loses its regenerated lock.
+                    // Two verdicts about one lock. Reporting the catalog one must not discard the
+                    // regeneration, or a plain dependency bumped in the same run loses its lock.
                     LockFileRegeneration.Result stale = staleCatalogLock(ips);
                     if (ips.regenResult != null && ips.regenResult.isSuccess()) {
                         SourceFile relocked = PackageJsonHelper.reparseLock(sf, ips.regenResult.getLockFileContent());
@@ -301,15 +300,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
     }
 
     /**
-     * A catalog edit leaves this project's lock behind, and the native engine cannot update it: the lock
-     * records the reference verbatim under `importers` and keeps the resolved version in a `catalogs:`
-     * block it has no model for. Refuse loudly rather than leave a lock that still installs the old
-     * version, which pnpm does not report (pnpm/pnpm#9369).
+     * The engine cannot update a lock for a catalog edit: the resolved version lives in a `catalogs:`
+     * block it has no model for. Refuse loudly, because a stale lock still installs the old version and
+     * pnpm does not report the disagreement (pnpm/pnpm#9369).
      */
-    /**
-     * A stale catalog is recomputed every cycle, but the warning must not be: a second marker on a tree
-     * that already carries one is a change, and the recipe would never settle.
-     */
+    /** A second marker on a tree that already carries one is a change, and the recipe would never settle. */
     private static SourceFile warnOnce(SourceFile sf, String message) {
         return sf.getMarkers().findFirst(Markup.Warn.class).isPresent() ?
                 sf :

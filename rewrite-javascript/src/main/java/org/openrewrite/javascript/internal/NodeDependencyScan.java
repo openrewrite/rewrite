@@ -41,11 +41,10 @@ public final class NodeDependencyScan {
     public static final class Accumulator {
         public final Map<Path, ProjectState> projects = new HashMap<>();
         public final Map<Path, Path> lockToPackage = new HashMap<>();
-        /** Workspace files that can declare catalogs, by path. */
         public final Map<Path, Yaml.Documents> workspaceFiles = new HashMap<>();
-        /** The catalog entries judged safe to edit in place, by the workspace file declaring them. */
+        /** The entries to edit, by the workspace file declaring them. */
         public final Map<Path, Set<NodeCatalogs.CatalogEntry>> catalogEdits = new HashMap<>();
-        /** Set whenever the inputs to {@link #decideCatalogEdits} change, so the verdict is recomputed. */
+        /** Cleared once the verdict is computed; set again by anything the verdict reads. */
         public boolean catalogEditsStale = true;
     }
 
@@ -60,7 +59,7 @@ public final class NodeDependencyScan {
         public @Nullable List<MatchedDependency> matchedDeps;
         /** Matched dependencies left alone because their version position holds a specifier protocol. */
         public final List<MatchedDependency> skippedProtocols = new ArrayList<>();
-        /** Catalog entries this manifest consumes that the recipe edited, leaving its lock stale. */
+        /** Entries this manifest consumes that were edited, so its lock is now stale. */
         public final List<NodeCatalogs.CatalogEntry> catalogEntriesEdited = new ArrayList<>();
         public LockFileRegeneration.@Nullable Result regenResult;
         public boolean failureRecorded;
@@ -116,15 +115,12 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * Decide which catalog entries to edit. A manifest that says {@code catalog:} has delegated its
-     * version to the catalog, so moving the entry is what it asked for, and moving it for every member
-     * at once is the point of having one. An entry is edited when it exists and does not already hold
-     * the constraint, and left alone with the skip reported otherwise.
+     * A manifest that says {@code catalog:} has delegated its version, so moving the entry is what it
+     * asked for, and moving it for every member at once is the point of having one.
      */
     public static void decideCatalogEdits(Accumulator acc, String newVersion) {
-        // Called once per source file, so a repository with catalogs must not pay for the whole verdict
-        // on every file it contains. Without a workspace file there is nothing to decide at all, and
-        // otherwise the verdict stands until something it reads changes.
+        // Called once per source file, not once per cycle, so the verdict is computed only when its
+        // inputs have changed.
         if (acc.workspaceFiles.isEmpty() || !acc.catalogEditsStale) {
             return;
         }
@@ -148,9 +144,8 @@ public final class NodeDependencyScan {
                 if (catalogName == null) {
                     continue;
                 }
-                // Ask the edit whether it would change anything rather than predicting it: an absent
-                // entry, one already at the constraint and one that cannot be rewritten all answer the
-                // same way. Recording a no-op would leave consumers answering for a lock nothing staled.
+                // Ask the edit rather than predict it: recording a no-op would leave every consumer
+                // answering for a lock that nothing staled.
                 if (NodeCatalogs.updateEntry(
                         workspaceFile, catalogName, skipped.getPackageName(), newVersion) == workspaceFile) {
                     continue;
@@ -169,7 +164,6 @@ public final class NodeDependencyScan {
         }
     }
 
-    /** True when this reference was followed into a catalog entry rather than left alone. */
     public static boolean isFollowedIntoCatalog(Accumulator acc, Path packageJsonPath, MatchedDependency skipped) {
         String catalogName = NodeCatalogs.catalogReference(skipped.getCurrentVersion());
         if (catalogName == null) {
@@ -184,7 +178,7 @@ public final class NodeDependencyScan {
                 edits.contains(new NodeCatalogs.CatalogEntry(catalogName, skipped.getPackageName()));
     }
 
-    /** The manifests under this workspace file that reference the entry, whose locks go stale with it. */
+    /** Every manifest referencing the entry, because the edit stales each of their locks. */
     private static List<Path> consumersOf(Accumulator acc, Path workspacePath, NodeCatalogs.CatalogEntry entry) {
         List<Path> consumers = new ArrayList<>();
         for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
@@ -203,11 +197,7 @@ public final class NodeDependencyScan {
         return consumers;
     }
 
-    /**
-     * The nearest workspace file at or above a manifest, of the kind this manifest's package manager
-     * keeps catalogs in. Catalogs are scoped to their own workspace, and a repository can hold both a
-     * `pnpm-workspace.yaml` and a `.yarnrc.yml`, so the marker decides which is read.
-     */
+    /** Nearest, because catalogs are scoped to their own workspace; by manager, because both files can exist. */
     private static @Nullable Path governingWorkspaceFile(Accumulator acc, Path manifestPath,
                                                          @Nullable SourceFile packageJson) {
         NodeResolutionResult marker = packageJson == null ? null :

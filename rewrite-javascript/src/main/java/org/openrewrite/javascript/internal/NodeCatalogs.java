@@ -39,7 +39,6 @@ public class NodeCatalogs {
     /** The default catalog has no name; {@code catalog:strict} names one. */
     public static final String DEFAULT_CATALOG = "";
 
-    /** A catalog entry's coordinates within a workspace file. */
     @Value
     public static class CatalogEntry {
         String catalogName;
@@ -50,11 +49,7 @@ public class NodeCatalogs {
     private static final String DEFAULT_CATALOG_KEY = "catalog";
     private static final String NAMED_CATALOGS_KEY = "catalogs";
 
-    /**
-     * Plain scalars YAML resolves to something other than a string. A bare-major or major.minor npm
-     * range (`2`, `2.0`) is the reachable case; the rest are here so the rule is the general one rather
-     * than the cases that happened to come up.
-     */
+    /** Plain scalars YAML resolves to something other than a string; `2` and `2.0` are valid npm ranges. */
     private static final Pattern YAML_NON_STRING = Pattern.compile(
             "[-+]?(\\.[0-9][0-9_]*|[0-9][0-9_]*(\\.[0-9_]*)?)([eE][-+]?[0-9]+)?" +
                     "|[-+]?0[xXbBoO][0-9a-fA-F_]+" +
@@ -62,22 +57,16 @@ public class NodeCatalogs {
                     "|~|[nN]ull|NULL" +
                     "|[tT]rue|TRUE|[fF]alse|FALSE|[yY]es|YES|[nN]o|NO|[oO]n|ON|[oO]ff|OFF");
 
-    /** Characters YAML reads as an indicator when a plain scalar opens with one. */
     private static final String PLAIN_SCALAR_INDICATORS = "-?:,[]{}#&*!|>'\"%@`";
 
     private static final String PNPM_WORKSPACE_FILE = "pnpm-workspace.yaml";
     private static final String YARN_WORKSPACE_FILE = ".yarnrc.yml";
 
-    /** True when the basename is a workspace file that can declare catalogs. */
     public static boolean isWorkspaceFile(String basename) {
         return PNPM_WORKSPACE_FILE.equals(basename) || YARN_WORKSPACE_FILE.equals(basename);
     }
 
-    /**
-     * The workspace file a manager keeps its catalogs in, or null for a manager that has none. A
-     * repository can contain both files, so the manager decides which one is read rather than whichever
-     * happens to be present.
-     */
+    /** A repository can contain both files, so the manager decides which is read, not whichever exists. */
     public static @Nullable String workspaceFileFor(@Nullable PackageManager pm) {
         if (pm == PackageManager.Pnpm) {
             return PNPM_WORKSPACE_FILE;
@@ -85,10 +74,7 @@ public class NodeCatalogs {
         return pm == PackageManager.YarnBerry ? YARN_WORKSPACE_FILE : null;
     }
 
-    /**
-     * The catalog a manifest's version position refers to, or null when it holds something else. Returns
-     * {@link #DEFAULT_CATALOG} for the bare {@code catalog:} and the name for {@code catalog:<name>}.
-     */
+    /** The catalog a version position refers to, {@link #DEFAULT_CATALOG} for a bare {@code catalog:}. */
     public static @Nullable String catalogReference(@Nullable String value) {
         return CATALOG_PROTOCOL.equals(PackageJsonHelper.dependencySpecifierProtocol(value)) ?
                 value.substring(CATALOG_PROTOCOL.length()) :
@@ -96,9 +82,8 @@ public class NodeCatalogs {
     }
 
     /**
-     * Set a catalog entry's version, returning {@code workspaceFile} unchanged when the entry is absent or
-     * already holds {@code newVersion}. Rewriting the scalar in place keeps its quoting style, so
-     * {@code '~1.4.1'} becomes {@code '~1.5.0'} rather than losing its quotes.
+     * Returns {@code workspaceFile} unchanged when nothing needs writing, which callers rely on to tell a
+     * real edit from a no-op. Rewriting the scalar in place is what preserves its quoting style.
      */
     public static SourceFile updateEntry(SourceFile workspaceFile, String catalogName, String packageName,
                                          String newVersion) {
@@ -124,7 +109,7 @@ public class NodeCatalogs {
         return changed ? documents.withDocuments(updated) : workspaceFile;
     }
 
-    /** Apply {@code f} to the mapping under {@code key}, returning {@code mapping} itself when nothing changed. */
+    /** Returns {@code mapping} itself when nothing changed, so callers can compare by identity. */
     private static Yaml.Mapping withMapping(Yaml.Mapping mapping, String key, UnaryOperator<Yaml.Mapping> f) {
         List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
         for (int i = 0; i < entries.size(); i++) {
@@ -167,13 +152,9 @@ public class NodeCatalogs {
     }
 
     /**
-     * Whether a value can stand unquoted where the old one did. An npm range may open with a character
-     * YAML reads as an indicator, so keeping the old scalar's style would emit something that no longer
-     * parses: `>=2.0.0` reads as a folded block scalar and `*` as an alias. It can also be a value YAML
-     * parses but resolves to another type, leaving a number where the catalog wants a version.
-     * <p>
-     * rewrite-yaml knows this rule too, but only in its `internal` package, which is not API and may
-     * move without notice. The rule is short and stable enough to state here rather than couple to it.
+     * An npm range can open with a YAML indicator (`>=2.0.0` reads as a folded scalar, `*` as an alias) or
+     * resolve to another type (`2` as an integer), so an entry that was unquoted cannot always stay that
+     * way. rewrite-yaml has this rule too, but only in its `internal` package, which is not API.
      */
     static boolean canBePlainScalar(String value) {
         if (value.isEmpty() || "---".equals(value) || "...".equals(value)) {
