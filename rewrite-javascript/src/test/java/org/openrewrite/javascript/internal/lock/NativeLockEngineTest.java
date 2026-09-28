@@ -949,8 +949,23 @@ class NativeLockEngineTest {
 
     @Test
     void unrelatedAddIsUnaffectedByAnExistingBunOverride() {
-        assertUnrelatedAddSucceeds(PackageManager.Bun, "\"overrides\":{\"shared\":\"^2.0.0\"}",
-                """
+        assertUnrelatedAddSucceeds(PackageManager.Bun, "\"overrides\":{\"shared\":\"^2.0.0\"}", bunLock());
+    }
+
+    /** Bun honours yarn's {@code resolutions} as well as {@code overrides}, and applies neither here yet. */
+    @Test
+    void reachedBunResolutionFailsLoud() {
+        Result result = regen(PackageManager.Bun,
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"resolutions\":{\"shared\":\"^2.0.0\"}}",
+                bunLock());
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("override shared reaches shared but is not yet applied for Bun");
+    }
+
+    private static String bunLock() {
+        return """
                 {
                   "lockfileVersion": 1,
                   "configVersion": 1,
@@ -968,7 +983,7 @@ class NativeLockEngineTest {
                     "shared": ["shared@2.0.0", "", {}, "sha512-SHARED2"],
                   }
                 }
-                """);
+                """;
     }
 
     @Test

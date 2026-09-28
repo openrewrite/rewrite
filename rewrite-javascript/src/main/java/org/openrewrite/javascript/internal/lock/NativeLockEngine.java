@@ -429,27 +429,41 @@ public final class NativeLockEngine {
      */
     private static Overrides declaredOverrides(PackageManager pm, String manifestJson) {
         Overrides overrides = new Overrides();
-        JsonNode node = overridesNode(pm, manifestJson);
-        if (node != null && pm == PackageManager.Npm) {
-            collectNpmOverrides(node, null, overrides);
-        } else if (node != null) {
-            collectKeyedOverrides(node, null, overrides);
+        for (JsonNode node : overridesNodes(pm, manifestJson)) {
+            if (pm == PackageManager.Npm) {
+                collectNpmOverrides(node, null, overrides);
+            } else {
+                collectKeyedOverrides(node, null, overrides);
+            }
         }
         return overrides;
     }
 
-    /** The manifest's override object for {@code pm}, or {@code null} when it declares none usable. */
-    private static @Nullable JsonNode overridesNode(PackageManager pm, String manifestJson) {
+    /** The manifest's override objects for {@code pm}; bun honours yarn's {@code resolutions} as well as npm's. */
+    private static List<JsonNode> overridesNodes(PackageManager pm, String manifestJson) {
+        JsonNode root;
         try {
-            JsonNode root = JSON.readTree(manifestJson);
-            JsonNode node = pm == PackageManager.Pnpm ?
-                    (root.path("pnpm").isObject() ? root.path("pnpm").get("overrides") : null) :
-                    root.get(pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic ?
-                            "resolutions" : "overrides");
-            return node == null || !node.isObject() || node.isEmpty() ? null : node;
+            root = JSON.readTree(manifestJson);
         } catch (Exception e) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest overrides");
         }
+        List<JsonNode> candidates;
+        if (pm == PackageManager.Pnpm) {
+            candidates = singletonList(root.path("pnpm").path("overrides"));
+        } else if (pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic) {
+            candidates = singletonList(root.path("resolutions"));
+        } else if (pm == PackageManager.Bun) {
+            candidates = Arrays.asList(root.path("overrides"), root.path("resolutions"));
+        } else {
+            candidates = singletonList(root.path("overrides"));
+        }
+        List<JsonNode> nodes = new ArrayList<>();
+        for (JsonNode node : candidates) {
+            if (node.isObject() && !node.isEmpty()) {
+                nodes.add(node);
+            }
+        }
+        return nodes;
     }
 
     private static void collectNpmOverrides(JsonNode node, @Nullable String parent, Overrides overrides) {
