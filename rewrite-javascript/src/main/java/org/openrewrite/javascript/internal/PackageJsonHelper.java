@@ -379,8 +379,12 @@ public class PackageJsonHelper {
         if (inner == null) {
             Json.JsonObject innerObj = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
                     Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
-            return doc.withValue(replaceMember(root, outerKey,
-                    appendMember(outer, makeMember(innerKey, innerObj, Space.EMPTY))));
+            // The JSON parser represents {} as a single Json.Empty member, which an append would print as {,}.
+            Json.JsonObject updatedOuter = outer.getMembers().stream().allMatch(m -> m instanceof Json.Empty) ?
+                    newObjectHolding(makeMember(innerKey, innerObj, Space.build("\n" + indent + indent, emptyList())),
+                            indent).withPrefix(outer.getPrefix()) :
+                    appendMember(outer, makeMember(innerKey, innerObj, Space.EMPTY));
+            return doc.withValue(replaceMember(root, outerKey, updatedOuter));
         }
 
         for (Json m : inner.getMembers()) {
@@ -395,7 +399,6 @@ public class PackageJsonHelper {
                     replaceMember(outer, innerKey, replaceMember(inner, entryKey, newLit))));
         }
 
-        // The TypeScript JSON parser represents {} as a single Json.Empty member.
         Json.JsonObject updatedInner;
         if (inner.getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
             updatedInner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),

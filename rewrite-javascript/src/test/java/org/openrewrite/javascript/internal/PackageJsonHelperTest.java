@@ -219,6 +219,73 @@ class PackageJsonHelperTest {
     }
 
     @Test
+    void aNestedOverrideKeepsThePinsItLandsOn() {
+        List<DependencyPathSegment> underExpress = PackageJsonOverrides.parsePath("express");
+
+        Json.Document parentPinned = PackageJsonHelper.upgradeTransitive(parsePackageJson("""
+                {
+                  "overrides": {
+                    "express": "4.18.2"
+                  }
+                }
+                """), NodeResolutionResult.PackageManager.Npm, "accepts", "1.3.8", underExpress);
+        assertThat(parentPinned.printAll()).isEqualTo("""
+                {
+                  "overrides": {
+                    "express": {
+                      ".": "4.18.2",
+                      "accepts": "1.3.8"
+                    }
+                  }
+                }
+                """);
+
+        Json.Document childNested = PackageJsonHelper.upgradeTransitive(parsePackageJson("""
+                {
+                  "overrides": {
+                    "express": {
+                      "accepts": {
+                        ".": "1.3.7",
+                        "negotiator": "0.6.3"
+                      }
+                    }
+                  }
+                }
+                """), NodeResolutionResult.PackageManager.Npm, "accepts", "1.3.8", underExpress);
+        assertThat(childNested.printAll()).isEqualTo("""
+                {
+                  "overrides": {
+                    "express": {
+                      "accepts": {
+                        ".": "1.3.8",
+                        "negotiator": "0.6.3"
+                      }
+                    }
+                  }
+                }
+                """);
+    }
+
+    @Test
+    void aNestedOverrideAlreadyPinnedUnderDotIsLeftAlone() {
+        Json.Document doc = parsePackageJson("""
+                {
+                  "overrides": {
+                    "express": {
+                      "accepts": {
+                        ".": "1.3.8",
+                        "negotiator": "0.6.3"
+                      }
+                    }
+                  }
+                }
+                """);
+
+        assertThat(PackageJsonHelper.upgradeTransitive(doc, NodeResolutionResult.PackageManager.Npm,
+                "accepts", "1.3.8", PackageJsonOverrides.parsePath("express"))).isSameAs(doc);
+    }
+
+    @Test
     void compileGlobPatternMatchesWildcard() {
         java.util.regex.Pattern p = PackageJsonHelper.compileGlobPattern("@types/*");
         assertThat(p.matcher("@types/node").matches()).isTrue();

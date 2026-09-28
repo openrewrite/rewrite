@@ -912,15 +912,53 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
     }
 
+    /** npm's documented way to override a direct dependency, so a bump of that dependency moves the override with it. */
     @Test
-    void overrideReferencingADeclaredDependencyFailsLoud() {
+    void aReferenceOverrideFollowsTheDirectDependencyItNames() {
+        routes.put("https://registry.npmjs.org/lodash", """
+                {"versions": {"4.17.20": {}, "4.17.21": {}}}""");
+        routes.put("https://registry.npmjs.org/lodash/4.17.20", """
+                {"name": "lodash", "version": "4.17.20", "dependencies": {}}""");
+        routes.put("https://registry.npmjs.org/lodash/4.17.21", """
+                {"name": "lodash", "version": "4.17.21", "dependencies": {},
+                 "dist": {"tarball": "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz", "integrity": "sha512-NEW"}}""");
+
+        String lock = """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20"}},
+                    "node_modules/lodash": {"version": "4.17.20", "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz", "integrity": "sha512-OLD"}
+                  }
+                }
+                """;
+
         Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib\":\"$lodash\"}}",
+                """
+                {"dependencies": {"lodash": "^4.17.20"}, "overrides": {"lodash": "$lodash"}}""",
+                """
+                {"dependencies": {"lodash": "^4.17.21"}, "overrides": {"lodash": "$lodash"}}""",
+                lock);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent())
+                .isEqualTo(lock.replace("4.17.20", "4.17.21").replace("sha512-OLD", "sha512-NEW"));
+    }
+
+    /** npm itself rejects a reference to a package the root does not depend on directly. */
+    @Test
+    void overrideReferencingAnUndeclaredDependencyFailsLoud() {
+        Result result = regen(PackageManager.Npm,
+                """
+                {"dependencies": {"lodash": "^4.17.20"}}""",
+                """
+                {"dependencies": {"lodash": "^4.17.20"}, "overrides": {"tslib": "$missing"}}""",
                 npmLock("4.17.20"));
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("is not a version range");
+        assertThat(result.getFailure().getDetail())
+                .isEqualTo("override of tslib references $missing, which is not a direct dependency");
     }
 
     /** Only npm applies overrides so far; the rest refuse rather than emit an untested lock. */
@@ -1693,6 +1731,17 @@ class NativeLockEngineTest {
                 .isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
                         singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express@4.18.2")))
                 .withMessageContaining("express resolved to 5.0.0");
+    }
+
+    /** npm reads the selector as a range, as it does any spec after the {@code @}. */
+    @Test
+    void rangeSelectedParentHoldsWhenTheParentSatisfiesIt() {
+        ResolutionGraph graph = graphOf(emptyMap(),
+                node("express", "4.18.2", singletonMap("accepts", "1.3.8")),
+                node("accepts", "1.3.8", emptyMap()));
+
+        assertThatNoException().isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
+                singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express@^4.0.0")));
     }
 
     private static ResolutionGraph graphOf(Map<String, Map<String, String>> rootDeclared, ResolvedNode... nodes) {

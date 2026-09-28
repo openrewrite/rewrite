@@ -413,8 +413,27 @@ public final class NativeLockEngine {
         }
         Map<String, String> overrides = new LinkedHashMap<>();
         Map<String, String> scopedParent = new LinkedHashMap<>();
-        collectOverrides(node, null, overrides, scopedParent);
+        collectOverrides(node, null, directDependencySpecs(manifestJson), overrides, scopedParent);
         return new Overrides(overrides, scopedParent);
+    }
+
+    /** What a {@code $name} override value stands for: the root's own spec for that direct dependency. */
+    private static Map<String, String> directDependencySpecs(String manifestJson) {
+        Map<String, String> specs = new LinkedHashMap<>();
+        try {
+            JsonNode root = JSON.readTree(manifestJson);
+            for (String scope : new String[]{"dependencies", "devDependencies", "optionalDependencies",
+                    "peerDependencies"}) {
+                for (Map.Entry<String, JsonNode> dep : root.path(scope).properties()) {
+                    if (dep.getValue().isTextual()) {
+                        specs.putIfAbsent(dep.getKey(), dep.getValue().asText());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest dependencies");
+        }
+        return specs;
     }
 
     private static @Nullable JsonNode overridesNode(PackageManager pm, String manifestJson) {
@@ -476,7 +495,7 @@ public final class NativeLockEngine {
         }
     }
 
-    private static void collectOverrides(JsonNode node, @Nullable String parent,
+    private static void collectOverrides(JsonNode node, @Nullable String parent, Map<String, String> directSpecs,
                                          Map<String, String> overrides, Map<String, String> scopedParent) {
         for (Map.Entry<String, JsonNode> property : node.properties()) {
             String key = property.getKey();
@@ -492,14 +511,22 @@ public final class NativeLockEngine {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                             "override nested under " + parent + " is not supported");
                 }
-                collectOverrides(value, key, overrides, scopedParent);
+                collectOverrides(value, key, directSpecs, overrides, scopedParent);
                 continue;
             }
-            if (!value.isTextual() || !Semver.validate(value.asText(), null, NODE).isValid()) {
+            String spec = value.isTextual() ? value.asText() : null;
+            if (spec != null && spec.startsWith("$")) {
+                spec = directSpecs.get(spec.substring(1));
+                if (spec == null) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key, "override of " + key + " references " +
+                            value.asText() + ", which is not a direct dependency");
+                }
+            }
+            if (spec == null || !Semver.validate(spec, null, NODE).isValid()) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                         "override of " + key + " is not a version range");
             }
-            if (overrides.put(key, value.asText()) != null) {
+            if (overrides.put(key, spec) != null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                         "override of " + key + " is declared more than once");
             }
@@ -546,7 +573,7 @@ public final class NativeLockEngine {
             if (wantVersion != null) {
                 for (ResolvedNode n : graph.getNodes().values()) {
                     if (parent.equals(n.getManifest().getName()) &&
-                            !wantVersion.equals(n.getManifest().getVersion())) {
+                            !Semver.satisfies(n.getManifest().getVersion(), wantVersion, NODE)) {
                         throw new EngineFailure(Reason.RESOLUTION_REQUIRED, child,
                                 "override of " + child + " scoped to " + e.getValue() + " but " + parent +
                                         " resolved to " + n.getManifest().getVersion());

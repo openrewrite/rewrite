@@ -137,8 +137,8 @@ public final class PackageJsonOverrides {
      * dispatching on the package manager dialect.
      * <p>
      * For the no-path (global) case, formatting is preserved via
-     * {@link PackageJsonHelper}'s mutation helpers. For deep-nested paths the
-     * document is re-serialised and re-parsed (acceptable per spec).
+     * {@link PackageJsonHelper}'s mutation helpers. For npm's nested paths only
+     * the {@code overrides} member is re-rendered.
      */
     public static Json.Document applyOverride(Json.Document doc,
                                               PackageManager pm,
@@ -175,8 +175,8 @@ public final class PackageJsonOverrides {
             return setFlatEntry(doc, "overrides", packageName, newVersion);
         }
 
-        // The reparse below rebuilds the whole document, so without this the entry is rewritten on every cycle
-        // and the recipe never stabilises. Same guard setFlatEntry applies to the un-nested case.
+        // setNestedOverride re-renders the whole overrides member, so without this the entry is rewritten on every
+        // cycle and the recipe never stabilises. Same guard setFlatEntry applies to the un-nested case.
         if (newVersion.equals(nestedOverrideValue(doc, path, packageName))) {
             return doc;
         }
@@ -197,12 +197,27 @@ public final class PackageJsonOverrides {
             ObjectNode overrides = rootNode.path("overrides").isObject() ?
                     (ObjectNode) rootNode.get("overrides") : mapper.createObjectNode();
 
+            // npm pins a package that also carries nested overrides under ".", which is where a pin standing on
+            // the path, or on the leaf, is kept.
             ObjectNode at = overrides;
             for (DependencyPathSegment seg : path) {
                 String key = seg.getVersion() != null ? seg.getName() + "@" + seg.getVersion() : seg.getName();
-                at = at.path(key).isObject() ? (ObjectNode) at.get(key) : at.putObject(key);
+                JsonNode existing = at.get(key);
+                if (existing != null && existing.isObject()) {
+                    at = (ObjectNode) existing;
+                } else {
+                    ObjectNode nested = at.putObject(key);
+                    if (existing != null && existing.isTextual()) {
+                        nested.put(".", existing.asText());
+                    }
+                    at = nested;
+                }
             }
-            at.put(packageName, newVersion);
+            if (at.path(packageName).isObject()) {
+                ((ObjectNode) at.get(packageName)).put(".", newVersion);
+            } else {
+                at.put(packageName, newVersion);
+            }
 
             JsonValue value = parseFragment(doc, mapper, overrides, indent);
             if (value == null) {
@@ -271,33 +286,14 @@ public final class PackageJsonOverrides {
         if (at == null) {
             return null;
         }
-        for (Json m : at.getMembers()) {
-            if (m instanceof Json.Member && packageName.equals(literalString(((Json.Member) m).getKey()))) {
+        Json.JsonObject pinned = findObjectMember(at, packageName);
+        String key = pinned == null ? packageName : ".";
+        for (Json m : (pinned == null ? at : pinned).getMembers()) {
+            if (m instanceof Json.Member && key.equals(literalString(((Json.Member) m).getKey()))) {
                 return literalString(((Json.Member) m).getValue());
             }
         }
         return null;
-    }
-
-    /**
-     * Builds a JSON object string for an npm nested override, e.g.:
-     * {@code {"express":{"accepts":"^2.0.0"}}}.
-     */
-    private static String buildNpmNestedOverride(String packageName, String newVersion,
-                                                  List<DependencyPathSegment> path) {
-        // Innermost value
-        StringBuilder sb = new StringBuilder();
-        sb.append(jsonString(packageName)).append(": ").append(jsonString(newVersion));
-
-        // Wrap from inside out
-        for (int i = path.size() - 1; i >= 0; i--) {
-            DependencyPathSegment seg = path.get(i);
-            String key = seg.getVersion() != null
-                    ? seg.getName() + "@" + seg.getVersion()
-                    : seg.getName();
-            sb.insert(0, jsonString(key) + ": {").append("}");
-        }
-        return "{" + sb + "}";
     }
 
     // -------------------------------------------------------------------------
@@ -393,60 +389,6 @@ public final class PackageJsonOverrides {
     }
 
     // -------------------------------------------------------------------------
-    // Reparse-based helpers (used for deep-nested cases)
-    // -------------------------------------------------------------------------
-
-    /**
-     * Merges {@code newObjectJson} into the existing {@code topLevelKey} object
-     * (or creates it) by re-serializing the whole document.
-     */
-    private static Json.Document mergeTopLevelObjectReparse(Json.Document doc,
-                                                             String topLevelKey,
-                                                             String newObjectJson) {
-        String serialized = doc.printAll();
-        // Use Jackson-style logic: parse as map, merge, re-serialize.
-        // Simpler: build string from scratch using the existing document as source.
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper =
-                    new com.fasterxml.jackson.databind.ObjectMapper();
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> root =
-                    mapper.readValue(serialized, java.util.Map.class);
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> newFragment =
-                    mapper.readValue(newObjectJson, java.util.Map.class);
-
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> existing =
-                    (java.util.Map<String, Object>) root.getOrDefault(topLevelKey, new java.util.LinkedHashMap<>());
-            java.util.Map<String, Object> merged = mergeDeep(existing, newFragment);
-            root.put(topLevelKey, merged);
-
-            String newJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
-            return PackageJsonHelper.reparseJson(doc, newJson);
-        } catch (Exception e) {
-            return doc;
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static java.util.Map<String, Object> mergeDeep(java.util.Map<String, Object> base,
-                                                             java.util.Map<String, Object> overlay) {
-        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>(base);
-        for (java.util.Map.Entry<String, Object> e : overlay.entrySet()) {
-            Object existing = result.get(e.getKey());
-            if (existing instanceof java.util.Map && e.getValue() instanceof java.util.Map) {
-                result.put(e.getKey(), mergeDeep(
-                        (java.util.Map<String, Object>) existing,
-                        (java.util.Map<String, Object>) e.getValue()));
-            } else {
-                result.put(e.getKey(), e.getValue());
-            }
-        }
-        return result;
-    }
-
-    // -------------------------------------------------------------------------
     // Tiny JSON helpers (avoid importing full JsonHelper as these are static utils)
     // -------------------------------------------------------------------------
 
@@ -506,9 +448,5 @@ public final class PackageJsonOverrides {
                 Space.EMPTY,
                 org.openrewrite.marker.Markers.EMPTY,
                 "\"" + value + "\"", value);
-    }
-
-    private static String jsonString(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 }
