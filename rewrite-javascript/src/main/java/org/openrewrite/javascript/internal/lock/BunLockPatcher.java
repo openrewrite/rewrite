@@ -46,8 +46,8 @@ import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.K
  * so the patch is targeted {@link Json.Literal} replacement: each moving package's {@code packages} tuple
  * locator ({@code "name@ver"}, element 0) and integrity (element 3) are rewritten and its {@code workspaces[dir]}
  * constraint re-pinned. Bun stores integrity only (no {@code resolved} URL), so element 1 and the metadata (2) stay.
- * The top-level {@code overrides} object is never written; {@code NativeLockEngine.requireRecordedOverridesMatch}
- * refuses any lock where that would matter.
+ * The top-level {@code overrides} object is never written; {@code NativeLockEngine.requireOverridesUnchanged}
+ * refuses any edit that would change it.
  */
 public final class BunLockPatcher implements LockPatcher {
 

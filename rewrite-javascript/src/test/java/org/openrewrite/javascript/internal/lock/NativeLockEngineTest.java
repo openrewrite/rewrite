@@ -987,42 +987,6 @@ class NativeLockEngineTest {
                 bunUnrelatedAddLock("  \"overrides\": {\n    \"shared\": \"^2.0.0\",\n  },\n"));
     }
 
-    @Test
-    void anAppliedOverrideIsRefusedOnOtherPackageManagers() {
-        routes.put("https://registry.npmjs.org/alpha",
-                "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/alpha/1.0.0",
-                "{\"name\":\"alpha\",\"version\":\"1.0.0\",\"dependencies\":{\"shared\":\"^1.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\",\"integrity\":\"sha512-ALPHA1\"}}");
-        routes.put("https://registry.npmjs.org/shared",
-                "{\"name\":\"shared\",\"dist-tags\":{},\"versions\":{\"1.5.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/shared/1.5.0",
-                "{\"name\":\"shared\",\"version\":\"1.5.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/shared/-/shared-1.5.0.tgz\",\"integrity\":\"sha512-SHARED\"}}");
-        routes.put("https://registry.npmjs.org/shared/2.0.0",
-                "{\"name\":\"shared\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/shared/-/shared-2.0.0.tgz\",\"integrity\":\"sha512-SHARED2\"}}");
-
-        String lock = "lockfileVersion: '9.0'\n\n" +
-                "settings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\n" +
-                "importers:\n\n  .:\n    dependencies:\n" +
-                "      alpha:\n        specifier: ^1.0.0\n        version: 1.0.0\n\n" +
-                "packages:\n\n" +
-                "  alpha@1.0.0:\n    resolution: {integrity: sha512-ALPHA1}\n\n" +
-                "  shared@1.5.0:\n    resolution: {integrity: sha512-SHARED}\n\n" +
-                "snapshots:\n\n" +
-                "  alpha@1.0.0:\n    dependencies:\n      shared: 1.5.0\n\n" +
-                "  shared@1.5.0: {}\n";
-
-        Result result = regen(PackageManager.Pnpm,
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"pnpm\":{\"overrides\":{\"shared\":\"^2.0.0\"}}}",
-                lock);
-
-        // The lock was installed without the override, so it is refused before resolution is attempted.
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail())
-                .isEqualTo("the lock's overrides section disagrees with the manifest on shared");
-    }
-
     /**
      * The same two-requirer shape, but global rather than scoped. Every
      * requirement is rewritten, so both dedupe onto one version and no second copy is needed.
@@ -1361,7 +1325,7 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail())
-                .isEqualTo("the lock's overrides section disagrees with the manifest on not-in-this-tree");
+                .isEqualTo("the edit may change the lock's overrides section, which is not written yet");
     }
 
     @Test
@@ -1659,33 +1623,55 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).isEqualTo("overrides are not yet applied for Bun");
     }
 
-    /** Bun does not merge: a non-empty overrides field hides resolutions whole, so beta is not overridden. */
+    /** Bun does not merge: an overrides field, even an empty one, hides resolutions whole, so beta is not overridden. */
     @Test
     void aBunOverridesFieldHidesResolutions() {
         assertUnrelatedAddSucceeds(PackageManager.Bun,
-                "\"overrides\":{\"not-in-this-tree\":\"^9.0.0\"},\"resolutions\":{\"beta\":\"^9.0.0\"}",
-                bunUnrelatedAddLock("  \"overrides\": {\n    \"not-in-this-tree\": \"^9.0.0\",\n  },\n"));
+                """
+                "overrides": {}, "resolutions": {"beta": "^9.0.0"}""",
+                bunUnrelatedAddLock(""));
     }
 
+    /** The lock records what {@code $alpha} stood for, so moving alpha moves the section. */
     @Test
-    void aBunLockRecordingADifferentOverrideRefuses() {
-        Result result = unrelatedAdd(PackageManager.Bun, "\"overrides\":{\"shared\":\"^2.0.0\"}",
-                bunUnrelatedAddLock("  \"overrides\": {\n    \"shared\": \"^1.0.0\",\n  },\n"));
+    void bumpingAReferencedDependencyRefusesOnPnpm() {
+        Result result = regen(PackageManager.Pnpm,
+                """
+                {"dependencies": {"alpha": "^1.0.0"}, "pnpm": {"overrides": {"alpha": "$alpha"}}}""",
+                """
+                {"dependencies": {"alpha": "^1.0.1"}, "pnpm": {"overrides": {"alpha": "$alpha"}}}""",
+                pnpmUnrelatedAddLock("""
+                        overrides:
+                          alpha: ^1.0.0
+
+                        """));
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail())
-                .isEqualTo("the lock's overrides section disagrees with the manifest on shared");
+                .isEqualTo("the edit may change the lock's overrides section, which is not written yet");
     }
 
     /**
-     * The lock records the same overrides in another order. shared would be refused on the whole-closure scope,
-     * where it moves a resolution, so success here is the per-dependency patch.
+     * An override the lock records but this manifest does not declare still bounds the edit: one declared at a
+     * workspace root, or in pnpm 11's pnpm-workspace.yaml, which the engine does not read.
      */
     @Test
-    void aLockRecordingTheSameOverridesRegenerates() {
-        assertUnrelatedAddSucceeds(PackageManager.Pnpm,
-                "\"pnpm\":{\"overrides\":{\"shared\":\"^2.0.0\",\"not-in-this-tree\":\"^9.0.0\"}}",
-                pnpmUnrelatedAddLock("overrides:\n  not-in-this-tree: ^9.0.0\n  shared: ^2.0.0\n\n"));
+    void anOverrideOnlyTheLockRecordsStillBoundsTheEdit() {
+        Result pnpm = unrelatedAdd(PackageManager.Pnpm, "\"private\":true", pnpmUnrelatedAddLock("""
+                overrides:
+                  beta: ^1.0.0
+
+                """));
+        assertThat(pnpm.isSuccess()).isFalse();
+        assertThat(pnpm.getFailure().getDetail()).isEqualTo("the closure contains beta, which an override selector reaches");
+
+        Result bun = unrelatedAdd(PackageManager.Bun, "\"private\":true", bunUnrelatedAddLock("""
+                  "overrides": {
+                    "beta": "^1.0.0",
+                  },
+                """));
+        assertThat(bun.isSuccess()).isFalse();
+        assertThat(bun.getFailure().getDetail()).isEqualTo("the closure contains beta, which an override selector reaches");
     }
 
     private Result unrelatedAdd(PackageManager pm, String overrides, String lock) {
