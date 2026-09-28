@@ -45,6 +45,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -855,6 +856,7 @@ public class RewriteRpc {
             }
 
             // If we get here, we've hit the total timeout
+            future.completeExceptionally(new TimeoutException());
             throw new RuntimeException("Request timed out after " + timeout.getSeconds() + " seconds");
         } catch (RuntimeException e) {
             // Check if process crashed during the request
