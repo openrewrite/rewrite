@@ -148,10 +148,11 @@ public final class NodeDependencyScan {
                 if (catalogName == null) {
                     continue;
                 }
-                // An entry already holding the constraint is not an edit: recording one would leave every
-                // consumer answering for a lock that nothing made stale.
-                String current = NodeCatalogs.findEntry(workspaceFile, catalogName, skipped.getPackageName());
-                if (current == null || newVersion.equals(current)) {
+                // Ask the edit whether it would change anything rather than predicting it: an absent
+                // entry, one already at the constraint and one that cannot be rewritten all answer the
+                // same way. Recording a no-op would leave consumers answering for a lock nothing staled.
+                if (NodeCatalogs.updateEntry(
+                        workspaceFile, catalogName, skipped.getPackageName(), newVersion) == workspaceFile) {
                     continue;
                 }
                 NodeCatalogs.CatalogEntry entry =

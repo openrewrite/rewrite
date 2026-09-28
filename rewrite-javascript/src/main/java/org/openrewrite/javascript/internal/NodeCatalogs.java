@@ -95,19 +95,6 @@ public class NodeCatalogs {
                 null;
     }
 
-    /** The constraint a catalog declares for a package, or null when the catalog or the entry is absent. */
-    public static @Nullable String findEntry(Yaml.Documents workspaceFile, String catalogName, String packageName) {
-        for (Yaml.Document document : workspaceFile.getDocuments()) {
-            if (!(document.getBlock() instanceof Yaml.Mapping)) continue;
-            Yaml.Mapping catalog = catalogMapping((Yaml.Mapping) document.getBlock(), catalogName);
-            Yaml.Scalar entry = catalog == null ? null : childScalar(catalog, packageName);
-            if (entry != null) {
-                return entry.getValue();
-            }
-        }
-        return null;
-    }
-
     /**
      * Set a catalog entry's version, returning {@code workspaceFile} unchanged when the entry is absent or
      * already holds {@code newVersion}. Rewriting the scalar in place keeps its quoting style, so
@@ -135,32 +122,6 @@ public class NodeCatalogs {
             }
         }
         return changed ? documents.withDocuments(updated) : workspaceFile;
-    }
-
-    private static Yaml.@Nullable Mapping catalogMapping(Yaml.Mapping root, String catalogName) {
-        if (DEFAULT_CATALOG.equals(catalogName)) {
-            return childMapping(root, DEFAULT_CATALOG_KEY);
-        }
-        Yaml.Mapping catalogs = childMapping(root, NAMED_CATALOGS_KEY);
-        return catalogs == null ? null : childMapping(catalogs, catalogName);
-    }
-
-    private static Yaml.@Nullable Mapping childMapping(Yaml.Mapping mapping, String key) {
-        for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-            if (key.equals(entry.getKey().getValue()) && entry.getValue() instanceof Yaml.Mapping) {
-                return (Yaml.Mapping) entry.getValue();
-            }
-        }
-        return null;
-    }
-
-    private static Yaml.@Nullable Scalar childScalar(Yaml.Mapping mapping, String key) {
-        for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-            if (key.equals(entry.getKey().getValue()) && entry.getValue() instanceof Yaml.Scalar) {
-                return (Yaml.Scalar) entry.getValue();
-            }
-        }
-        return null;
     }
 
     /** Apply {@code f} to the mapping under {@code key}, returning {@code mapping} itself when nothing changed. */
