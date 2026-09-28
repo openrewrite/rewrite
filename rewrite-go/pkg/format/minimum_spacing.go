@@ -65,7 +65,7 @@ func (v *MinimumViableSpacingVisitor) VisitCompilationUnit(cu *golang.Compilatio
 	// first one needs the same line break as the rest.
 	if cu.Imports != nil && cu.Imports.Before.IsEmpty() {
 		imports := *cu.Imports
-		imports.Before = java.Space{Whitespace: "\n"}
+		imports.Before = java.MakeSpace(nil, "\n")
 		out.Imports = &imports
 	}
 	out.Statements = separateStatements(cu.Statements, true)
@@ -199,7 +199,7 @@ func separateStatements[T java.Tree](statements []java.RightPadded[T], separateF
 		if out == nil {
 			out = append([]java.RightPadded[T](nil), statements...)
 		}
-		if fixed, ok := any(withPrefix(rp.Element, java.Space{Whitespace: "\n"})).(T); ok {
+		if fixed, ok := any(withPrefix(rp.Element, java.MakeSpace(nil, "\n"))).(T); ok {
 			out[i].Element = fixed
 		}
 	}
@@ -230,7 +230,7 @@ func separateFrom[T java.Tree](keyword string, t T, leading ...java.Space) T {
 }
 
 func withLeadingSpace(t java.Tree) java.Tree {
-	return withPrefix(t, java.Space{Whitespace: " "})
+	return withPrefix(t, java.MakeSpace(nil, " "))
 }
 
 // fusesWith reports whether the first token of after would join the last token
@@ -291,7 +291,7 @@ func (v *MinimumViableSpacingVisitor) VisitTypeParameter(tp *java.TypeParameter,
 	}
 	copied := *out
 	bounds := *out.Bounds
-	bounds.Before = java.Space{Whitespace: " "}
+	bounds.Before = java.MakeSpace(nil, " ")
 	copied.Bounds = &bounds
 	return &copied
 }

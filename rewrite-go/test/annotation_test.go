@@ -76,7 +76,7 @@ func TestAnnotation_PrintsPrefixWhitespace(t *testing.T) {
 	// The leading space (between the previous syntax and the annotation)
 	// lives on the Annotation's Prefix.
 	ann := newJSONTagAnnotation("validate", "required")
-	ann.Prefix = java.Space{Whitespace: " "}
+	ann.Prefix = java.MakeSpace(nil, " ")
 	out := printer.Print(ann)
 	want := ` validate:"required"`
 	assert.Equal(t, want, out)
@@ -86,7 +86,7 @@ func TestAnnotation_VisitorRoundtripIdentity(t *testing.T) {
 	// A no-op visitor over an Annotation should produce a tree whose
 	// printed form is identical to the input's.
 	ann := newJSONTagAnnotation("json", "user_id")
-	ann.Prefix = java.Space{Whitespace: " "}
+	ann.Prefix = java.MakeSpace(nil, " ")
 
 	v := visitor.Init(&visitor.GoVisitor{})
 	out := v.Visit(ann, nil)

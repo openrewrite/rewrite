@@ -45,11 +45,12 @@ func sendSpace(s java.Space, q *SendQueue) {
 	q.GetAndSendList(s,
 		func(v any) []any {
 			sp := v.(java.Space)
-			if sp.Comments == nil {
+			cs := sp.Comments()
+			if cs == nil {
 				return []any{} // must be empty slice, not nil, so Java gets ADD with empty list
 			}
-			result := make([]any, len(sp.Comments))
-			for i, c := range sp.Comments {
+			result := make([]any, len(cs))
+			for i, c := range cs {
 				result[i] = c
 			}
 			return result
@@ -67,12 +68,13 @@ func sendSpace(s java.Space, q *SendQueue) {
 			q.GetAndSend(c, func(x any) any { return x.(java.Comment).Markers },
 				func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 		})
-	q.GetAndSend(s, func(v any) any { return v.(java.Space).Whitespace }, nil)
+	q.GetAndSend(s, func(v any) any { return v.(java.Space).Whitespace() }, nil)
 }
 
 func receiveSpace(before java.Space, q *ReceiveQueue) java.Space {
-	commentsAny := make([]any, len(before.Comments))
-	for i, c := range before.Comments {
+	beforeComments := before.Comments()
+	commentsAny := make([]any, len(beforeComments))
+	for i, c := range beforeComments {
 		commentsAny[i] = c
 	}
 	afterComments := q.ReceiveList(commentsAny, func(v any) any {
@@ -101,22 +103,22 @@ func receiveSpace(before java.Space, q *ReceiveQueue) java.Space {
 		}
 	}
 
-	whitespace := receiveScalar[string](q, before.Whitespace)
-	return java.Space{Comments: comments, Whitespace: whitespace}
+	whitespace := receiveScalar[string](q, before.Whitespace())
+	return java.MakeSpace(comments, whitespace)
 }
 
 // Sends: ID (uuid string), then marker entries list as ref.
 func SendMarkersCodec(m java.Markers, q *SendQueue) {
-	q.GetAndSend(m, func(v any) any { return v.(java.Markers).ID.String() }, nil)
+	q.GetAndSend(m, func(v any) any { return v.(java.Markers).GetID().String() }, nil)
 	// Entries list (as ref) — matches Java's Markers.rpcSend protocol.
 	q.GetAndSendListAsRef(m,
 		func(v any) []any {
-			markers := v.(java.Markers)
-			if markers.Entries == nil {
+			entries := v.(java.Markers).Entries()
+			if entries == nil {
 				return []any{}
 			}
-			result := make([]any, len(markers.Entries))
-			for i, e := range markers.Entries {
+			result := make([]any, len(entries))
+			for i, e := range entries {
 				result[i] = e
 			}
 			return result
@@ -240,6 +242,12 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		// PartialTypeAttribution.rpcSend sends: id (UUID string), reason (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.PartialTypeAttribution).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.PartialTypeAttribution).Reason }, nil)
+	case golang.BuildConstraint:
+		// BuildConstraint.rpcSend sends: id (UUID string), constraint, goos, goarch
+		q.GetAndSend(m, func(x any) any { return x.(golang.BuildConstraint).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.BuildConstraint).Constraint }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.BuildConstraint).GOOS }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.BuildConstraint).GOARCH }, nil)
 	case golang.StructTagQuote:
 		// StructTagQuote.rpcSend sends: id (UUID string), quote (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.StructTagQuote).Ident.String() }, nil)
@@ -333,18 +341,19 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 }
 
 func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
-	idStr := receiveScalar[string](q, before.ID.String())
-	id := before.ID
-	if idStr != "" && idStr != before.ID.String() {
+	beforeID := before.GetID()
+	idStr := receiveScalar[string](q, beforeID.String())
+	id := beforeID
+	if idStr != "" && idStr != beforeID.String() {
 		if parsed, err := uuid.Parse(idStr); err == nil {
 			id = parsed
 		}
 	}
 	// Entries list
 	var beforeAny []any
-	if before.Entries != nil {
-		beforeAny = make([]any, len(before.Entries))
-		for i, e := range before.Entries {
+	if beforeEntries := before.Entries(); beforeEntries != nil {
+		beforeAny = make([]any, len(beforeEntries))
+		for i, e := range beforeEntries {
 			beforeAny[i] = e
 		}
 	}
@@ -507,6 +516,17 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 			}
 			m.Reason = receiveScalar[string](q, m.Reason)
 			return m
+		case golang.BuildConstraint:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.Constraint = receiveScalar[string](q, m.Constraint)
+			m.GOOS = receiveScalar[string](q, m.GOOS)
+			m.GOARCH = receiveScalar[string](q, m.GOARCH)
+			return m
 		case golang.StructTagQuote:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
@@ -601,5 +621,5 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 			entries[i] = v.(java.Marker)
 		}
 	}
-	return java.Markers{ID: id, Entries: entries}
+	return java.MakeMarkers(id, entries)
 }

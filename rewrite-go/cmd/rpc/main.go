@@ -754,9 +754,10 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 	}
 
 	// Parse each group; collect CUs by their original input index so the
-	// returned IDs land in input-order. Pre-filter against the parser's
-	// BuildContext so the post-parse `cus` slice aligns 1:1 with the
-	// `included` subset of the group.
+	// returned IDs land in input-order. Every file is parsed: those outside
+	// the parser's BuildContext keep their syntax and carry a BuildConstraint
+	// marker (ParsePackage type-checks only the matching subset), so the
+	// post-parse `cus` slice aligns 1:1 with the group.
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(resolvedInputs))
 	parseErrByIdx := make(map[int]error)
 	checkPrint := requirePrintEqualsInput(req.Options)
@@ -764,9 +765,6 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		included := make([]fileEntry, 0, len(group))
 		files := make([]goparser.FileInput, 0, len(group))
 		for _, g := range group {
-			if !goparser.MatchBuildContext(p.BuildContext, filepath.Base(g.input.Path), g.input.Content) {
-				continue
-			}
 			included = append(included, g)
 			files = append(files, g.input)
 		}
@@ -815,7 +813,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if mrr, err := goparser.ParseGoMod(r.sourcePath, r.source); err == nil && mrr != nil && mrr.ModulePath != "" {
-			gm.Markers.Entries = append(gm.Markers.Entries, *mrr)
+			gm.Markers = java.AddMarker(gm.Markers, *mrr)
 		}
 		goModByIdx[r.idx] = gm
 	}
@@ -823,8 +821,8 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 	// Index each go.mod's GoResolutionResult by directory for sibling go.sum.
 	mrrByDir := make(map[string]*golang.GoResolutionResult, len(goModByIdx))
 	for _, gm := range goModByIdx {
-		for i := range gm.Markers.Entries {
-			if mrr, ok := gm.Markers.Entries[i].(golang.GoResolutionResult); ok {
+		for _, entry := range gm.Markers.Entries() {
+			if mrr, ok := entry.(golang.GoResolutionResult); ok {
 				mrrByDir[filepath.Dir(gm.SourcePath)] = &mrr
 				break
 			}
@@ -842,7 +840,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if mrr, ok := mrrByDir[filepath.Dir(r.sourcePath)]; ok && mrr != nil {
-			gs.Markers.Entries = append(gs.Markers.Entries, *mrr)
+			gs.Markers = java.AddMarker(gs.Markers, *mrr)
 		}
 		goSumByIdx[r.idx] = gs
 	}
@@ -2607,6 +2605,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		var unresolved []string
 		if resolved, pkgs, rerr := goparser.ResolveModuleGraph(moduleDir); rerr != nil {
 			mrr.ResolutionStatus = golang.GoResolutionGoSumOnly
+			mrr.ResolutionError = rerr.Error()
 			s.logger.Printf("ParseProject: module resolution failed for %s (go.sum-only): %v", moduleDir, rerr)
 		} else {
 			buildList = resolved
@@ -2616,6 +2615,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			// no-op (its gate is len(PackageModules)==0) rather than break the build.
 			if pkgs.Incomplete {
 				mrr.ResolutionStatus = golang.GoResolutionIncomplete
+				mrr.UnresolvedImports = pkgs.Unresolved
 				unresolved = pkgs.Unresolved
 				s.logger.Printf("ParseProject: incomplete module resolution for %s; withholding package->module map to avoid unsafe require removal (unresolved imports: %v)", moduleDir, pkgs.Unresolved)
 			} else {
@@ -2766,10 +2766,10 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	}
 
 	// Parse each group; collect CUs by original input index so the
-	// returned IDs land in input-order. Files filtered out by the
-	// parser's BuildContext (`//go:build` / `_GOOS_GOARCH.go` suffixes)
-	// don't appear in the response — handled here so the post-parse
-	// `cus` slice aligns with the `included` subset of entries.
+	// returned IDs land in input-order. Every file is parsed: those outside
+	// the parser's BuildContext keep their syntax and carry a BuildConstraint
+	// marker (ParsePackage type-checks only the matching subset), so the
+	// post-parse `cus` slice aligns with the entries.
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(disc.goFiles))
 	parseErrByIdx := make(map[int]error)
 	checkPrint := requirePrintEqualsInput(req.Options)
@@ -2787,9 +2787,6 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		included := make([]fileEntry, 0, len(entries))
 		inputs := make([]goparser.FileInput, 0, len(entries))
 		for _, e := range entries {
-			if !goparser.MatchBuildContext(p.BuildContext, filepath.Base(e.sourcePath), e.content) {
-				continue
-			}
 			included = append(included, e)
 			inputs = append(inputs, goparser.FileInput{Path: e.sourcePath, Content: e.content})
 		}
@@ -2900,11 +2897,11 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
-			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr, m.goProject)
+			gm.Markers = java.AddMarker(java.AddMarker(gm.Markers, *m.mrr), m.goProject)
 			if m.mrr.ResolutionStatus == golang.GoResolutionGoSumOnly {
 				gm.Markers = java.AddMarkupWarn(gm.Markers,
 					"Go module resolution failed, so dependencies were derived from go.sum alone. go.sum records every version ever seen rather than the selected build list, so the dependency set is incomplete and may name older versions. Recipes that depend on the resolved module graph (e.g. go mod tidy) must not be trusted for this module until resolution succeeds.",
-					"")
+					m.mrr.ResolutionError)
 			} else if len(m.unresolved) > 0 {
 				gm.Markers = java.AddMarkupWarn(gm.Markers,
 					"Go module resolution was incomplete, so unused-require removal was skipped to avoid dropping a still-used dependency. Re-run once the modules below can be resolved.",
@@ -2939,7 +2936,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
-			gs.Markers.Entries = append(gs.Markers.Entries, *m.mrr, m.goProject)
+			gs.Markers = java.AddMarker(java.AddMarker(gs.Markers, *m.mrr), m.goProject)
 		}
 		id := gs.Ident.String()
 		s.localObjects[id] = gs
