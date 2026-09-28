@@ -224,7 +224,10 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     @Test
     void aCatalogReferenceWithNoEntryToFollowIsLeftAlone() {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW))
+                        .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
+                                assertThat(rows).extracting("packageName", "protocol", "currentValue")
+                                        .containsExactly(tuple("acme-logger", "catalog:", "catalog:"))),
                 packageJson(PACKAGE_JSON, null,
                         nodeResolutionResult(PackageManager.Pnpm,
                                 dependency("acme-logger", "catalog:"),
