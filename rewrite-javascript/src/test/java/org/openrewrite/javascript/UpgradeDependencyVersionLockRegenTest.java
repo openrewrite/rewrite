@@ -180,11 +180,11 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
                             assertThat(rows.get(0).getPackageName()).isEqualTo("ms-logger");
                             assertThat(rows.get(0).getReason()).isEqualTo("UNSUPPORTED_ENTRY_TYPE");
                         }),
-                packageJson(String.format(CATALOG_MANIFEST, "2.1.2"), String.format(CATALOG_MANIFEST, "2.1.3"),
+                packageJson(CATALOG_MANIFEST.formatted("2.1.2"), CATALOG_MANIFEST.formatted("2.1.3"),
                         nodeResolutionResult(PackageManager.Pnpm,
                                 dependency("ms", "2.1.2"),
                                 dependency("ms-logger", "catalog:"))),
-                yaml(String.format(CATALOG_WORKSPACE_YAML, "~1.4.1"), String.format(CATALOG_WORKSPACE_YAML, "2.1.3"),
+                yaml(CATALOG_WORKSPACE_YAML.formatted("~1.4.1"), CATALOG_WORKSPACE_YAML.formatted("2.1.3"),
                         s -> s.path("pnpm-workspace.yaml")),
                 pnpmLock(resource("lock/pnpm/v9/before"), resource("lock/pnpm/v9/after"),
                         s -> s.noTrim().afterRecipe(doc ->

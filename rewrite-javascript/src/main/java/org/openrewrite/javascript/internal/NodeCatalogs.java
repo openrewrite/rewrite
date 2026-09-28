@@ -82,22 +82,24 @@ public class NodeCatalogs {
     }
 
     /**
-     * Returns {@code workspaceFile} unchanged when nothing needs writing, which callers rely on to tell a
-     * real edit from a no-op. Rewriting the scalar in place is what preserves its quoting style.
+     * Three answers in one, because callers need to tell them apart: null when the catalog declares no
+     * such entry, {@code workspaceFile} itself when it does but already holds {@code newVersion}, and a
+     * rewritten file otherwise. Rewriting the scalar in place is what preserves its quoting style.
      */
-    public static SourceFile updateEntry(SourceFile workspaceFile, String catalogName, String packageName,
-                                         String newVersion) {
+    public static @Nullable SourceFile updateEntry(SourceFile workspaceFile, String catalogName,
+                                                   String packageName, String newVersion) {
         if (!(workspaceFile instanceof Yaml.Documents)) {
-            return workspaceFile;
+            return null;
         }
         Yaml.Documents documents = (Yaml.Documents) workspaceFile;
         List<Yaml.Document> updated = new ArrayList<>(documents.getDocuments());
+        boolean[] found = {false};
         boolean changed = false;
         for (int i = 0; i < updated.size(); i++) {
             Yaml.Document document = updated.get(i);
             if (!(document.getBlock() instanceof Yaml.Mapping)) continue;
             Yaml.Mapping root = (Yaml.Mapping) document.getBlock();
-            UnaryOperator<Yaml.Mapping> setVersion = catalog -> withVersion(catalog, packageName, newVersion);
+            UnaryOperator<Yaml.Mapping> setVersion = catalog -> withVersion(catalog, packageName, newVersion, found);
             Yaml.Mapping rewritten = DEFAULT_CATALOG.equals(catalogName) ?
                     withMapping(root, DEFAULT_CATALOG_KEY, setVersion) :
                     withMapping(root, NAMED_CATALOGS_KEY, catalogs -> withMapping(catalogs, catalogName, setVersion));
@@ -105,6 +107,9 @@ public class NodeCatalogs {
                 updated.set(i, document.withBlock(rewritten));
                 changed = true;
             }
+        }
+        if (!found[0]) {
+            return null;
         }
         return changed ? documents.withDocuments(updated) : workspaceFile;
     }
@@ -126,11 +131,13 @@ public class NodeCatalogs {
         return mapping;
     }
 
-    private static Yaml.Mapping withVersion(Yaml.Mapping catalog, String packageName, String newVersion) {
+    private static Yaml.Mapping withVersion(Yaml.Mapping catalog, String packageName, String newVersion,
+                                            boolean[] found) {
         List<Yaml.Mapping.Entry> entries = new ArrayList<>(catalog.getEntries());
         for (int i = 0; i < entries.size(); i++) {
             Yaml.Mapping.Entry entry = entries.get(i);
             if (!packageName.equals(entry.getKey().getValue()) || !(entry.getValue() instanceof Yaml.Scalar)) continue;
+            found[0] = true;
             Yaml.Scalar version = (Yaml.Scalar) entry.getValue();
             if (newVersion.equals(version.getValue())) {
                 return catalog;

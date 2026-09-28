@@ -158,7 +158,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     void catalogEntryIsUpgraded(PackageManager pm, String workspaceFile, String reference, String catalog) {
         rewriteRun(
                 spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
-                packageJson(String.format(MANIFEST, reference), null,
+                packageJson(MANIFEST.formatted(reference), null,
                         nodeResolutionResult(pm, dependency("acme-logger", reference))),
                 yaml(catalog.formatted(OLD), catalog.formatted(NEW), s -> s.path(workspaceFile))
         );
@@ -176,7 +176,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     void anUnquotedEntryGainsQuotesOnlyWhenTheConstraintNeedsThem(String newVersion, String rendered) {
         rewriteRun(
                 spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, newVersion)),
-                packageJson(String.format(MANIFEST, "catalog:"), null,
+                packageJson(MANIFEST.formatted("catalog:"), null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
                 yaml("catalog:\n  acme-logger: 1.4.1\n",
                         "catalog:\n  acme-logger: " + rendered + "\n",
@@ -248,7 +248,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                             assertThat(rows.get(0).getPackageName()).isEqualTo("acme-logger");
                             assertThat(rows.get(0).getReason()).isEqualTo("UNSUPPORTED_ENTRY_TYPE");
                         }),
-                packageJson(String.format(MANIFEST, "catalog:"), null,
+                packageJson(MANIFEST.formatted("catalog:"), null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
                 yaml(WORKSPACE_YAML.formatted(OLD), WORKSPACE_YAML.formatted(NEW), s -> s.path("pnpm-workspace.yaml")),
                 pnpmLock(PNPM_LOCK.formatted(OLD), null,
@@ -264,8 +264,12 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     @Test
     void aCatalogEntryAlreadyAtTheNewVersionIsLeftAlone() {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
-                packageJson(String.format(MANIFEST, "catalog:"), null,
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW))
+                        .afterRecipe(run -> assertThat(
+                                run.getDataTableRows(NodeDependencyProtocolsSkipped.class))
+                                .as("nothing needed doing, which is not the same as being skipped")
+                                .isEmpty()),
+                packageJson(MANIFEST.formatted("catalog:"), null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
                 yaml(WORKSPACE_YAML.formatted(NEW), s -> s.path("pnpm-workspace.yaml")),
                 pnpmLock(PNPM_LOCK.formatted(NEW), null)

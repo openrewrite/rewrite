@@ -196,8 +196,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 if (catalogEdits != null) {
                     SourceFile edited = sf;
                     for (NodeCatalogs.CatalogEntry edit : catalogEdits) {
-                        edited = NodeCatalogs.updateEntry(edited, edit.getCatalogName(),
+                        SourceFile next = NodeCatalogs.updateEntry(edited, edit.getCatalogName(),
                                 edit.getPackageName(), newVersion);
+                        if (next != null) {
+                            edited = next;
+                        }
                     }
                     return edited;
                 }

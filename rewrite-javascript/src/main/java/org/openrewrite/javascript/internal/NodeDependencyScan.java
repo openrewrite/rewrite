@@ -24,6 +24,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,8 @@ public final class NodeDependencyScan {
         public final Map<Path, Yaml.Documents> workspaceFiles = new HashMap<>();
         /** The entries to edit, by the workspace file declaring them. */
         public final Map<Path, Set<NodeCatalogs.CatalogEntry>> catalogEdits = new HashMap<>();
+        /** Entries a catalog does declare, edited or already current; the rest were not followed. */
+        public final Map<Path, Set<NodeCatalogs.CatalogEntry>> catalogsResolved = new HashMap<>();
         /** Cleared once the verdict is computed; set again by anything the verdict reads. */
         public boolean catalogEditsStale = true;
     }
@@ -126,41 +129,52 @@ public final class NodeDependencyScan {
         }
         acc.catalogEditsStale = false;
         acc.catalogEdits.clear();
+        acc.catalogsResolved.clear();
         for (ProjectState ps : acc.projects.values()) {
             ps.catalogEntriesEdited.clear();
         }
-        for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
-            ProjectState ps = project.getValue();
-            if (ps.skippedProtocols.isEmpty()) {
-                continue;
-            }
-            Path workspacePath = governingWorkspaceFile(acc, project.getKey(), ps.capturedPackageJson);
-            if (workspacePath == null) {
-                continue;
-            }
-            Yaml.Documents workspaceFile = acc.workspaceFiles.get(workspacePath);
-            for (MatchedDependency skipped : ps.skippedProtocols) {
-                String catalogName = NodeCatalogs.catalogReference(skipped.getCurrentVersion());
-                if (catalogName == null) {
-                    continue;
+        // An entry is shared, so it is decided once and then applied to each of its consumers, rather
+        // than reconsidered from every manifest that happens to reference it.
+        for (Map.Entry<Path, Set<NodeCatalogs.CatalogEntry>> workspace : referencedEntries(acc).entrySet()) {
+            Yaml.Documents workspaceFile = acc.workspaceFiles.get(workspace.getKey());
+            for (NodeCatalogs.CatalogEntry entry : workspace.getValue()) {
+                SourceFile edited = NodeCatalogs.updateEntry(
+                        workspaceFile, entry.getCatalogName(), entry.getPackageName(), newVersion);
+                if (edited == null) {
+                    continue; // no such entry, so the reference was not followed and is reported as a skip
                 }
-                // Ask the edit rather than predict it: recording a no-op would leave every consumer
-                // answering for a lock that nothing staled.
-                if (NodeCatalogs.updateEntry(
-                        workspaceFile, catalogName, skipped.getPackageName(), newVersion) == workspaceFile) {
-                    continue;
+                acc.catalogsResolved.computeIfAbsent(workspace.getKey(), k -> new LinkedHashSet<>()).add(entry);
+                if (edited == workspaceFile) {
+                    continue; // already the requested constraint, so nothing is written and no lock is staled
                 }
-                NodeCatalogs.CatalogEntry entry =
-                        new NodeCatalogs.CatalogEntry(catalogName, skipped.getPackageName());
-                acc.catalogEdits.computeIfAbsent(workspacePath, k -> new LinkedHashSet<>()).add(entry);
-                for (Path consumer : consumersOf(acc, workspacePath, entry)) {
-                    ProjectState consumerPs = acc.projects.get(consumer);
-                    if (!consumerPs.catalogEntriesEdited.contains(entry)) {
-                        consumerPs.catalogEntriesEdited.add(entry);
-                    }
+                acc.catalogEdits.computeIfAbsent(workspace.getKey(), k -> new LinkedHashSet<>()).add(entry);
+                for (Path consumer : consumersOf(acc, workspace.getKey(), entry)) {
+                    acc.projects.get(consumer).catalogEntriesEdited.add(entry);
                 }
             }
         }
+    }
+
+    /** Every catalog entry referenced from a scanned manifest, grouped by the workspace file declaring it. */
+    private static Map<Path, Set<NodeCatalogs.CatalogEntry>> referencedEntries(Accumulator acc) {
+        Map<Path, Set<NodeCatalogs.CatalogEntry>> referenced = new LinkedHashMap<>();
+        for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
+            ProjectState ps = project.getValue();
+            Path workspacePath = ps.skippedProtocols.isEmpty() ?
+                    null :
+                    governingWorkspaceFile(acc, project.getKey(), ps.capturedPackageJson);
+            if (workspacePath == null) {
+                continue;
+            }
+            for (MatchedDependency skipped : ps.skippedProtocols) {
+                String catalogName = NodeCatalogs.catalogReference(skipped.getCurrentVersion());
+                if (catalogName != null) {
+                    referenced.computeIfAbsent(workspacePath, k -> new LinkedHashSet<>())
+                            .add(new NodeCatalogs.CatalogEntry(catalogName, skipped.getPackageName()));
+                }
+            }
+        }
+        return referenced;
     }
 
     public static boolean isFollowedIntoCatalog(Accumulator acc, Path packageJsonPath, MatchedDependency skipped) {
@@ -171,10 +185,10 @@ public final class NodeDependencyScan {
         ProjectState ps = acc.projects.get(packageJsonPath);
         Path workspacePath = governingWorkspaceFile(acc, packageJsonPath,
                 ps == null ? null : ps.capturedPackageJson);
-        Set<NodeCatalogs.CatalogEntry> edits =
-                workspacePath == null ? null : acc.catalogEdits.get(workspacePath);
-        return edits != null &&
-                edits.contains(new NodeCatalogs.CatalogEntry(catalogName, skipped.getPackageName()));
+        Set<NodeCatalogs.CatalogEntry> resolved =
+                workspacePath == null ? null : acc.catalogsResolved.get(workspacePath);
+        return resolved != null &&
+                resolved.contains(new NodeCatalogs.CatalogEntry(catalogName, skipped.getPackageName()));
     }
 
     /** Every manifest referencing the entry, because the edit stales each of their locks. */
