@@ -135,8 +135,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                         Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : null;
                         if (tagScope == null) {
                             tagScope = getResolutionResult().getPom().getManagedScope(
-                                    groupId,
-                                    artifactId,
+                                    resolvedDependency.getGroupId(),
+                                    resolvedDependency.getArtifactId(),
                                     tag.getChildValue("type").orElse(null),
                                     tag.getChildValue("classifier").orElse(null)
                             );

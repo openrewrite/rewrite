@@ -179,10 +179,10 @@ public class MavenDependency implements Trait<Xml.Tag> {
                                 (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
                                 String scopeName = tag.getChildValue("scope").orElse(null);
                                 Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : null;
-                                if (tagScope == null && artifactId != null) {
+                                if (tagScope == null) {
                                     tagScope = getResolutionResult(cursor).getPom().getManagedScope(
-                                            groupId,
-                                            artifactId,
+                                            resolvedDependency.getGroupId(),
+                                            resolvedDependency.getArtifactId(),
                                             tag.getChildValue("type").orElse(null),
                                             tag.getChildValue("classifier").orElse(null)
                                     );
