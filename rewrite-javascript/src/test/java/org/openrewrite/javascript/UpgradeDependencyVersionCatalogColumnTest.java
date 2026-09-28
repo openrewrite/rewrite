@@ -31,7 +31,8 @@ import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 /**
- * The column `NpmCatalogTest > versionInACatalog — OpenRewrite` runs both dependency recipes composed.
+ * The column `NpmCatalogTest > versionInACatalog — OpenRewrite` runs both dependency recipes composed,
+ * over its four cells: pnpm and Yarn Berry, each with the default and a named catalog.
  * Both must behave: `UpgradeDependencyVersion` follows the reference into the catalog file, and
  * `UpgradeTransitiveDependencyVersion` declines to pin a dependency whose version position holds a
  * reference. The manifest must come out byte-identical, with no `overrides`, `resolutions` or
@@ -40,6 +41,7 @@ import static org.openrewrite.yaml.Assertions.yaml;
 class UpgradeDependencyVersionCatalogColumnTest implements RewriteTest {
 
     private static final String PKG = "acme-logger";
+    private static final String OLD_VERSION = "~1.4.1";
     private static final String NEW_VERSION = "~1.4.2-osera-00001";
 
     private static final String MANIFEST = """
@@ -69,22 +71,22 @@ class UpgradeDependencyVersionCatalogColumnTest implements RewriteTest {
 
     static Stream<Arguments> spellings() {
         return Stream.of(
-                Arguments.of("PnpmDefault", PackageManager.Pnpm, "pnpm-workspace.yaml", "catalog:", DEFAULT_CATALOG),
-                Arguments.of("PnpmNamed", PackageManager.Pnpm, "pnpm-workspace.yaml", "catalog:stable", NAMED_CATALOG),
-                Arguments.of("YarnDefault", PackageManager.YarnBerry, ".yarnrc.yml", "catalog:", DEFAULT_CATALOG),
-                Arguments.of("YarnNamed", PackageManager.YarnBerry, ".yarnrc.yml", "catalog:stable", NAMED_CATALOG));
+                Arguments.of(PackageManager.Pnpm, "pnpm-workspace.yaml", "catalog:", DEFAULT_CATALOG),
+                Arguments.of(PackageManager.Pnpm, "pnpm-workspace.yaml", "catalog:stable", NAMED_CATALOG),
+                Arguments.of(PackageManager.YarnBerry, ".yarnrc.yml", "catalog:", DEFAULT_CATALOG),
+                Arguments.of(PackageManager.YarnBerry, ".yarnrc.yml", "catalog:stable", NAMED_CATALOG));
     }
 
-    @ParameterizedTest(name = "{0}")
+    @ParameterizedTest(name = "{0} {2}")
     @MethodSource("spellings")
-    void versionInACatalog(String cell, PackageManager pm, String workspaceFile, String reference, String catalog) {
+    void versionInACatalog(PackageManager pm, String workspaceFile, String reference, String catalog) {
         rewriteRun(
                 spec -> spec.recipe(new CompositeRecipe(asList(
                         new UpgradeDependencyVersion(PKG, null, NEW_VERSION),
                         new UpgradeTransitiveDependencyVersion(PKG, NEW_VERSION, null)))),
-                packageJson(String.format(MANIFEST, reference), null,
+                packageJson(MANIFEST.formatted(reference), null,
                         nodeResolutionResult(pm, dependency(PKG, reference))),
-                yaml(String.format(catalog, "~1.4.1"), String.format(catalog, NEW_VERSION),
+                yaml(catalog.formatted(OLD_VERSION), catalog.formatted(NEW_VERSION),
                         s -> s.path(workspaceFile))
         );
     }

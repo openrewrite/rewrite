@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
 @UtilityClass
 public class NodeCatalogs {
 
-    /** The default catalog has no name; {@code catalog:strict} names one. */
+    /** The default catalog has no name; {@code catalog:stable} names one. */
     public static final String DEFAULT_CATALOG = "";
 
     @Value
@@ -137,8 +137,7 @@ public class NodeCatalogs {
             }
             Yaml.Scalar.Style style = version.getStyle();
             if (style == Yaml.Scalar.Style.LITERAL || style == Yaml.Scalar.Style.FOLDED) {
-                // `withValue` cannot rewrite a block scalar's body without clobbering its envelope, and a
-                // constraint has no business being one. Decline rather than corrupt the file.
+                // `withValue` cannot rewrite a block scalar's body without clobbering its envelope.
                 return catalog;
             }
             Yaml.Scalar rewritten = version.withValue(newVersion);

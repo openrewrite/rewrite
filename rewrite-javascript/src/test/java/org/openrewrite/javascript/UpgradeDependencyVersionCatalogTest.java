@@ -80,7 +80,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
             packages:
               - '.'
             catalog:
-              acme-logger: '~1.4.1'
+              acme-logger: '%s'
             """;
 
     private static final String NAMED_WORKSPACE_YAML = """
@@ -88,18 +88,18 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
               - '.'
             catalogs:
               stable:
-                acme-logger: '~1.4.1'
+                acme-logger: '%s'
             """;
 
     private static final String YARNRC = """
             catalog:
-              acme-logger: '~1.4.1'
+              acme-logger: '%s'
             """;
 
     private static final String NAMED_YARNRC = """
             catalogs:
               stable:
-                acme-logger: '~1.4.1'
+                acme-logger: '%s'
             """;
 
     private static final String ROOT_JSON = """
@@ -124,7 +124,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
             packages:
               - 'packages/*'
             catalog:
-              acme-logger: '~1.4.1'
+              acme-logger: '%s'
             """;
 
     private static final String PNPM_LOCK = """
@@ -133,7 +133,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
             catalogs:
               default:
                 acme-logger:
-                  specifier: '~1.4.1'
+                  specifier: '%s'
                   version: 1.4.1
 
             importers:
@@ -160,7 +160,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                 spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
                 packageJson(String.format(MANIFEST, reference), null,
                         nodeResolutionResult(pm, dependency("acme-logger", reference))),
-                yaml(catalog, catalog.replace(OLD, NEW), s -> s.path(workspaceFile))
+                yaml(catalog.formatted(OLD), catalog.formatted(NEW), s -> s.path(workspaceFile))
         );
     }
 
@@ -201,7 +201,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                 packageJson(MEMBER_JSON, null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:")),
                         s -> s.path("packages/b/package.json")),
-                yaml(MEMBERS_WORKSPACE_YAML, MEMBERS_WORKSPACE_YAML.replace(OLD, NEW),
+                yaml(MEMBERS_WORKSPACE_YAML.formatted(OLD), MEMBERS_WORKSPACE_YAML.formatted(NEW),
                         s -> s.path("pnpm-workspace.yaml"))
         );
     }
@@ -217,7 +217,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                         nodeResolutionResult(PackageManager.Pnpm,
                                 dependency("acme-logger", "catalog:"),
                                 dependency("acme-lib", "workspace:^"))),
-                yaml(WORKSPACE_YAML, WORKSPACE_YAML.replace(OLD, NEW), s -> s.path("pnpm-workspace.yaml"))
+                yaml(WORKSPACE_YAML.formatted(OLD), WORKSPACE_YAML.formatted(NEW), s -> s.path("pnpm-workspace.yaml"))
         );
     }
 
@@ -250,8 +250,8 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                         }),
                 packageJson(String.format(MANIFEST, "catalog:"), null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
-                yaml(WORKSPACE_YAML, WORKSPACE_YAML.replace(OLD, NEW), s -> s.path("pnpm-workspace.yaml")),
-                pnpmLock(PNPM_LOCK, null,
+                yaml(WORKSPACE_YAML.formatted(OLD), WORKSPACE_YAML.formatted(NEW), s -> s.path("pnpm-workspace.yaml")),
+                pnpmLock(PNPM_LOCK.formatted(OLD), null,
                         s -> s.afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                                 .as("the lock left behind by the catalog edit carries the warning").isPresent()))
         );
@@ -267,8 +267,8 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                 spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW)),
                 packageJson(String.format(MANIFEST, "catalog:"), null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
-                yaml(WORKSPACE_YAML.replace(OLD, NEW), s -> s.path("pnpm-workspace.yaml")),
-                pnpmLock(PNPM_LOCK.replace(OLD, NEW), null)
+                yaml(WORKSPACE_YAML.formatted(NEW), s -> s.path("pnpm-workspace.yaml")),
+                pnpmLock(PNPM_LOCK.formatted(NEW), null)
         );
     }
 
@@ -283,7 +283,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                         nodeResolutionResult(PackageManager.Pnpm,
                                 dependency("acme-logger", OLD),
                                 dependency("acme-lib", "workspace:^"))),
-                yaml(WORKSPACE_YAML, s -> s.path("pnpm-workspace.yaml"))
+                yaml(WORKSPACE_YAML.formatted(OLD), s -> s.path("pnpm-workspace.yaml"))
         );
     }
 }

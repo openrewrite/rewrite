@@ -153,7 +153,6 @@ public final class NodeDependencyScan {
                 NodeCatalogs.CatalogEntry entry =
                         new NodeCatalogs.CatalogEntry(catalogName, skipped.getPackageName());
                 acc.catalogEdits.computeIfAbsent(workspacePath, k -> new LinkedHashSet<>()).add(entry);
-                // Every consumer's lock now disagrees with the entry, so each needs to answer for it.
                 for (Path consumer : consumersOf(acc, workspacePath, entry)) {
                     ProjectState consumerPs = acc.projects.get(consumer);
                     if (!consumerPs.catalogEntriesEdited.contains(entry)) {

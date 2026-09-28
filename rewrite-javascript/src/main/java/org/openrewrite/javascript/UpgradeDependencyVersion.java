@@ -77,11 +77,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 "regenerates the lock file natively, without executing the package manager. Matching is by exact package " +
                 "name or glob pattern. " +
                 "A dependency declared as `catalog:` or `catalog:<name>` keeps its constraint in " +
-                "`pnpm-workspace.yaml` or `.yarnrc.yml`, so the catalog entry is updated in place and " +
-                "the manifest is left alone, so every member sharing that entry moves together. The " +
-                "entry is left alone and the skip reported when there is none to follow. The lock file cannot yet follow " +
-                "a catalog edit, so one is reported as a regeneration failure rather than written " +
-                "incorrectly. Other specifier protocols (`workspace:`, `patch:`, `portal:`, `npm:`) have " +
+                "`pnpm-workspace.yaml` or `.yarnrc.yml`. The catalog entry is updated in place and the " +
+                "manifest left untouched, so every member sharing that entry moves together. Where there " +
+                "is no entry to follow, the manifest is left alone and the skip reported. The lock file " +
+                "cannot yet follow a catalog edit, so one is reported as a regeneration failure rather " +
+                "than written incorrectly. Other specifier protocols (`workspace:`, `patch:`, `portal:`, `npm:`) have " +
                 "no such declaration to follow and are always left alone. " +
                 "v1 uses simple string inequality for the upgrade check (always overwrites). A future " +
                 "version will use semver to skip already-up-to-date constraints. " +
