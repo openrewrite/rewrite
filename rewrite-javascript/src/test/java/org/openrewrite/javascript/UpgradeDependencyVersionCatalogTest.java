@@ -18,6 +18,7 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
@@ -143,26 +144,22 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
         );
     }
 
-    static Stream<Arguments> constraintsAndRenderings() {
-        return Stream.of(
-                Arguments.of("~1.5.0", "  acme-logger: ~1.5.0"),
-                Arguments.of(">=2.0.0", "  acme-logger: '>=2.0.0'"));
-    }
-
     /**
      * That the quoting decision reaches the file: a constraint YAML already reads as a string keeps the
      * style it found, one it would read as something else gains quotes. Which constraints fall on which
      * side is {@link org.openrewrite.javascript.internal.NodeCatalogsTest}'s job.
      */
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("constraintsAndRenderings")
-    void anUnquotedEntryGainsQuotesOnlyWhenTheConstraintNeedsThem(String newVersion, String expectedEntry) {
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource(quoteCharacter = '"', value = {
+            "~1.5.0,  ~1.5.0",
+            ">=2.0.0, '>=2.0.0'"})
+    void anUnquotedEntryGainsQuotesOnlyWhenTheConstraintNeedsThem(String newVersion, String rendered) {
         rewriteRun(
                 spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, newVersion)),
                 packageJson(String.format(MANIFEST, "catalog:"), null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
                 yaml("catalog:\n  acme-logger: 1.4.1\n",
-                        "catalog:\n" + expectedEntry + "\n",
+                        "catalog:\n  acme-logger: " + rendered + "\n",
                         s -> s.path("pnpm-workspace.yaml"))
         );
     }
