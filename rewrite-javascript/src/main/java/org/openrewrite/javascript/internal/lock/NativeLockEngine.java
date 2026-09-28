@@ -277,10 +277,12 @@ public final class NativeLockEngine {
                                                    @Nullable Path packageJsonPath, NodeRegistries registries,
                                                    NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
+        Overrides overrides = boundedOverrides(PackageManager.YarnBerry, editedPackageJson);
         NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsBerry(existingLock),
-                declaredOverrides(PackageManager.YarnBerry, editedPackageJson).ranges);
+                overrides.ranges);
         ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
         requireOverridesApplyOnlyOnNpm(PackageManager.YarnBerry, builder);
+        requireUnmodelledOverridesMissTheClosure(graph, overrides);
         List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
         for (LockEditSet.PackageEdit edit : edits) {
             if (edit.getNewResolved() != null) {
@@ -321,10 +323,12 @@ public final class NativeLockEngine {
                                                      @Nullable Path packageJsonPath, NodeRegistries registries,
                                                      NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
+        Overrides overrides = boundedOverrides(PackageManager.YarnClassic, editedPackageJson);
         NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsYarnClassic(existingLock),
-                declaredOverrides(PackageManager.YarnClassic, editedPackageJson).ranges);
+                overrides.ranges);
         ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
         requireOverridesApplyOnlyOnNpm(PackageManager.YarnClassic, builder);
+        requireUnmodelledOverridesMissTheClosure(graph, overrides);
         List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnClassic, packageJsonPath),
                 PackageManager.YarnClassic, editedPackageJson, edits);
@@ -358,10 +362,12 @@ public final class NativeLockEngine {
                                               @Nullable Path packageJsonPath, NodeRegistries registries,
                                               NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
+        Overrides overrides = boundedOverrides(PackageManager.Pnpm, editedPackageJson);
         NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsPnpm(existingLock),
-                declaredOverrides(PackageManager.Pnpm, editedPackageJson).ranges);
+                overrides.ranges);
         ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
         requireOverridesApplyOnlyOnNpm(PackageManager.Pnpm, builder);
+        requireUnmodelledOverridesMissTheClosure(graph, overrides);
         List<LockEditSet.PackageEdit> edits = PnpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Pnpm, packageJsonPath),
                 PackageManager.Pnpm, editedPackageJson, edits);
@@ -394,10 +400,12 @@ public final class NativeLockEngine {
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
+        Overrides overrides = boundedOverrides(PackageManager.Bun, editedPackageJson);
         NpmGraphBuilder builder = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock),
-                declaredOverrides(PackageManager.Bun, editedPackageJson).ranges);
+                overrides.ranges);
         ResolutionGraph graph = builder.build(singletonMap("", editedPackageJson));
         requireOverridesApplyOnlyOnNpm(PackageManager.Bun, builder);
+        requireUnmodelledOverridesMissTheClosure(graph, overrides);
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),
                 PackageManager.Bun, editedPackageJson, edits);
@@ -409,12 +417,29 @@ public final class NativeLockEngine {
     private static Overrides declaredOverrides(PackageManager pm, String manifestJson) {
         JsonNode node = overridesNode(pm, manifestJson);
         if (node == null) {
-            return new Overrides(emptyMap(), emptyMap());
+            return new Overrides(emptyMap(), emptyMap(), emptySet());
         }
         Map<String, String> overrides = new LinkedHashMap<>();
         Map<String, String> scopedParent = new LinkedHashMap<>();
-        collectOverrides(node, null, directDependencySpecs(manifestJson), overrides, scopedParent);
-        return new Overrides(overrides, scopedParent);
+        collectOverrides(node, null, directDependencySpecs(manifestJson), overrides, scopedParent, null);
+        return new Overrides(overrides, scopedParent, emptySet());
+    }
+
+    /**
+     * The lenient sibling of {@link #declaredOverrides} for the managers that only refuse overrides: a key the
+     * strict read rejects is bounded to the names it could select instead of failing the whole run.
+     */
+    private static Overrides boundedOverrides(PackageManager pm, String manifestJson) {
+        JsonNode node = overridesNode(pm, manifestJson);
+        if (node == null) {
+            return new Overrides(emptyMap(), emptyMap(), emptySet());
+        }
+        Map<String, String> overrides = new LinkedHashMap<>();
+        Map<String, String> scopedParent = new LinkedHashMap<>();
+        Set<String> unmodelled = new LinkedHashSet<>();
+        boolean bounded = collectOverrides(node, null, directDependencySpecs(manifestJson), overrides, scopedParent,
+                unmodelled);
+        return new Overrides(overrides, scopedParent, bounded ? unmodelled : null);
     }
 
     /** What a {@code $name} override value stands for: the root's own spec for that direct dependency. */
@@ -485,33 +510,67 @@ public final class NativeLockEngine {
         }
     }
 
-    private static final class Overrides {
-        final Map<String, String> ranges;
-        final Map<String, String> scopedParent;
-
-        Overrides(Map<String, String> ranges, Map<String, String> scopedParent) {
-            this.ranges = ranges;
-            this.scopedParent = scopedParent;
+    /** Refuses an unread selector only when something it could select is actually in the closure. */
+    private static void requireUnmodelledOverridesMissTheClosure(ResolutionGraph graph, Overrides overrides) {
+        if (overrides.unmodelled == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                    "an override selector bounds no package name");
+        }
+        for (ResolvedNode n : graph.getNodes().values()) {
+            String name = n.getManifest().getName();
+            if (overrides.unmodelled.contains(name)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                        "the closure contains " + name + ", which an override selector reaches");
+            }
         }
     }
 
-    private static void collectOverrides(JsonNode node, @Nullable String parent, Map<String, String> directSpecs,
-                                         Map<String, String> overrides, Map<String, String> scopedParent) {
+    private static final class Overrides {
+        final Map<String, String> ranges;
+        final Map<String, String> scopedParent;
+        /** Names bounded out of keys the strict read rejects; {@code null} when some key bounds no name at all. */
+        final @Nullable Set<String> unmodelled;
+
+        Overrides(Map<String, String> ranges, Map<String, String> scopedParent, @Nullable Set<String> unmodelled) {
+            this.ranges = ranges;
+            this.scopedParent = scopedParent;
+            this.unmodelled = unmodelled;
+        }
+    }
+
+    /**
+     * With {@code unmodelled} null every entry the engine cannot apply throws. Otherwise such an entry is bounded
+     * into it instead.
+     *
+     * @return false once a bounded entry bounds no name at all.
+     */
+    private static boolean collectOverrides(JsonNode node, @Nullable String parent, Map<String, String> directSpecs,
+                                            Map<String, String> overrides, Map<String, String> scopedParent,
+                                            @Nullable Set<String> unmodelled) {
+        boolean bounded = true;
         for (Map.Entry<String, JsonNode> property : node.properties()) {
             String key = property.getKey();
             JsonNode value = property.getValue();
             // A parent key may carry a version selector, checked later against the resolved parent. A leaf
             // key may not: a range there selects which copies to override, and this engine places only one.
             if (!OVERRIDE_NAME.matcher(value.isObject() ? parentName(key) : key).matches()) {
+                if (unmodelled != null) {
+                    bounded &= collectOverrideKeyNames(JSON.createObjectNode().set(key, value), unmodelled);
+                    continue;
+                }
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                         "override selector " + key + " is not a plain package name");
             }
             if (value.isObject()) {
                 if (parent != null) {
+                    if (unmodelled != null) {
+                        bounded &= collectOverrideKeyNames(JSON.createObjectNode().set(key, value), unmodelled);
+                        continue;
+                    }
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                             "override nested under " + parent + " is not supported");
                 }
-                collectOverrides(value, key, directSpecs, overrides, scopedParent);
+                bounded &= collectOverrides(value, key, directSpecs, overrides, scopedParent, unmodelled);
                 continue;
             }
             String spec = value.isTextual() ? value.asText() : null;
@@ -523,6 +582,10 @@ public final class NativeLockEngine {
                 }
             }
             if (spec == null || !Semver.validate(spec, null, NODE).isValid()) {
+                if (unmodelled != null) {
+                    bounded &= collectOverrideKeyNames(JSON.createObjectNode().set(key, value), unmodelled);
+                    continue;
+                }
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                         "override of " + key + " is not a version range");
             }
@@ -534,6 +597,7 @@ public final class NativeLockEngine {
                 scopedParent.put(key, parent);
             }
         }
+        return bounded;
     }
 
     /** The name part of a parent key; the {@code > 0} guard keeps a scoped name's leading {@code @}. */
