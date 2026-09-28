@@ -1,0 +1,43 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+overrides:
+  is-buffer: 2.0.0
+
+importers:
+
+  .:
+    dependencies:
+      is-number:
+        specifier: 7.0.0
+        version: 7.0.0
+      kind-of:
+        specifier: 3.2.2
+        version: 3.2.2
+
+packages:
+
+  is-buffer@2.0.0:
+    resolution: {integrity: sha512-wsnW8g48qGzmZRy7yregikay4LbHR4yKdiGIhNnZobvTlEEy9O8cOh7jmo7J83nYdJM+4Qi635zgq4YLQwSt/A==}
+    engines: {node: '>=4'}
+
+  is-number@7.0.0:
+    resolution: {integrity: sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==}
+    engines: {node: '>=0.12.0'}
+
+  kind-of@3.2.2:
+    resolution: {integrity: sha512-NOW9QQXMoZGg/oqnVNoNTTIFEIid1627WCffUBJEdMxYApq7mNE7CpzucIPc+ZQg25Phej7IJSmX3hO+oblOtQ==}
+    engines: {node: '>=0.10.0'}
+
+snapshots:
+
+  is-buffer@2.0.0: {}
+
+  is-number@7.0.0: {}
+
+  kind-of@3.2.2:
+    dependencies:
+      is-buffer: 2.0.0

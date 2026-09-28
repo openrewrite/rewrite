@@ -173,7 +173,8 @@ final class PnpmLockDiff {
                 .newVersion(node.getVersion())
                 .newIntegrity(integrity)
                 .newDependencies(newEdges.isEmpty() ? null : newEdges)
-                .metadata(notEmpty(m.getEngines()) ? EntryMetadata.builder().engines(m.getEngines()).build() : null)
+                .metadata(EntryMetadata.builder().engines(notEmpty(m.getEngines()) ? m.getEngines() : null)
+                        .enginesChanged(true).build())
                 .scope(declaringScope(root, name))
                 .importerDir(null)
                 .kind(node.getVersion().equals(root.getResolved().get(name)) ?

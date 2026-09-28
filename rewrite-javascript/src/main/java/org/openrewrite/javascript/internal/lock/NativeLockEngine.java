@@ -19,6 +19,7 @@ import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.RecipeRunException;
@@ -40,6 +41,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.semver.Semver;
 import org.yaml.snakeyaml.Yaml;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
@@ -180,6 +182,10 @@ public final class NativeLockEngine {
             // or some other field the native engine cannot prove leaves the closure unchanged.
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                     "change is outside declared dependencies (e.g. overrides/resolutions) and requires resolution");
+        }
+        // bun and pnpm record the declared overrides in the lock, which only the whole-closure path rewrites.
+        if (!overridesNodes(pm, originalPackageJson).equals(overridesNodes(pm, editedPackageJson))) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "overrides changed and require resolution");
         }
         // Parsed before any registry call, so an override the package manager itself rejects fails fast.
         Set<String> overridden = declaredOverrides(pm, editedPackageJson).names();
@@ -369,12 +375,26 @@ public final class NativeLockEngine {
                                               @Nullable Path packageJsonPath, NodeRegistries registries,
                                               NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = buildWithoutOverrides(PackageManager.Pnpm, registry,
-                lockedVersionsPnpm(existingLock), editedPackageJson);
+        Overrides overrides = declaredOverrides(PackageManager.Pnpm, editedPackageJson);
+        Map<String, Set<String>> locked = lockedVersionsPnpm(existingLock);
+        requireUnsupportedUnreached(PackageManager.Pnpm, overrides, locked.keySet());
+        // pnpm pins an overridden direct dependency's importer specifier to the override as well.
+        String effective = withOverriddenDirectSpecs(editedPackageJson, overrides);
+        ResolutionGraph graph = buildPnpm(registry, locked, effective, overrides.ranges);
+        Map<String, String> ranges = settlePnpmParents(graph, overrides);
+        if (!ranges.equals(overrides.ranges)) {
+            graph = buildPnpm(registry, locked, effective, ranges);
+            if (!settlePnpmParents(graph, overrides).equals(ranges)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "scoped overrides do not settle on one set of applied rules");
+            }
+        }
+        requireUnsupportedUnreached(PackageManager.Pnpm, overrides, reachedNames(graph));
         List<LockEditSet.PackageEdit> edits = PnpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Pnpm, packageJsonPath),
-                PackageManager.Pnpm, editedPackageJson, edits);
-        return Result.success(new PnpmLockPatcher().patch(editSet));
+                PackageManager.Pnpm, effective, edits);
+        return Result.success(PnpmLockPatcher.withOverrides(new PnpmLockPatcher().patch(editSet),
+                recordedOverrides(PackageManager.Pnpm, editedPackageJson)));
     }
 
     /** The versions the pnpm lock already resolves, by name (bare {@code packages} keys). */
@@ -403,12 +423,20 @@ public final class NativeLockEngine {
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = buildWithoutOverrides(PackageManager.Bun, registry,
-                lockedVersionsBun(existingLock), editedPackageJson);
+        Overrides overrides = declaredOverrides(PackageManager.Bun, editedPackageJson);
+        if (!overrides.unsupported.isEmpty()) {
+            // bun records every declared override in the lock, and only flat ones are reproduced here.
+            Map.Entry<String, String> first = overrides.unsupported.entrySet().iterator().next();
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, first.getKey(),
+                    "override " + first.getValue() + " is not yet applied for " + PackageManager.Bun);
+        }
+        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock), false,
+                overrides.ranges).build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),
                 PackageManager.Bun, editedPackageJson, edits);
-        return Result.success(new BunLockPatcher().patch(editSet));
+        return Result.success(BunLockPatcher.withOverrides(new BunLockPatcher().patch(editSet),
+                recordedOverrides(PackageManager.Bun, editedPackageJson)));
     }
 
     /**
@@ -424,19 +452,41 @@ public final class NativeLockEngine {
     /**
      * Parse the manifest's overrides once, as {@code pm} reads them. A key naming no package is refused before
      * anything resolves. On npm, a top-level name and one level of {@code parent -> {name -> range}} (what a
-     * {@code dependencyPath} run writes) are applied; every other key is only recorded, and refuses once the
-     * closure reaches a name it selects.
+     * {@code dependencyPath} run writes) are applied, as are bun's flat keys and pnpm's plain and
+     * {@code parent>child} keys; every other key is only recorded, and refuses once the closure reaches a name it
+     * selects.
      */
     private static Overrides declaredOverrides(PackageManager pm, String manifestJson) {
         Overrides overrides = new Overrides();
         for (JsonNode node : overridesNodes(pm, manifestJson)) {
             if (pm == PackageManager.Npm) {
                 collectNpmOverrides(node, null, overrides);
+            } else if (pm == PackageManager.Bun) {
+                collectBunOverrides(node, overrides);
+            } else if (pm == PackageManager.Pnpm) {
+                collectPnpmOverrides(node, overrides);
             } else {
                 collectKeyedOverrides(node, null, overrides);
             }
         }
         return overrides;
+    }
+
+    /**
+     * bun applies a flat {@code name -> range} to every requirer, a direct dependency included. {@code overrides}
+     * is read before {@code resolutions}, and the first declaration of a name wins, as bun resolves it.
+     */
+    private static void collectBunOverrides(JsonNode node, Overrides overrides) {
+        for (Map.Entry<String, JsonNode> property : node.properties()) {
+            String key = property.getKey();
+            JsonNode value = property.getValue();
+            if (!OVERRIDE_NAME.matcher(key).matches() || !value.isTextual() ||
+                !Semver.validate(value.asText(), null, NODE).isValid()) {
+                recordKeyedOverride(key, value, key, overrides);
+            } else if (!overrides.ranges.containsKey(key) && !overrides.unsupported.containsKey(key)) {
+                overrides.ranges.put(key, value.asText());
+            }
+        }
     }
 
     /** The manifest's override objects for {@code pm}; bun honours yarn's {@code resolutions} as well as npm's. */
@@ -515,27 +565,135 @@ public final class NativeLockEngine {
         return requireOverrideName(key, parentName(key));
     }
 
-    /** pnpm, yarn and bun keys: none is applied yet, so each name a key selects is only recorded. */
-    private static void collectKeyedOverrides(JsonNode node, @Nullable String top, Overrides overrides) {
+    /** Keys this engine does not apply: each name a key selects is only recorded. */
+    /** pnpm: a plain key applies to every requirer, {@code parent>child} (plain names) to the parent's own edges. */
+    private static void collectPnpmOverrides(JsonNode node, Overrides overrides) {
         for (Map.Entry<String, JsonNode> property : node.properties()) {
             String key = property.getKey();
-            String owner = top == null ? key : top;
-            String[] segments = KEY_SEPARATOR.split(key);
-            boolean named = false;
-            for (int i = 0; i < segments.length; i++) {
-                String segment = segments[i].startsWith("@") && i + 1 < segments.length ?
-                        segments[i] + "/" + segments[++i] : segments[i];
-                if (!"**".equals(segment)) {
-                    overrides.unsupported(requireOverrideName(key, parentName(segment)), owner);
-                    named = true;
+            JsonNode value = property.getValue();
+            int gt = key.indexOf('>');
+            String child = gt < 0 ? key : key.substring(gt + 1);
+            String parent = gt < 0 ? null : key.substring(0, gt);
+            if (value.isTextual() && Semver.validate(value.asText(), null, NODE).isValid() &&
+                OVERRIDE_NAME.matcher(child).matches() && (parent == null || OVERRIDE_NAME.matcher(parent).matches()) &&
+                !overrides.names().contains(child)) {
+                overrides.ranges.put(child, value.asText());
+                if (parent != null) {
+                    overrides.scopedParent.put(child, parent);
+                }
+            } else {
+                recordKeyedOverride(key, value, key, overrides);
+            }
+        }
+    }
+
+    /**
+     * The declared overrides as the lock records them: bun folds {@code resolutions} into {@code overrides}, the
+     * first declaration of a name winning; pnpm keeps every key verbatim. Only string values are reproduced.
+     */
+    private static Map<String, String> recordedOverrides(PackageManager pm, String manifestJson) {
+        Map<String, String> recorded = new LinkedHashMap<>();
+        for (JsonNode node : overridesNodes(pm, manifestJson)) {
+            for (Map.Entry<String, JsonNode> property : node.properties()) {
+                if (!property.getValue().isTextual()) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, property.getKey(),
+                            "override " + property.getKey() + " is not yet recorded for " + pm);
+                }
+                recorded.putIfAbsent(property.getKey(), property.getValue().asText());
+            }
+        }
+        return recorded;
+    }
+
+    /** {@code manifestJson} with each directly declared dependency a global override names pinned to that override. */
+    private static String withOverriddenDirectSpecs(String manifestJson, Overrides overrides) {
+        try {
+            JsonNode root = JSON.readTree(manifestJson);
+            boolean changed = false;
+            for (String scope : DECLARED_SCOPES) {
+                JsonNode deps = root.get(scope);
+                if (deps == null || !deps.isObject()) {
+                    continue;
+                }
+                for (Map.Entry<String, String> e : overrides.ranges.entrySet()) {
+                    if (!overrides.scopedParent.containsKey(e.getKey()) && deps.has(e.getKey()) &&
+                        !e.getValue().equals(deps.get(e.getKey()).asText())) {
+                        ((ObjectNode) deps).put(e.getKey(), e.getValue());
+                        changed = true;
+                    }
                 }
             }
-            if (!named) {
-                requireOverrideName(key, key);
+            return changed ? JSON.writeValueAsString(root) : manifestJson;
+        } catch (IOException e) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest dependencies");
+        }
+    }
+
+    /**
+     * pnpm scopes {@code parent>child} to the parent's own dependency edges. Resolving it globally is the same
+     * answer only when the parent is the child's sole requirer; when no parent requires it the rule is inert, and
+     * any other mix would need a second copy the global resolver does not produce.
+     */
+    private static Map<String, String> settlePnpmParents(ResolutionGraph graph, Overrides overrides) {
+        Map<String, String> ranges = new LinkedHashMap<>(overrides.ranges);
+        for (Map.Entry<String, String> e : overrides.scopedParent.entrySet()) {
+            String child = e.getKey();
+            String parent = e.getValue();
+            String otherRequirer = null;
+            boolean parentRequires = false;
+            for (ResolutionGraph.Importer importer : graph.getImporters()) {
+                if (importer.getResolved().containsKey(child)) {
+                    otherRequirer = "the project";
+                }
             }
-            if (property.getValue().isObject()) {
-                collectKeyedOverrides(property.getValue(), owner, overrides);
+            for (ResolvedNode node : graph.getNodes().values()) {
+                boolean requires = node.getResolvedEdges().containsKey(child) ||
+                        (node.getManifest().getPeerDependencies() != null &&
+                                node.getManifest().getPeerDependencies().containsKey(child));
+                if (requires && parent.equals(node.getManifest().getName())) {
+                    parentRequires = true;
+                } else if (requires) {
+                    otherRequirer = node.getManifest().getName();
+                }
             }
+            if (!parentRequires) {
+                ranges.remove(child);
+            } else if (otherRequirer != null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, child,
+                        "override of " + child + " scoped to " + parent + " but " + otherRequirer + " also requires it");
+            }
+        }
+        return ranges;
+    }
+
+    private static ResolutionGraph buildPnpm(Registry registry, Map<String, Set<String>> locked,
+                                             String manifestJson, Map<String, String> ranges) {
+        return new NpmGraphBuilder(registry, false, locked, false, ranges).build(singletonMap("", manifestJson));
+    }
+
+    private static void collectKeyedOverrides(JsonNode node, @Nullable String top, Overrides overrides) {
+        for (Map.Entry<String, JsonNode> property : node.properties()) {
+            recordKeyedOverride(property.getKey(), property.getValue(), top == null ? property.getKey() : top,
+                    overrides);
+        }
+    }
+
+    private static void recordKeyedOverride(String key, JsonNode value, String owner, Overrides overrides) {
+        String[] segments = KEY_SEPARATOR.split(key);
+        boolean named = false;
+        for (int i = 0; i < segments.length; i++) {
+            String segment = segments[i].startsWith("@") && i + 1 < segments.length ?
+                    segments[i] + "/" + segments[++i] : segments[i];
+            if (!"**".equals(segment)) {
+                overrides.unsupported(requireOverrideName(key, parentName(segment)), owner);
+                named = true;
+            }
+        }
+        if (!named) {
+            requireOverrideName(key, key);
+        }
+        if (value.isObject()) {
+            collectKeyedOverrides(value, owner, overrides);
         }
     }
 
@@ -599,7 +757,7 @@ public final class NativeLockEngine {
         return names;
     }
 
-    /** pnpm, yarn and bun resolve with no override applied, refusing any the closure reaches. */
+    /** yarn resolves with no override applied, refusing any the closure reaches. */
     private static ResolutionGraph buildWithoutOverrides(PackageManager pm, Registry registry,
                                                          Map<String, Set<String>> locked, String editedPackageJson) {
         Overrides overrides = declaredOverrides(pm, editedPackageJson);

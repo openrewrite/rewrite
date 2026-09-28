@@ -1,0 +1,20 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "x",
+      "dependencies": {
+        "is-odd": "0.1.2",
+      },
+    },
+  },
+  "overrides": {
+    "is-odd": "0.1.1",
+  },
+  "packages": {
+    "is-number": ["is-number@1.1.2", "", {}, "sha512-dRKHHq76sZAXFf823ziHIOx5fXbuV1IrR892LugLDmyEBVMZzGoske4sY6lf+l3YPH/VyWNiKzNDXAPiQhx9Yg=="],
+
+    "is-odd": ["is-odd@0.1.1", "", { "dependencies": { "is-number": "^1.1.0" } }, "sha512-MryzYFJV3tn8l7PJdvCLVJvwjB3zdS+qKdopFQyo9uOlJ4AHeLoaIDElZTwDvcwk/vmcNqoIob2bBN4pFEsYCg=="],
+  }
+}

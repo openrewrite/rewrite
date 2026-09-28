@@ -952,16 +952,16 @@ class NativeLockEngineTest {
         assertUnrelatedAddSucceeds(PackageManager.Bun, "\"overrides\":{\"shared\":\"^2.0.0\"}", bunLock());
     }
 
-    /** Bun honours yarn's {@code resolutions} as well as {@code overrides}, and applies neither here yet. */
+    /** bun records every override in its lock and only flat keys are reproduced, so a nested one refuses unreached. */
     @Test
-    void reachedBunResolutionFailsLoud() {
+    void nestedBunOverrideFailsLoud() {
         Result result = regen(PackageManager.Bun,
                 "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"resolutions\":{\"shared\":\"^2.0.0\"}}",
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"overrides\":{\"alpha\":{\"shared\":\"^2.0.0\"}}}",
                 bunLock());
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("override shared reaches shared but is not yet applied for Bun");
+        assertThat(result.getFailure().getDetail()).contains("override alpha is not yet applied for Bun");
     }
 
     private static String bunLock() {
@@ -984,66 +984,6 @@ class NativeLockEngineTest {
                   }
                 }
                 """;
-    }
-
-    @Test
-    void anAppliedOverrideIsRefusedOnOtherPackageManagers() {
-        routes.put("https://registry.npmjs.org/alpha",
-                "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/alpha/1.0.0",
-                "{\"name\":\"alpha\",\"version\":\"1.0.0\",\"dependencies\":{\"shared\":\"^1.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\",\"integrity\":\"sha512-ALPHA1\"}}");
-        routes.put("https://registry.npmjs.org/shared",
-                "{\"name\":\"shared\",\"dist-tags\":{},\"versions\":{\"1.5.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/shared/1.5.0",
-                "{\"name\":\"shared\",\"version\":\"1.5.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/shared/-/shared-1.5.0.tgz\",\"integrity\":\"sha512-SHARED\"}}");
-        routes.put("https://registry.npmjs.org/shared/2.0.0",
-                "{\"name\":\"shared\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/shared/-/shared-2.0.0.tgz\",\"integrity\":\"sha512-SHARED2\"}}");
-
-        String lock = "lockfileVersion: '9.0'\n\n" +
-                "settings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\n" +
-                "importers:\n\n  .:\n    dependencies:\n" +
-                "      alpha:\n        specifier: ^1.0.0\n        version: 1.0.0\n\n" +
-                "packages:\n\n" +
-                "  alpha@1.0.0:\n    resolution: {integrity: sha512-ALPHA1}\n\n" +
-                "  shared@1.5.0:\n    resolution: {integrity: sha512-SHARED}\n\n" +
-                "snapshots:\n\n" +
-                "  alpha@1.0.0:\n    dependencies:\n      shared: 1.5.0\n\n" +
-                "  shared@1.5.0: {}\n";
-
-        Result result = regen(PackageManager.Pnpm,
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"pnpm\":{\"overrides\":{\"shared\":\"^2.0.0\"}}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("not yet applied for Pnpm");
-    }
-
-    /** pnpm's own {@code parent>child} key is valid there, so one the closure never reaches does not refuse. */
-    @Test
-    void unreachedPnpmPathOverrideIsInert() {
-        routes.put("https://registry.npmjs.org/alpha",
-                "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/alpha/1.0.0",
-                "{\"name\":\"alpha\",\"version\":\"1.0.0\"," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\",\"integrity\":\"sha512-ALPHA1\"}}");
-        String lock = "lockfileVersion: '9.0'\n\n" +
-                "settings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\n" +
-                "importers:\n\n  .:\n    dependencies:\n" +
-                "      alpha:\n        specifier: ^1.0.0\n        version: 1.0.0\n\n" +
-                "packages:\n\n" +
-                "  alpha@1.0.0:\n    resolution: {integrity: sha512-ALPHA1}\n\n" +
-                "snapshots:\n\n" +
-                "  alpha@1.0.0: {}\n";
-
-        Result result = regen(PackageManager.Pnpm,
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"pnpm\":{\"overrides\":{\"express>accepts\":\"^2.0.0\"}}}",
-                lock);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).isEqualTo(lock);
     }
 
     /**

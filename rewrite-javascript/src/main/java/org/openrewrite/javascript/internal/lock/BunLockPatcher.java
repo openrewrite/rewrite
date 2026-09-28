@@ -37,6 +37,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.Kind.*;
@@ -157,6 +158,49 @@ public final class BunLockPatcher implements LockPatcher {
             }
         }
         return patched.printAll();
+    }
+
+    /**
+     * Set the lock's top-level {@code overrides} to {@code overrides}, which bun writes sorted and directly after
+     * {@code workspaces}, or drop it when there are none.
+     */
+    static String withOverrides(String lock, Map<String, String> overrides) {
+        Json.Document document = LockJson.parse(lock, null);
+        Json.JsonObject root = (Json.JsonObject) document.getValue();
+        List<JsonRightPadded<Json>> members = new ArrayList<>(root.getPadding().getMembers());
+        int existing = -1;
+        int workspaces = -1;
+        for (int i = 0; i < members.size(); i++) {
+            Json el = members.get(i).getElement();
+            String key = el instanceof Json.Member ? LockJson.literal(((Json.Member) el).getKey()) : null;
+            if ("overrides".equals(key)) {
+                existing = i;
+            } else if ("workspaces".equals(key)) {
+                workspaces = i;
+            }
+        }
+        if (overrides.isEmpty()) {
+            if (existing < 0) {
+                return lock;
+            }
+            members.remove(existing);
+        } else {
+            StringBuilder source = new StringBuilder("\"overrides\": {\n");
+            for (Map.Entry<String, String> e : new TreeMap<>(overrides).entrySet()) {
+                source.append(UNIT).append(UNIT).append(quote(e.getKey())).append(": ").append(quote(e.getValue()))
+                        .append(",\n");
+            }
+            Json.Member member = parseMember(source.append(UNIT).append('}').toString());
+            member = member.withPrefix(Space.EMPTY.withWhitespace("\n" + UNIT));
+            if (existing >= 0) {
+                members.set(existing, members.get(existing).withElement(member));
+            } else if (workspaces >= 0) {
+                members.add(workspaces + 1, new JsonRightPadded<>(member, Space.EMPTY, Markers.EMPTY));
+            } else {
+                throw new EngineFailure(Reason.MALFORMED_LOCK, null, "bun.lock has no workspaces to place overrides after");
+            }
+        }
+        return document.withValue(root.getPadding().withMembers(members)).printAll();
     }
 
     // --- leaf / clean-closure add ----------------------------------
