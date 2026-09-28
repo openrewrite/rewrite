@@ -791,7 +791,7 @@ class NativeLockEngineTest {
         // No registry is stubbed here, so the whole-closure fallback in resolveAndPatch cannot run: its
         // packument fetch 404s and the NodeRegistryException is swallowed back into this per-dependency
         // deferral. The deferral asserted below is therefore the unreachable-registry path, not proof
-        // that an override defers in general -- see overrideOfALockedTransitiveMustNotSilentlySucceed.
+        // of how an override resolves -- see globalOverrideWithSeveralRequirersResolves.
         Result result = regen(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"1.0.0\"}}",
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"2.0.0\"}}",
@@ -802,60 +802,18 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).contains("outside declared dependencies");
     }
 
-    /**
-     * The whole-closure resolver reads only declared dependencies, so it recomputes the identical
-     * closure and reports success over a lock that still pins the old version.
-     */
-    @Test
-    void overrideOfALockedTransitiveMustNotSilentlySucceed() {
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{\"tslib\":\"^1.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\"," +
-                        "\"integrity\":\"sha512-LODASH\"}}");
-        routes.put("https://registry.npmjs.org/tslib",
-                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/tslib/1.0.0",
-                "{\"name\":\"tslib\",\"version\":\"1.0.0\"," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-TSLIB1\"}}");
-        routes.put("https://registry.npmjs.org/tslib/2.0.0",
-                "{\"name\":\"tslib\",\"version\":\"2.0.0\"," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-TSLIB2\"}}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib\":\"^2.0.0\"}}",
-                """
-                {
-                  "name": "x",
-                  "lockfileVersion": 3,
-                  "packages": {
-                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20"}},
-                    "node_modules/lodash": {"version": "4.17.20", "dependencies": {"tslib": "^1.0.0"}},
-                    "node_modules/tslib": {"version": "1.0.0"}
-                  }
-                }
-                """);
-
-        // Honoring the override or deferring are both defensible; claiming success is not.
-        assertThat(result.isSuccess() && result.getLockFileContent().contains("\"version\": \"1.0.0\""))
-                .as("must not report success while the lock still pins the overridden transitive")
-                .isFalse();
-    }
-
-    /** One level of nesting is applied; anything deeper the resolver cannot express. */
+    /** One level of nesting is applied; anything deeper the resolver cannot express, so it refuses once reached. */
     @Test
     void deeplyNestedOverrideFailsLoud() {
+        versionedParentRoutes();
+
         Result result = regen(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":{\"b\":{\"c\":\"1.0.0\"}}}}",
-                npmLock("4.17.20"));
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"lodash\":{\"tslib\":{\"c\":\"1.0.0\"}}}}",
+                versionedParentLock());
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("override nested under a");
+        assertThat(result.getFailure().getDetail()).contains("override lodash reaches tslib");
     }
 
     /**
@@ -906,15 +864,37 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
     }
 
+    /** A version-selected leaf key is valid npm this engine does not apply: inert until the closure reaches it. */
+    @Test
+    void versionSelectedLeafKeyIsInertUntilReached() {
+        versionedParentRoutes();
+
+        Result unreached = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"is-odd@1\":\"2.0.0\"}}",
+                versionedParentLock());
+        Result reached = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib@1\":\"2.0.0\"}}",
+                versionedParentLock());
+
+        assertThat(unreached.isSuccess()).as(String.valueOf(unreached.getErrorMessage())).isTrue();
+        assertThat(unreached.getLockFileContent()).isEqualTo(versionedParentLock());
+        assertThat(reached.isSuccess()).isFalse();
+        assertThat(reached.getFailure().getDetail()).contains("override tslib@1 reaches tslib");
+    }
+
     @Test
     void overrideReferencingADeclaredDependencyFailsLoud() {
+        versionedParentRoutes();
+
         Result result = regen(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib\":\"$lodash\"}}",
-                npmLock("4.17.20"));
+                versionedParentLock());
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("is not a version range");
+        assertThat(result.getFailure().getDetail()).contains("reaches tslib but is not yet applied");
     }
 
     /** Only npm applies overrides so far; the rest refuse rather than emit an untested lock. */
@@ -1023,6 +1003,32 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail()).contains("not yet applied for Pnpm");
+    }
+
+    /** pnpm's own {@code parent>child} key is valid there, so one the closure never reaches does not refuse. */
+    @Test
+    void unreachedPnpmPathOverrideIsInert() {
+        routes.put("https://registry.npmjs.org/alpha",
+                "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/alpha/1.0.0",
+                "{\"name\":\"alpha\",\"version\":\"1.0.0\"," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\",\"integrity\":\"sha512-ALPHA1\"}}");
+        String lock = "lockfileVersion: '9.0'\n\n" +
+                "settings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\n" +
+                "importers:\n\n  .:\n    dependencies:\n" +
+                "      alpha:\n        specifier: ^1.0.0\n        version: 1.0.0\n\n" +
+                "packages:\n\n" +
+                "  alpha@1.0.0:\n    resolution: {integrity: sha512-ALPHA1}\n\n" +
+                "snapshots:\n\n" +
+                "  alpha@1.0.0: {}\n";
+
+        Result result = regen(PackageManager.Pnpm,
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"pnpm\":{\"overrides\":{\"express>accepts\":\"^2.0.0\"}}}",
+                lock);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(lock);
     }
 
     /**
@@ -1271,10 +1277,7 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).contains("no longer resolved");
     }
 
-    /**
-     * An aliased dependency resolves through selectAlias, which keys the slot by the alias name and never
-     * reaches select, so an override naming it would be skipped without trace. Refuse instead.
-     */
+    /** npm fails with EOVERRIDE: the override rewrites the root's {@code npm:} spec. */
     @Test
     void overrideOfAnAliasedDependencyFailsLoud() {
         routes.put("https://registry.npmjs.org/tslib",
@@ -1294,6 +1297,43 @@ class NativeLockEngineTest {
                   "packages": {
                     "": {"name": "x", "dependencies": {"foo": "npm:tslib@^1.0.0"}},
                     "node_modules/foo": {"name": "tslib", "version": "1.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz", "integrity": "sha512-TSLIB100"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("foo").contains("direct dependency");
+    }
+
+    /**
+     * A dependency's own {@code npm:} alias edge is out of EOVERRIDE's reach, but selectAlias bypasses select, so
+     * a root override naming the alias would be skipped without trace. Refuse instead.
+     */
+    @Test
+    void overrideOfATransitiveAliasFailsLoud() {
+        routes.put("https://registry.npmjs.org/lib",
+                "{\"name\":\"lib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/lib/1.0.0",
+                "{\"name\":\"lib\",\"version\":\"1.0.0\",\"dependencies\":{\"foo\":\"npm:tslib@^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lib/-/lib-1.0.0.tgz\",\"integrity\":\"sha512-LIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/1.0.0",
+                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-TSLIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lib\":\"^1.0.0\"}}",
+                "{\"dependencies\":{\"lib\":\"^1.0.0\"},\"overrides\":{\"foo\":\"^2.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"lib": "^1.0.0"}},
+                    "node_modules/foo": {"name": "tslib", "version": "1.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz", "integrity": "sha512-TSLIB100"},
+                    "node_modules/lib": {"version": "1.0.0", "resolved": "https://registry.npmjs.org/lib/-/lib-1.0.0.tgz", "integrity": "sha512-LIB100", "dependencies": {"foo": "npm:tslib@^1.0.0"}}
                   }
                 }
                 """);
@@ -1515,11 +1555,11 @@ class NativeLockEngineTest {
 
     /**
      * PackageJsonOverrides writes a {@code name@version} parent key when a dependencyPath segment carries a
-     * version, and npm applies such an override only while the parent resolves to that version. When it does,
-     * the selector adds nothing to the scoped case already handled.
+     * version. Such a key also overrides the parent itself to that version, so against a direct {@code ^4.17.20}
+     * npm fails with EOVERRIDE.
      */
     @Test
-    void versionedParentKeyAppliesWhenTheParentMatches() {
+    void versionedParentKeyIntersectingADirectRangeRefuses() {
         versionedParentRoutes();
 
         Result result = regen(PackageManager.Npm,
@@ -1527,13 +1567,13 @@ class NativeLockEngineTest {
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"lodash@4.17.20\":{\"tslib\":\"^2.0.0\"}}}",
                 versionedParentLock());
 
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).contains("tslib-2.0.0.tgz").doesNotContain("tslib-1.0.0.tgz");
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("lodash").contains("direct dependency");
     }
 
-    /** The parent resolves to a different version, so npm would not apply it and neither can this. */
+    /** The key's version is outside the declared range, so npm ignores the rule and so does this. */
     @Test
-    void versionedParentKeyRefusesWhenTheParentDiffers() {
+    void versionedParentKeyOutsideADirectRangeIsInert() {
         versionedParentRoutes();
 
         Result result = regen(PackageManager.Npm,
@@ -1541,10 +1581,8 @@ class NativeLockEngineTest {
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"lodash@9.9.9\":{\"tslib\":\"^2.0.0\"}}}",
                 versionedParentLock());
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail())
-                .as("refused for the version mismatch, not for the selector shape")
-                .contains("resolved to 4.17.20");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(versionedParentLock());
     }
 
     @Test
@@ -1658,7 +1696,7 @@ class NativeLockEngineTest {
                 yarnClassicLock());
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("**/beta is not a plain package name");
+        assertThat(result.getFailure().getDetail()).contains("the edit reaches beta");
     }
 
     /** A selector bounding no name could select anything, so no edit can be shown to be unrelated to it. */

@@ -1,0 +1,12 @@
+{
+  "name": "version-selector-transitive-miss",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-even": "1.0.0"
+  },
+  "overrides": {
+    "is-odd@^2.0.0": {
+      "is-number": "7.0.0"
+    }
+  }
+}

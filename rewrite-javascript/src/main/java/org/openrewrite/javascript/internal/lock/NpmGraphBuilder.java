@@ -77,13 +77,6 @@ public final class NpmGraphBuilder {
 
     private final Map<String, String> overrides;
 
-    /** Lets a caller that cannot apply overrides tell a real one from a leftover nothing depends on. */
-    private final Set<String> appliedOverrides = new LinkedHashSet<>();
-
-    public Set<String> getAppliedOverrides() {
-        return appliedOverrides;
-    }
-
     public NpmGraphBuilder(Registry registry) {
         this(registry, false);
     }
@@ -99,11 +92,6 @@ public final class NpmGraphBuilder {
     public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions,
                            boolean placedPeerForks) {
         this(registry, autoInstallPeers, lockedVersions, placedPeerForks, emptyMap());
-    }
-
-    public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions,
-                           Map<String, String> overrides) {
-        this(registry, autoInstallPeers, lockedVersions, false, overrides);
     }
 
     public NpmGraphBuilder(Registry registry, boolean autoInstallPeers, Map<String, Set<String>> lockedVersions,
@@ -207,11 +195,7 @@ public final class NpmGraphBuilder {
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
                           Deque<String[]> work) {
         // Must precede the dedupe below: an override applied after it would lose to an already-chosen version.
-        String override = overrides.get(name);
-        if (override != null) {
-            appliedOverrides.add(name);
-            range = override;
-        }
+        range = overrides.getOrDefault(name, range);
         String deduped = Semver.maxSatisfying(chosen.getOrDefault(name, emptySet()), range, NODE);
         if (deduped != null) {
             return deduped;
@@ -255,7 +239,6 @@ public final class NpmGraphBuilder {
             // npm 11 does not apply an override keyed on the real name to an aliased slot, so only the alias
             // name refuses here; selectAlias bypasses select, so it would otherwise be skipped in silence.
             if (overrides.containsKey(name)) {
-                appliedOverrides.add(name);
                 throw new EngineFailure(RESOLUTION_REQUIRED, name,
                         "override of aliased dependency " + name + " (" + spec + ") is not supported");
             }
@@ -562,7 +545,6 @@ public final class NpmGraphBuilder {
         for (String[] miss : missing) {
             // resolveLeafPeer bypasses select, so an override naming this peer would be skipped silently.
             if (overrides.containsKey(miss[1])) {
-                appliedOverrides.add(miss[1]);
                 throw new EngineFailure(RESOLUTION_REQUIRED, miss[1],
                         "override of auto-installed peer " + miss[1] + " (required by " + miss[0] + ") is not supported");
             }
