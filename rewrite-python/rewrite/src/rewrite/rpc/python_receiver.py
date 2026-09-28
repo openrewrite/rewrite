@@ -1785,7 +1785,7 @@ def _send_parse_error(parse_error, q):
     """
     # Send all fields in order (matching Java's ParseError.rpcSend)
     q.get_and_send(parse_error, lambda x: id_to_str(x._id))
-    q.get_and_send(parse_error, lambda x: x.markers)
+    q.get_and_send_as_ref(parse_error, lambda x: x.markers)
     q.get_and_send(parse_error, lambda x: str(x.source_path))
     q.get_and_send(parse_error, lambda x: x.charset_name)
     q.get_and_send(parse_error, lambda x: x.charset_bom_marked)

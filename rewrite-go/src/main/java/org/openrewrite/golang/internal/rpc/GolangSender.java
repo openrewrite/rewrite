@@ -26,6 +26,7 @@ import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.rpc.Reference;
 
 import static org.openrewrite.rpc.Reference.getValueNonNull;
+import static org.openrewrite.rpc.Reference.asRef;
 
 public class GolangSender extends GolangVisitor<RpcSendQueue> {
     private final GolangSenderDelegate delegate = new GolangSenderDelegate(this);
@@ -42,7 +43,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.getAndSend(j, Tree::getMarkers);
+        q.getAndSend(j, mk -> asRef(mk.getMarkers()));
         return j;
     }
 

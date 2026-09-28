@@ -168,6 +168,8 @@ class RewriteRpcTest implements RewriteTest {
         PlainText synced = client.getObject(id, sourceFileType);
         assertThat(synced.getText()).isEqualTo("Hello");
         assertThat(server.remoteObjects).containsKey(id);
+        // The refs this exchange assigned (its Markers) stay; only the failed exchange's roll back.
+        int refsAfterSync = server.localRefs.size();
 
         // Step 2: replace with a PlainText that has null sourcePath, causing
         // NPE in PlainTextRpcCodec.rpcSend() at d.getSourcePath().toString()
@@ -192,7 +194,7 @@ class RewriteRpcTest implements RewriteTest {
         int refsAfterFailure = server.localRefs.size();
         assertThat(refsAfterFailure)
           .describedAs("Sender should roll back localRefs assigned during failed exchange")
-          .isEqualTo(0);
+          .isEqualTo(refsAfterSync);
 
         // Step 5: put back a valid tree and retry — should succeed via full ADD
         PlainText fixed = original.withText("Fixed");

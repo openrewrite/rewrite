@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Rewrite.Core.Rpc;
 using OpenRewrite.Core.Rpc;
 
 namespace OpenRewrite.Core;
@@ -72,7 +73,7 @@ public sealed class ParseError(
     public void RpcSend(ParseError after, RpcSendQueue q)
     {
         q.GetAndSend(after, e => e.Id);
-        q.GetAndSend(after, e => (object)e.Markers);
+        q.GetAndSend(after, e => Reference.AsRef(e.Markers));
         q.GetAndSend(after, e => e.SourcePath);
         q.GetAndSend(after, e => e.CharsetName);
         q.GetAndSend(after, e => (object)e.CharsetBomMarked);

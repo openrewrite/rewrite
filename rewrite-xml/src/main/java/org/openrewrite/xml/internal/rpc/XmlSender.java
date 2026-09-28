@@ -22,6 +22,7 @@ import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
+import static org.openrewrite.rpc.Reference.asRef;
 
 public class XmlSender extends XmlVisitor<RpcSendQueue> {
 
@@ -29,7 +30,7 @@ public class XmlSender extends XmlVisitor<RpcSendQueue> {
     public Xml preVisit(Xml x, RpcSendQueue q) {
         q.getAndSend(x, Tree::getId);
         q.getAndSend(x, Xml::getPrefix);
-        q.getAndSend(x, Tree::getMarkers);
+        q.getAndSend(x, mk -> asRef(mk.getMarkers()));
         return x;
     }
 
