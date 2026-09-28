@@ -184,14 +184,6 @@ public final class PackageJsonOverrides {
         return setNestedOverride(doc, path, packageName, newVersion);
     }
 
-    /**
-     * Set {@code overrides -> path... -> packageName}. Only the {@code overrides} value is rebuilt and spliced
-     * back in, so every other member keeps its original whitespace, which a whole-document reparse discarded.
-     * <p>
-     * Members already inside {@code overrides} are re-rendered rather than preserved: an existing
-     * {@code "overrides": { "a": "1.0.0" }} comes back expanded over several lines. Only this nested path
-     * does that; the un-nested one appends through {@code setFlatEntry} and keeps the block as it was.
-     */
     private static Json.Document setNestedOverride(Json.Document doc, List<DependencyPathSegment> path,
                                                    String packageName, String newVersion) {
         if (!(doc.getValue() instanceof Json.JsonObject)) {
@@ -237,10 +229,6 @@ public final class PackageJsonOverrides {
         }
     }
 
-    /**
-     * Render {@code overrides} with the document's own indent unit and parse it on its own, so only this value
-     * is rebuilt. It sits one level in, so every line after the first carries an extra unit.
-     */
     private static @Nullable JsonValue parseFragment(Json.Document doc, ObjectMapper mapper,
                                                      ObjectNode overrides, String indent) throws Exception {
         DefaultPrettyPrinter printer = new DefaultPrettyPrinter() {
@@ -267,7 +255,6 @@ public final class PackageJsonOverrides {
                 ((Json.JsonObject) holder.getValue()).withPrefix(Space.build(" ", emptyList())) : null;
     }
 
-    /** The value {@code overrides} already holds at {@code path -> packageName}, or {@code null}. */
     private static @Nullable String nestedOverrideValue(Json.Document doc, List<DependencyPathSegment> path,
                                                         String packageName) {
         if (!(doc.getValue() instanceof Json.JsonObject)) {
@@ -401,11 +388,6 @@ public final class PackageJsonOverrides {
         return PackageJsonHelper.addDependency(doc, entryKey, entryValue, topLevelKey);
     }
 
-    /**
-     * Sets {@code pnpm.overrides[key] = value}, creating {@code pnpm} and/or {@code pnpm.overrides}
-     * as needed. Preserves formatting, and returns the document unchanged when the entry already holds
-     * that value, which is what keeps the calling recipe single-cycle.
-     */
     private static Json.Document setPnpmOverridesEntry(Json.Document doc, String key, String value) {
         return PackageJsonHelper.setNestedEntry(doc, "pnpm", "overrides", key, value);
     }

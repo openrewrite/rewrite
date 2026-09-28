@@ -360,14 +360,6 @@ public class PackageJsonHelper {
         return doc.withValue(replaceMember(root, scope, updatedScope));
     }
 
-    /**
-     * Sets {@code doc[outerKey][innerKey][entryKey] = entryValue}, creating the outer and inner objects
-     * when absent, and returning {@code doc} <em>unchanged</em> when the entry already holds that value.
-     * <p>
-     * Both properties matter to callers. Formatting is preserved throughout, so setting one nested entry
-     * does not reprint the whole manifest; and the unchanged return is what keeps a recipe built on this
-     * single-cycle, since {@link #editAndRegenerate} decides whether anything changed by reference identity.
-     */
     public static Json.Document setNestedEntry(Json.Document doc, String outerKey, String innerKey,
                                                String entryKey, String entryValue) {
         if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
@@ -416,7 +408,6 @@ public class PackageJsonHelper {
                 replaceMember(outer, innerKey, updatedInner)));
     }
 
-    /** A new object holding exactly {@code member}, with {@code closingIndent} before its closing brace. */
     private static Json.JsonObject newObjectHolding(Json.Member member, String closingIndent) {
         return new Json.JsonObject(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
                 singletonList(JsonRightPadded.build((Json) member)

@@ -404,17 +404,8 @@ public final class NativeLockEngine {
         return Result.success(new BunLockPatcher().patch(editSet));
     }
 
-    /**
-     * A package name npm would accept: an optional {@code @scope/} then a plain name. An allowlist, because
-     * anything a denylist misses becomes a key matching no package, resolving as if the override were absent,
-     * and reporting success - the defect this engine exists to avoid.
-     */
     private static final Pattern OVERRIDE_NAME = Pattern.compile("(?:@[A-Za-z0-9~][A-Za-z0-9._~-]*/)?[A-Za-z0-9~][A-Za-z0-9._~-]*");
 
-    /**
-     * One level of nesting, {@code {"parent": {"child": range}}}, is what a {@code dependencyPath} run
-     * writes; it is applied globally and {@code requireOverridesHold} proves the equivalence afterwards.
-     */
     private static Overrides declaredOverrides(PackageManager pm, String manifestJson) {
         JsonNode node = overridesNode(pm, manifestJson);
         if (node == null) {
@@ -426,7 +417,6 @@ public final class NativeLockEngine {
         return new Overrides(overrides, scopedParent);
     }
 
-    /** The manifest's override object for {@code pm}, or {@code null} when it declares none usable. */
     private static @Nullable JsonNode overridesNode(PackageManager pm, String manifestJson) {
         try {
             JsonNode root = JSON.readTree(manifestJson);
@@ -443,12 +433,7 @@ public final class NativeLockEngine {
     /** A name a key could be selecting. Globs and separators match nothing; a version selector yields a token of its own. */
     private static final Pattern OVERRIDE_KEY_NAME = Pattern.compile("(?:@[A-Za-z0-9._~-]+/)?[A-Za-z0-9._~-]+");
 
-    /**
-     * Every package name the declared override keys might be selecting, including the glob and path forms
-     * {@link #collectOverrides} refuses to apply. Only routes the edit, never applies anything, so it reads
-     * keys without judging them and errs broad: a spurious name costs one diversion, a missed one costs a
-     * lock patched without its override. {@code null} once a key bounds no name, so nothing can be ruled out.
-     */
+    /** Errs broad: a spurious name costs a diversion, a missed one a lock patched without its override. */
     private static @Nullable Set<String> overriddenNames(PackageManager pm, String manifestJson) {
         Set<String> names = new LinkedHashSet<>();
         return collectOverrideKeyNames(overridesNode(pm, manifestJson), names) ? names : null;
@@ -473,11 +458,6 @@ public final class NativeLockEngine {
         return true;
     }
 
-    /**
-     * Resolution is manager-agnostic but each manager renders its own lock format, and only npm has a fixture
-     * covering an applied override. Refuse the rest rather than ship an untested lock, but only once an
-     * override reaches the closure, so merely carrying a resolutions block still regenerates.
-     */
     private static void requireOverridesApplyOnlyOnNpm(PackageManager pm, NpmGraphBuilder builder) {
         if (pm != PackageManager.Npm && !builder.getAppliedOverrides().isEmpty()) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED,
@@ -486,7 +466,6 @@ public final class NativeLockEngine {
         }
     }
 
-    /** What the manifest declares: the ranges to apply, and for a nested entry the parent it was scoped to. */
     private static final class Overrides {
         final Map<String, String> ranges;
         final Map<String, String> scopedParent;
@@ -497,7 +476,6 @@ public final class NativeLockEngine {
         }
     }
 
-    /** Accept {@code name -> range} and one level of {@code parent -> {name -> range}}; refuse anything else. */
     private static void collectOverrides(JsonNode node, @Nullable String parent,
                                          Map<String, String> overrides, Map<String, String> scopedParent) {
         for (Map.Entry<String, JsonNode> property : node.properties()) {
@@ -521,7 +499,6 @@ public final class NativeLockEngine {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                         "override of " + key + " is not a version range");
             }
-            // A name reachable twice (global and scoped, or under two parents) would resolve by key order.
             if (overrides.put(key, value.asText()) != null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                         "override of " + key + " is declared more than once");
@@ -544,12 +521,8 @@ public final class NativeLockEngine {
     }
 
     /**
-     * npm rejects an override that disagrees with a directly-declared range ("EOVERRIDE"), and resolving it
-     * here would leave the importer on its declared range, so the diff would find nothing to change.
-     * <p>
-     * A nested override is scoped to one parent but was applied to the whole closure. That is the same answer
-     * only when the parent is the sole requirer, so prove it: another requirer would have kept its own version
-     * and needed a second copy this engine does not place.
+     * A nested override is scoped to one parent but was applied to the whole closure, which is the same answer
+     * only when that parent is the sole requirer, so prove it rather than model it.
      */
     private static void requireOverridesHold(ResolutionGraph graph, Map<String, String> overrides,
                                              Map<String, String> scopedParent) {
@@ -571,8 +544,6 @@ public final class NativeLockEngine {
             String parent = parentName(e.getValue());
             String wantVersion = parentVersion(e.getValue());
             if (wantVersion != null) {
-                // npm applies a version-selected override only while the parent resolves to that version.
-                // It has already been applied globally, so a mismatch must refuse rather than re-resolve.
                 for (ResolvedNode n : graph.getNodes().values()) {
                     if (parent.equals(n.getManifest().getName()) &&
                             !wantVersion.equals(n.getManifest().getVersion())) {

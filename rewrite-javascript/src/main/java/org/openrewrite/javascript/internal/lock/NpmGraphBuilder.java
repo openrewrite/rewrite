@@ -69,7 +69,6 @@ public final class NpmGraphBuilder {
 
     private final Map<String, String> overrides;
 
-    /** Lets a caller that cannot apply overrides tell a real one from a leftover nothing depends on. */
     private final Set<String> appliedOverrides = new LinkedHashSet<>();
 
     public Set<String> getAppliedOverrides() {
