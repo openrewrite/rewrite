@@ -138,6 +138,7 @@ public final class NativeLockEngine {
         if (existingLock == null) {
             throw new EngineFailure(Reason.MALFORMED_LOCK, null, "no existing lock file to update");
         }
+        requireRecordedOverridesMatch(pm, editedPackageJson, existingLock);
 
         // Built once and shared by the per-dependency and whole-closure scopes.
         NodeRegistries registries = RegistryDiscovery.discover(ctx, marker, Environment.SYSTEM);
@@ -491,6 +492,89 @@ public final class NativeLockEngine {
         } catch (Exception e) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest overrides");
         }
+    }
+
+    /**
+     * pnpm and Bun record in the lock the overrides it was resolved with, and neither patcher writes that section,
+     * so a lock whose record no longer matches the manifest would be reported as regenerated while contradicting it.
+     */
+    private static void requireRecordedOverridesMatch(PackageManager pm, String editedPackageJson,
+                                                      String existingLock) {
+        if (pm != PackageManager.Pnpm && pm != PackageManager.Bun) {
+            return;
+        }
+        Map<String, String> declared = declaredOverrideSpecs(pm, editedPackageJson);
+        if (declared == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                    "the manifest declares an override the lock's overrides section cannot be compared with");
+        }
+        Map<String, String> recorded = recordedOverrides(pm, existingLock);
+        if (recorded == null) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                    "the lock records an override that cannot be compared with the manifest");
+        }
+        Set<String> selectors = new LinkedHashSet<>(declared.keySet());
+        selectors.addAll(recorded.keySet());
+        for (String selector : selectors) {
+            if (!Objects.equals(declared.get(selector), recorded.get(selector))) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "the lock's overrides section disagrees with the manifest on " + selector);
+            }
+        }
+    }
+
+    /** The selector-to-spec map the lock should record, or {@code null} when a value is not a plain spec. */
+    private static @Nullable Map<String, String> declaredOverrideSpecs(PackageManager pm, String manifestJson) {
+        Map<String, String> specs = new LinkedHashMap<>();
+        JsonNode node = overridesNode(pm, manifestJson);
+        if (node == null) {
+            return specs;
+        }
+        Map<String, String> directSpecs = directDependencySpecs(manifestJson);
+        for (Map.Entry<String, JsonNode> property : node.properties()) {
+            if (!property.getValue().isTextual()) {
+                return null;
+            }
+            String spec = property.getValue().asText();
+            if (spec.startsWith("$")) {
+                spec = directSpecs.get(spec.substring(1));
+                if (spec == null) {
+                    return null;
+                }
+            }
+            specs.put(property.getKey(), spec);
+        }
+        return specs;
+    }
+
+    /** The lock's own {@code overrides} section, empty when absent, {@code null} when a value is not a plain spec. */
+    private static @Nullable Map<String, String> recordedOverrides(PackageManager pm, String lock) {
+        Object section;
+        if (pm == PackageManager.Pnpm) {
+            Object loaded;
+            try {
+                loaded = new Yaml().load(lock);
+            } catch (RuntimeException e) {
+                throw new EngineFailure(Reason.MALFORMED_LOCK, null, "unparseable pnpm-lock.yaml: " + e.getMessage());
+            }
+            section = loaded instanceof Map ? ((Map<?, ?>) loaded).get("overrides") : null;
+        } else {
+            section = parseJsonObject(lock, false).get("overrides");
+        }
+        Map<String, String> recorded = new LinkedHashMap<>();
+        if (section == null) {
+            return recorded;
+        }
+        if (!(section instanceof Map)) {
+            return null;
+        }
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) section).entrySet()) {
+            if (!(e.getValue() instanceof String)) {
+                return null;
+            }
+            recorded.put(String.valueOf(e.getKey()), (String) e.getValue());
+        }
+        return recorded;
     }
 
     /** A name a key could be selecting. Globs and separators match nothing; a version selector yields a token of its own. */
