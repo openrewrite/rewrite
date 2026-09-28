@@ -178,6 +178,35 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 	assert.Equalf(t, "example.com/empty", got.ModulePath, "ModulePath: want %q", "example.com/empty")
 }
 
+// TestGoResolutionResultUnresolvedDiagnosticsRoundTrip pins that the diagnostic
+// fields a recipe needs to explain a skipped tidy — the unresolved import paths
+// (INCOMPLETE) and the toolchain failure reason (GO_SUM_ONLY) — survive the RPC
+// round-trip so recipes-go can read them instead of scraping a warning string.
+func TestGoResolutionResultUnresolvedDiagnosticsRoundTrip(t *testing.T) {
+	id := uuid.MustParse("88888888-0000-0000-0000-000000000000")
+	mrr := golang.GoResolutionResult{
+		Ident:            id,
+		ModulePath:       "example.com/foo",
+		Path:             "go.mod",
+		Requires:         []golang.GoRequire{},
+		Replaces:         []golang.GoReplace{},
+		Excludes:         []golang.GoExclude{},
+		Retracts:         []golang.GoRetract{},
+		ResolutionStatus: golang.GoResolutionIncomplete,
+		UnresolvedImports: []string{
+			"github.com/tidwall/redcon",
+			"github.com/valyala/fasthttp",
+		},
+		ResolutionError: "go list -m: 2 module(s) unresolved (build list unreliable): github.com/tidwall/redcon, gonum.org/v1/plot",
+	}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
+
+	after := roundTripMarkers(t, before)
+	got := after.Entries[0].(golang.GoResolutionResult)
+	assert.Equal(t, mrr.UnresolvedImports, got.UnresolvedImports, "unresolved imports must survive round-trip")
+	assert.Equal(t, mrr.ResolutionError, got.ResolutionError, "resolution error must survive round-trip")
+}
+
 // TestGoResolutionResultUnsetStatusRoundTrip pins the old-LST case: a marker whose
 // ResolutionStatus is unset (as when deserialized from an LST serialized before the
 // field existed) must round-trip as empty and travel as null on the wire, so the
