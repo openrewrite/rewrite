@@ -171,30 +171,18 @@ public class MavenDependency implements Trait<Xml.Tag> {
                     return null;
                 }
 
-                Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult(cursor).getDependencies();
+                MavenResolutionResult resolutionResult = getResolutionResult(cursor);
+                Map<Scope, List<ResolvedDependency>> dependencies = resolutionResult.getDependencies();
                 for (Scope scope : Scope.values()) {
                     if (dependencies.containsKey(scope)) {
                         for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
                             if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
                                 (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
-                                String scopeName = tag.getChildValue("scope").orElse(null);
-                                Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : null;
-                                if (tagScope == null) {
-                                    tagScope = getResolutionResult(cursor).getPom().getManagedScope(
-                                            resolvedDependency.getGroupId(),
-                                            resolvedDependency.getArtifactId(),
-                                            tag.getChildValue("type").orElse(null),
-                                            tag.getChildValue("classifier").orElse(null)
-                                    );
-                                }
-                                if (tagScope == null) {
-                                    tagScope = Scope.Compile;
-                                }
                                 Dependency req = resolvedDependency.getRequested();
                                 String reqGroup = req.getGroupId();
                                 if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
                                     req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                                    scope == tagScope) {
+                                    scope == effectiveScope(tag, resolvedDependency, resolutionResult.getPom())) {
                                     return new MavenDependency(cursor, resolvedDependency);
                                 }
                             }
@@ -204,6 +192,17 @@ public class MavenDependency implements Trait<Xml.Tag> {
             }
 
             return null;
+        }
+
+        private static Scope effectiveScope(Xml.Tag tag, ResolvedDependency resolvedDependency, ResolvedPom pom) {
+            String scopeName = tag.getChildValue("scope").orElse(null);
+            Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : pom.getManagedScope(
+                    resolvedDependency.getGroupId(),
+                    resolvedDependency.getArtifactId(),
+                    pom.getValue(tag.getChildValue("type").orElse(null)),
+                    pom.getValue(tag.getChildValue("classifier").orElse(null))
+            );
+            return tagScope != null ? tagScope : Scope.Compile;
         }
     }
 }
