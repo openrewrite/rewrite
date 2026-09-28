@@ -1572,11 +1572,7 @@ class NativeLockEngineTest {
      * overrides at all. Yarn Berry is absent: its checksums come from the real tarball, which routes cannot serve.
      */
     private void assertUnrelatedAddSucceeds(PackageManager pm, String overrides, String lock) {
-        unrelatedAddRoutes();
-        Result result = regen(pm,
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}," + overrides + "}",
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\",\"beta\":\"^1.0.0\"}," + overrides + "}",
-                lock);
+        Result result = unrelatedAdd(pm, overrides, lock);
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).contains("beta");
     }
@@ -1667,6 +1663,110 @@ class NativeLockEngineTest {
                   integrity sha512-SHARED15
                 """,
                 null, Paths.get("package.json"), ctx);
+    }
+
+    /** pnpm reads a top-level resolutions block as overrides too, so an add reaching one is refused, not patched. */
+    @Test
+    void aPnpmTopLevelResolutionIsAnOverride() {
+        Result result = unrelatedAdd(PackageManager.Pnpm, "\"resolutions\":{\"beta\":\"^1.0.0\"}",
+                pnpmUnrelatedAddLock("overrides:\n  beta: ^1.0.0\n\n"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).isEqualTo("overrides are not yet applied for Pnpm");
+    }
+
+    /** The unsatisfiable range is the one only pnpm.overrides declares, so reaching it proves that one won. */
+    @Test
+    void pnpmOverridesWinOverResolutionsOnTheSameKey() {
+        Result result = unrelatedAdd(PackageManager.Pnpm,
+                "\"resolutions\":{\"beta\":\"^1.0.0\"},\"pnpm\":{\"overrides\":{\"beta\":\"^9.0.0\"}}",
+                pnpmUnrelatedAddLock("overrides:\n  beta: ^9.0.0\n\n"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).isEqualTo("no version of beta satisfies ^9.0.0");
+    }
+
+    @Test
+    void aBunResolutionIsAnOverride() {
+        Result result = unrelatedAdd(PackageManager.Bun, "\"resolutions\":{\"beta\":\"^1.0.0\"}",
+                bunUnrelatedAddLock("  \"overrides\": {\n    \"beta\": \"^1.0.0\",\n  },\n"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).isEqualTo("overrides are not yet applied for Bun");
+    }
+
+    /** Bun does not merge: a non-empty overrides field hides resolutions whole, so beta is not overridden. */
+    @Test
+    void aBunOverridesFieldHidesResolutions() {
+        assertUnrelatedAddSucceeds(PackageManager.Bun,
+                "\"overrides\":{\"not-in-this-tree\":\"^9.0.0\"},\"resolutions\":{\"beta\":\"^9.0.0\"}",
+                bunUnrelatedAddLock("  \"overrides\": {\n    \"not-in-this-tree\": \"^9.0.0\",\n  },\n"));
+    }
+
+    private Result unrelatedAdd(PackageManager pm, String overrides, String lock) {
+        unrelatedAddRoutes();
+        return regen(pm,
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}," + overrides + "}",
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\",\"beta\":\"^1.0.0\"}," + overrides + "}",
+                lock);
+    }
+
+    private static String pnpmUnrelatedAddLock(String recordedOverrides) {
+        return """
+                lockfileVersion: '9.0'
+
+                settings:
+                  autoInstallPeers: true
+                  excludeLinksFromLockfile: false
+
+                """ + recordedOverrides + """
+                importers:
+
+                  .:
+                    dependencies:
+                      alpha:
+                        specifier: ^1.0.0
+                        version: 1.0.0
+
+                packages:
+
+                  alpha@1.0.0:
+                    resolution: {integrity: sha512-ALPHA1}
+
+                  shared@2.0.0:
+                    resolution: {integrity: sha512-SHARED2}
+
+                snapshots:
+
+                  alpha@1.0.0:
+                    dependencies:
+                      shared: 2.0.0
+
+                  shared@2.0.0: {}
+                """;
+    }
+
+    private static String bunUnrelatedAddLock(String recordedOverrides) {
+        return """
+                {
+                  "lockfileVersion": 1,
+                  "configVersion": 1,
+                  "workspaces": {
+                    "": {
+                      "name": "x",
+                      "dependencies": {
+                        "alpha": "^1.0.0",
+                      },
+                    },
+                  },
+                """ + recordedOverrides + """
+                  "packages": {
+                    "alpha": ["alpha@1.0.0", "", { "dependencies": { "shared": "^1.0.0" } }, "sha512-ALPHA1"],
+
+                    "shared": ["shared@2.0.0", "", {}, "sha512-SHARED2"],
+                  }
+                }
+                """;
     }
 
     private static String yarnClassicLock() {

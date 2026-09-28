@@ -19,6 +19,7 @@ import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.RecipeRunException;
@@ -461,13 +462,31 @@ public final class NativeLockEngine {
         return specs;
     }
 
+    /**
+     * Every field the manager itself reads overrides from. pnpm merges per key, {@code pnpm.overrides} winning
+     * ({@code {...resolutions, ...pnpm.overrides}} in pnpm's getOptionsFromRootManifest). Bun takes the whole
+     * {@code overrides} field when it has entries and only otherwise {@code resolutions} (bun's OverrideMap).
+     */
     private static @Nullable JsonNode overridesNode(PackageManager pm, String manifestJson) {
         try {
             JsonNode root = JSON.readTree(manifestJson);
-            JsonNode node = pm == PackageManager.Pnpm ?
-                    (root.path("pnpm").isObject() ? root.path("pnpm").get("overrides") : null) :
-                    root.get(pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic ?
-                            "resolutions" : "overrides");
+            JsonNode node;
+            if (pm == PackageManager.Pnpm) {
+                ObjectNode merged = JSON.createObjectNode();
+                if (root.path("resolutions").isObject()) {
+                    merged.setAll((ObjectNode) root.get("resolutions"));
+                }
+                if (root.path("pnpm").path("overrides").isObject()) {
+                    merged.setAll((ObjectNode) root.get("pnpm").get("overrides"));
+                }
+                node = merged;
+            } else if (pm == PackageManager.Bun) {
+                node = root.path("overrides").isObject() && !root.get("overrides").isEmpty() ?
+                        root.get("overrides") : root.get("resolutions");
+            } else {
+                node = root.get(pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic ?
+                        "resolutions" : "overrides");
+            }
             return node == null || !node.isObject() || node.isEmpty() ? null : node;
         } catch (Exception e) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest overrides");
