@@ -276,6 +276,24 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
         );
     }
 
+    /**
+     * An entry written as a block scalar cannot be rewritten without clobbering its envelope, so it is
+     * declined. Declining is a skip and has to be reported: the alternative is a run that changes nothing
+     * and says nothing.
+     */
+    @Test
+    void aCatalogEntryThatCannotBeRewrittenIsReported() {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW))
+                        .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
+                                assertThat(rows).extracting("packageName", "protocol")
+                                        .containsExactly(tuple("acme-logger", "catalog:"))),
+                packageJson(MANIFEST.formatted("catalog:"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:"))),
+                yaml("catalog:\n  acme-logger: >\n    ~1.4.1\n", s -> s.path("pnpm-workspace.yaml"))
+        );
+    }
+
     @Test
     void aMarkerClaimingAResolvedVersionStillCannotOverwriteTheManifest() {
         // The recipe filters by the marker, but the overwrite happens against the manifest literal. Were

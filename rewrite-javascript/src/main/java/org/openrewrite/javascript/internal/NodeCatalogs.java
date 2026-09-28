@@ -137,14 +137,15 @@ public class NodeCatalogs {
         for (int i = 0; i < entries.size(); i++) {
             Yaml.Mapping.Entry entry = entries.get(i);
             if (!packageName.equals(entry.getKey().getValue()) || !(entry.getValue() instanceof Yaml.Scalar)) continue;
-            found[0] = true;
             Yaml.Scalar version = (Yaml.Scalar) entry.getValue();
-            if (newVersion.equals(version.getValue())) {
-                return catalog;
-            }
             Yaml.Scalar.Style style = version.getStyle();
             if (style == Yaml.Scalar.Style.LITERAL || style == Yaml.Scalar.Style.FOLDED) {
-                // `withValue` cannot rewrite a block scalar's body without clobbering its envelope.
+                // `withValue` cannot rewrite a block scalar's body without clobbering its envelope. Leave
+                // `found` unset, so an entry that cannot be written reads as one that was not followed.
+                return catalog;
+            }
+            found[0] = true;
+            if (newVersion.equals(version.getValue())) {
                 return catalog;
             }
             Yaml.Scalar rewritten = version.withValue(newVersion);
