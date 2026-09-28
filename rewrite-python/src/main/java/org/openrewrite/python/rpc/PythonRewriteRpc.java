@@ -599,13 +599,15 @@ public class PythonRewriteRpc extends RewriteRpc {
         private static Path findDefaultPythonPath() {
             // Try to find a venv in the project structure
             Path basePath = Paths.get(System.getProperty("user.dir"));
+            String venvPython = System.getProperty("os.name").startsWith("Windows") ?
+                    ".venv/Scripts/python.exe" : ".venv/bin/python";
             Path[] searchPaths = {
                 // From rewrite root dir
-                basePath.resolve("rewrite-python/rewrite/.venv/bin/python"),
+                basePath.resolve("rewrite-python/rewrite/" + venvPython),
                 // From rewrite-python dir
-                basePath.resolve("rewrite/.venv/bin/python"),
+                basePath.resolve("rewrite/" + venvPython),
                 // From rewrite-python/rewrite dir
-                basePath.resolve(".venv/bin/python")
+                basePath.resolve(venvPython)
             };
 
             for (Path path : searchPaths) {
