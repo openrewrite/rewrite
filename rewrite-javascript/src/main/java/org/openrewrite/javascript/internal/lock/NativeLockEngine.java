@@ -524,7 +524,7 @@ public final class NativeLockEngine {
      * A nested override is scoped to one parent but was applied to the whole closure, which is the same answer
      * only when that parent is the sole requirer, so prove it rather than model it.
      */
-    private static void requireOverridesHold(ResolutionGraph graph, Map<String, String> overrides,
+    static void requireOverridesHold(ResolutionGraph graph, Map<String, String> overrides,
                                              Map<String, String> scopedParent) {
         for (Map.Entry<String, String> e : overrides.entrySet()) {
             String name = e.getKey();

@@ -31,6 +31,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.internal.registry.VersionManifest;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -41,12 +42,17 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class NativeLockEngineTest {
@@ -1026,84 +1032,7 @@ class NativeLockEngineTest {
     }
 
     /**
-     * A scoped override is applied to the whole closure, which is only the same answer when the parent is the
-     * sole requirer. Here another package needs tslib too, so npm would place a second copy; refuse instead.
-     */
-    @Test
-    void scopedOverrideWithAnotherRequirerFailsLoud() {
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{\"tslib\":\"^1.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\"integrity\":\"sha512-L\"}}");
-        routes.put("https://registry.npmjs.org/other",
-                "{\"name\":\"other\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/other/1.0.0",
-                "{\"name\":\"other\",\"version\":\"1.0.0\",\"dependencies\":{\"tslib\":\"^2.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/other/-/other-1.0.0.tgz\",\"integrity\":\"sha512-O\"}}");
-        routes.put("https://registry.npmjs.org/tslib",
-                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/tslib/1.0.0",
-                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-T1\"}}");
-        routes.put("https://registry.npmjs.org/tslib/2.0.0",
-                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-T2\"}}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\",\"other\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\",\"other\":\"^1.0.0\"},\"overrides\":{\"lodash\":{\"tslib\":\"^2.0.0\"}}}",
-                """
-                {
-                  "name": "x",
-                  "lockfileVersion": 3,
-                  "packages": {
-                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20", "other": "^1.0.0"}},
-                    "node_modules/lodash": {"version": "4.17.20", "dependencies": {"tslib": "^1.0.0"}},
-                    "node_modules/other": {"version": "1.0.0", "dependencies": {"tslib": "^2.0.0"}},
-                    "node_modules/tslib": {"version": "1.0.0"}
-                  }
-                }
-                """);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("other also requires it");
-    }
-
-    /** The same rule when the root itself declares the overridden package. */
-    @Test
-    void scopedOverrideOfADirectDependencyFailsLoud() {
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{\"tslib\":\"^1.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\"integrity\":\"sha512-L\"}}");
-        routes.put("https://registry.npmjs.org/tslib",
-                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/tslib/1.0.0",
-                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-T1\"}}");
-        routes.put("https://registry.npmjs.org/tslib/2.0.0",
-                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-T2\"}}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\",\"tslib\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\",\"tslib\":\"^1.0.0\"},\"overrides\":{\"lodash\":{\"tslib\":\"^2.0.0\"}}}",
-                """
-                {
-                  "name": "x",
-                  "lockfileVersion": 3,
-                  "packages": {
-                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20", "tslib": "^1.0.0"}},
-                    "node_modules/lodash": {"version": "4.17.20", "dependencies": {"tslib": "^1.0.0"}},
-                    "node_modules/tslib": {"version": "1.0.0"}
-                  }
-                }
-                """);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("direct dependency");
-    }
-
-    /**
-     * The same two-requirer shape as {@link #scopedOverrideWithAnotherRequirerFailsLoud}, but global. Every
+     * The same two-requirer shape, but global rather than scoped. Every
      * requirement is rewritten, so both dedupe onto one version and no second copy is needed.
      */
     @Test
@@ -1414,39 +1343,6 @@ class NativeLockEngineTest {
     }
 
     /**
-     * npm rejects an override that disagrees with a direct dependency: "EOVERRIDE - Override for
-     * is-number@^7.0.0 conflicts with direct dependency" (verified against npm 11). Resolving it here would
-     * pick the override while the importer keeps its declared range, so the diff finds nothing to change and
-     * the run reports success over an unchanged lock.
-     */
-    @Test
-    void globalOverrideDisagreeingWithADirectDependencyFailsLoud() {
-        routes.put("https://registry.npmjs.org/tslib",
-                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/tslib/1.0.0",
-                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-TSLIB100\"}}");
-        routes.put("https://registry.npmjs.org/tslib/2.0.0",
-                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"tslib\":\"^2.0.0\"}}",
-                "{\"dependencies\":{\"tslib\":\"^2.0.0\"},\"overrides\":{\"tslib\":\"1.0.0\"}}",
-                """
-                {
-                  "name": "x",
-                  "lockfileVersion": 3,
-                  "packages": {
-                    "": {"name": "x", "dependencies": {"tslib": "^2.0.0"}},
-                    "node_modules/tslib": {"version": "2.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz", "integrity": "sha512-TSLIB200"}
-                  }
-                }
-                """);
-
-        assertThat(result.isSuccess()).as("npm itself refuses this with EOVERRIDE").isFalse();
-        assertThat(result.getFailure().getDetail()).contains("direct dependency");
-    }
-
-    /**
      * Only npm applies overrides, but refusing on their mere presence would strip lock regeneration from every
      * pnpm or Yarn project carrying a resolutions block, including runs of the sibling recipes that never touch
      * overrides. An override naming a package outside the closure changes nothing, so it must stay the no-op it
@@ -1730,6 +1626,96 @@ class NativeLockEngineTest {
                         "\"integrity\":\"sha512-SHARED2\",\"shasum\":\"cccc333333333333333333333333333333333333\"}}");
     }
 
+
+
+    // --- requireOverridesHold against a hand-built graph ---------------------------------------------------
+    //
+    // A scoped override is applied to the whole closure and proven equivalent afterwards, so every branch of
+    // that proof is a property of the graph alone. Through regen() each needs a registry route and a lock
+    // fixture, and the two direct-dependency branches cannot be told apart by their message.
+
+    @Test
+    void scopedOverrideHoldsWhenTheParentIsTheSoleRequirer() {
+        ResolutionGraph graph = graphOf(emptyMap(),
+                node("express", "4.18.2", singletonMap("accepts", "1.3.8")),
+                node("accepts", "1.3.8", emptyMap()));
+
+        assertThatNoException().isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
+                singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express")));
+    }
+
+    @Test
+    void scopedOverrideRefusesWhenAnotherNodeRequiresTheChild() {
+        ResolutionGraph graph = graphOf(emptyMap(),
+                node("express", "4.18.2", singletonMap("accepts", "1.3.8")),
+                node("koa", "2.0.0", singletonMap("accepts", "1.3.8")),
+                node("accepts", "1.3.8", emptyMap()));
+
+        assertThatExceptionOfType(EngineFailure.class)
+                .isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
+                        singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express")))
+                .withMessageContaining("koa also requires it");
+    }
+
+    /** A peer requirer is absent from resolvedEdges, so only peerDependencies reveals it. */
+    @Test
+    void scopedOverrideRefusesWhenAnotherNodePeerDependsOnTheChild() {
+        ResolutionGraph graph = graphOf(emptyMap(),
+                node("express", "4.18.2", singletonMap("accepts", "1.3.8")),
+                nodeWithPeer("koa", "2.0.0", "accepts", "*"),
+                node("accepts", "1.3.8", emptyMap()));
+
+        assertThatExceptionOfType(EngineFailure.class)
+                .isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
+                        singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express")))
+                .withMessageContaining("koa also requires it");
+    }
+
+    @Test
+    void overrideRefusesWhenAnImporterDeclaresTheNameAtAnotherRange() {
+        ResolutionGraph graph = graphOf(
+                singletonMap("dependencies", singletonMap("accepts", "^1.0.0")),
+                node("accepts", "1.3.8", emptyMap()));
+
+        assertThatExceptionOfType(EngineFailure.class)
+                .isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
+                        singletonMap("accepts", "^2.0.0"), emptyMap()))
+                .withMessageContaining("conflicts with it as a direct dependency (^1.0.0)");
+    }
+
+    @Test
+    void versionSelectedParentRefusesWhenItResolvedToAnotherVersion() {
+        ResolutionGraph graph = graphOf(emptyMap(),
+                node("express", "5.0.0", singletonMap("accepts", "1.3.8")),
+                node("accepts", "1.3.8", emptyMap()));
+
+        assertThatExceptionOfType(EngineFailure.class)
+                .isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
+                        singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express@4.18.2")))
+                .withMessageContaining("express resolved to 5.0.0");
+    }
+
+    private static ResolutionGraph graphOf(Map<String, Map<String, String>> rootDeclared, ResolvedNode... nodes) {
+        Map<String, ResolvedNode> byKey = new LinkedHashMap<>();
+        for (ResolvedNode n : nodes) {
+            byKey.put(ResolutionGraph.key(n.getManifest().getName(), n.getManifest().getVersion()), n);
+        }
+        return new ResolutionGraph(
+                singletonList(new ResolutionGraph.Importer("", null, null, rootDeclared, emptyMap())), byKey);
+    }
+
+    private static ResolvedNode node(String name, String version, Map<String, String> edges) {
+        return new ResolvedNode(manifestOf(name, version, null), edges);
+    }
+
+    private static ResolvedNode nodeWithPeer(String name, String version, String peer, String range) {
+        return new ResolvedNode(manifestOf(name, version, singletonMap(peer, range)), emptyMap());
+    }
+
+    private static VersionManifest manifestOf(String name, String version, Map<String, String> peers) {
+        return new VersionManifest(name, version, null, null, emptyMap(), null, peers, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null);
+    }
 
     private static String resource(String path) {
         try (InputStream in = NativeLockEngineTest.class.getClassLoader().getResourceAsStream(path)) {
