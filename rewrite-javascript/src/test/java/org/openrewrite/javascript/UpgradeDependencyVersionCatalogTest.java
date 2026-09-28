@@ -147,19 +147,13 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     static Stream<Arguments> constraintsAndRenderings() {
         return Stream.of(
                 Arguments.of("~1.5.0", "  acme-logger: ~1.5.0"),
-                Arguments.of(">=2.0.0", "  acme-logger: '>=2.0.0'"),
-                Arguments.of("*", "  acme-logger: '*'"),
-                Arguments.of("2", "  acme-logger: '2'"),
-                Arguments.of("2.0", "  acme-logger: '2.0'"));
+                Arguments.of(">=2.0.0", "  acme-logger: '>=2.0.0'"));
     }
 
     /**
-     * An unquoted entry has to gain quotes whenever YAML would read the new constraint as something
-     * other than a string. Two ways that happens: the value opens with an indicator, so the file stops
-     * parsing at all ({@code >=2.0.0} reads as a folded block scalar, {@code *} as an alias); or the
-     * value parses but resolves to another type, so the catalog holds a number where a version belongs
-     * ({@code 2} is a valid npm range and reads as an integer). A constraint YAML already reads as a
-     * string keeps the style it found.
+     * That the quoting decision reaches the file: a constraint YAML already reads as a string keeps the
+     * style it found, one it would read as something else gains quotes. Which constraints fall on which
+     * side is {@link org.openrewrite.javascript.internal.NodeCatalogsTest}'s job.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("constraintsAndRenderings")

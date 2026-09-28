@@ -231,7 +231,7 @@ public class NodeCatalogs {
      * rewrite-yaml knows this rule too, but only in its `internal` package, which is not API and may
      * move without notice. The rule is short and stable enough to state here rather than couple to it.
      */
-    private static boolean canBePlainScalar(String value) {
+    static boolean canBePlainScalar(String value) {
         if (value.isEmpty() || "---".equals(value) || "...".equals(value)) {
             return false;
         }
