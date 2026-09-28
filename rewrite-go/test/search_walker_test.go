@@ -74,7 +74,7 @@ func TestCollectSearchResultIDsOnGoModNode(t *testing.T) {
 	val := &golang.GoModValue{
 		Ident:   uuid.New(),
 		Text:    "example.com/x",
-		Markers: java.AddMarker(java.Markers{}, mark),
+		Markers: java.AddMarker(java.EmptyMarkers, mark),
 	}
 	dir := &golang.GoModDirective{Ident: uuid.New(), Keyword: "require", Values: []*golang.GoModValue{val}}
 	gm := &golang.GoMod{

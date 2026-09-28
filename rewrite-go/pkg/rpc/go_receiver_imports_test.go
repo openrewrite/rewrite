@@ -57,7 +57,7 @@ func makeImport(path string) *java.Import {
 func TestCoerceRightPaddedTyped_PassThrough(t *testing.T) {
 	// already-correct variant should pass through with element identity preserved.
 	imp := makeImport("fmt")
-	var wire any = java.RightPadded[*java.Import]{Element: imp, Markers: java.Markers{}}
+	var wire any = java.RightPadded[*java.Import]{Element: imp, Markers: java.EmptyMarkers}
 
 	got := coerceRightPaddedTyped[*java.Import](wire)
 	if got.Element != imp {
@@ -70,7 +70,7 @@ func TestCoerceRightPaddedTyped_FromJVariant(t *testing.T) {
 	// any/J" trigger. *Import implements java.J but not Expression, so a
 	// type-erased receive can surface this variant.
 	imp := makeImport("os")
-	var wire any = java.RightPadded[java.J]{Element: imp, After: java.EmptySpace, Markers: java.Markers{}}
+	var wire any = java.RightPadded[java.J]{Element: imp, After: java.EmptySpace, Markers: java.EmptyMarkers}
 
 	got := coerceRightPaddedTyped[*java.Import](wire)
 	if got.Element != imp {
@@ -82,7 +82,7 @@ func TestCoerceRightPaddedTyped_NonMatchingElementFallsBack(t *testing.T) {
 	// given: a RightPadded whose element does NOT satisfy T (an *Identifier where
 	// we want *Import). Coercion must fall back to an element-less padding rather
 	// than panic — a stray element should never abort the whole receive.
-	var wire any = java.RightPadded[java.Expression]{Element: makeIdent("x"), After: java.EmptySpace, Markers: java.Markers{}}
+	var wire any = java.RightPadded[java.Expression]{Element: makeIdent("x"), After: java.EmptySpace, Markers: java.EmptyMarkers}
 
 	got := coerceRightPaddedTyped[*java.Import](wire)
 	assert.Nil(t, got.Element, "want nil Element on fallback")
@@ -105,7 +105,7 @@ func TestCompilationUnitRoundTrip_EmptyImports(t *testing.T) {
 	cuID := uuid.New()
 	before := &golang.CompilationUnit{
 		ID:      cuID,
-		Imports: &java.Container[*java.Import]{Before: java.EmptySpace, Markers: java.Markers{}},
+		Imports: &java.Container[*java.Import]{Before: java.EmptySpace, Markers: java.EmptyMarkers},
 	}
 	seed := &golang.CompilationUnit{ID: cuID}
 
@@ -125,8 +125,8 @@ func TestCompilationUnitRoundTrip_WithImports(t *testing.T) {
 		ID: cuID,
 		Imports: &java.Container[*java.Import]{
 			Elements: []java.RightPadded[*java.Import]{
-				{Element: imp1, Markers: java.Markers{}},
-				{Element: imp2, Markers: java.Markers{}},
+				{Element: imp1, Markers: java.EmptyMarkers},
+				{Element: imp2, Markers: java.EmptyMarkers},
 			},
 		},
 	}

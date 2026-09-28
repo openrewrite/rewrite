@@ -158,7 +158,7 @@ func (s *JavaSender) VisitBlock(b *java.Block, p any) java.J {
 	q := p.(*SendQueue)
 	// static (right-padded bool) - Java's JRightPadded<Boolean> with element=false
 	// Send manually since Go doesn't have RightPadded[bool]
-	sendRightPaddedBool(false, java.EmptySpace, java.Markers{}, q)
+	sendRightPaddedBool(false, java.EmptySpace, java.EmptyMarkers, q)
 	// statements
 	q.GetAndSendList(b,
 		func(v any) []any {

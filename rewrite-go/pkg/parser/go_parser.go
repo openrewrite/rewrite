@@ -477,12 +477,9 @@ func (ctx *parseContext) mapImports(file *ast.File) *java.Container[*java.Import
 		prevGrouped = true
 		openParenPrefix := ctx.prefix(first.Lparen)
 		ctx.skip(1) // skip "("
-		containerMarkers = java.Markers{
-			ID: uuid.New(),
-			Entries: []java.Marker{
-				golang.GroupedImport{Ident: uuid.New(), Before: openParenPrefix},
-			},
-		}
+		containerMarkers = java.MakeMarkers(uuid.New(), []java.Marker{
+			golang.GroupedImport{Ident: uuid.New(), Before: openParenPrefix},
+		})
 	}
 
 	for i, spec := range first.Specs {
@@ -521,10 +518,7 @@ func (ctx *parseContext) mapImports(file *ast.File) *java.Container[*java.Import
 			ctx.skip(1) // skip ")"
 			if len(importDecl.Specs) == 0 {
 				imp := &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}}
-				imp.Markers = java.Markers{
-					ID:      uuid.New(),
-					Entries: []java.Marker{importBlockMarker},
-				}
+				imp.Markers = java.MakeMarkers(uuid.New(), []java.Marker{importBlockMarker})
 				elements = append(elements, java.RightPadded[*java.Import]{Element: imp, After: closeParen})
 			} else {
 				elements = closeImportGroup(elements, closeParen)
@@ -544,10 +538,7 @@ func (ctx *parseContext) mapImportBlockSpecs(decl *ast.GenDecl, elements *[]java
 		is := spec.(*ast.ImportSpec)
 		imp := ctx.mapImportSpec(is)
 		if j == 0 {
-			imp.Markers = java.Markers{
-				ID:      uuid.New(),
-				Entries: []java.Marker{marker},
-			}
+			imp.Markers = java.MakeMarkers(uuid.New(), []java.Marker{marker})
 		}
 		rp := java.RightPadded[*java.Import]{Element: imp}
 		takeSemicolon(ctx, &rp, importSpecBoundary(ctx, decl, j))
@@ -575,7 +566,7 @@ func closeImportGroup(elements []java.RightPadded[*java.Import], closeParen java
 		elements[n-1].After = closeParen
 		return elements
 	}
-	if len(elements) == 0 && len(closeParen.Comments) == 0 && closeParen.Whitespace == "" {
+	if len(elements) == 0 && len(closeParen.Comments()) == 0 && closeParen.Whitespace() == "" {
 		return elements
 	}
 	return append(elements, java.RightPadded[*java.Import]{
@@ -648,7 +639,7 @@ func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) java.Statement {
 		spec := s.(*ast.ValueSpec)
 		innerPrefix := ctx.prefix(spec.Pos())
 		vd := ctx.mapValueSpec(spec, innerPrefix, keyword)
-		vd.Markers.Entries = append(vd.Markers.Entries, golang.GroupedSpec{Ident: uuid.New()})
+		vd.Markers = java.AddMarker(vd.Markers, golang.GroupedSpec{Ident: uuid.New()})
 		elements = append(elements, ctx.terminateSpec(vd, decl, i))
 	}
 
@@ -666,7 +657,7 @@ func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) java.Statement {
 	return &golang.DeclarationBlock{
 		ID:                 uuid.New(),
 		Prefix:             prefix,
-		Markers:            java.Markers{ID: uuid.New()},
+		Markers:            java.EmptyMarkers,
 		LeadingAnnotations: leadingAnns,
 		Kind:               kind,
 		Specs:              specs,
@@ -692,7 +683,7 @@ func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix java.Space, ke
 			}
 			nameAfters = append(nameAfters, after)
 		} else {
-			nameAfters = append(nameAfters, java.Space{})
+			nameAfters = append(nameAfters, java.EmptySpace)
 		}
 	}
 
@@ -744,7 +735,7 @@ func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix java.Space, ke
 	}
 	var markers java.Markers
 	if len(markerEntries) > 0 {
-		markers = java.Markers{ID: uuid.New(), Entries: markerEntries}
+		markers = java.MakeMarkers(uuid.New(), markerEntries)
 	}
 
 	return &java.VariableDeclarations{
@@ -777,7 +768,7 @@ func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) java.Statement {
 		spec := s.(*ast.TypeSpec)
 		innerPrefix := ctx.prefix(spec.Pos())
 		td := ctx.mapTypeSpec(spec, innerPrefix)
-		td.Markers.Entries = append(td.Markers.Entries, golang.GroupedSpec{Ident: uuid.New()})
+		td.Markers = java.AddMarker(td.Markers, golang.GroupedSpec{Ident: uuid.New()})
 		elements = append(elements, ctx.terminateSpec(td, decl, i))
 	}
 
@@ -933,14 +924,11 @@ func (ctx *parseContext) mapTypeParams(fl *ast.FieldList) *java.TypeParameters {
 		ctx.skip(1) // ","
 		commaAfter := ctx.prefix(fl.Closing)
 		ctx.skip(1) // "]"
-		markers = java.Markers{
-			ID: uuid.New(),
-			Entries: []java.Marker{golang.TrailingComma{
-				Ident:  uuid.New(),
-				Before: commaBefore,
-				After:  commaAfter,
-			}},
-		}
+		markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.TrailingComma{
+			Ident:  uuid.New(),
+			Before: commaBefore,
+			After:  commaAfter,
+		}})
 	} else {
 		closePrefix := ctx.prefix(fl.Closing)
 		ctx.skip(1) // "]"
@@ -1045,14 +1033,11 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 			ctx.skip(1) // ","
 			commaAfter := ctx.prefix(results.Closing)
 			ctx.skip(1) // ")"
-			markers = java.Markers{
-				ID: uuid.New(),
-				Entries: []java.Marker{golang.TrailingComma{
-					Ident:  uuid.New(),
-					Before: commaBefore,
-					After:  commaAfter,
-				}},
-			}
+			markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.TrailingComma{
+				Ident:  uuid.New(),
+				Before: commaBefore,
+				After:  commaAfter,
+			}})
 		} else {
 			closePrefix := ctx.prefix(results.Closing)
 			ctx.skip(1) // ")"
@@ -1175,14 +1160,11 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 			ctx.skip(1) // ","
 			commaAfter := ctx.prefix(fl.Closing)
 			ctx.skip(1) // ")"
-			markers = java.Markers{
-				ID: uuid.New(),
-				Entries: []java.Marker{golang.TrailingComma{
-					Ident:  uuid.New(),
-					Before: commaBefore,
-					After:  commaAfter,
-				}},
-			}
+			markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.TrailingComma{
+				Ident:  uuid.New(),
+				Before: commaBefore,
+				After:  commaAfter,
+			}})
 		} else {
 			closePrefix := ctx.prefix(fl.Closing)
 			ctx.skip(1) // ")"
@@ -1290,7 +1272,7 @@ func closeSpecGroup(elements []java.RightPadded[java.Statement], rparenPrefix ja
 		elements[n-1].After = rparenPrefix
 		return elements
 	}
-	if len(elements) == 0 && len(rparenPrefix.Comments) == 0 && rparenPrefix.Whitespace == "" {
+	if len(elements) == 0 && len(rparenPrefix.Comments()) == 0 && rparenPrefix.Whitespace() == "" {
 		return elements
 	}
 	return append(elements, java.RightPadded[java.Statement]{
@@ -1505,10 +1487,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 
 		var markers java.Markers
 		if stmt.Tok == token.DEFINE {
-			markers = java.Markers{
-				ID:      uuid.New(),
-				Entries: []java.Marker{golang.ShortVarDecl{Ident: uuid.New()}},
-			}
+			markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.ShortVarDecl{Ident: uuid.New()}})
 		}
 
 		return &golang.MultiAssignment{
@@ -1530,10 +1509,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 
 	var markers java.Markers
 	if stmt.Tok == token.DEFINE {
-		markers = java.Markers{
-			ID:      uuid.New(),
-			Entries: []java.Marker{golang.ShortVarDecl{Ident: uuid.New()}},
-		}
+		markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.ShortVarDecl{Ident: uuid.New()}})
 	}
 
 	return &java.Assignment{
@@ -1661,7 +1637,7 @@ func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) java.Statement {
 func controlParentheses(inner java.Expression) *java.ControlParentheses {
 	return &java.ControlParentheses{
 		ID:      uuid.New(),
-		Markers: java.Markers{ID: uuid.New()},
+		Markers: java.EmptyMarkers,
 		Tree:    java.RightPadded[java.Expression]{Element: inner},
 	}
 }
@@ -1675,7 +1651,7 @@ func switchSelector(inner java.Expression) *java.ControlParentheses {
 	return &java.ControlParentheses{
 		ID:      uuid.New(),
 		Prefix:  prefix,
-		Markers: java.Markers{ID: uuid.New()},
+		Markers: java.EmptyMarkers,
 		Tree:    java.RightPadded[java.Expression]{Element: hoisted},
 	}
 }
@@ -1723,7 +1699,7 @@ func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) java.Statement {
 
 	init := ctx.mapInitClause(stmt.Init, stmt.Body.Lbrace)
 
-	var selectorExpr java.Expression = &java.Empty{ID: uuid.New(), Markers: java.Markers{ID: uuid.New()}}
+	var selectorExpr java.Expression = &java.Empty{ID: uuid.New(), Markers: java.EmptyMarkers}
 	if stmt.Tag != nil {
 		selectorExpr = ctx.mapExpr(stmt.Tag)
 	}
@@ -1891,7 +1867,7 @@ func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statem
 		}
 	}
 	if selectorExpr == nil {
-		selectorExpr = &java.Empty{ID: uuid.New(), Markers: java.Markers{ID: uuid.New()}}
+		selectorExpr = &java.Empty{ID: uuid.New(), Markers: java.EmptyMarkers}
 	}
 
 	body := ctx.mapBlockStmt(stmt.Body)
@@ -1901,12 +1877,9 @@ func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statem
 		innerPrefix = java.EmptySpace
 	}
 	return wrapWithInit(prefix, init, &java.Switch{
-		ID:     uuid.New(),
-		Prefix: innerPrefix,
-		Markers: java.Markers{
-			ID:      uuid.New(),
-			Entries: []java.Marker{golang.TypeSwitchGuard{Ident: uuid.New()}},
-		},
+		ID:       uuid.New(),
+		Prefix:   innerPrefix,
+		Markers:  java.MakeMarkers(uuid.New(), []java.Marker{golang.TypeSwitchGuard{Ident: uuid.New()}}),
 		Selector: switchSelector(selectorExpr),
 		Body:     body,
 	})
@@ -2025,10 +1998,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 		}
 		control.Init = &java.RightPadded[java.Statement]{Element: &java.Empty{ID: uuid.New()}}
 		control.Update = &java.RightPadded[java.Statement]{Element: &java.Empty{ID: uuid.New()}}
-		control.Markers = java.Markers{
-			ID:      uuid.New(),
-			Entries: []java.Marker{golang.NewImplicitForClauses()},
-		}
+		control.Markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.NewImplicitForClauses()})
 	}
 
 	body := ctx.mapBlockStmt(stmt.Body)
@@ -2079,10 +2049,7 @@ func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *java.ForEachLoop {
 		ctx.skip(len(stmt.Tok.String()))
 		var markers java.Markers
 		if stmt.Tok == token.DEFINE {
-			markers = java.Markers{
-				ID:      uuid.New(),
-				Entries: []java.Marker{golang.ShortVarDecl{Ident: uuid.New()}},
-			}
+			markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.ShortVarDecl{Ident: uuid.New()}})
 		}
 
 		assign := &golang.MultiAssignment{
@@ -2371,7 +2338,7 @@ func decodeBasicLitValue(lit *ast.BasicLit) any {
 // OpenRewrite convention that whitespace belongs to the outermost element.
 func hoistLeftPrefix[T java.J](node T) (java.Space, T) {
 	prefix := node.GetPrefix()
-	if prefix.Whitespace == "" && len(prefix.Comments) == 0 {
+	if prefix.Whitespace() == "" && len(prefix.Comments()) == 0 {
 		return java.EmptySpace, node
 	}
 	m := reflect.ValueOf(node).MethodByName("WithPrefix")
@@ -2524,14 +2491,11 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 			ctx.skip(1) // ","
 			commaAfter := ctx.prefix(expr.Rparen)
 			ctx.skip(1) // ")"
-			markers = java.Markers{
-				ID: uuid.New(),
-				Entries: []java.Marker{golang.TrailingComma{
-					Ident:  uuid.New(),
-					Before: commaBefore,
-					After:  commaAfter,
-				}},
-			}
+			markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.TrailingComma{
+				Ident:  uuid.New(),
+				Before: commaBefore,
+				After:  commaAfter,
+			}})
 		} else {
 			closePrefix := ctx.prefix(expr.Rparen)
 			ctx.skip(1) // ")"
@@ -2647,14 +2611,11 @@ func (ctx *parseContext) mapConversion(expr *ast.CallExpr) java.Expression {
 		commaBefore := ctx.prefix(ctx.file.Pos(commaOffset))
 		ctx.skip(1) // ","
 		commaAfter := ctx.prefix(expr.Rparen)
-		markers = java.Markers{
-			ID: uuid.New(),
-			Entries: []java.Marker{golang.TrailingComma{
-				Ident:  uuid.New(),
-				Before: commaBefore,
-				After:  commaAfter,
-			}},
-		}
+		markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.TrailingComma{
+			Ident:  uuid.New(),
+			Before: commaBefore,
+			After:  commaAfter,
+		}})
 	} else {
 		rparenPrefix = ctx.prefix(expr.Rparen)
 	}
@@ -2861,14 +2822,11 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 			ctx.skip(1) // ","
 			commaAfter := ctx.prefix(expr.Rbrace)
 			ctx.skip(1) // "}"
-			compMarkers = java.Markers{
-				ID: uuid.New(),
-				Entries: []java.Marker{golang.TrailingComma{
-					Ident:  uuid.New(),
-					Before: commaBefore,
-					After:  commaAfter,
-				}},
-			}
+			compMarkers = java.MakeMarkers(uuid.New(), []java.Marker{golang.TrailingComma{
+				Ident:  uuid.New(),
+				Before: commaBefore,
+				After:  commaAfter,
+			}})
 		} else {
 			rbracePrefix := ctx.prefix(expr.Rbrace)
 			ctx.skip(1) // "}"
@@ -3113,18 +3071,15 @@ func (ctx *parseContext) closeTypeArgs(elements []java.RightPadded[java.Expressi
 		ctx.skip(1) // ","
 		after := ctx.prefix(rbrack)
 		ctx.skip(1) // "]"
-		return java.Markers{
-			ID: uuid.New(),
-			Entries: []java.Marker{golang.TrailingComma{
-				Ident:  uuid.New(),
-				Before: before,
-				After:  after,
-			}},
-		}
+		return java.MakeMarkers(uuid.New(), []java.Marker{golang.TrailingComma{
+			Ident:  uuid.New(),
+			Before: before,
+			After:  after,
+		}})
 	}
 	elements[len(elements)-1].After = ctx.prefix(rbrack)
 	ctx.skip(1) // "]"
-	return java.Markers{}
+	return java.EmptyMarkers
 }
 
 // mapParameterizedTypeMulti maps a multi-type-arg generic instantiation in a type position,
@@ -3468,13 +3423,10 @@ func (ctx *parseContext) mapChanType(expr *ast.ChanType) java.Expression {
 		}
 		ctx.skip(2) // "<-"
 		if !dirMarkerBefore.IsEmpty() {
-			markers = java.Markers{
-				ID: uuid.New(),
-				Entries: []java.Marker{golang.ChanDirMarker{
-					Ident:  uuid.New(),
-					Before: dirMarkerBefore,
-				}},
-			}
+			markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.ChanDirMarker{
+				Ident:  uuid.New(),
+				Before: dirMarkerBefore,
+			}})
 		}
 	case ast.RECV:
 		dir = golang.ChanRecvOnly
@@ -3487,13 +3439,10 @@ func (ctx *parseContext) mapChanType(expr *ast.ChanType) java.Expression {
 		}
 		ctx.skip(len("chan"))
 		if !dirMarkerBefore.IsEmpty() {
-			markers = java.Markers{
-				ID: uuid.New(),
-				Entries: []java.Marker{golang.ChanDirMarker{
-					Ident:  uuid.New(),
-					Before: dirMarkerBefore,
-				}},
-			}
+			markers = java.MakeMarkers(uuid.New(), []java.Marker{golang.ChanDirMarker{
+				Ident:  uuid.New(),
+				Before: dirMarkerBefore,
+			}})
 		}
 	default:
 		dir = golang.ChanBidi
@@ -3679,10 +3628,10 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 	for i, p := range pairs {
 		// The first pair's Prefix is the space outside the delimiter, so
 		// its own padding — which is inside — rides the key instead.
-		annPrefix := java.Space{Whitespace: p.PrefixWS}
+		annPrefix := java.MakeSpace(nil, p.PrefixWS)
 		var keyPrefix java.Space
 		if i == 0 {
-			annPrefix, keyPrefix = outerPrefix, java.Space{Whitespace: p.PrefixWS}
+			annPrefix, keyPrefix = outerPrefix, java.MakeSpace(nil, p.PrefixWS)
 		}
 		annotations[i] = &java.Annotation{
 			ID:     uuid.New(),
@@ -3704,7 +3653,7 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 		}
 	}
 	last := annotations[len(annotations)-1].Arguments.Elements
-	last[len(last)-1].After = java.Space{Whitespace: rest}
+	last[len(last)-1].After = java.MakeSpace(nil, rest)
 	vd.LeadingAnnotations = annotations
 }
 
@@ -3718,13 +3667,14 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 // var/const) to populate `LeadingAnnotations` and shrink the decl's
 // own Prefix to the whitespace between last directive and keyword.
 func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Space) {
-	if len(s.Comments) == 0 {
+	if len(s.Comments()) == 0 {
 		return nil, s
 	}
-	pendingPrefixWS := s.Whitespace
+	pendingPrefixWS := s.Whitespace()
 	i := 0
-	for i < len(s.Comments) {
-		c := s.Comments[i]
+	comments := s.Comments()
+	for i < len(comments) {
+		c := comments[i]
 		if c.Multiline {
 			break
 		}
@@ -3732,17 +3682,14 @@ func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Spa
 		if !ok {
 			break
 		}
-		anns = append(anns, buildDirectiveAnnotation(name, sep, args, java.Space{Whitespace: pendingPrefixWS}))
+		anns = append(anns, buildDirectiveAnnotation(name, sep, args, java.MakeSpace(nil, pendingPrefixWS)))
 		pendingPrefixWS = c.Suffix
 		i++
 	}
 	if len(anns) == 0 {
 		return nil, s
 	}
-	residual = java.Space{
-		Whitespace: pendingPrefixWS,
-		Comments:   s.Comments[i:],
-	}
+	residual = java.MakeSpace(comments[i:], pendingPrefixWS)
 	return anns, residual
 }
 
@@ -3802,7 +3749,7 @@ func buildDirectiveAnnotation(name, sep, args string, prefix java.Space) *java.A
 	// The separator is source even where it runs to the end of the line
 	// with no argument behind it.
 	if sep != "" || args != "" {
-		ann.Arguments = &java.Container[java.Expression]{Before: java.Space{Whitespace: sep}}
+		ann.Arguments = &java.Container[java.Expression]{Before: java.MakeSpace(nil, sep)}
 		if args != "" {
 			ann.Arguments.Elements = []java.RightPadded[java.Expression]{
 				{Element: &java.Literal{
@@ -3915,12 +3862,10 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 			returnType := ctx.mapReturnType(funcType.Results)
 
 			md := &java.MethodDeclaration{
-				ID:     uuid.New(),
-				Prefix: namePrefix,
-				Name:   name,
-				Markers: java.Markers{
-					Entries: []java.Marker{golang.InterfaceMethod{Ident: uuid.New()}},
-				},
+				ID:         uuid.New(),
+				Prefix:     namePrefix,
+				Name:       name,
+				Markers:    java.MakeMarkers(uuid.New(), []java.Marker{golang.InterfaceMethod{Ident: uuid.New()}}),
 				Parameters: params,
 				ReturnType: returnType,
 				// Body is nil — interface method has no body

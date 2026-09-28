@@ -262,9 +262,9 @@ func positionDirectiveAnnotation(template *java.Annotation, declPrefix *java.Spa
 	clone := cloneAnnotation(template)
 	if isFirst {
 		clone.Prefix = *declPrefix
-		*declPrefix = java.Space{Whitespace: "\n"}
+		*declPrefix = java.MakeSpace(nil, "\n")
 	} else {
-		clone.Prefix = java.Space{Whitespace: "\n"}
+		clone.Prefix = java.MakeSpace(nil, "\n")
 	}
 	return clone
 }
