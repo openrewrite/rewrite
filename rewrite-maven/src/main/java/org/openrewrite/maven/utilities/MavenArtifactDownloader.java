@@ -23,6 +23,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
+import org.openrewrite.ipc.http.ProxyStatus;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
@@ -154,12 +155,14 @@ public class MavenArtifactDownloader {
                                          authenticationRequiredEndpoints.contains(endpoint);
                     byte[] responseBytes = null;
                     int responseCode;
+                    List<ProxyStatus> proxyStatus;
                     HttpSender.Request firstRequest = preemptive ?
                             applyAuthentication(repository, httpSender.get(uri)).build() :
                             httpSender.get(uri).build();
                     try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(firstRequest));
                          InputStream body = response.getBody()) {
                         responseCode = response.getCode();
+                        proxyStatus = ProxyStatus.parse(response.getHeaders());
                         if (response.isSuccessful() && body != null) {
                             responseBytes = readAllBytes(body);
                         }
@@ -170,6 +173,7 @@ public class MavenArtifactDownloader {
                         try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                              InputStream body = response.getBody()) {
                             responseCode = response.getCode();
+                            proxyStatus = ProxyStatus.parse(response.getHeaders());
                             if (response.isSuccessful() && body != null) {
                                 responseBytes = readAllBytes(body);
                             }
@@ -180,10 +184,10 @@ public class MavenArtifactDownloader {
                         }
                     }
                     if (responseBytes == null) {
-                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s%s from %s. Response was %d",
+                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s%s from %s. Response was %d%s",
                                 dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(),
                                 dependency.getClassifier() == null ? "" : ":" + dependency.getClassifier(),
-                                uri, responseCode), null,
+                                uri, responseCode, ProxyStatus.render(proxyStatus)), null,
                                 dependency.getRequested().getGav()));
                         return null;
                     }

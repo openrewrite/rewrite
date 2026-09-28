@@ -164,6 +164,9 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
                     response = send("ParseSolution", new ParseSolution(path, rootDir, options), ParseSolutionResponse.class);
                     restoreTimeMs.addAndGet(response.getRestoreTimeMs());
+                    // Project files carry the resolved packages, so a consumer can read them before the sources.
+                    response.getItems().sort(Comparator.comparing((ParseSolutionResponse.Item item) ->
+                            !"org.openrewrite.xml.tree.Xml$Document".equals(item.getSourceFileType())));
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.getItems().size()));
                 }
 

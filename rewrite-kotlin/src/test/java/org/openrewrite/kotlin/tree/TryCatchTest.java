@@ -16,10 +16,17 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class TryCatchTest implements RewriteTest {
 
@@ -78,6 +85,38 @@ class TryCatchTest implements RewriteTest {
               fun method() {
                   try {
                   } catch (_: InterruptedException) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void markersOnCatchParameterPrintedWithTrailingComma() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<ExecutionContext>() {
+              @Override
+              public <T extends J> J.ControlParentheses<T> visitControlParentheses(J.ControlParentheses<T> controlParens, ExecutionContext ctx) {
+                  JRightPadded<T> tree = controlParens.getPadding().getTree();
+                  return controlParens.getPadding().withTree(
+                    tree.withMarkers(tree.getMarkers().addIfAbsent(new SearchResult(Tree.randomId(), null))));
+              }
+          })),
+          kotlin(
+            """
+              fun f() {
+                  try {
+                      println()
+                  } catch (e: Exception,) {
+                  }
+              }
+              """,
+            """
+              fun f() {
+                  try {
+                      println()
+                  } catch (/*~~>*/e: Exception,) {
                   }
               }
               """

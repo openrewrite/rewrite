@@ -53,6 +53,10 @@ type GoParser struct {
 	// generic instantiation — so a caller that compares shapes must tolerate
 	// that. Mirrors JavaScriptParser.parseOnly() in rewrite-javascript.
 	ParseOnly bool
+
+	// mapper spans every ParsePackage call, so a type the importer resolves once for
+	// many packages maps to one instance rather than one per package.
+	mapper *typeMapper
 }
 
 func NewGoParser() *GoParser {
@@ -190,7 +194,10 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 	// same thing, and each holds it for as long as the tree lives.
 	reason := strings.Join(partial, "; ")
 
-	mapper := newTypeMapper()
+	if gp.mapper == nil {
+		gp.mapper = newTypeMapper()
+	}
+	mapper := gp.mapper
 	cus := make([]*golang.CompilationUnit, 0, len(files))
 	for i, f := range files {
 		ctx := &parseContext{
@@ -2613,7 +2620,7 @@ func (ctx *parseContext) builtinSignature(callee ast.Expr, name string) *java.Ja
 	if !ok {
 		return nil
 	}
-	return ctx.mapper.mapSignature(sig, name, &java.JavaTypeClass{FullyQualifiedName: "builtin", Kind: "Class"})
+	return ctx.mapper.mapSignature(sig, name, ctx.mapper.packageClass("builtin"))
 }
 
 // isConversion reports whether a call is Go's `T(x)`, which converts one value
@@ -3219,7 +3226,7 @@ func (ctx *parseContext) resultsType(results *ast.FieldList) java.JavaType {
 			types = append(types, t)
 		}
 	}
-	return tupleType(types)
+	return ctx.mapper.tupleType(types)
 }
 
 // mapIndexListExpr maps a multi-index expression like `Map[int, string]` (generic instantiation).

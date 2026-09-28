@@ -20,8 +20,6 @@ jobs:
         21
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-      sonatype_username: ${{ secrets.SONATYPE_USERNAME }}
-      sonatype_token: ${{ secrets.SONATYPE_TOKEN}}
       ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
       ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
       artifactory_username: ${{ secrets.ARTIFACTORY_USERNAME }}

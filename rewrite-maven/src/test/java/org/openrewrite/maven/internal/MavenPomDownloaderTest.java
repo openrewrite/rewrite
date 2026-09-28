@@ -816,6 +816,35 @@ class MavenPomDownloaderTest implements RewriteTest {
               new MavenPomDownloader(emptyMap(), ctx).downloadMetadata(new GroupArtifact("does.definitely.not", "exist"), null, List.of(repository)));
         }
 
+        @Test
+        void proxiedUpstreamsReportedWithRepositoryResponse() throws Exception {
+            try (var server = new MockWebServer()) {
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        return new MockResponse().setResponseCode(404)
+                          .addHeader("Proxy-Status", "gateway; next-hop=\"https://repo.example.com/maven\"; received-status=404")
+                          .addHeader("Proxy-Status", "gateway; next-hop=\"https://mirror.example.com/maven\"; error=connection_timeout");
+                    }
+                });
+                server.start();
+
+                var repository = MavenRepository.builder()
+                  .id("gateway")
+                  .uri("http://%s:%d/maven/".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .build();
+                assertThatThrownBy(() -> new MavenPomDownloader(emptyMap(), ctx)
+                  .download(new GroupArtifactVersion("org.example", "missing", "1.0.0"), null, null, List.of(repository)))
+                  .isInstanceOfSatisfying(MavenDownloadingException.class, e ->
+                    assertThat(e.getMessage()).contains(
+                      "Tried repositories:\n" +
+                      repository.getUri() + ": HTTP 404, proxying:\n" +
+                      "  https://repo.example.com/maven: HTTP 404\n" +
+                      "  https://mirror.example.com/maven: connection_timeout"));
+            }
+        }
+
         @Issue("https://github.com/openrewrite/rewrite/issues/6739")
         @Test
         void deriveMetaDataFromHtmlWithTitleAttributes() throws Exception {

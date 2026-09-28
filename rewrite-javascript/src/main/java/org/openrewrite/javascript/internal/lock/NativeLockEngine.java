@@ -259,7 +259,8 @@ public final class NativeLockEngine {
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         Overrides overrides = declaredOverrides(PackageManager.Npm, editedPackageJson);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock), overrides.ranges)
+        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock),
+                overrides.ranges, true)
                 .build(singletonMap("", editedPackageJson));
         requireOverridesHold(graph, overrides.ranges, overrides.scopedParent);
         List<LockEditSet.PackageEdit> edits = NpmLockDiff.diff(graph, existingLock);

@@ -37,6 +37,24 @@ T = TypeVar('T')
 _STATE_BY_VALUE: Dict[str, RpcObjectState] = {s.value: s for s in RpcObjectState}
 
 
+class _FrozenList(list):
+    """A shared immutable empty ``list`` to deduplicate the many empty child
+    collections in a received LST (memory optimization). Subclassing ``list``
+    keeps ``isinstance(x, list)`` true; the mutators raise so a stray in-place
+    write fails loudly instead of corrupting every node that shares it."""
+
+    __slots__ = ()
+
+    def _immutable(self, *_args: Any, **_kwargs: Any) -> Any:
+        raise TypeError("empty received list is immutable and shared")
+
+    __setitem__ = __delitem__ = __iadd__ = __imul__ = _immutable  # type: ignore[assignment]
+    append = extend = insert = remove = pop = clear = sort = reverse = _immutable  # type: ignore[assignment]
+
+
+_EMPTY_LIST: List[Any] = _FrozenList()
+
+
 class RpcObjectData(NamedTuple):
     """Data structure for RPC object messages.
 
@@ -307,7 +325,7 @@ class RpcReceiveQueue:
             item = self.receive(b, on_change)
             after.append(item)
 
-        return after
+        return after if after else _EMPTY_LIST
 
     def receive_markers(self, markers: Optional['Markers'] = None) -> 'Markers':
         """Receive and deserialize Markers.

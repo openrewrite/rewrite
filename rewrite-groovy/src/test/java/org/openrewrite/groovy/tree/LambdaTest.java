@@ -17,8 +17,15 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings("GroovyUnusedAssignment")
@@ -142,6 +149,90 @@ class LambdaTest implements RewriteTest {
               def f1 = { -> 1 }
               def f2 = { 1 }
               def f3 = { -> }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8879")
+    @Test
+    void lambdaArgumentWithoutParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def f(List<String> boxes) {
+                  boxes.forEach (String box) -> {
+                      println box
+                  }
+                  boxes.forEach (box) -> println(box)
+                  boxes.forEach(box) -> {
+                      println box
+                  }
+                  boxes.forEach (a) -> a
+                  boxes.forEach ((String box) -> {
+                      println box
+                  })
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(new GroovyIsoVisitor<List<Boolean>>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<Boolean> omitsParentheses) {
+                    assertThat(method.getArguments()).singleElement().isInstanceOfSatisfying(J.Lambda.class,
+                      lambda -> {
+                          assertThat(lambda.getParameters().isParenthesized()).isTrue();
+                          omitsParentheses.add(lambda.getMarkers().findFirst(OmitParentheses.class).isPresent());
+                      });
+                    return method;
+                }
+            }.reduce(cu, new ArrayList<>())).containsExactly(true, true, true, true, false))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8879")
+    @Test
+    void lambdaArgumentWithEmptyParameterListWithoutParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              submit () -> {
+                  println "x"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8879")
+    @Test
+    void multipleLambdaArgumentsWithoutParenthesesInClosures() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  void mock(Map<String, String> parents) {
+                      when(a).thenAnswer {
+                          List<String> reqBoxes = it.getArgument(0)
+                          reqBoxes.forEach (String box) -> {
+                              if (parents.containsKey(box)) {
+                                  println box
+                              }
+                          }
+                          return Request.builder()
+                                  .boxes(reqBoxes)
+                                  .build()
+                      }
+                      when(b).thenAnswer {
+                          List<String> reqBoxes = it.getArgument(0)
+                          reqBoxes.forEach (String box) -> {
+                              println box
+                          }
+                          return Response.builder()
+                                  .boxes(reqBoxes)
+                                  .build()
+                      }
+                  }
+              }
               """
           )
         );

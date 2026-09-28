@@ -41,6 +41,15 @@ type typeMapper struct {
 	mappingOrigin map[*types.Named]*java.JavaTypeClass
 	// fieldOwner leads from a struct field back to its declaring type.
 	fieldOwner map[*types.Var]java.JavaType
+	// The RPC ref table interns by identity, so a type rebuilt at every use is resent at every use.
+	packages  map[string]*java.JavaTypeClass
+	methods   map[*types.Func]*java.JavaTypeMethod
+	variables map[variableKey]*java.JavaTypeVariable
+}
+
+type variableKey struct {
+	v         *types.Var
+	enclosing java.JavaType
 }
 
 // maxTypeDepth bounds how deep type attribution follows a type into its
@@ -54,6 +63,9 @@ func newTypeMapper() *typeMapper {
 		namedCache:    make(map[*types.Named]*java.JavaTypeClass),
 		mappingOrigin: make(map[*types.Named]*java.JavaTypeClass),
 		fieldOwner:    make(map[*types.Var]java.JavaType),
+		packages:      make(map[string]*java.JavaTypeClass),
+		methods:       make(map[*types.Func]*java.JavaTypeMethod),
+		variables:     make(map[variableKey]*java.JavaTypeVariable),
 	}
 }
 
@@ -299,7 +311,7 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 	for i := 0; i < results.Len(); i++ {
 		resultTypes = append(resultTypes, m.mapType(results.At(i).Type()))
 	}
-	mt.ReturnType = tupleType(resultTypes)
+	mt.ReturnType = m.tupleType(resultTypes)
 	params := sig.Params()
 	for i := 0; i < params.Len(); i++ {
 		p := params.At(i)
@@ -310,9 +322,19 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 	return mt
 }
 
+// packageClass stands a package in for the declaring type of what it declares.
+func (m *typeMapper) packageClass(path string) *java.JavaTypeClass {
+	if c, ok := m.packages[path]; ok {
+		return c
+	}
+	c := &java.JavaTypeClass{Kind: "Class", FullyQualifiedName: path}
+	m.packages[path] = c
+	return c
+}
+
 // tupleType is what a Go result list yields: nothing, the one type it names,
 // or the several it names bundled under `go.tuple`.
-func tupleType(results []java.JavaType) java.JavaType {
+func (m *typeMapper) tupleType(results []java.JavaType) java.JavaType {
 	switch len(results) {
 	case 0:
 		return &java.JavaTypePrimitive{Keyword: "void"}
@@ -320,7 +342,7 @@ func tupleType(results []java.JavaType) java.JavaType {
 		return results[0]
 	default:
 		return &java.JavaTypeParameterized{
-			Type:           &java.JavaTypeClass{FullyQualifiedName: "go.tuple", Kind: "Class"},
+			Type:           m.packageClass("go.tuple"),
 			TypeParameters: results,
 		}
 	}
@@ -473,10 +495,7 @@ func (m *typeMapper) mapObject(obj types.Object) java.JavaType {
 		// Map package aliases to "Class" with the import path as the FQN;
 		// recipes can recognize package references by the FQN containing
 		// path separators (e.g. "github.com/x/y").
-		return &java.JavaTypeClass{
-			Kind:               "Class",
-			FullyQualifiedName: imported.Path(),
-		}
+		return m.packageClass(imported.Path())
 	}
 	return m.mapType(obj.Type())
 }
@@ -488,11 +507,17 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object, enclosing java.JavaTy
 	}
 	switch o := obj.(type) {
 	case *types.Var:
-		return &java.JavaTypeVariable{
+		key := variableKey{o, enclosing}
+		if v, ok := m.variables[key]; ok {
+			return v
+		}
+		v := &java.JavaTypeVariable{
 			Name:  o.Name(),
 			Owner: m.ownerType(o, enclosing),
 			Type:  m.mapType(o.Type()),
 		}
+		m.variables[key] = v
+		return v
 	default:
 		return nil
 	}
@@ -511,7 +536,7 @@ func (m *typeMapper) ownerType(v *types.Var, enclosing java.JavaType) java.JavaT
 		return nil
 	}
 	if pkg := v.Pkg(); pkg != nil && v.Parent() == pkg.Scope() {
-		return &java.JavaTypeClass{Kind: "Class", FullyQualifiedName: pkg.Path()}
+		return m.packageClass(pkg.Path())
 	}
 	return enclosing
 }
@@ -520,6 +545,9 @@ func (m *typeMapper) ownerType(v *types.Var, enclosing java.JavaType) java.JavaT
 func (m *typeMapper) mapMethodObject(fn *types.Func) *java.JavaTypeMethod {
 	if fn == nil {
 		return nil
+	}
+	if mt, ok := m.methods[fn]; ok {
+		return mt
 	}
 	sig := fn.Type().(*types.Signature)
 
@@ -545,14 +573,13 @@ func (m *typeMapper) mapMethodObject(fn *types.Func) *java.JavaTypeMethod {
 		// Package-level function
 		pkg := fn.Pkg()
 		if pkg != nil {
-			declaringType = &java.JavaTypeClass{
-				FullyQualifiedName: pkg.Path(),
-				Kind:               "Class",
-			}
+			declaringType = m.packageClass(pkg.Path())
 		}
 	}
 
-	return m.mapSignature(sig, fn.Name(), declaringType)
+	mt := m.mapSignature(sig, fn.Name(), declaringType)
+	m.methods[fn] = mt
+	return mt
 }
 
 // mapSelection maps a types.Selection (field or method selection via ".") to a JavaType.

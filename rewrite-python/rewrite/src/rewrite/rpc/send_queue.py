@@ -26,6 +26,10 @@ class RpcObjectState(str, Enum):
 
 ADDED_LIST_ITEM = -1
 
+# Jackson reads a JSON number of at most 1000 characters
+# (StreamReadConstraints.getMaxNumberLength), which 3300 bits stays under.
+_MAX_WIRE_INT_BITS = 3300
+
 T = TypeVar('T')
 
 
@@ -330,12 +334,9 @@ class RpcSendQueue:
         if isinstance(obj, bool):
             return obj
         if isinstance(obj, int):
-            # Integers exceeding Java's long range cannot be serialized as
-            # JSON numbers (Jackson's StreamReadConstraints rejects them).
-            # Convert to string — the original source is preserved in valueSource.
-            if obj > 9223372036854775807 or obj < -9223372036854775808:
-                return str(obj)
-            return obj
+            # An integer travels as a number whatever its width, so that a receiver boxes it
+            # as one; a string here is indistinguishable from a string literal's value.
+            return obj if obj.bit_length() <= _MAX_WIRE_INT_BITS else None
         if isinstance(obj, str):
             return obj
         if isinstance(obj, float):
@@ -345,10 +346,9 @@ class RpcSendQueue:
                 return None
             return obj
         if isinstance(obj, complex):
-            # Java has no complex primitive, so carry the value as a string. Python's
-            # repr parenthesizes a complex with a non-zero real part ("(3+4j)"); strip
-            # those so the value matches the source, which is also kept in valueSource.
-            return str(obj).strip('()')
+            # No JSON number carries a complex, and a string is ruled out for the same
+            # reason as a wide int, so valueSource carries the literal alone.
+            return None
         if isinstance(obj, UUID):
             return str(obj)
         if isinstance(obj, Path):
