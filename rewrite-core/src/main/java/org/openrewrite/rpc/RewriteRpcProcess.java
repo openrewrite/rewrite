@@ -300,7 +300,7 @@ public class RewriteRpcProcess extends Thread {
         if (trace) {
             handler = new TraceMessageHandler("client", handler);
         }
-        this.rpcClient = new JsonRpc(handler).metrics(Metrics.globalRegistry, Tags.of("language", language));
+        this.rpcClient = new JsonRpc(handler).tags(Tags.of("language", language));
     }
 
     public void shutdown() {
