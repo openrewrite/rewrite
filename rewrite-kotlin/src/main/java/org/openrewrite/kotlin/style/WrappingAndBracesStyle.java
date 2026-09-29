@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.style;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.kotlin.KotlinStyle;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
@@ -25,6 +26,7 @@ import org.openrewrite.style.StyleHelper;
 @With
 public class WrappingAndBracesStyle implements KotlinStyle {
 
+    Integer hardWrapAt;
     KeepWhenFormatting keepWhenFormatting;
     ExtendsImplementsPermitsList extendsImplementsPermitsList;
     FunctionDeclarationParameters functionDeclarationParameters;
@@ -57,6 +59,7 @@ public class WrappingAndBracesStyle implements KotlinStyle {
     @Value
     @With
     public static class FunctionDeclarationParameters {
+        LineWrapSetting wrap;
         Boolean alignWhenMultiline;
         Boolean newLineAfterLeftParen;
         Boolean placeRightParenOnNewLine;
@@ -66,6 +69,7 @@ public class WrappingAndBracesStyle implements KotlinStyle {
     @Value
     @With
     public static class FunctionCallArguments {
+        LineWrapSetting wrap;
         Boolean alignWhenMultiline;
         Boolean newLineAfterLeftParen;
         Boolean placeRightParenOnNewLine;

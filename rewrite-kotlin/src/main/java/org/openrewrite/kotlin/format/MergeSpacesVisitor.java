@@ -662,12 +662,15 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             return markers == null ? Markers.EMPTY : markers;
         }
         Markers newMarkers = (Markers) ctx;
+        TrailingComma newTrailingComma = newMarkers.findFirst(TrailingComma.class).orElse(null);
+        if (newTrailingComma != null && !markers.findFirst(TrailingComma.class).isPresent()) {
+            // Wrapping may introduce a trailing comma, which is formatting rather than content
+            return markers.add(newTrailingComma);
+        }
         return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> {
-            if (marker instanceof TrailingComma) {
+            if (marker instanceof TrailingComma && newTrailingComma != null) {
                 TrailingComma t = (TrailingComma) marker;
-                return newMarkers.findFirst(TrailingComma.class)
-                        .map(n -> t.withSuffix(visitSpace(t.getSuffix(), Space.Location.LANGUAGE_EXTENSION, n.getSuffix())))
-                        .orElse(t);
+                return t.withSuffix(visitSpace(t.getSuffix(), Space.Location.LANGUAGE_EXTENSION, newTrailingComma.getSuffix()));
             }
             return marker;
         }));

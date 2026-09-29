@@ -25,7 +25,13 @@ import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.style.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -33,13 +39,19 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
+    private final List<NamedStyles> styles;
+
     @SuppressWarnings("unused")
     public AutoFormatVisitor() {
         this(null);
     }
 
-    public AutoFormatVisitor(@Nullable Tree stopAfter) {
+    /**
+     * @param styles Styles that take precedence over those attached to the source file.
+     */
+    public AutoFormatVisitor(@Nullable Tree stopAfter, NamedStyles... styles) {
         this.stopAfter = stopAfter;
+        this.styles = Arrays.asList(styles);
     }
 
     @Override
@@ -53,15 +65,15 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
         // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
         J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
         t = new MinimumViableSpacingVisitor<>(stopAfter).visit(t, p, cursor.fork());
-        t = new WrappingAndBracesVisitor<>(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter).visit(t, p, cursor.fork());
-        t = new SpacesVisitor<>(Style.from(SpacesStyle.class, cu, IntelliJ::spaces), stopAfter).visit(t, p, cursor.fork());
-        t = new NormalizeTabsOrSpacesVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter).visit(t, p, cursor.fork());
-        t = new TabsAndIndentsVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter).visit(t, p, cursor.fork());
+        t = new WrappingAndBracesVisitor<>(style(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), style(OtherStyle.class, cu, IntelliJ::other), stopAfter).visit(t, p, cursor.fork());
+        t = new SpacesVisitor<>(style(SpacesStyle.class, cu, IntelliJ::spaces), stopAfter).visit(t, p, cursor.fork());
+        t = new NormalizeTabsOrSpacesVisitor<>(style(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter).visit(t, p, cursor.fork());
+        t = new TabsAndIndentsVisitor<>(style(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), style(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter).visit(t, p, cursor.fork());
 
         // With the updated tree, overwrite the original space with the newly computed space
-        tree = new MergeSpacesVisitor(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces)).visit(tree, t, cursor.fork());
-        tree = new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter).visit(tree, p, cursor.fork());
-        tree = new NormalizeLineBreaksVisitor<>(Style.from(GeneralFormatStyle.class, cu, () -> new GeneralFormatStyle(false)), stopAfter).visit(tree, p, cursor.fork());
+        tree = new MergeSpacesVisitor(style(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces)).visit(tree, t, cursor.fork());
+        tree = new BlankLinesVisitor<>(style(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter).visit(tree, p, cursor.fork());
+        tree = new NormalizeLineBreaksVisitor<>(style(GeneralFormatStyle.class, cu, () -> new GeneralFormatStyle(false)), stopAfter).visit(tree, p, cursor.fork());
         tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(tree, p, cursor.fork());
 
         return (J) tree;
@@ -80,19 +92,30 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
 
             JavaSourceFile t = (JavaSourceFile) new NormalizeFormatVisitor<>(stopAfter).visit(tree, p);
             t = (JavaSourceFile) new MinimumViableSpacingVisitor<>(stopAfter).visit(t, p);
-            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter).visit(t, p);
-            t = (JavaSourceFile) new SpacesVisitor<>(Style.from(SpacesStyle.class, cu, IntelliJ::spaces), stopAfter).visit(t, p);
-            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter).visit(t, p);
-            t = (JavaSourceFile) new TabsAndIndentsVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter).visit(t, p);
+            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(style(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), style(OtherStyle.class, cu, IntelliJ::other), stopAfter).visit(t, p);
+            t = (JavaSourceFile) new SpacesVisitor<>(style(SpacesStyle.class, cu, IntelliJ::spaces), stopAfter).visit(t, p);
+            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(style(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter).visit(t, p);
+            t = (JavaSourceFile) new TabsAndIndentsVisitor<>(style(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), style(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter).visit(t, p);
 
-            tree = new MergeSpacesVisitor(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces)).visit(tree, t);
-            tree = new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter).visit(tree, p);
-            tree = new NormalizeLineBreaksVisitor<>(Style.from(GeneralFormatStyle.class, cu, () -> new GeneralFormatStyle(false)), stopAfter).visit(tree, p);
+            tree = new MergeSpacesVisitor(style(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces)).visit(tree, t);
+            tree = new BlankLinesVisitor<>(style(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter).visit(tree, p);
+            tree = new NormalizeLineBreaksVisitor<>(style(GeneralFormatStyle.class, cu, () -> new GeneralFormatStyle(false)), stopAfter).visit(tree, p);
             tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(tree, p);
 
             // With the updated tree, overwrite the original space with the newly computed space
             return (J) tree;
         }
         return (J) tree;
+    }
+
+    private <S extends Style> S style(Class<S> styleClass, JavaSourceFile cu, Supplier<S> defaultStyle) {
+        if (styles.isEmpty()) {
+            return Style.from(styleClass, cu, defaultStyle);
+        }
+        // NamedStyles.merge gives later entries precedence
+        List<NamedStyles> all = new ArrayList<>(cu.getMarkers().findAll(NamedStyles.class));
+        all.addAll(styles);
+        S s = NamedStyles.merge(styleClass, all);
+        return s == null ? defaultStyle.get() : s;
     }
 }

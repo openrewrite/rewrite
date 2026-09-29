@@ -23,10 +23,17 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.AddImportTest;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.style.IntelliJ;
+import org.openrewrite.kotlin.style.OtherStyle;
+import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.Arrays;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -410,6 +417,123 @@ class AutoFormatVisitorTest implements RewriteTest {
               )
 
               fun first(): Item? = null
+          }
+          """);
+    }
+
+    private static NamedStyles wrapping(UnaryOperator<WrappingAndBracesStyle> with, boolean useTrailingComma) {
+        return new NamedStyles(randomId(), "test", "test", "test", emptySet(),
+          Arrays.asList(with.apply(IntelliJ.wrappingAndBraces()), new OtherStyle(useTrailingComma)));
+    }
+
+    @Test
+    void chopFunctionParametersIfTooLong() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().styles(singletonList(wrapping(w -> w
+            .withHardWrapAt(50)
+            .withFunctionDeclarationParameters(w.getFunctionDeclarationParameters().withWrap(LineWrapSetting.ChopIfTooLong)), true)))),
+          kotlin(
+            """
+              class Builder {
+                  fun short(a: String): String = a
+                  fun describe(description: String, category: String): String = description + category
+              }
+              """,
+            """
+              class Builder {
+                  fun short(a: String): String = a
+                  fun describe(
+                      description: String,
+                      category: String,
+                  ): String = description + category
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void chopCallArgumentsIfTooLong() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().styles(singletonList(wrapping(w -> w
+            .withHardWrapAt(40)
+            .withFunctionCallArguments(w.getFunctionCallArguments().withWrap(LineWrapSetting.ChopIfTooLong)), false)))),
+          kotlin(
+            """
+              class Item(val id: String, val name: String)
+
+              fun build(id: String, name: String): Item {
+                  val s = maxOf(id.length + name.length, name.length, 100)
+                  return Item(id.uppercase(), name.lowercase())
+              }
+              """,
+            """
+              class Item(val id: String, val name: String)
+
+              fun build(id: String, name: String): Item {
+                  val s = maxOf(
+                      id.length + name.length,
+                      name.length,
+                      100
+                  )
+                  return Item(
+                      id.uppercase(),
+                      name.lowercase()
+                  )
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings({"OptionalGetWithoutIsPresent", "DataFlowIssue"})
+    @Test
+    void splicedDataClassChoppedWithExplicitStyles() {
+        K.CompilationUnit cu = KotlinParser.builder().build()
+          .parse("""
+            class Response {
+                abstract class Item {
+                    abstract fun id(): String
+                }
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+        J.ClassDeclaration dataClass = KotlinParser.builder().build()
+          .parse("""
+            package p
+
+            data class Item(val id: String, val name: String, val description: String, val category: String, val count: Int)
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get()
+          .getClasses().get(0);
+        NamedStyles styles = wrapping(w -> w
+          .withHardWrapAt(100)
+          .withFunctionDeclarationParameters(w.getFunctionDeclarationParameters().withWrap(LineWrapSetting.ChopIfTooLong)), true);
+
+        var result = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object p) {
+                if ("Item".equals(classDecl.getSimpleName())) {
+                    return (J.ClassDeclaration) new AutoFormatVisitor<>(null, styles)
+                      .visit(dataClass.withId(classDecl.getId()).withPrefix(classDecl.getPrefix()), p, getCursor().getParentTreeCursor());
+                }
+                return super.visitClassDeclaration(classDecl, p);
+            }
+        }.visit(cu, new InMemoryExecutionContext());
+
+        assertThat(result.printAll()).isEqualTo("""
+          class Response {
+              data class Item(
+                  val id: String,
+                  val name: String,
+                  val description: String,
+                  val category: String,
+                  val count: Int,
+              )
           }
           """);
     }
