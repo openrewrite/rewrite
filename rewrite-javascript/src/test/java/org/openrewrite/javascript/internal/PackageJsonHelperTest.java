@@ -526,7 +526,16 @@ class PackageJsonHelperTest {
             "link:../acme-logger,            link:",
             "github:acme/logger,             github:",
             "https://example.com/acme.tgz,   https:",
-            "git+ssh://example.com/acme.git, git+ssh:"
+            "git+ssh://example.com/acme.git, git+ssh:",
+            // npm's schemeless shorthands, answered with the protocol they expand to
+            "user/repo,                      github:",
+            "mochajs/mocha#4727d357ea,       github:",
+            "user/repo#semver:^1.0.0,        github:",
+            "git@github.com:user/repo.git,   git+ssh:",
+            "../pkg,                         file:",
+            "./pkg,                          file:",
+            "/abs/pkg,                       file:",
+            "~/pkg,                          file:"
     })
     void protocolSpecifiersAreRecognised(String value, String expectedProtocol) {
         assertThat(PackageJsonHelper.dependencySpecifierProtocol(value)).isEqualTo(expectedProtocol);
@@ -534,7 +543,8 @@ class PackageJsonHelperTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"^1.4.1", "~1.4.1", "1.4.1", "1.x", "*", "", "latest", "next",
-            ">=1.0.0 <2.0.0", "1.2.3-beta.1", "1.2.3+build.4", "Catalog:", "-bad:"})
+            ">=1.0.0 <2.0.0", "1.2.3 - 2.3.4", "1.2.3-beta.1", "1.2.3+build.4", "Catalog:", "-bad:",
+            "@scope/pkg"})
     void versionConstraintsAreNotMistakenForProtocols(String value) {
         assertThat(PackageJsonHelper.dependencySpecifierProtocol(value)).isNull();
     }

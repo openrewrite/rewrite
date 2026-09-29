@@ -239,6 +239,22 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     }
 
     /**
+     * npm accepts {@code "express": "expressjs/express"} as shorthand for GitHub, with no scheme to see.
+     * It is still a specifier, so it is left alone and reported as the protocol it expands to.
+     */
+    @Test
+    void aSchemelessSpecifierIsLeftAloneAndReported() {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, NEW))
+                        .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
+                                assertThat(rows).extracting("packageName", "protocol", "currentValue")
+                                        .containsExactly(tuple("acme-logger", "github:", "acme/logger#v1"))),
+                packageJson(MANIFEST.formatted("acme/logger#v1"), null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("acme-logger", "acme/logger#v1")))
+        );
+    }
+
+    /**
      * The entry moves but the lock cannot follow, and pnpm does not report the disagreement: a
      * frozen-lockfile install still succeeds and still installs the old version (pnpm/pnpm#9369). So a
      * silent stale lock would be a change that looks applied and is not. Refuse loudly instead.

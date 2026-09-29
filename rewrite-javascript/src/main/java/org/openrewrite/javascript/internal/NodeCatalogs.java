@@ -80,6 +80,9 @@ public class NodeCatalogs {
      * {@code catalog:default}, which pnpm treats as the same catalog.
      */
     public static @Nullable String catalogReference(@Nullable String value) {
+        // A returned protocol is not always a literal prefix of the value: a schemeless shorthand is
+        // answered with the protocol it expands to. Equality against `catalog:` is what keeps the
+        // substring below correct, since normalisation never yields `catalog:`.
         if (!CATALOG_PROTOCOL.equals(PackageJsonHelper.dependencySpecifierProtocol(value))) {
             return null;
         }
