@@ -580,6 +580,57 @@ public class PackageJsonHelper {
         return value.substring(0, colon + 1);
     }
 
+    /**
+     * Whether {@code protocol} is a <em>location specifier</em>: one whose value is a place to fetch
+     * the same package from, rather than an indirection to a constraint declared elsewhere.
+     * <p>
+     * {@code file:}, {@code link:} and {@code portal:} are all a relative path to a local folder,
+     * {@code github:}, {@code http:}, {@code https:} and the git family are a remote location.
+     * Replacing any of them with a version range is a migration to the registry: the package stays the
+     * same, only where it comes from changes. An <em>indirection specifier</em> such as
+     * {@code catalog:}, {@code workspace:}, {@code patch:} or {@code npm:} instead defers to a
+     * declaration held elsewhere or names a different target, so replacing it discards what it pointed
+     * at.
+     * <p>
+     * The git family is matched by composition rather than by listing it: {@code git+<transport>:}
+     * means git over that transport, so it is a checkout whatever the transport turns out to be. That
+     * is the only open-ended rule here, and it is closed under the meaning of {@code +}. A bare
+     * {@code git} prefix is not used, because it also matches {@code gitlab:}, {@code gitmoji:} and
+     * anything else that merely begins with those letters.
+     * <p>
+     * The hosted shortcuts are the four npm documents as dependency values ({@code github:},
+     * {@code gist:}, {@code bitbucket:}, {@code gitlab:}), which are one category: each names a git
+     * host to fetch the same package from, and a gist is a repository like the rest. A host with no
+     * shortcut, such as Azure DevOps or a self-hosted instance, is written as a full
+     * {@code git+https:} or {@code git+ssh:} URL and is already covered by the rule above.
+     * <p>
+     * Any other protocol is not a location specifier. npm resolves these shortcuts through
+     * hosted-git-info, which knows further hosts that npm does not document here, so this list is
+     * deliberately the documented four; an undocumented or newly added host refuses and is reported,
+     * which is the safe direction. The caller that asks this question is about to overwrite the
+     * value, so an unfamiliar protocol has to refuse.
+     */
+    public static boolean isLocationSpecifier(@Nullable String protocol) {
+        if (protocol == null) {
+            return false;
+        }
+        switch (protocol) {
+            case "file:":
+            case "link:":
+            case "portal:":
+            case "github:":
+            case "http:":
+            case "https:":
+            case "git:":
+            case "gist:":
+            case "bitbucket:":
+            case "gitlab:":
+                return true;
+            default:
+                return protocol.startsWith("git+");
+        }
+    }
+
     public static Json.Document upgradeVersion(Json.Document doc, List<MatchedDependency> matched, String newVersion) {
         if (!(doc.getValue() instanceof Json.JsonObject) || matched.isEmpty()) {
             return doc;
@@ -617,6 +668,9 @@ public class PackageJsonHelper {
                 // overwriting and the only one that sees what the manifest actually says. A marker is
                 // free to report a resolved version where the manifest holds a reference, and the cost
                 // of being wrong here is a discarded constraint, so the check is repeated.
+                // Every protocol is refused here, location specifier or not, unlike changeDependency:
+                // UpgradeDependencyVersion accepts a glob, so one run could repoint every matching fork,
+                // tarball and local link to the registry without ever naming them.
                 if (dependencySpecifierProtocol(literalString(oldLit)) != null) continue;
                 Json.Literal newLit = makeStringLiteral(newVersion).withPrefix(oldLit.getPrefix());
                 children.set(j, children.get(j).withElement(depMember.withValue(newLit)));
@@ -664,14 +718,20 @@ public class PackageJsonHelper {
                 Json.Literal oldKeyLit = (Json.Literal) depMember.getKey();
                 Json.Literal newKeyLit = makeStringLiteral(newName).withPrefix(oldKeyLit.getPrefix());
 
-                // A protocol value is a reference into a pnpm catalog, a workspace member or a patch, and
-                // that reference is keyed on the name being changed. Renaming here without renaming it
-                // there yields a manifest that no longer installs, and overwriting the value discards the
-                // constraint outright. Neither is recoverable from the manifest alone, so the whole
-                // declaration is left as it is; the caller reports why.
-                if (depMember.getValue() instanceof Json.Literal &&
-                        dependencySpecifierProtocol(literalString(depMember.getValue())) != null) {
-                    continue;
+                // An indirection specifier is a reference into a pnpm catalog, a workspace member or a
+                // patch, and that reference is keyed on the name being changed. Renaming here without
+                // renaming it there yields a manifest that no longer installs, and overwriting the value
+                // discards the constraint outright. Neither is recoverable from the manifest alone, so
+                // the whole declaration is left as it is; the caller reports why.
+                // A location specifier only says where to fetch the same package from, so an explicit
+                // newVersion migrates it to the registry rather than discarding anything. Without a
+                // newVersion it is refused too: the value points at the old package, and carrying it
+                // over to the new name would install the wrong thing under the right key.
+                if (depMember.getValue() instanceof Json.Literal) {
+                    String protocol = dependencySpecifierProtocol(literalString(depMember.getValue()));
+                    if (protocol != null && (newVersion == null || !isLocationSpecifier(protocol))) {
+                        continue;
+                    }
                 }
 
                 JsonValue newValue = depMember.getValue();

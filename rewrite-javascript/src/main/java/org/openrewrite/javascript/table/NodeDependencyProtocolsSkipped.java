@@ -32,7 +32,11 @@ public class NodeDependencyProtocolsSkipped extends DataTable<NodeDependencyProt
                         "protocol (in a workspace member, a patch, a catalog), and overwriting the " +
                         "reference would discard it. A `catalog:` reference is followed into its catalog " +
                         "entry instead, and appears here only when it could not be: the workspace file is " +
-                        "not in the source set, or it declares no entry for this package.");
+                        "not in the source set, or it declares no entry for this package. A location " +
+                        "specifier (`file:`, `link:`, `portal:`, `github:`, `http:`, `https:`, `git:`, " +
+                        "`git+<transport>:`) " +
+                        "given an explicit new version is migrated to the registry by `ChangeDependency`, " +
+                        "so it does not appear here for that recipe.");
     }
 
     @Value

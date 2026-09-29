@@ -128,8 +128,11 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
     }
 
     /**
-     * Record the matched dependency when its value is a specifier protocol, so the run reports that the
-     * declaration was left alone rather than renamed into a reference that no longer resolves.
+     * Record the matched dependency when its value is a specifier protocol the rename refuses, so the
+     * run reports that the declaration was left alone rather than renamed into a reference that no
+     * longer resolves. A location specifier given an explicit {@code newVersion} is migrated to the
+     * registry instead, so it is not recorded here; the condition mirrors the guard in
+     * {@link PackageJsonHelper#changeDependency}.
      */
     private void collectProtocolSkip(SourceFile pkg, NodeDependencyScan.ProjectState ps) {
         ps.skippedProtocols.clear();
@@ -145,7 +148,8 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
             for (Dependency d : deps) {
                 if (!oldPackageName.equals(d.getName())) continue;
                 String constraint = d.getVersionConstraint() == null ? "" : d.getVersionConstraint();
-                if (PackageJsonHelper.dependencySpecifierProtocol(constraint) != null) {
+                String protocol = PackageJsonHelper.dependencySpecifierProtocol(constraint);
+                if (protocol != null && (newVersion == null || !PackageJsonHelper.isLocationSpecifier(protocol))) {
                     ps.skippedProtocols.add(new MatchedDependency(d.getName(), scopeName, constraint));
                 }
             }

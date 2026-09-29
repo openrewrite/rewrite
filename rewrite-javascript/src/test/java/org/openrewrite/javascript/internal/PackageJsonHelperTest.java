@@ -543,4 +543,40 @@ class PackageJsonHelperTest {
     void nullIsNotAProtocol() {
         assertThat(PackageJsonHelper.dependencySpecifierProtocol(null)).isNull();
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "file:,      true",
+            "link:,      true",
+            "portal:,    true",
+            "github:,    true",
+            "http:,      true",
+            "https:,     true",
+            "git:,       true",
+            "git+ssh:,   true",
+            "git+https:, true",
+            "git+file:,  true",
+            "catalog:,   false",
+            "workspace:, false",
+            "patch:,     false",
+            "npm:,       false",
+            "future:,    false",
+            // the hosted shortcuts npm documents as dependency values are one category
+            "gitlab:,    true",
+            "bitbucket:, true",
+            "gist:,      true",
+            // hosted-git-info knows this one, npm does not document it, so it refuses like any other
+            "sourcehut:, false",
+            // merely beginning with `git` is not enough to be taken for a checkout; only `git+` is
+            "git-lfs:,   false",
+            "gitmoji:,   false"
+    })
+    void locationSpecifiersAreDistinguishedFromIndirectionSpecifiers(String protocol, boolean location) {
+        assertThat(PackageJsonHelper.isLocationSpecifier(protocol)).isEqualTo(location);
+    }
+
+    @Test
+    void nullIsNotALocationSpecifier() {
+        assertThat(PackageJsonHelper.isLocationSpecifier(null)).isFalse();
+    }
 }
