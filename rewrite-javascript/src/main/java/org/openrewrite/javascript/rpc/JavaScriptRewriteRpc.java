@@ -185,10 +185,16 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
+            private @Nullable String handedOver;
             private @Nullable ParseProjectResponse response;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                // Evicted once the next file is asked for, so the caller can still print this one against the peer's copy.
+                if (handedOver != null) {
+                    evict(handedOver);
+                    handedOver = null;
+                }
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
                     response = send("ParseProject", new ParseProject(projectPath, exclusions, base, parseOptions(ctx)), ParseProjectResponse.class);
@@ -252,6 +258,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                                 null);
                     }
                 }
+                handedOver = item.getId();
                 action.accept(sourceFile);
                 return true;
             }

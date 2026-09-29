@@ -156,10 +156,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
+            private @Nullable String handedOver;
             private @Nullable ParseSolutionResponse response;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                // Evicted once the next file is asked for, so the caller can still print this one against the peer's copy.
+                if (handedOver != null) {
+                    evict(handedOver);
+                    handedOver = null;
+                }
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
                     response = send("ParseSolution", new ParseSolution(path, rootDir, options), ParseSolutionResponse.class);
@@ -189,6 +195,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
 
                 parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
+                handedOver = item.getId();
                 action.accept(sourceFile);
                 return true;
             }
