@@ -24,6 +24,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.toml.tree.TomlValue;
 import org.openrewrite.trait.SimpleTraitMatcher;
 
 import java.util.Arrays;
@@ -54,15 +55,15 @@ class TomlVersionCatalog implements VersionCatalog {
     }
 
     @Override
-    public Map<GroupArtifact, VersionCatalogLibrary> getLibraryVersions() {
-        Map<GroupArtifact, VersionCatalogLibrary> libraries = new LinkedHashMap<>();
+    public Map<GroupArtifact, Entry> getLibraryVersions() {
+        Map<GroupArtifact, Entry> libraries = new LinkedHashMap<>();
         new VersionCatalogLibrary.Matcher().lower(cursor).forEach(library -> libraries.putIfAbsent(library.getGroupArtifact(), library));
         return libraries;
     }
 
     @Override
-    public Map<String, VersionCatalogPlugin> getPluginVersions() {
-        Map<String, VersionCatalogPlugin> plugins = new LinkedHashMap<>();
+    public Map<String, Entry> getPluginVersions() {
+        Map<String, Entry> plugins = new LinkedHashMap<>();
         new VersionCatalogPlugin.Matcher().lower(cursor).forEach(plugin -> plugins.putIfAbsent(plugin.getPluginId(), plugin));
         return plugins;
     }
@@ -70,7 +71,7 @@ class TomlVersionCatalog implements VersionCatalog {
     @Override
     public Map<String, String> getVersionDeclarations() {
         Map<String, String> versions = new LinkedHashMap<>();
-        for (Toml value : getTree().getValues()) {
+        for (TomlValue value : getTree().getValues()) {
             if (value instanceof Toml.Table && isVersionsTable((Toml.Table) value)) {
                 Toml.Table table = (Toml.Table) value;
                 for (Toml entry : table.getValues()) {
@@ -85,6 +86,11 @@ class TomlVersionCatalog implements VersionCatalog {
             }
         }
         return versions;
+    }
+
+    @Override
+    public TomlVersionCatalog withLibraryCoordinates(GroupArtifact ga, String newGroupId, String newArtifactId) {
+        return withLibrary(ga, library -> library.withGroup(newGroupId).withName(newArtifactId));
     }
 
     @Override
@@ -105,33 +111,44 @@ class TomlVersionCatalog implements VersionCatalog {
                 Toml.Table t = super.visitTable(table, ctx);
                 return isVersionsTable(t) ? VersionConstraint.withVersion(t, alias, newVersion) : t;
             }
-        }.visit(getTree(), new InMemoryExecutionContext(), cursor.getParent());
+        }.visitNonNull(getTree(), new InMemoryExecutionContext(), cursor.getParentOrThrow());
+        return withTree((Toml.Document) newTree);
+    }
+
+    @Override
+    public TomlVersionCatalog withPluginVersion(String pluginId, String newVersion) {
+        Toml newTree = (Toml) new VersionCatalogPlugin.Matcher().<ExecutionContext>asVisitor((plugin, ctx) ->
+                pluginId.equals(plugin.getPluginId()) ? plugin.withVersion(newVersion).getTree() : plugin.getTree()
+        ).visitNonNull(getTree(), new InMemoryExecutionContext(), cursor.getParentOrThrow());
         return withTree((Toml.Document) newTree);
     }
 
     private TomlVersionCatalog withLibrary(GroupArtifact ga, UnaryOperator<VersionCatalogLibrary> edit) {
         Toml newTree = (Toml) new VersionCatalogLibrary.Matcher().<ExecutionContext>asVisitor((library, ctx) ->
                 ga.equals(library.getGroupArtifact()) ? edit.apply(library).getTree() : library.getTree()
-        ).visit(getTree(), new InMemoryExecutionContext(), cursor.getParent());
+        ).visitNonNull(getTree(), new InMemoryExecutionContext(), cursor.getParentOrThrow());
         return withTree((Toml.Document) newTree);
     }
 
     private TomlVersionCatalog withTree(Toml.Document newTree) {
-        return newTree == getTree() ? this : new TomlVersionCatalog(new Cursor(cursor.getParent(), newTree));
+        return newTree == getTree() ? this : new TomlVersionCatalog(new Cursor(cursor.getParentOrThrow(), newTree));
     }
 
     private static boolean isVersionsTable(Toml.Table table) {
-        return table.getName() != null && "versions".equals(table.getName().getName());
+        Toml.Identifier name = table.getName();
+        return name != null && "versions".equals(name.getName());
     }
 
     static class Matcher extends SimpleTraitMatcher<TomlVersionCatalog> {
         @Override
         protected @Nullable TomlVersionCatalog test(Cursor cursor) {
             if (cursor.getValue() instanceof Toml.Document) {
-                for (Toml value : ((Toml.Document) cursor.getValue()).getValues()) {
-                    if (value instanceof Toml.Table && ((Toml.Table) value).getName() != null &&
-                        CATALOG_TABLES.contains(((Toml.Table) value).getName().getName())) {
-                        return new TomlVersionCatalog(cursor);
+                for (TomlValue value : ((Toml.Document) cursor.getValue()).getValues()) {
+                    if (value instanceof Toml.Table) {
+                        Toml.Identifier name = ((Toml.Table) value).getName();
+                        if (name != null && CATALOG_TABLES.contains(name.getName())) {
+                            return new TomlVersionCatalog(cursor);
+                        }
                     }
                 }
             }
