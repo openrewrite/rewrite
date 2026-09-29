@@ -63,7 +63,7 @@ func (s *JavaSender) PreVisit(t java.Tree, p any) java.Tree {
 	q.GetAndSend(t, func(v any) any { return v.(java.J).GetID().String() }, nil)
 	q.GetAndSend(t, func(v any) any { return v.(java.J).GetPrefix() },
 		func(v any) { sendSpace(v.(java.Space), q) })
-	q.GetAndSend(t, func(v any) any { return AsRef(nonNilEmpty(v.(java.J).GetMarkers())) },
+	q.GetAndSend(t, func(v any) any { return AsRef(v.(java.J).GetMarkers()) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	_ = j
 	return t

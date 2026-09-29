@@ -22,34 +22,38 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// A node whose Markers field is the zero value (typed-nil *markersData) still owns an
-// (empty) Markers as far as the Java peer is concerned. AsRef(nil) collapses to nil and
-// drops the field from the wire entirely, so the Java receiver reconstructs null markers
-// instead of Markers.EMPTY. Go reads nil-as-empty so the round-trip looks fine here, but
-// the sent bytes must still carry a Markers message; the boundary coerces nil to
-// EmptyMarkers before AsRef so it does.
+// A nil Markers must still travel as a Markers message, or the Java peer reconstructs null
+// markers instead of Markers.EMPTY and every visit of the tree yields a new instance.
 func TestNilMarkersStillCrossTheWire(t *testing.T) {
-	// given
-	var messages []RpcObjectData
-	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
-		messages = append(messages, batch...)
-	}, NewReferenceMap())
-	sender := NewGoSender()
+	for name, tree := range map[string]java.Tree{
+		"J":          &java.Identifier{ID: uuid.New(), Name: "a"},
+		"ParseError": &java.ParseError{Ident: uuid.New(), SourcePath: "a.go"},
+		"GoMod":      &golang.GoMod{Ident: uuid.New(), SourcePath: "go.mod"},
+		"GoSum":      &golang.GoSum{Ident: uuid.New(), SourcePath: "go.sum"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// given
+			var messages []RpcObjectData
+			sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
+				messages = append(messages, batch...)
+			}, NewReferenceMap())
 
-	// when
-	sender.Visit(&java.Identifier{ID: uuid.New(), Name: "a"}, sendQ)
-	sendQ.Flush()
+			// when
+			NewGoSender().Visit(tree, sendQ)
+			sendQ.Flush()
 
-	// then
-	var markerMessages []RpcObjectData
-	for _, m := range messages {
-		if m.ValueType != nil && *m.ValueType == "org.openrewrite.marker.Markers" {
-			markerMessages = append(markerMessages, m)
-		}
+			// then
+			var markerMessages []RpcObjectData
+			for _, m := range messages {
+				if m.ValueType != nil && *m.ValueType == "org.openrewrite.marker.Markers" {
+					markerMessages = append(markerMessages, m)
+				}
+			}
+			require.Len(t, markerMessages, 1)
+		})
 	}
-	require.Len(t, markerMessages, 1,
-		"a nil Markers must still travel as an org.openrewrite.marker.Markers message so the Java peer gets Markers.EMPTY, not null")
 }
