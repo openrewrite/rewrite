@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.Implicit;
@@ -263,6 +264,16 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
             return null;
         }
 
+        TrailingComma trailingComma = right.getMarkers().findFirst(TrailingComma.class).orElse(null);
+        if (trailingComma != null && !right.getAfter().getLastWhitespace().contains("\n")) {
+            // After a trailing comma the closing delimiter's whitespace lives in the marker; indent it as the after space
+            JRightPadded<T> r = visitRightPadded(right.withAfter(trailingComma.getSuffix()).withMarkers(right.getMarkers().removeByType(TrailingComma.class)), loc, p);
+            if (r.getElement() == right.getElement() && r.getAfter() == trailingComma.getSuffix()) {
+                return right;
+            }
+            return right.withElement(r.getElement()).withMarkers(right.getMarkers().setByType(trailingComma.withSuffix(r.getAfter())));
+        }
+
         setCursor(new Cursor(getCursor(), right));
 
         T t = right.getElement();
@@ -306,7 +317,9 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                             if (method != null) {
                                 int alignTo;
                                 if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
-                                    alignTo = getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
+                                    // Nothing on the opening line to align to, so the parameters indent from the declaration
+                                    alignTo = indent + (wrappingStyle.getFunctionDeclarationParameters().getUseContinuationIndent() ?
+                                            style.getContinuationIndent() : style.getIndentSize());
                                 } else {
                                     String source = method.print(getCursor());
                                     int firstArgIndex = source.indexOf(firstArg.print(getCursor()));

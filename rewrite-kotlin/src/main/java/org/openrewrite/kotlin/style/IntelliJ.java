@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
@@ -91,10 +92,11 @@ public class IntelliJ extends NamedStyles {
 
     public static WrappingAndBracesStyle wrappingAndBraces() {
         return new WrappingAndBracesStyle(
+                120,
                 new WrappingAndBracesStyle.KeepWhenFormatting(true, true),
                 new WrappingAndBracesStyle.ExtendsImplementsPermitsList(false, false),
-                new WrappingAndBracesStyle.FunctionDeclarationParameters(true, true, true, false),
-                new WrappingAndBracesStyle.FunctionCallArguments(false, true, true, false),
+                new WrappingAndBracesStyle.FunctionDeclarationParameters(LineWrapSetting.DoNotWrap, true, true, true, false),
+                new WrappingAndBracesStyle.FunctionCallArguments(LineWrapSetting.DoNotWrap, false, true, true, false),
                 new WrappingAndBracesStyle.FunctionParentheses(false),
                 new WrappingAndBracesStyle.ChainedFunctionCalls(false, false),
                 new WrappingAndBracesStyle.IfStatement(false, true, false),

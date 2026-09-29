@@ -20,12 +20,11 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.ToBeRemoved;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
-import org.openrewrite.kotlin.marker.TypeReferencePrefix;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.*;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
@@ -656,16 +655,23 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <M extends Marker> M visitMarker(Marker marker, @Nullable Object ctx) {
-        if (marker == ctx || !(ctx instanceof Marker)) {
-            return (M) marker;
+    public Markers visitMarkers(@Nullable Markers markers, @Nullable Object ctx) {
+        if (markers == null || markers == ctx || !(ctx instanceof Markers)) {
+            return markers == null ? Markers.EMPTY : markers;
         }
-
-        Marker newMarker = (Marker) ctx;
-        if (marker instanceof TypeReferencePrefix && newMarker instanceof TypeReferencePrefix) {
-            return super.visitMarker(newMarker, ((TypeReferencePrefix) newMarker).getPrefix());
+        Markers newMarkers = (Markers) ctx;
+        TrailingComma newTrailingComma = newMarkers.findFirst(TrailingComma.class).orElse(null);
+        if (newTrailingComma != null && !markers.findFirst(TrailingComma.class).isPresent()) {
+            // Wrapping may introduce a trailing comma, which is formatting rather than content
+            return markers.add(newTrailingComma);
         }
-        return super.visitMarker(marker, newMarker);
+        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> {
+            if (marker instanceof TrailingComma && newTrailingComma != null) {
+                TrailingComma t = (TrailingComma) marker;
+                return t.withSuffix(visitSpace(t.getSuffix(), Space.Location.LANGUAGE_EXTENSION, newTrailingComma.getSuffix()));
+            }
+            return marker;
+        }));
     }
 
     @Override
