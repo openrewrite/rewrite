@@ -21,6 +21,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
@@ -81,6 +82,102 @@ class JavaReceiverTest {
         assertThat(received.getName().getType())
                 .as("Name identifier type must survive the sender/receiver round trip")
                 .isNotNull();
+    }
+
+    @Test
+    void nullRightPaddedAfterBecomesEmptyOnReceive() {
+        // given: an argument whose right-padded `after` was left null (as an under-populated sender can produce)
+        J.Identifier arg = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                emptyList(), "x", null, null);
+        JRightPadded<Expression> paddedArg = new JRightPadded<>(arg, null, Markers.EMPTY);
+        J.MethodInvocation original = new J.MethodInvocation(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                null, null,
+                new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                        emptyList(), "foo", null, null),
+                JContainer.build(Space.EMPTY, new ArrayList<>(List.of(paddedArg)), Markers.EMPTY),
+                null
+        );
+
+        // when
+        sq.send(original, null, null);
+        sq.flush();
+        J.MethodInvocation received = rq.receive(null);
+
+        // then
+        assertThat(received.getPadding().getArguments().getPadding().getElements().get(0).getAfter())
+                .as("A null JRightPadded.after must be normalized to Space.EMPTY on receive")
+                .isEqualTo(Space.EMPTY);
+    }
+
+    @Test
+    void nullLeftPaddedBeforeBecomesEmptyOnReceive() {
+        // given: a field access whose left-padded name `before` was left null
+        J.Identifier target = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                emptyList(), "a", null, null);
+        J.Identifier field = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                emptyList(), "b", null, null);
+        JLeftPadded<J.Identifier> name = new JLeftPadded<>(null, field, Markers.EMPTY);
+        J.FieldAccess original = new J.FieldAccess(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY, target, name, null);
+
+        // when
+        sq.send(original, null, null);
+        sq.flush();
+        J.FieldAccess received = rq.receive(null);
+
+        // then
+        assertThat(received.getPadding().getName().getBefore())
+                .as("A null JLeftPadded.before must be normalized to Space.EMPTY on receive")
+                .isEqualTo(Space.EMPTY);
+    }
+
+    @Test
+    void nullRightPaddedMarkersBecomesEmptyOnReceive() {
+        // given: an argument whose right-padded `markers` was left null
+        J.Identifier arg = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                emptyList(), "x", null, null);
+        JRightPadded<Expression> paddedArg = new JRightPadded<>(arg, Space.EMPTY, null);
+        J.MethodInvocation original = new J.MethodInvocation(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                null, null,
+                new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                        emptyList(), "foo", null, null),
+                JContainer.build(Space.EMPTY, new ArrayList<>(List.of(paddedArg)), Markers.EMPTY),
+                null
+        );
+
+        // when
+        sq.send(original, null, null);
+        sq.flush();
+        J.MethodInvocation received = rq.receive(null);
+
+        // then
+        assertThat(received.getPadding().getArguments().getPadding().getElements().get(0).getMarkers())
+                .as("A null JRightPadded.markers must be normalized to Markers.EMPTY on receive")
+                .isEqualTo(Markers.EMPTY);
+    }
+
+    @Test
+    void nullLeftPaddedMarkersBecomesEmptyOnReceive() {
+        // given: a field access whose left-padded name `markers` was left null
+        J.Identifier target = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                emptyList(), "a", null, null);
+        J.Identifier field = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                emptyList(), "b", null, null);
+        JLeftPadded<J.Identifier> name = new JLeftPadded<>(Space.EMPTY, field, null);
+        J.FieldAccess original = new J.FieldAccess(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY, target, name, null);
+
+        // when
+        sq.send(original, null, null);
+        sq.flush();
+        J.FieldAccess received = rq.receive(null);
+
+        // then
+        assertThat(received.getPadding().getName().getMarkers())
+                .as("A null JLeftPadded.markers must be normalized to Markers.EMPTY on receive")
+                .isEqualTo(Markers.EMPTY);
     }
 
     @Test
