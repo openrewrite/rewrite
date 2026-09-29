@@ -5,7 +5,7 @@ plugins {
 dependencies {
     api(platform("org.junit:junit-bom:5.+"))
     api(project(":rewrite-core"))
-    compileOnly("io.micrometer:micrometer-core:1.+")
+    compileOnly("io.micrometer:micrometer-core:latest.release")
     api("org.junit.jupiter:junit-jupiter-api")
     api("org.junit.jupiter:junit-jupiter-params")
 
