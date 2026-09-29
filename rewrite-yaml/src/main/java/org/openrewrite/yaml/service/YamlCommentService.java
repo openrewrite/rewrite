@@ -25,13 +25,15 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.indexOfSubList;
 
 /**
  * {@link CommentService} for the YAML LST model. YAML has no dedicated comment node; comments live
  * as {@code # ...} lines inside a node's {@code prefix} string (conventionally on
  * {@link Yaml.Mapping.Entry}). This service reads and rewrites those lines, placing an added comment
- * on its own line immediately above the node.
+ * immediately above the node, one {@code #} line per line of comment text.
  */
 @Incubating(since = "8.86.0")
 public class YamlCommentService extends CommentService {
@@ -62,9 +64,42 @@ public class YamlCommentService extends CommentService {
         Yaml yaml = (Yaml) tree;
         String prefix = yaml.getPrefix();
         String indent = extractIndent(prefix);
-        // YAML supports only line comments; newlines would terminate the comment.
-        String commentText = text.replace("\n", " ");
-        return yaml.withPrefix(prefix + "#" + commentText + "\n" + indent);
+        StringBuilder comments = new StringBuilder(prefix);
+        for (String line : text.split("\\R")) {
+            comments.append('#').append(line).append('\n').append(indent);
+        }
+        return yaml.withPrefix(comments.toString());
+    }
+
+    @Override
+    private boolean hasEquivalentComment(Cursor cursor, String text) {
+        return indexOfSubList(trimmed(leadingComments(cursor)), trimmed(asList(text.split("\\R")))) >= 0;
+    }
+
+    /**
+     * The parser attaches the comments above the first entry of a file to the enclosing document, so
+     * gather comments from every ancestor that starts where this element does.
+     */
+    private List<String> leadingComments(Cursor cursor) {
+        List<String> comments = new ArrayList<>(getComments(cursor));
+        for (Cursor c = cursor; c.getParent() != null && startsWith(c.getParentTreeCursor().getValue(), c.getValue()); ) {
+            c = c.getParentTreeCursor();
+            comments.addAll(0, getComments(c));
+        }
+        return comments;
+    }
+
+    private static boolean startsWith(Object parent, Tree child) {
+        if (parent instanceof Yaml.Mapping) {
+            Yaml.Mapping mapping = (Yaml.Mapping) parent;
+            return mapping.getOpeningBracePrefix() == null && !mapping.getEntries().isEmpty() &&
+                    mapping.getEntries().get(0).getId().equals(child.getId());
+        }
+        if (parent instanceof Yaml.Document) {
+            Yaml.Document document = (Yaml.Document) parent;
+            return !document.isExplicit() && document.getBlock().getId().equals(child.getId());
+        }
+        return false;
     }
 
     @Override
@@ -103,6 +138,14 @@ public class YamlCommentService extends CommentService {
             }
         }
         return yaml.withPrefix(String.join("\n", lines));
+    }
+
+    private static List<String> trimmed(List<String> lines) {
+        List<String> trimmed = new ArrayList<>(lines.size());
+        for (String line : lines) {
+            trimmed.add(line.trim());
+        }
+        return trimmed;
     }
 
     private static String extractIndent(String prefix) {

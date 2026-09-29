@@ -110,6 +110,7 @@ func (q *SendQueue) getAndSendList(parent any, getter func(any) []any, id func(a
 }
 
 func (q *SendQueue) Send(after, before any, onChange func(any)) {
+	after, before = nonNilEmpty(after), nonNilEmpty(before)
 	afterVal := GetValue(after)
 	beforeVal := GetValue(before)
 
@@ -265,6 +266,17 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 			defaultSender.Visit(t, q)
 		}
 	}
+}
+
+// nonNilEmpty maps a nil Space or Markers to its shared empty sentinel, which Java expects in place of null.
+func nonNilEmpty(v any) any {
+	if sp, ok := v.(java.Space); ok && sp == nil {
+		return java.EmptySpace
+	}
+	if m, ok := v.(java.Markers); ok && m == nil {
+		return java.EmptyMarkers
+	}
+	return v
 }
 
 func sameIdentity(a, b any) bool {
