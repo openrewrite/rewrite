@@ -18,14 +18,17 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.javascript.Assertions.dependency;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
+import static org.openrewrite.javascript.Assertions.pnpmLock;
 
 /**
  * An override is a global instruction: it wins over whatever constraint the dependency graph resolves.
@@ -184,6 +187,174 @@ class UpgradeTransitiveDependencyVersionProtocolTest implements RewriteTest {
                         nodeResolutionResult(PackageManager.Pnpm),
                         s -> s.after(actual -> {
                             assertThat(actual).doesNotContain("\"pnpm\"");
+                            return actual;
+                        }))
+        );
+    }
+
+    private static final String ROOT = """
+            {
+              "name": "root",
+              "private": true
+            }
+            """;
+
+    private static String member(String constraint) {
+        return """
+                {
+                  "name": "member-a",
+                  "dependencies": {
+                    "acme-logger": "%s"
+                  }
+                }
+                """.formatted(constraint);
+    }
+
+    /**
+     * An override is honoured only in the root manifest and then applies to the whole graph, so a root
+     * entry would silently win over the member's reference. Two rows, because two manifests would each
+     * have received an override and each was declined.
+     */
+    @Test
+    void aWorkspaceRootDoesNotOverrideAMemberReference() {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("acme-logger", "~2.0.0", null))
+                        .expectedCyclesThatMakeChanges(1)
+                        .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
+                                assertThat(rows).extracting("sourcePath", "declaredIn", "protocol")
+                                        .containsExactlyInAnyOrder(
+                                                tuple("package.json", "packages/a/package.json", "catalog:"),
+                                                tuple("packages/a/package.json", "packages/a/package.json", "catalog:"))),
+                packageJson(ROOT, null,
+                        nodeResolutionResult(PackageManager.Pnpm, singletonList("packages/a/package.json")),
+                        s -> s.after(actual -> {
+                            assertThat(actual)
+                                    .as("the root gains no override")
+                                    .doesNotContain("\"pnpm\":");
+                            return actual;
+                        }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                .as("the root's decline names the member that declared the reference")
+                                .hasValueSatisfying(warn -> assertThat(warn.getMessage())
+                                        .contains("packages/a/package.json")))),
+                packageJson(member("catalog:"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:")),
+                        s -> s.path("packages/a/package.json").after(actual -> {
+                            assertThat(actual)
+                                    .as("the member gains no override either")
+                                    .contains("\"acme-logger\": \"catalog:\"")
+                                    .doesNotContain("\"pnpm\":");
+                            return actual;
+                        }))
+        );
+    }
+
+    @Test
+    void aWorkspaceRootStillOverridesWhenNoMemberHoldsAReference() {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("acme-logger", "~2.0.0", null))
+                        .afterRecipe(ChangeDependencyProtocolTest::assertNoSkipRows),
+                packageJson(ROOT,
+                        """
+                        {
+                          "name": "root",
+                          "private": true,
+                          "pnpm": {
+                            "overrides": {
+                              "acme-logger": "~2.0.0"
+                            }
+                          }
+                        }
+                        """,
+                        nodeResolutionResult(PackageManager.Pnpm, singletonList("packages/a/package.json"))),
+                packageJson(member("~1.4.1"),
+                        """
+                        {
+                          "name": "member-a",
+                          "dependencies": {
+                            "acme-logger": "~1.4.1"
+                          },
+                          "pnpm": {
+                            "overrides": {
+                              "acme-logger": "~2.0.0"
+                            }
+                          }
+                        }
+                        """,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "~1.4.1")),
+                        s -> s.path("packages/a/package.json"))
+        );
+    }
+
+    private static final String WORKSPACE_LOCK = """
+            lockfileVersion: '9.0'
+
+            importers:
+
+              .: {}
+
+              packages/a:
+                dependencies:
+                  acme-logger:
+                    specifier: 'catalog:'
+                    version: 1.4.1
+            """;
+
+    /**
+     * The lock is regenerated from the manifests, so a decline that only covers the manifest visit would
+     * still let the override reach the lock: the root's own document declares nothing, so there is no
+     * backstop in {@code upgradeTransitive} the way there is for the same-manifest case. A lock carrying
+     * an override the manifest says was never written is the worst outcome of the two.
+     */
+    @Test
+    void aDeclinedWorkspaceRootDoesNotReachTheLockEither() {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("acme-logger", "~2.0.0", null))
+                        .expectedCyclesThatMakeChanges(1)
+                        .afterRecipe(run -> assertThat(run.getDataTableRows(NodeLockRegenerationFailures.class))
+                                .as("nothing was written, so no lock regeneration was attempted")
+                                .isEmpty()),
+                packageJson(ROOT, null,
+                        nodeResolutionResult(PackageManager.Pnpm, singletonList("packages/a/package.json")),
+                        s -> s.after(actual -> {
+                            assertThat(actual).as("the root gains no override").doesNotContain("\"pnpm\":");
+                            return actual;
+                        })),
+                packageJson(member("catalog:"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:")),
+                        s -> s.path("packages/a/package.json").after(actual -> {
+                            assertThat(actual).as("the member gains none either").doesNotContain("\"pnpm\":");
+                            return actual;
+                        })),
+                pnpmLock(WORKSPACE_LOCK, null)
+        );
+    }
+
+    /**
+     * Without the document read this is the case that writes a wrong override: the member's marker
+     * claims a resolved range while its manifest holds a reference, and nothing in the root's own
+     * document contradicts it.
+     */
+    @Test
+    void aMemberWhoseMarkerHidesItsReferenceStillBlocksTheRoot() {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("acme-logger", "~2.0.0", null))
+                        .expectedCyclesThatMakeChanges(1),
+                packageJson(ROOT, null,
+                        nodeResolutionResult(PackageManager.Pnpm, singletonList("packages/a/package.json")),
+                        s -> s.after(actual -> {
+                            assertThat(actual)
+                                    .as("the root gains no override")
+                                    .doesNotContain("\"pnpm\":");
+                            return actual;
+                        })),
+                packageJson(member("catalog:"), null,
+                        // The marker claims a resolved range the member's manifest does not hold.
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "~1.4.1")),
+                        s -> s.path("packages/a/package.json").after(actual -> {
+                            assertThat(actual)
+                                    .as("the member is left alone too")
+                                    .contains("\"acme-logger\": \"catalog:\"")
+                                    .doesNotContain("\"pnpm\":");
                             return actual;
                         }))
         );

@@ -123,14 +123,28 @@ public final class NodeDependencyScan {
      * by writing into {@code manifestPath}, keyed by the manifest declaring it, {@code manifestPath}
      * itself first.
      * <p>
+     * The workspace members {@code manifestPath} governs are walked too, because an override is honoured
+     * only in the root manifest and then applies to the whole dependency graph. A root entry therefore
+     * wins over a member's reference workspace-wide, for pnpm {@code pnpm.overrides}, npm
+     * {@code overrides} and Yarn {@code resolutions} alike.
+     * <p>
      * Documents are read rather than markers, because a marker is free to report a resolved version
      * where the manifest holds a reference, and an override written on that basis silently wins over a
-     * constraint nobody meant to replace.
+     * constraint nobody meant to replace. The root's own document says nothing about a member, so there
+     * is no backstop there the way {@code declaredProtocolReference} is one for the same manifest.
      */
     public static Map<Path, List<MatchedDependency>> findProtocolReferences(
             Accumulator acc, ExecutionContext ctx, Path manifestPath, String packageName) {
         Map<Path, List<MatchedDependency>> references = new LinkedHashMap<>();
         collectProtocolReferences(acc, ctx, manifestPath, packageName, references);
+        ProjectState ps = acc.projects.get(manifestPath);
+        if (ps != null && ps.capturedPackageJson != null) {
+            for (Path member : PackageJsonHelper.workspaceMemberPaths(ps.capturedPackageJson)) {
+                if (!member.equals(manifestPath)) {
+                    collectProtocolReferences(acc, ctx, member, packageName, references);
+                }
+            }
+        }
         return references;
     }
 

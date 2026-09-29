@@ -220,7 +220,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 message.append("`").append(declaration.getPackageName()).append("` is declared as `")
                         .append(declaration.getCurrentVersion()).append("`, a ")
                         .append(PackageJsonHelper.dependencySpecifierProtocol(declaration.getCurrentVersion()))
-                        .append(" specifier rather than a version constraint.");
+                        .append(" specifier rather than a version constraint");
+                // Naming the manifest is what makes the warn and the rows match up, since a row's
+                // `Declared in` differs from its `Source path` exactly in this case.
+                if (!declaring.getKey().equals(sf.getSourcePath())) {
+                    message.append(", in the workspace member `").append(declaring.getKey()).append("`");
+                }
+                message.append('.');
             }
         }
         message.append(" An override beside it would silently win over whatever that specifier resolves")
