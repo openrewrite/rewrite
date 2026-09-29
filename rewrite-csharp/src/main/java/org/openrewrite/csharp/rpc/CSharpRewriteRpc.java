@@ -22,9 +22,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.DataTableStore;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.csharp.CSharpParser;
+import org.openrewrite.csharp.CsprojParser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
 import org.openrewrite.java.tree.JavaType;
@@ -38,6 +41,7 @@ import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.request.GetObjectResponse;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -186,11 +190,33 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     return true;
                 }
 
-                SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
+                SourceFile sourceFile;
+                try {
+                    sourceFile = getObject(item.getId(), item.getSourceFileType());
+                } catch (Exception e) {
+                    if (item.getSourcePath() == null) {
+                        throw e;
+                    }
+                    sourceFile = parseError(item, e);
+                }
 
                 parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
                 action.accept(sourceFile);
                 return true;
+            }
+
+            private SourceFile parseError(ParseSolutionResponse.Item item, Exception e) {
+                Parser parser = "org.openrewrite.xml.tree.Xml$Document".equals(item.getSourceFileType()) ?
+                        CsprojParser.builder().build() :
+                        CSharpParser.builder().build();
+                Path sourcePath = Paths.get(Objects.requireNonNull(item.getSourcePath()));
+                try {
+                    return ParseError.build(parser, Parser.Input.fromFile(rootDir.resolve(sourcePath)), rootDir, ctx, e);
+                } catch (Exception unreadable) {
+                    return new ParseError(Tree.randomId(),
+                            new Markers(Tree.randomId(), Collections.singletonList(ParseExceptionResult.build(parser, e))),
+                            sourcePath, null, null, false, null, "", null);
+                }
             }
 
             @Override

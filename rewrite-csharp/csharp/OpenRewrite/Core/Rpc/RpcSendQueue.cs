@@ -212,7 +212,14 @@ public class RpcSendQueue
 
                 if (beforePos == AddedListItem)
                 {
-                    Add(asRef ? Reference.AsRef(anAfter) : anAfter!, onChangeRun);
+                    if (anAfter == null)
+                    {
+                        Put(new RpcObjectData { State = DELETE });
+                    }
+                    else
+                    {
+                        Add(asRef ? Reference.AsRef(anAfter) : anAfter, onChangeRun);
+                    }
                 }
                 else
                 {
@@ -221,15 +228,19 @@ public class RpcSendQueue
                     {
                         Put(new RpcObjectData { State = NO_CHANGE });
                     }
-                    else if (asRef || aBefore == null || anAfter!.GetType() != aBefore.GetType())
+                    else if (anAfter == null)
+                    {
+                        Put(new RpcObjectData { State = DELETE });
+                    }
+                    else if (asRef || aBefore == null || anAfter.GetType() != aBefore.GetType())
                     {
                         // Type changed, or a ref-deduplicated item, which is always re-added
                         // rather than CHANGEd (see Send)
-                        Add(asRef ? Reference.AsRef(anAfter) : anAfter!, onChangeRun);
+                        Add(asRef ? Reference.AsRef(anAfter) : anAfter, onChangeRun);
                     }
                     else
                     {
-                        SendChange(anAfter!, aBefore!, onChangeRun);
+                        SendChange(anAfter, aBefore, onChangeRun);
                     }
                 }
             }
