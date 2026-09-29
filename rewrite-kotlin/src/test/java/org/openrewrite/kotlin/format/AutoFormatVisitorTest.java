@@ -566,4 +566,64 @@ class AutoFormatVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @SuppressWarnings({"OptionalGetWithoutIsPresent", "DataFlowIssue"})
+    @Test
+    void splicedNestedClassReindentsKDocContinuationLines() {
+        K.CompilationUnit cu = KotlinParser.builder().build()
+          .parse("""
+            class Outer {
+                class Item
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+        J.ClassDeclaration documented = KotlinParser.builder().build()
+          .parse("""
+            /**
+             * An item.
+
+             * Blank lines stay blank.
+             */
+            class Item {
+                /**
+                 * Its id.
+                 */
+                val id: String = ""
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get()
+          .getClasses().get(0);
+
+        var result = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object p) {
+                if ("Item".equals(classDecl.getSimpleName())) {
+                    J.ClassDeclaration spliced = documented.withId(classDecl.getId())
+                      .withPrefix(documented.getPrefix().withWhitespace(classDecl.getPrefix().getWhitespace()));
+                    return autoFormat(spliced, p, getCursor().getParentTreeCursor());
+                }
+                return super.visitClassDeclaration(classDecl, p);
+            }
+        }.visit(cu, new InMemoryExecutionContext());
+
+        assertThat(result.printAll()).isEqualTo("""
+          class Outer {
+              /**
+               * An item.
+
+               * Blank lines stay blank.
+               */
+              class Item {
+                  /**
+                   * Its id.
+                   */
+                  val id: String = ""
+              }
+          }
+          """);
+    }
 }

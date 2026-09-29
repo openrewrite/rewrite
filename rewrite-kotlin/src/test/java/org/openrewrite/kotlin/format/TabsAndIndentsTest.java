@@ -1138,7 +1138,6 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Disabled("java doc is not parsed")
     @Test
     void javadoc() {
         rewriteRun(
@@ -2042,8 +2041,8 @@ class TabsAndIndentsTest implements RewriteTest {
               """,
             """
               /******** Align JavaDoc with multiple leading '*' in margin left.
-                **** Align left
-                */
+               **** Align left
+               */
               public class Test {
                   /******** Align JavaDoc with multiple leading '*' in margin right.
                    **** Align right
@@ -2056,7 +2055,6 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Disabled("java doc is not parsed")
     @Issue("https://github.com/openrewrite/rewrite/pull/659")
     @Test
     void alignJavaDocs() {
