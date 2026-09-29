@@ -265,7 +265,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         TrailingComma trailingComma = right.getMarkers().findFirst(TrailingComma.class).orElse(null);
-        if (trailingComma != null && right.getAfter().getComments().isEmpty() && !right.getAfter().getLastWhitespace().contains("\n")) {
+        if (trailingComma != null && !right.getAfter().getLastWhitespace().contains("\n")) {
             // After a trailing comma the closing delimiter's whitespace lives in the marker; indent it as the after space
             JRightPadded<T> r = visitRightPadded(right.withAfter(trailingComma.getSuffix()).withMarkers(right.getMarkers().removeByType(TrailingComma.class)), loc, p);
             if (r.getElement() == right.getElement() && r.getAfter() == trailingComma.getSuffix()) {

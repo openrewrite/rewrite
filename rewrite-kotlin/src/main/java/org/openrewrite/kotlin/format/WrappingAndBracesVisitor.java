@@ -25,6 +25,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.marker.OmitBraces;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
@@ -66,7 +67,9 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
 
     @Override
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
-        if (container != null && getCursor().getNearestMessage("stop") == null) {
+        // An infix call's argument has no parentheses to wrap within
+        if (container != null && getCursor().getNearestMessage("stop") == null &&
+            !container.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
             LineWrapSetting wrap = wrapSetting(loc);
             if (wrap == LineWrapSetting.WrapAlways || wrap == LineWrapSetting.ChopIfTooLong && exceedsHardWrap(container)) {
                 container = wrap(container, loc);
@@ -170,8 +173,13 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
         }
         JRightPadded<? extends J> lastElement = elements.get(last);
         if (!lastElement.getAfter().getWhitespace().contains("\n")) {
-            int closing = column + lastElement.getAfter().getWhitespace().length() +
-                    (lastElement.getMarkers().findFirst(TrailingComma.class).isPresent() ? 1 : 0) + 1;
+            int closing = column + lastElement.getAfter().getWhitespace().length();
+            TrailingComma trailingComma = lastElement.getMarkers().findFirst(TrailingComma.class).orElse(null);
+            if (trailingComma != null) {
+                closing += trailingComma.getSuffix().getWhitespace().contains("\n") ? 1 : 2;
+            } else {
+                closing += 1;
+            }
             maxColumn = Math.max(maxColumn, closing);
         }
         return maxColumn > style.getHardWrapAt();

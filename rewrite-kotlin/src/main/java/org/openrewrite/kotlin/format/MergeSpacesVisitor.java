@@ -23,10 +23,8 @@ import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
-import org.openrewrite.kotlin.marker.TypeReferencePrefix;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.*;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
@@ -674,19 +672,6 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             }
             return marker;
         }));
-    }
-
-    @Override
-    public <M extends Marker> M visitMarker(Marker marker, @Nullable Object ctx) {
-        if (marker == ctx || !(ctx instanceof Marker)) {
-            return (M) marker;
-        }
-
-        Marker newMarker = (Marker) ctx;
-        if (marker instanceof TypeReferencePrefix && newMarker instanceof TypeReferencePrefix) {
-            return super.visitMarker(newMarker, ((TypeReferencePrefix) newMarker).getPrefix());
-        }
-        return super.visitMarker(marker, newMarker);
     }
 
     @Override

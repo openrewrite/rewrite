@@ -47,7 +47,7 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
     /**
-     * @param styles Styles that take precedence over those attached to the source file.
+     * @param styles Styles that replace, per style class, those attached to the source file.
      */
     public AutoFormatVisitor(@Nullable Tree stopAfter, NamedStyles... styles) {
         this.stopAfter = stopAfter;
@@ -109,9 +109,6 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
     private <S extends Style> S style(Class<S> styleClass, JavaSourceFile cu, Supplier<S> defaultStyle) {
-        if (styles.isEmpty()) {
-            return Style.from(styleClass, cu, defaultStyle);
-        }
         // NamedStyles.merge gives later entries precedence
         List<NamedStyles> all = new ArrayList<>(cu.getMarkers().findAll(NamedStyles.class));
         all.addAll(styles);

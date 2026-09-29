@@ -464,6 +464,7 @@ class AutoFormatVisitorTest implements RewriteTest {
 
               fun build(id: String, name: String): Item {
                   val s = maxOf(id.length + name.length, name.length, 100)
+                  val p = id to name.uppercase().lowercase().uppercase()
                   return Item(id.uppercase(), name.lowercase())
               }
               """,
@@ -476,6 +477,7 @@ class AutoFormatVisitorTest implements RewriteTest {
                       name.length,
                       100
                   )
+                  val p = id to name.uppercase().lowercase().uppercase()
                   return Item(
                       id.uppercase(),
                       name.lowercase()
