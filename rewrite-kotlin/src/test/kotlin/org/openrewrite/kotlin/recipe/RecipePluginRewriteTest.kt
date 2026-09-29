@@ -206,6 +206,50 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `property-access after-template FQN is shortened and imported`() {
+        val r = loadCompiledRecipe(
+            source = """
+                package demo
+                import org.openrewrite.recipe
+                class Foo {
+                    val oldProp: Int get() = 1
+                }
+                val UseHashOfOldProp = recipe(
+                    displayName = "Hash Foo.oldProp",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { f: Foo -> f.oldProp } to { f -> java.util.Objects.hashCode(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseHashOfOldProp",
+            packageName = "demo",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                package demo
+                class Foo {
+                    val oldProp: Int get() = 1
+                }
+                fun use(f: Foo): Int = f.oldProp
+                """,
+                """
+                package demo
+
+                import java.util.Objects
+                class Foo {
+                    val oldProp: Int get() = 1
+                }
+                fun use(f: Foo): Int = Objects.hashCode(f)
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `chain with Java-static inner segment — Optional_of_x_get to x`() {
         // The chain validator must accept an inner segment that is a Java
         // static call (`Optional.of(x)`). The inner has no dispatch receiver
@@ -1229,9 +1273,9 @@ class RecipePluginRewriteTest : RewriteTest {
                 import java.util.Arrays;
                 import java.util.List;
                 class A {
-                    List<Object> two = java.util.List.of(1, 2);
-                    List<Object> four = java.util.List.of(1, 2, 3, 4);
-                    List<Object> none = java.util.List.of();
+                    List<Object> two = List.of(1, 2);
+                    List<Object> four = List.of(1, 2, 3, 4);
+                    List<Object> none = List.of();
                 }
                 """.trimIndent(),
             ),
@@ -1301,7 +1345,7 @@ class RecipePluginRewriteTest : RewriteTest {
                 import java.util.Arrays;
                 import java.util.List;
                 class A {
-                    List<Object> xs = java.util.List.of(1, 2, 3);
+                    List<Object> xs = List.of(1, 2, 3);
                 }
                 """.trimIndent(),
             ),
@@ -1437,9 +1481,75 @@ class RecipePluginRewriteTest : RewriteTest {
                 import java.util.Arrays;
                 import java.util.List;
                 class A {
-                    List<Object> two = java.util.List.of(1, 2);
+                    List<Object> two = List.of(1, 2);
                     List<Object> three = Arrays.asList(1, 2, 3);
                 }
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `Java after-template FQN is shortened and imported`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseObjectsToString = recipe(
+                    displayName = "Use Objects.toString",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { o: Any -> java.lang.String.valueOf(o) } to { o -> java.util.Objects.toString(o) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseObjectsToString",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            java(
+                """
+                class A {
+                    String s = String.valueOf(new java.math.BigDecimal("1"));
+                }
+                """.trimIndent(),
+                """
+                import java.util.Objects;
+
+                class A {
+                    String s = Objects.toString(new java.math.BigDecimal("1"));
+                }
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `Kotlin after-template FQN is shortened and imported`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseObjectsToString = recipe(
+                    displayName = "Use Objects.toString",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { s: String -> s.lowercase() } to { s -> java.util.Objects.toString(s.uppercase()) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseObjectsToString",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                fun f(s: String): String = s.lowercase()
+                """.trimIndent(),
+                """
+                import java.util.Objects
+
+                fun f(s: String): String = Objects.toString(s.uppercase())
                 """.trimIndent(),
             ),
         )
