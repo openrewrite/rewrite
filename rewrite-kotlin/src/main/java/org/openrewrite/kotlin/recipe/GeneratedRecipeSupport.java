@@ -28,6 +28,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.search.UsesField;
 import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
@@ -57,6 +58,25 @@ import org.openrewrite.kotlin.tree.K;
 public final class GeneratedRecipeSupport {
 
     private GeneratedRecipeSupport() {}
+
+    /**
+     * After-templates carry the author's fully-qualified names verbatim, so each
+     * inserted tree is shortened and imported; scoping to that tree leaves
+     * qualified references to other types in the file alone.
+     */
+    private abstract static class JavaTemplateRewriter extends JavaVisitor<ExecutionContext> {
+        J shortenInserted(J inserted) {
+            doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(inserted));
+            return inserted;
+        }
+    }
+
+    private abstract static class KotlinTemplateRewriter extends KotlinVisitor<ExecutionContext> {
+        J shortenInserted(J inserted) {
+            doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(inserted));
+            return inserted;
+        }
+    }
 
     /**
      * Visitor for a {@code rewrite { ... } to { ... }} recipe whose before
@@ -94,7 +114,7 @@ public final class GeneratedRecipeSupport {
             matchers[i] = new MethodMatcher(specs[i]);
         }
         SubSource[][] substitutionSourcesByMatcher = parseSourcesPerMatcher(substitutionSourcesCsv, specs.length);
-        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinTemplateRewriter() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 int matchedIdx = -1;
@@ -130,7 +150,7 @@ public final class GeneratedRecipeSupport {
                         result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                         result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                     }
-                    return result.withPrefix(method.getPrefix());
+                    return shortenInserted(result.withPrefix(method.getPrefix()));
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
@@ -157,7 +177,7 @@ public final class GeneratedRecipeSupport {
         MethodMatcher outerMatcher = new MethodMatcher(matcherSpecsLine.substring(0, tabIdx));
         MethodMatcher innerMatcher = new MethodMatcher(matcherSpecsLine.substring(tabIdx + 1));
         ChainSourceRef[] sources = parseChainCsv(substitutionSourcesCsv);
-        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinTemplateRewriter() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (!outerMatcher.matches(method)) {
@@ -197,7 +217,7 @@ public final class GeneratedRecipeSupport {
                     result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                     result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                 }
-                return result.withPrefix(method.getPrefix());
+                return shortenInserted(result.withPrefix(method.getPrefix()));
             }
         };
         return wrapWithPrecondition(matcherSpecsLine, walker);
@@ -333,7 +353,7 @@ public final class GeneratedRecipeSupport {
             matchers[i] = new MethodMatcher(specs[i]);
         }
         int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
-        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinTemplateRewriter() {
             @Override
             public J visitUnary(K.Unary unary, ExecutionContext ctx) {
                 if (unary.getOperator() != K.Unary.Type.NotNull) {
@@ -380,7 +400,7 @@ public final class GeneratedRecipeSupport {
                     result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                     result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                 }
-                return result.withPrefix(unary.getPrefix());
+                return shortenInserted(result.withPrefix(unary.getPrefix()));
             }
         };
         return wrapWithPrecondition(matcherSpecsLines, walker);
@@ -420,7 +440,7 @@ public final class GeneratedRecipeSupport {
             }
         }
         int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
-        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinTemplateRewriter() {
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 String name = fieldAccess.getName().getSimpleName();
@@ -455,7 +475,7 @@ public final class GeneratedRecipeSupport {
                 }
                 J result = KotlinTemplate.builder(afterTemplate).build()
                         .apply(getCursor(), fieldAccess.getCoordinates().replace(), substitutions);
-                return result.withPrefix(fieldAccess.getPrefix());
+                return shortenInserted(result.withPrefix(fieldAccess.getPrefix()));
             }
         };
         return wrapWithPrecondition(matcherSpecsLines, walker);
@@ -489,7 +509,7 @@ public final class GeneratedRecipeSupport {
             matchers[i] = new MethodMatcher(specs[i]);
         }
         SubSource[][] substitutionSourcesByMatcher = parseSourcesPerMatcher(substitutionSourcesCsv, specs.length);
-        TreeVisitor<?, ExecutionContext> walker = new JavaVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> walker = new JavaTemplateRewriter() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 int matchedIdx = -1;
@@ -516,7 +536,7 @@ public final class GeneratedRecipeSupport {
                         result = preserveSelectAfter((J.MethodInvocation) result, method);
                         result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                     }
-                    return result.withPrefix(method.getPrefix());
+                    return shortenInserted(result.withPrefix(method.getPrefix()));
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
