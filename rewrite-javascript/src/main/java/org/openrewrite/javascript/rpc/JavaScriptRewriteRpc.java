@@ -498,23 +498,21 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             }
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
-
-            // Set working directory if specified
-            if (workingDirectory != null) {
-                process.setWorkingDirectory(workingDirectory);
-            }
-            process.setStderrRedirect(log);
-
-            process.unsetEnv(unsetEnvNames);
-            process.environment().putAll(environment);
+            Map<String, String> env = new LinkedHashMap<>(environment);
             // caller-provided options, if any, are taking precedence over the options baked above
-            process.environment().merge("NODE_OPTIONS", " --enable-source-maps", (callerProvided, local) -> local + " " + callerProvided);
+            env.merge("NODE_OPTIONS", " --enable-source-maps", (callerProvided, local) -> local + " " + callerProvided);
             if (npxPath.getParent() != null) {
                 // `npx` is typically a shebang script alongside the `node` executable
-                process.environment().put("PATH", npxPath.getParent() + File.pathSeparator +
+                env.put("PATH", npxPath.getParent() + File.pathSeparator +
                         System.getenv("PATH"));
             }
+            RewriteRpcProcess process = RewriteRpcProcess.forLanguage("javascript")
+                    .command(cmdArr)
+                    .workingDirectory(workingDirectory)
+                    .stderrRedirect(log)
+                    .unsetEnv(unsetEnvNames)
+                    .environment(env)
+                    .build();
             process.start();
 
             try {

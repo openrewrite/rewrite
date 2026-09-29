@@ -14,7 +14,8 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
-    api("io.micrometer:micrometer-core:1.9.+")
+    // Nothing here uses Micrometer, but the Scala compiler fails to load rewrite's classes without it.
+    implementation("io.micrometer:micrometer-core:latest.release")
 
     api("org.jetbrains:annotations:latest.release")
 
