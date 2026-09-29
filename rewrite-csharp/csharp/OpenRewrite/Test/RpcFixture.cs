@@ -66,6 +66,10 @@ public class RpcFixture : IDisposable
         _jsonRpc = new JsonRpc(handler);
 
         _server = new RewriteRpcServer(new RecipeMarketplace());
+        // A page per message, so every object in every test spans several pages and the tests
+        // cover paging rather than only the single-page case. Java and JavaScript size their
+        // RPC test fixtures the same way.
+        _server.BatchSize = 1;
         _server.Connect(_jsonRpc);
         RewriteRpcServer.SetCurrent(_server);
     }

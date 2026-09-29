@@ -962,26 +962,19 @@ func (v *GoVisitor) VisitAssignmentOperation(ao *java.AssignmentOperation, p any
 func (v *GoVisitor) VisitSwitch(sw *java.Switch, p any) java.J {
 	prefix := v.self().VisitSpace(sw.Prefix, p)
 	markers := v.visitMarkers(sw.Markers, p)
-	tag := sw.Tag
-	if tag != nil {
-		elem := visitExpression(v, tag.Element, p)
-		after := v.self().VisitSpace(tag.After, p)
-		if elem != tag.Element || !java.SpaceEqual(after, tag.After) {
-			c := *tag
-			c.Element = elem
-			c.After = after
-			tag = &c
-		}
+	var selector *java.ControlParentheses
+	if sw.Selector != nil {
+		selector = visitAndCast[*java.ControlParentheses](v, sw.Selector, p)
 	}
 	body := visitAndCast[*java.Block](v, sw.Body, p)
 	if java.SpaceEqual(prefix, sw.Prefix) && java.MarkersEqual(markers, sw.Markers) &&
-		tag == sw.Tag && body == sw.Body {
+		selector == sw.Selector && body == sw.Body {
 		return sw
 	}
 	c := *sw
 	c.Prefix = prefix
 	c.Markers = markers
-	c.Tag = tag
+	c.Selector = selector
 	c.Body = body
 	return &c
 }
@@ -1973,18 +1966,19 @@ func (v *GoVisitor) VisitMarker(marker java.Marker, p any) java.Marker {
 // sameMarker rather than ==, since marker types may hold slices or maps and
 // == panics on those.
 func (v *GoVisitor) visitMarkers(markers java.Markers, p any) java.Markers {
-	if len(markers.Entries) == 0 {
+	existing := markers.Entries()
+	if len(existing) == 0 {
 		return markers
 	}
 	// Preserve identity: return the same Markers (same entries slice) when no
 	// entry changed, so the enclosing withX guard (java.MarkersEqual) reports
 	// no change. Only allocate once VisitMarker actually rewrites an entry.
 	var entries []java.Marker
-	for i, m := range markers.Entries {
+	for i, m := range existing {
 		visited := v.self().VisitMarker(m, p)
 		if entries == nil && !sameMarker(visited, m) {
-			entries = make([]java.Marker, len(markers.Entries))
-			copy(entries, markers.Entries[:i])
+			entries = make([]java.Marker, len(existing))
+			copy(entries, existing[:i])
 		}
 		if entries != nil {
 			entries[i] = visited
@@ -1993,7 +1987,7 @@ func (v *GoVisitor) visitMarkers(markers java.Markers, p any) java.Markers {
 	if entries == nil {
 		return markers
 	}
-	return java.Markers{ID: markers.ID, Entries: entries}
+	return java.MakeMarkers(markers.GetID(), entries)
 }
 
 // sameMarker reports whether VisitMarker left an entry unchanged, without an

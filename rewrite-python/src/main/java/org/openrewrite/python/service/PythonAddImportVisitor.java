@@ -153,9 +153,9 @@ public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
                 return multi;
             }
 
-            // A quoted identifier is a forward reference holding a whole expression, so the
-            // target can be one name within it. Spelling it is enough: the Python side parses
-            // the reference, and this predicate may only over-approximate.
+            // A quoted identifier is a forward reference, which can name the target within a
+            // larger expression. Spelling it is enough: the Python side resolves it, and this
+            // predicate may only over-approximate.
             @Override
             public J visitIdentifier(J.Identifier identifier, AtomicBoolean found) {
                 String simpleName = identifier.getSimpleName();

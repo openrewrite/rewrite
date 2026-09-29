@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.java.internal.ImportComments;
 import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -207,6 +208,7 @@ public class RemoveUnusedImports extends Recipe {
                                     anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
                                             .getElement().withPrefix(elem.getPrefix())));
                                     anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
+                                    ImportComments.unfoldComments(getCursor(), elem, anImport.imports);
                                     changed = true;
                                 } else {
                                     anImport.used = false;
@@ -269,6 +271,7 @@ public class RemoveUnusedImports extends Recipe {
                                 anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
                                         .getElement().withPrefix(elem.getPrefix())));
                                 anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
+                                ImportComments.unfoldComments(getCursor(), elem, anImport.imports);
                                 changed = true;
                             } else {
                                 // No types are used unqualified, so remove the wildcard import entirely

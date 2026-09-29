@@ -113,6 +113,51 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
      */
     List<PackageModule> packageModules;
 
+    /**
+     * How much of the module graph the parser resolved. Any value other than
+     * {@link ResolutionStatus#RESOLVED} means {@link #resolvedDependencies} was not
+     * produced from the toolchain's build list and must not be trusted by recipes
+     * that depend on the resolved module graph. Null when read from an LST
+     * serialized before this field existed; recipes must treat null as not-RESOLVED.
+     */
+    @Nullable ResolutionStatus resolutionStatus;
+
+    /**
+     * Non-standard import paths the toolchain could not map to a providing module.
+     * Populated when {@link #resolutionStatus} is {@link ResolutionStatus#INCOMPLETE};
+     * empty otherwise. Names the offending imports so a recipe that must skip
+     * graph-dependent work (e.g. go mod tidy) can report exactly what blocked it.
+     * Null when read from an LST serialized before this field existed.
+     */
+    @Nullable List<String> unresolvedImports;
+
+    /**
+     * The toolchain/network failure reason when the build list could not be obtained
+     * at all. Populated when {@link #resolutionStatus} is {@link ResolutionStatus#GO_SUM_ONLY};
+     * it names the offending modules when the toolchain reported them. Null otherwise.
+     */
+    @Nullable String resolutionError;
+
+    /**
+     * Whether the resolved build list is trustworthy.
+     */
+    public enum ResolutionStatus {
+        /** The toolchain produced the MVS build list and a complete package-&gt;module map. */
+        RESOLVED,
+        /**
+         * The build list resolved, but the package-&gt;module map was incomplete (some imports
+         * resolved to no module) and was withheld, so unused-require removal is unsafe.
+         */
+        INCOMPLETE,
+        /**
+         * The toolchain build list could not be obtained (network/proxy/toolchain failure), so
+         * {@link #resolvedDependencies} was derived from go.sum alone. go.sum records every version
+         * ever seen rather than the MVS selection, so the set is incomplete and may name older
+         * versions; graph-dependent recipes must not be trusted for this module.
+         */
+        GO_SUM_ONLY
+    }
+
     public @Nullable Require findRequire(String module) {
         for (Require r : requires) {
             if (r.getModulePath().equals(module)) {
@@ -165,6 +210,10 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
         q.getAndSendListAsRef(after, r -> r.getPackageModules() != null ? r.getPackageModules() : emptyList(),
                 PackageModule::getImportPath,
                 pm -> pm.rpcSend(pm, q));
+        q.getAndSend(after, r -> r.getResolutionStatus() == null ? null : r.getResolutionStatus().name());
+        q.getAndSendList(after, r -> r.getUnresolvedImports() != null ? r.getUnresolvedImports() : emptyList(),
+                s -> s, s -> q.getAndSend(s, x -> x));
+        q.getAndSend(after, GoResolutionResult::getResolutionError);
     }
 
     @Override
@@ -180,7 +229,12 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                 .withExcludes(q.receiveList(before.excludes, r -> r.rpcReceive(r, q)))
                 .withRetracts(q.receiveList(before.retracts, r -> r.rpcReceive(r, q)))
                 .withResolvedDependencies(q.receiveList(before.resolvedDependencies, r -> r.rpcReceive(r, q)))
-                .withPackageModules(q.receiveList(before.packageModules, pm -> pm.rpcReceive(pm, q)));
+                .withPackageModules(q.receiveList(before.packageModules, pm -> pm.rpcReceive(pm, q)))
+                .withResolutionStatus(q.receiveAndGet(before.resolutionStatus,
+                        (String s) -> s == null || s.isEmpty() ? null : ResolutionStatus.valueOf(s)))
+                .withUnresolvedImports(q.receiveList(before.unresolvedImports,
+                        s -> q.<String, String>receiveAndGet(s, java.util.function.Function.identity())))
+                .withResolutionError(q.receive(before.resolutionError));
     }
 
     /**

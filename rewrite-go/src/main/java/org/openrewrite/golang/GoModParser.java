@@ -241,7 +241,10 @@ public class GoModParser implements Parser {
                 excludes,
                 retracts,
                 resolved,
-                new ArrayList<>()
+                new ArrayList<>(),
+                GoResolutionResult.ResolutionStatus.GO_SUM_ONLY,
+                new ArrayList<>(),
+                null
         );
     }
 

@@ -207,6 +207,83 @@ func TestAddImport_PromotesAliasedImportToGroupedBlock(t *testing.T) {
 	spec.RewriteRun(t, Golang(before, after))
 }
 
+func TestAddImport_PromotesUngroupedLaterDeclaration(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"})
+	before := `
+		package main
+
+		import "fmt"
+		import "os"
+
+		func main() { fmt.Println(os.Args) }
+	`
+	after := `
+		package main
+
+		import "fmt"
+		import (
+			"os"
+			"strings"
+		)
+
+		func main() { fmt.Println(os.Args) }
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_ClosesPromotedDeclarationBeforeTheNext(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "os"})
+	before := `
+		package main
+
+		import "fmt"
+		import "github.com/x/y"
+
+		func main() {}
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+			"os"
+		)
+		import "github.com/x/y"
+
+		func main() {}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_OpensLaterDeclaration(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "os"})
+	before := `
+		package main
+
+		import "github.com/a/b"
+
+		import (
+			"github.com/x/y"
+		)
+
+		func main() {}
+	`
+	after := `
+		package main
+
+		import "github.com/a/b"
+
+		import (
+			"os"
+
+			"github.com/x/y"
+		)
+
+		func main() {}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
 func TestAddImport_OnlyIfReferenced_NoOpWhenNotReferenced(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{
 		PackagePath:      "github.com/x/y",

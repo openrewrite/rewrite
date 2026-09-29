@@ -698,7 +698,7 @@ class TabsAndIndentsTest implements RewriteTest {
               label2:
               for (int i = 0; i < 5; i++) doSomething(i);
               }
-              switch (a) {
+              switch (x) {
               case 0:
               doCase0();
               break;
@@ -751,7 +751,7 @@ class TabsAndIndentsTest implements RewriteTest {
                                   label2:
                                   for (int i = 0; i < 5; i++) doSomething(i);
                               }
-                              switch (a) {
+                              switch (x) {
                                   case 0:
                                       doCase0();
                                       break;
@@ -1611,8 +1611,7 @@ class TabsAndIndentsTest implements RewriteTest {
               import java.io.ByteArrayInputStream;
               import java.io.InputStream;
               import java.io.Serializable;
-              import java.lang.annotation.Retention;
-              @Retention
+              @SuppressWarnings
               (value = "1.0")
               public
               class
@@ -1643,9 +1642,8 @@ class TabsAndIndentsTest implements RewriteTest {
               import java.io.ByteArrayInputStream;
               import java.io.InputStream;
               import java.io.Serializable;
-              import java.lang.annotation.Retention;
               
-              @Retention
+              @SuppressWarnings
                       (value = "1.0")
               public
               class
@@ -2735,6 +2733,36 @@ class TabsAndIndentsTest implements RewriteTest {
                                       ""\"
                       );
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void textBlockBlankLinesAreNotIndented() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces,
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+
+                    AND YES
+                    ""\";
+              }
+              """,
+            """
+              class Test {
+                  private final String foo = ""\"
+                          YES
+
+                          AND YES
+                          ""\";
               }
               """
           )

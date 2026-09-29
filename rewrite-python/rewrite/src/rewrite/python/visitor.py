@@ -595,6 +595,9 @@ class PythonVisitor(JavaVisitor[P]):
         alias = alias.replace(
             name=cast(j.Identifier, self.visit(alias.name, p))
         )
+        alias = alias.replace(
+            type_parameters=self.visit_container(alias.padding.type_parameters, p)
+        )
         alias = alias.padding.replace(
             value=self.visit_left_padded(alias.padding.value, p)
         )

@@ -40,7 +40,7 @@ public class LiteralValueReceiveTest
 
         var data = new List<RpcObjectData>();
         var sendQueue = new RpcSendQueue(1024, batch => data.AddRange(batch),
-            new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);
+            new RpcRefs(), null, false);
         sendQueue.Send(after, before, () => new JavaSender().Visit(after, sendQueue));
         sendQueue.Flush();
 

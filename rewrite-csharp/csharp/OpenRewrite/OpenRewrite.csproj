@@ -31,15 +31,18 @@
 
   <ItemGroup>
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-    <PackageReference Include="NuGet.Frameworks" Version="7.6.0" />
-    <PackageReference Include="NuGet.Versioning" Version="7.6.0" />
+    <PackageReference Include="NuGet.Frameworks" Version="7.9.0" />
+    <PackageReference Include="NuGet.Versioning" Version="7.9.0" />
     <!-- In-process NuGet restore (PackageSpec/DependencyGraphSpec -> RestoreRunner -> LockFile).
          Commands transitively supplies ProjectModel, Protocol, Packaging, Configuration, Common. -->
-    <PackageReference Include="NuGet.Commands" Version="7.6.0" />
-    <!-- Plain runtime dependency, used only for managed .sln parsing (SolutionFile.Parse).
-         No MSBuildLocator: project evaluation happens in the SDK's own `dotnet msbuild`
-         (NuGetResolver) or Roslyn's out-of-process BuildHost (MSBuildWorkspace). -->
-    <PackageReference Include="Microsoft.Build" Version="18.8.2" />
+    <PackageReference Include="NuGet.Commands" Version="7.9.0" />
+    <!-- In-process MSBuild: .sln parsing (SolutionFile.Parse) and restore-graph evaluation
+         (NuGetResolver). Tasks.Core/Utilities.Core carry the task assemblies the SDK targets
+         load; without them evaluation fails with MSB4062. MSBuildLocator.Register* is not
+         needed with these versions - see MSBuildEnvironment in NuGetResolver.cs. -->
+    <PackageReference Include="Microsoft.Build" Version="18.9.6" />
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.9.6" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.9.6" />
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" PrivateAssets="none" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" PrivateAssets="none" />

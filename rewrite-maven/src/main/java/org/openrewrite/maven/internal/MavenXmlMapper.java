@@ -29,7 +29,6 @@ import com.fasterxml.jackson.dataformat.xml.XmlFactory;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.xml.deser.FromXmlParser;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.jspecify.annotations.Nullable;
 
@@ -70,8 +69,7 @@ public class MavenXmlMapper {
 
         writeMapper = XmlMapper.builder(xmlFactory)
                 .defaultUseWrapper(false)
-                .build()
-                .registerModule(new JaxbAnnotationModule());
+                .build();
     }
 
     private MavenXmlMapper() {

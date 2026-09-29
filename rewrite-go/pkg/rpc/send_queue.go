@@ -59,6 +59,11 @@ func (q *SendQueue) DiscardNewReferences() {
 }
 
 func (q *SendQueue) Put(data RpcObjectData) {
+	// Every message reaching the wire is shaped here, which is what lets RpcObjectData
+	// stay a plain tagged struct the encoder writes field by field. Construct sendable
+	// messages only through Put: a whole float marshaled without this reads as an
+	// integer on the far side (see wireNumber).
+	data.Value = wireNumber(data.Value)
 	q.batch = append(q.batch, data)
 	if len(q.batch) == q.batchSize {
 		q.Flush()
@@ -105,6 +110,7 @@ func (q *SendQueue) getAndSendList(parent any, getter func(any) []any, id func(a
 }
 
 func (q *SendQueue) Send(after, before any, onChange func(any)) {
+	after, before = nonNilEmpty(after), nonNilEmpty(before)
 	afterVal := GetValue(after)
 	beforeVal := GetValue(before)
 
@@ -154,29 +160,34 @@ func (q *SendQueue) sendList(after, before []any, id func(any) any, onChange fun
 			return
 		}
 
-		// Build before index map
-		beforeIdx := make(map[any]int)
-		if before != nil {
+		positions := make([]any, len(after))
+		if len(before) == 0 {
+			// Every element is an addition, so the positions are a constant that needs
+			// neither an index map nor a key computed per element.
+			for i := range positions {
+				positions[i] = AddedListItem
+			}
+		} else {
+			beforeIdx := make(map[any]int, len(before))
 			for i, b := range before {
 				beforeIdx[id(b)] = i
 			}
-		}
-
-		// Send positions
-		positions := make([]any, len(after))
-		for i, a := range after {
-			if pos, ok := beforeIdx[id(a)]; ok {
-				positions[i] = pos
-			} else {
-				positions[i] = AddedListItem
+			for i, a := range after {
+				if pos, ok := beforeIdx[id(a)]; ok {
+					positions[i] = pos
+				} else {
+					positions[i] = AddedListItem
+				}
 			}
 		}
 		q.Put(RpcObjectData{State: Change, Value: positions})
 
 		// Send each item
-		for _, a := range after {
-			aid := id(a)
-			pos, existed := beforeIdx[aid]
+		for i, a := range after {
+			pos, existed := 0, false
+			if p, ok := positions[i].(int); ok && p != AddedListItem {
+				pos, existed = p, true
+			}
 			var onChangeRun func(any)
 			if onChange != nil {
 				item := a
@@ -255,6 +266,17 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 			defaultSender.Visit(t, q)
 		}
 	}
+}
+
+// nonNilEmpty maps a nil Space or Markers to its shared empty sentinel, which Java expects in place of null.
+func nonNilEmpty(v any) any {
+	if sp, ok := v.(java.Space); ok && sp == nil {
+		return java.EmptySpace
+	}
+	if m, ok := v.(java.Markers); ok && m == nil {
+		return java.EmptyMarkers
+	}
+	return v
 }
 
 func sameIdentity(a, b any) bool {

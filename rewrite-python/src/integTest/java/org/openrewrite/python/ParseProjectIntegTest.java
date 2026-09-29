@@ -172,6 +172,38 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void manifestsPrecedeSources() throws Exception {
+        Path pyprojectDir = tempDir.resolve("pyproject_first");
+        Files.createDirectories(pyprojectDir);
+        Files.writeString(pyprojectDir.resolve("a.py"), "x = 1");
+        Files.writeString(pyprojectDir.resolve("b.py"), "y = 2");
+        Files.writeString(pyprojectDir.resolve("pyproject.toml"), """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                """);
+
+        assertThat(client().parseProject(pyprojectDir, new InMemoryExecutionContext()).findFirst())
+                .get()
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .isEqualTo("pyproject.toml");
+
+        Path setupPyDir = tempDir.resolve("setup_py_first");
+        Files.createDirectories(setupPyDir);
+        Files.writeString(setupPyDir.resolve("a.py"), "x = 1");
+        Files.writeString(setupPyDir.resolve("setup.py"), """
+                from setuptools import setup
+                setup(name="myapp", version="1.0.0")
+                """);
+
+        assertThat(client().parseProject(setupPyDir, new InMemoryExecutionContext()).findFirst())
+                .get()
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .isEqualTo("setup.py");
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void includesPyprojectToml() throws Exception {
         Path projectDir = tempDir.resolve("with_pyproject");
         Files.createDirectories(projectDir);

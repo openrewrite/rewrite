@@ -48,7 +48,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.getAndSend(j, Tree::getMarkers);
+        q.getAndSend(j, mk -> asRef(mk.getMarkers()));
 
         return j;
     }
@@ -893,7 +893,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
                             q.getAndSend(tc, TextComment::isMultiline);
                             q.getAndSend(tc, TextComment::getText);
                             q.getAndSend(c, Comment::getSuffix);
-                            q.getAndSend(c, Comment::getMarkers);
+                            q.getAndSend(c, mk -> asRef(mk.getMarkers()));
                         } else {
                             throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
                         }

@@ -13,11 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections;
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
 using NuGet.Frameworks;
@@ -27,8 +31,10 @@ using OpenRewrite.Java;
 using Serilog;
 using StreamJsonRpc;
 using StreamJsonRpc.Protocol;
+using StreamJsonRpc.Reflection;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
+using OpenRewrite.CSharp.NuGet;
 
 namespace OpenRewrite.CSharp.Rpc;
 
@@ -79,7 +85,12 @@ public class RewriteRpcServer
     /// <summary>
     /// Referentially deduplicated objects and their ref IDs.
     /// </summary>
-    private readonly ConcurrentDictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
+    /// <summary>One in-flight transfer per object id, mirroring Java's inProgressGetRpcObjects.</summary>
+    private readonly ConcurrentDictionary<string, Lazy<Channel<List<RpcObjectData>>>> _inProgressGetObject = new();
+
+    internal int BatchSize = 1000;
+
+    private readonly RpcRefs _localRefs = new();
 
     /// <summary>
     /// Refs received from the remote process (Java) for deduplication.
@@ -87,7 +98,7 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<int, object> _remoteRefs = new();
 
     /// <summary>
-    /// Ref high-water per source file (send-side _localRefs count, receive-side max _remoteRefs
+    /// Ref high-water per source file (send-side highest id issued, receive-side max _remoteRefs
     /// key), captured before first visit so <see cref="Evict"/> rolls back exactly its refs.
     /// </summary>
     private readonly ConcurrentDictionary<string, (int LocalRefs, int RemoteRefsMax)> _refCheckpoints = new();
@@ -282,12 +293,88 @@ public class RewriteRpcServer
             };
         }
 
+        var restoreMsBefore = SolutionRestore.TotalRestoreMs;
         var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
 
-        var response = new ParseSolutionResponse();
+        var response = new ParseSolutionResponse
+        {
+            RestoreTimeMs = SolutionRestore.TotalRestoreMs - restoreMsBefore,
+        };
         var seenProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var projectList = solution.Projects.Where(p => p.FilePath != null).ToList();
         Log.Debug("RPC ParseSolution: {ProjectCount} projects to parse", projectList.Count);
+
+        // Repository-relative paths already emitted, so a project recovered from disk after an
+        // MSBuild evaluation failure does not re-emit a file another project already contributed.
+        var emittedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var emittedProjectFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var projectsWithSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void EmitSourceFiles(List<SourceFile> sourceFiles)
+        {
+            foreach (var sourceFile in sourceFiles)
+            {
+                var id = sourceFile.Id.ToString();
+                var sourceFileType = sourceFile is ParseError
+                    ? "org.openrewrite.tree.ParseError"
+                    : "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+
+                emittedPaths.Add(sourceFile.SourcePath);
+                _localObjects[id] = sourceFile;
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = id,
+                    SourceFileType = sourceFileType
+                });
+            }
+
+            // Oversize source files skipped during parsing are emitted as Quarks; the Java
+            // side builds each Quark from SourcePath locally, so they carry no content and
+            // are deliberately not registered in _localObjects (no GetObject round-trip).
+            foreach (var relPath in solutionParser.LastOversizePaths)
+            {
+                emittedPaths.Add(relPath);
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = Tree.RandomId().ToString(),
+                    SourceFileType = "org.openrewrite.quark.Quark",
+                    SourcePath = relPath
+                });
+            }
+        }
+
+        // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker.
+        // The in-process restore during solution loading produced the in-memory LockFile
+        // for each project; fall back to a fresh in-process resolve when absent.
+        void EmitProjectFile(string projectPath)
+        {
+            if (!emittedProjectFiles.Add(Path.GetFullPath(projectPath)))
+                return;
+            try
+            {
+                var content = ReadFilePreservingBom(projectPath);
+                var relativePath = Path.GetRelativePath(rootDir, projectPath);
+                var xmlParser = new OpenRewrite.Xml.XmlParser();
+                var csprojDoc = xmlParser.Parse(content, relativePath);
+                var projectFullPath = Path.GetFullPath(projectPath);
+                var marker = solutionParser.RestoredLockFiles.TryGetValue(projectFullPath, out var lockFile)
+                    ? MSBuildProjectHelper.CreateMarker(csprojDoc, lockFile, Path.GetDirectoryName(projectFullPath)!)
+                    : MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
+                if (marker != null)
+                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
+                _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = csprojDoc.Id.ToString(),
+                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document"
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("RPC ParseSolution: failed to parse csproj for {ProjectPath}: {ExType}: {ExMessage}",
+                    projectPath, ex.GetType().Name, ex.Message);
+            }
+        }
 
         var projectIndex = 0;
         foreach (var project in projectList)
@@ -312,61 +399,37 @@ public class RewriteRpcServer
                 throw;
             }
 
-            foreach (var sourceFile in sourceFiles)
-            {
-                var id = sourceFile.Id.ToString();
-                var sourceFileType = sourceFile is ParseError
-                    ? "org.openrewrite.tree.ParseError"
-                    : "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+            if (sourceFiles.Count > 0 || solutionParser.LastOversizePaths.Count > 0)
+                projectsWithSources.Add(Path.GetFullPath(project.FilePath!));
+            EmitSourceFiles(sourceFiles);
+            EmitProjectFile(project.FilePath!);
+        }
 
-                _localObjects[id] = sourceFile;
-                response.Items.Add(new ParseSolutionResponseItem
-                {
-                    Id = id,
-                    SourceFileType = sourceFileType
-                });
-            }
+        // Projects MSBuild could not evaluate come back with no documents, which would silently
+        // drop every source file they own — a build-only task (a source-control/PDB <UsingTask>,
+        // say) must not make source code disappear from an analysis build. Recover their sources
+        // straight off disk instead: syntax-only LSTs, no type attestation, but present.
+        foreach (var (projectPath, reason) in solutionParser.UnevaluatedProjects)
+        {
+            // A diagnostic can name a project that nonetheless evaluated far enough to yield its
+            // documents (an unresolvable ProjectReference, say). Recovering from disk there would
+            // resurrect files the project deliberately excludes, so leave those projects alone.
+            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)))
+                continue;
 
-            // Oversize source files skipped during parsing are emitted as Quarks; the Java
-            // side builds each Quark from SourcePath locally, so they carry no content and
-            // are deliberately not registered in _localObjects (no GetObject round-trip).
-            foreach (var relPath in solutionParser.LastOversizePaths)
-            {
-                response.Items.Add(new ParseSolutionResponseItem
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    SourceFileType = "org.openrewrite.quark.Quark",
-                    SourcePath = relPath
-                });
-            }
+            var recovered = solutionParser.ParseProjectWithoutMSBuild(projectPath, rootDir,
+                requirePrintEqualsInput, emittedPaths);
+            var oversize = solutionParser.LastOversizePaths.Count;
+            if (recovered.Count == 0 && oversize == 0)
+                continue;
 
-            // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker.
-            // The in-process restore during solution loading produced the in-memory LockFile
-            // for each project; fall back to a fresh in-process resolve when absent.
-            try
-            {
-                var content = ReadFilePreservingBom(project.FilePath!);
-                var relativePath = Path.GetRelativePath(rootDir, project.FilePath!);
-                var xmlParser = new OpenRewrite.Xml.XmlParser();
-                var csprojDoc = xmlParser.Parse(content, relativePath);
-                var projectFullPath = Path.GetFullPath(project.FilePath!);
-                var marker = solutionParser.RestoredLockFiles.TryGetValue(projectFullPath, out var lockFile)
-                    ? MSBuildProjectHelper.CreateMarker(csprojDoc, lockFile, Path.GetDirectoryName(projectFullPath)!)
-                    : MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
-                if (marker != null)
-                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
-                _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
-                response.Items.Add(new ParseSolutionResponseItem
-                {
-                    Id = csprojDoc.Id.ToString(),
-                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document"
-                });
-            }
-            catch (Exception ex)
-            {
-                Log.Debug("RPC ParseSolution: failed to parse csproj for {ProjectPath}: {ExType}: {ExMessage}",
-                    project.FilePath, ex.GetType().Name, ex.Message);
-            }
+            Log.Warning("MSBuild could not evaluate {ProjectPath}, so it contributed no source files: {Reason}. " +
+                        "Recovered {FileCount} source file(s) from disk without type attestation; " +
+                        "recipes that match on type will not see them",
+                projectPath, reason, recovered.Count + oversize);
+
+            EmitSourceFiles(recovered);
+            EmitProjectFile(projectPath);
         }
 
         // Capture build context files from disk for reattestation
@@ -434,7 +497,7 @@ public class RewriteRpcServer
             var types = AssemblyTypeEnumerator.Enumerate(own, references);
 
             data = new List<RpcObjectData>();
-            var sendRefs = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+            var sendRefs = new RpcRefs();
             var q = new RpcSendQueue(1024, batch => data.AddRange(batch), sendRefs,
                 "org.openrewrite.java.tree.JavaType$Class", false);
             var sender = new OpenRewrite.Java.Rpc.JavaSender();
@@ -521,67 +584,88 @@ public class RewriteRpcServer
     }
 
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
-    public Task<List<RpcObjectData>> GetObject(GetObjectRequest request)
+    public async Task<List<RpcObjectData>> GetObject(GetObjectRequest request)
     {
         var after = _localObjects.GetValueOrDefault(request.Id);
 
         if (after == null)
         {
             Log.Debug("RPC GetObject: {Id} not found, returning DELETE", request.Id);
-            return Task.FromResult(new List<RpcObjectData>
+            return new List<RpcObjectData>
             {
                 new() { State = DELETE },
                 new() { State = END_OF_OBJECT }
-            });
+            };
         }
 
         // ExecutionContext is sent as a typed shell with no data,
         // matching the JavaScript pattern (empty codec).
         if (after is ExecutionContext)
         {
-            return Task.FromResult(new List<RpcObjectData>
+            return new List<RpcObjectData>
             {
                 new() { State = ADD, ValueType = "org.openrewrite.InMemoryExecutionContext" },
                 new() { State = END_OF_OBJECT }
-            });
+            };
         }
 
-        var before = _remoteObjects.GetValueOrDefault(request.Id);
-        var sw = Stopwatch.StartNew();
+        var pages = _inProgressGetObject.GetOrAdd(request.Id, id =>
+            new Lazy<Channel<List<RpcObjectData>>>(() => StartTransfer(id, after, request.SourceFileType))).Value;
 
-        // Accumulate all RPC data into a single list
-        var allData = new List<RpcObjectData>();
-        var sendQueue = new RpcSendQueue(
-            1024,
-            batch => allData.AddRange(batch),
-            _localRefs,
-            request.SourceFileType,
-            false,
-            TreeCodec.Instance
-        );
-
-        try
+        var page = await pages.Reader.ReadAsync();
+        if (page.Count > 0 && page[^1].State == END_OF_OBJECT)
         {
-            sendQueue.Send(after, before, null);
+            _inProgressGetObject.TryRemove(request.Id, out _);
         }
-        catch (Exception ex)
+        return page;
+    }
+
+    /// <summary>
+    /// Serializes one object into a bounded channel a page at a time. The capacity of one stalls
+    /// the producer until the remote takes the previous page, which bounds what is held to two
+    /// pages and lets the remote fetch one while this side fills the next.
+    /// </summary>
+    private Channel<List<RpcObjectData>> StartTransfer(string id, object after, string? sourceFileType)
+    {
+        var pages = Channel.CreateBounded<List<RpcObjectData>>(1);
+        var before = _remoteObjects.GetValueOrDefault(id);
+        var refHighWater = _localRefs.HighWater;
+
+        // On the thread pool because the drain blocks whenever the channel is full, and the
+        // thread that has to drain it is the one serving the next GetObject.
+        _ = Task.Run(() =>
         {
-            Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
-                request.Id, after.GetType().Name, ex.GetType().Name, ex.Message);
-            throw new InvalidOperationException(
-                $"Failed to send object {request.Id} (type: {after.GetType().Name}): {ex.Message}\n{ex.StackTrace}", ex);
-        }
-        sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
-        sendQueue.Flush();
-
-        // Update our understanding of remote's state
-        _remoteObjects[request.Id] = after;
-
-        sw.Stop();
-        Log.Debug("RPC GetObject: {Id} sent {ItemCount} items ({ElapsedMs}ms)",
-            request.Id, allData.Count, sw.Elapsed.TotalMilliseconds.ToString("F0"));
-
-        return Task.FromResult(allData);
+            var sendQueue = new RpcSendQueue(
+                BatchSize,
+                page => pages.Writer.WriteAsync(page).AsTask().GetAwaiter().GetResult(),
+                _localRefs,
+                sourceFileType,
+                false,
+                TreeCodec.Instance
+            );
+            try
+            {
+                sendQueue.Send(after, before, null);
+                _remoteObjects[id] = after;
+            }
+            catch (Exception ex)
+            {
+                // The remote holds a partial tree, so drop the baseline and the refs this exchange
+                // issued; the next request then sends a whole object rather than a delta against a
+                // baseline the remote never finished receiving.
+                _remoteObjects.TryRemove(id, out _);
+                _localRefs.RollbackTo(refHighWater);
+                Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
+                    id, after.GetType().Name, ex.GetType().Name, ex.Message);
+            }
+            finally
+            {
+                sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
+                sendQueue.Flush();
+                pages.Writer.Complete();
+            }
+        });
+        return pages;
     }
 
     [JsonRpcMethod("Print", UseSingleObjectParameterDeserialization = true)]
@@ -629,12 +713,30 @@ public class RewriteRpcServer
     {
         var localObject = _localObjects.GetValueOrDefault(id);
 
+        Task<List<RpcObjectData>> RequestPage() =>
+            _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
+                "GetObject",
+                new GetObjectRequest { Id = id, SourceFileType = sourceFileType });
+
+        // The following page is requested before this one is handed to the queue, so the
+        // remote serializes it while this side deserializes what it already has.
+        Task<List<RpcObjectData>>? nextPage = null;
         var q = new RpcReceiveQueue(
             _remoteRefs,
-            () => _jsonRpc!.InvokeWithParameterObjectAsync<List<RpcObjectData>>(
-                "GetObject",
-                new GetObjectRequest { Id = id, SourceFileType = sourceFileType })
-                .GetAwaiter().GetResult(),
+            () =>
+            {
+                var pending = nextPage;
+                nextPage = null;
+                var page = (pending ?? RequestPage()).GetAwaiter().GetResult();
+                // A page ending in END_OF_OBJECT has no successor; the remote drops its
+                // transfer state when it sends that marker, so asking again would restart
+                // the transfer rather than return nothing.
+                if (page.Count > 0 && page[^1].State != END_OF_OBJECT)
+                {
+                    nextPage = RequestPage();
+                }
+                return page;
+            },
             sourceFileType,
             TreeCodec.Instance
         );
@@ -643,29 +745,54 @@ public class RewriteRpcServer
         try
         {
             remoteObject = q.Receive(localObject, (Func<object, object>?)null);
+
+            // Inside the try so that a missing end marker unwinds the same way a failed
+            // receive does: a page is in flight here whenever the last one did not end in
+            // END_OF_OBJECT, which is the condition this rejects.
+            var endMarker = q.Take();
+            if (endMarker.State != END_OF_OBJECT)
+            {
+                // Collect remaining items for debugging
+                var remaining = new System.Text.StringBuilder();
+                remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
+                // Only what is already buffered: pulling here would ask the remote for a page of a
+                // transfer it has finished, starting a fresh one that nothing will drain.
+                for (int i = 1; i < 20 && q.Buffered > 0; i++)
+                {
+                    try
+                    {
+                        var next = q.Take();
+                        remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
+                        if (next.State == END_OF_OBJECT) break;
+                    }
+                    catch { break; }
+                }
+                throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+            }
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException(
-                $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
-        }
-        var endMarker = q.Take();
-        if (endMarker.State != END_OF_OBJECT)
-        {
-            // Collect remaining items for debugging
-            var remaining = new System.Text.StringBuilder();
-            remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
-            for (int i = 1; i < 20; i++)
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            _remoteObjects.TryRemove(id, out _);
+            var pending = nextPage;
+            nextPage = null;
+            if (pending != null)
             {
+                // Awaited rather than abandoned so the remote's serialization of it is
+                // finished before the next request; the response itself is correlated by
+                // id, so an unawaited one is dropped rather than misdelivered.
                 try
                 {
-                    var next = q.Take();
-                    remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
-                    if (next.State == END_OF_OBJECT) break;
+                    pending.GetAwaiter().GetResult();
                 }
-                catch { break; }
+                catch
+                {
+                    // the original failure is the one worth reporting
+                }
             }
-            throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+            throw new InvalidOperationException(
+                $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
         }
 
         if (remoteObject != null)
@@ -948,6 +1075,7 @@ public class RewriteRpcServer
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        MSBuildEnvironment.ScrubFrom(psi);
 
         using var process = System.Diagnostics.Process.Start(psi)
                             ?? throw new InvalidOperationException("Failed to start dotnet process");
@@ -1177,7 +1305,7 @@ public class RewriteRpcServer
             // this marketplace, so a miss means the host owns this recipe: answer with delegatesTo
             // so the host resolves the id locally (the Java recipe is on its classpath) rather than
             // failing with "Recipe not found".
-            var delegateId = Guid.NewGuid().ToString();
+            var delegateId = Tree.RandomId().ToString();
             return Task.FromResult(new PrepareRecipeResponse
             {
                 Id = delegateId,
@@ -1238,7 +1366,7 @@ public class RewriteRpcServer
             }
         }
 
-        var id = Guid.NewGuid().ToString();
+        var id = Tree.RandomId().ToString();
         _preparedRecipes[id] = recipe;
 
         var response = new PrepareRecipeResponse
@@ -1372,10 +1500,17 @@ public class RewriteRpcServer
         foreach (var (key, value) in options)
         {
             var prop = recipeType.GetProperty(key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-            if (prop != null && prop.CanWrite)
+            if (prop == null || !prop.CanWrite)
             {
-                prop.SetValue(recipe, ConvertOptionValue(value, prop.PropertyType));
+                continue;
             }
+            var converted = ConvertOptionValue(value, prop.PropertyType);
+            if (converted == null && prop.PropertyType.IsValueType &&
+                Nullable.GetUnderlyingType(prop.PropertyType) == null)
+            {
+                continue;
+            }
+            prop.SetValue(recipe, converted);
         }
         return recipe;
     }
@@ -1392,7 +1527,7 @@ public class RewriteRpcServer
     {
         if (value is JsonElement element)
         {
-            return element.Deserialize(targetType, RpcJson.Options);
+            return ConvertOptionElement(element, targetType);
         }
         if (value is null || targetType.IsInstanceOfType(value))
         {
@@ -1400,6 +1535,95 @@ public class RewriteRpcServer
         }
         var conversionType = Nullable.GetUnderlyingType(targetType) ?? targetType;
         return Convert.ChangeType(value, conversionType);
+    }
+
+    private static object? ConvertOptionElement(JsonElement element, Type targetType)
+    {
+        var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
+        if (element.ValueKind == JsonValueKind.Null || element.ValueKind == JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            var text = element.GetString()!;
+            if (underlying != typeof(string) && string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+            if (TryCoerceFromString(text, underlying, out var coerced))
+            {
+                return coerced;
+            }
+        }
+        else if (underlying == typeof(string))
+        {
+            return element.ValueKind == JsonValueKind.Object || element.ValueKind == JsonValueKind.Array
+                ? element.Deserialize(targetType, RpcJson.Options)
+                : element.GetRawText();
+        }
+
+        return element.Deserialize(targetType, RpcJson.Options);
+    }
+
+    private static readonly HashSet<Type> NumericOptionTypes =
+    [
+        typeof(sbyte), typeof(byte), typeof(short), typeof(ushort), typeof(int), typeof(uint),
+        typeof(long), typeof(ulong), typeof(float), typeof(double), typeof(decimal)
+    ];
+
+    private static bool TryCoerceFromString(string text, Type targetType, out object? result)
+    {
+        result = null;
+        if (targetType == typeof(bool))
+        {
+            var trimmed = text.Trim();
+            if (bool.TryParse(trimmed, out var flag))
+            {
+                result = flag;
+                return true;
+            }
+            if (trimmed == "1" || trimmed == "0")
+            {
+                result = trimmed == "1";
+                return true;
+            }
+            return false;
+        }
+        if (NumericOptionTypes.Contains(targetType))
+        {
+            try
+            {
+                result = Convert.ChangeType(text.Trim(), targetType, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception e) when (e is FormatException or OverflowException)
+            {
+                return false;
+            }
+        }
+        if (targetType != typeof(string) && typeof(IEnumerable).IsAssignableFrom(targetType))
+        {
+            var elementType = targetType.IsArray
+                ? targetType.GetElementType()!
+                : targetType.GetInterfaces()
+                    .Concat([targetType])
+                    .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                    ?.GetGenericArguments()[0];
+            if (elementType == typeof(string))
+            {
+                var items = new JsonArray();
+                foreach (var part in text.Split(','))
+                {
+                    items.Add(JsonValue.Create(part));
+                }
+                result = items.Deserialize(targetType, RpcJson.Options);
+                return true;
+            }
+        }
+        return false;
     }
 
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
@@ -1651,7 +1875,7 @@ public class RewriteRpcServer
         {
             metrics = new RpcMetricsWriter(metricsCsv, () =>
                 (server._localObjects.Count, server._remoteObjects.Count,
-                    server._localRefs.Count + server._remoteRefs.Count));
+                    server._localRefs.HighWater + server._remoteRefs.Count));
             handler = new MetricsMessageHandler(handler, metrics);
         }
 
@@ -1809,7 +2033,7 @@ public class RewriteRpcServer
                     remoteMax = key;
                 }
             }
-            return (_localRefs.Count, remoteMax);
+            return (_localRefs.HighWater, remoteMax);
         });
     }
 
@@ -1828,13 +2052,7 @@ public class RewriteRpcServer
         _remoteObjects.TryRemove(request.Id, out _);
         if (_refCheckpoints.TryRemove(request.Id, out var cp))
         {
-            foreach (var kv in _localRefs)
-            {
-                if (kv.Value > cp.LocalRefs)
-                {
-                    _localRefs.TryRemove(kv.Key, out _);
-                }
-            }
+            _localRefs.RollbackTo(cp.LocalRefs);
             foreach (var key in _remoteRefs.Keys)
             {
                 if (key > cp.RemoteRefsMax)
@@ -1993,7 +2211,7 @@ internal sealed class RpcMetricsWriter : IDisposable
 /// Wraps the message handler to record a metrics row when each inbound request's response is
 /// written. Notifications (Evict) get no response and aren't recorded; outbound requests are ignored.
 /// </summary>
-internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IDisposable
+internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IJsonRpcMessageBufferManager, IDisposable
 {
     private readonly IJsonRpcMessageHandler _inner;
     private readonly RpcMetricsWriter _metrics;
@@ -2008,6 +2226,13 @@ internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IDisposabl
     public bool CanRead => _inner.CanRead;
     public bool CanWrite => _inner.CanWrite;
     public IJsonRpcMessageFormatter Formatter => _inner.Formatter;
+
+    // JsonRpc looks for this interface on the outermost handler only, so a wrapper that
+    // omits it strands the callback that lets the inner handler advance past a consumed
+    // message: its read buffer then grows for the life of the connection, and the final
+    // read sees leftover bytes instead of the empty buffer that means a clean disconnect.
+    public void DeserializationComplete(JsonRpcMessage message) =>
+        (_inner as IJsonRpcMessageBufferManager)?.DeserializationComplete(message);
 
     public async ValueTask<JsonRpcMessage?> ReadAsync(CancellationToken cancellationToken)
     {
@@ -2088,6 +2313,9 @@ public class DependencyRequest
 public class ParseSolutionResponse
 {
     public List<ParseSolutionResponseItem> Items { get; set; } = new();
+
+    /// <summary>Milliseconds spent restoring NuGet dependencies for this entry path.</summary>
+    public long RestoreTimeMs { get; set; }
 }
 
 public class ParseSolutionResponseItem

@@ -3094,7 +3094,12 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 markers: emptyMarkers,
                 init: [node.initializer ?
-                    (ts.isVariableDeclarationList(node.initializer) ? this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer)) :
+                    (ts.isVariableDeclarationList(node.initializer) ? (() => {
+                            const initializerPrefix = this.prefix(node.initializer);
+                            return this.rightPadded(produce(this.visit(node.initializer), draft => {
+                                draft.prefix = initializerPrefix;
+                            }), this.suffix(node.initializer));
+                        })() :
                         this.rightPadded(ts.isStatement(node.initializer) ? this.visit(node.initializer) : {
                             kind: JS.Kind.ExpressionStatement,
                             id: randomId(),

@@ -41,6 +41,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -75,6 +76,10 @@ public class RewriteRpcProcess extends Thread {
         PROCESS_DESCENDANTS = descendants;
         PROCESS_HANDLE_DESTROY_FORCIBLY = destroyForcibly;
     }
+
+    private static final long GRACEFUL_EXIT_MILLIS = 200;
+
+    private static volatile long memoryLimit;
 
     private final String[] command;
 
@@ -139,10 +144,29 @@ public class RewriteRpcProcess extends Thread {
         return this;
     }
 
+    /**
+     * Caps what a peer may commit ({@code RLIMIT_DATA} on Linux, no effect elsewhere) so one that
+     * outgrows its budget dies alone rather than taking the host process with it. 0 is no cap.
+     */
+    public static void setMemoryLimit(long bytes) {
+        memoryLimit = bytes;
+    }
+
+    /** Best-effort: a hard limit already below the cap can't be raised unprivileged, so the tighter one stands. */
+    List<String> launchCommand() {
+        if (memoryLimit <= 0 || !System.getProperty("os.name").startsWith("Linux")) {
+            return Arrays.asList(command);
+        }
+        List<String> limited = new ArrayList<>(Arrays.asList("/bin/sh", "-c",
+                "ulimit -d " + memoryLimit / 1024 + "; exec \"$@\"", "sh"));
+        limited.addAll(Arrays.asList(command));
+        return limited;
+    }
+
     @Override
     public void run() {
         try {
-            ProcessBuilder pb = new ProcessBuilder(command);
+            ProcessBuilder pb = new ProcessBuilder(launchCommand());
             // Strip inherited vars BEFORE putAll so the caller's explicit
             // environment (which can re-set any of these names) wins.
             unsetEnvNames.forEach(pb.environment()::remove);
@@ -292,9 +316,23 @@ public class RewriteRpcProcess extends Thread {
             }
             shutdownHook = null;
         }
-        // Force-kill the direct child; a wedged peer may not exit gracefully.
-        if (process != null) {
-            process.destroyForcibly();
+        // EOF on stdin is every peer's exit signal, and taking it lets them flush metrics
+        // and logs and remove their temp dirs. SIGTERM would not do: of the four peers only
+        // the JS one installs a handler.
+        Process p = process;
+        if (p != null) {
+            // Closing stdin needs the monitor that HeaderDelimitedMessageHandler holds across
+            // a send, so against a peer that stopped draining it blocks until the kill below
+            // releases the writer. Only the exit is waited on, which keeps that wait bounded.
+            severStdin(p);
+            try {
+                if (!p.waitFor(GRACEFUL_EXIT_MILLIS, TimeUnit.MILLISECONDS)) {
+                    p.destroyForcibly();
+                }
+            } catch (InterruptedException e) {
+                p.destroyForcibly();
+                Thread.currentThread().interrupt();
+            }
         }
         // Force-kill the descendants captured above; empty on Java 8 or a single-process peer.
         destroyDescendantsForcibly(descendants);
@@ -307,6 +345,19 @@ public class RewriteRpcProcess extends Thread {
             }
             stderrDrainThread = null;
         }
+    }
+
+    /** Signals the peer to exit by closing its stdin, on a daemon thread that may never return. */
+    private static void severStdin(Process p) {
+        Thread closer = new Thread(() -> {
+            try {
+                p.getOutputStream().close();
+            } catch (IOException ignored) {
+                // The peer is going away regardless; the caller force-kills on timeout.
+            }
+        }, "rpc-stdin-close");
+        closer.setDaemon(true);
+        closer.start();
     }
 
     /** The peer's descendants as {@code ProcessHandle}s, empty on Java 8 or if unobtainable. */

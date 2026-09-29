@@ -65,7 +65,7 @@ public sealed class Markers(Guid id, IList<Marker> markerList) : IRpcCodec<Marke
     public static Markers Build(IEnumerable<Marker> markers)
     {
         var list = markers.ToList();
-        return list.Count == 0 ? Empty : new Markers(Guid.NewGuid(), list);
+        return list.Count == 0 ? Empty : new Markers(Tree.RandomId(), list);
     }
 
     public T? FindFirst<T>() where T : Marker =>

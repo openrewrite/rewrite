@@ -332,8 +332,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         }
                         Optional<String> finalVersion = versionComparator.upgrade(oldVersion != null ? oldVersion : "", singletonList(newVersion));
                         if (finalVersion.isPresent()) {
-                            String valueSource = initializer.getValueSource() == null || oldVersion == null ? initializer.getValueSource() : initializer.getValueSource().replace(oldVersion, newVersion);
-                            return visited.withInitializer(initializer.withValueSource(valueSource).withValue(finalVersion.get()));
+                            return visited.withInitializer(ChangeStringLiteral.withStringValue(initializer, finalVersion.get()));
                         }
                     }
                 }

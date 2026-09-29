@@ -243,3 +243,63 @@ def test_nested_fstring_in_expression():
         print(message)
         """
     ))
+
+
+def test_line_continuation_before_closing_delimiter():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        '''\
+a = f"""alpha {b}\\
+"""
+c = 1
+'''
+    ))
+
+
+def test_unmatched_surrogate_escape_is_only_text():
+    RecipeSpec().rewrite_run(python(r'a = f"\ud800"'))
+
+    RecipeSpec().rewrite_run(python(r'a = f"{x:\uD800}"'))
+
+
+def test_consecutive_unmatched_surrogate_escapes():
+    RecipeSpec().rewrite_run(python(r'a = f"\ud800\udfffb"'))
+
+
+def test_format_spec_keeps_source_text():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        '''\
+a = f"{x:>10\\
+}"
+b = f"{x:>\\t10}"
+'''
+    ))
+
+
+def test_format_spec_with_named_unicode_escape():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        r'''a = f"{x:>\N{BULLET}10}"
+b = f"{x:\N{BULLET}}"
+'''
+    ))
+
+
+def test_named_unicode_escape_and_doubled_braces_in_text():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        r"""a = f"\N{BULLET}{x}"
+b = f"{{\N{BULLET}}}"
+c = f"\\N{{x}}"
+d = rf"\N{{x}}"
+"""
+    ))
+
+
+def test_named_unicode_escape_beside_field_in_format_spec():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        r"""a = f"{x:{w}\N{BULLET}}"
+"""
+    ))

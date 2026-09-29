@@ -26,19 +26,19 @@ import org.openrewrite.TreeVisitor;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Enumeration;
-import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+import static java.lang.invoke.MethodType.methodType;
 
 public class TreeVisitorAdapter {
-    private static final Integer classCreationLock = 1;
-    private static final Map<ClassLoader, TreeVisitorAdapterClassLoader> classLoaders = new IdentityHashMap<>();
+    private static final Object classCreationLock = new Object();
+    private static final Map<ClassLoader, TreeVisitorAdapterClassLoader> classLoaders = new ConcurrentHashMap<>();
 
     private TreeVisitorAdapter() {
     }
@@ -55,23 +55,42 @@ public class TreeVisitorAdapter {
                     "TreeVisitorAdapter currently supports at most one mixin per adapt() call; got " + mixins.length + ".");
         }
 
-        TreeVisitorAdapterClassLoader cl;
-        synchronized (classLoaders) {
-            cl = classLoaders.computeIfAbsent(delegate.getClass().getClassLoader(), TreeVisitorAdapterClassLoader::new);
-        }
-
-        TreeVisitor<?, ?> mixin = mixins.length == 1 ? mixins[0] : discoverRegisteredMixin(cl, delegate, adaptTo);
+        TreeVisitor<?, ?> mixin = mixins.length == 1 ? mixins[0] : null;
         if (mixin != null && !adaptTo.isAssignableFrom(mixin.getClass())) {
             throw new IllegalArgumentException(
                     "Mixin " + mixin.getClass().getName() + " is not assignable to " + adaptTo.getName() +
                     "; the mixin must extend (or be a subtype of) the adaptTo class so that proxy generation can extend it.");
         }
 
-        Timer.Sample timer = Timer.start();
+        ClassLoader parent = delegate.getClass().getClassLoader();
+        TreeVisitorAdapterClassLoader cl = classLoaders.get(parent);
+        if (cl == null) {
+            cl = classLoaders.computeIfAbsent(parent, TreeVisitorAdapterClassLoader::new);
+        }
+
+        // adapt() runs for every foreign-language node a visitor reaches, so the reflective work is
+        // done once per (delegate class, adaptTo, mixin class) and the hot path only instantiates.
+        AdapterKey key = new AdapterKey(delegate.getClass(), adaptTo, mixin == null ? null : mixin.getClass());
+        Adapter adapter = cl.getAdapter(key);
+        if (adapter == null) {
+            adapter = cl.putAdapterIfAbsent(key, createAdapter(cl, delegate, adaptTo, mixin));
+        }
+
+        try {
+            //noinspection unchecked
+            return (Adapted) adapter.newInstance(delegate, mixin);
+        } catch (Throwable t) {
+            throw adaptFailed(adaptTo, t);
+        }
+    }
+
+    private static Adapter createAdapter(TreeVisitorAdapterClassLoader cl, TreeVisitor<?, ?> delegate,
+                                         Class<?> adaptTo, @Nullable TreeVisitor<?, ?> mixin) {
+        Class<?> registeredMixinClass = mixin == null ? cl.mixinClass(delegate.getClass(), adaptTo).orElse(null) : null;
 
         //noinspection rawtypes
         Class<? extends TreeVisitor> delegateType = adapterDelegateType(delegate);
-        Class<?> mixinClass = mixin == null ? null : mixin.getClass();
+        Class<?> mixinClass = mixin == null ? registeredMixinClass : mixin.getClass();
         Class<?> proxySuper = mixinClass == null ? adaptTo : mixinClass;
 
         String adaptedName = delegate.getClass().getName().trim().replace('$', '_') +
@@ -200,21 +219,25 @@ public class TreeVisitorAdapter {
 
         try {
             Class<?> a = cl.loadClass(adaptedName);
-
-            @SuppressWarnings("unchecked")
-            Adapted adapted = (Adapted) a.getDeclaredConstructor().newInstance();
-
-            if (mixin != null) {
-                copyMixinInstanceFields(mixin, adapted);
-            }
-            a.getDeclaredMethod("setDelegate", delegateType).invoke(adapted, delegate);
-            return adapted;
-        } catch (InvocationTargetException | NoSuchMethodException | InstantiationException | IllegalAccessException |
-                 ClassNotFoundException e) {
-            timer.stop(MetricsHelper.errorTags(Timer.builder("rewrite.visitor.adapt")
-                    .tag("adapt.to", adaptTo.getSimpleName()), e).register(Metrics.globalRegistry));
-            throw new RuntimeException(e);
+            MethodHandles.Lookup lookup = MethodHandles.lookup();
+            return new Adapter(
+                    lookup.findConstructor(a, methodType(void.class)).asType(methodType(Object.class)),
+                    lookup.findVirtual(a, "setDelegate", methodType(void.class, delegateType))
+                            .asType(methodType(void.class, Object.class, TreeVisitor.class)),
+                    registeredMixinClass == null ? null :
+                            lookup.findConstructor(registeredMixinClass, methodType(void.class))
+                                    .asType(methodType(TreeVisitor.class)),
+                    mixinClass == null ? new Field[0] : mixinInstanceFields(mixinClass)
+            );
+        } catch (ReflectiveOperationException e) {
+            throw adaptFailed(adaptTo, e);
         }
+    }
+
+    private static RuntimeException adaptFailed(Class<?> adaptTo, Throwable t) {
+        Timer.start().stop(MetricsHelper.errorTags(Timer.builder("rewrite.visitor.adapt")
+                .tag("adapt.to", adaptTo.getSimpleName()), t).register(Metrics.globalRegistry));
+        return new RuntimeException(t);
     }
 
     private static boolean declaresUserOverrideByNameAndArity(Class<?> mixinClass, Class<?> adaptTo, Method baseMethod) {
@@ -319,34 +342,20 @@ public class TreeVisitorAdapter {
         return false;
     }
 
-    private static void copyMixinInstanceFields(TreeVisitor<?, ?> mixin, Object proxy) throws IllegalAccessException {
-        Class<?> c = mixin.getClass();
+    private static Field[] mixinInstanceFields(Class<?> mixinClass) {
+        List<Field> fields = new ArrayList<>();
+        Class<?> c = mixinClass;
         while (c != null && c != Object.class && c != TreeVisitor.class) {
             for (Field f : c.getDeclaredFields()) {
                 if (Modifier.isStatic(f.getModifiers())) {
                     continue;
                 }
                 f.setAccessible(true);
-                f.set(proxy, f.get(mixin));
+                fields.add(f);
             }
             c = c.getSuperclass();
         }
-    }
-
-    private static @Nullable TreeVisitor<?, ?> discoverRegisteredMixin(
-            TreeVisitorAdapterClassLoader cache, TreeVisitor<?, ?> delegate, Class<?> adaptTo) {
-        // Cache the per-(delegate, adaptTo) classpath scan — adapt() runs once per node — and
-        // instantiate a fresh mixin each call (the proxy copies its fields).
-        Optional<Class<?>> mixinClass = cache.mixinClass(delegate.getClass(), adaptTo);
-        if (!mixinClass.isPresent()) {
-            return null;
-        }
-        try {
-            return (TreeVisitor<?, ?>) mixinClass.get().getDeclaredConstructor().newInstance();
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(
-                    "Failed to instantiate registered mixin " + mixinClass.get().getName() + ".", e);
-        }
+        return fields.toArray(new Field[0]);
     }
 
     static Optional<Class<?>> discoverRegisteredMixinClass(Class<?> delegateClass, Class<?> adaptTo) {
@@ -437,5 +446,61 @@ public class TreeVisitorAdapter {
         }
         throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
                                            "type hierarchy of visitor " + delegate.getClass().getName());
+    }
+
+    static final class AdapterKey {
+        private final Class<?> delegateClass;
+        private final Class<?> adaptTo;
+        private final @Nullable Class<?> mixinClass;
+
+        AdapterKey(Class<?> delegateClass, Class<?> adaptTo, @Nullable Class<?> mixinClass) {
+            this.delegateClass = delegateClass;
+            this.adaptTo = adaptTo;
+            this.mixinClass = mixinClass;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof AdapterKey)) {
+                return false;
+            }
+            AdapterKey other = (AdapterKey) o;
+            return delegateClass == other.delegateClass && adaptTo == other.adaptTo && mixinClass == other.mixinClass;
+        }
+
+        @Override
+        public int hashCode() {
+            return (delegateClass.hashCode() * 31 + adaptTo.hashCode()) * 31 + Objects.hashCode(mixinClass);
+        }
+    }
+
+    static final class Adapter {
+        private final MethodHandle constructor;
+        private final MethodHandle setDelegate;
+        private final @Nullable MethodHandle registeredMixinConstructor;
+        private final Field[] mixinFields;
+
+        Adapter(MethodHandle constructor, MethodHandle setDelegate,
+                @Nullable MethodHandle registeredMixinConstructor, Field[] mixinFields) {
+            this.constructor = constructor;
+            this.setDelegate = setDelegate;
+            this.registeredMixinConstructor = registeredMixinConstructor;
+            this.mixinFields = mixinFields;
+        }
+
+        Object newInstance(TreeVisitor<?, ?> delegate, @Nullable TreeVisitor<?, ?> mixin) throws Throwable {
+            Object adapted = constructor.invokeExact();
+            if (mixin == null && registeredMixinConstructor != null) {
+                // A fresh registered mixin for every proxy, as its fields are copied onto the proxy
+                mixin = (TreeVisitor<?, ?>) registeredMixinConstructor.invokeExact();
+            }
+            if (mixin != null) {
+                for (Field f : mixinFields) {
+                    f.set(adapted, f.get(mixin));
+                }
+            }
+            setDelegate.invokeExact(adapted, delegate);
+            return adapted;
+        }
     }
 }

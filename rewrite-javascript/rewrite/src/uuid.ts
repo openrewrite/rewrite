@@ -35,12 +35,19 @@ function fallbackRandomId(): UUID {
 }
 
 /**
- * Generate a random UUID v4.
- *
  * Uses native crypto.randomUUID() on Node 14.17.0+, falls back to
  * crypto.randomBytes() on older versions. The implementation is
  * selected once at module load time to avoid per-call overhead.
  */
-export const randomId: () => UUID = typeof crypto.randomUUID === 'function'
+const generateId: () => UUID = typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID
     : fallbackRandomId;
+
+/**
+ * Generate a random UUID v4.
+ */
+export const randomId: () => UUID = () =>
+    // Both randomUUID() and concatenation yield an unflattened cons-string. An id is only ever
+    // compared or serialized, so nothing forces a flatten and each would be retained as a rope of
+    // tiny heap nodes for the life of the LST; the round-trip flattens it to a sequential string.
+    Buffer.from(generateId(), 'latin1').toString('latin1');

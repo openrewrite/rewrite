@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,26 +37,28 @@ final class EnvExpansion {
     }
 
     /**
-     * An expanded value plus whether any placeholder survived expansion (an unset variable
-     * without a default).
+     * An expanded value plus the placeholders that survived expansion (unset variables
+     * without a default), verbatim as written, e.g. {@code ${NPM_TOKEN}}.
      */
     static final class Expansion {
         final @Nullable String value;
         final boolean unresolvedPlaceholders;
+        final List<String> unresolved;
 
-        Expansion(@Nullable String value, boolean unresolvedPlaceholders) {
+        Expansion(@Nullable String value, List<String> unresolved) {
             this.value = value;
-            this.unresolvedPlaceholders = unresolvedPlaceholders;
+            this.unresolvedPlaceholders = !unresolved.isEmpty();
+            this.unresolved = unresolved;
         }
     }
 
     static Expansion expand(@Nullable String s, Environment env) {
         if (s == null || s.indexOf('$') < 0) {
-            return new Expansion(s, false);
+            return new Expansion(s, new ArrayList<>());
         }
         Matcher m = VAR.matcher(s);
         StringBuffer sb = new StringBuffer();
-        boolean unresolved = false;
+        List<String> unresolved = new ArrayList<>();
         while (m.find()) {
             String inner = m.group(1);
             String name = inner;
@@ -72,7 +76,7 @@ final class EnvExpansion {
                 replacement = def;
             } else {
                 replacement = m.group();
-                unresolved = true;
+                unresolved.add(m.group());
             }
             m.appendReplacement(sb, Matcher.quoteReplacement(replacement));
         }

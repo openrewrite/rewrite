@@ -130,11 +130,12 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     @Override
     public Yaml visitScalar(Yaml.Scalar scalar, PrintOutputCapture<P> p) {
         beforeSyntax(scalar, p);
-        if (scalar.getTag() != null) {
-            visit(scalar.getTag(), p);
-        }
+        // A leading tag fails to parse, so a scalar carrying both properties always had the anchor first in source.
         if (scalar.getAnchor() != null) {
             visit(scalar.getAnchor(), p);
+        }
+        if (scalar.getTag() != null) {
+            visit(scalar.getTag(), p);
         }
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:

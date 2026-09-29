@@ -42,7 +42,7 @@ public class RpcSendQueue
     private readonly int _batchSize;
     private readonly List<RpcObjectData> _batch;
     private readonly Action<List<RpcObjectData>> _drain;
-    private readonly IDictionary<object, int> _refs;
+    private readonly RpcRefs _refs;
     private readonly string? _sourceFileType;
     private readonly bool _trace;
     private readonly IRpcCodec? _treeCodec;
@@ -50,7 +50,7 @@ public class RpcSendQueue
     private object? _before;
 
     public RpcSendQueue(int batchSize, Action<List<RpcObjectData>> drain,
-                        IDictionary<object, int> refs, string? sourceFileType, bool trace,
+                        RpcRefs refs, string? sourceFileType, bool trace,
                         IRpcCodec? treeCodec = null)
     {
         _batchSize = batchSize;
@@ -202,21 +202,21 @@ public class RpcSendQueue
             if (after == null)
                 throw new InvalidOperationException("A DELETE event should have been sent.");
 
-            var beforeIdx = PutListPositions(after, before, id);
+            var positions = PutListPositions(after, before, id);
 
-            foreach (var anAfter in after)
+            for (int i = 0; i < after.Count; i++)
             {
-                var itemId = id(anAfter);
-                var beforePos = beforeIdx.GetValueOrDefault(itemId, -1);
+                var anAfter = after[i];
+                var beforePos = positions == null ? AddedListItem : positions[i];
                 Action? onChangeRun = onChange == null ? null : () => onChange(anAfter);
 
-                if (!beforeIdx.ContainsKey(itemId))
+                if (beforePos == AddedListItem)
                 {
                     Add(asRef ? Reference.AsRef(anAfter) : anAfter!, onChangeRun);
                 }
                 else
                 {
-                    var aBefore = before == null ? default : before[beforePos];
+                    var aBefore = before![beforePos];
                     if (ReferenceEquals(aBefore, anAfter))
                     {
                         Put(new RpcObjectData { State = NO_CHANGE });
@@ -236,32 +236,39 @@ public class RpcSendQueue
         });
     }
 
-    private Dictionary<object, int> PutListPositions<T>(IList<T> after, IList<T>? before, Func<T, object> id)
+    /// <summary>
+    /// Emits the positions message and returns the same positions for the caller to walk,
+    /// or null when every element is new.
+    /// </summary>
+    private List<int>? PutListPositions<T>(IList<T> after, IList<T>? before, Func<T, object> id)
     {
-        var beforeIdx = new Dictionary<object, int>();
-        if (before != null)
+        if (before == null || before.Count == 0)
         {
-            for (int i = 0; i < before.Count; i++)
+            // Every element is an addition, so the positions are a constant that needs
+            // neither an index map nor a key computed per element.
+            var added = new List<int>(after.Count);
+            for (int i = 0; i < after.Count; i++)
             {
-                beforeIdx[id(before[i])] = i;
+                added.Add(AddedListItem);
             }
+            Put(new RpcObjectData { State = CHANGE, Value = added });
+            return null;
         }
 
-        var positions = new List<int>();
+        var beforeIdx = new Dictionary<object, int>(before.Count);
+        for (int i = 0; i < before.Count; i++)
+        {
+            beforeIdx[id(before[i])] = i;
+        }
+
+        var positions = new List<int>(after.Count);
         foreach (var t in after)
         {
-            if (beforeIdx.TryGetValue(id(t), out var beforePos))
-            {
-                positions.Add(beforePos);
-            }
-            else
-            {
-                positions.Add(AddedListItem);
-            }
+            positions.Add(beforeIdx.TryGetValue(id(t), out var beforePos) ? beforePos : AddedListItem);
         }
 
         Put(new RpcObjectData { State = CHANGE, Value = positions });
-        return beforeIdx;
+        return positions;
     }
 
     private void Add(object after, Action? onChange)
@@ -276,7 +283,7 @@ public class RpcSendQueue
                 Put(new RpcObjectData { State = ADD, Ref = existingRef });
                 return;
             }
-            refValue = _refs.Count + 1;
+            refValue = _refs.NextId();
             _refs[afterVal] = refValue.Value;
         }
 

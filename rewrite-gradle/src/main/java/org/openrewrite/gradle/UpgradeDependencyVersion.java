@@ -21,12 +21,14 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.AddDependencyVisitor;
+import org.openrewrite.gradle.internal.SpringBomProperty;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.ExtraProperty;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
+import org.openrewrite.gradle.trait.VersionCatalog;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -50,10 +52,11 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
@@ -105,7 +108,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             "Supports updating dependency declarations of various forms:\n" +
             " * `String` notation: `\"group:artifact:version\"` \n" +
             " * `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
-            "Can update version numbers which are defined earlier in the same file in variable declarations.";
+            "Can update version numbers which are defined earlier in the same file in variable declarations, " +
+            "and in a version catalog.";
 
     @Override
     public Validated<Object> validate() {
@@ -140,6 +144,52 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
          * means the variable cannot be safely bumped; absence means the verdict is not yet known.
          */
         Map<String, @Nullable String> safeVariableVerdict = new HashMap<>();
+
+        /**
+         * Per module, the properties of BOMs imported through the Spring dependency management plugin that govern
+         * a targeted dependency. Overriding such a property is how the version is upgraded.
+         */
+        Map<String, Set<String>> bomPropertiesPerModule = new HashMap<>();
+
+        Set<String> gradlePropertiesKeys = new HashSet<>();
+
+        /**
+         * BOMs imported by any script in the build, since {@code apply from:} scripts and a root {@code subprojects}
+         * block import on behalf of a project whose own script says nothing.
+         */
+        List<GroupArtifactVersion> scriptImportedBoms = new ArrayList<>();
+
+        /**
+         * Extra properties any script declares, so an override is not written twice when the existing declaration
+         * lives in another script.
+         */
+        Set<String> declaredExtProperties = new HashSet<>();
+
+        /**
+         * Dependencies possibly governed by a BOM property, resolved once the whole build has been scanned and the
+         * imported BOMs of every script are known.
+         */
+        List<BomCandidate> bomCandidates = new ArrayList<>();
+
+        AtomicBoolean bomCandidatesResolved = new AtomicBoolean();
+
+        /**
+         * The root project's if it was scanned, otherwise the first one seen, so that a catalog
+         * carrying no marker of its own resolves against the same repositories the build does.
+         */
+        AtomicReference<@Nullable GradleProject> gradleProject = new AtomicReference<>();
+    }
+
+    @Value
+    static class BomCandidate {
+        GradleProject gradleProject;
+        GroupArtifact ga;
+        String configurationName;
+
+        /**
+         * The version Gradle resolved, which the BOM governs and this recipe may improve on.
+         */
+        String resolvedVersion;
     }
 
     @Override
@@ -151,7 +201,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
 
         //noinspection BooleanMethodIsAlwaysInverted
-        return new JavaVisitor<ExecutionContext>() {
+        JavaVisitor<ExecutionContext> scanGradle = new JavaVisitor<ExecutionContext>() {
             @Nullable
             GradleProject gradleProject;
 
@@ -165,6 +215,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    if (gradleProject != null && (acc.gradleProject.get() == null || ":".equals(gradleProject.getPath()))) {
+                        acc.gradleProject.set(gradleProject);
+                    }
+                    for (GroupArtifactVersion bom : SpringBomProperty.importedBoms((JavaSourceFile) tree)) {
+                        if (!acc.scriptImportedBoms.contains(bom)) {
+                            acc.scriptImportedBoms.add(bom);
+                        }
+                    }
+                    acc.declaredExtProperties.addAll(SpringBomProperty.declaredProperties((JavaSourceFile) tree));
                 }
                 return super.visit(tree, ctx);
             }
@@ -278,12 +337,19 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             .add(configName);
                 }
 
-                if (!acc.gaToNewVersion.containsKey(ga) && shouldResolveVersion(groupId, artifactId)) {
+                if (!shouldResolveVersion(groupId, artifactId)) {
+                    return;
+                }
+
+                // Recorded per module, since each module needs its own override written
+                recordBomCandidate(gradleDependency, ga, configName);
+
+                if (!acc.gaToNewVersion.containsKey(ga)) {
                     try {
+                        String versionVar = gradleDependency.getVersionVariable();
                         String newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                 .select(ga, configName, UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
 
-                        String versionVar = gradleDependency.getVersionVariable();
                         if (versionVar != null) {
                             acc.versionPropNameToGA
                                     .computeIfAbsent(versionVar, k -> new HashMap<>())
@@ -298,6 +364,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
             }
 
+            // Which BOMs the build imports isn't known until every script has been scanned.
+            private void recordBomCandidate(GradleDependency gradleDependency, GroupArtifact ga, String configName) {
+                if (gradleProject != null && SpringBomProperty.isPluginApplied(gradleProject) &&
+                        gradleDependency.getDeclaredVersion() == null && !gradleDependency.isPlatform()) {
+                    acc.bomCandidates.add(new BomCandidate(gradleProject, ga, configName, gradleDependency.getVersion()));
+                }
+            }
+
             // Some recipes make use of UpgradeDependencyVersion as an implementation detail.
             // Those other recipes might not know up-front which dependency needs upgrading
             // So they use the UpgradeDependencyVersion recipe with null groupId and artifactId to pre-populate all data they could possibly need
@@ -309,6 +383,28 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
         };
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return scanGradle.isAcceptable(sourceFile, ctx) ||
+                        (sourceFile instanceof Properties.File && sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME));
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof Properties.File) {
+                    // Only the keys matter: a BOM property defined here is updated in place rather than declared in the script
+                    for (Properties.Content content : ((Properties.File) tree).getContent()) {
+                        if (content instanceof Properties.Entry) {
+                            acc.gradlePropertiesKeys.add(((Properties.Entry) content).getKey());
+                        }
+                    }
+                    return tree;
+                }
+                return scanGradle.visit(tree, ctx);
+            }
+        };
     }
 
     @Override
@@ -316,10 +412,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
+            private final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+            private final TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) -> {
+                // A catalog file has no marker and a settings script no GradleProject, so fall back to a scanned project's repositories
+                @Nullable GradleProject gradleProject = catalog.getCursor().firstEnclosingOrThrow(SourceFile.class).getMarkers()
+                        .findFirst(GradleProject.class).orElseGet(acc.gradleProject::get);
+                return upgradeCatalog(catalog, dependencyMatcher, new DependencyVersionSelector(metadataFailures, gradleProject, null), ctx);
+            });
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
-                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx);
+                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx) ||
+                       updateVersionCatalog.isAcceptable(sf, ctx);
             }
 
             @Override
@@ -327,11 +431,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 stopAfterPreVisit();
                 Tree t = tree;
                 if (t instanceof SourceFile) {
+                    resolveBomCandidates(acc, ctx);
                     SourceFile sf = (SourceFile) t;
                     if (updateProperties.isAcceptable(sf, ctx)) {
                         t = updateProperties.visitNonNull(t, ctx);
                     } else if (updateGradle.isAcceptable(sf, ctx)) {
                         t = updateGradle.visitNonNull(t, ctx);
+                    }
+                    if (updateVersionCatalog.isAcceptable(sf, ctx)) {
+                        t = updateVersionCatalog.visitNonNull(t, ctx);
                     }
                     Optional<GradleProject> projectMarker = t.getMarkers().findFirst(GradleProject.class);
                     if (tree != t && projectMarker.isPresent()) {
@@ -360,8 +468,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 }
                             }
 
-                            gradleProject = gradleProject.upgradeDirectDependencyVersions(upgrades, ctx)
-                                    .upgradeBuildscriptDirectDependencyVersions(upgrades, ctx);
+                            gradleProject = constrainBomGoverned(gradleProject.upgradeDirectDependencyVersions(upgrades, ctx)
+                                    .upgradeBuildscriptDirectDependencyVersions(upgrades, ctx), ctx);
                             if (projectMarker.get() != gradleProject) {
                                 t = t.withMarkers(t.getMarkers().setByType(gradleProject));
                             }
@@ -384,7 +492,66 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return t;
             }
 
+            /**
+             * A BOM property override also moves every other artifact the property governs; the model reflects
+             * that as a constraint on each configuration resolving one of them.
+             */
+            private GradleProject constrainBomGoverned(GradleProject gradleProject, ExecutionContext ctx) {
+                Map<String, Set<GroupArtifactVersion>> constraints = new HashMap<>();
+                for (String property : acc.bomPropertiesPerModule.getOrDefault(getGradleProjectKey(gradleProject), emptySet())) {
+                    String version = safeUpdatedVersion(property, updateGradle.dependencyMatcher, acc, gradleProject, ctx);
+                    if (version == null) {
+                        continue;
+                    }
+                    for (Map.Entry<GroupArtifact, Set<String>> usage : acc.variableNames.get(property).entrySet()) {
+                        GroupArtifact ga = usage.getKey();
+                        if (!acc.gaToNewVersion.containsKey(ga)) {
+                            for (String configuration : usage.getValue()) {
+                                constraints.computeIfAbsent(configuration, k -> new HashSet<>())
+                                        .add(new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), version));
+                            }
+                        }
+                    }
+                }
+                return constraints.isEmpty() ? gradleProject : gradleProject.addOrUpdateConstraints(constraints, ctx);
+            }
         };
+    }
+
+    /**
+     * Moves every library this recipe matches to its selected version, however the catalog holding
+     * them is declared. A library whose metadata can't be downloaded is left alone and warned about
+     * on the catalog, the exception naming the library.
+     */
+    private Tree upgradeCatalog(VersionCatalog catalog, DependencyMatcher dependencyMatcher,
+                                DependencyVersionSelector versionSelector, ExecutionContext ctx) {
+        Map<String, String> declarations = catalog.getVersionDeclarations();
+        Map<GroupArtifact, String> selected = new LinkedHashMap<>();
+        List<MavenDownloadingException> failures = new ArrayList<>();
+        for (Map.Entry<GroupArtifact, ? extends VersionCatalog.Entry> library : catalog.getLibraryVersions().entrySet()) {
+            GroupArtifact ga = library.getKey();
+            String currentVersion = library.getValue().getResolvedVersion(declarations);
+            if (currentVersion == null || !dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
+                continue;
+            }
+            try {
+                GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), currentVersion);
+                String selectedVersion = versionSelector.select(gav, null, newVersion, versionPattern, ctx);
+                if (selectedVersion != null && !selectedVersion.equals(currentVersion)) {
+                    selected.put(ga, selectedVersion);
+                }
+            } catch (MavenDownloadingException e) {
+                failures.add(e);
+            }
+        }
+        Tree t = catalog.withVersions(selected).getTree();
+        // Warn once: a later cycle reports the same failure differently, which would never stabilize
+        if (!t.getMarkers().findFirst(Markup.Warn.class).isPresent()) {
+            for (MavenDownloadingException failure : failures) {
+                t = failure.warn(t);
+            }
+        }
+        return t;
     }
 
     @RequiredArgsConstructor
@@ -415,6 +582,41 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return finalVersion.map(v -> entry.withValue(entry.getValue().withText(v))).orElse(entry);
             }
             return entry;
+        }
+    }
+
+    // Recorded like a version variable so the shared-variable guard vets the other artifacts the property governs.
+    private void resolveBomCandidates(DependencyVersionState acc, ExecutionContext ctx) {
+        if (!acc.bomCandidatesResolved.compareAndSet(false, true)) {
+            return;
+        }
+        for (BomCandidate candidate : acc.bomCandidates) {
+            GradleProject gradleProject = candidate.getGradleProject();
+            GroupArtifact ga = candidate.getGa();
+            SpringBomProperty property = SpringBomProperty.find(gradleProject, acc.scriptImportedBoms, ga, ctx);
+            if (property == null) {
+                continue;
+            }
+            String selected;
+            try {
+                GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), candidate.getResolvedVersion());
+                selected = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                        .select(gav, candidate.getConfigurationName(), newVersion, versionPattern, ctx);
+            } catch (MavenDownloadingException e) {
+                continue;
+            }
+            if (selected == null || selected.equals(candidate.getResolvedVersion())) {
+                continue;
+            }
+            acc.gaToNewVersion.put(ga, selected);
+            acc.bomPropertiesPerModule.computeIfAbsent(getGradleProjectKey(gradleProject), k -> new HashSet<>()).add(property.getName());
+            acc.versionPropNameToGA.computeIfAbsent(property.getName(), k -> new HashMap<>())
+                    .computeIfAbsent(ga, k -> new HashSet<>())
+                    .add(candidate.getConfigurationName());
+            Map<GroupArtifact, Set<String>> usages = acc.variableNames.computeIfAbsent(property.getName(), k -> new HashMap<>());
+            usages.computeIfAbsent(ga, k -> new HashSet<>()).add(candidate.getConfigurationName());
+            property.governedOnClasspath(gradleProject, ga).forEach((governed, configurations) ->
+                    usages.computeIfAbsent(governed, k -> new HashSet<>()).addAll(configurations));
         }
     }
 
@@ -566,7 +768,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 gradleProject = original.getMarkers().findFirst(GradleProject.class)
                         .orElse(null);
                 JavaSourceFile sourceFile = applyPluginProvidedDependencies(original, ctx);
-                JavaSourceFile result = (JavaSourceFile) super.visit(sourceFile, ctx);
+                JavaSourceFile result = declareBomProperties((JavaSourceFile) super.visit(sourceFile, ctx), ctx);
                 if (result != original && gradleProject != null) {
                     JavaSourceSet.markDirty(ctx, gradleProject.getProjectName());
                 }
@@ -671,6 +873,26 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
             }
             return sourceFile;
+        }
+
+        /**
+         * Declares each BOM property override the script does not set yet. Properties the script already sets are
+         * updated in {@code postVisit}, and those defined in gradle.properties by {@code UpdateProperties}.
+         */
+        private JavaSourceFile declareBomProperties(JavaSourceFile cu, ExecutionContext ctx) {
+            if (gradleProject == null) {
+                return cu;
+            }
+            for (String property : acc.bomPropertiesPerModule.getOrDefault(getGradleProjectKey(gradleProject), emptySet())) {
+                if (acc.gradlePropertiesKeys.contains(property) || acc.declaredExtProperties.contains(property)) {
+                    continue;
+                }
+                String version = safeUpdatedVersion(property, dependencyMatcher, acc, gradleProject, ctx);
+                if (version != null) {
+                    cu = SpringBomProperty.addDeclaration(new Cursor(getCursor(), cu), property, version);
+                }
+            }
+            return cu;
         }
 
         /**
@@ -852,14 +1074,24 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 String configName = dependency.getConfigurationName();
 
                 if (currentVersion == null) {
-                    // Only handle dependencies without versions if they are platform dependencies
-                    // Regular dependencies without versions are governed by constraints and should not be upgraded
-                    if (!dependency.isPlatform()) {
-                        return dependency.getTree();
-                    }
                     GroupArtifact ga = new GroupArtifact(groupId, artifactId);
-                    selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                            .select(ga, configName, newVersion, versionPattern, ctx);
+                    if (dependency.isPlatform()) {
+                        selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                .select(ga, configName, newVersion, versionPattern, ctx);
+                    } else {
+                        // A version the build never declares is ours to pin only when a platform supplies it.
+                        // One supplied by a constraint belongs to UpgradeTransitiveDependencyVersion.
+                        String managedVersion = platformManagedVersion(ga, configName, ctx);
+                        if (managedVersion == null) {
+                            return dependency.getTree();
+                        }
+                        GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, managedVersion);
+                        selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                .select(gav, configName, newVersion, versionPattern, ctx);
+                        if (managedVersion.equals(selectedVersion)) {
+                            return dependency.getTree();
+                        }
+                    }
                 } else {
                     GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, currentVersion);
                     selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
@@ -901,6 +1133,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             return dependency.withDeclaredVersion(selectedVersion).getTree();
+        }
+
+        private @Nullable String platformManagedVersion(GroupArtifact ga, String configName, ExecutionContext ctx) {
+            if (gradleProject == null) {
+                return null;
+            }
+            GradleDependencyConfiguration configuration = gradleProject.getConfiguration(configName);
+            return configuration == null ? null :
+                    configuration.getPlatformManagedVersion(ga, gradleProject.getMavenRepositories(), ctx, bomGa -> {
+                        Object upgradedBomVersion = acc.gaToNewVersion.get(bomGa);
+                        return upgradedBomVersion instanceof String ? (String) upgradedBomVersion : null;
+                    });
         }
 
         /**

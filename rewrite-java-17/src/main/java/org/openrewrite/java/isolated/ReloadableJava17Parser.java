@@ -83,9 +83,11 @@ public class ReloadableJava17Parser implements JavaParser {
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
     private final List<Processor> annotationProcessors;
+    private final boolean typeAttribution;
 
     private ReloadableJava17Parser(
             boolean logCompilationWarningsAndErrors,
+            boolean typeAttribution,
             @Nullable Collection<Path> classpath,
             Collection<byte[]> classBytesClasspath,
             @Nullable Collection<Input> dependsOn,
@@ -96,6 +98,7 @@ public class ReloadableJava17Parser implements JavaParser {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
+        this.typeAttribution = typeAttribution;
         this.typeCache = typeCache;
         this.typeFactory = typeFactory != null ? typeFactory : new DefaultJavaTypeFactory(typeCache);
 
@@ -247,6 +250,9 @@ public class ReloadableJava17Parser implements JavaParser {
                 handleParsingException(ctx, t);
             }
 
+            if (!typeAttribution) {
+                compiler.todo.clear();
+            }
             while (!compiler.todo.isEmpty()) {
                 try {
                     compiler.attribute(compiler.todo);
@@ -350,7 +356,7 @@ public class ReloadableJava17Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<ReloadableJava17Parser, Builder> {
         @Override
         public ReloadableJava17Parser build() {
-            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, javaTypeFactory);
+            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, javaTypeFactory);
         }
     }
 

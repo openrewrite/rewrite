@@ -108,8 +108,12 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitListLiteral(G.ListLiteral listLiteral, PrintOutputCapture<P> p) {
         beforeSyntax(listLiteral, GSpace.Location.LIST_LITERAL, p);
-        visitContainer("[", listLiteral.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS,
-                ",", "]", p);
+        Object parent = getCursor().getParentOrThrow().getValue();
+        boolean multiIndex = parent instanceof G.Binary && ((G.Binary) parent).getOperator() == G.Binary.Type.Access &&
+                ((G.Binary) parent).getRight() == listLiteral &&
+                ((G.Binary) parent).getMarkers().findFirst(MultiIndexAccess.class).isPresent();
+        visitContainer(multiIndex ? "" : "[", listLiteral.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS,
+                ",", multiIndex ? "" : "]", p);
         afterSyntax(listLiteral, p);
         return listLiteral;
     }
@@ -521,6 +525,11 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
+            // The parser gives a zero-argument call a J.Empty argument; an element-less container is
+            // recipe-built, and the loop below only emits parentheses alongside an argument.
+            if (args.isEmpty()) {
+                p.append("()");
+            }
             boolean argsAreAllClosures = args.stream().allMatch(it -> it.getElement() instanceof J.Lambda);
             boolean hasParentheses = true;
             boolean applyTrailingLambdaParenthese = true;

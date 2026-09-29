@@ -23,23 +23,29 @@ import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import okhttp3.tls.HandshakeCertificates;
 import okhttp3.tls.HeldCertificate;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.maven.http.OkHttpSender;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.regex.Matcher;
@@ -52,6 +58,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
+@SuppressWarnings("DataFlowIssue")
 class UpgradeDependencyVersionTest implements RewriteTest {
 
     @DocumentExample
@@ -1102,6 +1109,78 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                             <artifactId>junit</artifactId>
                             <version>${junit.version}</version>
                             <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void overrideManagedVersionDoesNotShadowPropertyOwnedByLocalParent() {
+        // The parent owns both the managed version and the property behind it, so bumping the property
+        // there fixes every module. Adding an override to the child as well leaves two places to
+        // maintain, and pins the child if the parent later moves.
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "14.0", "", true, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <guava.version>13.0</guava.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>${guava.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <guava.version>14.0</guava.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>${guava.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("my-child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>my-child</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
                         </dependency>
                     </dependencies>
                 </project>
@@ -3160,6 +3239,123 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void latestPatchFindsBackpatchWithoutVersionPattern() throws Exception {
+        HeldCertificate certificate = new HeldCertificate.Builder()
+          .addSubjectAlternativeName(InetAddress.getByName("localhost").getCanonicalHostName())
+          .build();
+        HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+          .heldCertificate(certificate)
+          .build();
+        HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+          .addTrustedCertificate(certificate.certificate())
+          .build();
+
+        try (var mockRepo = new MockWebServer()) {
+            mockRepo.useHttps(serverCertificates.sslSocketFactory(), false);
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    String path = request.getPath();
+                    if (path == null || !path.contains("/com/example/my-lib/")) {
+                        return new MockResponse().setResponseCode(404);
+                    }
+                    if (path.endsWith("/maven-metadata.xml")) {
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <metadata>
+                            <groupId>com.example</groupId>
+                            <artifactId>my-lib</artifactId>
+                            <versioning>
+                              <versions>
+                                <version>2.14.1</version>
+                                <version>2.14.1.1-osera-00001</version>
+                                <version>2.14.1.1-osera-00002</version>
+                                <version>2.15.0</version>
+                              </versions>
+                            </versioning>
+                          </metadata>
+                          """);
+                    }
+                    if (path.endsWith(".pom")) {
+                        String version = path.substring(path.lastIndexOf("/my-lib-") + "/my-lib-".length(), path.length() - ".pom".length());
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <project>
+                            <modelVersion>4.0.0</modelVersion>
+                            <groupId>com.example</groupId>
+                            <artifactId>my-lib</artifactId>
+                            <version>%s</version>
+                          </project>
+                          """.formatted(version));
+                    }
+                    return new MockResponse().setResponseCode(404);
+                }
+            });
+            mockRepo.start();
+
+            @SuppressWarnings("ConstantConditions")
+            MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <mirrors>
+                        <mirror>
+                            <mirrorOf>*</mirrorOf>
+                            <name>mock</name>
+                            <url>https://%s:%d</url>
+                            <id>mock</id>
+                        </mirror>
+                    </mirrors>
+                </settings>
+                """.formatted(mockRepo.getHostName(), mockRepo.getPort())
+            ), new InMemoryExecutionContext());
+
+            OkHttpClient client = new OkHttpClient.Builder()
+              .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+              .connectTimeout(Duration.ofSeconds(1))
+              .readTimeout(Duration.ofSeconds(1))
+              .build();
+
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradeDependencyVersion("com.example", "my-lib", "latest.patch", null, null, null))
+                .executionContext(MavenExecutionContextView.view(
+                    HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+                      .setHttpSender(new OkHttpSender(client)))
+                  .setMavenSettings(settings, "mock")),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.example</groupId>
+                              <artifactId>my-lib</artifactId>
+                              <version>2.14.1</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.example</groupId>
+                              <artifactId>my-lib</artifactId>
+                              <version>2.14.1.1-osera-00002</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+    }
+
+    @Test
     void bomUpgradeSkipsSnapshotVersions() throws Exception {
         // Serve over TLS: MavenPomDownloader#normalizeRepository probes https first and only falls back to
         // http once that fails, so a plaintext mock costs two doomed handshakes per repository before anything
@@ -3455,4 +3651,453 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Nested
+    class ImportedBomVersionProperty {
+        @Language("xml")
+        private static final String REMOTE_PARENT_POM = """
+          <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.example</groupId>
+              <artifactId>remote-parent</artifactId>
+              <version>1.0.0</version>
+              <packaging>pom</packaging>
+              <properties>
+                  <junit.version>5.10.0</junit.version>
+              </properties>
+              <dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit</groupId>
+                          <artifactId>junit-bom</artifactId>
+                          <version>${junit.version}</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                      </dependency>
+                  </dependencies>
+              </dependencyManagement>
+          </project>
+          """;
+
+        /**
+         * Publish the parent pom to a temporary local repository, so that it resolves as a remote parent
+         * rather than as a source file.
+         */
+        private ExecutionContext executionContextWithRemoteParent(Path localRepository) throws IOException {
+            Path parentDir = localRepository.resolve("com/example/remote-parent/1.0.0");
+            Files.createDirectories(parentDir);
+            Files.writeString(parentDir.resolve("remote-parent-1.0.0.pom"), REMOTE_PARENT_POM);
+
+            return MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
+              .setLocalRepository(MavenRepository.builder()
+                .id("local")
+                .uri(localRepository.toUri().toString())
+                .snapshots(false)
+                .knownToExist(true)
+                .build());
+        }
+
+        @Test
+        void bomVersionPropertyDeclaredLocallyButImportedByRemoteParent(@TempDir Path localRepository) throws IOException {
+            ExecutionContext ctx = executionContextWithRemoteParent(localRepository);
+            rewriteRun(
+              spec -> spec
+                .executionContext(ctx)
+                .recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.10.2", null, null, null)),
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
+                      <properties>
+                          <junit.version>5.10.1</junit.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
+                      <properties>
+                          <junit.version>5.10.2</junit.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void childOverrideOfBomVersionPropertyDeclaredByLocalParent() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.10.2", null, null, null)),
+              mavenProject("parent",
+                //language=xml
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>pom</packaging>
+                        <properties>
+                            <junit.version>5.10.0</junit.version>
+                        </properties>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.junit</groupId>
+                                    <artifactId>junit-bom</artifactId>
+                                    <version>${junit.version}</version>
+                                    <type>pom</type>
+                                    <scope>import</scope>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>pom</packaging>
+                        <properties>
+                            <junit.version>5.10.2</junit.version>
+                        </properties>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.junit</groupId>
+                                    <artifactId>junit-bom</artifactId>
+                                    <version>${junit.version}</version>
+                                    <type>pom</type>
+                                    <scope>import</scope>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject("app",
+                  //language=xml
+                  pomXml(
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.example</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0</version>
+                          </parent>
+                          <artifactId>app</artifactId>
+                          <properties>
+                              <junit.version>5.10.1</junit.version>
+                          </properties>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.junit.jupiter</groupId>
+                                  <artifactId>junit-jupiter-api</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """,
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.example</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0</version>
+                          </parent>
+                          <artifactId>app</artifactId>
+                          <properties>
+                              <junit.version>5.10.2</junit.version>
+                          </properties>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.junit.jupiter</groupId>
+                                  <artifactId>junit-jupiter-api</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
+        @Test
+        void doesNotChangePropertyWhenBomCoordinatesDoNotMatch(@TempDir Path localRepository) throws IOException {
+            ExecutionContext ctx = executionContextWithRemoteParent(localRepository);
+            rewriteRun(
+              spec -> spec
+                .executionContext(ctx)
+                .recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.10.2", null, null, null)),
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
+                      <properties>
+                          <junit.version>5.10.1</junit.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+        @Test
+        void changesPropertyRatherThanPinningAVersionWhenOverridingManagedVersions(@TempDir Path localRepository) throws IOException {
+            ExecutionContext ctx = executionContextWithRemoteParent(localRepository);
+            rewriteRun(
+              spec -> spec
+                .executionContext(ctx)
+                .recipe(new UpgradeDependencyVersion("org.junit*", "*", "5.10.2", null, true, null)),
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
+                      <properties>
+                          <junit.version>5.10.1</junit.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
+                      <properties>
+                          <junit.version>5.10.2</junit.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+    }
+
+    /**
+     * Two artifacts of a multi-module build share one version property declared by their parent and
+     * resolve to different newer versions. Before the property was keyed on path and name alone, which
+     * of the two reached the pom depended on `HashSet` iteration order. The repository serves no
+     * `boot-a-3.2.0.pom`, so taking the higher of the two would leave a pom that no longer resolves.
+     */
+    @Test
+    void sharedVersionPropertyResolvesToTheLowestUpgrade() throws Exception {
+        HeldCertificate certificate = new HeldCertificate.Builder()
+          .addSubjectAlternativeName(InetAddress.getByName("localhost").getCanonicalHostName())
+          .build();
+        HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+          .heldCertificate(certificate)
+          .build();
+        HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+          .addTrustedCertificate(certificate.certificate())
+          .build();
+
+        try (var mockRepo = new MockWebServer()) {
+            mockRepo.useHttps(serverCertificates.sslSocketFactory(), false);
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    String path = request.getPath();
+                    if (path == null) {
+                        return new MockResponse().setResponseCode(404);
+                    }
+                    // boot-a stops at 3.1.0 while boot-b has published 3.2.0
+                    Matcher metadata = Pattern.compile("com/example/boot/(boot-[ab])/maven-metadata\\.xml").matcher(path);
+                    if (metadata.find()) {
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <metadata>
+                            <groupId>com.example.boot</groupId>
+                            <artifactId>%s</artifactId>
+                            <versioning>
+                              <versions>
+                                <version>3.0.0</version>
+                                <version>3.1.0</version>
+                                %s
+                              </versions>
+                            </versioning>
+                          </metadata>
+                          """.formatted(metadata.group(1),
+                          "boot-b".equals(metadata.group(1)) ? "<version>3.2.0</version>" : ""));
+                    }
+                    Matcher pom = Pattern.compile("com/example/boot/(boot-[ab])/([^/]+)/boot-[ab]-[^/]+\\.pom").matcher(path);
+                    if (pom.find()) {
+                        if ("boot-a".equals(pom.group(1)) && "3.2.0".equals(pom.group(2))) {
+                            return new MockResponse().setResponseCode(404); // boot-a never published 3.2.0
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <project>
+                            <modelVersion>4.0.0</modelVersion>
+                            <groupId>com.example.boot</groupId>
+                            <artifactId>%s</artifactId>
+                            <version>%s</version>
+                          </project>
+                          """.formatted(pom.group(1), pom.group(2)));
+                    }
+                    return new MockResponse().setResponseCode(404);
+                }
+            });
+            mockRepo.start();
+
+            @SuppressWarnings("ConstantConditions")
+            MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <mirrors>
+                        <mirror>
+                            <mirrorOf>*</mirrorOf>
+                            <name>mock</name>
+                            <url>https://%s:%d</url>
+                            <id>mock</id>
+                        </mirror>
+                    </mirrors>
+                </settings>
+                """.formatted(mockRepo.getHostName(), mockRepo.getPort())
+            ), new InMemoryExecutionContext());
+
+            OkHttpClient client = new OkHttpClient.Builder()
+              .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+              .connectTimeout(Duration.ofSeconds(1))
+              .readTimeout(Duration.ofSeconds(1))
+              .build();
+
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradeDependencyVersion("com.example.boot", "*", "latest.release", null, null, null))
+                .executionContext(MavenExecutionContextView.view(
+                    HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+                      .setHttpSender(new OkHttpSender(client)))
+                  .setMavenSettings(settings, "mock")),
+              mavenProject("parent",
+                //language=xml
+                pomXml(
+                  """
+                    <project>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>pom</packaging>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                        <properties>
+                            <boot.version>3.0.0</boot.version>
+                        </properties>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>pom</packaging>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                        <properties>
+                            <boot.version>3.1.0</boot.version>
+                        </properties>
+                    </project>
+                    """
+                ),
+                mavenProject("child",
+                  //language=xml
+                  pomXml(
+                    """
+                      <project>
+                          <parent>
+                              <groupId>com.example</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0</version>
+                          </parent>
+                          <artifactId>child</artifactId>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.example.boot</groupId>
+                                  <artifactId>boot-a</artifactId>
+                                  <version>${boot.version}</version>
+                              </dependency>
+                              <dependency>
+                                  <groupId>com.example.boot</groupId>
+                                  <artifactId>boot-b</artifactId>
+                                  <version>${boot.version}</version>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+    }
 }

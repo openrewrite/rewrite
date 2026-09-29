@@ -607,9 +607,12 @@ func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 			out.Append(";")
 		}
 	}
-	if sw.Tag != nil {
-		p.Visit(sw.Tag.Element, out)
-		p.visitSpace(sw.Tag.After, out)
+	// The selector is a ControlParentheses (matching J.Switch), but Go has no
+	// parens, so emit only its inner element (an Empty for a tagless `switch {}`).
+	if sw.Selector != nil {
+		p.visitSpace(sw.Selector.Prefix, out)
+		p.Visit(sw.Selector.Tree.Element, out)
+		p.visitSpace(sw.Selector.Tree.After, out)
 	}
 	p.Visit(sw.Body, out)
 	p.afterSyntax(sw.Markers, out)
@@ -1439,8 +1442,8 @@ func (p *GoPrinter) VisitEmpty(empty *java.Empty, param any) java.J {
 // Convention: Whitespace (before comments) is emitted first, then each comment
 // with its suffix. This matches Java OpenRewrite's Space model.
 func (p *GoPrinter) visitSpace(space java.Space, out *PrintOutputCapture) {
-	out.Append(space.Whitespace)
-	for _, comment := range space.Comments {
+	out.Append(space.Whitespace())
+	for _, comment := range space.Comments() {
 		printComment(comment, out)
 		out.Append(comment.Suffix)
 	}
