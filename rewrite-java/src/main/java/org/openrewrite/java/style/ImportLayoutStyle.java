@@ -33,10 +33,12 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.java.internal.ImportComments;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.Style;
@@ -349,7 +351,12 @@ public class ImportLayoutStyle implements JavaStyle {
     }
 
     public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Collection<JavaType.FullyQualified> classpath, boolean classpathDirty) {
+        return orderImports(originalImports, classpath, classpathDirty, null);
+    }
+
+    public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Collection<JavaType.FullyQualified> classpath, boolean classpathDirty, @Nullable Cursor cursor) {
         LayoutState layoutState = new LayoutState();
+        layoutState.importComments = cursor == null ? null : cursor.getNearestMessage(ImportComments.CURSOR_MESSAGE_KEY);
         ImportLayoutConflictDetection importLayoutConflictDetection = new ImportLayoutConflictDetection(classpath, originalImports, classpathDirty);
         List<JRightPadded<J.Import>> orderedImports = new ArrayList<>();
 
@@ -393,7 +400,8 @@ public class ImportLayoutStyle implements JavaStyle {
                     boolean whitespaceContainsCRLF = orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n");
                     Space prefix;
                     if (importIndex == 0) {
-                        prefix = originalImports.get(0).getElement().getPrefix();
+                        prefix = orderedImport.getElement().getPrefix()
+                                .withWhitespace(originalImports.get(0).getElement().getPrefix().getWhitespace());
                     } else {
                         // Preserve the existing newline character type of either CRLF or LF.
                         // Classic Mac OS new line return '\r' is replaced by '\n'.
@@ -530,6 +538,8 @@ public class ImportLayoutStyle implements JavaStyle {
      */
     public static class LayoutState {
         Map<Block, List<JRightPadded<J.Import>>> imports = new HashMap<>();
+        @Nullable
+        ImportComments importComments;
 
         public void claimImport(Block block, JRightPadded<J.Import> import_) {
             imports.computeIfAbsent(block, b -> new ArrayList<>()).add(import_);
@@ -768,14 +778,16 @@ public class ImportLayoutStyle implements JavaStyle {
                                 .findAny();
 
                         if (starImportExists || !oneOfTheTypesIsInAnotherGroupToo.isPresent()) {
-                            ordered.add(toStar.withElement(toStar.getElement().withQualid(qualid.withName(name.withSimpleName("*")))));
+                            ordered.add(toStar.withElement(ImportComments.foldComments(importGroup, layoutState.importComments)
+                                    .withQualid(qualid.withName(name.withSimpleName("*")))));
                             continue;
                         }
                     }
 
                     Predicate<JRightPadded<J.Import>> predicate = distinctBy(t -> t.getElement().printTrimmed(new JavaPrinter<>()));
                     for (JRightPadded<J.Import> importJRightPadded : importGroup) {
-                        if (predicate.test(importJRightPadded)) {
+                        if (predicate.test(importJRightPadded) || layoutState.importComments != null &&
+                                layoutState.importComments.hasTrailingComments(importJRightPadded.getElement())) {
                             ordered.add(importJRightPadded);
                         }
                     }
