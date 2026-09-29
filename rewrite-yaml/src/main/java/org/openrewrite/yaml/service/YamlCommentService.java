@@ -72,7 +72,7 @@ public class YamlCommentService extends CommentService {
     }
 
     @Override
-    public boolean hasEquivalentComment(Cursor cursor, String text) {
+    private boolean hasEquivalentComment(Cursor cursor, String text) {
         return indexOfSubList(trimmed(leadingComments(cursor)), trimmed(asList(text.split("\\R")))) >= 0;
     }
 
