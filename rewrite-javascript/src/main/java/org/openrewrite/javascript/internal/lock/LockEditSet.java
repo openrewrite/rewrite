@@ -97,6 +97,10 @@ public class LockEditSet {
         @Nullable
         String newConstraint;
 
+        /** yarn classic: every range the block's header lists once the edit lands, when the diff has settled them all. */
+        @Nullable
+        List<String> selectors;
+
         /** pnpm's peer-suffixed form of {@link #newVersion} ({@code version(peer@version)…}) for snapshot keys and references. */
         @Nullable
         String newVersionRef;

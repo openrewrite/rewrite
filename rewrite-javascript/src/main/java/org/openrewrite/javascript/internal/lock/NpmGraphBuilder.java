@@ -144,7 +144,8 @@ public final class NpmGraphBuilder {
             Map<String, String> importerResolved = new LinkedHashMap<>();
             for (Map<String, String> scope : decl.scopes.values()) {
                 for (Map.Entry<String, String> dep : scope.entrySet()) {
-                    importerResolved.put(dep.getKey(), resolvedVersionOf(dep.getKey(), dep.getValue(), chosen));
+                    importerResolved.put(dep.getKey(),
+                            resolvedVersionOf(dep.getKey(), overrides.getOrDefault(dep.getKey(), dep.getValue()), chosen));
                 }
             }
             // peerDependencies trails the resolved scopes so the writer mirrors npm's root-entry field order.

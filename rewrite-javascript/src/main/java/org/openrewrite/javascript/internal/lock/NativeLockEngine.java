@@ -50,6 +50,7 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -149,7 +150,8 @@ public final class NativeLockEngine {
             return patchEditedDependencies(pm, editedPackageJson, originalPackageJson, existingLock,
                     packageJsonPath, registries, client);
         } catch (EngineFailure perDependency) {
-            return resolveAndPatch(pm, perDependency, editedPackageJson, existingLock, packageJsonPath, registries, client);
+            return resolveAndPatch(pm, perDependency, editedPackageJson, originalPackageJson, existingLock, packageJsonPath,
+                    registries, client);
         } catch (RecipeRunException rre) {
             // A patcher failing loud from inside a rewrite-json/yaml visitor wraps its EngineFailure; unwrap it
             // so a cannot-reshape deferral still routes to whole-closure resolution.
@@ -157,7 +159,8 @@ public final class NativeLockEngine {
             if (perDependency == null) {
                 throw rre;
             }
-            return resolveAndPatch(pm, perDependency, editedPackageJson, existingLock, packageJsonPath, registries, client);
+            return resolveAndPatch(pm, perDependency, editedPackageJson, originalPackageJson, existingLock, packageJsonPath,
+                    registries, client);
         }
     }
 
@@ -189,6 +192,11 @@ public final class NativeLockEngine {
         }
         // Parsed before any registry call, so an override the package manager itself rejects fails fast.
         Set<String> overridden = declaredOverrides(pm, editedPackageJson).names();
+        if (pm == PackageManager.YarnClassic && !overridesNodes(pm, editedPackageJson).isEmpty()) {
+            // Any re-resolve also requests every resolution at the top level, which only the whole closure models.
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                    "yarn classic re-requests every resolution and requires resolution");
+        }
         Path lockPath = lockPath(pm, packageJsonPath);
         String memberImporterDir = addImporterDir(pm, existingLock, packageJsonPath);
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
@@ -225,6 +233,7 @@ public final class NativeLockEngine {
      * the real blocker). A genuine input/environment deferral rethrows the per-dependency failure unchanged.
      */
     private static Result resolveAndPatch(PackageManager pm, EngineFailure perDependency, String editedPackageJson,
+                                          @Nullable String originalPackageJson,
                                            String existingLock, @Nullable Path packageJsonPath,
                                            NodeRegistries registries, NpmRegistryClient client) {
         if (!RESOLVABLE_REASONS.contains(perDependency.failure.getReason())) {
@@ -248,7 +257,8 @@ public final class NativeLockEngine {
             if (pm == PackageManager.Bun) {
                 return resolveAndPatchBun(editedPackageJson, existingLock, packageJsonPath, registries, client);
             }
-            return resolveAndPatchYarnClassic(editedPackageJson, existingLock, packageJsonPath, registries, client);
+            return resolveAndPatchYarnClassic(editedPackageJson, originalPackageJson, existingLock, packageJsonPath,
+                    registries, client);
         } catch (NodeRegistryException nre) {
             // The deeper closure walk hit a registry/environment error the per-dependency path did not need to
             // reach; it produced no better answer, so return that deferral unchanged (no wrong lock either way).
@@ -298,9 +308,22 @@ public final class NativeLockEngine {
                                                    @Nullable Path packageJsonPath, NodeRegistries registries,
                                                    NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = buildWithoutOverrides(PackageManager.YarnBerry, registry,
-                lockedVersionsBerry(existingLock), editedPackageJson);
-        List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
+        Overrides overrides = declaredOverrides(PackageManager.YarnBerry, editedPackageJson);
+        Map<String, Set<String>> locked = lockedVersionsBerry(existingLock);
+        requireUnsupportedUnreached(PackageManager.YarnBerry, overrides, locked.keySet());
+        ResolutionGraph graph = buildWithoutPeerInstall(registry, locked, editedPackageJson, overrides.ranges);
+        Map<String, String> ranges = settleParentEdges(graph, overrides);
+        if (!ranges.equals(overrides.ranges)) {
+            graph = buildWithoutPeerInstall(registry, locked, editedPackageJson, ranges);
+            if (!settleParentEdges(graph, overrides).equals(ranges)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "scoped overrides do not settle on one set of applied rules");
+            }
+        }
+        requireUnsupportedUnreached(PackageManager.YarnBerry, overrides, reachedNames(graph));
+        Map<String, String> scopedParent = new LinkedHashMap<>(overrides.scopedParent);
+        scopedParent.keySet().retainAll(ranges.keySet());
+        List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock, ranges, scopedParent);
         for (LockEditSet.PackageEdit edit : edits) {
             if (edit.getNewResolved() != null) {
                 edits = enrichBerryChecksums(edits, existingLock, registries, client);
@@ -336,16 +359,211 @@ public final class NativeLockEngine {
      * The classic-yarn variant of {@link #resolveAndPatchNpm}: resolve the closure seeded by the existing
      * yarn.lock, diff against its flat blocks, and patch only the difference.
      */
-    private static Result resolveAndPatchYarnClassic(String editedPackageJson, String existingLock,
+    private static Result resolveAndPatchYarnClassic(String editedPackageJson, @Nullable String originalPackageJson,
+                                                     String existingLock,
                                                      @Nullable Path packageJsonPath, NodeRegistries registries,
                                                      NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = buildWithoutOverrides(PackageManager.YarnClassic, registry,
-                lockedVersionsYarnClassic(existingLock), editedPackageJson);
+        Overrides overrides = declaredOverrides(PackageManager.YarnClassic, editedPackageJson);
+        Map<String, Set<String>> locked = lockedVersionsYarnClassic(existingLock);
+        requireUnsupportedUnreached(PackageManager.YarnClassic, overrides, locked.keySet());
+        Map<String, String> declared = rootDeclared(editedPackageJson);
+        Map<String, String> ranges = settleClassicResolutions(null, overrides, declared);
+        ResolutionGraph graph = buildWithoutPeerInstall(registry, locked, editedPackageJson, transitiveOnly(ranges, declared));
+        Map<String, String> settled = settleClassicResolutions(graph, overrides, declared);
+        if (!settled.equals(ranges)) {
+            graph = buildWithoutPeerInstall(registry, locked, editedPackageJson, transitiveOnly(settled, declared));
+        }
+        // A changed dependency list always makes yarn resolve; otherwise only a pattern it can no longer find does.
+        boolean dependenciesChanged = originalPackageJson == null ||
+                                      !diffDeclaredDeps(originalPackageJson, editedPackageJson).isEmpty();
+        if (!dependenciesChanged && !yarnClassicReResolves(graph, existingLock, declared, settled, overrides.scopedParent)) {
+            // Every requested pattern is still locked and satisfied, so yarn leaves the lock as it is.
+            return Result.success(existingLock);
+        }
+        requireReproducibleResolutionRequests(overrides, declared);
+        String requested = withResolutionRequests(editedPackageJson, overrides, declared);
+        graph = buildWithoutPeerInstall(registry, locked, requested, transitiveOnly(settled, declared));
+        if (!settleClassicResolutions(graph, overrides, declared).equals(settled)) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                    "scoped overrides do not settle on one set of applied rules");
+        }
+        requireUnsupportedUnreached(PackageManager.YarnClassic, overrides, reachedNames(graph));
         List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnClassic, packageJsonPath),
-                PackageManager.YarnClassic, editedPackageJson, edits);
+                PackageManager.YarnClassic, requested, edits);
         return Result.success(new YarnClassicLockPatcher().patch(editSet));
+    }
+
+    /**
+     * yarn classic reaches transitive requirers only, and {@code parent/child} only below a directly declared
+     * parent; it ignores a version-qualified parent. With a {@code graph}, a scoped rule also needs its parent to be
+     * the child's sole requirer (inert when no parent requires it), as global resolution would otherwise reach more.
+     */
+    private static Map<String, String> settleClassicResolutions(@Nullable ResolutionGraph graph, Overrides overrides,
+                                                                Map<String, String> declared) {
+        Map<String, String> ranges = new LinkedHashMap<>(overrides.ranges);
+        for (Map.Entry<String, String> e : overrides.scopedParent.entrySet()) {
+            String child = e.getKey();
+            String parent = e.getValue();
+            if (parentVersion(parent) != null || !declared.containsKey(parent)) {
+                ranges.remove(child);
+                continue;
+            }
+            if (graph == null) {
+                continue;
+            }
+            boolean parentRequires = false;
+            String otherRequirer = null;
+            for (ResolvedNode node : graph.getNodes().values()) {
+                if (node.getResolvedEdges().containsKey(child)) {
+                    if (parent.equals(node.getManifest().getName())) {
+                        parentRequires = true;
+                    } else {
+                        otherRequirer = node.getManifest().getName();
+                    }
+                }
+            }
+            if (!parentRequires) {
+                ranges.remove(child);
+            } else if (otherRequirer != null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, child,
+                        "override of " + child + " scoped to " + parent + " but " + otherRequirer + " also requires it");
+            }
+        }
+        return ranges;
+    }
+
+    /** yarn classic never resolves a direct dependency through a resolution, so its declared spec stands. */
+    private static Map<String, String> transitiveOnly(Map<String, String> ranges, Map<String, String> declared) {
+        Map<String, String> transitive = new LinkedHashMap<>(ranges);
+        transitive.entrySet().removeIf(e -> declared.containsKey(e.getKey()) &&
+                                            !declared.get(e.getKey()).equals(e.getValue()));
+        return transitive;
+    }
+
+    /**
+     * {@code manifestJson} with every resolution also requested at the top level as {@code child@value}, as yarn
+     * classic does whenever it resolves. A child the project already declares keeps its own entry.
+     */
+    private static String withResolutionRequests(String manifestJson, Overrides overrides, Map<String, String> declared) {
+        try {
+            JsonNode root = JSON.readTree(manifestJson);
+            ObjectNode deps = root.has("dependencies") && root.get("dependencies").isObject() ?
+                    (ObjectNode) root.get("dependencies") : ((ObjectNode) root).putObject("dependencies");
+            boolean changed = false;
+            for (Map.Entry<String, String> e : overrides.ranges.entrySet()) {
+                if (!declared.containsKey(e.getKey())) {
+                    deps.put(e.getKey(), e.getValue());
+                    changed = true;
+                }
+            }
+            return changed ? JSON.writeValueAsString(root) : manifestJson;
+        } catch (IOException e) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "could not read manifest dependencies");
+        }
+    }
+
+    /**
+     * Whether yarn classic would resolve at all: it does when a pattern the project requests, directly or
+     * transitively with its resolution substituted, is not locked, or its locked version no longer satisfies it.
+     * The top-level resolution requests do not count; they are only added once yarn resolves.
+     */
+    private static boolean yarnClassicReResolves(ResolutionGraph graph, String lock, Map<String, String> declared,
+                                                 Map<String, String> ranges, Map<String, String> scopedParent) {
+        Map<String, String> locked = lockedPatternsYarnClassic(lock);
+        Deque<String> queue = new ArrayDeque<>();
+        Set<String> seen = new HashSet<>();
+        ResolutionGraph.Importer root = graph.getImporters().get(0);
+        for (Map.Entry<String, String> dep : declared.entrySet()) {
+            if (!satisfiedPattern(locked, dep.getKey(), dep.getValue())) {
+                return true;
+            }
+            String version = root.getResolved().get(dep.getKey());
+            if (version != null && seen.add(ResolutionGraph.key(dep.getKey(), version))) {
+                queue.add(ResolutionGraph.key(dep.getKey(), version));
+            }
+        }
+        while (!queue.isEmpty()) {
+            ResolvedNode node = graph.getNodes().get(queue.poll());
+            if (node == null) {
+                continue;
+            }
+            Map<String, String> deps = new LinkedHashMap<>();
+            if (node.getManifest().getOptionalDependencies() != null) {
+                deps.putAll(node.getManifest().getOptionalDependencies());
+            }
+            if (node.getManifest().getDependencies() != null) {
+                deps.putAll(node.getManifest().getDependencies());
+            }
+            for (Map.Entry<String, String> edge : node.getResolvedEdges().entrySet()) {
+                String dep = edge.getKey();
+                String parent = scopedParent.get(dep);
+                String range = ranges.containsKey(dep) &&
+                               (parent == null || parent.equals(node.getManifest().getName())) ?
+                        ranges.get(dep) : deps.get(dep);
+                if (range != null && !satisfiedPattern(locked, dep, range)) {
+                    return true;
+                }
+                String key = ResolutionGraph.key(dep, edge.getValue());
+                if (seen.add(key)) {
+                    queue.add(key);
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean satisfiedPattern(Map<String, String> locked, String name, String range) {
+        String version = locked.get(name + "@" + range);
+        return version != null && (!Semver.validate(range, null, NODE).isValid() ||
+                                   Semver.satisfies(version, range, NODE));
+    }
+
+    /**
+     * yarn classic requests every resolution at the top level once it resolves; only the shapes it was recorded
+     * doing that for are reproduced, and a request that collides with a direct dependency's own is not.
+     */
+    private static void requireReproducibleResolutionRequests(Overrides overrides, Map<String, String> declared) {
+        for (Map.Entry<String, String> e : overrides.unsupported.entrySet()) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, e.getKey(),
+                    "override " + e.getValue() + " is not yet requested for " + PackageManager.YarnClassic);
+        }
+        for (Map.Entry<String, String> e : overrides.ranges.entrySet()) {
+            String parent = overrides.scopedParent.get(e.getKey());
+            if (parent != null && parentVersion(parent) != null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, e.getKey(),
+                        "override " + parent + "/" + e.getKey() + " is not yet requested for " + PackageManager.YarnClassic);
+            }
+            String spec = declared.get(e.getKey());
+            if (spec != null && !spec.equals(e.getValue())) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, e.getKey(),
+                        "resolution of " + e.getKey() + " collides with its direct dependency (" + spec + ")");
+            }
+        }
+    }
+
+    /** Every {@code name@range} pattern a classic lock heads, with the version it resolves to. */
+    private static Map<String, String> lockedPatternsYarnClassic(String lock) {
+        Map<String, String> locked = new HashMap<>();
+        List<String> header = null;
+        for (String line : lock.split("\n")) {
+            if (!line.isEmpty() && !Character.isWhitespace(line.charAt(0)) && line.charAt(0) != '#' &&
+                line.trim().endsWith(":")) {
+                String trimmed = line.trim();
+                header = new ArrayList<>();
+                for (String selector : YarnClassicLockPatcher.splitSelectors(trimmed.substring(0, trimmed.length() - 1))) {
+                    header.add(unquote(selector.trim()));
+                }
+            } else if (header != null && line.trim().startsWith("version ")) {
+                String version = unquote(line.trim().substring("version ".length()).trim());
+                for (String selector : header) {
+                    locked.put(selector, version);
+                }
+                header = null;
+            }
+        }
+        return locked;
     }
 
     /** The versions the lock already resolves, scanned from every {@code name@range:} header's version line. */
@@ -380,11 +598,11 @@ public final class NativeLockEngine {
         requireUnsupportedUnreached(PackageManager.Pnpm, overrides, locked.keySet());
         // pnpm pins an overridden direct dependency's importer specifier to the override as well.
         String effective = withOverriddenDirectSpecs(editedPackageJson, overrides);
-        ResolutionGraph graph = buildPnpm(registry, locked, effective, overrides.ranges);
-        Map<String, String> ranges = settlePnpmParents(graph, overrides);
+        ResolutionGraph graph = buildWithoutPeerInstall(registry, locked, effective, overrides.ranges);
+        Map<String, String> ranges = settleParentEdges(graph, overrides);
         if (!ranges.equals(overrides.ranges)) {
-            graph = buildPnpm(registry, locked, effective, ranges);
-            if (!settlePnpmParents(graph, overrides).equals(ranges)) {
+            graph = buildWithoutPeerInstall(registry, locked, effective, ranges);
+            if (!settleParentEdges(graph, overrides).equals(ranges)) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                         "scoped overrides do not settle on one set of applied rules");
             }
@@ -430,8 +648,8 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, first.getKey(),
                     "override " + first.getValue() + " is not yet applied for " + PackageManager.Bun);
         }
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock), false,
-                overrides.ranges).build(singletonMap("", editedPackageJson));
+        ResolutionGraph graph = buildWithoutPeerInstall(registry, lockedVersionsBun(existingLock), editedPackageJson,
+                overrides.ranges);
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),
                 PackageManager.Bun, editedPackageJson, edits);
@@ -452,9 +670,9 @@ public final class NativeLockEngine {
     /**
      * Parse the manifest's overrides once, as {@code pm} reads them. A key naming no package is refused before
      * anything resolves. On npm, a top-level name and one level of {@code parent -> {name -> range}} (what a
-     * {@code dependencyPath} run writes) are applied, as are bun's flat keys and pnpm's plain and
-     * {@code parent>child} keys; every other key is only recorded, and refuses once the closure reaches a name it
-     * selects.
+     * {@code dependencyPath} run writes) are applied, as are bun's flat keys, pnpm's plain and {@code parent>child}
+     * keys and yarn's plain and {@code parent/child} keys; every other key is only recorded, and refuses once the
+     * closure reaches a name it selects.
      */
     private static Overrides declaredOverrides(PackageManager pm, String manifestJson) {
         Overrides overrides = new Overrides();
@@ -465,6 +683,8 @@ public final class NativeLockEngine {
                 collectBunOverrides(node, overrides);
             } else if (pm == PackageManager.Pnpm) {
                 collectPnpmOverrides(node, overrides);
+            } else if (pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic) {
+                collectYarnOverrides(node, overrides, pm == PackageManager.YarnClassic);
             } else {
                 collectKeyedOverrides(node, null, overrides);
             }
@@ -588,6 +808,39 @@ public final class NativeLockEngine {
     }
 
     /**
+     * yarn {@code resolutions}: a plain key, or {@code parent[@range]/child} naming one parent. Scoped names keep
+     * their own slash; classic reads {@code **}{@code /child} as the plain key (berry rejects it), and other globs and
+     * longer paths are only recorded.
+     */
+    private static void collectYarnOverrides(JsonNode node, Overrides overrides, boolean classic) {
+        for (Map.Entry<String, JsonNode> property : node.properties()) {
+            String key = property.getKey();
+            JsonNode value = property.getValue();
+            List<String> segments = new ArrayList<>();
+            String[] parts = key.split("/");
+            for (int i = 0; i < parts.length; i++) {
+                segments.add(parts[i].startsWith("@") && i + 1 < parts.length ? parts[i] + "/" + parts[++i] : parts[i]);
+            }
+            if (classic && segments.size() == 2 && "**".equals(segments.get(0))) {
+                segments.remove(0);
+            }
+            String child = segments.get(segments.size() - 1);
+            String parent = segments.size() == 2 ? segments.get(0) : null;
+            if (segments.size() <= 2 && value.isTextual() && Semver.validate(value.asText(), null, NODE).isValid() &&
+                OVERRIDE_NAME.matcher(child).matches() &&
+                (parent == null || OVERRIDE_NAME.matcher(parentName(parent)).matches()) &&
+                !overrides.names().contains(child)) {
+                overrides.ranges.put(child, value.asText());
+                if (parent != null) {
+                    overrides.scopedParent.put(child, parent);
+                }
+            } else {
+                recordKeyedOverride(key, value, key, overrides);
+            }
+        }
+    }
+
+    /**
      * The declared overrides as the lock records them: bun folds {@code resolutions} into {@code overrides}, the
      * first declaration of a name winning; pnpm keeps every key verbatim. Only string values are reproduced.
      */
@@ -630,15 +883,17 @@ public final class NativeLockEngine {
     }
 
     /**
-     * pnpm scopes {@code parent>child} to the parent's own dependency edges. Resolving it globally is the same
+     * pnpm's {@code parent>child} and yarn's {@code parent/child} reach only the parent's own dependency edges,
+     * a version-qualified parent only the copies its range admits. Resolving the rule globally is the same
      * answer only when the parent is the child's sole requirer; when no parent requires it the rule is inert, and
      * any other mix would need a second copy the global resolver does not produce.
      */
-    private static Map<String, String> settlePnpmParents(ResolutionGraph graph, Overrides overrides) {
+    private static Map<String, String> settleParentEdges(ResolutionGraph graph, Overrides overrides) {
         Map<String, String> ranges = new LinkedHashMap<>(overrides.ranges);
         for (Map.Entry<String, String> e : overrides.scopedParent.entrySet()) {
             String child = e.getKey();
-            String parent = e.getValue();
+            String parent = parentName(e.getValue());
+            String selector = parentVersion(e.getValue());
             String otherRequirer = null;
             boolean parentRequires = false;
             for (ResolutionGraph.Importer importer : graph.getImporters()) {
@@ -650,7 +905,8 @@ public final class NativeLockEngine {
                 boolean requires = node.getResolvedEdges().containsKey(child) ||
                         (node.getManifest().getPeerDependencies() != null &&
                                 node.getManifest().getPeerDependencies().containsKey(child));
-                if (requires && parent.equals(node.getManifest().getName())) {
+                if (requires && parent.equals(node.getManifest().getName()) &&
+                    (selector == null || Semver.satisfies(node.getManifest().getVersion(), selector, NODE))) {
                     parentRequires = true;
                 } else if (requires) {
                     otherRequirer = node.getManifest().getName();
@@ -666,8 +922,9 @@ public final class NativeLockEngine {
         return ranges;
     }
 
-    private static ResolutionGraph buildPnpm(Registry registry, Map<String, Set<String>> locked,
-                                             String manifestJson, Map<String, String> ranges) {
+    /** bun, pnpm and yarn: none auto-installs a missing peer or places a peer copy per requirer. */
+    private static ResolutionGraph buildWithoutPeerInstall(Registry registry, Map<String, Set<String>> locked,
+                                                           String manifestJson, Map<String, String> ranges) {
         return new NpmGraphBuilder(registry, false, locked, false, ranges).build(singletonMap("", manifestJson));
     }
 
@@ -755,16 +1012,6 @@ public final class NativeLockEngine {
             names.addAll(node.getResolvedEdges().keySet());
         }
         return names;
-    }
-
-    /** yarn resolves with no override applied, refusing any the closure reaches. */
-    private static ResolutionGraph buildWithoutOverrides(PackageManager pm, Registry registry,
-                                                         Map<String, Set<String>> locked, String editedPackageJson) {
-        Overrides overrides = declaredOverrides(pm, editedPackageJson);
-        requireUnsupportedUnreached(pm, overrides, locked.keySet());
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, locked).build(singletonMap("", editedPackageJson));
-        requireUnsupportedUnreached(pm, overrides, reachedNames(graph));
-        return graph;
     }
 
     private static ResolutionGraph buildNpm(Registry registry, Map<String, Set<String>> locked,

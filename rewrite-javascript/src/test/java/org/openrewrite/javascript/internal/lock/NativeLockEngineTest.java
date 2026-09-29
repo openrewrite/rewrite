@@ -1651,7 +1651,7 @@ class NativeLockEngineTest {
                 yarnClassicLock());
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("the edit reaches beta");
+        assertThat(result.getFailure().getDetail()).contains("yarn classic re-requests every resolution");
     }
 
     /** A selector bounding no name could select anything, so no edit can be shown to be unrelated to it. */

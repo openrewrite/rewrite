@@ -31,7 +31,8 @@ abstract class OverrideLockRegenTestSupport extends LockRegenTestSupport {
 
     private static final String REGISTRY = "lock/overrides-registry/";
     private static final String[] MANIFESTS = {"is-buffer@1.1.6", "is-buffer@2.0.0", "is-buffer@2.0.5",
-            "is-number@1.1.2", "is-number@3.0.0", "is-number@7.0.0", "is-odd@0.1.1", "is-odd@0.1.2", "kind-of@3.2.2"};
+            "is-number@1.1.2", "is-number@3.0.0", "is-number@7.0.0", "is-odd@0.1.1", "is-odd@0.1.2", "kind-of@3.2.2",
+            "left-pad@1.3.0"};
 
     @BeforeEach
     void routes() {
@@ -41,6 +42,9 @@ abstract class OverrideLockRegenTestSupport extends LockRegenTestSupport {
             String version = nameVersion.substring(at + 1);
             routes.put(REG + name, resource(REGISTRY + name));
             routes.put(REG + name + "/" + version, resource(REGISTRY + name + "-" + version));
+            // yarn berry checksums a moved entry from its tarball.
+            binaryRoutes.put(REG + name + "/-/" + name + "-" + version + ".tgz",
+                    bytesResource(REGISTRY + name + "-" + version + ".tgz"));
         }
     }
 
