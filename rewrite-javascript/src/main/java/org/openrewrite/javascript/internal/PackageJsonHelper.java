@@ -827,7 +827,10 @@ public class PackageJsonHelper {
                                                    NodeResolutionResult.PackageManager pm,
                                                    String name, String newVersion,
                                                    @Nullable List<DependencyPathSegment> path) {
-        if (declaredProtocolReference(doc, name) != null) {
+        // Only a global override is declined. A scoped override such as `foo>acme-logger` pins the copy
+        // under `foo` and never reaches the reference-held constraint of the direct declaration; the
+        // path names the parents, never the overridden package itself.
+        if ((path == null || path.isEmpty()) && declaredProtocolReference(doc, name) != null) {
             // The declaration holds a reference, not a version, so its real constraint lives elsewhere.
             // An override beside it would silently win over whatever that is, and the next edit to the
             // declaration would not move what is installed.
@@ -838,9 +841,21 @@ public class PackageJsonHelper {
 
     /** The specifier protocol any scope of this manifest declares {@code name} with, or null if none does. */
     static @Nullable String declaredProtocolReference(Json.Document doc, String name) {
+        List<MatchedDependency> declarations = findProtocolDeclarations(doc, name);
+        return declarations.isEmpty() ?
+                null :
+                dependencySpecifierProtocol(declarations.get(0).getCurrentVersion());
+    }
+
+    /**
+     * Every declaration of {@code name} in a declared scope of {@code doc} whose value carries a
+     * specifier protocol, so a caller reporting the decline can name the scope and the current value.
+     */
+    public static List<MatchedDependency> findProtocolDeclarations(Json.Document doc, String name) {
         if (!(doc.getValue() instanceof Json.JsonObject)) {
-            return null;
+            return emptyList();
         }
+        List<MatchedDependency> declarations = new ArrayList<>();
         for (Json rootMember : ((Json.JsonObject) doc.getValue()).getMembers()) {
             if (!(rootMember instanceof Json.Member)) continue;
             Json.Member scope = (Json.Member) rootMember;
@@ -852,14 +867,14 @@ public class PackageJsonHelper {
             for (Json child : ((Json.JsonObject) scope.getValue()).getMembers()) {
                 if (!(child instanceof Json.Member)) continue;
                 Json.Member dependency = (Json.Member) child;
-                String protocol = name.equals(literalString(dependency.getKey())) ?
-                        dependencySpecifierProtocol(literalString(dependency.getValue())) : null;
-                if (protocol != null) {
-                    return protocol;
+                if (!name.equals(literalString(dependency.getKey()))) continue;
+                String value = literalString(dependency.getValue());
+                if (value != null && dependencySpecifierProtocol(value) != null) {
+                    declarations.add(new MatchedDependency(name, scopeKey, value));
                 }
             }
         }
-        return null;
+        return declarations;
     }
 
     /**

@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.json.tree.Json;
@@ -115,6 +116,45 @@ public final class NodeDependencyScan {
             }
         }
         return importers;
+    }
+
+    /**
+     * Every declaration of {@code packageName} that holds a specifier protocol and would be overridden
+     * by writing into {@code manifestPath}, keyed by the manifest declaring it, {@code manifestPath}
+     * itself first.
+     * <p>
+     * Documents are read rather than markers, because a marker is free to report a resolved version
+     * where the manifest holds a reference, and an override written on that basis silently wins over a
+     * constraint nobody meant to replace.
+     */
+    public static Map<Path, List<MatchedDependency>> findProtocolReferences(
+            Accumulator acc, ExecutionContext ctx, Path manifestPath, String packageName) {
+        Map<Path, List<MatchedDependency>> references = new LinkedHashMap<>();
+        collectProtocolReferences(acc, ctx, manifestPath, packageName, references);
+        return references;
+    }
+
+    private static void collectProtocolReferences(Accumulator acc, ExecutionContext ctx, Path manifestPath,
+                                                  String packageName,
+                                                  Map<Path, List<MatchedDependency>> into) {
+        Json.Document doc = documentFor(acc, ctx, manifestPath);
+        if (doc == null) {
+            return;
+        }
+        List<MatchedDependency> declarations = PackageJsonHelper.findProtocolDeclarations(doc, packageName);
+        if (!declarations.isEmpty()) {
+            into.put(manifestPath, declarations);
+        }
+    }
+
+    /** The current revision of a manifest: what an earlier recipe in this run left, else what was scanned. */
+    private static Json.@Nullable Document documentFor(Accumulator acc, ExecutionContext ctx, Path manifestPath) {
+        SourceFile live = PackageJsonHelper.getLiveTree(ctx, manifestPath);
+        if (live == null) {
+            ProjectState ps = acc.projects.get(manifestPath);
+            live = ps == null ? null : ps.capturedPackageJson;
+        }
+        return live instanceof Json.Document ? (Json.Document) live : null;
     }
 
     /**

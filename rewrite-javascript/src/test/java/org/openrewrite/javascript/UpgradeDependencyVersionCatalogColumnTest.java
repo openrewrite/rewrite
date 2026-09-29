@@ -20,11 +20,13 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.stream.Stream;
 
 import static java.util.Arrays.asList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.dependency;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
@@ -36,7 +38,9 @@ import static org.openrewrite.yaml.Assertions.yaml;
  * Both must behave: `UpgradeDependencyVersion` follows the reference into the catalog file, and
  * `UpgradeTransitiveDependencyVersion` declines to pin a dependency whose version position holds a
  * reference. The manifest must come out byte-identical, with no `overrides`, `resolutions` or
- * `pnpm.overrides` block, and only the entry's scalar may change.
+ * `pnpm.overrides` block, and only the entry's scalar may change. The transitive recipe marks its
+ * decline even here, where the other recipe did follow the reference: its own job, pinning the
+ * transitive copy, was still not done.
  */
 class UpgradeDependencyVersionCatalogColumnTest implements RewriteTest {
 
@@ -84,8 +88,23 @@ class UpgradeDependencyVersionCatalogColumnTest implements RewriteTest {
                 spec -> spec.recipe(new CompositeRecipe(asList(
                         new UpgradeDependencyVersion(PKG, null, NEW_VERSION),
                         new UpgradeTransitiveDependencyVersion(PKG, NEW_VERSION, null)))),
+                // `after` is the printed source including the marker comment, so it is asserted on rather
+                // than spelled out: what matters is that the declaration itself is byte-identical.
                 packageJson(MANIFEST.formatted(reference), null,
-                        nodeResolutionResult(pm, dependency(PKG, reference))),
+                        nodeResolutionResult(pm, dependency(PKG, reference)),
+                        s -> s.after(actual -> {
+                            assertThat(actual)
+                                    .as("the manifest is byte-identical and gains no override block")
+                                    .contains("\"acme-logger\": \"" + reference + "\"")
+                                    .doesNotContain("\"overrides\"")
+                                    .doesNotContain("\"resolutions\"")
+                                    .doesNotContain("\"pnpm\"");
+                            return actual;
+                        }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                .as("the transitive recipe's decline is reported, even though the catalog entry moved")
+                                .hasValueSatisfying(warn -> assertThat(warn.getMessage())
+                                        .contains(PKG)
+                                        .contains(reference)))),
                 yaml(catalog.formatted(OLD_VERSION), catalog.formatted(NEW_VERSION),
                         s -> s.path(workspaceFile))
         );

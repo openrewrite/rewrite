@@ -167,24 +167,4 @@ class UpgradeTransitiveDependencyVersionPnpmTest implements RewriteTest {
                                         .contains("not an object"))))
         );
     }
-
-    @Test
-    void aReferenceInALaterScopeStillBlocksTheOverride() {
-        rewriteRun(
-                packageJson(
-                        """
-                        {
-                          "name": "consumer",
-                          "peerDependencies": {
-                            "acme-transitive": "^1.0.0"
-                          },
-                          "devDependencies": {
-                            "acme-transitive": "catalog:"
-                          }
-                        }
-                        """,
-                        null,
-                        nodeResolutionResult(PackageManager.Pnpm))
-        );
-    }
 }

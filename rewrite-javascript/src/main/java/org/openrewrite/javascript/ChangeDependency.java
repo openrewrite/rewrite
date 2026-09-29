@@ -165,6 +165,8 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
         for (MatchedDependency skipped : ps.skippedProtocols) {
             protocolsSkipped.insertRow(ctx, new NodeDependencyProtocolsSkipped.Row(
                     packageJsonPath.toString(),
+                    // The two writers only ever decline the manifest that declares the reference.
+                    packageJsonPath.toString(),
                     skipped.getPackageName(),
                     skipped.getDependencyScope(),
                     PackageJsonHelper.dependencySpecifierProtocol(skipped.getCurrentVersion()),

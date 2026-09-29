@@ -42,8 +42,14 @@ public class NodeDependencyProtocolsSkipped extends DataTable<NodeDependencyProt
     @Value
     public static class Row {
         @Column(displayName = "Source path",
-                description = "The path of the package.json declaring the dependency.")
+                description = "The path of the package.json the recipe declined to change.")
         String sourcePath;
+
+        @Column(displayName = "Declared in",
+                description = "The path of the package.json declaring the reference. The same file as " +
+                        "`Source path`, except when a workspace root's override was declined for a " +
+                        "reference declared by a member it governs.")
+        String declaredIn;
 
         @Column(displayName = "Package name",
                 description = "The dependency that was left alone.")
