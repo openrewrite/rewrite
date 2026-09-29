@@ -110,7 +110,7 @@ func (q *SendQueue) getAndSendList(parent any, getter func(any) []any, id func(a
 }
 
 func (q *SendQueue) Send(after, before any, onChange func(any)) {
-	after, before = nonNilSpace(after), nonNilSpace(before)
+	after, before = nonNilEmpty(after), nonNilEmpty(before)
 	afterVal := GetValue(after)
 	beforeVal := GetValue(before)
 
@@ -268,10 +268,17 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 	}
 }
 
-// nonNilSpace maps a nil Space to EmptySpace, which Java expects in place of null.
-func nonNilSpace(v any) any {
+// nonNilEmpty maps a nil Space or Markers to its shared empty sentinel. Both are
+// pointer aliases (*spaceData / *markersData) whose zero value is a nil pointer, and
+// Java's J.prefix and J.markers are non-null. Without this, a node left with a nil
+// Space/Markers diffs nil-against-nil as NO_CHANGE, so the receiver keeps the null
+// its freshly instantiated node started with, yielding a null prefix/markers.
+func nonNilEmpty(v any) any {
 	if sp, ok := v.(java.Space); ok && sp == nil {
 		return java.EmptySpace
+	}
+	if m, ok := v.(java.Markers); ok && m == nil {
+		return java.EmptyMarkers
 	}
 	return v
 }

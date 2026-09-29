@@ -115,6 +115,36 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void noNullMarkers() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                import "github.com/gin-gonic/gin"
+
+                                func main() {
+                                	_ = gin.Default()
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> {
+                            List<String> nullMarkers = new ArrayList<>();
+                            new GolangVisitor<Integer>() {
+                                @Override
+                                public J preVisit(J tree, Integer p) {
+                                    if (tree.getMarkers() == null) {
+                                        nullMarkers.add(tree.getClass().getSimpleName());
+                                    }
+                                    return tree;
+                                }
+                            }.visit(cu, 0);
+                            assertThat(nullMarkers).isEmpty();
+                        })
+                )
+        );
+    }
+
+    @Test
     void verifyPackageDeclSurvivesRecipe() {
         rewriteRun(
                 go(
