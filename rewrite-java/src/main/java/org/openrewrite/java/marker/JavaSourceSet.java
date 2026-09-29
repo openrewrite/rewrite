@@ -33,8 +33,13 @@ import org.openrewrite.PathUtils;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
+import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
+import org.openrewrite.java.internal.rpc.JavaTypeSender;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SourceSet;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.beans.ConstructorProperties;
 import java.io.IOException;
@@ -52,7 +57,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
-public class JavaSourceSet implements SourceSet {
+public class JavaSourceSet implements SourceSet, RpcCodec<JavaSourceSet> {
     @EqualsAndHashCode.Include
     UUID id;
 
@@ -434,6 +439,52 @@ public class JavaSourceSet implements SourceSet {
             return null;
         }
         return name;
+    }
+
+    /**
+     * Field order is the protocol; every peer codec mirrors it. Without a codec this marker is
+     * inlined as a single {@link org.openrewrite.rpc.RpcObjectData} — for a real classpath, one
+     * JSON document of well over 100 MB, built and parsed whole, holding a second type universe
+     * the receiver cannot share with the {@link JavaType}s the tree already sent.
+     */
+    @Override
+    public void rpcSend(JavaSourceSet after, RpcSendQueue q) {
+        JavaTypeSender typeSender = new JavaTypeSender();
+        q.getAndSend(after, JavaSourceSet::getId);
+        q.getAndSend(after, JavaSourceSet::getName);
+        q.getAndSendListAsRef(after, JavaSourceSet::getClasspath,
+                JavaType.FullyQualified::getFullyQualifiedName, t -> typeSender.visit(t, q));
+
+        // getValueType returns null for a Map, so sending gavToTypes whole would inline the entire
+        // type graph a second time. Keys first, then each bucket as refs: the values are the same
+        // instances that are already on the classpath above (see build), so every one is a ref hit.
+        q.getAndSendList(after, a -> new ArrayList<>(a.getGavToTypes().keySet()), s -> s, null);
+        for (String gav : after.getGavToTypes().keySet()) {
+            q.getAndSendListAsRef(after, a -> a.getGavToTypes().get(gav),
+                    JavaType.FullyQualified::getFullyQualifiedName, t -> typeSender.visit(t, q));
+        }
+    }
+
+    @Override
+    public JavaSourceSet rpcReceive(JavaSourceSet before, RpcReceiveQueue q) {
+        JavaTypeReceiver typeReceiver = new JavaTypeReceiver();
+        JavaSourceSet after = before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withName(q.receive(before.getName()))
+                .withClasspath(q.receiveList(before.getClasspath(),
+                        t -> (JavaType.FullyQualified) typeReceiver.visit(t, q)));
+
+        // On an ADD Objenesis leaves every field null, so the before map is never dereferenced.
+        Map<String, List<JavaType.FullyQualified>> beforeGavs = before.getGavToTypes();
+        List<String> gavs = q.receiveList(beforeGavs == null ? null : new ArrayList<>(beforeGavs.keySet()), null);
+        Map<String, List<JavaType.FullyQualified>> gavToTypes = new LinkedHashMap<>();
+        if (gavs != null) {
+            for (String gav : gavs) {
+                gavToTypes.put(gav, q.receiveList(beforeGavs == null ? null : beforeGavs.get(gav),
+                        t -> (JavaType.FullyQualified) typeReceiver.visit(t, q)));
+            }
+        }
+        return after.withGavToTypes(gavToTypes);
     }
 
 

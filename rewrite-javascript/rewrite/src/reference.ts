@@ -93,6 +93,10 @@ export class ReferenceMap {
         return this.refsById.size;
     }
 
+    /**
+     * Undo the refs a single failed transfer allocated. Only `GetObject` calls this — refs
+     * survive an `Evict` so the next source file reuses them.
+     */
     rollbackTo(savedRefCount: number): void {
         for (let i = savedRefCount; i < this.refCount; i++) {
             const obj = this.refsById.get(i);

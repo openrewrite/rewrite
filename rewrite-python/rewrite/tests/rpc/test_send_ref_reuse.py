@@ -88,17 +88,15 @@ def test_the_second_file_cites_refs_the_first_file_sent(tmp_path):
 
 
 @requires_ty_types_cli
-def test_evicting_a_file_releases_the_refs_it_introduced(tmp_path):
+def test_evicting_a_file_keeps_the_refs_it_introduced(tmp_path):
     first_id, second_id = parse_two_files(tmp_path)
 
-    # The sequence Java drives per file: checkpoint on first visit, pull the tree, evict.
-    server._local_ref_checkpoints.setdefault(first_id, server.local_refs.snapshot())
-    get_object(first_id)
+    first = get_object(first_id)
     server.handle_evict({'id': first_id})
 
     second = get_object(second_id)
-    assert used(second) <= defined(second), "cited a ref Java rolled back"
-    assert len(server.local_refs) == len(defined(second))
+    assert used(second) - defined(second), "the second file resent everything the first sent"
+    assert len(server.local_refs) == len(defined(first)) + len(defined(second))
 
 
 @requires_ty_types_cli

@@ -75,18 +75,6 @@ remote_refs: Dict[int, Any] = {}
 # Refs sent to Java, so a type sent for one source file is cited rather than resent
 # by the next (mirrors RewriteRpc.localRefs).
 local_refs = ReferenceMap()
-# Per-source-file ref high-water on each side, captured before a file is first visited
-# so handle_evict can roll back exactly the refs that file introduced. Keyed by tree id.
-_ref_checkpoints: Dict[str, int] = {}
-_local_ref_checkpoints: Dict[str, int] = {}
-
-
-def _checkpoint_refs(tree_id: str) -> None:
-    """Snapshot both directions' ref high-water before any of a file's data moves, so
-    handle_evict rolls back exactly what that file introduced (first sight of the file wins)."""
-    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
-    _local_ref_checkpoints.setdefault(tree_id, local_refs.snapshot())
-
 
 # Per-call metrics CSV (--metrics-csv), same schema as Go: cache-size ramp vs per-file-Evict sawtooth.
 _metrics_file = None
@@ -1260,15 +1248,11 @@ def handle_reset(params: dict) -> bool:
     _local_object_ids.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
-    _ref_checkpoints.clear()
-    _local_ref_checkpoints.clear()
     local_refs.clear()
     _hub_tree.clear()
     _hub_served.clear()
     _hub_send_refs.clear()
     _hub_recv_refs.clear()
-    _hub_send_checkpoint.clear()
-    _hub_recv_checkpoint.clear()
     # A half-drained page would resume mid-list for a host that expects to start over.
     _dependency_types_pending.clear()
 
@@ -1277,25 +1261,15 @@ def handle_reset(params: dict) -> bool:
 
 
 def handle_evict(params: dict) -> bool:
-    """Handle an Evict RPC notification - drop one source file's tree and roll back the
-    refs it introduced, bounding memory to roughly one source file at a time. Recipe,
+    """Handle an Evict RPC notification - drop one source file's tree. Interned refs are
+    deliberately kept so the next file reuses them; only Reset clears them. Recipe,
     accumulator, and execution-context state (keyed separately) is left intact.
-
-    Both directions roll back together, matching RewriteRpc.evict: Java drops this file's
-    refs from both of its maps, so any kept here would name ids it no longer holds.
     """
     obj_id = params.get('id')
     if obj_id is None:
         return True
     local_objects.pop(obj_id, None)
     remote_objects.pop(obj_id, None)
-    checkpoint = _ref_checkpoints.pop(obj_id, None)
-    if checkpoint is not None:
-        for ref_id in [k for k in remote_refs if k > checkpoint]:
-            del remote_refs[ref_id]
-    local_checkpoint = _local_ref_checkpoints.pop(obj_id, None)
-    if local_checkpoint is not None:
-        local_refs.rollback_to(local_checkpoint)
     return True
 
 
@@ -2228,8 +2202,6 @@ def handle_visit(params: dict) -> dict:
 
     ctx = _context_for(p_id)
 
-    _checkpoint_refs(tree_id)
-
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
     tree = get_object_from_java(tree_id, source_file_type)
@@ -2284,8 +2256,6 @@ def handle_batch_visit(params: dict) -> dict:
     logger.debug(f"BatchVisit: treeId={tree_id}, visitors={len(visitors)}")
 
     ctx = _context_for(p_id)
-
-    _checkpoint_refs(tree_id)
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -2509,17 +2479,12 @@ _hub_tree: Dict[str, Any] = {}              # obj_id -> the facade's authoritati
 _hub_send_refs: Dict[str, ReferenceMap] = {}  # bundle -> send ref map      (facade -> child)
 _hub_recv_refs: Dict[str, Dict[int, Any]] = {}  # bundle -> receive ref map (child -> facade)
 _hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that child was last served
-_hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
-_hub_recv_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> highest received ref before this file
 
 def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
     """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
     first time it is needed and owned by the facade from then on."""
     if obj_id is None:
         return None
-    # The facade routes Visit and BatchVisit past handle_visit, so this is the only place
-    # it sees a file early enough to checkpoint the facade<->Java tables.
-    _checkpoint_refs(obj_id)
     tree = _hub_tree.get(obj_id)
     if tree is None:
         tree = get_object_from_java(obj_id, source_file_type)
@@ -2542,9 +2507,6 @@ def _hub_serve_child(bundle: str, obj_id: str, source_file_type: Optional[str]) 
         return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
 
     refs = _hub_send_refs.setdefault(bundle, ReferenceMap())
-    # Remember where this child's ref numbering stood before this file, so Evict can roll it back
-    # in lockstep with the child's own rollback (see _hub_release).
-    _hub_send_checkpoint.setdefault((bundle, obj_id), refs.snapshot())
     data = RpcSendQueue(source_file_type, refs).generate(tree, _hub_served.get((bundle, obj_id)))
     _hub_served[(bundle, obj_id)] = tree
     return data
@@ -2560,7 +2522,6 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
     # The child's send map spans its connection, so a bundle pulled twice — a BatchVisit whose
     # owners alternate, or a later file — cites on the second pull a ref it ADDed on the first.
     refs = _hub_recv_refs.setdefault(bundle, {})
-    _hub_recv_checkpoint.setdefault((bundle, obj_id), max(refs, default=-1))
     remaining = [children.request(bundle, 'GetObject',
                                   {'id': obj_id, 'sourceFileType': source_file_type})]
 
@@ -2586,38 +2547,17 @@ def _hub_drop_bundle(bundle: str) -> None:
     """Forget everything the hub holds on one bundle's behalf, for when its child is replaced."""
     _hub_send_refs.pop(bundle, None)
     _hub_recv_refs.pop(bundle, None)
-    for table in (_hub_served, _hub_send_checkpoint, _hub_recv_checkpoint):
-        for key in [k for k in table if k[0] == bundle]:
-            del table[key]
+    for key in [k for k in _hub_served if k[0] == bundle]:
+        del _hub_served[key]
 
 
 def _hub_forget(obj_id: str) -> None:
-    """Let go of a file while leaving every child's ref numbering where it stands. This is the half
-    of _hub_release that is safe without an Evict: a child that has not been told to roll back still
-    holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
+    """Drop the hub's copy of one file's tree. Every child's ref numbering is left where it stands,
+    symmetric with the child's own maps, which no longer drop refs on Evict either."""
     _hub_tree.pop(obj_id, None)
     local_objects.pop(obj_id, None)
     for key in [k for k in _hub_served if k[1] == obj_id]:
         del _hub_served[key]
-
-
-def _hub_release(obj_id: str) -> None:
-    """The rollback must be symmetric with the child's own Evict, in both directions: the child drops
-    this file's refs from both of its maps, so a ref kept here would name an id the child no longer
-    holds ("Received reference to unknown object").
-    """
-    _hub_forget(obj_id)
-    for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
-        checkpoint = _hub_send_checkpoint.pop(key)
-        refs = _hub_send_refs.get(key[0])
-        if refs is not None:
-            refs.rollback_to(checkpoint)
-    for key in [k for k in _hub_recv_checkpoint if k[1] == obj_id]:
-        checkpoint = _hub_recv_checkpoint.pop(key)
-        refs = _hub_recv_refs.get(key[0])
-        if refs is not None:
-            for ref_id in [r for r in refs if r > checkpoint]:
-                del refs[ref_id]
 
 
 def _hub_is_builtin_visitor(visitor_name: Optional[str]) -> bool:
@@ -2712,7 +2652,7 @@ def handle_request(method: str, params: dict) -> Any:
 
         if method == 'Evict':
             facade.evict(params)
-            _hub_release(params.get('id'))
+            _hub_forget(params.get('id'))
             return handle_evict(params)
         if method == 'Reset':
             facade.reset(params)
@@ -3082,7 +3022,7 @@ def _rss_bytes():
 
 def _record_metric(method: str, duration_ms: float, error: str) -> None:
     """Append one row of timing + cache residency. refs counts both connection-scoped ref
-    tables, the ones handle_evict rolls back: what Java sent us and what we sent Java."""
+    tables: what Java sent us and what we sent Java."""
     if _metrics_writer is None:
         return
     used, peak = _rss_bytes()
