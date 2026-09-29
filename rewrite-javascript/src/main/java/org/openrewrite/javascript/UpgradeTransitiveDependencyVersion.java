@@ -107,6 +107,29 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         return marker != null && marker.getPackageManager() != null;
     }
 
+    /** A second marker on a tree that already carries one is a change, and the recipe would never settle. */
+    private static SourceFile warnOnce(SourceFile sf, String message) {
+        return sf.getMarkers().findFirst(Markup.Warn.class).isPresent() ?
+                sf :
+                Markup.warn(sf, new IllegalStateException(message));
+    }
+
+    /**
+     * The key this dialect writes its override into exists but is not an object, so there is nowhere to
+     * write. Appending would leave the manifest with two members of that name; declining leaves it
+     * valid, and the marker is what makes the decline visible in the run.
+     */
+    private @Nullable String unusableOverrideContainer(SourceFile sf) {
+        if (!(sf instanceof Json.Document)) {
+            return null;
+        }
+        NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+        if (marker == null || marker.getPackageManager() == null) {
+            return null;
+        }
+        return PackageJsonOverrides.unusableOverrideContainerKey((Json.Document) sf, marker.getPackageManager());
+    }
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyScan.Accumulator acc) {
         NodeDependencyScan.linkWorkspaceMembers(acc);
@@ -120,6 +143,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 NodeDependencyScan.ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if (canApply(sf)) {
+                        String unusable = unusableOverrideContainer(sf);
+                        if (unusable != null) {
+                            return warnOnce(sf, "`" + unusable + "` is not an object in this `package.json`," +
+                                    " so there is nowhere to write the override for `" + packageName + "`," +
+                                    " and it was not written. Make `" + unusable + "` an object first.");
+                        }
                         ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {

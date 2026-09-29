@@ -107,6 +107,55 @@ class PackageJsonHelperTest {
     }
 
     @Test
+    void addDependencyDeclinesANonObjectScope() {
+        String before = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"overrides\": []\n" +
+                "}\n";
+        Json.Document doc = parsePackageJson(before);
+        Json.Document modified = PackageJsonHelper.addDependency(doc, "lodash", "^4.17.21", "overrides");
+        assertThat(modified.printAll()).isEqualTo(before);
+        assertThat(countMembersNamed(modified.printAll(), "overrides")).isEqualTo(1);
+    }
+
+    @Test
+    void setNestedEntryDeclinesANonObjectOuterKey() {
+        String before = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"pnpm\": \"hoist\"\n" +
+                "}\n";
+        Json.Document doc = parsePackageJson(before);
+        Json.Document modified = PackageJsonHelper.setNestedEntry(doc, "pnpm", "overrides", "lodash", "^4.17.21");
+        assertThat(modified.printAll()).isEqualTo(before);
+        assertThat(countMembersNamed(modified.printAll(), "pnpm")).isEqualTo(1);
+    }
+
+    @Test
+    void setNestedEntryDeclinesANonObjectInnerKey() {
+        String before = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"pnpm\": {\n" +
+                "    \"overrides\": \"none\"\n" +
+                "  }\n" +
+                "}\n";
+        Json.Document doc = parsePackageJson(before);
+        Json.Document modified = PackageJsonHelper.setNestedEntry(doc, "pnpm", "overrides", "lodash", "^4.17.21");
+        assertThat(modified.printAll()).isEqualTo(before);
+        assertThat(countMembersNamed(modified.printAll(), "overrides")).isEqualTo(1);
+    }
+
+    private static int countMembersNamed(String printed, String name) {
+        int count = 0;
+        int from = 0;
+        String key = "\"" + name + "\":";
+        while ((from = printed.indexOf(key, from)) >= 0) {
+            count++;
+            from += key.length();
+        }
+        return count;
+    }
+
+    @Test
     void removeDependencyDropsMember() {
         Json.Document doc = parsePackageJson(
                 "{\n" +

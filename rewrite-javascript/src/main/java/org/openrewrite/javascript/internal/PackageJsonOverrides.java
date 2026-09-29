@@ -252,6 +252,11 @@ public final class PackageJsonOverrides {
 
         Json.JsonObject existingScope = findObjectMember(root, topLevelKey);
         if (existingScope == null) {
+            // The key is there but does not hold an object, so there is nothing to add to and appending
+            // would write a second member of the same name. Decline; the recipe reports it.
+            if (PackageJsonHelper.hasMemberNamed(root, topLevelKey)) {
+                return doc;
+            }
             // Create the parent object with the single entry
             return PackageJsonHelper.addDependency(doc, entryKey, entryValue, topLevelKey);
         }
@@ -274,6 +279,43 @@ public final class PackageJsonOverrides {
 
         // Key not present: append
         return PackageJsonHelper.addDependency(doc, entryKey, entryValue, topLevelKey);
+    }
+
+    /**
+     * Whether the container this dialect writes its override into is present in {@code doc} but does not
+     * hold an object, so there is nowhere to write and appending would produce a duplicate key.
+     * Dialect knowledge stays here rather than moving into the recipe.
+     */
+    public static boolean overrideContainerIsUnusable(Json.Document doc, PackageManager pm) {
+        return unusableOverrideContainerKey(doc, pm) != null;
+    }
+
+    /** The key {@link #overrideContainerIsUnusable} found unusable, for a message naming it, else null. */
+    public static @Nullable String unusableOverrideContainerKey(Json.Document doc, PackageManager pm) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return null;
+        }
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        switch (pm) {
+            case Npm:
+            case Bun:
+                return presentButNotAnObject(root, "overrides") ? "overrides" : null;
+            case YarnClassic:
+            case YarnBerry:
+                return presentButNotAnObject(root, "resolutions") ? "resolutions" : null;
+            case Pnpm:
+                if (presentButNotAnObject(root, "pnpm")) {
+                    return "pnpm";
+                }
+                Json.JsonObject pnpm = findObjectMember(root, "pnpm");
+                return pnpm != null && presentButNotAnObject(pnpm, "overrides") ? "pnpm.overrides" : null;
+            default:
+                return null;
+        }
+    }
+
+    private static boolean presentButNotAnObject(Json.JsonObject obj, String key) {
+        return findObjectMember(obj, key) == null && PackageJsonHelper.hasMemberNamed(obj, key);
     }
 
     /**

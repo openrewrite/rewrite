@@ -217,6 +217,20 @@ public class PackageJsonHelper {
         return null;
     }
 
+    /**
+     * Whether {@code obj} has a member keyed {@code name}, whatever its value type. The complement of
+     * {@link #findObjectMember} returning null for a key that exists but does not hold an object, which
+     * a caller must not read as "absent" and append a second member of that name.
+     */
+    static boolean hasMemberNamed(Json.JsonObject obj, String name) {
+        for (Json m : obj.getMembers()) {
+            if (m instanceof Json.Member && name.equals(literalString(((Json.Member) m).getKey()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static @Nullable String literalString(@Nullable Object node) {
         if (node instanceof Json.Literal) {
             Object value = ((Json.Literal) node).getValue();
@@ -312,6 +326,11 @@ public class PackageJsonHelper {
 
         Json.JsonObject existingScope = findObjectMember(root, scope);
         if (existingScope == null) {
+            // The key is there but does not hold an object, so there is nothing to add to and appending
+            // would write a second member of the same name. Decline; the recipe reports it.
+            if (hasMemberNamed(root, scope)) {
+                return doc;
+            }
             // Detect indent unit from the first root member's prefix (e.g. "\n  " → "  ").
             String outerIndent = detectIndentUnit(root);
             String innerIndent = outerIndent + outerIndent;
@@ -376,6 +395,11 @@ public class PackageJsonHelper {
 
         Json.JsonObject outer = findObjectMember(root, outerKey);
         if (outer == null) {
+            // The key is there but does not hold an object, so there is nothing to nest into and
+            // appending would write a second member of the same name. Decline; the recipe reports it.
+            if (hasMemberNamed(root, outerKey)) {
+                return doc;
+            }
             Json.JsonObject inner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
                     Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
             Json.JsonObject outerObj = newObjectHolding(makeMember(innerKey, inner,
@@ -385,6 +409,9 @@ public class PackageJsonHelper {
 
         Json.JsonObject inner = findObjectMember(outer, innerKey);
         if (inner == null) {
+            if (hasMemberNamed(outer, innerKey)) {
+                return doc;
+            }
             Json.JsonObject innerObj = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
                     Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
             // The JSON parser represents {} as a single Json.Empty member, which an append would print as {,}.

@@ -17,9 +17,11 @@ package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.dependency;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
@@ -93,6 +95,76 @@ class UpgradeTransitiveDependencyVersionPnpmTest implements RewriteTest {
                         }
                         """,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "~1.4.1")))
+        );
+    }
+
+    /**
+     * The key the dialect writes into exists but holds something other than an object, so there is
+     * nowhere to write. Appending would leave the manifest with two members of that name.
+     */
+    @Test
+    void aNonObjectPnpmKeyIsDeclinedAndMarked() {
+        rewriteRun(
+                spec -> spec.expectedCyclesThatMakeChanges(1),
+                packageJson(
+                        """
+                        {
+                          "name": "consumer",
+                          "dependencies": {
+                            "acme-logger": "~1.4.1"
+                          },
+                          "pnpm": "hoist"
+                        }
+                        """,
+                        null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "~1.4.1")),
+                        s -> s.after(actual -> {
+                            assertThat(actual)
+                                    .as("the declaration is left exactly as it was")
+                                    .contains("\"pnpm\": \"hoist\"")
+                                    .doesNotContain("\"acme-transitive\":");
+                            assertThat(actual.indexOf("\"pnpm\""))
+                                    .as("exactly one `pnpm` member survives")
+                                    .isEqualTo(actual.lastIndexOf("\"pnpm\""));
+                            return actual;
+                        }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                .as("the decline is marked on the manifest")
+                                .hasValueSatisfying(warn -> assertThat(warn.getMessage())
+                                        .contains("pnpm")
+                                        .contains("not an object"))))
+        );
+    }
+
+    @Test
+    void aNonObjectOverridesKeyIsDeclinedAndMarked() {
+        rewriteRun(
+                spec -> spec.expectedCyclesThatMakeChanges(1),
+                packageJson(
+                        """
+                        {
+                          "name": "consumer",
+                          "dependencies": {
+                            "acme-logger": "~1.4.1"
+                          },
+                          "overrides": []
+                        }
+                        """,
+                        null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("acme-logger", "~1.4.1")),
+                        s -> s.after(actual -> {
+                            assertThat(actual)
+                                    .as("the declaration is left exactly as it was")
+                                    .contains("\"overrides\": []")
+                                    .doesNotContain("\"acme-transitive\":");
+                            assertThat(actual.indexOf("\"overrides\""))
+                                    .as("exactly one `overrides` member survives")
+                                    .isEqualTo(actual.lastIndexOf("\"overrides\""));
+                            return actual;
+                        }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                .as("the decline is marked on the manifest")
+                                .hasValueSatisfying(warn -> assertThat(warn.getMessage())
+                                        .contains("overrides")
+                                        .contains("not an object"))))
         );
     }
 
