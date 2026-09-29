@@ -268,11 +268,7 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 	}
 }
 
-// nonNilEmpty maps a nil Space or Markers to its shared empty sentinel. Both are
-// pointer aliases (*spaceData / *markersData) whose zero value is a nil pointer, and
-// Java's J.prefix and J.markers are non-null. Without this, a node left with a nil
-// Space/Markers diffs nil-against-nil as NO_CHANGE, so the receiver keeps the null
-// its freshly instantiated node started with, yielding a null prefix/markers.
+// nonNilEmpty maps a nil Space or Markers to its shared empty sentinel, which Java expects in place of null.
 func nonNilEmpty(v any) any {
 	if sp, ok := v.(java.Space); ok && sp == nil {
 		return java.EmptySpace
