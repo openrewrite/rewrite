@@ -206,6 +206,50 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `property-access after-template FQN is shortened and imported`() {
+        val r = loadCompiledRecipe(
+            source = """
+                package demo
+                import org.openrewrite.recipe
+                class Foo {
+                    val oldProp: Int get() = 1
+                }
+                val UseHashOfOldProp = recipe(
+                    displayName = "Hash Foo.oldProp",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { f: Foo -> f.oldProp } to { f -> java.util.Objects.hashCode(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseHashOfOldProp",
+            packageName = "demo",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                package demo
+                class Foo {
+                    val oldProp: Int get() = 1
+                }
+                fun use(f: Foo): Int = f.oldProp
+                """,
+                """
+                package demo
+
+                import java.util.Objects
+                class Foo {
+                    val oldProp: Int get() = 1
+                }
+                fun use(f: Foo): Int = Objects.hashCode(f)
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `chain with Java-static inner segment — Optional_of_x_get to x`() {
         // The chain validator must accept an inner segment that is a Java
         // static call (`Optional.of(x)`). The inner has no dispatch receiver
@@ -1254,18 +1298,16 @@ class RecipePluginRewriteTest : RewriteTest {
             """.trimIndent(),
             propertyName = "UseListOf",
         )
-        // `xs` references Kotlin's `List`, so importing `java.util.List` would
-        // shadow it; the inserted `java.util.List.of` has to stay qualified.
         rewriteRun(
             { spec -> spec.recipe(r) },
             kotlin(
                 """
-                fun use(xs: List<Int>) {
+                fun use() {
                     java.util.Arrays.asList(1, 2, 3, 4, 5)
                 }
                 """.trimIndent(),
                 """
-                fun use(xs: List<Int>) {
+                fun use() {
                     java.util.List.of(1, 2, 3, 4, 5)
                 }
                 """.trimIndent(),
@@ -1468,16 +1510,14 @@ class RecipePluginRewriteTest : RewriteTest {
             java(
                 """
                 class A {
-                    String s = String.valueOf(new Object());
-                    java.util.List<String> t = java.util.Collections.emptyList();
+                    String s = String.valueOf(new java.math.BigDecimal("1"));
                 }
                 """.trimIndent(),
                 """
                 import java.util.Objects;
 
                 class A {
-                    String s = Objects.toString(new Object());
-                    java.util.List<String> t = java.util.Collections.emptyList();
+                    String s = Objects.toString(new java.math.BigDecimal("1"));
                 }
                 """.trimIndent(),
             ),

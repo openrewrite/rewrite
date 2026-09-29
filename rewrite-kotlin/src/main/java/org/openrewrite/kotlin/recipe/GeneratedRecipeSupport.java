@@ -11,8 +11,10 @@ package org.openrewrite.kotlin.recipe;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.jspecify.annotations.Nullable;
@@ -33,7 +35,9 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
@@ -58,25 +62,6 @@ import org.openrewrite.kotlin.tree.K;
 public final class GeneratedRecipeSupport {
 
     private GeneratedRecipeSupport() {}
-
-    /**
-     * After-templates carry the author's fully-qualified names verbatim, so each
-     * inserted tree is shortened and imported; scoping to that tree leaves
-     * qualified references to other types in the file alone.
-     */
-    private abstract static class JavaTemplateRewriter extends JavaVisitor<ExecutionContext> {
-        J shortenInserted(J inserted) {
-            doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(inserted));
-            return inserted;
-        }
-    }
-
-    private abstract static class KotlinTemplateRewriter extends KotlinVisitor<ExecutionContext> {
-        J shortenInserted(J inserted) {
-            doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(inserted));
-            return inserted;
-        }
-    }
 
     /**
      * Visitor for a {@code rewrite { ... } to { ... }} recipe whose before
@@ -114,7 +99,7 @@ public final class GeneratedRecipeSupport {
             matchers[i] = new MethodMatcher(specs[i]);
         }
         SubSource[][] substitutionSourcesByMatcher = parseSourcesPerMatcher(substitutionSourcesCsv, specs.length);
-        TreeVisitor<?, ExecutionContext> walker = new KotlinTemplateRewriter() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 int matchedIdx = -1;
@@ -150,7 +135,9 @@ public final class GeneratedRecipeSupport {
                         result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                         result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                     }
-                    return shortenInserted(result.withPrefix(method.getPrefix()));
+                    J inserted = result.withPrefix(method.getPrefix());
+                    doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
+                    return inserted;
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
@@ -177,7 +164,7 @@ public final class GeneratedRecipeSupport {
         MethodMatcher outerMatcher = new MethodMatcher(matcherSpecsLine.substring(0, tabIdx));
         MethodMatcher innerMatcher = new MethodMatcher(matcherSpecsLine.substring(tabIdx + 1));
         ChainSourceRef[] sources = parseChainCsv(substitutionSourcesCsv);
-        TreeVisitor<?, ExecutionContext> walker = new KotlinTemplateRewriter() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (!outerMatcher.matches(method)) {
@@ -217,7 +204,9 @@ public final class GeneratedRecipeSupport {
                     result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                     result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                 }
-                return shortenInserted(result.withPrefix(method.getPrefix()));
+                J inserted = result.withPrefix(method.getPrefix());
+                doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
+                return inserted;
             }
         };
         return wrapWithPrecondition(matcherSpecsLine, walker);
@@ -353,7 +342,7 @@ public final class GeneratedRecipeSupport {
             matchers[i] = new MethodMatcher(specs[i]);
         }
         int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
-        TreeVisitor<?, ExecutionContext> walker = new KotlinTemplateRewriter() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitUnary(K.Unary unary, ExecutionContext ctx) {
                 if (unary.getOperator() != K.Unary.Type.NotNull) {
@@ -400,7 +389,9 @@ public final class GeneratedRecipeSupport {
                     result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                     result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                 }
-                return shortenInserted(result.withPrefix(unary.getPrefix()));
+                J inserted = result.withPrefix(unary.getPrefix());
+                doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
+                return inserted;
             }
         };
         return wrapWithPrecondition(matcherSpecsLines, walker);
@@ -440,7 +431,7 @@ public final class GeneratedRecipeSupport {
             }
         }
         int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
-        TreeVisitor<?, ExecutionContext> walker = new KotlinTemplateRewriter() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 String name = fieldAccess.getName().getSimpleName();
@@ -475,10 +466,55 @@ public final class GeneratedRecipeSupport {
                 }
                 J result = KotlinTemplate.builder(afterTemplate).build()
                         .apply(getCursor(), fieldAccess.getCoordinates().replace(), substitutions);
-                return shortenInserted(result.withPrefix(fieldAccess.getPrefix()));
+                J inserted = result.withPrefix(fieldAccess.getPrefix());
+                doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
+                return inserted;
             }
         };
         return wrapWithPrecondition(matcherSpecsLines, walker);
+    }
+
+    /**
+     * Shortens and imports the qualified type references the after-template spells out. Substituted
+     * captures are the matched source's own code and keep their spelling.
+     */
+    private static TreeVisitor<?, ExecutionContext> shortenTemplateTypes(
+            JavaVisitor<ExecutionContext> visitor, J inserted, Object[] substitutions) {
+        Set<UUID> captured = new HashSet<>();
+        for (Object substitution : substitutions) {
+            if (substitution instanceof J) {
+                captured.add(((J) substitution).getId());
+            }
+        }
+        List<J.FieldAccess> qualified = new ArrayList<>();
+        new KotlinIsoVisitor<Integer>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, Integer p) {
+                return tree != null && captured.contains(tree.getId()) ? (J) tree : super.visit(tree, p);
+            }
+
+            @Override
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                if (fieldAccess.getType() instanceof JavaType.FullyQualified && fieldAccess.getName().getFieldType() == null) {
+                    qualified.add(fieldAccess);
+                    return fieldAccess;
+                }
+                return super.visitFieldAccess(fieldAccess, p);
+            }
+        }.visit(inserted, 0);
+        if (qualified.isEmpty()) {
+            return TreeVisitor.noop();
+        }
+        ImportService importService = visitor.service(ImportService.class);
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                for (J.FieldAccess fieldAccess : qualified) {
+                    tree = importService.shortenFullyQualifiedTypeReferencesIn(fieldAccess).visit(tree, ctx);
+                }
+                return tree;
+            }
+        };
     }
 
     private static @Nullable String fullyQualifiedNameOf(org.openrewrite.java.tree.@Nullable JavaType type) {
@@ -509,7 +545,7 @@ public final class GeneratedRecipeSupport {
             matchers[i] = new MethodMatcher(specs[i]);
         }
         SubSource[][] substitutionSourcesByMatcher = parseSourcesPerMatcher(substitutionSourcesCsv, specs.length);
-        TreeVisitor<?, ExecutionContext> walker = new JavaTemplateRewriter() {
+        TreeVisitor<?, ExecutionContext> walker = new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 int matchedIdx = -1;
@@ -536,7 +572,9 @@ public final class GeneratedRecipeSupport {
                         result = preserveSelectAfter((J.MethodInvocation) result, method);
                         result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                     }
-                    return shortenInserted(result.withPrefix(method.getPrefix()));
+                    J inserted = result.withPrefix(method.getPrefix());
+                    doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
+                    return inserted;
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
