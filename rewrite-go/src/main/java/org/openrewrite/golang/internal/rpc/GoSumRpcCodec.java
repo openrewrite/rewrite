@@ -30,6 +30,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import static org.openrewrite.rpc.Reference.asRef;
 
 // Field order must match the Go-side gosum_codec.go exactly.
 @Getter
@@ -50,7 +51,7 @@ public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSum> {
         GolangSender sender = new GolangSender();
         q.getAndSend(after, Tree::getId);
         q.getAndSend(after, GoSum::getPrefix, space -> sender.visitSpace(space, q));
-        q.getAndSend(after, Tree::getMarkers);
+        q.getAndSend(after, mk -> asRef(mk.getMarkers()));
         q.getAndSend(after, (GoSum g) -> g.getSourcePath().toString());
         q.getAndSend(after, (GoSum g) -> g.getCharset().name());
         q.getAndSend(after, GoSum::isCharsetBomMarked);
@@ -65,13 +66,13 @@ public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSum> {
     private static void sendRightPadded(GolangSender sender, JRightPadded<GoSum.Line> rp, RpcSendQueue q) {
         q.getAndSend(rp, JRightPadded::getElement, el -> sendLine(sender, el, q));
         q.getAndSend(rp, JRightPadded::getAfter, space -> sender.visitSpace(space, q));
-        q.getAndSend(rp, JRightPadded::getMarkers);
+        q.getAndSend(rp, mk -> asRef(mk.getMarkers()));
     }
 
     private static void sendLine(GolangSender sender, GoSum.Line l, RpcSendQueue q) {
         q.getAndSend(l, GoSum.Line::getId);
         q.getAndSend(l, GoSum.Line::getPrefix, space -> sender.visitSpace(space, q));
-        q.getAndSend(l, GoSum.Line::getMarkers);
+        q.getAndSend(l, mk -> asRef(mk.getMarkers()));
         q.getAndSend(l, GoSum.Line::getModulePath);
         q.getAndSend(l, GoSum.Line::getVersion);
         q.getAndSend(l, GoSum.Line::isGoMod);

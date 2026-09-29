@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Rewrite.Core.Rpc;
 using System.Text;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
@@ -108,7 +109,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSend(j, (J t) => t.Id);
         q.GetAndSend(j, (J t) => t.Prefix, space => VisitSpace(GetValueNonNull<Space>(space), q));
-        q.GetAndSend(j, (J t) => t.Markers);
+        q.GetAndSend(j, (J t) => Reference.AsRef(t.Markers));
         return j;
     }
 
@@ -623,7 +624,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             q.GetAndSend(left, l => l.Element);
         }
         // C# JLeftPadded does not have Markers; send empty for protocol compatibility
-        q.GetAndSend(left, _ => Markers.Empty);
+        q.GetAndSend(left, _ => Reference.AsRef(Markers.Empty));
     }
 
     public virtual void VisitRightPadded<T>(JRightPadded<T> right, RpcSendQueue q)
@@ -642,7 +643,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             q.GetAndSend(right, r => r.Element);
         }
         q.GetAndSend(right, r => r.After, space => VisitSpace(GetValueNonNull<Space>(space), q));
-        q.GetAndSend(right, r => r.Markers);
+        q.GetAndSend(right, r => Reference.AsRef(r.Markers));
     }
 
     public virtual void VisitContainer<TJ>(JContainer<TJ> container, RpcSendQueue q) where TJ : J
@@ -655,7 +656,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
                     $"Null element in JContainer<{typeof(TJ).Name}>, cursor path: {BuildCursorPath()}");
             return e.Element.Id;
         }, e => VisitRightPadded(e, q));
-        q.GetAndSend(container, c => c.Markers);
+        q.GetAndSend(container, c => Reference.AsRef(c.Markers));
     }
 
     private string BuildCursorPath()
@@ -681,7 +682,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
                 q.GetAndSend(c, cm => cm.Text);
                 q.GetAndSend(c, cm => cm.Suffix);
                 // C# Comment does not have Markers; send empty Markers for protocol compatibility
-                q.GetAndSend(c, _ => Markers.Empty);
+                q.GetAndSend(c, _ => Reference.AsRef(Markers.Empty));
             });
         q.GetAndSend(space, s => s.Whitespace);
     }

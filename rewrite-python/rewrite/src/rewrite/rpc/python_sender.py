@@ -161,7 +161,7 @@ class PythonRpcSender:
         """Handle common J fields: id, prefix, markers."""
         q.get_and_send(j, lambda x: id_to_str(x._id))
         q.get_and_send(j, lambda x: x.prefix, lambda space: self._visit_space(space, q))
-        q.get_and_send(j, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
+        q.get_and_send_as_ref(j, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
 
     def _visit_compilation_unit(self, cu: CompilationUnit, q: 'RpcSendQueue') -> None:
         """Visit CompilationUnit - only non-common fields."""
@@ -185,7 +185,7 @@ class PythonRpcSender:
         rather than in _pre_visit.
         """
         q.get_and_send(pe, lambda x: id_to_str(x._id))
-        q.get_and_send(pe, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
+        q.get_and_send_as_ref(pe, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
         q.get_and_send(pe, lambda x: str(x.source_path))
         q.get_and_send(pe, lambda x: x.charset_name)
         q.get_and_send(pe, lambda x: x.charset_bom_marked)
@@ -1040,7 +1040,7 @@ class PythonRpcSender:
         q.get_and_send(comment, lambda x: x.multiline)
         q.get_and_send(comment, lambda x: x.text)
         q.get_and_send(comment, lambda x: x.suffix)
-        q.get_and_send(comment, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
+        q.get_and_send_as_ref(comment, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
 
     def _visit_right_padded(self, rp: JRightPadded, q: 'RpcSendQueue') -> None:
         """Visit a JRightPadded wrapper."""
@@ -1056,7 +1056,7 @@ class PythonRpcSender:
             # Primitives (bool, etc.) - send without callback
             q.get_and_send(rp, lambda x: x.element)
         q.get_and_send(rp, lambda x: x.after, lambda space: self._visit_space(space, q))
-        q.get_and_send(rp, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
+        q.get_and_send_as_ref(rp, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
 
     def _visit_left_padded(self, lp: JLeftPadded, q: 'RpcSendQueue') -> None:
         """Visit a JLeftPadded wrapper."""
@@ -1072,7 +1072,7 @@ class PythonRpcSender:
         else:
             # Primitives (enums, etc.) - send without callback
             q.get_and_send(lp, lambda x: x.element)
-        q.get_and_send(lp, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
+        q.get_and_send_as_ref(lp, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
 
     def _visit_container(self, container: JContainer, q: 'RpcSendQueue') -> None:
         """Visit a JContainer wrapper."""
@@ -1083,4 +1083,4 @@ class PythonRpcSender:
         q.get_and_send_list(container, lambda x: x.padding.elements,
                            lambda el: id_to_str(el.element._id),
                            lambda el: self._visit_right_padded(el, q))
-        q.get_and_send(container, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
+        q.get_and_send_as_ref(container, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))

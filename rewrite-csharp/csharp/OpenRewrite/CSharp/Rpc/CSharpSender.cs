@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Rewrite.Core.Rpc;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
@@ -184,7 +185,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(j, (J t) => t.Id);
         q.GetAndSend(j, (J t) => t.Prefix, space => VisitSpace(GetValueNonNull<Space>(space), q));
-        q.GetAndSend(j, (J t) => t.Markers);
+        q.GetAndSend(j, (J t) => Reference.AsRef(t.Markers));
         return j;
     }
 
@@ -1107,7 +1108,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
                         q.GetAndSend(c, cm => cm.Text);
                         q.GetAndSend(c, cm => cm.Suffix);
                         // C# Comment has no Markers; send empty Markers for protocol compatibility.
-                        q.GetAndSend(c, _ => Markers.Empty);
+                        q.GetAndSend(c, _ => Reference.AsRef(Markers.Empty));
                     }
                 });
             q.GetAndSend(space, s => s.Whitespace);

@@ -19,6 +19,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
+import static org.openrewrite.rpc.Reference.asRef;
 
 public class YamlSender extends YamlVisitor<RpcSendQueue> {
 
@@ -26,7 +27,7 @@ public class YamlSender extends YamlVisitor<RpcSendQueue> {
     public Yaml preVisit(Yaml y, RpcSendQueue q) {
         q.getAndSend(y, Tree::getId);
         q.getAndSend(y, Yaml::getPrefix);
-        q.getAndSend(y, Tree::getMarkers);
+        q.getAndSend(y, mk -> asRef(mk.getMarkers()));
         return y;
     }
 
