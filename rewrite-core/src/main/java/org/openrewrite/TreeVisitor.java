@@ -22,6 +22,7 @@ import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.scheduling.SourceFileDeadline;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -49,6 +50,7 @@ import static java.util.Objects.requireNonNull;
  */
 public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     private static final String STOP_AFTER_PRE_VISIT = "__org.openrewrite.stopVisitor__";
+    private static final int DEADLINE_CHECK_MASK = 255;
 
     Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
 
@@ -234,6 +236,10 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
         boolean isAcceptable = tree.isAcceptable(this, p) && (!(tree instanceof SourceFile) || isAcceptable((SourceFile) tree, p));
 
         try {
+            // On every top-level visit, so short-lived visitors created in a loop still check, and every 256 visits
+            if ((visitCount & DEADLINE_CHECK_MASK) == 1) {
+                SourceFileDeadline.check();
+            }
             if (isAcceptable) {
                 //noinspection unchecked
                 t = preVisit((T) tree, p);
