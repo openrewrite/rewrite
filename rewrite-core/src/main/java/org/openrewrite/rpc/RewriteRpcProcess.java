@@ -26,8 +26,6 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import io.moderne.jsonrpc.JsonRpc;
-import io.moderne.jsonrpc.JsonRpcListener;
-import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.MessageHandler;
@@ -51,7 +49,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -303,7 +300,7 @@ public class RewriteRpcProcess extends Thread {
         if (trace) {
             handler = new TraceMessageHandler("client", handler);
         }
-        this.rpcClient = new JsonRpc(handler).listener(new RequestTimer(language));
+        this.rpcClient = new JsonRpc(handler).metrics(Metrics.globalRegistry, Tags.of("language", language));
     }
 
     public void shutdown() {
@@ -546,35 +543,6 @@ public class RewriteRpcProcess extends Thread {
 
         public RewriteRpcProcess build() {
             return new RewriteRpcProcess(this);
-        }
-    }
-
-    private static class RequestTimer implements JsonRpcListener {
-        private final String language;
-
-        RequestTimer(String language) {
-            this.language = language;
-        }
-
-        @Override
-        public Completion requestSent(JsonRpcRequest request) {
-            return timed("rewrite.rpc.client.requests", "Requests this process sent to an RPC peer", request);
-        }
-
-        @Override
-        public Completion requestReceived(JsonRpcRequest request) {
-            return timed("rewrite.rpc.server.requests", "Requests this process received from an RPC peer and handled", request);
-        }
-
-        private Completion timed(String name, String description, JsonRpcRequest request) {
-            long start = System.nanoTime();
-            return outcome -> Timer.builder(name)
-                    .description(description)
-                    .tag("language", language)
-                    .tag("rpc.method", request.getMethod())
-                    .tag("outcome", outcome.name().toLowerCase(Locale.ROOT))
-                    .register(Metrics.globalRegistry)
-                    .record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
     }
 
