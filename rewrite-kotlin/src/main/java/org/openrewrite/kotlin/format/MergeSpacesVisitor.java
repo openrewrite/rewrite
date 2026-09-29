@@ -20,6 +20,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.ToBeRemoved;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.TypeReferencePrefix;
@@ -653,6 +654,23 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         Markers markers = visitMarkers(right.getMarkers(), newRight.getMarkers());
         return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
                 right : new JRightPadded<>(t, after, markers);
+    }
+
+    @Override
+    public Markers visitMarkers(@Nullable Markers markers, @Nullable Object ctx) {
+        if (markers == null || markers == ctx || !(ctx instanceof Markers)) {
+            return markers == null ? Markers.EMPTY : markers;
+        }
+        Markers newMarkers = (Markers) ctx;
+        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> {
+            if (marker instanceof TrailingComma) {
+                TrailingComma t = (TrailingComma) marker;
+                return newMarkers.findFirst(TrailingComma.class)
+                        .map(n -> t.withSuffix(visitSpace(t.getSuffix(), Space.Location.LANGUAGE_EXTENSION, n.getSuffix())))
+                        .orElse(t);
+            }
+            return marker;
+        }));
     }
 
     @Override

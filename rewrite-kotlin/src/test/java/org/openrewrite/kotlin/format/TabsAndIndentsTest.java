@@ -208,9 +208,9 @@ class TabsAndIndentsTest implements RewriteTest {
                                                 third: String) {
                   }
                   private fun firstArgOnNewLine(
-                          first: String,
-                          second: Int,
-                          third: String) {
+                      first: String,
+                      second: Int,
+                      third: String) {
                   }
               }
               """
@@ -257,7 +257,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignMethodDeclarationParamsWhenContinuationIndentUsingTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          style(tabs -> tabs.withUseTabCharacter(true),
+            wrapping -> wrapping.withFunctionDeclarationParameters(wrapping.getFunctionDeclarationParameters().withUseContinuationIndent(true))),
           kotlin(
             """
             import java.util.*;
@@ -953,7 +954,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodDeclaration() {
         rewriteRun(
-          tabsAndIndents(style -> style.withContinuationIndent(2)),
+          style(tabs -> tabs.withContinuationIndent(2),
+            wrapping -> wrapping.withFunctionDeclarationParameters(wrapping.getFunctionDeclarationParameters().withUseContinuationIndent(true))),
           kotlin(
             """
               public class Test {

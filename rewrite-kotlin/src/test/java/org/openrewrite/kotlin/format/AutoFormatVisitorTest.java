@@ -169,8 +169,8 @@ class AutoFormatVisitorTest implements RewriteTest {
                   }
 
                   fun multilineMethod(
-                          foo: String,
-                          bar: String
+                      foo: String,
+                      bar: String
                   ) {
                       foo
                           .length
@@ -194,7 +194,7 @@ class AutoFormatVisitorTest implements RewriteTest {
               package com.netflix.graphql.dgs.client.codegen
 
               class BaseProjectionNode (
-                      val type: Int = 1
+                  val type: Int = 1
               ) {
               }
               """
@@ -359,6 +359,57 @@ class AutoFormatVisitorTest implements RewriteTest {
               fun method(): String {
                   return ""
               }
+          }
+          """);
+    }
+
+    @SuppressWarnings({"OptionalGetWithoutIsPresent", "DataFlowIssue"})
+    @Test
+    void splicedNestedDataClassIndentedToParent() {
+        K.CompilationUnit cu = KotlinParser.builder().build()
+          .parse("""
+            class Response {
+                abstract class Item {
+                    abstract fun id(): String
+                }
+
+                fun first(): Item? = null
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+        J.ClassDeclaration dataClass = KotlinParser.builder().build()
+          .parse("""
+            package p
+
+            data class Item(
+                val id: String,
+            )
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get()
+          .getClasses().get(0);
+
+        var result = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object p) {
+                if ("Item".equals(classDecl.getSimpleName())) {
+                    // Keeping the replaced declaration's id tells the formatter where in the body the tree sits
+                    return autoFormat(dataClass.withId(classDecl.getId()).withPrefix(classDecl.getPrefix()), p, getCursor().getParentTreeCursor());
+                }
+                return super.visitClassDeclaration(classDecl, p);
+            }
+        }.visit(cu, new InMemoryExecutionContext());
+
+        assertThat(result.printAll()).isEqualTo("""
+          class Response {
+              data class Item(
+                  val id: String,
+              )
+
+              fun first(): Item? = null
           }
           """);
     }
