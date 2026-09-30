@@ -104,6 +104,7 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.java.internal.JavaTypeFactory",
+            "org.openrewrite.java.internal.ImportComments",
             "org.openrewrite.java.service",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
