@@ -457,12 +457,12 @@
 
 - imageName: eclipse-temurin
   tagPatterns: ["24", "24-*", "24.*"]
-  eolDate: "2025-09-16"
+  eolDate: "2025-09-22"
   suggestedReplacement: 25 or 21 (LTS)
 
 - imageName: eclipse-temurin
   tagPatterns: ["26", "26-*", "26.*"]
-  eolDate: "2026-09-15"
+  eolDate: "2026-09-22"
   suggestedReplacement: 25 or 21 (LTS)
 
 # Amazon Corretto
@@ -580,6 +580,11 @@
 - imageName: azul/zulu-openjdk
   tagPatterns: ["24", "24-*", "24.*"]
   eolDate: "2025-09-16"
+  suggestedReplacement: 25 or 21 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["26", "26-*", "26.*"]
+  eolDate: "2026-09-30"
   suggestedReplacement: 25 or 21 (LTS)
 
 # CentOS (all versions EOL - commonly found in legacy Dockerfiles)
