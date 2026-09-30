@@ -53,7 +53,7 @@ class AddLiteralMethodArgumentTest implements RewriteTest {
     @Test
     void addToMiddleArgument() {
         rewriteRun(
-          spec -> spec.recipe(new AddLiteralMethodArgument("B foo(int, int)", 1, -1, "int")),
+          spec -> spec.recipe(new AddLiteralMethodArgument("B foo(int, int)", 1, -1, "int", null)),
           java(
             "class A {{ B.foo(0, 1); }}",
             "class A {{ B.foo(0, -1, 1); }}"
@@ -64,7 +64,7 @@ class AddLiteralMethodArgumentTest implements RewriteTest {
     @Test
     void addToMiddleArgumentAsString() {
         rewriteRun(
-          spec -> spec.recipe(new AddLiteralMethodArgument("B foo(int, int)", 1, "-1", "int")),
+          spec -> spec.recipe(new AddLiteralMethodArgument("B foo(int, int)", 1, "-1", "int", null)),
           java(
             "class A {{ B.foo(0, 1); }}",
             "class A {{ B.foo(0, -1, 1); }}"
@@ -75,7 +75,7 @@ class AddLiteralMethodArgumentTest implements RewriteTest {
     @Test
     void addToMiddleStringArgument() {
         rewriteRun(
-          spec -> spec.recipe(new AddLiteralMethodArgument("B bar(String, String)", 1, "-1", "String")),
+          spec -> spec.recipe(new AddLiteralMethodArgument("B bar(String, String)", 1, "-1", "String", null)),
           java(
             "class A {{ B.bar(\"0\", \"1\"); }}",
             "class A {{ B.bar(\"0\", \"-1\", \"1\"); }}"
@@ -87,8 +87,8 @@ class AddLiteralMethodArgumentTest implements RewriteTest {
     void addArgumentsConsecutively() {
         rewriteRun(
           spec -> spec.recipes(
-            new AddLiteralMethodArgument("B foo(int)", 1, 1, "int"),
-            new AddLiteralMethodArgument("B foo(int, int)", 2, "2", "int")
+            new AddLiteralMethodArgument("B foo(int)", 1, 1, "int", null),
+            new AddLiteralMethodArgument("B foo(int, int)", 2, "2", "int", null)
           ),
           java(
             "class A {{ B.foo(0); }}",
@@ -100,7 +100,7 @@ class AddLiteralMethodArgumentTest implements RewriteTest {
     @Test
     void addToConstructorArgument() {
         rewriteRun(
-          spec -> spec.recipe(new AddLiteralMethodArgument("B <constructor>()", 0, 1, "int")),
+          spec -> spec.recipe(new AddLiteralMethodArgument("B <constructor>()", 0, 1, "int", null)),
           java(
             "class A { B b = new B(); }",
             "class A { B b = new B(1); }"
@@ -112,17 +112,54 @@ class AddLiteralMethodArgumentTest implements RewriteTest {
     void addOtherTypes() {
         rewriteRun(
           spec -> spec.recipes(
-            new AddLiteralMethodArgument("B baz(String)", 1, true, "boolean"),
-            new AddLiteralMethodArgument("B baz(String, boolean)", 2, 1, "int"),
-            new AddLiteralMethodArgument("B baz(String, boolean, int)", 3, "2L", "long"),
-            new AddLiteralMethodArgument("B baz(String, boolean, int, long)", 4, 2.5, "double"),
-            new AddLiteralMethodArgument("B baz(String, boolean, int, long, double)", 5, "3.5f", "float"),
-            new AddLiteralMethodArgument("B baz(String, boolean, int, long, double, float)", 6, 32767, "short"),
-            new AddLiteralMethodArgument("B baz(String, boolean, int, long, double, float, short)", 7, 'c', "char")
+            new AddLiteralMethodArgument("B baz(String)", 1, true, "boolean", null),
+            new AddLiteralMethodArgument("B baz(String, boolean)", 2, 1, "int", null),
+            new AddLiteralMethodArgument("B baz(String, boolean, int)", 3, "2L", "long", null),
+            new AddLiteralMethodArgument("B baz(String, boolean, int, long)", 4, 2.5, "double", null),
+            new AddLiteralMethodArgument("B baz(String, boolean, int, long, double)", 5, "3.5f", "float", null),
+            new AddLiteralMethodArgument("B baz(String, boolean, int, long, double, float)", 6, 32767, "short", null),
+            new AddLiteralMethodArgument("B baz(String, boolean, int, long, double, float, short)", 7, 'c', "char", null)
           ),
           java(
             "class A {{ B.baz(\"hi\"); }}",
             "class A {{ B.baz(\"hi\", true, 1, 2L, 2.5, 3.5f, 32767, 'c'); }}"
+          )
+        );
+    }
+
+    @Test
+    void matchOverrides() {
+        rewriteRun(
+          spec -> spec.recipe(new AddLiteralMethodArgument("Sup foo()", 0, 1, "int", true)),
+          java(
+            """
+              class Sup {
+                  void foo() {
+                  }
+              }
+
+              class Sub extends Sup {
+                  @Override
+                  void foo() {
+                  }
+              }
+
+              class UsesSub {{ new Sub().foo(); }}
+              """,
+            """
+              class Sup {
+                  void foo() {
+                  }
+              }
+
+              class Sub extends Sup {
+                  @Override
+                  void foo() {
+                  }
+              }
+
+              class UsesSub {{ new Sub().foo(1); }}
+              """
           )
         );
     }

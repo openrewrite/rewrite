@@ -69,6 +69,12 @@ public class AddLiteralMethodArgument extends Recipe {
     @Nullable
     String primitiveType;
 
+    @Option(displayName = "Match on overrides",
+            description = "When enabled, find methods that are overrides of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchOverrides;
+
     @Override
     public String getInstanceNameSuffix() {
         return String.format("%d in methods `%s`", argumentIndex, methodPattern);
@@ -85,7 +91,7 @@ public class AddLiteralMethodArgument extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesMethod<>(methodPattern), new AddLiteralMethodArgumentVisitor(new MethodMatcher(methodPattern)));
+        return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new AddLiteralMethodArgumentVisitor(new MethodMatcher(methodPattern, matchOverrides)));
     }
 
     private class AddLiteralMethodArgumentVisitor extends JavaIsoVisitor<ExecutionContext> {
