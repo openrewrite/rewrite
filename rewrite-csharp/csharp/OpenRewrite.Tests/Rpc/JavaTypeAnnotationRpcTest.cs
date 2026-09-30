@@ -176,29 +176,7 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
             public class Both { }
             """;
 
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, path: "Both.cs");
-        var references = Assemblies.Net90
-            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, CancellationToken.None)
-            .GetAwaiter().GetResult();
-        var compilation = CSharpCompilation.Create("AnnotationRpcTest")
-            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-            .AddReferences(references)
-            .AddSyntaxTrees(syntaxTree);
-        var cu = new CSharpParser().Parse(source, sourcePath: "Both.cs",
-            semanticModel: compilation.GetSemanticModel(syntaxTree));
-
-        var server = RewriteRpcServer.Current!;
-        var treeId = cu.Id.ToString();
-        server.StoreLocalObject(treeId, cu);
-        var ctxId = Guid.NewGuid().ToString();
-        server.StoreLocalObject(ctxId, new ExecutionContext());
-
-        var returned = server.VisitOnRemote(
-            "org.openrewrite.csharp.rpc.JavaTypeAnnotationProbe",
-            treeId, CsCompilationUnitType, ctxId,
-            new Dictionary<string, object?> { ["type"] = "Both" });
-
-        var both = FindClassDeclaration((J)returned, "Both");
+        var both = FindClassDeclaration(ProbeOnJava(source, "Both.cs", "Both"), "Both");
 
         var marker = both.Markers.FindFirst<SearchResult>();
         Assert.NotNull(marker);
@@ -222,6 +200,58 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
                     .Single(v => v.Element is JavaType.Variable { Name: "Type" }).ReferenceValue)
             .FullyQualifiedName).ToList();
         Assert.Equal(["System.String", "System.Uri"], types);
+    }
+
+    [Fact]
+    public void NullInAttributeArgumentArrayRoundTripsThroughJava()
+    {
+        var source = """
+            using System;
+
+            sealed class RowAttribute : Attribute
+            {
+                public RowAttribute(params object?[] values) { Values = values; }
+                public object?[] Values { get; }
+            }
+
+            [Row(null, "a", null)]
+            public class Rows { }
+            """;
+
+        var rows = FindClassDeclaration(ProbeOnJava(source, "Rows.cs", "Rows"), "Rows");
+
+        Assert.Equal("@RowAttribute(Values=[null,a,null])", rows.Markers.FindFirst<SearchResult>()?.Description);
+
+        var row = Assert.Single(Assert.IsAssignableFrom<JavaType.Class>(rows.Type).Annotations!
+            .OfType<JavaType.Annotation>());
+        var values = Assert.IsType<JavaType.Annotation.ArrayElementValue>(Assert.Single(row.Values!));
+        Assert.Equal([null, "a", null], values.ConstantValues!);
+    }
+
+    private static J ProbeOnJava(string source, string path, string type)
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, path: path);
+        var references = Assemblies.Net90
+            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, CancellationToken.None)
+            .GetAwaiter().GetResult();
+        var compilation = CSharpCompilation.Create("AnnotationRpcTest")
+            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithNullableContextOptions(NullableContextOptions.Enable))
+            .AddReferences(references)
+            .AddSyntaxTrees(syntaxTree);
+        var cu = new CSharpParser().Parse(source, sourcePath: path,
+            semanticModel: compilation.GetSemanticModel(syntaxTree));
+
+        var server = RewriteRpcServer.Current!;
+        var treeId = cu.Id.ToString();
+        server.StoreLocalObject(treeId, cu);
+        var ctxId = Guid.NewGuid().ToString();
+        server.StoreLocalObject(ctxId, new ExecutionContext());
+
+        return (J)server.VisitOnRemote(
+            "org.openrewrite.csharp.rpc.JavaTypeAnnotationProbe",
+            treeId, CsCompilationUnitType, ctxId,
+            new Dictionary<string, object?> { ["type"] = type });
     }
 
     private static ClassDeclaration FindClassDeclaration(J tree, string simpleName)

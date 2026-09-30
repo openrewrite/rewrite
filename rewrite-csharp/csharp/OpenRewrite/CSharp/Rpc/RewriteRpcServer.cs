@@ -324,7 +324,8 @@ public class RewriteRpcServer
                 response.Items.Add(new ParseSolutionResponseItem
                 {
                     Id = id,
-                    SourceFileType = sourceFileType
+                    SourceFileType = sourceFileType,
+                    SourcePath = sourceFile.SourcePath
                 });
             }
 
@@ -366,7 +367,8 @@ public class RewriteRpcServer
                 response.Items.Add(new ParseSolutionResponseItem
                 {
                     Id = csprojDoc.Id.ToString(),
-                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document"
+                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document",
+                    SourcePath = csprojDoc.SourcePath
                 });
             }
             catch (Exception ex)
@@ -612,7 +614,16 @@ public class RewriteRpcServer
         var pages = _inProgressGetObject.GetOrAdd(request.Id, id =>
             new Lazy<Channel<List<RpcObjectData>>>(() => StartTransfer(id, after, request.SourceFileType))).Value;
 
-        var page = await pages.Reader.ReadAsync();
+        List<RpcObjectData> page;
+        try
+        {
+            page = await pages.Reader.ReadAsync();
+        }
+        catch (ChannelClosedException e) when (e.InnerException != null)
+        {
+            _inProgressGetObject.TryRemove(request.Id, out _);
+            throw e.InnerException;
+        }
         if (page.Count > 0 && page[^1].State == END_OF_OBJECT)
         {
             _inProgressGetObject.TryRemove(request.Id, out _);
@@ -643,6 +654,7 @@ public class RewriteRpcServer
                 false,
                 TreeCodec.Instance
             );
+            Exception? failure = null;
             try
             {
                 sendQueue.Send(after, before, null);
@@ -655,14 +667,20 @@ public class RewriteRpcServer
                 // baseline the remote never finished receiving.
                 _remoteObjects.TryRemove(id, out _);
                 _localRefs.RollbackTo(refHighWater);
-                Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
-                    id, after.GetType().Name, ex.GetType().Name, ex.Message);
+                var sourcePath = (after as SourceFile)?.SourcePath;
+                Log.Warning("RPC GetObject: EXCEPTION sending {Id} ({ObjType}, {SourcePath}): {Exception}",
+                    id, after.GetType().Name, sourcePath, ex.ToString());
+                failure = new InvalidOperationException(
+                    $"Failed to send {after.GetType().Name} {id}{(sourcePath == null ? "" : $" ({sourcePath})")}: {ex.GetType().Name}: {ex.Message}", ex);
             }
             finally
             {
-                sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
-                sendQueue.Flush();
-                pages.Writer.Complete();
+                if (failure == null)
+                {
+                    sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
+                    sendQueue.Flush();
+                }
+                pages.Writer.Complete(failure);
             }
         });
         return pages;
@@ -2323,8 +2341,8 @@ public class ParseSolutionResponseItem
     public string Id { get; set; } = "";
     public string SourceFileType { get; set; } = "";
 
-    // Relative source path; only populated for Quark items, from which the Java
-    // side builds the Quark locally. Null for normal items (fetched via GetObject).
+    // Relative source path. The Java side builds Quark items from it locally, and names the
+    // file in the ParseError it substitutes when fetching any other item fails.
     public string? SourcePath { get; set; }
 }
 

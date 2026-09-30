@@ -239,12 +239,32 @@ class RpcSendQueueTest {
         assertThat(roundTripList(after, before)).isEqualTo(after);
     }
 
+    @Test
+    void nullElementsRoundTrip() {
+        List<@Nullable String> after = Arrays.asList(null, "A", null);
+
+        assertThat(roundTripList(after, List.of())).isEqualTo(after);
+        assertThat(roundTripList(after, List.of("B", "A"))).isEqualTo(after);
+    }
+
+    @Test
+    void elementReplacedByNullRoundTrips() {
+        List<@Nullable String> before = List.of("A");
+        List<@Nullable String> after = Collections.singletonList(null);
+
+        assertThat(roundTripList(after, before, s -> "same")).isEqualTo(after);
+    }
+
     private List<String> roundTripList(List<String> after, List<String> before) {
+        return roundTripList(after, before, Function.identity());
+    }
+
+    private List<String> roundTripList(List<String> after, List<String> before, Function<String, ?> id) {
         Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
         RpcSendQueue sq = new RpcSendQueue(1, batches::addLast, new IdentityHashMap<>(), null, false);
         RpcReceiveQueue rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, null, null);
 
-        sq.sendList(after, before, Function.identity(), null, false);
+        sq.sendList(after, before, id, null, false);
         sq.flush();
         return rq.receiveList(before, null);
     }
