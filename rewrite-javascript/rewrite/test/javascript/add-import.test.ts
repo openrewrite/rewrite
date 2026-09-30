@@ -3396,3 +3396,86 @@ describe('AddImport visitor', () => {
     });
 
 });
+
+describe('AddImport follows the file it lands in', () => {
+    function addImport(config?: Record<string, unknown>, options: Partial<AddImportOptions> = {}): JavaScriptVisitor<any> {
+        const visitor = new AddImport({module: 'n', member: 'b', onlyIfReferenced: false, ...options});
+        return new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                return await visitor.visit(config ? withPrettierStyle(cu, config) : cu, p);
+            }
+        };
+    }
+
+    test('a semicolon-free file gets an import without one', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport());
+        await spec.rewriteRun(typescript(
+            `import got from 'got'\nimport http from 'http'\n\nconst x = 1\n`,
+            `import got from 'got'\nimport http from 'http'\nimport {b} from 'n'\n\nconst x = 1\n`
+        ));
+    });
+
+    test('a semicolon-free file without imports is judged by its other statements', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport());
+        await spec.rewriteRun(typescript(
+            `const x = 1\nconsole.log(x)\n`,
+            `import {b} from 'n'\n\nconst x = 1\nconsole.log(x)\n`
+        ));
+    });
+
+    test('a file with semicolons keeps them', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport());
+        await spec.rewriteRun(typescript(
+            `import got from 'got';\nimport http from 'http';\n\nconst x = 1;\n`,
+            `import got from 'got';\nimport http from 'http';\nimport {b} from 'n';\n\nconst x = 1;\n`
+        ));
+    });
+
+    test('Prettier semi:false outranks the semicolons the file writes', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport({semi: false, singleQuote: true}));
+        await spec.rewriteRun(typescript(
+            `import { a } from 'm';\n\nconst x = [a];\n`,
+            `import { a } from 'm';\nimport { b } from 'n'\n\nconst x = [a];\n`
+        ));
+    });
+
+    test('a file whose imports are spaced gets a spaced import', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport());
+        await spec.rewriteRun(typescript(
+            `import { a } from "m";\nimport { c } from "o";\n\nconst x = [a, c];\n`,
+            `import { a } from "m";\nimport { c } from "o";\nimport { b } from "n";\n\nconst x = [a, c];\n`
+        ));
+    });
+
+    test('a one-per-line import list is no evidence of brace spacing', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport());
+        await spec.rewriteRun(typescript(
+            `import {\n    a,\n    c,\n} from "m";\n\nconst x = [a, c];\n`,
+            `import {\n    a,\n    c,\n} from "m";\nimport {b} from "n";\n\nconst x = [a, c];\n`
+        ));
+    });
+
+    test('Prettier bracketSpacing:false outranks the spacing the file writes', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport({bracketSpacing: false, singleQuote: true}));
+        await spec.rewriteRun(typescript(
+            `import { a } from 'm';\n\nconst x = [a];\n`,
+            `import { a } from 'm';\nimport {b} from 'n';\n\nconst x = [a];\n`
+        ));
+    });
+
+    test('Prettier singleQuote:false outranks the quote the file writes', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport({singleQuote: false}));
+        await spec.rewriteRun(typescript(
+            `import { a } from 'm';\n\nconst x = [a];\n`,
+            `import { a } from 'm';\nimport { b } from "n";\n\nconst x = [a];\n`
+        ));
+    });
+});
