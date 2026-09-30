@@ -217,6 +217,13 @@ public class PackageJsonHelper {
         return null;
     }
 
+    /** Whether {@code key} is a top-level member of {@code doc} that does not hold an object. */
+    public static boolean holdsNonObject(Json.Document doc, String key) {
+        return doc.getValue() instanceof Json.JsonObject &&
+                hasMemberNamed((Json.JsonObject) doc.getValue(), key) &&
+                findObjectMember((Json.JsonObject) doc.getValue(), key) == null;
+    }
+
     /**
      * Whether {@code obj} has a member keyed {@code name}, whatever its value type. The complement of
      * {@link #findObjectMember} returning null for a key that exists but does not hold an object, which
@@ -588,16 +595,19 @@ public class PackageJsonHelper {
      * prefix: ranges start with a digit, {@code ^}, {@code ~}, {@code >}, {@code <}, {@code =} or
      * {@code *}, and dist-tags like {@code latest} carry no colon.
      * <p>
-     * npm also accepts three schemeless shorthands, which mean a protocol without carrying its scheme:
-     * {@code "express": "expressjs/express"} is shorthand for GitHub, {@code git@host:user/repo.git} is
-     * a git dependency, and a local path {@code ../foo/bar}, {@code ~/foo/bar}, {@code ./foo/bar} or
-     * {@code /foo/bar} is normalised by npm itself to {@code "bar": "file:../foo/bar"}
-     * (https://docs.npmjs.com/cli/v11/configuring-npm/package-json). Such a value is answered with the
+     * npm also accepts values without a scheme: {@code "express": "expressjs/express"} is shorthand for
+     * GitHub, {@code git@host:user/repo.git} is a git dependency, and a local path or tarball name is a
+     * {@code file:} dependency (npm-package-arg's {@code resolve}). Such a value is answered with the
      * protocol it <em>means</em>, so the returned protocol is not always a prefix of the value.
      */
     public static @Nullable String dependencySpecifierProtocol(@Nullable String value) {
         if (value == null) {
             return null;
+        }
+        // npm-package-arg checks a file spec before anything else, which is what keeps a drive letter
+        // like `c:/pkgs/foo` from reading as a one-letter scheme.
+        if (FILE_SPEC.matcher(value).find()) {
+            return "file:";
         }
         int colon = value.indexOf(':');
         if (colon >= 1 && isSchemePrefix(value, colon)) {
@@ -618,10 +628,16 @@ public class PackageJsonHelper {
         return true;
     }
 
+    /** npm-package-arg's {@code isPosixFile} and {@code isWindowsFile}, which a manifest can meet on either. */
+    private static final Pattern FILE_SPEC = Pattern.compile("^(?:[.]|~[/]|[/\\\\]|[a-zA-Z]:)");
+
+    /** npm-package-arg's {@code isFileType}: a tarball named without any path. */
+    private static final Pattern FILE_TYPE = Pattern.compile("[.](?:tgz|tar\\.gz|tar)$", Pattern.CASE_INSENSITIVE);
+
     /**
      * The protocol a value without a scheme prefix expands to, or {@code null} when it is an ordinary
-     * version constraint. Path shapes are checked before the {@code user/repo} shape, so {@code ../pkg}
-     * is a {@code file:} and not a GitHub shorthand.
+     * version constraint. Follows npm-package-arg's {@code resolve}: a GitHub shorthand first, and any
+     * other value holding a slash, or naming a tarball, is a local path.
      */
     private static @Nullable String schemelessShorthandProtocol(String value) {
         // A bare scp-style location. The label is cosmetic: a value starting with `git@` is
@@ -629,22 +645,32 @@ public class PackageJsonHelper {
         if (value.startsWith("git@")) {
             return "git+ssh:";
         }
-        if (value.startsWith("./") || value.startsWith("../") || value.startsWith("/") ||
-                value.startsWith("~/") || ".".equals(value) || "..".equals(value)) {
-            return "file:";
-        }
-        // The one shape that is a judgement about intent rather than a prefix match, so it is kept
-        // narrow: a scoped package name starts with `@`, and every range wide enough to hold a `/`
-        // (`>=1.0.0 <2.0.0`, `1.2.3 - 2.3.4`) carries whitespace.
-        if (value.indexOf('/') >= 0 && !value.startsWith("@")) {
-            for (int i = 0; i < value.length(); i++) {
-                if (Character.isWhitespace(value.charAt(i))) {
-                    return null;
-                }
-            }
+        if (isGitHubShorthand(value)) {
             return "github:";
         }
+        if (value.indexOf('/') >= 0 || value.indexOf('\\') >= 0 || FILE_TYPE.matcher(value).find()) {
+            return "file:";
+        }
         return null;
+    }
+
+    /** hosted-git-info's {@code isGitHubShorthand}: {@code user/repo}, where anything may follow a {@code #}. */
+    private static boolean isGitHubShorthand(String value) {
+        int hash = value.indexOf('#');
+        int end = hash < 0 ? value.length() : hash;
+        int firstSlash = value.indexOf('/');
+        int secondSlash = firstSlash < 0 ? -1 : value.indexOf('/', firstSlash + 1);
+        if (firstSlash <= 0 || firstSlash >= end || secondSlash >= 0 && secondSlash < end ||
+                value.charAt(end - 1) == '/') {
+            return false;
+        }
+        for (int i = 0; i < end; i++) {
+            char c = value.charAt(i);
+            if (Character.isWhitespace(c) || c == '@' || c == ':') {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

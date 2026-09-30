@@ -165,7 +165,6 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
         for (MatchedDependency skipped : ps.skippedProtocols) {
             protocolsSkipped.insertRow(ctx, new NodeDependencyProtocolsSkipped.Row(
                     packageJsonPath.toString(),
-                    // The two writers only ever decline the manifest that declares the reference.
                     packageJsonPath.toString(),
                     skipped.getPackageName(),
                     skipped.getDependencyScope(),
@@ -198,18 +197,32 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
             return sf;
         }
         StringBuilder message = new StringBuilder();
+        boolean reference = false;
+        boolean location = false;
         for (MatchedDependency skipped : ps.skippedProtocols) {
             if (message.length() > 0) {
                 message.append(' ');
             }
+            String protocol = PackageJsonHelper.dependencySpecifierProtocol(skipped.getCurrentVersion());
             message.append("`").append(skipped.getPackageName()).append("` is declared as `")
-                    .append(skipped.getCurrentVersion()).append("`, a ")
-                    .append(PackageJsonHelper.dependencySpecifierProtocol(skipped.getCurrentVersion()))
-                    .append(" reference whose constraint is held elsewhere and keyed on the current name.");
+                    .append(skipped.getCurrentVersion()).append("`, a ").append(protocol);
+            // A location specifier is refused only for want of a newVersion, so its remedy differs.
+            if (PackageJsonHelper.isLocationSpecifier(protocol)) {
+                location = true;
+                message.append(" location that still points at the old package.");
+            } else {
+                reference = true;
+                message.append(" reference whose constraint is held elsewhere and keyed on the current name.");
+            }
         }
-        message.append(" Renaming it here would leave that reference dangling and the manifest would no")
-                .append(" longer install, so `").append(oldPackageName).append("` was left unchanged.")
-                .append(" Rename it in the file holding the constraint first.");
+        message.append(" `").append(oldPackageName).append("` was left unchanged.");
+        if (reference) {
+            message.append(" Renaming a reference here would leave it dangling and the manifest would no")
+                    .append(" longer install; rename it in the file holding the constraint first.");
+        }
+        if (location) {
+            message.append(" Pass a `newVersion` to move a location to the registry under the new name.");
+        }
         return Markup.warn(sf, new IllegalStateException(message.toString()));
     }
 

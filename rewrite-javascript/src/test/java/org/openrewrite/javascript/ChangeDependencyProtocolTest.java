@@ -62,19 +62,20 @@ class ChangeDependencyProtocolTest implements RewriteTest {
 
     @ParameterizedTest
     @CsvSource(nullValues = "null", value = {
-            "catalog:,                           catalog:,   null",
-            "catalog:,                           catalog:,   ^2.0.0",
-            "workspace:^,                        workspace:, null",
-            "workspace:^,                        workspace:, ^2.0.0",
-            "patch:acme-logger@1.4.1#fix.patch,  patch:,     null",
-            "patch:acme-logger@1.4.1#fix.patch,  patch:,     ^2.0.0",
-            "npm:@acme/other@^1.0.0,             npm:,       null",
-            "npm:@acme/other@^1.0.0,             npm:,       ^2.0.0",
+            "catalog:,                           catalog:,   null,   file holding the constraint",
+            "catalog:,                           catalog:,   ^2.0.0, file holding the constraint",
+            "workspace:^,                        workspace:, null,   file holding the constraint",
+            "workspace:^,                        workspace:, ^2.0.0, file holding the constraint",
+            "patch:acme-logger@1.4.1#fix.patch,  patch:,     null,   file holding the constraint",
+            "patch:acme-logger@1.4.1#fix.patch,  patch:,     ^2.0.0, file holding the constraint",
+            "npm:@acme/other@^1.0.0,             npm:,       null,   file holding the constraint",
+            "npm:@acme/other@^1.0.0,             npm:,       ^2.0.0, file holding the constraint",
             // A location specifier is refused too when no new version is given: its value points at the
             // old package, so carrying it over to the new name installs the wrong thing.
-            "github:me/old-fork,                 github:,    null"
+            "github:me/old-fork,                 github:,    null,   Pass a `newVersion`"
     })
-    void renameIsRefusedForAProtocolValue(String declaredValue, String expectedProtocol, @Nullable String newVersion) {
+    void renameIsRefusedForAProtocolValue(String declaredValue, String expectedProtocol, @Nullable String newVersion,
+                                          String expectedRemedy) {
         rewriteRun(
                 spec -> spec.recipe(new ChangeDependency("acme-logger", "acme-log", newVersion, null))
                         .expectedCyclesThatMakeChanges(1)
@@ -100,7 +101,8 @@ class ChangeDependencyProtocolTest implements RewriteTest {
                                 .hasValueSatisfying(error -> assertThat(error.getMessage())
                                         .contains("acme-logger")
                                         .contains(expectedProtocol)
-                                        .contains("left unchanged"))))
+                                        .contains("left unchanged")
+                                        .contains(expectedRemedy))))
         );
     }
 

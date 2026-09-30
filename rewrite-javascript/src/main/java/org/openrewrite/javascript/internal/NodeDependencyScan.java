@@ -135,13 +135,23 @@ public final class NodeDependencyScan {
      */
     public static Map<Path, List<MatchedDependency>> findProtocolReferences(
             Accumulator acc, ExecutionContext ctx, Path manifestPath, String packageName) {
+        return findProtocolReferences(acc, ctx, manifestPath, packageName, null);
+    }
+
+    /**
+     * As {@link #findProtocolReferences(Accumulator, ExecutionContext, Path, String)}, restricted to the
+     * manifest whose own {@code name} is {@code parentName} when that is given.
+     */
+    public static Map<Path, List<MatchedDependency>> findProtocolReferences(
+            Accumulator acc, ExecutionContext ctx, Path manifestPath, String packageName,
+            @Nullable String parentName) {
         Map<Path, List<MatchedDependency>> references = new LinkedHashMap<>();
-        collectProtocolReferences(acc, ctx, manifestPath, packageName, references);
+        collectProtocolReferences(acc, ctx, manifestPath, packageName, parentName, references);
         ProjectState ps = acc.projects.get(manifestPath);
         if (ps != null && ps.capturedPackageJson != null) {
             for (Path member : PackageJsonHelper.workspaceMemberPaths(ps.capturedPackageJson)) {
                 if (!member.equals(manifestPath)) {
-                    collectProtocolReferences(acc, ctx, member, packageName, references);
+                    collectProtocolReferences(acc, ctx, member, packageName, parentName, references);
                 }
             }
         }
@@ -149,16 +159,32 @@ public final class NodeDependencyScan {
     }
 
     private static void collectProtocolReferences(Accumulator acc, ExecutionContext ctx, Path manifestPath,
-                                                  String packageName,
+                                                  String packageName, @Nullable String parentName,
                                                   Map<Path, List<MatchedDependency>> into) {
         Json.Document doc = documentFor(acc, ctx, manifestPath);
-        if (doc == null) {
+        if (doc == null || parentName != null && !parentName.equals(declaredName(doc))) {
             return;
         }
         List<MatchedDependency> declarations = PackageJsonHelper.findProtocolDeclarations(doc, packageName);
         if (!declarations.isEmpty()) {
             into.put(manifestPath, declarations);
         }
+    }
+
+    private static @Nullable String declaredName(Json.Document doc) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return null;
+        }
+        for (Json member : ((Json.JsonObject) doc.getValue()).getMembers()) {
+            if (member instanceof Json.Member &&
+                    ((Json.Member) member).getKey() instanceof Json.Literal &&
+                    "name".equals(((Json.Literal) ((Json.Member) member).getKey()).getValue()) &&
+                    ((Json.Member) member).getValue() instanceof Json.Literal) {
+                Object value = ((Json.Literal) ((Json.Member) member).getValue()).getValue();
+                return value == null ? null : value.toString();
+            }
+        }
+        return null;
     }
 
     /** The current revision of a manifest: what an earlier recipe in this run left, else what was scanned. */

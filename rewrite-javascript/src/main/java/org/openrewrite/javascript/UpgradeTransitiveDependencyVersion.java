@@ -38,8 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-import static java.util.Collections.emptyMap;
-
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDependencyScan.Accumulator> {
@@ -137,18 +135,17 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
     }
 
     /**
-     * The declarations a global override written into {@code manifestPath} would silently win over.
-     * Empty for a scoped override: {@code foo>acme-logger} pins the copy under {@code foo} and never
-     * reaches the reference-held constraint of the direct declaration.
+     * The declarations an override written into {@code manifestPath} would silently win over. A scoped
+     * override {@code foo>acme-logger} pins only the copy under {@code foo}, so it reaches a reference
+     * only when {@code foo} is itself a workspace package declaring one.
      */
     private Map<Path, List<MatchedDependency>> findProtocolSkips(NodeDependencyScan.Accumulator acc,
                                                                  ExecutionContext ctx, Path manifestPath) {
         // Gated on the parsed path, not on `dependencyPath`, so this agrees with the guard in
         // `upgradeTransitive`: a path that parses to no segments is a global override.
         List<DependencyPathSegment> parsed = parsedPath();
-        return parsed == null || parsed.isEmpty() ?
-                NodeDependencyScan.findProtocolReferences(acc, ctx, manifestPath, packageName) :
-                emptyMap();
+        return NodeDependencyScan.findProtocolReferences(acc, ctx, manifestPath, packageName,
+                parsed == null || parsed.isEmpty() ? null : parsed.get(parsed.size() - 1).getName());
     }
 
     private @Nullable List<DependencyPathSegment> parsedPath() {

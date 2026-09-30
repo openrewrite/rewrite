@@ -33,8 +33,8 @@ public class NodeDependencyProtocolsSkipped extends DataTable<NodeDependencyProt
                         "reference would discard it. A `catalog:` reference is followed into its catalog " +
                         "entry instead, and appears here only when it could not be: the workspace file is " +
                         "not in the source set, or it declares no entry for this package. A location " +
-                        "specifier (`file:`, `link:`, `portal:`, `github:`, `http:`, `https:`, `git:`, " +
-                        "`git+<transport>:`) " +
+                        "specifier (`file:`, `link:`, `portal:`, `github:`, `gist:`, `bitbucket:`, " +
+                        "`gitlab:`, `http:`, `https:`, `git:`, `git+<transport>:`) " +
                         "given an explicit new version is migrated to the registry by `ChangeDependency`, " +
                         "so it does not appear here for that recipe.");
     }
@@ -60,7 +60,8 @@ public class NodeDependencyProtocolsSkipped extends DataTable<NodeDependencyProt
         String dependencyScope;
 
         @Column(displayName = "Protocol",
-                description = "The specifier protocol found in the version position, e.g. `catalog:` or `workspace:`.")
+                description = "The specifier protocol of the value, e.g. `catalog:` or `workspace:`. For a value " +
+                        "written without a scheme, the protocol it expands to, e.g. `github:` for `user/repo`.")
         String protocol;
 
         @Column(displayName = "Current value",

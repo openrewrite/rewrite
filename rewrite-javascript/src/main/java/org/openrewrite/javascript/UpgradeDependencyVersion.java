@@ -358,7 +358,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
             }
             protocolsSkipped.insertRow(ctx, new NodeDependencyProtocolsSkipped.Row(
                     packageJsonPath.toString(),
-                    // The two writers only ever decline the manifest that declares the reference.
                     packageJsonPath.toString(),
                     skipped.getPackageName(),
                     skipped.getDependencyScope(),

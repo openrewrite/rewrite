@@ -282,15 +282,9 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * Whether the container this dialect writes its override into is present in {@code doc} but does not
-     * hold an object, so there is nowhere to write and appending would produce a duplicate key.
-     * Dialect knowledge stays here rather than moving into the recipe.
+     * The key this dialect writes its override into, when it is present in {@code doc} but does not hold an
+     * object, so there is nowhere to write and appending would produce a duplicate key; null otherwise.
      */
-    public static boolean overrideContainerIsUnusable(Json.Document doc, PackageManager pm) {
-        return unusableOverrideContainerKey(doc, pm) != null;
-    }
-
-    /** The key {@link #overrideContainerIsUnusable} found unusable, for a message naming it, else null. */
     public static @Nullable String unusableOverrideContainerKey(Json.Document doc, PackageManager pm) {
         if (!(doc.getValue() instanceof Json.JsonObject)) {
             return null;

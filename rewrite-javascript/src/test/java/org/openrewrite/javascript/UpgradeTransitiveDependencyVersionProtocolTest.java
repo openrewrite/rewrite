@@ -249,6 +249,31 @@ class UpgradeTransitiveDependencyVersionProtocolTest implements RewriteTest {
     }
 
     @Test
+    void anOverrideScopedToAMemberDoesNotOverrideItsReference() {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("acme-logger", "~2.0.0", "member-a"))
+                        .expectedCyclesThatMakeChanges(1)
+                        .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
+                                assertThat(rows).extracting("sourcePath", "declaredIn", "protocol")
+                                        .containsExactlyInAnyOrder(
+                                                tuple("package.json", "packages/a/package.json", "catalog:"),
+                                                tuple("packages/a/package.json", "packages/a/package.json", "catalog:"))),
+                packageJson(ROOT, null,
+                        nodeResolutionResult(PackageManager.Pnpm, singletonList("packages/a/package.json")),
+                        s -> s.after(actual -> {
+                            assertThat(actual).as("the root gains no override").doesNotContain("\"pnpm\":");
+                            return actual;
+                        })),
+                packageJson(member("catalog:"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "catalog:")),
+                        s -> s.path("packages/a/package.json").after(actual -> {
+                            assertThat(actual).as("the member gains no override either").doesNotContain("\"pnpm\":");
+                            return actual;
+                        }))
+        );
+    }
+
+    @Test
     void aWorkspaceRootStillOverridesWhenNoMemberHoldsAReference() {
         rewriteRun(
                 spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("acme-logger", "~2.0.0", null))

@@ -584,7 +584,17 @@ class PackageJsonHelperTest {
             "../pkg,                         file:",
             "./pkg,                          file:",
             "/abs/pkg,                       file:",
-            "~/pkg,                          file:"
+            "~/pkg,                          file:",
+            // npm-package-arg's file rules: any leading `.`, a drive letter, a tarball name, or a slash
+            // in anything that is not a GitHub shorthand
+            ".local,                         file:",
+            "C:\\pkgs\\foo,                  file:",
+            "c:/pkgs/foo,                    file:",
+            "foo-1.0.0.tgz,                  file:",
+            "team/sub/repo,                  file:",
+            "@scope/pkg,                     file:",
+            // hosted-git-info allows whitespace after the `#`
+            "user/repo#semver:>=1 <2,        github:"
     })
     void protocolSpecifiersAreRecognised(String value, String expectedProtocol) {
         assertThat(PackageJsonHelper.dependencySpecifierProtocol(value)).isEqualTo(expectedProtocol);
@@ -592,8 +602,7 @@ class PackageJsonHelperTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"^1.4.1", "~1.4.1", "1.4.1", "1.x", "*", "", "latest", "next",
-            ">=1.0.0 <2.0.0", "1.2.3 - 2.3.4", "1.2.3-beta.1", "1.2.3+build.4", "Catalog:", "-bad:",
-            "@scope/pkg"})
+            ">=1.0.0 <2.0.0", "1.2.3 - 2.3.4", "1.2.3-beta.1", "1.2.3+build.4", "Catalog:", "-bad:"})
     void versionConstraintsAreNotMistakenForProtocols(String value) {
         assertThat(PackageJsonHelper.dependencySpecifierProtocol(value)).isNull();
     }
