@@ -48,6 +48,12 @@ public class AddLiteralMethodArgument extends Recipe {
             example = "com.yourorg.A foo(int, int)")
     String methodPattern;
 
+    @Option(displayName = "Match on overrides",
+            description = "When enabled, find methods that are overrides of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchOverrides;
+
     /**
      * A zero-based index indicating where to insert the new argument.
      */
@@ -68,12 +74,6 @@ public class AddLiteralMethodArgument extends Recipe {
             valid = {"String", "int", "short", "long", "float", "double", "boolean", "char"})
     @Nullable
     String primitiveType;
-
-    @Option(displayName = "Match on overrides",
-            description = "When enabled, find methods that are overrides of the method pattern.",
-            required = false)
-    @Nullable
-    Boolean matchOverrides;
 
     @Override
     public String getInstanceNameSuffix() {
