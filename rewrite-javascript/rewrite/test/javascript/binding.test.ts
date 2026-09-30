@@ -1066,7 +1066,7 @@ describe("maybeRebind", () => {
         });
         await spec.rewriteRun(typescript(
             `import { Old } from "m";\n\nconst y = Old;`,
-            `import { New as Old } from "m2";\nimport {New} from "other";\n\nconst y = Old;`
+            `import { New as Old } from "m2";\nimport { New } from "other";\n\nconst y = Old;`
         ));
         expect(bound.name).toBe("Old");
     });
@@ -1370,7 +1370,7 @@ describe("maybeRebind", () => {
         });
         await spec.rewriteRun(typescript(
             `import type { a, b} from "m";\n\nlet x: a;\nlet y: b;`,
-            `import type { b} from "m";\nimport type {a} from "m2";\n\nlet x: a;\nlet y: b;`
+            `import type { b} from "m";\nimport type { a } from "m2";\n\nlet x: a;\nlet y: b;`
         ));
     });
 
@@ -1409,6 +1409,51 @@ describe("maybeRebind", () => {
         await spec.rewriteRun(typescript(
             `import {type a, b} from "m";\n\nlet x: a;\nlet y: b;`,
             `import {b} from "m";\nimport type {a} from "m2";\n\nlet x: a;\nlet y: b;`
+        ));
+    });
+
+    function rebindMember(member: string) {
+        return new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member}, to: {module: "n", member}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        };
+    }
+
+    test("moving the last specifier out of a spaced list keeps the space before its brace", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindMember("c"));
+        await spec.rewriteRun(typescript(
+            `import { a, b, c } from "m";\n\nconst x = [a, b, c];`,
+            `import { a, b } from "m";\nimport { c } from "n";\n\nconst x = [a, b, c];`
+        ));
+    });
+
+    test("moving a middle specifier out of a spaced list", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindMember("b"));
+        await spec.rewriteRun(typescript(
+            `import { a, b, c } from "m";\n\nconst x = [a, b, c];`,
+            `import { a, c } from "m";\nimport { b } from "n";\n\nconst x = [a, b, c];`
+        ));
+    });
+
+    test("moving the last specifier out of an unspaced list", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindMember("c"));
+        await spec.rewriteRun(typescript(
+            `import {a, b, c} from "m";\n\nconst x = [a, b, c];`,
+            `import {a, b} from "m";\nimport {c} from "n";\n\nconst x = [a, b, c];`
+        ));
+    });
+
+    test("moving the last specifier out of a one-per-line list keeps its trailing comma and line break", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindMember("b"));
+        await spec.rewriteRun(typescript(
+            `import {\n    a,\n    b,\n} from "m";\n\nconst x = [a, b];`,
+            `import {\n    a,\n} from "m";\nimport {b} from "n";\n\nconst x = [a, b];`
         ));
     });
 });

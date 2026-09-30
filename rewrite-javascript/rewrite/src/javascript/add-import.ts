@@ -2,7 +2,8 @@ import {JavaScriptVisitor} from "./visitor";
 import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, TrailingComma, Type} from "../java";
 import {JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
-import {emptyMarkers, findMarker, markers} from "../markers";
+import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
+import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
 import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
@@ -456,11 +457,33 @@ function quoteOf(expression: J | undefined): QuoteChar | undefined {
 }
 
 /**
- * Pick the quote character for a module specifier being added to `cu`, so that it agrees
- * with the file it lands in. An existing specifier is the most direct precedent; a Prettier
- * config states intent even where the file itself has not been formatted to match.
+ * The value a Prettier configuration on `cu` gives `option`, or Prettier's own `fallback` where the
+ * configuration does not name it; `undefined` without a configuration in force. A configuration
+ * outranks the file's own evidence, since running Prettier would arrive at its answer anyway.
  */
-async function detectQuote(cu: JS.CompilationUnit): Promise<QuoteChar> {
+function prettierOption<T>(cu: JS.CompilationUnit, option: string, fallback: T): T | undefined {
+    const prettier = getPrettierStyle(cu);
+    if (!prettier || prettier.ignored) {
+        return undefined;
+    }
+    const value = prettier.config[option];
+    return typeof value === typeof fallback ? value as T : fallback;
+}
+
+/**
+ * Pick the quote character for a module specifier being added to `cu`, so that it agrees
+ * with the file it lands in. A Prettier configuration settles it; short of one, the caller's
+ * `requested` quote, then an existing specifier as the most direct precedent.
+ */
+async function detectQuote(cu: JS.CompilationUnit, requested?: QuoteChar): Promise<QuoteChar> {
+    const singleQuote = prettierOption(cu, 'singleQuote', false);
+    if (singleQuote !== undefined) {
+        return singleQuote ? "'" : '"';
+    }
+    if (requested) {
+        return requested;
+    }
+
     // Static imports are top-level, so the highest-ranked signal needs no traversal to find.
     for (const statement of cu.statements) {
         const element = statement.element;
@@ -521,25 +544,87 @@ async function detectQuote(cu: JS.CompilationUnit): Promise<QuoteChar> {
         return specifierQuote;
     }
 
-    const prettier = getPrettierStyle(cu);
-    if (prettier && !prettier.ignored) {
-        const singleQuote = prettier.config.singleQuote;
-        if (typeof singleQuote === 'boolean') {
-            return singleQuote ? "'" : '"';
-        }
-    }
-
     return double > single ? '"' : "'";
 }
 
+/** Top-level statements that end in `;` in a file that uses semicolons at all. */
+const semicolonTerminated = new Set<string>([
+    JS.Kind.Import, JS.Kind.ExportDeclaration, JS.Kind.ExportAssignment, JS.Kind.TypeDeclaration,
+    JS.Kind.ExpressionStatement, J.Kind.VariableDeclarations, J.Kind.MethodInvocation, J.Kind.Assignment
+]);
+
 /**
- * Lays out the import statement `AddImport` wrote, so that the file's own style — a Prettier
- * configuration's brace spacing and print width, say — reaches it.
+ * Whether an import statement added to `cu` should end in `;`. A Prettier configuration settles
+ * it; short of one, the file's imports, then its other statements that would take one.
  */
-async function formatImport<P>(cu: JS.CompilationUnit, id: UUID, p: P): Promise<JS.CompilationUnit> {
+function detectSemi(cu: JS.CompilationUnit): boolean {
+    const semi = prettierOption(cu, 'semi', true);
+    if (semi !== undefined) {
+        return semi;
+    }
+    const tally = (kinds: (kind: string) => boolean): number => {
+        let score = 0;
+        for (const statement of cu.statements) {
+            if (statement.element && kinds(statement.element.kind)) {
+                score += findMarker(statement, J.Markers.Semicolon) ? 1 : -1;
+            }
+        }
+        return score;
+    };
+    const score = cu.statements.some(s => s.element?.kind === JS.Kind.Import)
+        ? tally(kind => kind === JS.Kind.Import)
+        : tally(kind => semicolonTerminated.has(kind));
+    return score >= 0;
+}
+
+/**
+ * Whether a brace list added to `cu` is written `{ x }` rather than `{x}`. A Prettier configuration
+ * settles it; short of one, the file's own single-line import lists, then the style in force.
+ */
+function detectBraceSpacing(cu: JS.CompilationUnit): boolean {
+    const bracketSpacing = prettierOption(cu, 'bracketSpacing', true);
+    if (bracketSpacing !== undefined) {
+        return bracketSpacing;
+    }
+    let score = 0;
+    for (const statement of cu.statements) {
+        const namedBindings = statement.element?.kind === JS.Kind.Import
+            ? (statement.element as JS.Import).importClause?.namedBindings
+            : undefined;
+        if (namedBindings?.kind !== JS.Kind.NamedImports) {
+            continue;
+        }
+        const first = (namedBindings as JS.NamedImports).elements.elements[0]?.element;
+        // A list laid out one per line says nothing about how a one-line list is spaced.
+        if (first && !first.prefix.whitespace.includes('\n')) {
+            score += first.prefix.whitespace.length > 0 ? 1 : -1;
+        }
+    }
+    if (score !== 0) {
+        return score > 0;
+    }
+    return (getStyle(StyleKind.SpacesStyle, cu) as SpacesStyle).within.es6ImportExportBraces;
+}
+
+/**
+ * Lays out the import statement `AddImport` wrote, so that a Prettier configuration's print width,
+ * say, reaches it. Its quote, brace spacing and semicolon were already chosen to match the file.
+ */
+async function formatImport<P>(cu: JS.CompilationUnit, id: UUID, p: P, braceSpacing?: boolean): Promise<JS.CompilationUnit> {
+    // The formatter would otherwise re-space the braces by the style in force, over the file's own evidence.
+    const spaces = getStyle(StyleKind.SpacesStyle, cu) as SpacesStyle;
+    const styles: NamedStyles<string>[] | undefined =
+        braceSpacing === undefined || braceSpacing === spaces.within.es6ImportExportBraces ? undefined : [{
+            kind: MarkersKind.NamedStyles,
+            id: randomId(),
+            name: "org.openrewrite.javascript.AddImport",
+            displayName: "Brace spacing detected by AddImport",
+            tags: [],
+            styles: [{...spaces, within: {...spaces.within, es6ImportExportBraces: braceSpacing}} as SpacesStyle]
+        }];
     return await new class extends JavaScriptVisitor<P> {
         override async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
-            return jsImport.id === id ? await autoFormat(jsImport, p, undefined, this.cursor.parent) : jsImport;
+            return jsImport.id === id ? await autoFormat(jsImport, p, undefined, this.cursor.parent, styles) : jsImport;
         }
     }().visit(cu, p) as JS.CompilationUnit;
 }
@@ -820,15 +905,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         const withImport = await this.produceJavaScript(compilationUnit, p, async draft => {
             // Insert the import at the appropriate position
-            // Create semicolon marker for the import statement
-            const semicolonMarkers = markers({
-                kind: J.Markers.Semicolon,
-                id: randomId()
-            });
+            const semicolonMarkers = detectSemi(compilationUnit)
+                ? markers({kind: J.Markers.Semicolon, id: randomId()})
+                : emptyMarkers;
 
             if (insertionIndex === 0) {
                 // Insert at the beginning
-                // The `after` space should be empty since semicolon is printed after it
+                // The `after` space should be empty since any semicolon is printed after it
                 // The spacing comes from updating the next statement's prefix
                 const updatedStatements = compilationUnit.statements.length > 0
                     ? [
@@ -876,7 +959,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         });
 
-        return formatImport(withImport, newImport.id, p);
+        return formatImport(withImport, newImport.id, p, detectBraceSpacing(compilationUnit));
     }
 
     /**
@@ -1403,7 +1486,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // Note: value is the unquoted module name; valueSource and unicodeEscapes are its printed form
         let valueSource = this.moduleValueSource;
         if (valueSource === undefined) {
-            const quote = this.quoteStyle ?? await detectQuote(compilationUnit);
+            const quote = await detectQuote(compilationUnit, this.quoteStyle);
             valueSource = `${quote}${this.module}${quote}`;
         }
         const moduleSpecifier: J.Literal = {
@@ -1490,9 +1573,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         } else {
             // Named import: import { member } from 'module'
 
-            // Get the spaces style for brace spacing
-            const spacesStyle = getStyle(StyleKind.SpacesStyle, compilationUnit) as SpacesStyle;
-            const braceSpace = spacesStyle.within.es6ImportExportBraces ? singleSpace : emptySpace;
+            const braceSpace = detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
 
             const importSpec = this.createImportSpecifier();
             // Apply brace spacing: the space after { is in the specifier's prefix,
@@ -1822,7 +1903,7 @@ function aliasing(local: J.Identifier, member: string): JS.Alias {
  * Drops the binding for `member` from `jsImport`'s clause — the default, the namespace alias, or
  * one entry of the named list, whichever `member` names — keeping everything else the clause
  * binds. `ElementRemovalFormatter` carries the dropped binding's prefix onto whatever prints
- * next, the same way `RemoveImport` keeps formatting sane when trimming a list.
+ * next, and a dropped last entry's trailing space onto the new last, as `RemoveImport` does.
  */
 function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Import {
     const importClause = jsImport.importClause;
@@ -1875,6 +1956,12 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
         // An emptied brace list still prints, as `import D, {} from "m"`, so it goes with its
         // last member; the caller drops the whole statement when no default remains either.
         return {...jsImport, importClause: {...importClause, namedBindings: undefined}};
+    }
+    // The space before `}` and any trailing comma belong to the last entry, so they move onto the
+    // new last entry when the old one is dropped.
+    const originalLast = namedImports.elements.elements[namedImports.elements.elements.length - 1];
+    if (namedSpecifierImports(originalLast.element.specifier, key)) {
+        kept[kept.length - 1] = {...kept[kept.length - 1], after: originalLast.after, markers: originalLast.markers};
     }
     const updatedNamedImports: JS.NamedImports = {...namedImports, elements: {...namedImports.elements, elements: kept}};
     return {...jsImport, importClause: {...importClause, namedBindings: updatedNamedImports}};
