@@ -95,6 +95,10 @@ public final class NativeLockEngine {
     private static final List<String> DECLARED_SCOPES = Arrays.asList(
             "dependencies", "devDependencies", "peerDependencies", "optionalDependencies");
 
+    /** npm keeps one root edge per name, each scope it loads replacing the last: peer, prod, optional, then dev. */
+    private static final List<String> NPM_EDGE_PRECEDENCE = Arrays.asList(
+            "devDependencies", "optionalDependencies", "dependencies", "peerDependencies");
+
     /**
      * The cannot-reshape deferrals whole-closure resolution may still reproduce byte-exact. Genuine
      * input/environment failures (malformed lock/manifest, registry/auth/not-found) are deliberately absent —
@@ -195,9 +199,6 @@ public final class NativeLockEngine {
         for (DepChange change : changes) {
             edits.addAll(resolveEdit(pm, change, existingLock, memberImporterDir, registries, client));
         }
-        if (pm == PackageManager.YarnBerry) {
-            edits = enrichBerryChecksums(edits, existingLock, registries, client);
-        }
         // resolveEdit does not consult overrides, so an edit that reaches an overridden package would lock it
         // at its registry version. One the edit never touches is left alone: diverting it only loses a patch.
         Set<String> overridden = overriddenNames(pm, editedPackageJson, recordedOverrides);
@@ -206,6 +207,9 @@ public final class NativeLockEngine {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, edit.getName(),
                         "the edit reaches " + edit.getName() + ", which the manifest overrides");
             }
+        }
+        if (pm == PackageManager.YarnBerry) {
+            edits = enrichBerryChecksums(edits, existingLock, registries, client);
         }
 
         LockEditSet editSet = new LockEditSet(existingLock, lockPath, pm, editedPackageJson, edits);
@@ -456,8 +460,7 @@ public final class NativeLockEngine {
         Map<String, String> specs = new LinkedHashMap<>();
         try {
             JsonNode root = JSON.readTree(manifestJson);
-            for (String scope : new String[]{"dependencies", "devDependencies", "optionalDependencies",
-                    "peerDependencies"}) {
+            for (String scope : NPM_EDGE_PRECEDENCE) {
                 for (Map.Entry<String, JsonNode> dep : root.path(scope).properties()) {
                     if (dep.getValue().isTextual()) {
                         specs.putIfAbsent(dep.getKey(), dep.getValue().asText());
@@ -542,8 +545,7 @@ public final class NativeLockEngine {
             } else if (value.isTextual() && value.asText().startsWith("$")) {
                 String ref = value.asText().substring(1);
                 // Every scope, so the precedence each manager gives them needs no modelling.
-                for (String scope : new String[]{"dependencies", "devDependencies", "optionalDependencies",
-                        "peerDependencies"}) {
+                for (String scope : DECLARED_SCOPES) {
                     inputs.add(root.path(scope).path(ref).toString());
                 }
             }
@@ -571,8 +573,10 @@ public final class NativeLockEngine {
         if (header < 0) {
             return emptyList();
         }
-        StringBuilder section = new StringBuilder("overrides:\n");
-        int line = lock.indexOf('\n', header + 1) + 1;
+        int headerEnd = lock.indexOf('\n', header + 1);
+        StringBuilder section = new StringBuilder(lock.substring(header == 0 ? 0 : header + 1,
+                headerEnd < 0 ? lock.length() : headerEnd)).append('\n');
+        int line = headerEnd + 1;
         while (line > 0 && line < lock.length()) {
             int end = lock.indexOf('\n', line);
             String text = lock.substring(line, end < 0 ? lock.length() : end);
@@ -697,6 +701,12 @@ public final class NativeLockEngine {
         for (Map.Entry<String, JsonNode> property : node.properties()) {
             String key = property.getKey();
             JsonNode value = property.getValue();
+            // npm's "." pins the parent package itself, which under an unversioned top-level parent is a global
+            // override of that parent.
+            boolean parentPin = ".".equals(key) && parent != null && !value.isObject() && parentVersion(parent) == null;
+            if (parentPin) {
+                key = parent;
+            }
             // A parent key may carry a version selector, checked later against the resolved parent. A leaf
             // key may not: a range there selects which copies to override, and this engine places only one.
             if (!OVERRIDE_NAME.matcher(value.isObject() ? parentName(key) : key).matches()) {
@@ -728,7 +738,7 @@ public final class NativeLockEngine {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key,
                         "override of " + key + " is declared more than once");
             }
-            if (parent != null) {
+            if (parent != null && !parentPin) {
                 scopedParent.put(key, parent);
             }
         }
@@ -741,6 +751,16 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, key, refusal);
         }
         return collectOverrideKeyNames(JSON.createObjectNode().set(key, value), unmodelled);
+    }
+
+    private static @Nullable String effectiveEdgeSpec(ResolutionGraph.Importer importer, String name) {
+        for (String scope : NPM_EDGE_PRECEDENCE) {
+            Map<String, String> declared = importer.getDeclared().get(scope);
+            if (declared != null && declared.containsKey(name)) {
+                return declared.get(name);
+            }
+        }
+        return null;
     }
 
     /** The name part of a parent key; the {@code > 0} guard keeps a scoped name's leading {@code @}. */
@@ -763,13 +783,10 @@ public final class NativeLockEngine {
         for (Map.Entry<String, String> e : overrides.entrySet()) {
             String name = e.getKey();
             for (ResolutionGraph.Importer importer : graph.getImporters()) {
-                for (Map<String, String> scope : importer.getDeclared().values()) {
-                    String declared = scope.get(name);
-                    if (declared != null && !declared.equals(e.getValue())) {
-                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                                "override of " + name + " conflicts with it as a direct dependency (" +
-                                        declared + ")");
-                    }
+                String declared = effectiveEdgeSpec(importer, name);
+                if (declared != null && !declared.equals(e.getValue())) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                            "override of " + name + " conflicts with it as a direct dependency (" + declared + ")");
                 }
             }
         }

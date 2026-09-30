@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -193,7 +194,9 @@ public final class PackageJsonOverrides {
         String indent = PackageJsonHelper.detectIndentUnit(root);
         try {
             ObjectMapper mapper = new ObjectMapper();
-            JsonNode rootNode = mapper.readTree(doc.printAll());
+            // A warning an earlier recipe left on the manifest would otherwise print into the JSON.
+            JsonNode rootNode = mapper.readTree(doc.printAll(
+                    new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)));
             ObjectNode overrides = rootNode.path("overrides").isObject() ?
                     (ObjectNode) rootNode.get("overrides") : mapper.createObjectNode();
 
@@ -220,9 +223,6 @@ public final class PackageJsonOverrides {
             }
 
             JsonValue value = parseFragment(doc, mapper, overrides, indent);
-            if (value == null) {
-                return doc;
-            }
             if (findObjectMember(root, "overrides") != null) {
                 return doc.withValue(replaceMemberValue(root, "overrides", value));
             }
@@ -240,11 +240,11 @@ public final class PackageJsonOverrides {
                     closing, Markers.EMPTY));
             return doc.withValue(root.getPadding().withMembers(members));
         } catch (Exception e) {
-            return doc;
+            throw new IllegalStateException("could not write the override of " + packageName, e);
         }
     }
 
-    private static @Nullable JsonValue parseFragment(Json.Document doc, ObjectMapper mapper,
+    private static JsonValue parseFragment(Json.Document doc, ObjectMapper mapper,
                                                      ObjectNode overrides, String indent) throws Exception {
         DefaultPrettyPrinter printer = new DefaultPrettyPrinter() {
             @Override
@@ -266,8 +266,10 @@ public final class PackageJsonOverrides {
             sb.append(i == 0 ? "" : "\n" + indent).append(lines[i]);
         }
         Json.Document holder = PackageJsonHelper.reparseJson(doc, sb.toString());
-        return holder.getValue() instanceof Json.JsonObject ?
-                ((Json.JsonObject) holder.getValue()).withPrefix(Space.build(" ", emptyList())) : null;
+        if (!(holder.getValue() instanceof Json.JsonObject)) {
+            throw new IllegalStateException("the overrides object did not reparse as one");
+        }
+        return ((Json.JsonObject) holder.getValue()).withPrefix(Space.build(" ", emptyList()));
     }
 
     private static @Nullable String nestedOverrideValue(Json.Document doc, List<DependencyPathSegment> path,

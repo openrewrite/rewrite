@@ -17,11 +17,13 @@ package org.openrewrite.javascript.internal;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markup;
 
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -264,6 +266,29 @@ class PackageJsonHelperTest {
                   }
                 }
                 """);
+    }
+
+    @Test
+    void aNestedOverrideIsWrittenPastAnEarlierWarning() {
+        Json.Document warned = (Json.Document) Markup.warn(parsePackageJson("""
+                {
+                  "overrides": {}
+                }
+                """), new RuntimeException("lock regeneration failed"));
+
+        Json.Document written = PackageJsonHelper.upgradeTransitive(warned, NodeResolutionResult.PackageManager.Npm,
+                "accepts", "1.3.8", PackageJsonOverrides.parsePath("express"));
+
+        assertThat(written.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
+                .isEqualTo("""
+                        {
+                          "overrides": {
+                            "express": {
+                              "accepts": "1.3.8"
+                            }
+                          }
+                        }
+                        """);
     }
 
     @Test

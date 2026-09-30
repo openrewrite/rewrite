@@ -808,10 +808,7 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).contains("outside declared dependencies");
     }
 
-    /**
-     * The whole-closure resolver reads only declared dependencies, so it recomputes the identical
-     * closure and reports success over a lock that still pins the old version.
-     */
+    /** Resolved without the override, the closure would come out unchanged over a lock pinning the old version. */
     @Test
     void overrideOfALockedTransitiveMustNotSilentlySucceed() {
         routes.put("https://registry.npmjs.org/lodash",
@@ -1258,14 +1255,12 @@ class NativeLockEngineTest {
     }
 
     /**
-     * The four forms an allowlist must reject. Each reached select with a key that matches no package, so the
-     * closure resolved as if the override were absent and the engine reported success over an unchanged lock:
-     * the defect this class exists to pin, in forms a denylist did not enumerate.
+     * Forms the strict read rejects. Each selects by something other than a plain name, so resolving past it
+     * would treat the override as absent and report success over an unchanged lock.
      */
     @ParameterizedTest
     @ValueSource(strings = {
             "{\"tslib@^2\":\"1.0.0\"}",
-            "{\"tslib\":{\".\":\"1.0.0\"}}",
             "{\"lodash\":{\"tslib@^2\":\"1.0.0\"}}",
             "{\"lodash\":{\"tslib\":\"1.0.0\"},\"tslib\":\"2.0.0\"}"
     })
@@ -1382,6 +1377,24 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).contains("tslib-2.0.0.tgz").doesNotContain("tslib-1.0.0.tgz");
+    }
+
+    @Test
+    void aDotPinOverridesItsParentBesideItsNestedOverride() {
+        versionedParentRoutes();
+
+        Result result = regen(PackageManager.Npm,
+                """
+                {"dependencies": {"lodash": "^4.17.20"}}""",
+                """
+                {"dependencies": {"lodash": "^4.17.20"}, "overrides": {"lodash": {".": "^4.17.20", "tslib": "^2.0.0"}}}""",
+                versionedParentLock());
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(versionedParentLock()
+                .replace("\"version\": \"1.0.0\"", "\"version\": \"2.0.0\"")
+                .replace("tslib-1.0.0.tgz", "tslib-2.0.0.tgz")
+                .replace("sha512-TSLIB100", "sha512-TSLIB200"));
     }
 
     /** The parent resolves to a different version, so npm would not apply it and neither can this. */
@@ -1672,6 +1685,13 @@ class NativeLockEngineTest {
                 """));
         assertThat(bun.isSuccess()).isFalse();
         assertThat(bun.getFailure().getDetail()).isEqualTo("the closure contains beta, which an override selector reaches");
+
+        Result pnpmFlow = unrelatedAdd(PackageManager.Pnpm, "\"private\":true", pnpmUnrelatedAddLock("""
+                overrides: {beta: ^1.0.0}
+
+                """));
+        assertThat(pnpmFlow.isSuccess()).isFalse();
+        assertThat(pnpmFlow.getFailure().getDetail()).isEqualTo("the closure contains beta, which an override selector reaches");
     }
 
     private Result unrelatedAdd(PackageManager pm, String overrides, String lock) {
@@ -1840,6 +1860,17 @@ class NativeLockEngineTest {
                 .isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
                         singletonMap("accepts", "^2.0.0"), emptyMap()))
                 .withMessageContaining("conflicts with it as a direct dependency (^1.0.0)");
+    }
+
+    @Test
+    void overrideMatchingTheEffectiveEdgeHoldsBesideAWiderPeerRange() {
+        Map<String, Map<String, String>> declared = new LinkedHashMap<>();
+        declared.put("devDependencies", singletonMap("react", "^18.2.0"));
+        declared.put("peerDependencies", singletonMap("react", "^18"));
+        ResolutionGraph graph = graphOf(declared, node("react", "18.3.1", emptyMap()));
+
+        assertThatNoException().isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
+                singletonMap("react", "^18.2.0"), emptyMap()));
     }
 
     @Test
