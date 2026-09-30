@@ -1267,6 +1267,88 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void doesNotCorruptSharedVariableInMapNotation() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-annotations", version: jacksonVersion
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonVersion
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-annotations", version: "2.21"
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedVariableInKotlinNamedArguments() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-annotations", version = jacksonVersion)
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = jacksonVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-annotations", version = "2.21")
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = jacksonVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotCorruptSharedGradleProperty() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
