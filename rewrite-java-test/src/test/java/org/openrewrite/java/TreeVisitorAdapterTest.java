@@ -26,6 +26,8 @@ import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.java.tree.J;
 
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -240,6 +242,61 @@ class TreeVisitorAdapterTest {
             }
         } finally {
             executor.shutdownNow();
+        }
+    }
+
+    /**
+     * Recipe class loaders (e.g. the Moderne CLI's) give a recipe its own copy of rewrite-java, while the
+     * visitor type a tree adapts to (e.g. {@code GroovyVisitor} from the LST's G.accept) comes from the parent.
+     */
+    @Test
+    void adaptVisitorFromChildFirstClassLoader() throws Exception {
+        URL rewriteJava = JavaIsoVisitor.class.getProtectionDomain().getCodeSource().getLocation();
+        URL testClasses = TreeVisitorAdapterTest.class.getProtectionDomain().getCodeSource().getLocation();
+        try (URLClassLoader recipeLoader = new ChildFirstClassLoader(new URL[]{rewriteJava, testClasses},
+          TreeVisitorAdapterTest.class.getClassLoader())) {
+            Class<?> childVisitor = recipeLoader.loadClass(ChildLoadedVisitor.class.getName());
+            assertThat(childVisitor.getSuperclass()).isNotSameAs(JavaIsoVisitor.class);
+
+            TreeVisitor<?, ?> delegate = (TreeVisitor<?, ?>) childVisitor.getDeclaredConstructor().newInstance();
+            //noinspection unchecked
+            JavaVisitor<Integer> adapted = TreeVisitorAdapter.adapt((TreeVisitor<J, ?>) delegate, JavaVisitor.class);
+            J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
+              .findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+            assertThat(adapted.visit(cu, 0)).isSameAs(cu);
+        }
+    }
+
+    public static class ChildLoadedVisitor extends JavaIsoVisitor<Integer> {
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+            return identifier;
+        }
+    }
+
+    static class ChildFirstClassLoader extends URLClassLoader {
+        ChildFirstClassLoader(URL[] urls, ClassLoader parent) {
+            super(urls, parent);
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (!name.equals(JavaIsoVisitor.class.getName()) && !name.startsWith(TreeVisitorAdapterTest.class.getName() + "$")) {
+                return super.loadClass(name, resolve);
+            }
+            synchronized (getClassLoadingLock(name)) {
+                Class<?> c = findLoadedClass(name);
+                if (c == null) {
+                    try {
+                        c = findClass(name);
+                    } catch (ClassNotFoundException e) {
+                        c = super.loadClass(name, resolve);
+                    }
+                }
+                return c;
+            }
         }
     }
 
