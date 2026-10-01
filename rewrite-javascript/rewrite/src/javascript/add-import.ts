@@ -1233,6 +1233,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * or extracting it from the FQN.
      */
     private getModuleFromClassType(classType: Type.Class): string | undefined {
+        if (Type.isFunctionType(classType)) {
+            return undefined;
+        }
         // Traverse owningClass chain to find the root
         let current: Type.Class = classType;
         while (current.owningClass && Type.isClass(current.owningClass)) {
@@ -1355,6 +1358,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const targetModule = this.module;
         let found = false;
         const self = this;
+        const matchesModule = (name: string | undefined) =>
+            name !== undefined && (name === expectedDeclaringType || name === targetModule);
 
         // If no existing imports from this module, look for unresolved references
         // If there ARE existing imports, look for references with the expected declaring type
@@ -1368,12 +1373,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         // We have an expected declaring type - check for exact match
                         if (type && Type.isMethod(type)) {
                             const declaringTypeName = Type.FullyQualified.getFullyQualifiedName((type as Type.Method).declaringType);
-                            if (declaringTypeName === expectedDeclaringType) {
+                            if (matchesModule(declaringTypeName)) {
                                 found = true;
                             }
                         }
                         else if (type && Type.isClass(type)) {
-                            if (self.classTypeMatchesModule(type as Type.Class, expectedDeclaringType)) {
+                            if (self.classTypeMatchesModule(type as Type.Class, expectedDeclaringType) ||
+                                self.classTypeMatchesModule(type as Type.Class, targetModule)) {
                                 found = true;
                             }
                         }
@@ -1381,7 +1387,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                             const ownerTypeName = (fieldType as Type.Variable).owner
                                 ? Type.FullyQualified.getFullyQualifiedName((fieldType as Type.Variable).owner!)
                                 : undefined;
-                            if (ownerTypeName === expectedDeclaringType) {
+                            if (matchesModule(ownerTypeName)) {
                                 found = true;
                             }
                         }
@@ -1429,25 +1435,17 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
 
             override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: void): Promise<J | undefined> {
-                if (methodInvocation.methodType && methodInvocation.methodType.name === targetName) {
-                    if (expectedDeclaringType) {
-                        const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodInvocation.methodType.declaringType);
-                        if (declaringTypeName === expectedDeclaringType) {
-                            found = true;
-                        }
-                    }
+                if (expectedDeclaringType && methodInvocation.methodType && methodInvocation.methodType.name === targetName &&
+                    matchesModule(Type.FullyQualified.getFullyQualifiedName(methodInvocation.methodType.declaringType))) {
+                    found = true;
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
 
             override async visitFunctionCall(functionCall: JS.FunctionCall, p: void): Promise<J | undefined> {
-                if (functionCall.methodType && functionCall.methodType.name === targetName) {
-                    if (expectedDeclaringType) {
-                        const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(functionCall.methodType.declaringType);
-                        if (declaringTypeName === expectedDeclaringType) {
-                            found = true;
-                        }
-                    }
+                if (expectedDeclaringType && functionCall.methodType && functionCall.methodType.name === targetName &&
+                    matchesModule(Type.FullyQualified.getFullyQualifiedName(functionCall.methodType.declaringType))) {
+                    found = true;
                 }
                 return super.visitFunctionCall(functionCall, p);
             }
@@ -1456,13 +1454,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 const type = fieldAccess.type;
                 if (type && Type.isMethod(type)) {
                     const methodType = type as Type.Method;
-                    if (methodType.name === targetName) {
-                        if (expectedDeclaringType) {
-                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
-                            if (declaringTypeName === expectedDeclaringType) {
-                                found = true;
-                            }
-                        }
+                    if (expectedDeclaringType && methodType.name === targetName &&
+                        matchesModule(Type.FullyQualified.getFullyQualifiedName(methodType.declaringType))) {
+                        found = true;
                     }
                 }
                 return super.visitFieldAccess(fieldAccess, p);
