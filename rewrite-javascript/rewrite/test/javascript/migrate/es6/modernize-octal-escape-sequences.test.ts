@@ -116,6 +116,26 @@ describe("modernize-octal-escape-sequences", () => {
         )
     })
 
+    test("keeps surrogate escapes in place when the text before them changes length", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const s = "\\1\\ud83d\\ude80\\12";`,
+                `const s = "\\x01\\ud83d\\ude80\\x0a";`
+            )
+        )
+    })
+
+    test("an octal escape stops at a surrogate escape", () => {
+        return spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `const s = "\\1\\ud83d23";`,
+                `const s = "\\x01\\ud83d23";`
+            )
+        )
+    })
+
     test("converts single-quoted strings", () => {
         return spec.rewriteRun(
             //language=javascript

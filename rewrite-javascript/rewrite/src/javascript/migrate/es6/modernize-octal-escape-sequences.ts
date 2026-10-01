@@ -42,6 +42,17 @@ export class ModernizeOctalEscapeSequences extends Recipe {
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const useUnicode = this.useUnicodeEscapes;
+        const modernize = (source: string) => source.replace(
+            /\\([0-3][0-7]{0,2}|[4-7][0-7]?|[\s\S])/g,
+            (escape: string, body: string, offset: number) => {
+                if (!/^[0-7]/.test(body) || (body === '0' && !/[0-9]/.test(source[offset + 2] ?? ''))) {
+                    return escape;
+                }
+                const code = parseInt(body, 8);
+                return useUnicode ?
+                    `\\u${code.toString(16).padStart(4, '0')}` :
+                    `\\x${code.toString(16).padStart(2, '0')}`;
+            });
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
             protected async visitLiteral(literal: J.Literal, _ctx: ExecutionContext): Promise<J | undefined> {
@@ -51,20 +62,20 @@ export class ModernizeOctalEscapeSequences extends Recipe {
                     return literal;
                 }
 
-                const modernized = valueSource.replace(
-                    /\\([0-3][0-7]{0,2}|[4-7][0-7]?|[\s\S])/g,
-                    (escape: string, body: string, offset: number) => {
-                        if (!/^[0-7]/.test(body) || (body === '0' && !/[0-9]/.test(valueSource[offset + 2] ?? ''))) {
-                            return escape;
-                        }
-                        const code = parseInt(body, 8);
-                        return useUnicode ?
-                            `\\u${code.toString(16).padStart(4, '0')}` :
-                            `\\x${code.toString(16).padStart(2, '0')}`;
-                    });
+                // Surrogate escapes are held outside valueSource, so each run between them is rewritten on its own
+                // and the escapes are moved to where their runs now end.
+                let modernized = '';
+                let cut = 0;
+                const unicodeEscapes = literal.unicodeEscapes?.map(escape => {
+                    modernized += modernize(valueSource.slice(cut, escape.valueSourceIndex));
+                    cut = escape.valueSourceIndex;
+                    return {...escape, valueSourceIndex: modernized.length};
+                });
+                modernized += modernize(valueSource.slice(cut));
 
                 return modernized === valueSource ? literal : produce(literal, draft => {
                     draft.valueSource = modernized;
+                    draft.unicodeEscapes = unicodeEscapes;
                 });
             }
         }
