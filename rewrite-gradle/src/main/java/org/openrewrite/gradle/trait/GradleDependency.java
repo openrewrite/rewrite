@@ -1379,14 +1379,6 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         return updated == m ? this : new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
     }
 
-    /**
-     * <pre>
-     * versionReplacement('1.0',      "2.0", [group: "com.acme"])  -> '2.0'
-     * versionReplacement('2.0',      "2.0", [group: 'com.acme'])  -> null
-     * versionReplacement(libVersion, "2.0", [group: 'com.acme'])  -> '2.0'
-     * versionReplacement(versions.x, "2.0", [group = "com.acme"]) -> "2.0"
-     * </pre>
-     */
     private static J.@Nullable Literal versionReplacement(Expression declaredVersion, String newVersion,
                                                           List<? extends Expression> quoteFrom) {
         if (declaredVersion instanceof J.Literal) {
