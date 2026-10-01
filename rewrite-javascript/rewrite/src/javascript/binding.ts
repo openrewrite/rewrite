@@ -164,7 +164,7 @@ function dynamicallyImportedModule(declaration: J.VariableDeclarations): string 
     }
     const argument = call.arguments.elements[0]?.element;
     return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === "string"
-        ? (argument as J.Literal).value as string
+        ? moduleNameOf(argument as J.Literal)
         : undefined;
 }
 
@@ -200,10 +200,10 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
         if (specifier?.kind !== J.Kind.Literal) {
             continue;
         }
-        const module = (specifier as J.Literal).value;
-        if (typeof module !== "string") {
+        if (typeof (specifier as J.Literal).value !== "string") {
             continue;
         }
+        const module = moduleNameOf(specifier as J.Literal);
         const clause = jsImport.importClause;
         const typeOnly = clause?.typeOnly ?? false;
         if (clause?.name?.element?.kind === J.Kind.Identifier) {

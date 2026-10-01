@@ -1301,6 +1301,63 @@ describe("maybeRebind", () => {
         expect(bound.name).toBe("Old");
     });
 
+    test("an ESM module named with surrogate escapes is replaced whole, escapes included", async () => {
+        // given
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "\ud83d\ude80/Old"}, to: {module: "a/New"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+
+        // when / then
+        await spec.rewriteRun(typescript(
+            `import Old from "\\ud83d\\ude80/Old";\n\nOld.f();`,
+            `import Old from "a/New";\n\nOld.f();`
+        ));
+    });
+
+    test("an AMD dependency named with surrogate escapes is replaced whole, escapes included", async () => {
+        // given
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName !== "target") {
+                    return super.visitMethodInvocation(m, p);
+                }
+                maybeRebind(this, {from: {module: "\ud83d\ude80/Old"}, to: {module: "a/New"}});
+                return m;
+            }
+        });
+
+        // when / then
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["\\ud83d\\ude80/Old"], function (Old) { target(); });`,
+            `sap.ui.define(["a/New"], function (Old) { target(); });`
+        ));
+    });
+
+    test("an AMD dependency written as a template literal names its module without the backticks", async () => {
+        // given
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (m.name.simpleName !== "target") {
+                    return super.visitMethodInvocation(m, p);
+                }
+                maybeRebind(this, {from: {module: "a/Old"}, to: {module: "a/New"}});
+                return m;
+            }
+        });
+
+        // when / then
+        await spec.rewriteRun(javascript(
+            "sap.ui.define([`a/Old`], function (Old) { target(); });",
+            `sap.ui.define(["a/New"], function (Old) { target(); });`
+        ));
+    });
+
     test("a rebind of a module nothing binds returns undefined and changes nothing", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};

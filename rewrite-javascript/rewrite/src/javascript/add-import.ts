@@ -438,7 +438,7 @@ export function moduleNameOf(module: string | J.Literal): string {
     }
     restored += source.slice(cut);
     const quote = restored.charAt(0);
-    return (quote === "'" || quote === '"') && restored.endsWith(quote) && restored.length > 1
+    return (quote === "'" || quote === '"' || quote === '`') && restored.endsWith(quote) && restored.length > 1
         ? restored.slice(1, -1)
         : restored;
 }
@@ -1747,7 +1747,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
  */
 function importBinds(jsImport: JS.Import, module: string, member: string | undefined): string | undefined {
     const specifier = jsImport.moduleSpecifier?.element;
-    if (specifier?.kind !== J.Kind.Literal || (specifier as J.Literal).value !== module) {
+    if (specifier?.kind !== J.Kind.Literal || moduleNameOf(specifier as J.Literal) !== module) {
         return undefined;
     }
     const importClause = jsImport.importClause;
@@ -2029,6 +2029,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             const originalSource = literal.valueSource || `"${this.from.module}"`;
             const quoteChar = originalSource.startsWith("'") ? "'" : '"';
             literal.valueSource = `${quoteChar}${this.to.module}${quoteChar}`;
+            literal.unicodeEscapes = undefined;
 
             // A default or namespace import carries its local name on the clause itself; a named
             // one states the member alongside it, in the specifier.
