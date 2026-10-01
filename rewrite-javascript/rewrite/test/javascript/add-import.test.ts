@@ -25,6 +25,7 @@ import {
     JavaScriptVisitor,
     JS,
     maybeAddImport,
+    maybeRemoveImport,
     npm,
     packageJson,
     prettierStyle,
@@ -34,9 +35,9 @@ import {
     tsx,
     typescript
 } from "../../src/javascript";
-import {emptySpace, J} from "../../src/java";
+import {emptySpace, J, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
-import {MarkersKind, NamedStyles, randomId} from "../../src";
+import {MarkersKind, NamedStyles, produceAsync, randomId} from "../../src";
 import {create as produce} from "mutative";
 import {withDir} from "tmp-promise";
 
@@ -1001,6 +1002,66 @@ describe('AddImport visitor', () => {
     });
 
     describe('usage detection', () => {
+        test('should add import for a renamed call whose callee carries the method type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                    if (m.name.simpleName === 'readFile' && Type.FullyQualified.getFullyQualifiedName(m.methodType?.declaringType!) === 'fs') {
+                        maybeAddImport(this, {module: 'fs', member: 'writeFile'});
+                        maybeRemoveImport(this, 'fs', 'readFile');
+                        return produceAsync(m, async draft => {
+                            draft.name.simpleName = 'writeFile';
+                        });
+                    }
+                    return m;
+                }
+            });
+
+            //language=typescript
+            await spec.rewriteRun({
+                ...typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        readFile('test.txt', () => {});
+                    `,
+                    `
+                        import {writeFile} from 'fs';
+
+                        writeFile('test.txt', () => {});
+                    `
+                ),
+                beforeRecipe: async (cu: JS.CompilationUnit) => await new class extends JavaScriptVisitor<void> {
+                    override async visitMethodInvocation(method: J.MethodInvocation, p: void): Promise<J | undefined> {
+                        const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                        return m.methodType ? produceAsync(m, async draft => {
+                            draft.name.type = m.methodType;
+                        }) : m;
+                    }
+                }().visit<JS.CompilationUnit>(cu, undefined)
+            });
+        });
+
+        test('should not add import for a local function sharing the name of a module member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'writeFile'}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        function writeFile() {}
+
+                        readFile('test.txt', () => {});
+                        const write = writeFile;
+                    `
+                )
+            );
+        });
+
         test('should detect usage in field access', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({ module: "fs" }));
