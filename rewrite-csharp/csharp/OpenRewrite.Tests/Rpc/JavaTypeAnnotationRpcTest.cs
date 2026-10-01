@@ -228,6 +228,60 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
         Assert.Equal([null, "a", null], values.ConstantValues!);
     }
 
+    /// <summary>
+    /// JSON has no literal for NaN or the infinities, so non-finite constants travel as the
+    /// <c>"NaN"</c>/<c>"Infinity"</c>/<c>"-Infinity"</c> strings Jackson uses for them rather than
+    /// failing the whole file's serialization.
+    /// </summary>
+    [Fact]
+    public void NonFiniteConstantsRoundTripThroughJava()
+    {
+        var source = """
+            using System;
+
+            [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+            sealed class LimitAttribute : Attribute
+            {
+                public double Value { get; set; }
+            }
+
+            sealed class DataAttribute : Attribute
+            {
+                public DataAttribute(params object[] data) { Data = data; }
+                public object[] Data { get; }
+            }
+
+            [Limit(Value = double.NaN)]
+            [Limit(Value = double.PositiveInfinity)]
+            [Data(double.NaN, double.PositiveInfinity, float.NegativeInfinity, 1.5)]
+            public class NonFinite { }
+            """;
+
+        var nonFinite = FindClassDeclaration(ProbeOnJava(source, "NonFinite.cs", "NonFinite"), "NonFinite");
+
+        var marker = nonFinite.Markers.FindFirst<SearchResult>();
+        Assert.NotNull(marker);
+        Assert.Equal(
+            "@LimitAttribute(Value=NaN);" +
+            "@LimitAttribute(Value=Infinity);" +
+            "@DataAttribute(Data=[NaN,Infinity,-Infinity,1.5])",
+            marker!.Description);
+
+        var cls = Assert.IsAssignableFrom<JavaType.Class>(nonFinite.Type);
+        var annotations = cls.Annotations!.OfType<JavaType.Annotation>().ToList();
+
+        var limits = annotations
+            .Where(a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "LimitAttribute" })
+            .Select(a => a.Values!.OfType<JavaType.Annotation.SingleElementValue>().Single().ConstantValue)
+            .ToList();
+        Assert.Equal(["probed:NaN", "probed:Infinity"], limits);
+
+        var data = annotations
+            .Single(a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "DataAttribute" })
+            .Values!.OfType<JavaType.Annotation.ArrayElementValue>().Single().ConstantValues;
+        Assert.Equal(["NaN", "Infinity", "-Infinity", 1.5], data!);
+    }
+
     private static J ProbeOnJava(string source, string path, string type)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, path: path);
