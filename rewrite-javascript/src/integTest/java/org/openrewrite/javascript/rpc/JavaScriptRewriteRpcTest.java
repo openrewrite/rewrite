@@ -205,6 +205,28 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @SuppressWarnings("JSUnusedLocalSymbols")
+    @ValueSource(booleans = {true, false})
+    void runSearchRecipeWithNegatedJavaRecipeActingAsPrecondition(boolean vendored) {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.javascript.find-identifier-outside-vendored-or-bundled",
+              Map.of("identifier", "hello"))),
+          vendored ?
+            javascript(
+              "const hello = 'world'",
+              spec -> spec.path("vendor/hello.js")
+            ) :
+            javascript(
+              "const hello = 'world'",
+              "const /*~~>*/hello = 'world'",
+              spec -> spec.path("src/hello.js")
+            )
+        );
+    }
+
     @Test
     void printJava() {
         assertThat(client().installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")).getRecipesInstalled())
