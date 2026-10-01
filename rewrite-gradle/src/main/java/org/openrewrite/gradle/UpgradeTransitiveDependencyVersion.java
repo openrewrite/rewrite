@@ -124,13 +124,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     /**
      * Parse a constant Gradle snippet as a build script, so that a recipe adding code gets a tree the parser
      * produced rather than one it assembled by hand, which is how printing and formatting stay correct.
-     * The result is cached on the execution context, as GradleParser is slow enough that reparsing the same
-     * snippet for every source file is noticeable.
+     * The result is cached on the root cursor, which every visitor in a cycle shares, as GradleParser is slow
+     * enough that reparsing the same snippet for every source file is noticeable.
      */
-    private static Optional<JavaSourceFile> parseAsGradle(String snippet, boolean isKotlinDsl, ExecutionContext ctx) {
-        //noinspection unchecked
-        Map<String, Optional<JavaSourceFile>> cache = (Map<String, Optional<JavaSourceFile>>) ctx.getMessages()
-                .computeIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<String, Optional<JavaSourceFile>>());
+    private static Optional<JavaSourceFile> parseAsGradle(Cursor cursor, String snippet, boolean isKotlinDsl, ExecutionContext ctx) {
+        Map<String, Optional<JavaSourceFile>> cache = cursor.getRoot()
+                .computeMessageIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<>());
         return cache.computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(singleton(
                         new Parser.Input(
                                 Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
@@ -538,7 +537,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     if (updateProperties.isAcceptable(sf, ctx)) {
                         t = updateProperties.visitNonNull(t, ctx);
                     } else if (updateGradle.isAcceptable(sf, ctx)) {
-                        t = updateGradle.visitNonNull(t, ctx);
+                        t = updateGradle.visitNonNull(t, ctx, getCursor());
                     }
                     Optional<GradleProject> projectMarker = t.getMarkers().findFirst(GradleProject.class);
                     if (tree != t && projectMarker.isPresent()) {
@@ -633,7 +632,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                 }
                             }),
                             new AddConstraintsBlock(cu instanceof K.CompilationUnit)
-                    ).visitNonNull(cu, ctx);
+                    ).visitNonNull(cu, ctx, getCursor());
 
                     for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : projectRequiredUpdates.entrySet()) {
                         if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId()) || bomProperties.containsValue(update.getKey())) {
@@ -642,7 +641,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         Map<GradleDependencyConfiguration, String> configs = update.getValue();
                         for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
                             cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
-                                    update.getKey().getArtifactId(), config.getValue()), gradleProject, because).visitNonNull(cu, ctx);
+                                    update.getKey().getArtifactId(), config.getValue()), gradleProject, because).visitNonNull(cu, ctx, getCursor());
                         }
                     }
 
@@ -740,7 +739,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 if (cu instanceof G.CompilationUnit && !isKotlinDsl) {
                     G.CompilationUnit g = (G.CompilationUnit) cu;
                     if (!hasDependenciesBlock(g.getStatements())) {
-                        J.MethodInvocation dependencies = parseAsGradle(
+                        J.MethodInvocation dependencies = parseAsGradle(getCursor(),
                                 //language=groovy
                                 "dependencies {\n" +
                                 "}\n", false, ctx)
@@ -758,7 +757,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             .flatMap(block -> block.getStatements().stream())
                             .collect(toList());
                     if (!hasDependenciesBlock(statements)) {
-                        J.MethodInvocation dependencies = parseAsGradle(
+                        J.MethodInvocation dependencies = parseAsGradle(getCursor(),
                                 //language=kotlin
                                 "dependencies {\n" +
                                 "}\n", true, ctx)
@@ -811,7 +810,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
             if (!isKotlinDsl && DEPENDENCIES_DSL_MATCHER.matches(method)) {
-                G.CompilationUnit withConstraints = (G.CompilationUnit) parseAsGradle(
+                G.CompilationUnit withConstraints = (G.CompilationUnit) parseAsGradle(getCursor(),
                         //language=groovy
                         "plugins { id 'java' }\n" +
                         "dependencies {\n" +
@@ -845,7 +844,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             ListUtils.concat(constraints, statements)));
                 })), constraints, ctx, getCursor().getParentOrThrow());
             } else if (isKotlinDsl && "dependencies".equals(m.getSimpleName()) && getCursor().getParentTreeCursor().firstEnclosing(J.MethodInvocation.class) == null) {
-                K.CompilationUnit withConstraints = (K.CompilationUnit) parseAsGradle(
+                K.CompilationUnit withConstraints = (K.CompilationUnit) parseAsGradle(getCursor(),
                         //language=kotlin
                         "plugins { id(\"java\") }\n" +
                         "dependencies {\n" +
@@ -1096,7 +1095,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
             J.MethodInvocation constraint;
             if (!isKotlinDsl) {
-                constraint = parseAsGradle(because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET_GROOVY : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, false, ctx)
+                constraint = parseAsGradle(getCursor(), because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET_GROOVY : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, false, ctx)
                         .map(requireParsed(G.CompilationUnit.class))
                         .map(it -> (J.MethodInvocation) it.getStatements().get(1))
                         .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
@@ -1128,7 +1127,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(it -> it.withId(Tree.randomId()))
                         .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
             } else {
-                constraint = parseAsGradle(because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET_KOTLIN : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
+                constraint = parseAsGradle(getCursor(), because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET_KOTLIN : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
                         .map(requireParsed(K.CompilationUnit.class))
                         .map(it -> (J.Block) it.getStatements().get(0))
                         .map(it -> (J.MethodInvocation) it.getStatements().get(1))
@@ -1291,7 +1290,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.Lambda becauseArg;
             if (!isKotlinDsl) {
-                becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, false, ctx)
+                becauseArg = parseAsGradle(getCursor(), INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, false, ctx)
                         .map(requireParsed(G.CompilationUnit.class))
                         .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
                         .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
@@ -1310,7 +1309,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         }.visitNonNull(it, 0))
                         .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
             } else {
-                becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
+                becauseArg = parseAsGradle(getCursor(), INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
                         .map(requireParsed(K.CompilationUnit.class))
                         .map(cu -> (J.Block) cu.getStatements().get(0))
                         .map(block -> (J.MethodInvocation) block.getStatements().get(1))
