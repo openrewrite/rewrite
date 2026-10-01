@@ -66,6 +66,11 @@ internal static class TestHelpers
                 new JRightPadded<TypeTree>(MakeId("int"), Space.Empty, Markers.Empty)),
             expr);
 
+    public static InstanceOf MakeInstanceOf(Expression expr) =>
+        new(Guid.NewGuid(), Space.Empty, Markers.Empty,
+            new JRightPadded<Expression>(expr, Space.Empty, Markers.Empty),
+            MakeId("string"), null, null, null);
+
     public static Assignment MakeAssignment(Expression variable, Expression value) =>
         new(Guid.NewGuid(), Space.Empty, Markers.Empty, variable,
             new JLeftPadded<Expression>(Space.Empty, value),

@@ -885,11 +885,18 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(sizeOf, p);
         p.Append("sizeof");
-        p.Append('(');
-        Visit(sizeOf.Expression, p);
-        p.Append(')');
+        Visit(sizeOf.Clazz, p);
         AfterSyntax(sizeOf, p);
         return sizeOf;
+    }
+
+    public override J VisitTypeOf(TypeOf typeOf, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(typeOf, p);
+        p.Append("typeof");
+        Visit(typeOf.Clazz, p);
+        AfterSyntax(typeOf, p);
+        return typeOf;
     }
 
     public override J VisitUnsafeStatement(UnsafeStatement unsafeStatement, PrintOutputCapture<P> p)
@@ -1798,25 +1805,13 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitInstanceOf(InstanceOf instanceOf, PrintOutputCapture<P> p)
     {
         BeforeSyntax(instanceOf, p);
-        if (instanceOf.Expression.Element is Empty)
+        Visit(instanceOf.Expression.Element, p);
+        VisitSpace(instanceOf.Expression.After, p);
+        p.Append("is");
+        Visit(instanceOf.Clazz, p);
+        if (instanceOf.Pattern != null)
         {
-            // typeof(T) — space between typeof and ( is in Expression.After
-            p.Append("typeof");
-            VisitSpace(instanceOf.Expression.After, p);
-            p.Append('(');
-            Visit(instanceOf.Clazz, p);
-            p.Append(')');
-        }
-        else
-        {
-            Visit(instanceOf.Expression.Element, p);
-            VisitSpace(instanceOf.Expression.After, p);
-            p.Append("is");
-            Visit(instanceOf.Clazz, p);
-            if (instanceOf.Pattern != null)
-            {
-                Visit(instanceOf.Pattern, p);
-            }
+            Visit(instanceOf.Pattern, p);
         }
         AfterSyntax(instanceOf, p);
         return instanceOf;
@@ -1856,6 +1851,17 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         Visit(cp.Tree.Element, p);
         VisitSpace(cp.Tree.After, p);
         if (!omitParens) p.Append(')');
+        AfterSyntax(cp, p);
+        return cp;
+    }
+
+    public override J VisitControlParentheses(ControlParentheses<TypeTree> cp, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(cp, p);
+        p.Append('(');
+        Visit(cp.Tree.Element, p);
+        VisitSpace(cp.Tree.After, p);
+        p.Append(')');
         AfterSyntax(cp, p);
         return cp;
     }
@@ -3373,19 +3379,19 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         BeforeSyntax(usingStatement, p);
         p.Append("using");
 
-        // Print parenthesized expression (left-padding = open paren prefix)
-        VisitSpace(usingStatement.ExpressionPadded.Before, p);
+        VisitSpace(usingStatement.Expression.Prefix, p);
         p.Append('(');
 
-        if (usingStatement.ExpressionPadded.Element is StatementExpression { Statement: VariableDeclarations varDecl })
+        if (usingStatement.Expression.Tree.Element is StatementExpression { Statement: VariableDeclarations varDecl })
         {
             VisitVariableDeclarationsWithoutSemicolon(varDecl, p);
         }
         else
         {
-            Visit(usingStatement.ExpressionPadded.Element, p);
+            Visit(usingStatement.Expression.Tree.Element, p);
         }
 
+        VisitSpace(usingStatement.Expression.Tree.After, p);
         p.Append(')');
 
         Visit(usingStatement.Statement, p);

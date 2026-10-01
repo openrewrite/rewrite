@@ -322,7 +322,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitUsingStatement(Cs.UsingStatement usingStatement, RpcReceiveQueue q) {
         return usingStatement
-                .getPadding().withExpression(q.receive(usingStatement.getPadding().getExpression(), el -> visitLeftPadded(el, q)))
+                .withExpression(q.receive(usingStatement.getExpression(), el -> (J.ControlParentheses<Expression>) visitNonNull(el, q)))
                 .withStatement(q.receive(usingStatement.getStatement(), el -> (Statement) visitNonNull(el, q)));
     }
 
@@ -441,8 +441,15 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitSizeOf(Cs.SizeOf sizeOf, RpcReceiveQueue q) {
         return sizeOf
-                .withExpression(q.receive(sizeOf.getExpression(), el -> (Expression) visitNonNull(el, q)))
+                .withClazz(q.receive(sizeOf.getClazz(), el -> (J.ControlParentheses<TypeTree>) visitNonNull(el, q)))
                 .withType(q.receive(sizeOf.getType(), t -> visitType(t, q)));
+    }
+
+    @Override
+    public J visitTypeOf(Cs.TypeOf typeOf, RpcReceiveQueue q) {
+        return typeOf
+                .withClazz(q.receive(typeOf.getClazz(), el -> (J.ControlParentheses<TypeTree>) visitNonNull(el, q)))
+                .withType(q.receive(typeOf.getType(), t -> visitType(t, q)));
     }
 
     @Override

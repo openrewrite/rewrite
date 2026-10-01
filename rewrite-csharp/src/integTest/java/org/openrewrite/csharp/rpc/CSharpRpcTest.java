@@ -690,7 +690,8 @@ class CSharpRpcTest implements RewriteTest {
                 {
                     public System.Type GetIntType()
                     {
-                        return typeof(int);
+                        var list = typeof( System.Collections.Generic.List<int> );
+                        return typeof (int);
                     }
                 }
             }
@@ -708,7 +709,7 @@ class CSharpRpcTest implements RewriteTest {
                 {
                     public int GetIntSize()
                     {
-                        return sizeof(int);
+                        return sizeof(int) + sizeof ( long );
                     }
                 }
             }
@@ -930,6 +931,9 @@ class CSharpRpcTest implements RewriteTest {
                     public void Read()
                     {
                         using (var stream = new MemoryStream())
+                        {
+                        }
+                        using ( var other = new MemoryStream() /* trailing */ )
                         {
                         }
                     }

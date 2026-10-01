@@ -391,7 +391,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitUsingStatement(Cs.UsingStatement usingStatement, RpcSendQueue q) {
-        q.getAndSend(usingStatement, u -> u.getPadding().getExpression(), el -> visitLeftPadded(el, q));
+        q.getAndSend(usingStatement, Cs.UsingStatement::getExpression, el -> visit(el, q));
         q.getAndSend(usingStatement, Cs.UsingStatement::getStatement, el -> visit(el, q));
         return usingStatement;
     }
@@ -513,9 +513,16 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitSizeOf(Cs.SizeOf sizeOf, RpcSendQueue q) {
-        q.getAndSend(sizeOf, Cs.SizeOf::getExpression, el -> visit(el, q));
+        q.getAndSend(sizeOf, Cs.SizeOf::getClazz, el -> visit(el, q));
         q.getAndSend(sizeOf, s -> asRef(s.getType()), type -> visitType(getValueNonNull(type), q));
         return sizeOf;
+    }
+
+    @Override
+    public J visitTypeOf(Cs.TypeOf typeOf, RpcSendQueue q) {
+        q.getAndSend(typeOf, Cs.TypeOf::getClazz, el -> visit(el, q));
+        q.getAndSend(typeOf, t -> asRef(t.getType()), type -> visitType(getValueNonNull(type), q));
+        return typeOf;
     }
 
     @Override
