@@ -47,6 +47,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             IsPattern ip => VisitIsPattern(ip, p),
             StatementExpression se => VisitStatementExpression(se, p),
             SizeOf sof => VisitSizeOf(sof, p),
+            TypeOf tof => VisitTypeOf(tof, p),
             UnsafeStatement us => VisitUnsafeStatement(us, p),
             FixedStatement fs => VisitFixedStatement(fs, p),
             PointerType pt => VisitPointerType(pt, p),
@@ -324,7 +325,21 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (exprResult is not SizeOf node) return exprResult;
 
         return node
-            .WithExpression((Expression)Visit(node.Expression, p)!)
+            .WithClazz((ControlParentheses<TypeTree>)Visit(node.Clazz, p)!)
+            .WithType((JavaType?)VisitType(node.Type, p));
+    }
+
+    public virtual J VisitTypeOf(TypeOf typeOf, P p)
+    {
+        typeOf = typeOf
+            .WithPrefix(VisitSpace(typeOf.Prefix, p))
+            .WithMarkers(VisitMarkers(typeOf.Markers, p));
+
+        var exprResult = VisitExpression(typeOf, p);
+        if (exprResult is not TypeOf node) return exprResult;
+
+        return node
+            .WithClazz((ControlParentheses<TypeTree>)Visit(node.Clazz, p)!)
             .WithType((JavaType?)VisitType(node.Type, p));
     }
 
@@ -893,7 +908,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (stmtResult is not UsingStatement node) return stmtResult;
 
         return node
-            .WithExpressionPadded(VisitLeftPadded(node.ExpressionPadded, p)!)
+            .WithExpression((ControlParentheses<Expression>)Visit(node.Expression, p)!)
             .WithStatement((Statement)Visit(node.Statement, p)!);
     }
 

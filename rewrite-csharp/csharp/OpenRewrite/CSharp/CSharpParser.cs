@@ -4428,25 +4428,33 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var prefix = ExtractPrefix(node);
         _cursor = node.Keyword.Span.End;
 
-        // Capture space between 'typeof' and '(' — stored in the empty expression's After
-        var spaceBeforeParen = ExtractSpaceBefore(node.OpenParenToken);
-        _cursor = node.OpenParenToken.Span.End;
-
-        var type = (J)VisitType(node.Type)!;
-
-        // Skip the close paren
-        SkipTo(node.CloseParenToken.SpanStart);
-        SkipToken(node.CloseParenToken);
-
-        return new InstanceOf(
+        return new TypeOf(
             Tree.RandomId(),
             prefix,
             Markers.Empty,
-            new JRightPadded<Expression>(new Empty(Tree.RandomId(), Space.Empty, Markers.Empty), spaceBeforeParen, Markers.Empty),
-            type,
-            null,
-            _typeMapping?.Type(node),
-            null
+            ParseParenthesizedType(node.OpenParenToken, node.Type, node.CloseParenToken),
+            _typeMapping?.Type(node)
+        );
+    }
+
+    private ControlParentheses<TypeTree> ParseParenthesizedType(SyntaxToken openParen, TypeSyntax typeSyntax, SyntaxToken closeParen)
+    {
+        var openParenPrefix = ExtractSpaceBefore(openParen);
+        _cursor = openParen.Span.End;
+
+        if (VisitType(typeSyntax) is not { } type)
+        {
+            throw new InvalidOperationException($"Expected TypeTree for {Truncate(typeSyntax.ToString())}");
+        }
+
+        var closeParenPrefix = ExtractSpaceBefore(closeParen);
+        _cursor = closeParen.Span.End;
+
+        return new ControlParentheses<TypeTree>(
+            Tree.RandomId(),
+            openParenPrefix,
+            Markers.Empty,
+            new JRightPadded<TypeTree>(type, closeParenPrefix, Markers.Empty)
         );
     }
 
@@ -4526,21 +4534,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var prefix = ExtractPrefix(node);
         _cursor = node.Keyword.Span.End;
 
-        // Skip the open paren
-        SkipTo(node.OpenParenToken.SpanStart);
-        SkipToken(node.OpenParenToken);
-
-        var type = (Expression)VisitType(node.Type)!;
-
-        // Skip the close paren
-        SkipTo(node.CloseParenToken.SpanStart);
-        SkipToken(node.CloseParenToken);
-
         return new SizeOf(
             Tree.RandomId(),
             prefix,
             Markers.Empty,
-            type,
+            ParseParenthesizedType(node.OpenParenToken, node.Type, node.CloseParenToken),
             _typeMapping?.Type(node)
         );
     }
@@ -9858,7 +9856,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var closeParenPrefix = ExtractSpaceBefore(node.CloseParenToken);
         _cursor = node.CloseParenToken.Span.End;
 
-        var expressionPadded = new JLeftPadded<Expression>(openParenPrefix, innerExpr);
+        var expression = new ControlParentheses<Expression>(
+            Tree.RandomId(),
+            openParenPrefix,
+            Markers.Empty,
+            new JRightPadded<Expression>(innerExpr, closeParenPrefix, Markers.Empty)
+        );
         var body = (Statement)Visit(node.Statement)!;
         Block block;
         if (body is Block b)
@@ -9873,7 +9876,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 [PadStatement(body)], Space.Empty);
         }
 
-        var usingStatement = new UsingStatement(Tree.RandomId(), hasAwait ? Space.Empty : prefix, Markers.Empty, expressionPadded, block);
+        var usingStatement = new UsingStatement(Tree.RandomId(), hasAwait ? Space.Empty : prefix, Markers.Empty, expression, block);
 
         if (hasAwait)
         {

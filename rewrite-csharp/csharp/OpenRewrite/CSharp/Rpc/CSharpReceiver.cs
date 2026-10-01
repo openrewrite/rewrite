@@ -83,6 +83,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             IsPattern ip => VisitIsPattern(ip, q),
             StatementExpression se => VisitStatementExpression(se, q),
             SizeOf sof => VisitSizeOf(sof, q),
+            TypeOf tof => VisitTypeOf(tof, q),
             UnsafeStatement us => VisitUnsafeStatement(us, q),
             FixedStatement fs => VisitFixedStatement(fs, q),
             PointerType pt => VisitPointerType(pt, q),
@@ -313,9 +314,16 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- SizeOf ----
     public override J VisitSizeOf(SizeOf sizeOf, RpcReceiveQueue q)
     {
-        var expression = q.Receive((J)sizeOf.Expression, el => (J)VisitNonNull(el, q));
+        var clazz = q.Receive(sizeOf.Clazz, el => (ControlParentheses<TypeTree>)VisitNonNull(el, q));
         var type = q.Receive(sizeOf.Type, t => VisitType(t, q)!);
-        return sizeOf.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!).WithType(type);
+        return sizeOf.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithClazz(clazz!).WithType(type);
+    }
+
+    public override J VisitTypeOf(TypeOf typeOf, RpcReceiveQueue q)
+    {
+        var clazz = q.Receive(typeOf.Clazz, el => (ControlParentheses<TypeTree>)VisitNonNull(el, q));
+        var type = q.Receive(typeOf.Type, t => VisitType(t, q)!);
+        return typeOf.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithClazz(clazz!).WithType(type);
     }
 
     // ---- UnsafeStatement ----
@@ -686,9 +694,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
 
     public override J VisitUsingStatement(UsingStatement ust, RpcReceiveQueue q)
     {
-        var exprPadded = q.Receive(ust.ExpressionPadded, lp => _delegate.VisitLeftPadded(lp, q));
+        var expression = q.Receive(ust.Expression, el => (ControlParentheses<Expression>)VisitNonNull(el, q));
         var statement = q.Receive((J)ust.Statement, el => (J)VisitNonNull(el, q));
-        return ust.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressionPadded(exprPadded!).WithStatement((Statement)statement!);
+        return ust.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression(expression!).WithStatement((Statement)statement!);
     }
 
     public override J VisitAllowsConstraintClause(AllowsConstraintClause acc, RpcReceiveQueue q)

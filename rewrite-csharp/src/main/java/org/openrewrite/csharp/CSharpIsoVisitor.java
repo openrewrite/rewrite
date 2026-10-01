@@ -279,6 +279,11 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
+    public Cs.TypeOf visitTypeOf(Cs.TypeOf typeOf, P p) {
+        return (Cs.TypeOf) super.visitTypeOf(typeOf, p);
+    }
+
+    @Override
     public Cs.DefaultExpression visitDefaultExpression(Cs.DefaultExpression defaultExpression, P p) {
         return (Cs.DefaultExpression) super.visitDefaultExpression(defaultExpression, p);
     }
