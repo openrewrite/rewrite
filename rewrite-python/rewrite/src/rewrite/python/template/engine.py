@@ -75,8 +75,8 @@ class TemplateEngine:
     - LRU caching for parsed templates
     """
 
-    # Global template cache (code -> parsed tree), LRU eviction
-    _cache: OrderedDict[str, J] = OrderedDict()
+    # Global template cache (code -> parsed tree and the context parsed ahead of it), LRU eviction
+    _cache: OrderedDict[str, Tuple[J, Tuple[Statement, ...]]] = OrderedDict()
     _cache_max_size: int = 100
 
     @classmethod
@@ -101,6 +101,25 @@ class TemplateEngine:
             SyntaxError: If the template code is invalid Python.
             ValueError: If placeholder validation fails.
         """
+        return cls._parse(code, captures, options)[0]
+
+    @classmethod
+    def get_context_statements(
+        cls,
+        code: str,
+        captures: Dict[str, Capture],
+        options: Optional[TemplateOptions] = None
+    ) -> Tuple[Statement, ...]:
+        """The statements parsed ahead of the template, which are what its context binds."""
+        return cls._parse(code, captures, options)[1]
+
+    @classmethod
+    def _parse(
+        cls,
+        code: str,
+        captures: Dict[str, Capture],
+        options: Optional[TemplateOptions] = None
+    ) -> Tuple[J, Tuple[Statement, ...]]:
         options = options or TemplateOptions()
 
         # Create cache key
@@ -125,12 +144,15 @@ class TemplateEngine:
         # Extract template content from wrapper
         extracted = cls._extract_from_wrapper(compilation_unit, is_expression)
 
+        # The template's own code is the last statement, so everything ahead of it is context.
+        parsed = (extracted, tuple(compilation_unit.statements[:-1]))
+
         # Cache with LRU eviction
-        cls._cache[cache_key] = extracted
+        cls._cache[cache_key] = parsed
         if len(cls._cache) > cls._cache_max_size:
             cls._cache.popitem(last=False)
 
-        return extracted
+        return parsed
 
     @classmethod
     def apply_substitutions(
