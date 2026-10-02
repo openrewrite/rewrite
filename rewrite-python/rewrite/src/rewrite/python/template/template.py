@@ -25,8 +25,8 @@ from .coordinates import PythonCoordinates
 from .engine import TemplateEngine, TemplateOptions
 
 if TYPE_CHECKING:
+    from rewrite.python.binding_utils import Binding
     from rewrite.visitor import Cursor
-    from .bindings import ContextBinding
     from .pattern import MatchResult
 
 
@@ -82,7 +82,7 @@ class Template:
             dependencies=tuple(sorted(dependencies.items())) if dependencies else (),
         )
         self._cached_tree: Optional[J] = None
-        self._context_bindings: Optional[Tuple['ContextBinding', ...]] = None
+        self._context_bindings: Optional[Tuple['Binding', ...]] = None
 
     @property
     def code(self) -> str:
@@ -109,16 +109,18 @@ class Template:
             )
         return self._cached_tree
 
-    def context_bindings(self) -> Tuple['ContextBinding', ...]:
+    def context_bindings(self) -> Tuple['Binding', ...]:
         """The modules this template's code reads through its context, which the file it is
         spliced into has to bind too for that code to run there. Context that only types a
         capture is read by nothing the template splices, so it binds nothing here."""
         if self._context_bindings is None:
-            from .bindings import context_bindings, names_read
+            from rewrite.python.binding_utils import import_bindings
+            from .bindings import names_read
             read = names_read(self.get_tree())
+            context = TemplateEngine.get_context_statements(
+                self._code, self._captures, self._options)
             self._context_bindings = tuple(
-                b for b in context_bindings(self._options.imports + self._options.context)
-                if b.name in read)
+                b for b in import_bindings(context) if b.name in read)
         return self._context_bindings
 
     def apply(
@@ -136,10 +138,8 @@ class Template:
         Args:
             cursor: Where the result lands, which for a recipe rewriting what it is visiting
                 is ``self.cursor``.
-            visitor: The visitor doing the edit. A template whose context imports a module needs
-                it: the module reaches the file through the visitor, not through the cursor. The
-                import is registered as the template is applied, so apply it where it is known to
-                land rather than to find out whether it would.
+            visitor: The visitor doing the edit, which is how a context import reaches the file.
+                The import is registered as the template is applied, so apply it where it lands.
             values: Captured values from a pattern match, or a dict of values.
             coordinates: Where/how to insert (default: replace current).
             format: Whether the result is fitted to where it lands. Pass False to assemble
@@ -165,11 +165,13 @@ class Template:
                 raise ValueError(
                     f"Template imports {', '.join(sorted({b.module for b in self.context_bindings()}))} "
                     "in its context, so applying it has to bind those modules in the file it is "
-                    "spliced into. Name the visitor — apply(self.cursor, visitor=self, ...).")
+                    "spliced into. Pass visitor=self.")
             from .bindings import bind_context
             # The splice site decides which names are in scope, which is where the visitor stands
             # only for a recipe rewriting what it is visiting.
-            renames = bind_context(visitor, cursor or visitor.cursor, self.context_bindings())
+            renames = bind_context(
+                visitor, cursor if cursor is not None else visitor.cursor,
+                self.context_bindings())
 
         # Get the template tree
         template_tree = self.get_tree()

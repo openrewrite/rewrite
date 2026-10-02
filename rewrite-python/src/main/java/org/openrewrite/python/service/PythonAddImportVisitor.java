@@ -135,10 +135,14 @@ public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
         return nameString(imp.getQualid()).equals(expected) && Objects.equals(alias, aliasName(imp));
     }
 
+    /** The name {@code import <module>} binds: `import a.b.c` binds only `a`. */
+    private static String rootPackage(String module) {
+        int dot = module.indexOf('.');
+        return dot < 0 ? module : module.substring(0, dot);
+    }
+
     private boolean isReferenced(Py.CompilationUnit cu) {
-        // `import a.b.c` binds only `a`, so that is the name a use of it reads through.
-        String target = alias != null ? alias :
-                name != null ? name : module.split("\\.", 2)[0];
+        String target = alias != null ? alias : name != null ? name : rootPackage(module);
         Pattern spelledIn = Pattern.compile("\\b" + Pattern.quote(target) + "\\b");
         AtomicBoolean found = new AtomicBoolean();
         new PythonVisitor<AtomicBoolean>() {

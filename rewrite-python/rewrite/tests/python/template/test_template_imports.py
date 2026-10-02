@@ -244,7 +244,7 @@ def test_applying_without_naming_the_visitor_cannot_bind_and_says_so():
                 """,
             )
         )
-    assert "Name the visitor" in str(refusal.value.cause)
+    assert "Pass visitor=self" in str(refusal.value.cause)
 
 
 def test_dotted_module_binds_its_root():
@@ -307,7 +307,7 @@ def test_a_scope_binding_the_name_to_something_else_refuses():
                 """,
             )
         )
-    assert "rather than the module 'subprocess'" in str(refusal.value.cause)
+    assert "binds something other than the module 'subprocess'" in str(refusal.value.cause)
 
 
 def test_a_file_binding_the_name_to_another_module_refuses():
@@ -477,7 +477,7 @@ def test_a_conditional_local_import_does_not_cover_the_context():
                 """,
             )
         )
-    assert "binds 'subprocess'" in str(refusal.value.cause)
+    assert "at the splice site binds" in str(refusal.value.cause)
 
 
 def test_a_local_import_after_the_splice_does_not_cover_it():
@@ -500,7 +500,7 @@ def test_a_local_import_after_the_splice_does_not_cover_it():
                 """,
             )
         )
-    assert "binds 'subprocess'" in str(refusal.value.cause)
+    assert "at the splice site binds" in str(refusal.value.cause)
 
 
 def test_the_file_s_name_is_judged_in_scope_not_the_template_s():
@@ -548,4 +548,4 @@ def test_a_rename_onto_another_context_name_refuses():
                 """,
             )
         )
-    assert "read one for the other" in str(refusal.value.cause)
+    assert "context binds to something else" in str(refusal.value.cause)
