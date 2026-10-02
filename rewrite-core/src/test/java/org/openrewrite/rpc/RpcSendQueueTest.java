@@ -188,12 +188,83 @@ class RpcSendQueueTest {
         assertThat(roundTripList(after, before)).isEqualTo(after);
     }
 
+    /**
+     * The positions array is what lets a reorder cost one integer per element instead of
+     * re-sending the elements themselves; an event stream without a move event cannot.
+     */
+    @Test
+    void reorderedElementsAreRepositionedNotResent() throws Exception {
+        List<String> before = List.of("A", "B", "C");
+        List<String> after = List.of("C", "A", "B");
+
+        CountDownLatch latch = new CountDownLatch(1);
+        RpcSendQueue q = new RpcSendQueue(10, t -> {
+            assertThat(t).containsExactly(
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null, false),
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(2, 0, 1), null, false),
+              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null, false) /* C */,
+              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null, false) /* A */,
+              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null, false) /* B */
+            );
+            latch.countDown();
+        }, new IdentityHashMap<>(), null, false);
+
+        q.sendList(after, before, Function.identity(), null, false);
+        q.flush();
+
+        assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(roundTripList(after, before)).isEqualTo(after);
+    }
+
+    @Test
+    void everyElementIsAddedWhenTheBeforeListIsEmpty() throws Exception {
+        List<String> before = List.of();
+        List<String> after = List.of("A", "B");
+
+        CountDownLatch latch = new CountDownLatch(1);
+        RpcSendQueue q = new RpcSendQueue(10, t -> {
+            assertThat(t).containsExactly(
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null, false),
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(-1, -1), null, false),
+              new RpcObjectData(ADD, null, "A", null, false),
+              new RpcObjectData(ADD, null, "B", null, false)
+            );
+            latch.countDown();
+        }, new IdentityHashMap<>(), null, false);
+
+        q.sendList(after, before, Function.identity(), null, false);
+        q.flush();
+
+        assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(roundTripList(after, before)).isEqualTo(after);
+    }
+
+    @Test
+    void nullElementsRoundTrip() {
+        List<@Nullable String> after = Arrays.asList(null, "A", null);
+
+        assertThat(roundTripList(after, List.of())).isEqualTo(after);
+        assertThat(roundTripList(after, List.of("B", "A"))).isEqualTo(after);
+    }
+
+    @Test
+    void elementReplacedByNullRoundTrips() {
+        List<@Nullable String> before = List.of("A");
+        List<@Nullable String> after = Collections.singletonList(null);
+
+        assertThat(roundTripList(after, before, s -> "same")).isEqualTo(after);
+    }
+
     private List<String> roundTripList(List<String> after, List<String> before) {
+        return roundTripList(after, before, Function.identity());
+    }
+
+    private List<String> roundTripList(List<String> after, List<String> before, Function<String, ?> id) {
         Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
         RpcSendQueue sq = new RpcSendQueue(1, batches::addLast, new IdentityHashMap<>(), null, false);
         RpcReceiveQueue rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, null, null);
 
-        sq.sendList(after, before, Function.identity(), null, false);
+        sq.sendList(after, before, id, null, false);
         sq.flush();
         return rq.receiveList(before, null);
     }

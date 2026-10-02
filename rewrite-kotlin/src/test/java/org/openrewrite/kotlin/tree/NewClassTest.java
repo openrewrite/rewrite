@@ -83,4 +83,19 @@ class NewClassTest implements RewriteTest {
           kotlin("val t = Test ( if ( true ) 4 else 2 )")
         );
     }
+
+    @Test
+    void trailingCommaInTypeArgumentList() {
+        rewriteRun(
+          kotlin(
+            """
+              class Box<A, B>
+              val b = Box<
+                  String,
+                  Int,
+              >()
+              """
+          )
+        );
+    }
 }

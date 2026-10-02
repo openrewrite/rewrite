@@ -1,8 +1,9 @@
 import {JavaScriptVisitor} from "./visitor";
-import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, Type} from "../java";
+import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, TrailingComma, Type} from "../java";
 import {JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
-import {emptyMarkers, markers} from "../markers";
+import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
+import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
 import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
@@ -437,7 +438,7 @@ export function moduleNameOf(module: string | J.Literal): string {
     }
     restored += source.slice(cut);
     const quote = restored.charAt(0);
-    return (quote === "'" || quote === '"') && restored.endsWith(quote) && restored.length > 1
+    return (quote === "'" || quote === '"' || quote === '`') && restored.endsWith(quote) && restored.length > 1
         ? restored.slice(1, -1)
         : restored;
 }
@@ -456,11 +457,33 @@ function quoteOf(expression: J | undefined): QuoteChar | undefined {
 }
 
 /**
- * Pick the quote character for a module specifier being added to `cu`, so that it agrees
- * with the file it lands in. An existing specifier is the most direct precedent; a Prettier
- * config states intent even where the file itself has not been formatted to match.
+ * The value a Prettier configuration on `cu` gives `option`, or Prettier's own `fallback` where the
+ * configuration does not name it; `undefined` without a configuration in force. A configuration
+ * outranks the file's own evidence, since running Prettier would arrive at its answer anyway.
  */
-async function detectQuote(cu: JS.CompilationUnit): Promise<QuoteChar> {
+function prettierOption<T>(cu: JS.CompilationUnit, option: string, fallback: T): T | undefined {
+    const prettier = getPrettierStyle(cu);
+    if (!prettier || prettier.ignored) {
+        return undefined;
+    }
+    const value = prettier.config[option];
+    return typeof value === typeof fallback ? value as T : fallback;
+}
+
+/**
+ * Pick the quote character for a module specifier being added to `cu`, so that it agrees
+ * with the file it lands in. A Prettier configuration settles it; short of one, the caller's
+ * `requested` quote, then an existing specifier as the most direct precedent.
+ */
+async function detectQuote(cu: JS.CompilationUnit, requested?: QuoteChar): Promise<QuoteChar> {
+    const singleQuote = prettierOption(cu, 'singleQuote', false);
+    if (singleQuote !== undefined) {
+        return singleQuote ? "'" : '"';
+    }
+    if (requested) {
+        return requested;
+    }
+
     // Static imports are top-level, so the highest-ranked signal needs no traversal to find.
     for (const statement of cu.statements) {
         const element = statement.element;
@@ -521,25 +544,87 @@ async function detectQuote(cu: JS.CompilationUnit): Promise<QuoteChar> {
         return specifierQuote;
     }
 
-    const prettier = getPrettierStyle(cu);
-    if (prettier && !prettier.ignored) {
-        const singleQuote = prettier.config.singleQuote;
-        if (typeof singleQuote === 'boolean') {
-            return singleQuote ? "'" : '"';
-        }
-    }
-
     return double > single ? '"' : "'";
 }
 
+/** Top-level statements that end in `;` in a file that uses semicolons at all. */
+const semicolonTerminated = new Set<string>([
+    JS.Kind.Import, JS.Kind.ExportDeclaration, JS.Kind.ExportAssignment, JS.Kind.TypeDeclaration,
+    JS.Kind.ExpressionStatement, J.Kind.VariableDeclarations, J.Kind.MethodInvocation, J.Kind.Assignment
+]);
+
 /**
- * Lays out the import statement `AddImport` wrote, so that the file's own style — a Prettier
- * configuration's brace spacing and print width, say — reaches it.
+ * Whether an import statement added to `cu` should end in `;`. A Prettier configuration settles
+ * it; short of one, the file's imports, then its other statements that would take one.
  */
-async function formatImport<P>(cu: JS.CompilationUnit, id: UUID, p: P): Promise<JS.CompilationUnit> {
+function detectSemi(cu: JS.CompilationUnit): boolean {
+    const semi = prettierOption(cu, 'semi', true);
+    if (semi !== undefined) {
+        return semi;
+    }
+    const tally = (kinds: (kind: string) => boolean): number => {
+        let score = 0;
+        for (const statement of cu.statements) {
+            if (statement.element && kinds(statement.element.kind)) {
+                score += findMarker(statement, J.Markers.Semicolon) ? 1 : -1;
+            }
+        }
+        return score;
+    };
+    const score = cu.statements.some(s => s.element?.kind === JS.Kind.Import)
+        ? tally(kind => kind === JS.Kind.Import)
+        : tally(kind => semicolonTerminated.has(kind));
+    return score >= 0;
+}
+
+/**
+ * Whether a brace list added to `cu` is written `{ x }` rather than `{x}`. A Prettier configuration
+ * settles it; short of one, the file's own single-line import lists, then the style in force.
+ */
+function detectBraceSpacing(cu: JS.CompilationUnit): boolean {
+    const bracketSpacing = prettierOption(cu, 'bracketSpacing', true);
+    if (bracketSpacing !== undefined) {
+        return bracketSpacing;
+    }
+    let score = 0;
+    for (const statement of cu.statements) {
+        const namedBindings = statement.element?.kind === JS.Kind.Import
+            ? (statement.element as JS.Import).importClause?.namedBindings
+            : undefined;
+        if (namedBindings?.kind !== JS.Kind.NamedImports) {
+            continue;
+        }
+        const first = (namedBindings as JS.NamedImports).elements.elements[0]?.element;
+        // A list laid out one per line says nothing about how a one-line list is spaced.
+        if (first && !first.prefix.whitespace.includes('\n')) {
+            score += first.prefix.whitespace.length > 0 ? 1 : -1;
+        }
+    }
+    if (score !== 0) {
+        return score > 0;
+    }
+    return (getStyle(StyleKind.SpacesStyle, cu) as SpacesStyle).within.es6ImportExportBraces;
+}
+
+/**
+ * Lays out the import statement `AddImport` wrote, so that a Prettier configuration's print width,
+ * say, reaches it. Its quote, brace spacing and semicolon were already chosen to match the file.
+ */
+async function formatImport<P>(cu: JS.CompilationUnit, id: UUID, p: P, braceSpacing?: boolean): Promise<JS.CompilationUnit> {
+    // The formatter would otherwise re-space the braces by the style in force, over the file's own evidence.
+    const spaces = getStyle(StyleKind.SpacesStyle, cu) as SpacesStyle;
+    const styles: NamedStyles<string>[] | undefined =
+        braceSpacing === undefined || braceSpacing === spaces.within.es6ImportExportBraces ? undefined : [{
+            kind: MarkersKind.NamedStyles,
+            id: randomId(),
+            name: "org.openrewrite.javascript.AddImport",
+            displayName: "Brace spacing detected by AddImport",
+            tags: [],
+            styles: [{...spaces, within: {...spaces.within, es6ImportExportBraces: braceSpacing}} as SpacesStyle]
+        }];
     return await new class extends JavaScriptVisitor<P> {
         override async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
-            return jsImport.id === id ? await autoFormat(jsImport, p, undefined, this.cursor.parent) : jsImport;
+            return jsImport.id === id ? await autoFormat(jsImport, p, undefined, this.cursor.parent, styles) : jsImport;
         }
     }().visit(cu, p) as JS.CompilationUnit;
 }
@@ -820,15 +905,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         const withImport = await this.produceJavaScript(compilationUnit, p, async draft => {
             // Insert the import at the appropriate position
-            // Create semicolon marker for the import statement
-            const semicolonMarkers = markers({
-                kind: J.Markers.Semicolon,
-                id: randomId()
-            });
+            const semicolonMarkers = detectSemi(compilationUnit)
+                ? markers({kind: J.Markers.Semicolon, id: randomId()})
+                : emptyMarkers;
 
             if (insertionIndex === 0) {
                 // Insert at the beginning
-                // The `after` space should be empty since semicolon is printed after it
+                // The `after` space should be empty since any semicolon is printed after it
                 // The spacing comes from updating the next statement's prefix
                 const updatedStatements = compilationUnit.statements.length > 0
                     ? [
@@ -876,7 +959,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         });
 
-        return formatImport(withImport, newImport.id, p);
+        return formatImport(withImport, newImport.id, p, detectBraceSpacing(compilationUnit));
     }
 
     /**
@@ -940,7 +1023,14 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         // - trailingSpace: space before } (from last element's after)
                         const firstElementPrefix = existingElements[0]?.element?.prefix ?? emptySpace;
                         const lastIndex = existingElements.length - 1;
-                        const trailingSpace = existingElements[lastIndex].after;
+                        // What separates one element from the next after its comma: the space in front of
+                        // the second element, or for a lone element on its own line, that line break.
+                        const separator = existingElements[1]?.element?.prefix ??
+                            (firstElementPrefix.whitespace.includes('\n') ? firstElementPrefix : singleSpace);
+                        // A trailing comma is a marker on the last element rather than padding, so with
+                        // one present the space before `}` lives in the marker's suffix, not in `after`.
+                        const trailingComma = findMarker<TrailingComma>(existingElements[lastIndex], J.Markers.TrailingComma);
+                        const trailingSpace = trailingComma ? trailingComma.suffix : existingElements[lastIndex].after;
 
                         // Build the new elements array with proper spacing
                         const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
@@ -953,17 +1043,26 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                         // Insert new element here
                                         // First element gets the same prefix as the original first element
                                         // Other positions get a single space (separator after comma)
-                                        const prefix = j === 0 ? firstElementPrefix : singleSpace;
+                                        const prefix = j === 0 ? firstElementPrefix : separator;
                                         results.push(rightPadded({...newSpecifier, prefix}, emptySpace));
                                     }
                                     // Adjust existing element: if inserting before first, give it space prefix
                                     let adjusted = elem;
                                     if (j === 0 && insertIndex === 0 && elem.element) {
-                                        adjusted = {...elem, element: {...elem.element, prefix: singleSpace}};
+                                        adjusted = {...elem, element: {...elem.element, prefix: separator}};
                                     }
-                                    // Last element before a new trailing element loses its trailing space
+                                    // Last element before a new trailing element loses its trailing space,
+                                    // and hands off its trailing comma to the element that becomes last.
                                     if (j === lastIndex && insertIndex > lastIndex) {
-                                        adjusted = {...adjusted, after: emptySpace};
+                                        adjusted = trailingComma ?
+                                            {
+                                                ...adjusted,
+                                                markers: {
+                                                    ...adjusted.markers,
+                                                    markers: adjusted.markers.markers.filter(m => m !== trailingComma)
+                                                }
+                                            } :
+                                            {...adjusted, after: emptySpace};
                                     }
                                     results.push(adjusted);
                                     return results;
@@ -971,7 +1070,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
                                 // Append at end if inserting after all existing elements
                                 if (insertIndex > lastIndex) {
-                                    newElements.push(rightPadded({...newSpecifier, prefix: singleSpace}, trailingSpace));
+                                    const appended = rightPadded(
+                                        {...newSpecifier, prefix: separator},
+                                        trailingComma ? emptySpace : trailingSpace);
+                                    newElements.push(trailingComma ?
+                                        {...appended, markers: markers(trailingComma)} :
+                                        appended);
                                 }
 
                                 namedDraft.elements = {...namedImports.elements, elements: newElements};
@@ -1129,6 +1233,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * or extracting it from the FQN.
      */
     private getModuleFromClassType(classType: Type.Class): string | undefined {
+        if (Type.isFunctionType(classType)) {
+            return undefined;
+        }
         // Traverse owningClass chain to find the root
         let current: Type.Class = classType;
         while (current.owningClass && Type.isClass(current.owningClass)) {
@@ -1251,6 +1358,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const targetModule = this.module;
         let found = false;
         const self = this;
+        const matchesModule = (name: string | undefined) =>
+            name !== undefined && (name === expectedDeclaringType || name === targetModule);
 
         // If no existing imports from this module, look for unresolved references
         // If there ARE existing imports, look for references with the expected declaring type
@@ -1264,12 +1373,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         // We have an expected declaring type - check for exact match
                         if (type && Type.isMethod(type)) {
                             const declaringTypeName = Type.FullyQualified.getFullyQualifiedName((type as Type.Method).declaringType);
-                            if (declaringTypeName === expectedDeclaringType) {
+                            if (matchesModule(declaringTypeName)) {
                                 found = true;
                             }
                         }
                         else if (type && Type.isClass(type)) {
-                            if (self.classTypeMatchesModule(type as Type.Class, expectedDeclaringType)) {
+                            if (self.classTypeMatchesModule(type as Type.Class, expectedDeclaringType) ||
+                                self.classTypeMatchesModule(type as Type.Class, targetModule)) {
                                 found = true;
                             }
                         }
@@ -1277,7 +1387,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                             const ownerTypeName = (fieldType as Type.Variable).owner
                                 ? Type.FullyQualified.getFullyQualifiedName((fieldType as Type.Variable).owner!)
                                 : undefined;
-                            if (ownerTypeName === expectedDeclaringType) {
+                            if (matchesModule(ownerTypeName)) {
                                 found = true;
                             }
                         }
@@ -1325,25 +1435,17 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
 
             override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: void): Promise<J | undefined> {
-                if (methodInvocation.methodType && methodInvocation.methodType.name === targetName) {
-                    if (expectedDeclaringType) {
-                        const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodInvocation.methodType.declaringType);
-                        if (declaringTypeName === expectedDeclaringType) {
-                            found = true;
-                        }
-                    }
+                if (expectedDeclaringType && methodInvocation.methodType && methodInvocation.methodType.name === targetName &&
+                    matchesModule(Type.FullyQualified.getFullyQualifiedName(methodInvocation.methodType.declaringType))) {
+                    found = true;
                 }
                 return super.visitMethodInvocation(methodInvocation, p);
             }
 
             override async visitFunctionCall(functionCall: JS.FunctionCall, p: void): Promise<J | undefined> {
-                if (functionCall.methodType && functionCall.methodType.name === targetName) {
-                    if (expectedDeclaringType) {
-                        const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(functionCall.methodType.declaringType);
-                        if (declaringTypeName === expectedDeclaringType) {
-                            found = true;
-                        }
-                    }
+                if (expectedDeclaringType && functionCall.methodType && functionCall.methodType.name === targetName &&
+                    matchesModule(Type.FullyQualified.getFullyQualifiedName(functionCall.methodType.declaringType))) {
+                    found = true;
                 }
                 return super.visitFunctionCall(functionCall, p);
             }
@@ -1352,13 +1454,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 const type = fieldAccess.type;
                 if (type && Type.isMethod(type)) {
                     const methodType = type as Type.Method;
-                    if (methodType.name === targetName) {
-                        if (expectedDeclaringType) {
-                            const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
-                            if (declaringTypeName === expectedDeclaringType) {
-                                found = true;
-                            }
-                        }
+                    if (expectedDeclaringType && methodType.name === targetName &&
+                        matchesModule(Type.FullyQualified.getFullyQualifiedName(methodType.declaringType))) {
+                        found = true;
                     }
                 }
                 return super.visitFieldAccess(fieldAccess, p);
@@ -1382,7 +1480,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // Note: value is the unquoted module name; valueSource and unicodeEscapes are its printed form
         let valueSource = this.moduleValueSource;
         if (valueSource === undefined) {
-            const quote = this.quoteStyle ?? await detectQuote(compilationUnit);
+            const quote = await detectQuote(compilationUnit, this.quoteStyle);
             valueSource = `${quote}${this.module}${quote}`;
         }
         const moduleSpecifier: J.Literal = {
@@ -1469,9 +1567,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         } else {
             // Named import: import { member } from 'module'
 
-            // Get the spaces style for brace spacing
-            const spacesStyle = getStyle(StyleKind.SpacesStyle, compilationUnit) as SpacesStyle;
-            const braceSpace = spacesStyle.within.es6ImportExportBraces ? singleSpace : emptySpace;
+            const braceSpace = detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
 
             const importSpec = this.createImportSpecifier();
             // Apply brace spacing: the space after { is in the specifier's prefix,
@@ -1651,7 +1747,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
  */
 function importBinds(jsImport: JS.Import, module: string, member: string | undefined): string | undefined {
     const specifier = jsImport.moduleSpecifier?.element;
-    if (specifier?.kind !== J.Kind.Literal || (specifier as J.Literal).value !== module) {
+    if (specifier?.kind !== J.Kind.Literal || moduleNameOf(specifier as J.Literal) !== module) {
         return undefined;
     }
     const importClause = jsImport.importClause;
@@ -1801,7 +1897,7 @@ function aliasing(local: J.Identifier, member: string): JS.Alias {
  * Drops the binding for `member` from `jsImport`'s clause — the default, the namespace alias, or
  * one entry of the named list, whichever `member` names — keeping everything else the clause
  * binds. `ElementRemovalFormatter` carries the dropped binding's prefix onto whatever prints
- * next, the same way `RemoveImport` keeps formatting sane when trimming a list.
+ * next, and a dropped last entry's trailing space onto the new last, as `RemoveImport` does.
  */
 function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Import {
     const importClause = jsImport.importClause;
@@ -1854,6 +1950,12 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
         // An emptied brace list still prints, as `import D, {} from "m"`, so it goes with its
         // last member; the caller drops the whole statement when no default remains either.
         return {...jsImport, importClause: {...importClause, namedBindings: undefined}};
+    }
+    // The space before `}` and any trailing comma belong to the last entry, so they move onto the
+    // new last entry when the old one is dropped.
+    const originalLast = namedImports.elements.elements[namedImports.elements.elements.length - 1];
+    if (namedSpecifierImports(originalLast.element.specifier, key)) {
+        kept[kept.length - 1] = {...kept[kept.length - 1], after: originalLast.after, markers: originalLast.markers};
     }
     const updatedNamedImports: JS.NamedImports = {...namedImports, elements: {...namedImports.elements, elements: kept}};
     return {...jsImport, importClause: {...importClause, namedBindings: updatedNamedImports}};
@@ -1927,6 +2029,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             const originalSource = literal.valueSource || `"${this.from.module}"`;
             const quoteChar = originalSource.startsWith("'") ? "'" : '"';
             literal.valueSource = `${quoteChar}${this.to.module}${quoteChar}`;
+            literal.unicodeEscapes = undefined;
 
             // A default or namespace import carries its local name on the clause itself; a named
             // one states the member alongside it, in the specifier.
@@ -2090,7 +2193,9 @@ class MovedTypes extends TypeVisitor<undefined> {
     /**
      * A type reached while it is still being visited is a cycle — a class holds a method whose
      * declaring type is that class — and answers with itself, which is what ends the walk. Every
-     * reference to a binding shares one type, so a completed walk is remembered for the next.
+     * type visited is remembered by its answer, so a graph whose references fan out or rejoin is
+     * walked once rather than once per path that reaches into it. An answer settled inside a cycle
+     * stands for the path it was on, so a walk reusing it can leave a rename unapplied.
      */
     override async visit<T extends Type>(type: T | undefined, p: undefined): Promise<T | undefined> {
         if (type === undefined || this.onPath.has(type)) {
@@ -2102,11 +2207,7 @@ class MovedTypes extends TypeVisitor<undefined> {
         this.onPath.add(type);
         try {
             const answer = await super.visit(type, p);
-            // Only the type a walk entered at is remembered: one reached inside it may have met
-            // a back edge, which answers with the type itself and so stands for the path it was on.
-            if (this.onPath.size === 1) {
-                this.answered.set(type, answer);
-            }
+            this.answered.set(type, answer);
             return answer;
         } finally {
             this.onPath.delete(type);

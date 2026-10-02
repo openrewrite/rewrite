@@ -20,6 +20,7 @@ import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.CsDocCommentVisitor;
 import org.openrewrite.csharp.tree.CsDocComment;
 import org.openrewrite.rpc.RpcSendQueue;
+import static org.openrewrite.rpc.Reference.asRef;
 
 /**
  * Decomposes a {@link CsDocComment} tree over RPC, mirroring the way {@link CSharpSender}
@@ -36,7 +37,7 @@ class CsDocCommentSender extends CsDocCommentVisitor<RpcSendQueue> {
     @Override
     public CsDocComment visitDocComment(CsDocComment.DocComment docComment, RpcSendQueue q) {
         q.getAndSend(docComment, Tree::getId);
-        q.getAndSend(docComment, CsDocComment.DocComment::getMarkers);
+        q.getAndSend(docComment, mk -> asRef(mk.getMarkers()));
         q.getAndSendList(docComment, CsDocComment.DocComment::getBody, Tree::getId, b -> visit(b, q));
         q.getAndSend(docComment, CsDocComment.DocComment::getSuffix);
         return docComment;
@@ -45,7 +46,7 @@ class CsDocCommentSender extends CsDocCommentVisitor<RpcSendQueue> {
     @Override
     public CsDocComment visitXmlElement(CsDocComment.XmlElement element, RpcSendQueue q) {
         q.getAndSend(element, Tree::getId);
-        q.getAndSend(element, CsDocComment.XmlElement::getMarkers);
+        q.getAndSend(element, mk -> asRef(mk.getMarkers()));
         q.getAndSend(element, CsDocComment.XmlElement::getName);
         q.getAndSendList(element, CsDocComment.XmlElement::getAttributes, Tree::getId, a -> visit(a, q));
         q.getAndSendList(element, CsDocComment.XmlElement::getSpaceBeforeClose, Tree::getId, s -> visit(s, q));
@@ -57,7 +58,7 @@ class CsDocCommentSender extends CsDocCommentVisitor<RpcSendQueue> {
     @Override
     public CsDocComment visitXmlEmptyElement(CsDocComment.XmlEmptyElement element, RpcSendQueue q) {
         q.getAndSend(element, Tree::getId);
-        q.getAndSend(element, CsDocComment.XmlEmptyElement::getMarkers);
+        q.getAndSend(element, mk -> asRef(mk.getMarkers()));
         q.getAndSend(element, CsDocComment.XmlEmptyElement::getName);
         q.getAndSendList(element, CsDocComment.XmlEmptyElement::getAttributes, Tree::getId, a -> visit(a, q));
         q.getAndSendList(element, CsDocComment.XmlEmptyElement::getSpaceBeforeSlashClose, Tree::getId, s -> visit(s, q));
@@ -67,7 +68,7 @@ class CsDocCommentSender extends CsDocCommentVisitor<RpcSendQueue> {
     @Override
     public CsDocComment visitXmlText(CsDocComment.XmlText text, RpcSendQueue q) {
         q.getAndSend(text, Tree::getId);
-        q.getAndSend(text, CsDocComment.XmlText::getMarkers);
+        q.getAndSend(text, mk -> asRef(mk.getMarkers()));
         q.getAndSend(text, CsDocComment.XmlText::getText);
         return text;
     }
@@ -75,7 +76,7 @@ class CsDocCommentSender extends CsDocCommentVisitor<RpcSendQueue> {
     @Override
     public CsDocComment visitXmlAttribute(CsDocComment.XmlAttribute attribute, RpcSendQueue q) {
         q.getAndSend(attribute, Tree::getId);
-        q.getAndSend(attribute, CsDocComment.XmlAttribute::getMarkers);
+        q.getAndSend(attribute, mk -> asRef(mk.getMarkers()));
         q.getAndSend(attribute, CsDocComment.XmlAttribute::getName);
         q.getAndSendList(attribute, CsDocComment.XmlAttribute::getSpaceBeforeEquals, Tree::getId, s -> visit(s, q));
         q.getAndSendList(attribute, CsDocComment.XmlAttribute::getValue, Tree::getId, v -> visit(v, q));
@@ -85,7 +86,7 @@ class CsDocCommentSender extends CsDocCommentVisitor<RpcSendQueue> {
     @Override
     public CsDocComment visitXmlCrefAttribute(CsDocComment.XmlCrefAttribute attribute, RpcSendQueue q) {
         q.getAndSend(attribute, Tree::getId);
-        q.getAndSend(attribute, CsDocComment.XmlCrefAttribute::getMarkers);
+        q.getAndSend(attribute, mk -> asRef(mk.getMarkers()));
         q.getAndSendList(attribute, CsDocComment.XmlCrefAttribute::getSpaceBeforeEquals, Tree::getId, s -> visit(s, q));
         q.getAndSendList(attribute, CsDocComment.XmlCrefAttribute::getValue, Tree::getId, v -> visit(v, q));
         q.getAndSend(attribute, CsDocComment.XmlCrefAttribute::getReference, ref -> csharpVisitorVisit(ref, q));
@@ -95,7 +96,7 @@ class CsDocCommentSender extends CsDocCommentVisitor<RpcSendQueue> {
     @Override
     public CsDocComment visitXmlNameAttribute(CsDocComment.XmlNameAttribute attribute, RpcSendQueue q) {
         q.getAndSend(attribute, Tree::getId);
-        q.getAndSend(attribute, CsDocComment.XmlNameAttribute::getMarkers);
+        q.getAndSend(attribute, mk -> asRef(mk.getMarkers()));
         q.getAndSendList(attribute, CsDocComment.XmlNameAttribute::getSpaceBeforeEquals, Tree::getId, s -> visit(s, q));
         q.getAndSendList(attribute, CsDocComment.XmlNameAttribute::getValue, Tree::getId, v -> visit(v, q));
         q.getAndSend(attribute, CsDocComment.XmlNameAttribute::getParamName, name -> csharpVisitorVisit(name, q));
@@ -106,7 +107,7 @@ class CsDocCommentSender extends CsDocCommentVisitor<RpcSendQueue> {
     public CsDocComment visitLineBreak(CsDocComment.LineBreak lineBreak, RpcSendQueue q) {
         q.getAndSend(lineBreak, Tree::getId);
         q.getAndSend(lineBreak, CsDocComment.LineBreak::getMargin);
-        q.getAndSend(lineBreak, CsDocComment.LineBreak::getMarkers);
+        q.getAndSend(lineBreak, mk -> asRef(mk.getMarkers()));
         return lineBreak;
     }
 }

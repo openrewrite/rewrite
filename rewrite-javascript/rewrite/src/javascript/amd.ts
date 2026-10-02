@@ -29,6 +29,7 @@ import {
     TrailingComma
 } from "../java";
 import {JS} from "./tree";
+import {moduleNameOf} from "./add-import";
 import {cursorOf, deconflict, namesDeclaredWithin, scopeOf} from "./scope";
 import {Cursor} from "../tree";
 import {JavaScriptVisitor} from "./visitor";
@@ -183,7 +184,7 @@ function foldDeclarationTrailingSpace(entry: J.RightPadded<J>): J.RightPadded<J>
 export function dependencyNames(block: AmdBlock): string[] {
     return elementsOf(block).map(padded => {
         const element = padded.element;
-        return isLiteral(element) && typeof element.value === "string" ? element.value : "";
+        return isLiteral(element) && typeof element.value === "string" ? moduleNameOf(element) : "";
     });
 }
 
@@ -519,7 +520,7 @@ export function withDependencyModuleAt(
     const elements = [...elementsOf(block)];
     const entry = elements[index];
     const literal = entry.element as J.Literal;
-    const updated: J.Literal = {...literal, value: module, valueSource: `${quote}${module}${quote}`};
+    const updated: J.Literal = {...literal, value: module, valueSource: `${quote}${module}${quote}`, unicodeEscapes: undefined};
     elements[index] = {...entry, element: updated};
     const dependencies = withElements(block.dependencies, elements);
     return withParts(call, block, dependencies, block.factory);

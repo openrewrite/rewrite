@@ -376,7 +376,7 @@ class FindImplementationsTest implements RewriteTest {
               package org.x;
               class B implements A {
                   @Override
-                  void foo() {
+                  public void foo() {
                   }
               }
               """
@@ -385,7 +385,7 @@ class FindImplementationsTest implements RewriteTest {
               package org.x;
               /*~~>*/class B implements A {
                   @Override
-                  void foo() {
+                  public void foo() {
                   }
               }
               """

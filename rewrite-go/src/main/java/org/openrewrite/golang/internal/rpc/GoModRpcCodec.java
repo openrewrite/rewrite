@@ -31,6 +31,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import static org.openrewrite.rpc.Reference.asRef;
 
 /**
  * RPC codec for the {@link GoMod} SourceFile. The field order here is the single
@@ -62,7 +63,7 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
         GolangSender sender = new GolangSender();
         q.getAndSend(after, Tree::getId);
         q.getAndSend(after, GoMod::getPrefix, space -> sender.visitSpace(space, q));
-        q.getAndSend(after, Tree::getMarkers);
+        q.getAndSend(after, mk -> asRef(mk.getMarkers()));
         q.getAndSend(after, (GoMod g) -> g.getSourcePath().toString());
         q.getAndSend(after, (GoMod g) -> g.getCharset().name());
         q.getAndSend(after, GoMod::isCharsetBomMarked);
@@ -77,7 +78,7 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     private static void sendRightPadded(GolangSender sender, JRightPadded<GoModStatement> rp, RpcSendQueue q) {
         q.getAndSend(rp, JRightPadded::getElement, el -> sendStatement(sender, el, q));
         q.getAndSend(rp, JRightPadded::getAfter, space -> sender.visitSpace(space, q));
-        q.getAndSend(rp, JRightPadded::getMarkers);
+        q.getAndSend(rp, mk -> asRef(mk.getMarkers()));
     }
 
     private static void sendStatement(GolangSender sender, GoModStatement s, RpcSendQueue q) {
@@ -91,7 +92,7 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     private static void sendDirective(GolangSender sender, GoMod.Directive d, RpcSendQueue q) {
         q.getAndSend(d, GoMod.Directive::getId);
         q.getAndSend(d, GoMod.Directive::getPrefix, space -> sender.visitSpace(space, q));
-        q.getAndSend(d, GoMod.Directive::getMarkers);
+        q.getAndSend(d, mk -> asRef(mk.getMarkers()));
         q.getAndSend(d, GoMod.Directive::getKeyword);
         q.getAndSendList(d, GoMod.Directive::getValues, GoMod.Value::getId, v -> sendValue(sender, v, q));
     }
@@ -99,7 +100,7 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     private static void sendBlock(GolangSender sender, GoMod.Block b, RpcSendQueue q) {
         q.getAndSend(b, GoMod.Block::getId);
         q.getAndSend(b, GoMod.Block::getPrefix, space -> sender.visitSpace(space, q));
-        q.getAndSend(b, GoMod.Block::getMarkers);
+        q.getAndSend(b, mk -> asRef(mk.getMarkers()));
         q.getAndSend(b, GoMod.Block::getKeyword);
         q.getAndSend(b, GoMod.Block::getBeforeLParen, space -> sender.visitSpace(space, q));
         q.getAndSendList(b, GoMod.Block::getEntries,
@@ -111,7 +112,7 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     private static void sendValue(GolangSender sender, GoMod.Value v, RpcSendQueue q) {
         q.getAndSend(v, GoMod.Value::getId);
         q.getAndSend(v, GoMod.Value::getPrefix, space -> sender.visitSpace(space, q));
-        q.getAndSend(v, GoMod.Value::getMarkers);
+        q.getAndSend(v, mk -> asRef(mk.getMarkers()));
         q.getAndSend(v, GoMod.Value::getText);
     }
 

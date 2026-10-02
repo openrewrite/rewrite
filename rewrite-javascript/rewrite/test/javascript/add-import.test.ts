@@ -25,6 +25,7 @@ import {
     JavaScriptVisitor,
     JS,
     maybeAddImport,
+    maybeRemoveImport,
     npm,
     packageJson,
     prettierStyle,
@@ -34,9 +35,9 @@ import {
     tsx,
     typescript
 } from "../../src/javascript";
-import {emptySpace, J} from "../../src/java";
+import {emptySpace, J, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
-import {MarkersKind, NamedStyles, randomId} from "../../src";
+import {MarkersKind, NamedStyles, produceAsync, randomId} from "../../src";
 import {create as produce} from "mutative";
 import {withDir} from "tmp-promise";
 
@@ -512,6 +513,97 @@ describe('AddImport visitor', () => {
             );
         });
 
+        test('should keep a trailing comma single when appending to the list', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFileSync", onlyIfReferenced: false }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {readFile,} from 'fs';\n`,
+                    `import {readFile, readFileSync,} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should keep a trailing comma single when inserting before the first element', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "aaa", onlyIfReferenced: false }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {readFile,} from 'fs';\n`,
+                    `import {aaa, readFile,} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should move a multiline trailing comma to the appended element', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "zzz", onlyIfReferenced: false }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`,
+                    `import {\n    readFile,\n    stat,\n    zzz,\n} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should put an appended element on its own line in a one-per-line list', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "zzz", onlyIfReferenced: false }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {\n    readFile,\n    stat\n} from 'fs';\n`,
+                    `import {\n    readFile,\n    stat,\n    zzz\n} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should put an element inserted mid-list on its own line in a one-per-line list', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readdir", onlyIfReferenced: false }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`,
+                    `import {\n    readdir,\n    readFile,\n    stat,\n} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should keep the first element on its own line when inserting before it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "access", onlyIfReferenced: false }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`,
+                    `import {\n    access,\n    readFile,\n    stat,\n} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should break a single multiline element list onto new lines', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "stat", onlyIfReferenced: false }));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {\n    readFile,\n} from 'fs';\n`,
+                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`
+                )
+            );
+        });
+
         test('should merge aliased member into existing import', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({ module: "fs", member: "readFileSync", alias: "readSync", onlyIfReferenced: false }));
@@ -910,6 +1002,66 @@ describe('AddImport visitor', () => {
     });
 
     describe('usage detection', () => {
+        test('should add import for a renamed call whose callee carries the method type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                    if (m.name.simpleName === 'readFile' && Type.FullyQualified.getFullyQualifiedName(m.methodType?.declaringType!) === 'fs') {
+                        maybeAddImport(this, {module: 'fs', member: 'writeFile'});
+                        maybeRemoveImport(this, 'fs', 'readFile');
+                        return produceAsync(m, async draft => {
+                            draft.name.simpleName = 'writeFile';
+                        });
+                    }
+                    return m;
+                }
+            });
+
+            //language=typescript
+            await spec.rewriteRun({
+                ...typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        readFile('test.txt', () => {});
+                    `,
+                    `
+                        import {writeFile} from 'fs';
+
+                        writeFile('test.txt', () => {});
+                    `
+                ),
+                beforeRecipe: async (cu: JS.CompilationUnit) => await new class extends JavaScriptVisitor<void> {
+                    override async visitMethodInvocation(method: J.MethodInvocation, p: void): Promise<J | undefined> {
+                        const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                        return m.methodType ? produceAsync(m, async draft => {
+                            draft.name.type = m.methodType;
+                        }) : m;
+                    }
+                }().visit<JS.CompilationUnit>(cu, undefined)
+            });
+        });
+
+        test('should not add import for a local function sharing the name of a module member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'writeFile'}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        function writeFile() {}
+
+                        readFile('test.txt', () => {});
+                        const write = writeFile;
+                    `
+                )
+            );
+        });
+
         test('should detect usage in field access', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({ module: "fs" }));
@@ -3304,4 +3456,87 @@ describe('AddImport visitor', () => {
         });
     });
 
+});
+
+describe('AddImport follows the file it lands in', () => {
+    function addImport(config?: Record<string, unknown>, options: Partial<AddImportOptions> = {}): JavaScriptVisitor<any> {
+        const visitor = new AddImport({module: 'n', member: 'b', onlyIfReferenced: false, ...options});
+        return new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                return await visitor.visit(config ? withPrettierStyle(cu, config) : cu, p);
+            }
+        };
+    }
+
+    test('a semicolon-free file gets an import without one', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport());
+        await spec.rewriteRun(typescript(
+            `import got from 'got'\nimport http from 'http'\n\nconst x = 1\n`,
+            `import got from 'got'\nimport http from 'http'\nimport {b} from 'n'\n\nconst x = 1\n`
+        ));
+    });
+
+    test('a semicolon-free file without imports is judged by its other statements', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport());
+        await spec.rewriteRun(typescript(
+            `const x = 1\nconsole.log(x)\n`,
+            `import {b} from 'n'\n\nconst x = 1\nconsole.log(x)\n`
+        ));
+    });
+
+    test('a file with semicolons keeps them', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport());
+        await spec.rewriteRun(typescript(
+            `import got from 'got';\nimport http from 'http';\n\nconst x = 1;\n`,
+            `import got from 'got';\nimport http from 'http';\nimport {b} from 'n';\n\nconst x = 1;\n`
+        ));
+    });
+
+    test('Prettier semi:false outranks the semicolons the file writes', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport({semi: false, singleQuote: true}));
+        await spec.rewriteRun(typescript(
+            `import { a } from 'm';\n\nconst x = [a];\n`,
+            `import { a } from 'm';\nimport { b } from 'n'\n\nconst x = [a];\n`
+        ));
+    });
+
+    test('a file whose imports are spaced gets a spaced import', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport());
+        await spec.rewriteRun(typescript(
+            `import { a } from "m";\nimport { c } from "o";\n\nconst x = [a, c];\n`,
+            `import { a } from "m";\nimport { c } from "o";\nimport { b } from "n";\n\nconst x = [a, c];\n`
+        ));
+    });
+
+    test('a one-per-line import list is no evidence of brace spacing', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport());
+        await spec.rewriteRun(typescript(
+            `import {\n    a,\n    c,\n} from "m";\n\nconst x = [a, c];\n`,
+            `import {\n    a,\n    c,\n} from "m";\nimport {b} from "n";\n\nconst x = [a, c];\n`
+        ));
+    });
+
+    test('Prettier bracketSpacing:false outranks the spacing the file writes', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport({bracketSpacing: false, singleQuote: true}));
+        await spec.rewriteRun(typescript(
+            `import { a } from 'm';\n\nconst x = [a];\n`,
+            `import { a } from 'm';\nimport {b} from 'n';\n\nconst x = [a];\n`
+        ));
+    });
+
+    test('Prettier singleQuote:false outranks the quote the file writes', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addImport({singleQuote: false}));
+        await spec.rewriteRun(typescript(
+            `import { a } from 'm';\n\nconst x = [a];\n`,
+            `import { a } from 'm';\nimport { b } from "n";\n\nconst x = [a];\n`
+        ));
+    });
 });

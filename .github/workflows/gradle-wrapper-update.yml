@@ -24,6 +24,9 @@ jobs:
 
       - name: Update versions
         run: ./gradlew :rewrite-gradle:syncWrapperScripts
+        env:
+          ORG_GRADLE_PROJECT_codegenomeUsername: ${{ secrets.CODEGENOME_USERNAME }}
+          ORG_GRADLE_PROJECT_codegenomePassword: ${{ secrets.CODEGENOME_TOKEN }}
 
       # Commit and push
       - name: configure-git-user

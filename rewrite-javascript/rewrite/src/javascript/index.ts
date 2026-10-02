@@ -54,6 +54,9 @@ export * from "./remove-import";
 export * from "./cleanup/index";
 export * from "./recipes/index";
 export * from "./search/index";
+export * from "./migrate/index";
+export * from "./migrate/es6/index";
+export * from "./migrate/typescript/index";
 
 import "./print";
 import "./rpc";

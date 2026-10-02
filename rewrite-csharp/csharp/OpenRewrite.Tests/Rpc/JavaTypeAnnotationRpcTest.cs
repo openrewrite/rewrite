@@ -106,7 +106,7 @@ public class JavaTypeAnnotationRpcTest
 
         var data = new List<RpcObjectData>();
         var q = new RpcSendQueue(1024, batch => data.AddRange(batch),
-            new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);
+            new RpcRefs(), null, false);
 
         q.Send(after, before, () => new JavaSender().VisitType(after, q));
         q.Flush();
@@ -125,7 +125,7 @@ public class JavaTypeAnnotationRpcTest
     {
         var data = new List<RpcObjectData>();
         var q = new RpcSendQueue(1024, batch => data.AddRange(batch),
-            new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);
+            new RpcRefs(), null, false);
         q.Send(Reference.AsRef(after), before == null ? null : Reference.AsRef(before),
             () => new JavaSender().VisitType(after, q));
         q.Flush();
@@ -176,29 +176,7 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
             public class Both { }
             """;
 
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, path: "Both.cs");
-        var references = Assemblies.Net90
-            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, CancellationToken.None)
-            .GetAwaiter().GetResult();
-        var compilation = CSharpCompilation.Create("AnnotationRpcTest")
-            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-            .AddReferences(references)
-            .AddSyntaxTrees(syntaxTree);
-        var cu = new CSharpParser().Parse(source, sourcePath: "Both.cs",
-            semanticModel: compilation.GetSemanticModel(syntaxTree));
-
-        var server = RewriteRpcServer.Current!;
-        var treeId = cu.Id.ToString();
-        server.StoreLocalObject(treeId, cu);
-        var ctxId = Guid.NewGuid().ToString();
-        server.StoreLocalObject(ctxId, new ExecutionContext());
-
-        var returned = server.VisitOnRemote(
-            "org.openrewrite.csharp.rpc.JavaTypeAnnotationProbe",
-            treeId, CsCompilationUnitType, ctxId,
-            new Dictionary<string, object?> { ["type"] = "Both" });
-
-        var both = FindClassDeclaration((J)returned, "Both");
+        var both = FindClassDeclaration(ProbeOnJava(source, "Both.cs", "Both"), "Both");
 
         var marker = both.Markers.FindFirst<SearchResult>();
         Assert.NotNull(marker);
@@ -222,6 +200,112 @@ public class JavaTypeAnnotationRealRpcTest : RpcRewriteTest
                     .Single(v => v.Element is JavaType.Variable { Name: "Type" }).ReferenceValue)
             .FullyQualifiedName).ToList();
         Assert.Equal(["System.String", "System.Uri"], types);
+    }
+
+    [Fact]
+    public void NullInAttributeArgumentArrayRoundTripsThroughJava()
+    {
+        var source = """
+            using System;
+
+            sealed class RowAttribute : Attribute
+            {
+                public RowAttribute(params object?[] values) { Values = values; }
+                public object?[] Values { get; }
+            }
+
+            [Row(null, "a", null)]
+            public class Rows { }
+            """;
+
+        var rows = FindClassDeclaration(ProbeOnJava(source, "Rows.cs", "Rows"), "Rows");
+
+        Assert.Equal("@RowAttribute(Values=[null,a,null])", rows.Markers.FindFirst<SearchResult>()?.Description);
+
+        var row = Assert.Single(Assert.IsAssignableFrom<JavaType.Class>(rows.Type).Annotations!
+            .OfType<JavaType.Annotation>());
+        var values = Assert.IsType<JavaType.Annotation.ArrayElementValue>(Assert.Single(row.Values!));
+        Assert.Equal([null, "a", null], values.ConstantValues!);
+    }
+
+    /// <summary>
+    /// JSON has no literal for NaN or the infinities, so non-finite constants travel as the
+    /// <c>"NaN"</c>/<c>"Infinity"</c>/<c>"-Infinity"</c> strings Jackson uses for them rather than
+    /// failing the whole file's serialization.
+    /// </summary>
+    [Fact]
+    public void NonFiniteConstantsRoundTripThroughJava()
+    {
+        var source = """
+            using System;
+
+            [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+            sealed class LimitAttribute : Attribute
+            {
+                public double Value { get; set; }
+            }
+
+            sealed class DataAttribute : Attribute
+            {
+                public DataAttribute(params object[] data) { Data = data; }
+                public object[] Data { get; }
+            }
+
+            [Limit(Value = double.NaN)]
+            [Limit(Value = double.PositiveInfinity)]
+            [Data(double.NaN, double.PositiveInfinity, float.NegativeInfinity, 1.5)]
+            public class NonFinite { }
+            """;
+
+        var nonFinite = FindClassDeclaration(ProbeOnJava(source, "NonFinite.cs", "NonFinite"), "NonFinite");
+
+        var marker = nonFinite.Markers.FindFirst<SearchResult>();
+        Assert.NotNull(marker);
+        Assert.Equal(
+            "@LimitAttribute(Value=NaN);" +
+            "@LimitAttribute(Value=Infinity);" +
+            "@DataAttribute(Data=[NaN,Infinity,-Infinity,1.5])",
+            marker!.Description);
+
+        var cls = Assert.IsAssignableFrom<JavaType.Class>(nonFinite.Type);
+        var annotations = cls.Annotations!.OfType<JavaType.Annotation>().ToList();
+
+        var limits = annotations
+            .Where(a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "LimitAttribute" })
+            .Select(a => a.Values!.OfType<JavaType.Annotation.SingleElementValue>().Single().ConstantValue)
+            .ToList();
+        Assert.Equal(["probed:NaN", "probed:Infinity"], limits);
+
+        var data = annotations
+            .Single(a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "DataAttribute" })
+            .Values!.OfType<JavaType.Annotation.ArrayElementValue>().Single().ConstantValues;
+        Assert.Equal(["NaN", "Infinity", "-Infinity", 1.5], data!);
+    }
+
+    private static J ProbeOnJava(string source, string path, string type)
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, path: path);
+        var references = Assemblies.Net90
+            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, CancellationToken.None)
+            .GetAwaiter().GetResult();
+        var compilation = CSharpCompilation.Create("AnnotationRpcTest")
+            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithNullableContextOptions(NullableContextOptions.Enable))
+            .AddReferences(references)
+            .AddSyntaxTrees(syntaxTree);
+        var cu = new CSharpParser().Parse(source, sourcePath: path,
+            semanticModel: compilation.GetSemanticModel(syntaxTree));
+
+        var server = RewriteRpcServer.Current!;
+        var treeId = cu.Id.ToString();
+        server.StoreLocalObject(treeId, cu);
+        var ctxId = Guid.NewGuid().ToString();
+        server.StoreLocalObject(ctxId, new ExecutionContext());
+
+        return (J)server.VisitOnRemote(
+            "org.openrewrite.csharp.rpc.JavaTypeAnnotationProbe",
+            treeId, CsCompilationUnitType, ctxId,
+            new Dictionary<string, object?> { ["type"] = type });
     }
 
     private static ClassDeclaration FindClassDeclaration(J tree, string simpleName)

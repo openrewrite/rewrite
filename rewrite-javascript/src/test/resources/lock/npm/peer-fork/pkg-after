@@ -1,0 +1,9 @@
+{
+  "name": "peer-fork",
+  "version": "1.0.0",
+  "dependencies": {
+    "escape-string-regexp": "4.0.0",
+    "micromatch": "4.0.8",
+    "tinyglobby": "0.2.14"
+  }
+}

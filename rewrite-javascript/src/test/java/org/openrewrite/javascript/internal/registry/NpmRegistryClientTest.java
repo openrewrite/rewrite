@@ -44,7 +44,7 @@ class NpmRegistryClientTest {
     }
 
     @Test
-    void packumentSendsInstallV1Accept() {
+    void packumentAcceptsInstallV1WithJsonFallback() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"dist-tags\":{\"latest\":\"4.17.21\"}," +
                 "\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
@@ -53,7 +53,8 @@ class NpmRegistryClientTest {
         AbbreviatedPackument packument = client.getPackument(registry(), "lodash");
 
         assertThat(sender.last().getUrl().getPath()).isEqualTo("/lodash");
-        assertThat(sender.last().getRequestHeaders()).containsEntry("Accept", "application/vnd.npm.install-v1+json");
+        assertThat(sender.last().getRequestHeaders())
+                .containsEntry("Accept", "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*");
         assertThat(packument.getVersions()).containsExactly("4.17.20", "4.17.21");
         assertThat(packument.getDistTags()).containsEntry("latest", "4.17.21");
     }
@@ -247,6 +248,46 @@ class NpmRegistryClientTest {
                 .isInstanceOfSatisfying(NodeRegistryException.class,
                         e -> assertThat(e.getReason()).isEqualTo(Reason.UNREACHABLE));
         assertThat(sender.sendCount).isZero();
+    }
+
+    @Test
+    void unresolvedCredentialsAreSentAsWritten() {
+        StubHttpSender sender = new StubHttpSender();
+        sender.enqueueJson(200, "{\"versions\":{}}");
+        var client = new NpmRegistryClient(sender);
+        var unresolved = new NodeRegistry(null, "https://registry.test/", "${NPM_TOKEN}", null, null, null,
+                false, null, true, false).withUnresolvedCredentialPlaceholders(singletonList("${NPM_TOKEN}"));
+
+        client.getPackument(unresolved, "lodash");
+
+        assertThat(sender.last().getRequestHeaders()).containsEntry("Authorization", "Bearer ${NPM_TOKEN}");
+    }
+
+    @Test
+    void rejectedRequestNamesUnresolvedPlaceholders() {
+        StubHttpSender sender = new StubHttpSender();
+        sender.enqueueJson(401, "{}");
+        var client = new NpmRegistryClient(sender);
+        var unresolved = registry().withUnresolvedCredentialPlaceholders(List.of("${NPM_USER}", "${NPM_PASS}"));
+
+        assertThatThrownBy(() -> client.getPackument(unresolved, "lodash"))
+                .isInstanceOfSatisfying(NodeRegistryException.class, e -> {
+                    assertThat(e.getReason()).isEqualTo(Reason.AUTH_FAILED);
+                    assertThat(e.getMessage())
+                            .startsWith("HTTP 401 from http://registry.test/lodash")
+                            .contains("reference ${NPM_USER}, ${NPM_PASS}, which are not set");
+                });
+    }
+
+    @Test
+    void rejectedRequestWithoutUnresolvedPlaceholdersHasNoHint() {
+        StubHttpSender sender = new StubHttpSender();
+        sender.enqueueJson(403, "{}");
+        var client = new NpmRegistryClient(sender);
+
+        assertThatThrownBy(() -> client.getPackument(registry(), "lodash"))
+                .isInstanceOfSatisfying(NodeRegistryException.class,
+                        e -> assertThat(e.getMessage()).isEqualTo("HTTP 403 from http://registry.test/lodash"));
     }
 
     @Test

@@ -51,7 +51,8 @@ public class CSharpVisitorTests
     {
         var original = new SizeOf(
             Guid.NewGuid(), Space.Empty, Markers.Empty,
-            expression: MakeId("int"),
+            clazz: new ControlParentheses<TypeTree>(Guid.NewGuid(), Space.Empty, Markers.Empty,
+                new JRightPadded<TypeTree>(MakeId("int"), Space.Empty, Markers.Empty)),
             type: null
         );
 

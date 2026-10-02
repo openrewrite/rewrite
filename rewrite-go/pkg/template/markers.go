@@ -54,7 +54,7 @@ func matchMarkers(pattern, candidate java.Markers) bool {
 	if n == 0 {
 		return true
 	}
-	for _, marker := range pattern.Entries {
+	for _, marker := range pattern.Entries() {
 		t := reflect.TypeOf(marker)
 		if !semanticMarkers[t] {
 			continue
@@ -68,7 +68,7 @@ func matchMarkers(pattern, candidate java.Markers) bool {
 
 func countSemantic(markers java.Markers) int {
 	n := 0
-	for _, m := range markers.Entries {
+	for _, m := range markers.Entries() {
 		if semanticMarkers[reflect.TypeOf(m)] {
 			n++
 		}
@@ -77,7 +77,7 @@ func countSemantic(markers java.Markers) int {
 }
 
 func hasMatchingMarker(markers java.Markers, t reflect.Type, marker java.Marker) bool {
-	for _, other := range markers.Entries {
+	for _, other := range markers.Entries() {
 		if reflect.TypeOf(other) == t {
 			return sameMarkerValue(marker, other)
 		}

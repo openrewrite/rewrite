@@ -24,6 +24,7 @@ from rewrite.java import J
 from rewrite.java.tree import Block, Identifier
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
 from rewrite.python.binding_utils import Binding, ImportBindings, import_bindings, is_reference
+from rewrite.python.import_utils import module_binding_name
 from rewrite.python.scope_utils import scope_of
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
@@ -36,7 +37,7 @@ class ContextBinding:
 
     name: str
     """The local name the template's code uses: the alias where the context gives one, else the
-    member of a ``from`` import and the root package of ``import a.b.c``."""
+    member of a ``from`` import and :func:`module_binding_name` of a plain one."""
 
     module: str
     """The module as written, keeping a relative import's leading dots."""
@@ -61,7 +62,7 @@ def context_bindings(context: Sequence[str]) -> Tuple[ContextBinding, ...]:
     for node in parsed.body:
         if isinstance(node, ast.Import):
             for name in node.names:
-                bindings.append(ContextBinding(name.asname or name.name.split('.')[0],
+                bindings.append(ContextBinding(name.asname or module_binding_name(name.name),
                                                name.name, None, name.asname))
         elif isinstance(node, ast.ImportFrom):
             module = '.' * node.level + (node.module or '')
@@ -180,7 +181,7 @@ def _same_package(held: Optional[Binding], binding: ContextBinding) -> bool:
     ``import a.c`` both bind ``a`` to it."""
     return (held is not None and held.member is None and binding.member is None
             and binding.alias is None and held.name == binding.name
-            and held.module.split('.')[0] == binding.module.split('.')[0])
+            and module_binding_name(held.module) == module_binding_name(binding.module))
 
 
 class RenameBindings(PythonVisitor[None]):

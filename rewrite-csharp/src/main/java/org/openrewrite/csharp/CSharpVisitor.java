@@ -498,7 +498,7 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         }
         usingStatement = (Cs.UsingStatement) tempStatement;
         usingStatement = usingStatement.withMarkers(visitMarkers(usingStatement.getMarkers(), p));
-        usingStatement = usingStatement.getPadding().withExpression(visitLeftPadded(usingStatement.getPadding().getExpression(), CsLeftPadded.Location.USING_STATEMENT_EXPRESSION, p));
+        usingStatement = usingStatement.withExpression(visitAndCast(usingStatement.getExpression(), p));
         return usingStatement.withStatement(visitAndCast(usingStatement.getStatement(), p));
     }
 
@@ -682,7 +682,18 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         }
         sizeOf = (Cs.SizeOf) tempExpression;
         sizeOf = sizeOf.withMarkers(visitMarkers(sizeOf.getMarkers(), p));
-        return sizeOf.withExpression(visitAndCast(sizeOf.getExpression(), p));
+        return sizeOf.withClazz(visitAndCast(sizeOf.getClazz(), p));
+    }
+
+    public J visitTypeOf(Cs.TypeOf typeOf, P p) {
+        typeOf = typeOf.withPrefix(visitSpace(typeOf.getPrefix(), CsSpace.Location.TYPE_OF_PREFIX, p));
+        Expression tempExpression = (Expression) visitExpression(typeOf, p);
+        if (!(tempExpression instanceof Cs.TypeOf)) {
+            return tempExpression;
+        }
+        typeOf = (Cs.TypeOf) tempExpression;
+        typeOf = typeOf.withMarkers(visitMarkers(typeOf.getMarkers(), p));
+        return typeOf.withClazz(visitAndCast(typeOf.getClazz(), p));
     }
 
     public J visitDefaultExpression(Cs.DefaultExpression defaultExpression, P p) {

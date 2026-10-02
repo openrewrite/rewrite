@@ -401,8 +401,8 @@ func pkgPathOf(fqn string) string {
 	return fqn
 }
 
-// AddToBlock returns a copy of cu with imp inserted into the existing
-// import container. If cu has no imports container yet, one is created
+// AddToBlock returns a copy of cu with imp inserted into one of its
+// import declarations. If cu has no imports container yet, one is created
 // with default formatting (single ungrouped `import "path"` line).
 //
 // The insertion preserves group ordering: imp is placed at the end of
@@ -423,7 +423,7 @@ func AddToBlock(cu *golang.CompilationUnit, imp *java.Import, modulePath string)
 	c := *cu
 	if c.Imports == nil {
 		c.Imports = &java.Container[*java.Import]{
-			Before: java.Space{Whitespace: "\n\n"},
+			Before: java.MakeSpace(nil, "\n\n"),
 		}
 		// Wire the leading-space convention onto the new import: the
 		// space between `import` and the path lives on the Qualid
@@ -431,56 +431,157 @@ func AddToBlock(cu *golang.CompilationUnit, imp *java.Import, modulePath string)
 		// space after `import` lives on Import.Prefix and the space between
 		// alias and path lives on the literal.
 		if imp.Alias != nil {
-			imp.Prefix = java.Space{Whitespace: " "}
+			imp.Prefix = java.MakeSpace(nil, " ")
 		} else {
 			if lit, ok := imp.Qualid.(*java.Literal); ok {
 				cloned := *lit
-				cloned.Prefix = java.Space{Whitespace: " "}
+				cloned.Prefix = java.MakeSpace(nil, " ")
 				imp.Qualid = &cloned
 			}
 		}
 	}
 	imps := *c.Imports
-
-	// Adding a second import to an ungrouped single-import file
-	// promotes it to the grouped `import (...)` form — that's the
-	// only legal Go syntax for multiple imports in one block.
-	if len(imps.Elements) == 1 && java.FindMarker[golang.GroupedImport](imps.Markers) == nil {
-		promoteToGrouped(&imps)
+	if len(imps.Elements) == 0 {
+		imps.Elements = insertGrouped(imps.Elements, imp, modulePath)
+		c.Imports = &imps
+		return &c
 	}
 
-	imps.Elements = insertGrouped(imps.Elements, imp, modulePath)
+	// A file may hold several import declarations: the first one's shape
+	// lives on the container, each later one's on an ImportBlock marker on
+	// its first import. imp joins the last declaration holding its group.
+	elements := append([]java.RightPadded[*java.Import](nil), imps.Elements...)
+	start, end := targetDeclaration(elements, GroupOf(ImportPath(imp), modulePath), modulePath)
+
+	// Adding a second import to an ungrouped declaration promotes it to
+	// the grouped `import (...)` form — that's the only legal Go syntax
+	// for multiple imports in one declaration.
+	if !isGroupedDeclaration(imps, elements[start]) {
+		promoteToGrouped(&imps, elements, start, end)
+	}
+
+	inserted := insertGrouped(elements[start:end], imp, modulePath)
+	if start > 0 && java.FindMarker[golang.ImportBlock](inserted[0].Element.Markers) == nil {
+		inserted = moveImportBlock(inserted)
+	}
+	out := make([]java.RightPadded[*java.Import], 0, len(elements)+1)
+	out = append(out, elements[:start]...)
+	out = append(out, inserted...)
+	imps.Elements = append(out, elements[end:]...)
 	c.Imports = &imps
 	return &c
 }
 
-// promoteToGrouped converts an ungrouped single-import block to the
-// grouped `import (...)` form. Adds the GroupedImport marker and
-// rewrites the existing element's Prefix / After so the printer emits
-// it indented inside parens.
-func promoteToGrouped(imps *java.Container[*java.Import]) {
-	imps.Markers = java.AddMarker(imps.Markers, golang.GroupedImport{
-		Ident:  uuid.New(),
-		Before: java.Space{Whitespace: " "}, // space between `import` and `(`
-	})
-	if len(imps.Elements) == 0 {
+// targetDeclaration returns the [start, end) element range of the last
+// import declaration holding an import of group, else of the last
+// declaration.
+func targetDeclaration(elements []java.RightPadded[*java.Import], group ImportGroup, modulePath string) (int, int) {
+	starts := []int{0}
+	for i := 1; i < len(elements); i++ {
+		if elements[i].Element != nil && java.FindMarker[golang.ImportBlock](elements[i].Element.Markers) != nil {
+			starts = append(starts, i)
+		}
+	}
+	endOf := func(d int) int {
+		if d+1 < len(starts) {
+			return starts[d+1]
+		}
+		return len(elements)
+	}
+	for d := len(starts) - 1; d >= 0; d-- {
+		for i := starts[d]; i < endOf(d); i++ {
+			if elements[i].Element != nil && GroupOf(ImportPath(elements[i].Element), modulePath) == group {
+				return starts[d], endOf(d)
+			}
+		}
+	}
+	last := len(starts) - 1
+	return starts[last], endOf(last)
+}
+
+func isGroupedDeclaration(imps java.Container[*java.Import], first java.RightPadded[*java.Import]) bool {
+	if first.Element != nil {
+		if block := java.FindMarker[golang.ImportBlock](first.Element.Markers); block != nil {
+			return block.Grouped
+		}
+	}
+	return java.FindMarker[golang.GroupedImport](imps.Markers) != nil
+}
+
+// promoteToGrouped converts the ungrouped single-import declaration at
+// elements[start] to the grouped `import (...)` form: a GroupedImport
+// marker for the first declaration, a grouped ImportBlock for a later one.
+// It rewrites the element's Prefix / After so the printer emits it
+// indented inside parens, and has the declaration at elements[end], if
+// any, close those parens.
+func promoteToGrouped(imps *java.Container[*java.Import], elements []java.RightPadded[*java.Import], start, end int) {
+	rp := &elements[start]
+	if rp.Element == nil {
 		return
 	}
 	// The previously-ungrouped element had Qualid.Prefix=" " (space
 	// between `import` and the path). Inside parens we want the import
 	// indented onto its own line: imp.Prefix="\n\t", Qualid.Prefix="".
-	rp := &imps.Elements[0]
-	if rp.Element != nil {
-		imp := *rp.Element
-		imp.Prefix = java.Space{Whitespace: "\n\t"}
-		if lit, ok := imp.Qualid.(*java.Literal); ok && imp.Alias == nil {
-			cloned := *lit
-			cloned.Prefix = java.EmptySpace
-			imp.Qualid = &cloned
-		}
-		rp.Element = &imp
+	imp := *rp.Element
+	imp.Prefix = java.MakeSpace(nil, "\n\t")
+	if lit, ok := imp.Qualid.(*java.Literal); ok && imp.Alias == nil {
+		cloned := *lit
+		cloned.Prefix = java.EmptySpace
+		imp.Qualid = &cloned
 	}
-	rp.After = java.Space{Whitespace: "\n"} // newline before `)`
+	if block := java.FindMarker[golang.ImportBlock](imp.Markers); block != nil {
+		block.Grouped = true
+		block.GroupedBefore = java.MakeSpace(nil, " ") // space between `import` and `(`
+		imp.Markers = withImportBlock(imp.Markers, block)
+	} else {
+		imps.Markers = java.AddMarker(imps.Markers, golang.GroupedImport{
+			Ident:  uuid.New(),
+			Before: java.MakeSpace(nil, " "), // space between `import` and `(`
+		})
+	}
+	rp.Element = &imp
+	rp.After = java.MakeSpace(nil, "\n") // newline before `)`
+
+	if end < len(elements) && elements[end].Element != nil {
+		next := *elements[end].Element
+		if block := java.FindMarker[golang.ImportBlock](next.Markers); block != nil {
+			block.ClosePrevious = true
+			next.Markers = withImportBlock(next.Markers, block)
+			elements[end].Element = &next
+		}
+	}
+}
+
+// moveImportBlock hands the ImportBlock marker, which prints a later
+// declaration's `import (`, from the import insertGrouped displaced to the
+// one now opening the declaration.
+func moveImportBlock(elements []java.RightPadded[*java.Import]) []java.RightPadded[*java.Import] {
+	displaced := *elements[1].Element
+	block := java.FindMarker[golang.ImportBlock](displaced.Markers)
+	if block == nil {
+		return elements
+	}
+	displaced.Markers = withImportBlock(displaced.Markers, nil)
+	elements[1].Element = &displaced
+	head := *elements[0].Element
+	head.Markers = withImportBlock(head.Markers, block)
+	elements[0].Element = &head
+	return elements
+}
+
+// withImportBlock returns markers with its ImportBlock replaced by block,
+// or dropped when block is nil.
+func withImportBlock(markers java.Markers, block *golang.ImportBlock) java.Markers {
+	entries := make([]java.Marker, 0, len(markers.Entries())+1)
+	for _, m := range markers.Entries() {
+		if _, ok := m.(golang.ImportBlock); !ok {
+			entries = append(entries, m)
+		}
+	}
+	if block != nil {
+		entries = append(entries, *block)
+	}
+	return java.MakeMarkers(markers.GetID(), entries)
 }
 
 // RemoveFromBlock returns a copy of cu with imp deleted from the imports
@@ -498,7 +599,7 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 	}
 	c := *cu
 	imps := *c.Imports
-	removedLastAfter := java.Space{}
+	removedLastAfter := java.EmptySpace
 	removedWasLast := false
 	removedWasFirst := false
 	out := make([]java.RightPadded[*java.Import], 0, len(imps.Elements))
@@ -535,7 +636,7 @@ func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.Compi
 // withGroupSeparator prefixes imp with the blank line gofmt puts in front of
 // the import that opens a group.
 func withGroupSeparator(imp *java.Import, indent java.Space) *java.Import {
-	return withPrefixWhitespace(imp, "\n"+indent.Whitespace)
+	return withPrefixWhitespace(imp, "\n"+indent.Whitespace())
 }
 
 // withoutLeadingBlankLines is the inverse: imp keeps its indent but opens no
@@ -544,15 +645,15 @@ func withoutLeadingBlankLines(imp *java.Import) *java.Import {
 	if imp == nil {
 		return imp
 	}
-	return withPrefixWhitespace(imp, canonicalIndentOf(imp.Prefix.Whitespace))
+	return withPrefixWhitespace(imp, canonicalIndentOf(imp.Prefix.Whitespace()))
 }
 
 func withPrefixWhitespace(imp *java.Import, ws string) *java.Import {
-	if imp == nil || imp.Prefix.Whitespace == ws {
+	if imp == nil || imp.Prefix.Whitespace() == ws {
 		return imp
 	}
 	cloned := *imp
-	cloned.Prefix = java.Space{Comments: imp.Prefix.Comments, Whitespace: ws}
+	cloned.Prefix = java.MakeSpace(imp.Prefix.Comments(), ws)
 	return &cloned
 }
 
@@ -570,11 +671,11 @@ func canonicalIndent(elements []java.RightPadded[*java.Import]) java.Space {
 		if rp.Element == nil {
 			continue
 		}
-		if canonical := canonicalIndentOf(rp.Element.Prefix.Whitespace); strings.HasPrefix(canonical, "\n") {
-			return java.Space{Whitespace: canonical}
+		if canonical := canonicalIndentOf(rp.Element.Prefix.Whitespace()); strings.HasPrefix(canonical, "\n") {
+			return java.MakeSpace(nil, canonical)
 		}
 	}
-	return java.Space{Whitespace: "\n\t"}
+	return java.MakeSpace(nil, "\n\t")
 }
 
 // insertGrouped places imp at the end of its own group while preserving
@@ -604,11 +705,11 @@ func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, 
 
 	if len(elements) > 0 {
 		indent := canonicalIndent(elements)
-		if imp.Prefix.Whitespace == "" {
+		if imp.Prefix.Whitespace() == "" {
 			if insertAt > 0 && GroupOf(ImportPath(elements[insertAt-1].Element), modulePath) != target {
 				out[insertAt].Element = withGroupSeparator(imp, indent)
 			} else {
-				out[insertAt].Element = withPrefixWhitespace(imp, indent.Whitespace)
+				out[insertAt].Element = withPrefixWhitespace(imp, indent.Whitespace())
 			}
 		}
 		if insertAt == 0 {
@@ -625,7 +726,7 @@ func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, 
 		prev := &out[len(out)-2]
 		newTail := &out[len(out)-1]
 		newTail.After = prev.After
-		prev.After = java.Space{}
+		prev.After = java.EmptySpace
 	}
 	return out
 }
@@ -641,11 +742,11 @@ func NewImport(path string, alias *string) *java.Import {
 	if alias != nil {
 		if lit, ok := imp.Qualid.(*java.Literal); ok {
 			cloned := *lit
-			cloned.Prefix = java.Space{Whitespace: " "}
+			cloned.Prefix = java.MakeSpace(nil, " ")
 			imp.Qualid = &cloned
 		}
 		imp.Alias = &java.LeftPadded[*java.Identifier]{
-			Before: java.Space{Whitespace: " "},
+			Before: java.MakeSpace(nil, " "),
 			Element: &java.Identifier{
 				ID:   uuid.New(),
 				Name: *alias,
@@ -709,7 +810,7 @@ func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) [
 			if j == 0 && len(out) > 0 {
 				item.Element = withGroupSeparator(item.Element, indentPrefix)
 			} else {
-				item.Element = withPrefixWhitespace(item.Element, indentPrefix.Whitespace)
+				item.Element = withPrefixWhitespace(item.Element, indentPrefix.Whitespace())
 			}
 			b.items[j] = item
 		}
@@ -736,7 +837,7 @@ func FindModulePath(cu *golang.CompilationUnit) string {
 	if cu == nil {
 		return ""
 	}
-	for _, m := range cu.Markers.Entries {
+	for _, m := range cu.Markers.Entries() {
 		if gp, ok := m.(golang.GoProject); ok && gp.ModulePath != "" {
 			return gp.ModulePath
 		}

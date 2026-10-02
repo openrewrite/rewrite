@@ -17,10 +17,13 @@ package org.openrewrite.rpc;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
@@ -29,9 +32,11 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
+import static java.lang.ProcessBuilder.Redirect.DISCARD;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -110,11 +115,12 @@ class RewriteRpcProcessTest {
             for (int i = 0; i < parallel; i++) {
                 Path log = Files.createTempFile("rpc-stderr-drain-test-" + i, ".log");
                 logs.add(log);
-                RewriteRpcProcess process = new RewriteRpcProcess(
-                        System.getProperty("java.home") + "/bin/java",
-                        "-cp", System.getProperty("java.class.path"),
-                        StderrFlooderEntryPoint.class.getName());
-                process.setStderrRedirect(log);
+                RewriteRpcProcess process = RewriteRpcProcess.forLanguage("test")
+                        .command(System.getProperty("java.home") + "/bin/java",
+                                "-cp", System.getProperty("java.class.path"),
+                                StderrFlooderEntryPoint.class.getName())
+                        .stderrRedirect(log)
+                        .build();
                 process.start();
                 processes.add(process);
             }
@@ -160,7 +166,7 @@ class RewriteRpcProcessTest {
     void startFailsFastWhenBinaryMissing() {
         // given: a command pointing at a binary that does not exist anywhere
         String missing = "definitely-no-such-binary-7a3f9e2c";
-        RewriteRpcProcess process = new RewriteRpcProcess(missing);
+        RewriteRpcProcess process = RewriteRpcProcess.forLanguage("test").command(missing).build();
 
         // when / then: start() must surface the failure within a bounded time, not hang
         assertTimeoutPreemptively(Duration.ofSeconds(5), () ->
@@ -192,6 +198,64 @@ class RewriteRpcProcessTest {
         } finally {
             wedged.descendants().forEach(ProcessHandle::destroyForcibly);
             wedged.destroyForcibly();
+            peerProcess.destroyForcibly();
+        }
+    }
+
+    /**
+     * Taking the EOF path is what lets a peer flush its metrics and logs and remove its
+     * temp directories before exiting.
+     */
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void shutdownLetsAPeerExitOnStdinEof() throws Exception {
+        Process peerProcess = new ProcessBuilder("cat").redirectOutput(DISCARD).start();
+        RewriteRpcProcess peer = peerWrapping(peerProcess);
+        try {
+            peer.shutdown();
+
+            // A force-kill is asynchronous, so the exit status only settles once the peer has gone.
+            await(() -> peerProcess.isAlive() ? null : Boolean.TRUE);
+            assertThat(peerProcess.exitValue())
+                    .as("exit status should be the peer's own, not 128+SIGKILL")
+                    .isZero();
+        } finally {
+            peerProcess.destroyForcibly();
+        }
+    }
+
+    /**
+     * A wedged peer leaves the RPC writer holding the monitor that {@code close()} needs,
+     * so severing stdin must not be what the shutdown thread waits on.
+     */
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void shutdownIsBoundedWhenAWriterHoldsAWedgedPeersStdin() throws Exception {
+        Process peerProcess = new ProcessBuilder("sh", "-c", "sleep 300").start();
+        RewriteRpcProcess peer = peerWrapping(peerProcess);
+        OutputStream stdin = peerProcess.getOutputStream();
+        CountDownLatch holdingMonitor = new CountDownLatch(1);
+        Thread writer = new Thread(() -> {
+            //noinspection SynchronizationOnLocalVariableOrMethodParameter
+            synchronized (stdin) { // the monitor HeaderDelimitedMessageHandler.send() holds
+                holdingMonitor.countDown();
+                try {
+                    // Outruns the pipe buffer, so this blocks until the peer is killed.
+                    stdin.write(new byte[8 * 1024 * 1024]);
+                    stdin.flush();
+                } catch (IOException ignored) {
+                }
+            }
+        }, "rpc-writer");
+        writer.setDaemon(true);
+        writer.start();
+        assertThat(holdingMonitor.await(10, TimeUnit.SECONDS)).isTrue();
+        try {
+            assertTimeoutPreemptively(Duration.ofSeconds(30), peer::shutdown);
+
+            await(() -> peerProcess.isAlive() ? null : Boolean.TRUE);
+            assertThat(peerProcess.isAlive()).isFalse();
+        } finally {
             peerProcess.destroyForcibly();
         }
     }
@@ -236,9 +300,33 @@ class RewriteRpcProcessTest {
         }
     }
 
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    void memoryLimitLaunchesUnderUlimit() {
+        RewriteRpcProcess.setMemoryLimit(6L << 30);
+        try {
+            assertThat(RewriteRpcProcess.forLanguage("test").command("noop", "--flag").build().launchCommand())
+                    .containsExactly("/bin/sh", "-c", "ulimit -d 6291456; exec \"$@\"", "sh", "noop", "--flag");
+        } finally {
+            RewriteRpcProcess.setMemoryLimit(0);
+        }
+        assertThat(RewriteRpcProcess.forLanguage("test").command("noop", "--flag").build().launchCommand()).containsExactly("noop", "--flag");
+    }
+
+    @Test
+    @DisabledOnOs(OS.LINUX)
+    void memoryLimitOnlyAppliesOnLinux() {
+        RewriteRpcProcess.setMemoryLimit(6L << 30);
+        try {
+            assertThat(RewriteRpcProcess.forLanguage("test").command("noop", "--flag").build().launchCommand()).containsExactly("noop", "--flag");
+        } finally {
+            RewriteRpcProcess.setMemoryLimit(0);
+        }
+    }
+
     /** An unstarted {@link RewriteRpcProcess} whose {@code process} field is the given spawned tree. */
     private static RewriteRpcProcess peerWrapping(Process process) {
-        RewriteRpcProcess peer = new RewriteRpcProcess("noop");
+        RewriteRpcProcess peer = RewriteRpcProcess.forLanguage("test").command("noop").build();
         peer.process = process;
         return peer;
     }
@@ -261,7 +349,7 @@ class RewriteRpcProcessTest {
      */
     public static class ForkedJvmEntryPoint {
         public static void main(String[] args) throws Exception {
-            RewriteRpcProcess proc = new RewriteRpcProcess("sleep", "30");
+            RewriteRpcProcess proc = RewriteRpcProcess.forLanguage("test").command("sleep", "30").build();
             proc.start();
 
             Field f = RewriteRpcProcess.class.getDeclaredField("process");

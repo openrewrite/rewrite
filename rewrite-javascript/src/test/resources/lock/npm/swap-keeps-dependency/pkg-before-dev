@@ -1,0 +1,7 @@
+{
+  "name": "swap-keeps-dependency",
+  "version": "1.0.0",
+  "devDependencies": {
+    "ms": "2.1.3"
+  }
+}

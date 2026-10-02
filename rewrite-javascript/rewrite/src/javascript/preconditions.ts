@@ -15,7 +15,7 @@
  */
 import {RecipeRef} from "../preconditions";
 import {IsSourceFile} from "../search";
-import {UsesMethod, UsesType} from "./search";
+import {IsVendoredOrBundled, UsesMethod, UsesType} from "./search";
 
 /**
  * Match source files by path glob.
@@ -37,6 +37,24 @@ export function hasSourcePath(filePattern: string): RecipeRef {
         "org.openrewrite.FindSourceFiles",
         {filePattern},
         new IsSourceFile(filePattern),
+    );
+}
+
+/**
+ * Match vendored, bundled and build-output JavaScript and TypeScript sources,
+ * typically negated with {@link not} so that a recipe leaves them alone.
+ *
+ * Returns a {@link RecipeRef} placeholder bundled with a native
+ * {@link IsVendoredOrBundled} visitor for in-process evaluation; see
+ * {@link hasSourcePath} for the introspection / lazy-evaluation pattern.
+ *
+ * Delegates to {@code org.openrewrite.javascript.search.FindVendoredOrBundled}.
+ */
+export function isVendoredOrBundled(): RecipeRef {
+    return new RecipeRef(
+        "org.openrewrite.javascript.search.FindVendoredOrBundled",
+        {},
+        new IsVendoredOrBundled(),
     );
 }
 

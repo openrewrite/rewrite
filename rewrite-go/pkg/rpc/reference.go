@@ -105,8 +105,10 @@ func assertReferenceIdentity(v any) {
 	}
 }
 
-// Returns nil if the value is nil (including typed nil pointers/interfaces).
+// Returns nil if the value is nil (including typed nil pointers/interfaces), except that a
+// nil Space or Markers becomes a ref to its empty sentinel, as Send would coerce it.
 func AsRef(v any) any {
+	v = nonNilEmpty(v)
 	if isNilValue(v) {
 		return nil
 	}

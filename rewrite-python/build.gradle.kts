@@ -52,26 +52,48 @@ val isWindows = System.getProperty("os.name").lowercase().contains("windows")
 val pythonExe = if (isWindows) venvDir.resolve("Scripts/python.exe") else venvDir.resolve("bin/python")
 val pipExe = if (isWindows) venvDir.resolve("Scripts/pip.exe") else venvDir.resolve("bin/pip")
 
-// Find system Python
+// The floor the package's requires-python declares. An interpreter below it still
+// yields a venv, and the rejection surfaces out of the editable install as a
+// requires-python error naming the package rather than the interpreter behind it.
+val minimumPython = 3 to 12
+
+// `major to minor` for an interpreter, or null when it cannot be run or does not say.
+// stderr is kept off the pipe: an interpreter that greets on it (a deprecation notice,
+// sitecustomize output) is still one whose version answer on stdout is good.
+fun pythonVersion(exe: String): Pair<Int, Int>? = try {
+    val process = ProcessBuilder(exe, "-c", "import sys; print('%d.%d' % sys.version_info[:2])")
+        .redirectError(ProcessBuilder.Redirect.DISCARD)
+        .start()
+    val printed = process.inputStream.bufferedReader().readText().trim()
+    if (process.waitFor() != 0) null else printed.split('.').map { it.toInt() }.let { it[0] to it[1] }
+} catch (e: Exception) {
+    null
+}
+
+fun Pair<Int, Int>.meetsMinimum() =
+    first > minimumPython.first || (first == minimumPython.first && second >= minimumPython.second)
+
+fun Pair<Int, Int>.display() = "${first}.${second}"
+
 fun findPython(): String {
     val candidates = if (isWindows) {
         listOf("python", "python3", "py")
     } else {
         listOf("python3", "python")
     }
+    val rejected = mutableListOf<String>()
     for (cmd in candidates) {
-        try {
-            val process = ProcessBuilder(cmd, "--version")
-                .redirectErrorStream(true)
-                .start()
-            if (process.waitFor() == 0) {
-                return cmd
-            }
-        } catch (e: Exception) {
-            // Command not found, try next
+        val version = pythonVersion(cmd) ?: continue
+        if (version.meetsMinimum()) {
+            return cmd
         }
+        rejected.add("$cmd is ${version.display()}")
     }
-    throw GradleException("Python 3 not found. Please install Python 3.10+ and ensure it's on your PATH.")
+    val found = if (rejected.isEmpty()) "" else " (found ${rejected.joinToString(", ")})"
+    throw GradleException(
+        "Python ${minimumPython.display()}+ not found$found. " +
+            "Please install Python ${minimumPython.display()} or newer and ensure it's on your PATH."
+    )
 }
 
 val pythonSetupVenv by tasks.registering(Exec::class) {
@@ -81,9 +103,11 @@ val pythonSetupVenv by tasks.registering(Exec::class) {
     onlyIf { !venvDir.exists() }
 
     workingDir = pythonDir
-    commandLine(findPython(), "-m", "venv", ".venv")
 
     doFirst {
+        // Resolved in the task action, not at configuration time, so a project that
+        // already has a venv configures on any interpreter.
+        commandLine(findPython(), "-m", "venv", ".venv")
         logger.lifecycle("Creating Python virtual environment in ${venvDir}")
     }
 }
@@ -116,6 +140,15 @@ val pythonInstall by tasks.registering(Exec::class) {
     inputs.file(pythonDir.resolve("pyproject.toml"))
 
     doFirst {
+        // An existing venv is reused as-is, so the interpreter inside one is checked
+        // here as well as at creation.
+        val version = pythonVersion(pythonExe.absolutePath)
+        if (version == null || !version.meetsMinimum()) {
+            throw GradleException(
+                "The virtual environment at $venvDir runs ${version?.display() ?: "an unknown Python"}, " +
+                    "below ${minimumPython.display()}. Delete it and re-run to have it rebuilt."
+            )
+        }
         logger.lifecycle("Installing Python package with pip")
     }
 }

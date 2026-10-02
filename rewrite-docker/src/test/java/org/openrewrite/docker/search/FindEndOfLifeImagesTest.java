@@ -40,7 +40,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             //language=csv
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
-              Dockerfile,,debian,buster,2022-09-10,"trixie (13)"
+              Dockerfile,,debian,buster,2024-06-30,"trixie (13)"
               """
           ),
           docker(
@@ -49,7 +49,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:buster (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:buster
+              ~~(EOL: debian:buster (ended 2024-06-30, suggest trixie (13)))~~>FROM debian:buster
               RUN apt-get update
               """
           )
@@ -63,7 +63,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             //language=csv
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
-              Dockerfile,,debian,buster-slim,2022-09-10,"trixie (13)"
+              Dockerfile,,debian,buster-slim,2024-06-30,"trixie (13)"
               """
           ),
           docker(
@@ -72,7 +72,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:buster-slim (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:buster-slim
+              ~~(EOL: debian:buster-slim (ended 2024-06-30, suggest trixie (13)))~~>FROM debian:buster-slim
               RUN apt-get update
               """
           )
@@ -88,7 +88,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:stretch (ended 2020-07-18, suggest trixie (13)))~~>FROM debian:stretch
+              ~~(EOL: debian:stretch (ended 2022-07-01, suggest trixie (13)))~~>FROM debian:stretch
               RUN apt-get update
               """
           )
@@ -254,7 +254,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
               Dockerfile,builder,node,14,2023-04-30,"26 or 24"
-              Dockerfile,,debian,buster,2022-09-10,"trixie (13)"
+              Dockerfile,,debian,buster,2024-06-30,"trixie (13)"
               """
           ),
           docker(
@@ -269,7 +269,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               ~~(EOL: node:14 (ended 2023-04-30, suggest 26 or 24))~~>FROM node:14 AS builder
               RUN npm run build
 
-              ~~(EOL: debian:buster (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:buster
+              ~~(EOL: debian:buster (ended 2024-06-30, suggest trixie (13)))~~>FROM debian:buster
               COPY --from=builder /app /app
               """
           )
@@ -283,7 +283,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             //language=csv
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
-              Dockerfile,,debian,buster,2022-09-10,"trixie (13)"
+              Dockerfile,,debian,buster,2024-06-30,"trixie (13)"
               """
           ),
           docker(
@@ -298,7 +298,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               FROM debian:trixie AS builder
               RUN ./build.sh
 
-              ~~(EOL: debian:buster (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:buster
+              ~~(EOL: debian:buster (ended 2024-06-30, suggest trixie (13)))~~>FROM debian:buster
               COPY --from=builder /app /app
               """
           )
@@ -326,7 +326,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: debian:10 (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:10
+              ~~(EOL: debian:10 (ended 2024-06-30, suggest trixie (13)))~~>FROM debian:10
               RUN apt-get update
               """
           )

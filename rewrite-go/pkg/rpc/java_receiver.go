@@ -529,22 +529,10 @@ func (r *JavaReceiver) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *sw // shallow copy to avoid mutating remoteObjects baseline
 	sw = &c
-	// selector - Java sends ControlParentheses, extract inner Expression for Tag
-	var selBefore any
-	if sw.Tag != nil {
-		selBefore = &java.ControlParentheses{
-			Tree: java.RightPadded[java.Expression]{Element: sw.Tag.Element, After: sw.Tag.After, Markers: sw.Tag.Markers},
-		}
-	}
-	if cpResult := q.Receive(selBefore, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
-		if cp, ok := cpResult.(*java.ControlParentheses); ok {
-			if _, isEmpty := cp.Tree.Element.(*java.Empty); !isEmpty {
-				sw.Tag = &java.RightPadded[java.Expression]{
-					Element: cp.Tree.Element,
-					After:   cp.Tree.After,
-				}
-			}
-		}
+	// selector - a ControlParentheses matching J.Switch; pass the existing one as
+	// the baseline so a changed selector keeps its unchanged children (mirroring VisitIf).
+	if cpResult := q.Receive(sw.Selector, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
+		sw.Selector = cpResult.(*java.ControlParentheses)
 	}
 	sw.Body = receiveValue(q, sw.Body, func(e *java.Block) any { return r.Visit(e, q) })
 	return sw
@@ -603,7 +591,7 @@ func (r *JavaReceiver) VisitArrayType(at *java.ArrayType, p any) java.J {
 	at = &c
 	at.ElementType = receiveValue(q, at.ElementType, func(e java.Expression) any { return r.Visit(e, q) })
 	q.ReceiveList(nil, nil) // annotations
-	if result := q.Receive(at.Dimension, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
+	if result := q.Receive(at.Dimension, func(v any) any { return receiveLeftPaddedSpaceVal(r, q, v) }); result != nil {
 		at.Dimension = result.(java.LeftPadded[java.Space])
 	}
 	at.Type = r.receiveType(at.Type, q)

@@ -1098,9 +1098,7 @@ class TestChangeImportPythonScopeRules:
             """,
         )
 
-    def test_a_quoted_annotation_renames_when_the_name_stands_alone(self):
-        """A quoted annotation parses to a single identifier, so only a name that is the
-        whole annotation is in reach."""
+    def test_a_quoted_annotation_renames_the_names_it_contains(self):
         self._run(
             """\
             from time import clock
@@ -1113,7 +1111,7 @@ class TestChangeImportPythonScopeRules:
             from time import perf_counter
 
 
-            def f(x: 'perf_counter', y: 'List[clock]'):
+            def f(x: 'perf_counter', y: 'List[perf_counter]'):
                 pass
             """,
         )

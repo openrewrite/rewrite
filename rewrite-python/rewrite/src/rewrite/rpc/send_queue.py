@@ -26,6 +26,10 @@ class RpcObjectState(str, Enum):
 
 ADDED_LIST_ITEM = -1
 
+# Jackson reads a JSON number of at most 1000 characters
+# (StreamReadConstraints.getMaxNumberLength), which 3300 bits stays under.
+_MAX_WIRE_INT_BITS = 3300
+
 T = TypeVar('T')
 
 
@@ -155,33 +159,30 @@ class RpcSendQueue:
 
         def list_change():
             assert after is not None
-            # Build before index map
-            before_idx = {}
-            if before is not None:
-                for i, item in enumerate(before):
-                    before_idx[id_getter(item)] = i
+            if not before:
+                # Every element is an addition, so the positions are a constant that needs
+                # neither an index map nor a key computed per element.
+                self.put({'state': RpcObjectState.CHANGE, 'value': [ADDED_LIST_ITEM] * len(after)})
+                for item in after:
+                    add_fn(item, (lambda i=item: on_change(i)) if on_change else None)
+                return
 
-            # Send positions array
-            positions = []
-            for item in after:
-                item_id = id_getter(item)
-                if item_id in before_idx:
-                    positions.append(before_idx[item_id])
-                else:
-                    positions.append(ADDED_LIST_ITEM)
+            before_idx = {}
+            for i, item in enumerate(before):
+                before_idx[id_getter(item)] = i
+
+            positions = [before_idx.get(id_getter(item), ADDED_LIST_ITEM) for item in after]
             self.put({'state': RpcObjectState.CHANGE, 'value': positions})
 
             # Send each item
-            for item in after:
-                item_id = id_getter(item)
-                before_pos = before_idx.get(item_id)
+            for item, before_pos in zip(after, positions):
                 # Wrap on_change to capture current item
                 wrapped = (lambda i=item: on_change(i)) if on_change else None
 
-                if before_pos is None:
+                if before_pos == ADDED_LIST_ITEM:
                     add_fn(item, wrapped)
                 else:
-                    a_before = before[before_pos] if before else None
+                    a_before = before[before_pos]
                     if a_before is item:
                         self.put({'state': RpcObjectState.NO_CHANGE})
                     elif as_ref or a_before is None or type(item) != type(a_before):
@@ -333,12 +334,9 @@ class RpcSendQueue:
         if isinstance(obj, bool):
             return obj
         if isinstance(obj, int):
-            # Integers exceeding Java's long range cannot be serialized as
-            # JSON numbers (Jackson's StreamReadConstraints rejects them).
-            # Convert to string — the original source is preserved in valueSource.
-            if obj > 9223372036854775807 or obj < -9223372036854775808:
-                return str(obj)
-            return obj
+            # An integer travels as a number whatever its width, so that a receiver boxes it
+            # as one; a string here is indistinguishable from a string literal's value.
+            return obj if obj.bit_length() <= _MAX_WIRE_INT_BITS else None
         if isinstance(obj, str):
             return obj
         if isinstance(obj, float):
@@ -348,10 +346,9 @@ class RpcSendQueue:
                 return None
             return obj
         if isinstance(obj, complex):
-            # Java has no complex primitive, so carry the value as a string. Python's
-            # repr parenthesizes a complex with a non-zero real part ("(3+4j)"); strip
-            # those so the value matches the source, which is also kept in valueSource.
-            return str(obj).strip('()')
+            # No JSON number carries a complex, and a string is ruled out for the same
+            # reason as a wide int, so valueSource carries the literal alone.
+            return None
         if isinstance(obj, UUID):
             return str(obj)
         if isinstance(obj, Path):

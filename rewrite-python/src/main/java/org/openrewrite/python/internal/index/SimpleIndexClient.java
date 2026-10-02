@@ -93,8 +93,7 @@ public class SimpleIndexClient {
         try (HttpSender.Response response = httpSender.send(request)) {
             int code = response.getCode();
             if (code == 401 || code == 403) {
-                throw new PythonIndexException(Reason.AUTH_FAILED, index.getUrl(),
-                        "HTTP " + code + " from " + pageUrl);
+                throw PythonIndexException.authFailed(index, code, pageUrl);
             }
             if (code == 404) {
                 throw new PythonIndexException(Reason.NOT_FOUND, index.getUrl(),

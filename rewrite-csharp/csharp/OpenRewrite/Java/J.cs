@@ -1201,7 +1201,7 @@ public sealed class TypeParameters(
     /// Create a TypeParameters wrapper from a JContainer (for RPC sending).
     /// </summary>
     public static TypeParameters FromContainer(JContainer<TypeParameter> container) =>
-        new(Guid.NewGuid(), container.Before, Markers.Empty, [], container.Elements);
+        new(Tree.RandomId(), container.Before, Markers.Empty, [], container.Elements);
 
     /// <summary>
     /// Convert back to a JContainer (for RPC receiving).

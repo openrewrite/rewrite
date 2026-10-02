@@ -543,7 +543,7 @@ func (s *GoSender) VisitCommClause(cc *golang.CommClause, p any) java.J {
 // the framework switch.
 func (s *GoSender) sendParseError(pe *java.ParseError, q *SendQueue) {
 	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).Ident.String() }, nil)
-	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).Markers },
+	q.GetAndSend(pe, func(v any) any { return AsRef(v.(*java.ParseError).Markers) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).SourcePath }, nil)
 	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).CharsetName }, nil)

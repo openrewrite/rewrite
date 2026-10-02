@@ -52,7 +52,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
             return j;
         }
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.getAndSend(j, Tree::getMarkers);
+        q.getAndSend(j, mk -> asRef(mk.getMarkers()));
 
         return j;
     }

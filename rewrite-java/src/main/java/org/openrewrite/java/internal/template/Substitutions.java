@@ -27,6 +27,7 @@ import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -420,6 +421,11 @@ public class Substitutions {
                 Integer param = parameterIndex(marker.getPrefix());
                 if (param != null) {
                     J j2 = spliceParameter(param);
+                    // Markers the parser put on the placeholder describe the position it occupied rather than the
+                    // placeholder itself — Groovy's `OmitParentheses`, say — so they belong to whatever takes it
+                    for (Marker m : replaced.getMarkers().getMarkers()) {
+                        j2 = j2.withMarkers(j2.getMarkers().addIfAbsent(m));
+                    }
                     return j2.withPrefix(j2.getPrefix().withWhitespace(replaced.getPrefix().getWhitespace()));
                 }
                 return null;

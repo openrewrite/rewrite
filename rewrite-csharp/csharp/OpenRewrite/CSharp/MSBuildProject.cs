@@ -257,6 +257,9 @@ public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
     /// <summary>Package ships a legacy content/ folder (ignored under PackageReference).</summary>
     public bool HasLegacyContentFolder { get; }
 
+    /// <summary>Declared dependency version range per child package id, lock file <c>dependencies</c> section.</summary>
+    public IDictionary<string, string> DependencyRanges { get; }
+
     public ResolvedPackage(
         string name,
         string resolvedVersion,
@@ -274,7 +277,8 @@ public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
         IList<string>? analyzerAssemblies = null,
         bool hasInstallScripts = false,
         bool hasXdtTransforms = false,
-        bool hasLegacyContentFolder = false)
+        bool hasLegacyContentFolder = false,
+        IDictionary<string, string>? dependencyRanges = null)
     {
         Name = name;
         ResolvedVersion = resolvedVersion;
@@ -293,6 +297,7 @@ public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
         HasInstallScripts = hasInstallScripts;
         HasXdtTransforms = hasXdtTransforms;
         HasLegacyContentFolder = hasLegacyContentFolder;
+        DependencyRanges = dependencyRanges ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     }
 
     public ResolvedPackage WithName(string name) =>
@@ -307,15 +312,20 @@ public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
     public ResolvedPackage WithDepth(int depth) =>
         depth == Depth ? this : Copy(depth: depth);
 
+    public ResolvedPackage WithDependencyRanges(IDictionary<string, string> dependencyRanges) =>
+        ReferenceEquals(dependencyRanges, DependencyRanges) ? this : Copy(dependencyRanges: dependencyRanges);
+
     private ResolvedPackage Copy(
         string? name = null,
         string? resolvedVersion = null,
         IList<ResolvedPackage>? dependencies = null,
-        int? depth = null) =>
+        int? depth = null,
+        IDictionary<string, string>? dependencyRanges = null) =>
         new(name ?? Name, resolvedVersion ?? ResolvedVersion, dependencies ?? Dependencies,
             depth ?? Depth, Type, CompileAssemblies, RuntimeAssemblies, FrameworkAssemblies,
             BuildFiles, BuildMultiTargetingFiles, ContentFiles, RuntimeTargets, ResourceAssemblies,
-            AnalyzerAssemblies, HasInstallScripts, HasXdtTransforms, HasLegacyContentFolder);
+            AnalyzerAssemblies, HasInstallScripts, HasXdtTransforms, HasLegacyContentFolder,
+            dependencyRanges ?? DependencyRanges);
 
     public void RpcSend(ResolvedPackage after, RpcSendQueue q)
     {
@@ -338,6 +348,14 @@ public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
         q.GetAndSend(after, rp => rp.HasInstallScripts);
         q.GetAndSend(after, rp => rp.HasXdtTransforms);
         q.GetAndSend(after, rp => rp.HasLegacyContentFolder);
+        // Send map as parallel lists: keys then values. Instances materialized by the RPC
+        // layer bypass the constructor, so the dictionary can be null.
+        q.GetAndSendList(after, rp => (IList<string>)(rp.DependencyRanges == null ? [] : new List<string>(rp.DependencyRanges.Keys)),
+            k => k,
+            k => q.GetAndSend(k, x => x));
+        q.GetAndSendList(after, rp => (IList<string>)(rp.DependencyRanges == null ? [] : new List<string>(rp.DependencyRanges.Values)),
+            v => v,
+            v => q.GetAndSend(v, x => x));
     }
 
     private static void SendStringList(RpcSendQueue q, ResolvedPackage after,
@@ -365,10 +383,20 @@ public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
         var hasInstallScripts = q.ReceiveAndGet<bool, bool>(before.HasInstallScripts, x => x);
         var hasXdtTransforms = q.ReceiveAndGet<bool, bool>(before.HasXdtTransforms, x => x);
         var hasLegacyContentFolder = q.ReceiveAndGet<bool, bool>(before.HasLegacyContentFolder, x => x);
+        // Receive parallel lists and zip into dictionary. The before instance can be an
+        // RPC-materialized skeleton whose dictionary is null.
+        var beforeRanges = before.DependencyRanges ?? new Dictionary<string, string>();
+        var rangeKeys = ReceiveStringList(q, new List<string>(beforeRanges.Keys));
+        var rangeValues = ReceiveStringList(q, new List<string>(beforeRanges.Values));
+        var dependencyRanges = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < rangeKeys.Count && i < rangeValues.Count; i++)
+        {
+            dependencyRanges[rangeKeys[i]] = rangeValues[i];
+        }
         return new ResolvedPackage(name, resolvedVersion, dependencies, depth, type,
             compile, runtime, frameworkAssemblies, buildFiles, buildMultiTargeting, contentFiles,
             runtimeTargets, resourceAssemblies, analyzerAssemblies,
-            hasInstallScripts, hasXdtTransforms, hasLegacyContentFolder);
+            hasInstallScripts, hasXdtTransforms, hasLegacyContentFolder, dependencyRanges);
     }
 
     private static IList<string> ReceiveStringList(RpcReceiveQueue q, IList<string> before)

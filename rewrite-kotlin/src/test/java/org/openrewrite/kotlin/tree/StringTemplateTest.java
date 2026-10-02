@@ -17,8 +17,12 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"KotlinConstantConditions", "ControlFlowWithEmptyBody"})
@@ -100,6 +104,21 @@ class StringTemplateTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void escapeFragmentValueIsUnescaped() {
+        rewriteRun(
+          kotlin("val id = 1\nval s = \"a\\nb\\u2605${id}\"", spec -> spec.afterRecipe(cu -> {
+              J.VariableDeclarations vd = (J.VariableDeclarations) cu.getStatements().get(1);
+              K.StringTemplate template = (K.StringTemplate) vd.getVariables().getFirst().getInitializer();
+              List<J> strings = template.getStrings();
+              J.Literal newline = (J.Literal) strings.get(1);
+              assertThat(newline.getValue()).isEqualTo("\n");
+              assertThat(newline.getValueSource()).isEqualTo("\\n");
+              assertThat(((J.Literal) strings.get(3)).getValue()).isEqualTo("★");
+          }))
         );
     }
 }

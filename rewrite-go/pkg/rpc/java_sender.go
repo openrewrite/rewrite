@@ -19,7 +19,6 @@ package rpc
 import (
 	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -64,7 +63,7 @@ func (s *JavaSender) PreVisit(t java.Tree, p any) java.Tree {
 	q.GetAndSend(t, func(v any) any { return v.(java.J).GetID().String() }, nil)
 	q.GetAndSend(t, func(v any) any { return v.(java.J).GetPrefix() },
 		func(v any) { sendSpace(v.(java.Space), q) })
-	q.GetAndSend(t, func(v any) any { return v.(java.J).GetMarkers() },
+	q.GetAndSend(t, func(v any) any { return AsRef(v.(java.J).GetMarkers()) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	_ = j
 	return t
@@ -159,7 +158,7 @@ func (s *JavaSender) VisitBlock(b *java.Block, p any) java.J {
 	q := p.(*SendQueue)
 	// static (right-padded bool) - Java's JRightPadded<Boolean> with element=false
 	// Send manually since Go doesn't have RightPadded[bool]
-	sendRightPaddedBool(false, java.EmptySpace, java.Markers{}, q)
+	sendRightPaddedBool(false, java.EmptySpace, java.EmptyMarkers, q)
 	// statements
 	q.GetAndSendList(b,
 		func(v any) []any {
@@ -397,22 +396,9 @@ func (s *JavaSender) VisitForEachControl(fc *java.ForEachControl, p any) java.J 
 
 func (s *JavaSender) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*SendQueue)
-	// selector - wrap tag in ControlParentheses for Java's J.Switch model
-	q.GetAndSend(sw, func(v any) any {
-		tag := v.(*java.Switch).Tag
-		var inner java.Expression
-		if tag != nil {
-			inner = tag.Element
-		} else {
-			// Tagless switch: use Empty as the expression
-			inner = &java.Empty{ID: uuid.New()}
-		}
-		return &java.ControlParentheses{
-			ID:      uuid.New(),
-			Markers: java.Markers{ID: uuid.New()},
-			Tree:    java.RightPadded[java.Expression]{Element: inner, After: java.EmptySpace},
-		}
-	}, func(v any) { s.Visit(v.(java.Tree), q) })
+	// selector - already a ControlParentheses, matching J.Switch
+	q.GetAndSend(sw, func(v any) any { return v.(*java.Switch).Selector },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// cases (Block)
 	q.GetAndSend(sw, func(v any) any { return v.(*java.Switch).Body },
 		func(v any) { s.Visit(v.(java.Tree), q) })

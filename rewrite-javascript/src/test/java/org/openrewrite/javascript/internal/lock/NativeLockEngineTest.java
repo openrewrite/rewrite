@@ -25,6 +25,9 @@ import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
+import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.io.ByteArrayInputStream;
@@ -34,11 +37,15 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class NativeLockEngineTest {
 
@@ -76,6 +83,60 @@ class NativeLockEngineTest {
                 "    \"node_modules/lodash\": {\"version\": \"" + lockedVersion + "\"}\n" +
                 "  }\n" +
                 "}\n";
+    }
+
+    @Test
+    void npmrcTokenWithExplicitDefaultPortRegeneratesLock() {
+        String registry = "https://registry.example:443/npm/";
+        NodeExecutionContextView.view(ctx).setRegistries(emptyList());
+        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
+                new Npmrc(NpmrcScope.User, Map.of(
+                        "registry", "https://registry.example/npm/",
+                        "//registry.example/npm/:_authToken", "s3cret")),
+                new Npmrc(NpmrcScope.Project, Map.of("registry", registry, "always-auth", "false"))));
+        routes.put(registry + "lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+        routes.put(registry + "lodash/4.17.20",
+                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
+        routes.put(registry + "lodash/4.17.21",
+                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"" + registry + "lodash/-/lodash-4.17.21.tgz\"," +
+                        "\"integrity\":\"sha512-NEW\"}}");
+        List<HttpSender.Request> requests = new ArrayList<>();
+        HttpSenderExecutionContextView.view(ctx).setHttpSender(request -> {
+            requests.add(request);
+            if (!"Bearer s3cret".equals(request.getRequestHeaders().get("Authorization"))) {
+                return new HttpSender.Response(401, new ByteArrayInputStream(new byte[0]), () -> {
+                });
+            }
+            String body = routes.get(request.getUrl().toString());
+            return new HttpSender.Response(body == null ? 404 : 200,
+                    new ByteArrayInputStream((body == null ? "" : body).getBytes(StandardCharsets.UTF_8)), () -> {
+            });
+        });
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"packages\": {\n" +
+                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"node_modules/lodash\": {\n" +
+                "      \"version\": \"4.17.20\",\n" +
+                "      \"resolved\": \"" + registry + "lodash/-/lodash-4.17.20.tgz\",\n" +
+                "      \"integrity\": \"sha512-OLD\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "}\n";
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                lock, marker, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(
+                lock.replace("4.17.20", "4.17.21").replace("sha512-OLD", "sha512-NEW"));
+        assertThat(requests).isNotEmpty().allSatisfy(request -> {
+            assertThat(request.getUrl().toString()).startsWith(registry);
+            assertThat(request.getRequestHeaders()).containsEntry("Authorization", "Bearer s3cret");
+        });
     }
 
     @Test

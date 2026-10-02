@@ -9,7 +9,7 @@ from uuid import UUID
 
 from rewrite import Markers
 from rewrite import Tree, SourceFile, TreeVisitor
-from rewrite.utils import replace_if_changed
+from rewrite.utils import lst_dataclass, lst_value_dataclass, replace_if_changed
 
 if TYPE_CHECKING:
     from .visitor import JavaVisitor
@@ -49,7 +49,7 @@ class J(Tree):
         ...
 
 
-@dataclass(frozen=True, slots=True)
+@lst_value_dataclass
 class Comment(ABC):
     @property
     @abstractmethod
@@ -79,7 +79,7 @@ class Comment(ABC):
         return replace_if_changed(self, **kwargs)
 
 
-@dataclass(frozen=True, slots=True)
+@lst_value_dataclass
 class TextComment(Comment):
     _multiline: bool
 
@@ -89,13 +89,13 @@ class TextComment(Comment):
 
     # IMPORTANT: This explicit constructor aligns the parameter order with the Java side
     def __init__(self, _multiline: bool, _text: str, _suffix: str, _markers: Markers) -> None:
-        object.__setattr__(self, '_multiline', _multiline)
-        object.__setattr__(self, '_text', _text)
-        object.__setattr__(self, '_suffix', _suffix)
-        object.__setattr__(self, '_markers', _markers)
+        self._multiline = _multiline  # ty: ignore[invalid-assignment]  # frozen to a checker only
+        self._text = _text  # ty: ignore[invalid-assignment]
+        self._suffix = _suffix  # ty: ignore[invalid-assignment]
+        self._markers = _markers  # ty: ignore[invalid-assignment]
 
 
-@dataclass(frozen=True, slots=True)
+@lst_value_dataclass
 class Space:
     _comments: List[Comment]
 
@@ -115,6 +115,17 @@ class Space:
 
     def is_empty(self) -> bool:
         return len(self._comments) == 0 and (self._whitespace is None or self._whitespace == '')
+
+    @classmethod
+    def build(cls, comments: List[Comment], whitespace: Optional[str]) -> Space:
+        """The two comment-free whitespace values that dominate a tree are shared
+        instances; every other Space is built fresh."""
+        if not comments:
+            if not whitespace:
+                return cls.EMPTY
+            if whitespace == ' ':
+                return cls.SINGLE_SPACE
+        return cls(comments, whitespace)
 
     @classmethod
     def first_prefix(cls, trees: Optional[Iterable[J]]) -> Space:
@@ -206,8 +217,18 @@ class MethodCall(Expression):
     __slots__ = ()
 
 
+def _fully_qualified_repr(self) -> str:
+    """A type's identity, not its graph: `object` is reachable from nearly every
+    method signature, so expanding fields re-prints everything reachable at every
+    position it occupies. Assigned in each subclass body because `dataclass`
+    generates a `__repr__` unless the body defines one."""
+    return f"{type(self).__qualname__}({self.fully_qualified_name!r})"
+
+
 class JavaType(ABC):
     class FullyQualified:
+        __slots__ = ()
+
         class Kind(Enum):
             Class = 0
             Enum = 1
@@ -224,34 +245,54 @@ class JavaType(ABC):
             return getattr(self, '_interfaces', None) or []
 
     class Unknown(FullyQualified):
-        pass
+        __slots__ = ()
 
+        # Carries no name to render, and a heap address would make the repr of every
+        # node holding one differ run to run.
+        def __repr__(self) -> str:
+            return 'JavaType.Unknown()'
+
+    # Identity equality, as for the other `lst_dataclass` types here: a type graph is
+    # cyclic through members and methods, and Java compares these on name and type
+    # parameters alone.
+    @lst_dataclass
     class Class(FullyQualified):
-        _flags_bit_map: int
-        _fully_qualified_name: str
-        _kind: JavaType.FullyQualified.Kind
-        _type_parameters: Optional[List[JavaType]]
-        _supertype: Optional[JavaType.FullyQualified]
-        _owning_class: Optional[JavaType.FullyQualified]
-        _annotations: Optional[List[JavaType.FullyQualified]]
-        _interfaces: Optional[List[JavaType.FullyQualified]]
-        _members: Optional[List[JavaType.Variable]]
-        _methods: Optional[List[JavaType.Method]]
+        _flags_bit_map: int = 0
+        _fully_qualified_name: str = ''
+        # `Kind` lives on the base, which a nested class body cannot see, so the
+        # declaration-time default is filled in once the module is loaded.
+        _kind: Optional[JavaType.FullyQualified.Kind] = None
+        _type_parameters: Optional[List[JavaType]] = None
+        _supertype: Optional[JavaType.FullyQualified] = None
+        _owning_class: Optional[JavaType.FullyQualified] = None
+        _annotations: Optional[List[JavaType.FullyQualified]] = None
+        _interfaces: Optional[List[JavaType.FullyQualified]] = None
+        _members: Optional[List[JavaType.Variable]] = None
+        _methods: Optional[List[JavaType.Method]] = None
+
+        __repr__ = _fully_qualified_repr
+
+        def __post_init__(self):
+            if self._kind is None:
+                self._kind = JavaType.FullyQualified.Kind.Class
 
         @property
         def fully_qualified_name(self) -> str:
             return self._fully_qualified_name
 
     class ShallowClass(Class):
-        pass
+        __slots__ = ()
 
+    @lst_dataclass
     class Parameterized(FullyQualified):
-        _type: JavaType.FullyQualified
-        _type_parameters: Optional[List[JavaType]]
+        _type: Optional[JavaType.FullyQualified] = None
+        _type_parameters: Optional[List[JavaType]] = None
+
+        __repr__ = _fully_qualified_repr
 
         @property
         def type(self) -> JavaType.FullyQualified:
-            return self._type
+            return cast(JavaType.FullyQualified, self._type)
 
         @property
         def type_parameters(self) -> Optional[List[JavaType]]:
@@ -274,13 +315,16 @@ class JavaType(ABC):
             t = getattr(self, '_type', None)
             return t.interfaces if t is not None else []
 
+    @lst_dataclass
     class Annotation(FullyQualified):
-        _type: JavaType.FullyQualified
-        _values: Optional[List[JavaType.Annotation.ElementValue]]
+        _type: Optional[JavaType.FullyQualified] = None
+        _values: Optional[List[JavaType.Annotation.ElementValue]] = None
+
+        __repr__ = _fully_qualified_repr
 
         @property
         def type(self) -> JavaType.FullyQualified:
-            return self._type
+            return cast(JavaType.FullyQualified, self._type)
 
         @property
         def values(self) -> List[JavaType.Annotation.ElementValue]:
@@ -518,7 +562,7 @@ J2 = TypeVar('J2', bound=J)
 J3 = TypeVar('J3', bound=J)
 
 
-@dataclass(frozen=True, slots=True)
+@lst_dataclass
 class JRightPadded(Generic[T]):
     _element: T
 
@@ -592,7 +636,7 @@ class JRightPadded(Generic[T]):
 
 
 
-@dataclass(frozen=True, slots=True)
+@lst_dataclass
 class JLeftPadded(Generic[T]):
     _before: Space
 
@@ -626,7 +670,7 @@ class JLeftPadded(Generic[T]):
 
 
 
-@dataclass(frozen=True, slots=True)
+@lst_dataclass
 class JContainer(Generic[J2]):
     _before: Space
 

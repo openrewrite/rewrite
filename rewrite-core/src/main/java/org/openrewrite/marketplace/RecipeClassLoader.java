@@ -104,6 +104,7 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.java.internal.JavaTypeFactory",
+            "org.openrewrite.java.internal.ImportComments",
             "org.openrewrite.java.service",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
@@ -209,14 +210,18 @@ public class RecipeClassLoader extends URLClassLoader {
             }
         }
 
-        // SLF4J, Jackson, and the Kotlin runtime should always come from the parent.
+        // SLF4J, Jackson, Micrometer, and the Kotlin runtime should always come from the parent.
         // Why kotlin: if both the parent and a recipe jar ship kotlin-stdlib, types like
         // kotlin.jvm.functions.Function1 get defined by both loaders. When Jackson (loaded
         // from parent) interacts with jackson-module-kotlin (typically bundled in the recipe
         // jar), the JVM raises a LinkageError on loader-constraint violations.
         // See moderneinc/customer-requests#2372.
+        // Why micrometer: every recipe jar ships it through rewrite-core, and a child-loaded
+        // copy has its own Metrics.globalRegistry with no registries attached, so meters
+        // recorded by OpenRewrite classes loaded here would never reach the host's.
         if (className.startsWith("org.slf4j") ||
             className.startsWith("com.fasterxml.jackson") ||
+            className.startsWith("io.micrometer.") ||
             className.startsWith("kotlin.")) {
             return true;
         }

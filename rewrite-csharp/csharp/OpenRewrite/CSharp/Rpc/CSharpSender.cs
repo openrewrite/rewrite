@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Rewrite.Core.Rpc;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
@@ -81,6 +82,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             IsPattern ip => VisitIsPattern(ip, q),
             StatementExpression se => VisitStatementExpression(se, q),
             SizeOf sof => VisitSizeOf(sof, q),
+            TypeOf tof => VisitTypeOf(tof, q),
             UnsafeStatement us => VisitUnsafeStatement(us, q),
             FixedStatement fs => VisitFixedStatement(fs, q),
             PointerType pt => VisitPointerType(pt, q),
@@ -184,7 +186,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(j, (J t) => t.Id);
         q.GetAndSend(j, (J t) => t.Prefix, space => VisitSpace(GetValueNonNull<Space>(space), q));
-        q.GetAndSend(j, (J t) => t.Markers);
+        q.GetAndSend(j, (J t) => Reference.AsRef(t.Markers));
         return j;
     }
 
@@ -314,9 +316,16 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
 
     public override J VisitSizeOf(SizeOf sizeOf, RpcSendQueue q)
     {
-        q.GetAndSend(sizeOf, s => (J)s.Expression, el => Visit(el, q));
+        q.GetAndSend(sizeOf, s => (J)s.Clazz, el => Visit(el, q));
         q.GetAndSend(sizeOf, s => AsRef(s.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
         return sizeOf;
+    }
+
+    public override J VisitTypeOf(TypeOf typeOf, RpcSendQueue q)
+    {
+        q.GetAndSend(typeOf, t => (J)t.Clazz, el => Visit(el, q));
+        q.GetAndSend(typeOf, t => AsRef(t.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
+        return typeOf;
     }
 
     public override J VisitUnsafeStatement(UnsafeStatement unsafeStatement, RpcSendQueue q)
@@ -759,7 +768,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
 
     public override J VisitUsingStatement(UsingStatement ust, RpcSendQueue q)
     {
-        q.GetAndSend(ust, u => u.ExpressionPadded, lp => VisitLeftPadded(lp, q));
+        q.GetAndSend(ust, u => (J)u.Expression, el => Visit(el, q));
         q.GetAndSend(ust, u => (J)u.Statement, el => Visit(el, q));
         return ust;
     }
@@ -1107,7 +1116,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
                         q.GetAndSend(c, cm => cm.Text);
                         q.GetAndSend(c, cm => cm.Suffix);
                         // C# Comment has no Markers; send empty Markers for protocol compatibility.
-                        q.GetAndSend(c, _ => Markers.Empty);
+                        q.GetAndSend(c, _ => Reference.AsRef(Markers.Empty));
                     }
                 });
             q.GetAndSend(space, s => s.Whitespace);

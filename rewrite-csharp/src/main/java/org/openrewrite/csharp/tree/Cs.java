@@ -3119,12 +3119,7 @@ public interface Cs extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class UsingStatement implements Cs, Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
         @With
         @EqualsAndHashCode.Include
         @Getter
@@ -3138,19 +3133,16 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
-        JLeftPadded<Expression> expression;
-
-        public Expression getExpression() {
-            return expression.getElement();
-        }
-
-        public UsingStatement withExpression(Expression expression) {
-            return getPadding().withExpression(this.expression.withElement(expression));
-        }
-
         /**
-         * The block is null for using declaration form.
+         * <pre>
+         * using (var stream = File.OpenRead(path)) { }
+         *       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+         * </pre>
          */
+        @With
+        @Getter
+        ControlParentheses<Expression> expression;
+
         @With
         @Getter
         Statement statement;
@@ -3164,34 +3156,6 @@ public interface Cs extends J {
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final UsingStatement t;
-
-            public JLeftPadded<Expression> getExpression() {
-                return t.expression;
-            }
-
-            public UsingStatement withExpression(JLeftPadded<Expression> expression) {
-                return t.expression == expression ? t : new UsingStatement(t.id, t.prefix, t.markers, expression, t.statement);
-            }
         }
     }
     //endregion
@@ -4494,9 +4458,15 @@ public interface Cs extends J {
         @Getter
         Markers markers;
 
+        /**
+         * <pre>
+         * sizeof(int)
+         *       ^^^^^
+         * </pre>
+         */
         @With
         @Getter
-        Expression expression;
+        ControlParentheses<TypeTree> clazz;
 
         @With
         @Nullable
@@ -4506,6 +4476,55 @@ public interface Cs extends J {
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
             return v.visitSizeOf(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Represents a C# typeof expression, e.g. {@code typeof(int)}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @Data
+    final class TypeOf implements Cs, Expression, TypedTree {
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * <pre>
+         * typeof(int)
+         *       ^^^^^
+         * </pre>
+         */
+        @With
+        @Getter
+        ControlParentheses<TypeTree> clazz;
+
+        @With
+        @Nullable
+        @Getter
+        JavaType type;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitTypeOf(this, p);
         }
 
         @Override

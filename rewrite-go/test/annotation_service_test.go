@@ -98,7 +98,7 @@ func TestAnnotationService_AddAnnotationVisitor_OnFunc(t *testing.T) {
 	svc := &recipes.AnnotationService{}
 	ann := &java.Annotation{
 		ID:             uuid.New(),
-		Prefix:         java.Space{Whitespace: "\n"},
+		Prefix:         java.MakeSpace(nil, "\n"),
 		AnnotationType: &java.Identifier{ID: uuid.New(), Name: "go:noinline"},
 	}
 	v := svc.AddAnnotationVisitor(func(t java.Tree) bool {
