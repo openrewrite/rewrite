@@ -24,7 +24,7 @@ from rewrite.test import RecipeSpec, python
 from rewrite.visitor import Cursor
 
 
-def _recipe(pat, tmpl) -> Recipe:
+def _recipe(pat, tmpl, *, name_visitor: bool = True) -> Recipe:
     """A recipe replacing every match of ``pat`` with ``tmpl``."""
 
     class Replace(Recipe):
@@ -46,7 +46,8 @@ def _recipe(pat, tmpl) -> Recipe:
                     method = super().visit_method_invocation(method, p)
                     match = pat.match(method, self.cursor)
                     if match:
-                        return tmpl.apply(self.cursor, visitor=self, values=match)
+                        return (tmpl.apply(self.cursor, visitor=self, values=match)
+                                if name_visitor else tmpl.apply(self.cursor, values=match))
                     return method
 
             return Visitor()
@@ -149,6 +150,31 @@ def test_conditional_import_does_not_bind_at_runtime():
         )
     )
 
+    member = template(f"run({arg}, shell=True)", context=["from subprocess import run"])
+    RecipeSpec(recipe=_recipe(pat, member)).rewrite_run(
+        python(
+            """
+            import os
+            from typing import TYPE_CHECKING
+
+            if TYPE_CHECKING:
+                from subprocess import run
+
+            out = os.popen('ls')
+            """,
+            """
+            import os
+            from typing import TYPE_CHECKING
+            from subprocess import run
+
+            if TYPE_CHECKING:
+                from subprocess import run
+
+            out = run('ls', shell=True)
+            """,
+        )
+    )
+
 
 def test_context_the_template_does_not_reference_is_not_imported():
     """Context typing a capture is not code the template splices, so it imports nothing —
@@ -203,11 +229,22 @@ def test_import_lands_at_module_scope_for_a_splice_inside_a_function():
     )
 
 
-def test_applying_to_a_cursor_cannot_bind_and_says_so():
-    tmpl = template("subprocess.run('ls')", context=["import subprocess"])
+def test_applying_without_naming_the_visitor_cannot_bind_and_says_so():
+    """The cursor alone reaches the splice site but not the file's imports."""
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"subprocess.run({arg}, shell=True)", context=["import subprocess"])
 
-    with pytest.raises(ValueError, match="Name the visitor"):
-        tmpl.apply(cursor=None)
+    with pytest.raises(RecipeRunException) as refusal:
+        RecipeSpec(recipe=_recipe(pat, tmpl, name_visitor=False)).rewrite_run(
+            python(
+                """
+                import os
+                out = os.popen('ls')
+                """,
+            )
+        )
+    assert "Name the visitor" in str(refusal.value.cause)
 
 
 def test_dotted_module_binds_its_root():
@@ -417,3 +454,98 @@ def test_a_splice_reads_the_scope_it_lands_in_not_the_one_the_visitor_stands_in(
             """,
         )
     )
+
+
+def test_a_conditional_local_import_does_not_cover_the_context():
+    """``if TYPE_CHECKING`` inside a function makes the name local and binds it to nothing."""
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"subprocess.run({arg}, shell=True)", context=["import subprocess"])
+
+    with pytest.raises(RecipeRunException) as refusal:
+        RecipeSpec(recipe=_recipe(pat, tmpl)).rewrite_run(
+            python(
+                """
+                import os
+                from typing import TYPE_CHECKING
+
+
+                def listing():
+                    if TYPE_CHECKING:
+                        import subprocess
+                    return os.popen('ls')
+                """,
+            )
+        )
+    assert "binds 'subprocess'" in str(refusal.value.cause)
+
+
+def test_a_local_import_after_the_splice_does_not_cover_it():
+    """A function-local import binds its name for the whole call, so a read above it is unbound."""
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"subprocess.run({arg}, shell=True)", context=["import subprocess"])
+
+    with pytest.raises(RecipeRunException) as refusal:
+        RecipeSpec(recipe=_recipe(pat, tmpl)).rewrite_run(
+            python(
+                """
+                import os
+
+
+                def listing():
+                    out = os.popen('ls')
+                    import subprocess
+                    return out, subprocess
+                """,
+            )
+        )
+    assert "binds 'subprocess'" in str(refusal.value.cause)
+
+
+def test_the_file_s_name_is_judged_in_scope_not_the_template_s():
+    """The splice reads the file's alias, so the declared name being shadowed costs it nothing."""
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"subprocess.run({arg}, shell=True)", context=["import subprocess"])
+
+    RecipeSpec(recipe=_recipe(pat, tmpl)).rewrite_run(
+        python(
+            """
+            import os
+            import subprocess as sp
+
+
+            def listing(subprocess):
+                return os.popen('ls')
+            """,
+            """
+            import os
+            import subprocess as sp
+
+
+            def listing(subprocess):
+                return sp.run('ls', shell=True)
+            """,
+        )
+    )
+
+
+def test_a_rename_onto_another_context_name_refuses():
+    arg = capture('arg')
+    pat = pattern(f"os.popen({arg})", context=["import os"])
+    tmpl = template(f"json.dumps(subprocess.run({arg}))",
+                    context=["import subprocess", "import json"])
+
+    with pytest.raises(RecipeRunException) as refusal:
+        RecipeSpec(recipe=_recipe(pat, tmpl)).rewrite_run(
+            python(
+                """
+                import os
+                import subprocess as json
+                import json
+                out = os.popen('ls')
+                """,
+            )
+        )
+    assert "read one for the other" in str(refusal.value.cause)

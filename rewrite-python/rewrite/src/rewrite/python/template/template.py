@@ -137,7 +137,9 @@ class Template:
             cursor: Where the result lands, which for a recipe rewriting what it is visiting
                 is ``self.cursor``.
             visitor: The visitor doing the edit. A template whose context imports a module needs
-                it: the module reaches the file through the visitor, not through the cursor.
+                it: the module reaches the file through the visitor, not through the cursor. The
+                import is registered as the template is applied, so apply it where it is known to
+                land rather than to find out whether it would.
             values: Captured values from a pattern match, or a dict of values.
             coordinates: Where/how to insert (default: replace current).
             format: Whether the result is fitted to where it lands. Pass False to assemble
