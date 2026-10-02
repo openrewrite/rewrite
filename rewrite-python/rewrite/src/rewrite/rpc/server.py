@@ -1189,7 +1189,7 @@ def _serialize_object_fallback(obj: Any) -> List[dict]:
 
 def handle_get_languages(params: dict) -> List[str]:
     """Handle a GetLanguages RPC request."""
-    return ['org.openrewrite.python.tree.Py$CompilationUnit']
+    return ['org.openrewrite.python.tree.Py$CompilationUnit', 'org.openrewrite.toml.tree.Toml$Document']
 
 
 def handle_print(params: dict) -> str:
@@ -1230,6 +1230,10 @@ def handle_print(params: dict) -> str:
         # A FENCED typo would otherwise silently fall back to /*~~>*/ and corrupt the diff.
         if marker_printer is None and name not in (None, 'DEFAULT'):
             logger.warning(f"Unknown markerPrinter '{name}'; using default rendering")
+        from rewrite.toml import Document as TomlDocument
+        from rewrite.visitor import Cursor
+        if isinstance(obj, TomlDocument):
+            return obj.print(Cursor(None, Cursor.ROOT_VALUE), CorePrintOutputCapture(0, marker_printer))
         printer = PythonPrinter()
         return printer.print(obj, PrintOutputCapture(marker_printer))
     except ImportError as e:
@@ -1884,18 +1888,14 @@ def _prepare_instance(recipe, marketplace) -> dict:
     # evaluate it locally and skip the visit RPC for non-matching files) and cache the bare editor
     # (so a subsequent dispatch via _instantiate_visitor returns the unwrapped editor — otherwise
     # the precondition would also run Python-side and double the cost).
-    edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
-    if not is_scanning:
-        try:
-            editor_visitor = recipe.editor()
-        except Exception:
-            editor_visitor = None
-        if editor_visitor is not None:
-            extracted = _extract_preconditions_from_editor(editor_visitor)
-            if extracted is not None:
-                bare_editor, wire_entries = extracted
-                _prepared_editor_overrides[prepared_id] = bare_editor
-                edit_preconditions.extend(wire_entries)
+    editor_visitor = _phase_visitor(recipe, 'edit')
+    edit_preconditions: List[Dict[str, Any]] = _language_gate(editor_visitor)
+    if not is_scanning and editor_visitor is not None:
+        extracted = _extract_preconditions_from_editor(editor_visitor)
+        if extracted is not None:
+            bare_editor, wire_entries = extracted
+            _prepared_editor_overrides[prepared_id] = bare_editor
+            edit_preconditions.extend(wire_entries)
     _prepared_edit_preconditions[prepared_id] = edit_preconditions
 
     response = {
@@ -1904,7 +1904,7 @@ def _prepare_instance(recipe, marketplace) -> dict:
         'editVisitor': f'edit:{prepared_id}',
         'editPreconditions': edit_preconditions,
         'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
-        'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
+        'scanPreconditions': _language_gate(_phase_visitor(recipe, 'scan')) if is_scanning else [],
     }
 
     if is_delegating:
@@ -2024,17 +2024,50 @@ def handle_prepare_recipe(params: dict) -> dict:
     return response
 
 
-def _get_preconditions(recipe, phase: str) -> List[dict]:
-    """Baseline preconditions for a recipe phase.
+def _phase_visitor(recipe, phase: str) -> Optional[Any]:
+    """The visitor a recipe phase runs, or None if it can't be built at prepare time.
 
-    Always includes the language gate (only visit Python source files). Recipe-
-    declared preconditions from a ``Preconditions.check(...)`` wrapper around
-    ``recipe.editor()`` are added on top by ``handle_prepare_recipe`` — see
-    :func:`_extract_preconditions_from_editor`.
+    A scanning recipe's visitors are built against a placeholder accumulator: only
+    their type is of interest here.
     """
+    from rewrite.recipe import ScanningRecipe
+
+    try:
+        if isinstance(recipe, ScanningRecipe):
+            return recipe.scanner(None) if phase == 'scan' else recipe.editor_with_data(None)
+        return recipe.editor()
+    except Exception:
+        return None
+
+
+def _language_gate(visitor: Optional[Any]) -> List[Dict[str, Any]]:
+    """Baseline preconditions for a recipe phase: the host sends the phase only the
+    source files its visitor visits.
+
+    Mirrors the JavaScript peer's ``PrepareRecipe.visitorTypePrecondition``: a
+    ``TomlVisitor`` gets TOML documents, a plain ``TreeVisitor`` every source file
+    this peer shares with the host (see ``handle_get_languages``). Anything else —
+    a Python/Java visitor, a no-op (as of a composite), or a visitor that could not
+    be built — keeps to Python sources. Recipe-declared preconditions from a
+    ``Preconditions.check(...)`` wrapper around ``recipe.editor()`` are added on top
+    by ``_prepare_instance`` — see :func:`_extract_preconditions_from_editor`.
+    """
+    from rewrite.preconditions import Check
+    from rewrite.toml import TomlVisitor
+    from rewrite.visitor import NoopVisitor, TreeVisitor
+    from rewrite.java.visitor import JavaVisitor
+
+    while isinstance(visitor, Check):
+        visitor = visitor.wrapped
+    if isinstance(visitor, TomlVisitor):
+        tree_type = 'org.openrewrite.toml.tree.Toml'
+    elif isinstance(visitor, TreeVisitor) and not isinstance(visitor, (JavaVisitor, NoopVisitor)):
+        return []
+    else:
+        tree_type = 'org.openrewrite.python.tree.Py'
     return [{
         'visitorName': 'org.openrewrite.rpc.internal.FindTreesOfType',
-        'visitorOptions': {'type': 'org.openrewrite.python.tree.Py'}
+        'visitorOptions': {'type': tree_type}
     }]
 
 
