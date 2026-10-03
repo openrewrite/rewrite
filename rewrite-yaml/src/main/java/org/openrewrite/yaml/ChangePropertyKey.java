@@ -263,6 +263,20 @@ public class ChangePropertyKey extends Recipe {
             Yaml.Mapping m = super.visitMapping(mapping, p);
             if (m.getEntries().contains(scope)) {
                 String newEntryPrefix = scope.getPrefix();
+                // The portion before the first line break belongs to the preceding sibling.
+                int lineBreak = newEntryPrefix.indexOf('\n');
+                if (lineBreak >= 0) {
+                    newEntryPrefix = newEntryPrefix.substring(lineBreak > 0 && newEntryPrefix.charAt(lineBreak - 1) == '\r' ? lineBreak - 1 : lineBreak);
+                }
+                // Keep comments from ancestors that disappear with the moved property.
+                Yaml.Mapping.Entry ancestor = scope;
+                while (ancestor != entryToReplace && ancestor.getValue() instanceof Yaml.Mapping &&
+                       ((Yaml.Mapping) ancestor.getValue()).getEntries().size() == 1) {
+                    ancestor = ((Yaml.Mapping) ancestor.getValue()).getEntries().get(0);
+                    if (ancestor.getPrefix().contains("#")) {
+                        newEntryPrefix += ancestor.getPrefix().trim() + "\n";
+                    }
+                }
                 Yaml.Mapping.Entry newEntry = new Yaml.Mapping.Entry(randomId(),
                         newEntryPrefix,
                         Markers.EMPTY,
@@ -287,14 +301,27 @@ public class ChangePropertyKey extends Recipe {
                         if (incoming == null) {
                             incoming = m.withEntries(singletonList(newEntry));
                         }
-                        Yaml.Mapping mergedMapping = (Yaml.Mapping) new MergeYamlVisitor<>(m, incoming, true, null, false, null, null).visitMapping(m, p);
-                        // Preserve the first entry's prefix at the document root so auto-format does not insert a blank line before it
-                        boolean atDocumentRoot = getCursor().getParentOrThrow().getValue() instanceof Yaml.Document;
-                        String firstEntryPrefix = atDocumentRoot ? mergedMapping.getEntries().get(0).getPrefix() : null;
-                        m = maybeAutoFormat(m, mergedMapping, p, getCursor().getParentOrThrow());
-                        if (atDocumentRoot && !m.getEntries().isEmpty()) {
-                            m = m.withEntries(ListUtils.mapFirst(m.getEntries(), e -> e.withPrefix(firstEntryPrefix)));
-                        }
+                        // Inline comments can live on a following sibling outside this mapping,
+                        // or on Document.End. Merge from the document so those boundaries are visited.
+                        Yaml.Mapping target = m;
+                        Cursor formattingParent = getCursor().getParentOrThrow();
+                        doAfterVisit(new MergeYamlVisitor<P>(m, incoming, true, null, false, null, null) {
+                            @Override
+                            public Yaml visitMapping(Yaml.Mapping mapping, P p) {
+                                Yaml.Mapping merged = (Yaml.Mapping) super.visitMapping(mapping, p);
+                                if (!target.isScope(mapping)) {
+                                    return merged;
+                                }
+                                // Keep the existing formatting behavior, including document-root spacing.
+                                boolean atDocumentRoot = getCursor().getParentOrThrow().getValue() instanceof Yaml.Document;
+                                String firstPrefix = atDocumentRoot ? merged.getEntries().get(0).getPrefix() : null;
+                                merged = maybeAutoFormat(mapping, merged, p, formattingParent);
+                                if (atDocumentRoot && !merged.getEntries().isEmpty()) {
+                                    merged = merged.withEntries(ListUtils.mapFirst(merged.getEntries(), e -> e.withPrefix(firstPrefix)));
+                                }
+                                return merged;
+                            }
+                        });
                     }
                 }
             }
