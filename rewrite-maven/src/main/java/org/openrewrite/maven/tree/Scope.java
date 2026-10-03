@@ -36,6 +36,46 @@ public enum Scope {
     }
 
     /**
+     * Used to decide which of a project's own directly-requested dependencies seed the resolution of a given
+     * target scope. Unlike {@link #transitiveOf}/{@link #isInClasspathOf}, which govern how a dependency's scope
+     * degrades one hop further down its own transitive dependencies, this answers a single-hop question: does a
+     * dependency declared with this scope belong in the dependency set being assembled for the given target scope.
+     * <p>
+     * There are only three real classpaths - compile, runtime, and test - "provided" is not itself a classpath,
+     * but a scope that contributes to the compile and test classpaths while being withheld from the runtime
+     * classpath. This matches the scope table at
+     * <a href="https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#dependency-scope">Dependency Scope</a>.
+     * <p>
+     * this (rows) x target scope (columns):
+     * <pre>
+     *           Compile   Provided   Runtime   Test
+     * Compile:    T         F          T         T
+     * Provided:   T         T          F         T
+     * Runtime:    F         F          T         T
+     * Test:       F         F          F         T
+     * </pre>
+     *
+     * @param scope The target scope whose dependency set is being assembled.
+     * @return If a directly-requested dependency declared with this scope belongs in that target scope's
+     * dependency set.
+     */
+    public boolean isDirectlyIncludedIn(Scope scope) {
+        if (this == scope) {
+            return true;
+        }
+        switch (this) {
+            case Compile:
+                return scope == Runtime || scope == Test;
+            case Provided:
+                return scope == Compile || scope == Test;
+            case Runtime:
+                return scope == Test;
+            default:
+                return false;
+        }
+    }
+
+    /**
      * See the table at <a href="Dependency Scope">https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#dependency-scope</a>.
      * <code>this</code> represents the scope on the top row of the table.
      *
