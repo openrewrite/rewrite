@@ -119,6 +119,9 @@ function tabsAndIndentsFrom(prettierStyle: PrettierStyle, fallback: TabsAndInden
     return {...fallback, useTabCharacter, tabSize: tabWidth, indentSize: tabWidth, continuationIndent: tabWidth};
 }
 
+/** A word operator carries its own separator, so no `aroundOperators` setting can take it away. */
+const WORD_OPERATOR_KEEPS_ITS_SEPARATOR = true;
+
 export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
     constructor(private style: SpacesStyle, private stopAfter?: Tree) {
         super();
@@ -156,6 +159,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.dimension.index.after.whitespace = this.style.within.arrayBrackets ? " " : "";
             }
         });
+    }
+
+    protected async visitAs(as_: JS.As, p: P): Promise<J | undefined> {
+        const ret = await super.visitAs(as_, p) as JS.As;
+        return produce(ret, draft => {
+            this.normalizeWordOperatorSeparator(draft.left, draft.right);
+        }) as JS.As;
     }
 
     protected async visitAssignment(assignment: J.Assignment, p: P): Promise<J | undefined> {
@@ -220,6 +230,37 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.right.prefix.whitespace = property ? " " : "";
             }
         }) as J.Binary;
+    }
+
+    /** The operators TypeScript adds to the Java model; {@link SpacesVisitor#visitBinary} only sees a `J.Binary`. */
+    protected async visitBinaryExtensions(binary: JS.Binary, p: P): Promise<J | undefined> {
+        const ret = await super.visitBinaryExtensions(binary, p) as JS.Binary;
+        switch (ret.operator.element.valueOf()) {
+            case JS.Binary.Type.IdentityEquals:
+            case JS.Binary.Type.IdentityNotEquals:
+                return this.spaceAroundBinaryOperator(ret, this.style.aroundOperators.equality);
+            case JS.Binary.Type.QuestionQuestion:
+                return this.spaceAroundBinaryOperator(ret, this.style.aroundOperators.logical);
+            case JS.Binary.Type.In:
+            case JS.Binary.Type.As:
+                return this.spaceAroundBinaryOperator(ret, WORD_OPERATOR_KEEPS_ITS_SEPARATOR);
+            case JS.Binary.Type.Comma:
+                // The comma operator takes the comma rules, which are asymmetric.
+                return produce(ret, draft => {
+                    this.spaceBeforeLeftPaddedOperatorDraft(draft.operator, this.style.other.beforeComma);
+                    this.spaceBeforeDraft(draft.right, this.style.other.afterComma);
+                }) as JS.Binary;
+            default:
+                // Unknown operator: keep the author's spacing rather than throw mid-file.
+                return ret;
+        }
+    }
+
+    private spaceAroundBinaryOperator(binary: JS.Binary, space: boolean): JS.Binary {
+        return produce(binary, draft => {
+            this.spaceBeforeLeftPaddedOperatorDraft(draft.operator, space);
+            this.spaceBeforeDraft(draft.right, space);
+        }) as JS.Binary;
     }
 
     protected async visitCase(aCase: J.Case, p: P): Promise<J | undefined> {
@@ -417,6 +458,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
+    protected async visitInstanceOf(instanceOf: J.InstanceOf, p: P): Promise<J | undefined> {
+        const ret = await super.visitInstanceOf(instanceOf, p) as J.InstanceOf;
+        return produce(ret, draft => {
+            this.normalizeWordOperatorSeparator(draft.expression, draft.class);
+        }) as J.InstanceOf;
+    }
+
     protected async visitMethodDeclaration(methodDecl: J.MethodDeclaration, p: P): Promise<J | undefined> {
         const ret = await super.visitMethodDeclaration(methodDecl, p) as J.MethodDeclaration;
         return produceAsync(ret, async draft => {
@@ -479,6 +527,13 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
             });
         }
         return pa;
+    }
+
+    protected async visitSatisfiesExpression(satisfies: JS.SatisfiesExpression, p: P): Promise<J | undefined> {
+        const ret = await super.visitSatisfiesExpression(satisfies, p) as JS.SatisfiesExpression;
+        return produce(ret, draft => {
+            this.spaceBeforeLeftPaddedElementDraft(draft.satisfiesType, WORD_OPERATOR_KEEPS_ITS_SEPARATOR, WORD_OPERATOR_KEEPS_ITS_SEPARATOR);
+        }) as JS.SatisfiesExpression;
     }
 
     protected async visitSwitch(switchNode: J.Switch, p: P): Promise<J | undefined> {
@@ -661,6 +716,24 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
             draft.after.whitespace = " ";
         } else if (!spaceAfter && SpacesVisitor.isOnlySpacesAndNotEmpty(draft.after.whitespace)) {
             draft.after.whitespace = "";
+        }
+    }
+
+    /** Normalizes to the one space a word operator needs; `xasany` and `"k"ino` would not parse. */
+    private normalizeWordOperatorSeparator<L extends J, R extends J>(left: Draft<J.RightPadded<L>>, right: Draft<R>): void {
+        this.spaceAfterRightPaddedDraft(left, WORD_OPERATOR_KEEPS_ITS_SEPARATOR);
+        this.spaceBeforeDraft(right, WORD_OPERATOR_KEEPS_ITS_SEPARATOR);
+    }
+
+    /** Modifies the before space of a LeftPadded draft whose element is not a tree, in place. */
+    private spaceBeforeLeftPaddedOperatorDraft<T extends J | J.Space | number | string | boolean>(draft: Draft<J.LeftPadded<T>>, spaceBefore: boolean): void {
+        if (draft.before.comments.length > 0) {
+            return;
+        }
+        if (spaceBefore && SpacesVisitor.isNotSingleSpace(draft.before.whitespace)) {
+            draft.before.whitespace = " ";
+        } else if (!spaceBefore && SpacesVisitor.isOnlySpacesAndNotEmpty(draft.before.whitespace)) {
+            draft.before.whitespace = "";
         }
     }
 

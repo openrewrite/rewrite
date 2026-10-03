@@ -266,6 +266,79 @@ describe('SpacesVisitor', () => {
             // @formatter:on
         )});
 
+    test('space around the operators TypeScript adds to the Java model', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = x  ===  y;
+const b = x  !==  y;
+const c = x  ??  y;
+const d = "k"  in  o;
+const e = x  instanceof  Y;
+const f = x  as  any;
+const g = obj  satisfies  Shape;`,
+                `const a = x === y;
+const b = x !== y;
+const c = x ?? y;
+const d = "k" in o;
+const e = x instanceof Y;
+const f = x as any;
+const g = obj satisfies Shape;`)
+            // @formatter:on
+        )});
+
+    test('the aroundOperators settings reach those operators too', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.aroundOperators.equality = false;
+            draft.aroundOperators.logical = false;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = x == y;
+const b = x === y;
+const c = x !== y;
+const d = x && y;
+const e = x ?? y;`,
+                `const a = x==y;
+const b = x===y;
+const c = x!==y;
+const d = x&&y;
+const e = x??y;`)
+            // @formatter:on
+        )});
+
+    test('a word operator keeps its space whatever the settings say', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces(draft => {
+            draft.aroundOperators.equality = false;
+            draft.aroundOperators.relational = false;
+            draft.aroundOperators.logical = false;
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = "k" in o;
+const b = x instanceof Y;
+const c = x as any;
+const d = obj satisfies Shape;`)
+            // @formatter:on
+        )});
+
+    test('a line break around one of those operators is the author\'s', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `const a = someLongCondition
+    ?? someOtherValue;`)
+            // @formatter:on
+        )});
+
     test('assignment with newline after = should not collapse to single line', () => {
         spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
         return spec.rewriteRun(
