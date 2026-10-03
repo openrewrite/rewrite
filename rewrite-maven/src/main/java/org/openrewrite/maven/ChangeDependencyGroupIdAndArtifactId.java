@@ -98,12 +98,23 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     @Nullable
     Boolean changeManagedDependency;
 
+    @Option(displayName = "Change plugin dependencies",
+            description = "Also change dependencies declared inside Maven plugins. Defaults to true.",
+            required = false)
+    @Nullable
+    Boolean changePluginDependencies;
+
     public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
         this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, false, true);
     }
 
-    @JsonCreator
     public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency) {
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, overrideManagedVersion, changeManagedDependency, null);
+    }
+
+    @JsonCreator
+    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency, @Nullable Boolean changePluginDependencies) {
+        this.changePluginDependencies = changePluginDependencies;
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
@@ -168,6 +179,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (Boolean.FALSE.equals(changePluginDependencies) && isPluginDependencyTag()) {
+                    return tag;
+                }
                 if (!isDependencyTag(oldGroupId, oldArtifactId) &&
                         !isPluginDependencyTag(oldGroupId, oldArtifactId) &&
                         !isAnnotationProcessorPathTag(oldGroupId, oldArtifactId)) {
@@ -287,6 +301,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     doAfterVisit(new MavenVisitor<ExecutionContext>() {
                         @Override
                         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                            if (Boolean.FALSE.equals(changePluginDependencies) && isPluginDependencyTag()) {
+                                return tag;
+                            }
                             Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                             if (!"exclusions".equals(t.getName())) {
                                 return t;
@@ -318,6 +335,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (Boolean.FALSE.equals(changePluginDependencies) && isPluginDependencyTag()) {
+                    return tag;
+                }
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
 
                 // Update version properties in parent POMs based on scanner results

@@ -2242,6 +2242,142 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Test
+    void leavePluginDependenciesWhenDisabled() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.liquibase", "liquibase-core", "org.springframework.boot", "spring-boot-starter-liquibase",
+            "4.0.0", null, null, null, false
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.liquibase</groupId>
+                              <artifactId>liquibase-maven-plugin</artifactId>
+                              <version>4.24.0</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.liquibase</groupId>
+                                      <artifactId>liquibase-core</artifactId>
+                                      <version>4.24.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeApplicationDependencyButPreserveProfilePluginManagement() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.liquibase", "liquibase-core", "org.springframework.boot", "spring-boot-starter-liquibase",
+            "4.0.0", null, null, null, false
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.liquibase</groupId>
+                          <artifactId>liquibase-core</artifactId>
+                          <version>4.24.0</version>
+                      </dependency>
+                  </dependencies>
+                  <profiles>
+                      <profile>
+                          <id>migration</id>
+                          <build>
+                              <pluginManagement>
+                                  <plugins>
+                                      <plugin>
+                                          <groupId>org.liquibase</groupId>
+                                          <artifactId>liquibase-maven-plugin</artifactId>
+                                          <version>4.24.0</version>
+                                          <dependencies>
+                                              <dependency>
+                                                  <groupId>org.liquibase</groupId>
+                                                  <artifactId>liquibase-core</artifactId>
+                                                  <version>4.24.0</version>
+                                                  <exclusions>
+                                                      <exclusion>
+                                                          <groupId>org.liquibase</groupId>
+                                                          <artifactId>liquibase-core</artifactId>
+                                                      </exclusion>
+                                                  </exclusions>
+                                              </dependency>
+                                          </dependencies>
+                                      </plugin>
+                                  </plugins>
+                              </pluginManagement>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-liquibase</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+                  <profiles>
+                      <profile>
+                          <id>migration</id>
+                          <build>
+                              <pluginManagement>
+                                  <plugins>
+                                      <plugin>
+                                          <groupId>org.liquibase</groupId>
+                                          <artifactId>liquibase-maven-plugin</artifactId>
+                                          <version>4.24.0</version>
+                                          <dependencies>
+                                              <dependency>
+                                                  <groupId>org.liquibase</groupId>
+                                                  <artifactId>liquibase-core</artifactId>
+                                                  <version>4.24.0</version>
+                                                  <exclusions>
+                                                      <exclusion>
+                                                          <groupId>org.liquibase</groupId>
+                                                          <artifactId>liquibase-core</artifactId>
+                                                      </exclusion>
+                                                  </exclusions>
+                                              </dependency>
+                                          </dependencies>
+                                      </plugin>
+                                  </plugins>
+                              </pluginManagement>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4779")
     @Test
     void changePluginDependencyGroupIdAndArtifactId() {
