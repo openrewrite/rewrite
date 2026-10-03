@@ -34,6 +34,39 @@ import {fromVisitor, RecipeSpec} from "../../../src/test";
 import * as path from "path";
 import * as os from "os";
 
+/** Where `process.cwd()` declares for a template with these options; `process` is reachable only through automatic type inclusion. */
+async function processDeclaringType(
+    dependencies: Record<string, string>,
+    types: string[]
+): Promise<string | undefined> {
+    const tmpl = template`process.cwd()`.configure({dependencies, types});
+
+    const parser = new JavaScriptParser();
+    const parseGen = parser.parse({text: `const x = 1;`, sourcePath: 'test.ts'});
+    const cu = (await parseGen.next()).value;
+
+    let applied: J | undefined;
+    await (new class extends JavaScriptVisitor<any> {
+        override async visitVariable(variable: any, _p: any): Promise<any> {
+            applied ??= await tmpl.apply(variable, this.cursor, {values: new Map()});
+            return variable;
+        }
+    }).visit(cu, undefined);
+
+    let methodType: Type.Method | undefined;
+    await (new class extends JavaScriptVisitor<any> {
+        override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+            if (method.name.simpleName === 'cwd') {
+                methodType ??= method.methodType;
+            }
+            return method;
+        }
+    }).visit(applied!, undefined);
+    // The declaring type, not the name, is what says the declarations were loaded.
+    const declaring = methodType?.declaringType;
+    return declaring && Type.isClass(declaring) ? (declaring as Type.Class).fullyQualifiedName : undefined;
+}
+
 describe('template dependencies integration', () => {
 
     test('pattern with dependencies has proper type attribution in AST', async () => {
@@ -108,48 +141,16 @@ describe('template dependencies integration', () => {
     }, 120000);
 
     test('`types` decides which declarations the template parse loads', async () => {
-        // `process` is a global `@types/node` declares, reachable only through automatic type
-        // inclusion — unlike a module specifier, which resolves by path whatever this option says.
-        // An explicit list replaces the default rather than extending it, so `[]` loads nothing.
-        const processDeclaringTypeWith = async (types: string[]) => {
-            const tmpl = template`process.cwd()`.configure({
-                dependencies: {'@types/node': '^20.0.0'},
-                types
-            });
+        expect(await processDeclaringType({'@types/node': '^20.0.0'}, ['node'])).toBe('global.NodeJS.Process');
 
-            const parser = new JavaScriptParser();
-            const parseGen = parser.parse({text: `const x = 1;`, sourcePath: 'test.ts'});
-            const cu = (await parseGen.next()).value;
-
-            let applied: J | undefined;
-            await (new class extends JavaScriptVisitor<any> {
-                override async visitVariable(variable: any, _p: any): Promise<any> {
-                    applied ??= await tmpl.apply(variable, this.cursor, {values: new Map()});
-                    return variable;
-                }
-            }).visit(cu, undefined);
-
-            let methodType: Type.Method | undefined;
-            await (new class extends JavaScriptVisitor<any> {
-                override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
-                    if (method.name.simpleName === 'cwd') {
-                        methodType ??= method.methodType;
-                    }
-                    return method;
-                }
-            }).visit(applied!, undefined);
-            // `name` is the callee's own spelling whether or not anything resolved, so the
-            // declaring type is what says the declarations were loaded.
-            const declaring = methodType?.declaringType;
-            return declaring && Type.isClass(declaring)
-                ? (declaring as Type.Class).fullyQualifiedName
-                : undefined;
-        };
-
-        expect(await processDeclaringTypeWith(['node'])).toBe('global.NodeJS.Process');
-
-        expect(await processDeclaringTypeWith([])).toBeUndefined();
+        expect(await processDeclaringType({'@types/node': '^20.0.0'}, [])).toBeUndefined();
     }, 120000);
+
+    test('a named package is loaded alongside the type roots rather than in place of them', async () => {
+        expect(await processDeclaringType(
+            {'@openui5/types': '1.136.0', '@types/node': '^20.0.0'}, ['@openui5/types']))
+            .toBe('global.NodeJS.Process');
+    }, 180000);
 
     test('template with dependencies generates AST with type attribution', async () => {
         // Create a template with dependencies
