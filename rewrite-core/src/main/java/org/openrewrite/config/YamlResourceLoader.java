@@ -24,6 +24,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeLoader;
+import org.openrewrite.marketplace.MarketplaceRecipeLoader;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
@@ -172,12 +173,44 @@ public class YamlResourceLoader implements ResourceLoader {
                               @Nullable ClassLoader classLoader,
                               Collection<? extends ResourceLoader> dependencyResourceLoaders,
                               Consumer<ObjectMapper> mapperCustomizer) {
+        this(yamlInput, source, properties, classLoader, dependencyResourceLoaders, mapperCustomizer, null);
+    }
+
+    /**
+     * Load a declarative recipe off a classloader, falling back to a marketplace for
+     * {@code recipeList} entries the classloader cannot satisfy. That fallback is what lets a recipe
+     * packaged in one package ecosystem's artifact name a recipe contributed by another.
+     *
+     * @param marketplaceRecipeLoader Consulted only after the classloader lookup fails. Null keeps
+     *                                resolution classloader-only.
+     */
+    public YamlResourceLoader(InputStream yamlInput, URI source, @Nullable Properties properties,
+                              @Nullable ClassLoader classLoader,
+                              Collection<? extends ResourceLoader> dependencyResourceLoaders,
+                              Consumer<ObjectMapper> mapperCustomizer,
+                              @Nullable MarketplaceRecipeLoader marketplaceRecipeLoader) {
         this.source = source;
         this.dependencyResourceLoaders = dependencyResourceLoaders;
         this.mapper = ObjectMappers.propertyBasedMapper(classLoader);
 
         RecipeLoader nonMarketplaceLoader = new RecipeLoader(classLoader);
-        this.recipeLoader = nonMarketplaceLoader::load;
+        this.recipeLoader = marketplaceRecipeLoader == null ?
+                nonMarketplaceLoader::load :
+                (recipeName, options) -> {
+                    try {
+                        return nonMarketplaceLoader.load(recipeName, options);
+                    } catch (IllegalArgumentException e) {
+                        // Only a configured entry has to be answered now; a bare name resolves lazily.
+                        if (options == null || !(e.getCause() instanceof InvalidTypeIdException)) {
+                            throw e;
+                        }
+                        Recipe fromMarketplace = marketplaceRecipeLoader.load(recipeName, options);
+                        if (fromMarketplace == null) {
+                            throw e;
+                        }
+                        return fromMarketplace;
+                    }
+                };
 
         mapperCustomizer.accept(mapper);
         maybeAddKotlinModule(mapper);
