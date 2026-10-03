@@ -139,6 +139,9 @@ public class ChangePropertyKey extends Recipe {
 
             String propertyToTest = newPropertyKey;
             if (oldKeyMatcher.matchesGlob(prop)) {
+                if (!hasNonExcludedValues(entry)) {
+                    return e;
+                }
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
@@ -270,7 +273,7 @@ public class ChangePropertyKey extends Recipe {
                 }
                 // Keep comments from ancestors that disappear with the moved property.
                 Yaml.Mapping.Entry ancestor = scope;
-                while (ancestor != entryToReplace && ancestor.getValue() instanceof Yaml.Mapping &&
+                while (!hasExcludedValues(entryToReplace) && ancestor != entryToReplace && ancestor.getValue() instanceof Yaml.Mapping &&
                        ((Yaml.Mapping) ancestor.getValue()).getEntries().size() == 1) {
                     ancestor = ((Yaml.Mapping) ancestor.getValue()).getEntries().get(0);
                     if (ancestor.getPrefix().contains("#")) {
@@ -286,7 +289,7 @@ public class ChangePropertyKey extends Recipe {
                         removeExclusions(entryToReplace.getValue().copyPaste()));
 
                 if (hasExcludedValues(entryToReplace)) {
-                    m = m.withEntries(ListUtils.concat(m.getEntries(), newEntry));
+                    m = maybeAutoFormat(m, m.withEntries(ListUtils.concat(m.getEntries(), newEntry)), p, getCursor().getParentOrThrow());
                 } else {
                     if (m.getEntries().contains(entryToReplace)) {
                         m = m.withEntries(ListUtils.map(m.getEntries(), e -> {

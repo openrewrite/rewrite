@@ -31,6 +31,32 @@ import static org.openrewrite.yaml.Assertions.yaml;
 class ChangePropertyKeyTest implements RewriteTest {
 
     @Test
+    void keepParentCommentWhenExclusionsRetainTheParent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.settings", "a.new.settings", null, List.of("keep"), null)),
+          yaml(
+            """
+              a:
+                old: # original group
+                  settings:
+                    keep: 1
+                    move: 2
+                other: true
+              """,
+            """
+              a:
+                old: # original group
+                  settings:
+                    keep: 1
+                other: true
+                new.settings:
+                  move: 2
+              """
+          )
+        );
+    }
+
+    @Test
     void retainCommentOnRemovedParentAsStandaloneComment() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.new.endpoint", null, null, null)),
