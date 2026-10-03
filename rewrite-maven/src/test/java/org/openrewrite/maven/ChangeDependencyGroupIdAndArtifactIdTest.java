@@ -17,6 +17,8 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
@@ -2561,6 +2563,84 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"build", "pluginManagement", "profile", "profilePluginManagement"})
+    void preserveVersionPropertyUsedByBuildPlugin(String location) {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.liquibase", "liquibase-core", "org.springframework.boot",
+            "spring-boot-starter-liquibase", "4.0.0", null)),
+          pomXml(
+            pluginVersionPropertyLocation("""
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <liquibase.version>3.9.0</liquibase.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.liquibase</groupId>
+                          <artifactId>liquibase-core</artifactId>
+                          <version>${liquibase.version}</version>
+                      </dependency>
+                  </dependencies>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.liquibase</groupId>
+                              <artifactId>liquibase-maven-plugin</artifactId>
+                              <version>${liquibase.version}</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """, location),
+            pluginVersionPropertyLocation("""
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <liquibase.version>3.9.0</liquibase.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-liquibase</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.liquibase</groupId>
+                              <artifactId>liquibase-maven-plugin</artifactId>
+                              <version>${liquibase.version}</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """, location)
+          )
+        );
+    }
+
+    private static String pluginVersionPropertyLocation(String pom, String location) {
+        if (location.equals("pluginManagement") || location.equals("profilePluginManagement")) {
+            pom = pom.replace("<plugins>", "<pluginManagement><plugins>")
+              .replace("</plugins>", "</plugins></pluginManagement>");
+        }
+        if (location.equals("profile") || location.equals("profilePluginManagement")) {
+            pom = pom.replace("<build>", "<profiles><profile><id>migration</id><build>")
+              .replace("</build>", "</build></profile></profiles>");
+        }
+        return pom;
     }
 
     @Test

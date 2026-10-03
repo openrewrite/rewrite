@@ -22,6 +22,7 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
@@ -69,7 +70,32 @@ public class MavenDependencyPropertyUsageOverlap {
                 remainingProperties.remove(d.getVersion());
             }
         }
+        // A dependency relocation must not repurpose versions also used by the build.
+        // Inspect inactive profiles too: their plugins still need the original version
+        // when the profile is activated in a later build.
+        filterPropertiesUsedByPlugins(remainingProperties, requestedPom.getPlugins());
+        filterPropertiesUsedByPlugins(remainingProperties, requestedPom.getPluginManagement());
+        if (requestedPom.getProfiles() != null) {
+            for (Profile profile : requestedPom.getProfiles()) {
+                filterPropertiesUsedByPlugins(remainingProperties, profile.getPlugins());
+                filterPropertiesUsedByPlugins(remainingProperties, profile.getPluginManagement());
+            }
+        }
         return remainingProperties;
+    }
+
+    private static void filterPropertiesUsedByPlugins(Set<String> properties, @Nullable List<Plugin> plugins) {
+        if (plugins == null) {
+            return;
+        }
+        for (Plugin plugin : plugins) {
+            properties.remove(plugin.getVersion());
+            if (plugin.getDependencies() != null) {
+                for (Dependency dependency : plugin.getDependencies()) {
+                    properties.remove(dependency.getVersion());
+                }
+            }
+        }
     }
 
     public static Set<String> filterPropertiesWithOverlapInChildren(
