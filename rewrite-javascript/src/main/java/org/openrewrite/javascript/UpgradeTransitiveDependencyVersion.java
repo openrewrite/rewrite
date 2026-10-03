@@ -24,7 +24,9 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PackageJsonOverrides;
+import org.openrewrite.javascript.internal.MatchedDependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
@@ -33,6 +35,7 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 @EqualsAndHashCode(callSuper = false)
@@ -40,6 +43,7 @@ import java.util.function.Function;
 public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDependencyScan.Accumulator> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
+    transient NodeDependencyProtocolsSkipped protocolsSkipped = new NodeDependencyProtocolsSkipped(this);
 
     @Option(displayName = "Package name",
             description = "The name of the transitive npm dependency to upgrade.",
@@ -107,6 +111,126 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         return marker != null && marker.getPackageManager() != null;
     }
 
+    /** A second marker on a tree that already carries one is a change, and the recipe would never settle. */
+    private static SourceFile warnOnce(SourceFile sf, String message) {
+        return sf.getMarkers().findFirst(Markup.Warn.class).isPresent() ?
+                sf :
+                Markup.warn(sf, new IllegalStateException(message));
+    }
+
+    /**
+     * The key this dialect writes its override into exists but is not an object, so there is nowhere to
+     * write. Appending would leave the manifest with two members of that name; declining leaves it
+     * valid, and the marker is what makes the decline visible in the run.
+     */
+    private @Nullable String unusableOverrideContainer(SourceFile sf) {
+        if (!(sf instanceof Json.Document)) {
+            return null;
+        }
+        NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+        if (marker == null || marker.getPackageManager() == null) {
+            return null;
+        }
+        return PackageJsonOverrides.unusableOverrideContainerKey((Json.Document) sf, marker.getPackageManager());
+    }
+
+    /**
+     * The declarations an override written into {@code manifestPath} would silently win over. A scoped
+     * override {@code foo>acme-logger} pins only the copy under {@code foo}, so it reaches a reference
+     * only when {@code foo} is itself a workspace package declaring one.
+     */
+    private Map<Path, List<MatchedDependency>> findProtocolSkips(NodeDependencyScan.Accumulator acc,
+                                                                 ExecutionContext ctx, Path manifestPath) {
+        // Gated on the parsed path, not on `dependencyPath`, so this agrees with the guard in
+        // `upgradeTransitive`: a path that parses to no segments is a global override.
+        List<DependencyPathSegment> parsed = parsedPath();
+        return NodeDependencyScan.findProtocolReferences(acc, ctx, manifestPath, packageName,
+                parsed == null || parsed.isEmpty() ? null : parsed.get(parsed.size() - 1).getName());
+    }
+
+    private @Nullable List<DependencyPathSegment> parsedPath() {
+        return dependencyPath == null ? null : PackageJsonOverrides.parsePath(dependencyPath);
+    }
+
+    /**
+     * Whether an override would actually be written, so a manifest that already holds the requested
+     * entry is not reported as a decline: nothing was declined, there was nothing left to do.
+     */
+    private boolean overrideWouldBeWritten(SourceFile pkg) {
+        if (!(pkg instanceof Json.Document)) {
+            return false;
+        }
+        NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+        if (marker == null || marker.getPackageManager() == null) {
+            return false;
+        }
+        Json.Document doc = (Json.Document) pkg;
+        return PackageJsonOverrides.applyOverride(
+                doc, marker.getPackageManager(), packageName, newVersion, parsedPath()) != doc;
+    }
+
+    /**
+     * The one predicate both entry points honour. The manifest visit reports and marks the decline; the
+     * lock path only obeys it, because the lock is regenerated from the manifests and a lock carrying an
+     * override the manifest says was never written is worse than either alone. {@code upgradeTransitive}
+     * is no backstop here: for a workspace root the reference sits in a member, and the root's own
+     * document says nothing about it.
+     */
+    private boolean declines(NodeDependencyScan.Accumulator acc, ExecutionContext ctx,
+                             Path manifestPath, SourceFile pkg) {
+        return unusableOverrideContainer(pkg) != null ||
+                !findProtocolSkips(acc, ctx, manifestPath).isEmpty();
+    }
+
+    /** One row per declaration the override was declined for, emitted once per project. */
+    private void reportProtocolSkips(ExecutionContext ctx, NodeDependencyScan.ProjectState ps,
+                                     Path manifestPath, Map<Path, List<MatchedDependency>> skips) {
+        if (ps.protocolsReported || skips.isEmpty()) {
+            return;
+        }
+        ps.protocolsReported = true;
+        for (Map.Entry<Path, List<MatchedDependency>> declaring : skips.entrySet()) {
+            for (MatchedDependency declaration : declaring.getValue()) {
+                protocolsSkipped.insertRow(ctx, new NodeDependencyProtocolsSkipped.Row(
+                        manifestPath.toString(),
+                        declaring.getKey().toString(),
+                        declaration.getPackageName(),
+                        declaration.getDependencyScope(),
+                        PackageJsonHelper.dependencySpecifierProtocol(declaration.getCurrentVersion()),
+                        declaration.getCurrentVersion(),
+                        newVersion));
+            }
+        }
+    }
+
+    /**
+     * Mark the manifest with why the override was declined. A warning rather than an error: nothing is
+     * broken, a requested change was declined and the file is left valid.
+     */
+    private SourceFile markProtocolSkips(SourceFile sf, Map<Path, List<MatchedDependency>> skips) {
+        StringBuilder message = new StringBuilder();
+        for (Map.Entry<Path, List<MatchedDependency>> declaring : skips.entrySet()) {
+            for (MatchedDependency declaration : declaring.getValue()) {
+                if (message.length() > 0) {
+                    message.append(' ');
+                }
+                message.append("`").append(declaration.getPackageName()).append("` is declared as `")
+                        .append(declaration.getCurrentVersion()).append("`, a ")
+                        .append(PackageJsonHelper.dependencySpecifierProtocol(declaration.getCurrentVersion()))
+                        .append(" specifier rather than a version constraint");
+                // Naming the manifest is what makes the warn and the rows match up, since a row's
+                // `Declared in` differs from its `Source path` exactly in this case.
+                if (!declaring.getKey().equals(sf.getSourcePath())) {
+                    message.append(", in the workspace member `").append(declaring.getKey()).append("`");
+                }
+                message.append('.');
+            }
+        }
+        message.append(" An override beside it would silently win over whatever that specifier resolves")
+                .append(" to, so none was written for `").append(packageName).append("`.");
+        return warnOnce(sf, message.toString());
+    }
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyScan.Accumulator acc) {
         NodeDependencyScan.linkWorkspaceMembers(acc);
@@ -120,7 +244,18 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 NodeDependencyScan.ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if (canApply(sf)) {
-                        ensureComputed(ps, sf, ctx);
+                        String unusable = unusableOverrideContainer(sf);
+                        if (unusable != null) {
+                            return warnOnce(sf, "`" + unusable + "` is not an object in this `package.json`," +
+                                    " so there is nowhere to write the override for `" + packageName + "`," +
+                                    " and it was not written. Make `" + unusable + "` an object first.");
+                        }
+                        Map<Path, List<MatchedDependency>> skips = findProtocolSkips(acc, ctx, p);
+                        if (!skips.isEmpty() && overrideWouldBeWritten(sf)) {
+                            reportProtocolSkips(ctx, ps, p, skips);
+                            return markProtocolSkips(sf, skips);
+                        }
+                        ensureComputed(ps, p, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = NodeDependencyScan.modifiedFor(ps, sf);
@@ -146,7 +281,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                         SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
                         if (pkg == null) pkg = ips.capturedPackageJson;
                         if (pkg != null && canApply(pkg)) {
-                            ensureComputed(ips, pkg, ctx);
+                            ensureComputed(ips, importer, pkg, ctx);
                             if (ips.modifiedPackageJson != null) {
                                 PackageJsonHelper.putLiveTree(ctx, importer, ips.modifiedPackageJson);
                             }
@@ -164,14 +299,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 return tree;
             }
 
-            private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
+            private void ensureComputed(NodeDependencyScan.ProjectState ps, Path manifestPath,
+                                        SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
+                if (declines(acc, ctx, manifestPath, pkg)) return;
                 NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                 if (marker == null || marker.getPackageManager() == null) return;
                 NodeResolutionResult.PackageManager pm = marker.getPackageManager();
-                List<DependencyPathSegment> parsedPath = dependencyPath == null
-                        ? null
-                        : PackageJsonOverrides.parsePath(dependencyPath);
+                List<DependencyPathSegment> parsedPath = parsedPath();
 
                 Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(

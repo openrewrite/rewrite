@@ -72,6 +72,30 @@ class AddDependencyLockRegenTest implements RewriteTest {
     }
 
     @Test
+    void aScopeThatIsNotAnObjectIsDeclinedAndMarked() {
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("left-pad", "^1.3.0", "devDependencies")),
+                packageJson(
+                        """
+                        {
+                          "name": "consumer",
+                          "devDependencies": null
+                        }
+                        """,
+                        null,
+                        nodeResolutionResult(PackageManager.Npm),
+                        s -> s.after(actual -> {
+                            assertThat(actual).as("nothing is added").doesNotContain("left-pad\":");
+                            return actual;
+                        }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                .as("the decline is marked on the manifest")
+                                .hasValueSatisfying(warn -> assertThat(warn.getMessage())
+                                        .contains("`devDependencies` is not an object")
+                                        .contains("left-pad"))))
+        );
+    }
+
+    @Test
     void leafAddRegeneratesLockByteExact() {
         routes.put("https://registry.npmjs.org/left-pad", resource("lock/npm/add-leaf/http/left-pad"));
         routes.put("https://registry.npmjs.org/left-pad/1.3.0", resource("lock/npm/add-leaf/http/left-pad-1.3.0"));

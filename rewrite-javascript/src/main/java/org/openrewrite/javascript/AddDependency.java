@@ -129,6 +129,13 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
                 NodeDependencyScan.ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
                     if (matchesAdd(sf)) {
+                        if (sf instanceof Json.Document && PackageJsonHelper.holdsNonObject((Json.Document) sf, targetScope())) {
+                            // Marked once: a marker is a new tree, so re-marking each cycle would never settle.
+                            return sf.getMarkers().findFirst(Markup.Warn.class).isPresent() ? sf :
+                                    Markup.warn(sf, new IllegalStateException("`" + targetScope() +
+                                            "` is not an object in this `package.json`, so `" + packageName +
+                                            "` was not added. Make `" + targetScope() + "` an object first."));
+                        }
                         ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {

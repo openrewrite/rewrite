@@ -252,6 +252,11 @@ public final class PackageJsonOverrides {
 
         Json.JsonObject existingScope = findObjectMember(root, topLevelKey);
         if (existingScope == null) {
+            // The key is there but does not hold an object, so there is nothing to add to and appending
+            // would write a second member of the same name. Decline; the recipe reports it.
+            if (PackageJsonHelper.hasMemberNamed(root, topLevelKey)) {
+                return doc;
+            }
             // Create the parent object with the single entry
             return PackageJsonHelper.addDependency(doc, entryKey, entryValue, topLevelKey);
         }
@@ -277,27 +282,43 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * Sets {@code pnpm.overrides[key] = value}, creating {@code pnpm} and/or
-     * {@code pnpm.overrides} objects as needed. Preserves formatting.
+     * The key this dialect writes its override into, when it is present in {@code doc} but does not hold an
+     * object, so there is nowhere to write and appending would produce a duplicate key; null otherwise.
+     */
+    public static @Nullable String unusableOverrideContainerKey(Json.Document doc, PackageManager pm) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return null;
+        }
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        switch (pm) {
+            case Npm:
+            case Bun:
+                return presentButNotAnObject(root, "overrides") ? "overrides" : null;
+            case YarnClassic:
+            case YarnBerry:
+                return presentButNotAnObject(root, "resolutions") ? "resolutions" : null;
+            case Pnpm:
+                if (presentButNotAnObject(root, "pnpm")) {
+                    return "pnpm";
+                }
+                Json.JsonObject pnpm = findObjectMember(root, "pnpm");
+                return pnpm != null && presentButNotAnObject(pnpm, "overrides") ? "pnpm.overrides" : null;
+            default:
+                return null;
+        }
+    }
+
+    private static boolean presentButNotAnObject(Json.JsonObject obj, String key) {
+        return findObjectMember(obj, key) == null && PackageJsonHelper.hasMemberNamed(obj, key);
+    }
+
+    /**
+     * Sets {@code pnpm.overrides[key] = value}, creating {@code pnpm} and/or {@code pnpm.overrides}
+     * as needed. Preserves formatting, and returns the document unchanged when the entry already holds
+     * that value, which is what keeps the calling recipe single-cycle.
      */
     private static Json.Document setPnpmOverridesEntry(Json.Document doc, String key, String value) {
-        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
-        Json.JsonObject root = (Json.JsonObject) doc.getValue();
-
-        Json.JsonObject pnpmObj = findObjectMember(root, "pnpm");
-        if (pnpmObj == null) {
-            // No pnpm object yet — create pnpm: { overrides: { key: value } }
-            // Use addDependency twice: first add the inner entry (to trigger scope creation),
-            // but we need a two-level nest. Use the reparse fallback for this edge case.
-            String newJson = buildPnpmSnippet(doc, key, value);
-            return PackageJsonHelper.reparseJson(doc, newJson);
-        }
-
-        // pnpm object exists — delegate to flat entry within the "overrides" sub-object
-        // We'll operate directly on the pnpm sub-object via reparse for simplicity.
-        // (The pnpm.overrides nesting is unusual enough that reparse is fine.)
-        String newJson = buildPnpmSnippet(doc, key, value);
-        return PackageJsonHelper.reparseJson(doc, newJson);
+        return PackageJsonHelper.setNestedEntry(doc, "pnpm", "overrides", key, value);
     }
 
     // -------------------------------------------------------------------------
@@ -352,34 +373,6 @@ public final class PackageJsonOverrides {
             }
         }
         return result;
-    }
-
-    /**
-     * Builds a new full JSON document string with the pnpm.overrides[key] = value set.
-     */
-    private static String buildPnpmSnippet(Json.Document doc, String key, String value) {
-        String serialized = doc.printAll();
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper =
-                    new com.fasterxml.jackson.databind.ObjectMapper();
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> root =
-                    mapper.readValue(serialized, java.util.Map.class);
-
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> pnpm =
-                    (java.util.Map<String, Object>) root.computeIfAbsent("pnpm",
-                            k -> new java.util.LinkedHashMap<>());
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> overrides =
-                    (java.util.Map<String, Object>) pnpm.computeIfAbsent("overrides",
-                            k -> new java.util.LinkedHashMap<>());
-            overrides.put(key, value);
-
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
-        } catch (Exception e) {
-            return serialized;
-        }
     }
 
     // -------------------------------------------------------------------------
