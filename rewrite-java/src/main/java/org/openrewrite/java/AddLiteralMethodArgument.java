@@ -48,6 +48,12 @@ public class AddLiteralMethodArgument extends Recipe {
             example = "com.yourorg.A foo(int, int)")
     String methodPattern;
 
+    @Option(displayName = "Match on overrides",
+            description = "When enabled, find methods that are overrides of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchOverrides;
+
     /**
      * A zero-based index indicating where to insert the new argument.
      */
@@ -85,7 +91,7 @@ public class AddLiteralMethodArgument extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesMethod<>(methodPattern), new AddLiteralMethodArgumentVisitor(new MethodMatcher(methodPattern)));
+        return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new AddLiteralMethodArgumentVisitor(new MethodMatcher(methodPattern, matchOverrides)));
     }
 
     private class AddLiteralMethodArgumentVisitor extends JavaIsoVisitor<ExecutionContext> {
