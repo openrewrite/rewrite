@@ -255,6 +255,8 @@ public class ChangePropertyKey extends Recipe {
         private final String subproperty;
         private final Yaml.Mapping.Entry entryToReplace;
 
+        private boolean changed;
+
         private InsertSubpropertyVisitor(Yaml.Mapping.Entry scope, String subproperty, Yaml.Mapping.Entry entryToReplace) {
             this.scope = scope;
             this.subproperty = subproperty;
@@ -262,9 +264,18 @@ public class ChangePropertyKey extends Recipe {
         }
 
         @Override
+        public Yaml.Document visitDocument(Yaml.Document document, P p) {
+            Yaml.Document before = document;
+            changed = false;
+            Yaml.Document visited = super.visitDocument(document, p);
+            return changed ? YamlDocumentEndCommentRelocator.relocate(before, visited) : visited;
+        }
+
+        @Override
         public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
             Yaml.Mapping m = super.visitMapping(mapping, p);
             if (m.getEntries().contains(scope)) {
+                changed = true;
                 String newEntryPrefix = scope.getPrefix();
                 // The portion before the first line break belongs to the preceding sibling.
                 int lineBreak = newEntryPrefix.indexOf('\n');
