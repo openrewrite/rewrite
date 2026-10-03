@@ -292,6 +292,22 @@ class UsePropertyAssignmentSyntaxTest implements RewriteTest {
     }
 
     @Test
+    void regularMethodWithSameNameUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("group")),
+          buildGradle(
+            """
+              def m = java.util.regex.Pattern.compile("(\\\\d+)\\\\..*").matcher("1.2")
+              def major = ""
+              if (m.find()) {
+                  major = m.group(1)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void noArgMethodCallUnchanged() {
         rewriteRun(
           buildGradle(
