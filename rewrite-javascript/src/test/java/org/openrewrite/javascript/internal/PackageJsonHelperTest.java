@@ -17,11 +17,13 @@ package org.openrewrite.javascript.internal;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markup;
 
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -216,6 +218,96 @@ class PackageJsonHelperTest {
                 java.util.Collections.<DependencyPathSegment>emptyList());
         assertThat(modified.printAll()).contains("\"overrides\"");
         assertThat(modified.printAll()).contains("\"lodash\": \"^4.17.21\"");
+    }
+
+    @Test
+    void aNestedOverrideKeepsThePinsItLandsOn() {
+        List<DependencyPathSegment> underExpress = PackageJsonOverrides.parsePath("express");
+
+        Json.Document parentPinned = PackageJsonHelper.upgradeTransitive(parsePackageJson("""
+                {
+                  "overrides": {
+                    "express": "4.18.2"
+                  }
+                }
+                """), NodeResolutionResult.PackageManager.Npm, "accepts", "1.3.8", underExpress);
+        assertThat(parentPinned.printAll()).isEqualTo("""
+                {
+                  "overrides": {
+                    "express": {
+                      ".": "4.18.2",
+                      "accepts": "1.3.8"
+                    }
+                  }
+                }
+                """);
+
+        Json.Document childNested = PackageJsonHelper.upgradeTransitive(parsePackageJson("""
+                {
+                  "overrides": {
+                    "express": {
+                      "accepts": {
+                        ".": "1.3.7",
+                        "negotiator": "0.6.3"
+                      }
+                    }
+                  }
+                }
+                """), NodeResolutionResult.PackageManager.Npm, "accepts", "1.3.8", underExpress);
+        assertThat(childNested.printAll()).isEqualTo("""
+                {
+                  "overrides": {
+                    "express": {
+                      "accepts": {
+                        ".": "1.3.8",
+                        "negotiator": "0.6.3"
+                      }
+                    }
+                  }
+                }
+                """);
+    }
+
+    @Test
+    void aNestedOverrideIsWrittenPastAnEarlierWarning() {
+        Json.Document warned = (Json.Document) Markup.warn(parsePackageJson("""
+                {
+                  "overrides": {}
+                }
+                """), new RuntimeException("lock regeneration failed"));
+
+        Json.Document written = PackageJsonHelper.upgradeTransitive(warned, NodeResolutionResult.PackageManager.Npm,
+                "accepts", "1.3.8", PackageJsonOverrides.parsePath("express"));
+
+        assertThat(written.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
+                .isEqualTo("""
+                        {
+                          "overrides": {
+                            "express": {
+                              "accepts": "1.3.8"
+                            }
+                          }
+                        }
+                        """);
+    }
+
+    @Test
+    void aNestedOverrideAlreadyPinnedUnderDotIsLeftAlone() {
+        Json.Document doc = parsePackageJson("""
+                {
+                  "overrides": {
+                    "express": {
+                      "accepts": {
+                        ".": "1.3.8",
+                        "negotiator": "0.6.3"
+                      }
+                    }
+                  }
+                }
+                """);
+
+        assertThat(PackageJsonHelper.upgradeTransitive(doc, NodeResolutionResult.PackageManager.Npm,
+                "accepts", "1.3.8", PackageJsonOverrides.parsePath("express"))).isSameAs(doc);
     }
 
     @Test

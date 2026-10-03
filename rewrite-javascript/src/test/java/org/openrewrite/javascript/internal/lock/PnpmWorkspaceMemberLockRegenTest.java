@@ -58,6 +58,29 @@ class PnpmWorkspaceMemberLockRegenTest extends LockRegenTestSupport {
         assertThat(result.getLockFileContent()).isEqualTo(resource("lock/pnpm/v9-ws/after"));
     }
 
+    /** Only the root's overrides reach the lock, so a member's manifest never declares what the section records. */
+    @Test
+    void memberBumpUnderRootOverridesItNeverReachesByteExact() {
+        routes.put(REG + "ms", resource("lock/pnpm/v9/http/ms"));
+        routes.put(REG + "ms/2.1.2", resource("lock/pnpm/v9/http/ms-2.1.2"));
+        routes.put(REG + "ms/2.1.3", resource("lock/pnpm/v9/http/ms-2.1.3"));
+        String rootOverrides = """
+                overrides:
+                  semver: ^7.5.2
+
+                importers:""";
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Pnpm,
+                resource("lock/pnpm/v9-ws/pkg-app-after"),
+                resource("lock/pnpm/v9-ws/pkg-app-before"),
+                resource("lock/pnpm/v9-ws/before").replace("importers:", rootOverrides),
+                null, Paths.get("packages/app/package.json"), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent())
+                .isEqualTo(resource("lock/pnpm/v9-ws/after").replace("importers:", rootOverrides));
+    }
+
     @Test
     void memberAddByteExact() {
         // A brand-new leaf (object-assign) added to the packages/app member: a new importer edge under

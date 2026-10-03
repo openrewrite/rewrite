@@ -19,6 +19,7 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.Tree;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
@@ -359,6 +360,63 @@ public class PackageJsonHelper {
         return doc.withValue(replaceMember(root, scope, updatedScope));
     }
 
+    public static Json.Document setNestedEntry(Json.Document doc, String outerKey, String innerKey,
+                                               String entryKey, String entryValue) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        String indent = detectIndentUnit(root);
+
+        Json.JsonObject outer = findObjectMember(root, outerKey);
+        if (outer == null) {
+            Json.JsonObject inner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
+            Json.JsonObject outerObj = newObjectHolding(makeMember(innerKey, inner,
+                    Space.build("\n" + indent + indent, emptyList())), indent);
+            return doc.withValue(appendMember(root, makeMember(outerKey, outerObj, Space.EMPTY)));
+        }
+
+        Json.JsonObject inner = findObjectMember(outer, innerKey);
+        if (inner == null) {
+            Json.JsonObject innerObj = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
+            // The JSON parser represents {} as a single Json.Empty member, which an append would print as {,}.
+            Json.JsonObject updatedOuter = outer.getMembers().stream().allMatch(m -> m instanceof Json.Empty) ?
+                    newObjectHolding(makeMember(innerKey, innerObj, Space.build("\n" + indent + indent, emptyList())),
+                            indent).withPrefix(outer.getPrefix()) :
+                    appendMember(outer, makeMember(innerKey, innerObj, Space.EMPTY));
+            return doc.withValue(replaceMember(root, outerKey, updatedOuter));
+        }
+
+        for (Json m : inner.getMembers()) {
+            if (!(m instanceof Json.Member)) continue;
+            Json.Member member = (Json.Member) m;
+            if (!entryKey.equals(literalString(member.getKey()))) continue;
+            if (entryValue.equals(literalString(member.getValue()))) {
+                return doc;
+            }
+            Json.Literal newLit = makeStringLiteral(entryValue).withPrefix(member.getValue().getPrefix());
+            return doc.withValue(replaceMember(root, outerKey,
+                    replaceMember(outer, innerKey, replaceMember(inner, entryKey, newLit))));
+        }
+
+        Json.JsonObject updatedInner;
+        if (inner.getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
+            updatedInner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent)
+                    .withPrefix(inner.getPrefix());
+        } else {
+            updatedInner = appendMember(inner, makeMember(entryKey, makeStringLiteral(entryValue), Space.EMPTY));
+        }
+        return doc.withValue(replaceMember(root, outerKey,
+                replaceMember(outer, innerKey, updatedInner)));
+    }
+
+    private static Json.JsonObject newObjectHolding(Json.Member member, String closingIndent) {
+        return new Json.JsonObject(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                singletonList(JsonRightPadded.build((Json) member)
+                        .withAfter(Space.build("\n" + closingIndent, emptyList()))));
+    }
+
     /**
      * Remove {@code name} from each of {@code scopes} in {@code doc}, dropping a scope that ends up
      * empty; a no-op when no matching member is found.
@@ -417,7 +475,7 @@ public class PackageJsonHelper {
     }
 
     /** The indent unit from {@code obj}'s first member, or two spaces when none can be detected. */
-    private static String detectIndentUnit(Json.JsonObject obj) {
+    static String detectIndentUnit(Json.JsonObject obj) {
         List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
         if (!members.isEmpty()) {
             String ws = members.get(0).getElement().getPrefix().getWhitespace();
@@ -512,9 +570,8 @@ public class PackageJsonHelper {
                 String name = literalString(depMember.getKey());
                 if (name == null || !targetNames.contains(name)) continue;
                 if (!(depMember.getValue() instanceof Json.Literal)) continue;
-                Json.Literal newLit = makeStringLiteral(newVersion);
                 Json.Literal oldLit = (Json.Literal) depMember.getValue();
-                newLit = newLit.withPrefix(oldLit.getPrefix());
+                Json.Literal newLit = makeStringLiteral(newVersion).withPrefix(oldLit.getPrefix());
                 children.set(j, children.get(j).withElement(depMember.withValue(newLit)));
                 scopeChanged = true;
             }
@@ -643,7 +700,7 @@ public class PackageJsonHelper {
     }
 
     /** A member with {@code prefix}; a bare literal value gets a leading space so it prints {@code "key": "value"}. */
-    private static Json.Member makeMember(String key, JsonValue value, Space prefix) {
+    static Json.Member makeMember(String key, JsonValue value, Space prefix) {
         Json.Literal keyLit = makeStringLiteral(key);
         // Ensure there's a space between ':' and the value (standard JSON formatting).
         JsonValue spacedValue = value;

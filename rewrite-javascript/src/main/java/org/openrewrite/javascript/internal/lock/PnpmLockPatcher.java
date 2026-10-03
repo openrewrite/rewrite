@@ -45,7 +45,8 @@ import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.K
  * byte. This parser sees {@code resolution: {integrity: …}} and {@code engines: {…}} as single opaque
  * flow-map scalars, so integrity/engines are rewritten as substrings inside that one scalar. Any edit that
  * would move a peer suffix, retarget a by-version reference, or fork a version shared across importers is
- * closure-changing and fails loud, as does lockfileVersion &lt; 6.
+ * closure-changing and fails loud, as does lockfileVersion &lt; 6. The top-level {@code overrides} section is
+ * never written; {@code NativeLockEngine.requireOverridesUnchanged} refuses any edit that would change it.
  */
 public final class PnpmLockPatcher implements LockPatcher {
 
