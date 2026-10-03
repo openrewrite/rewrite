@@ -277,6 +277,9 @@ public class ChangePropertyKey extends Recipe {
                        ((Yaml.Mapping) ancestor.getValue()).getEntries().size() == 1) {
                     ancestor = ((Yaml.Mapping) ancestor.getValue()).getEntries().get(0);
                     if (ancestor.getPrefix().contains("#")) {
+                        if (!newEntryPrefix.contains("\n")) {
+                            newEntryPrefix += "\n";
+                        }
                         newEntryPrefix += ancestor.getPrefix().trim() + "\n";
                     }
                 }

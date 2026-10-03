@@ -31,6 +31,27 @@ import static org.openrewrite.yaml.Assertions.yaml;
 class ChangePropertyKeyTest implements RewriteTest {
 
     @Test
+    void separateMovedAncestorCommentsFromPreviousScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "b.endpoint", null, null, null)),
+          yaml(
+            """
+              a: # parent comment
+                old: # child comment
+                  endpoint: url
+              z: x
+              """,
+            """
+              z: x
+              # parent comment
+              # child comment
+              b.endpoint: url
+              """
+          )
+        );
+    }
+
+    @Test
     void keepParentCommentWhenExclusionsRetainTheParent() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey("a.old.settings", "a.new.settings", null, List.of("keep"), null)),
