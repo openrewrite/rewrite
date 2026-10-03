@@ -424,6 +424,8 @@ public class SolutionParser
         // otherwise fail evaluation with NETSDK1100 on Linux/macOS, and one failing project
         // reference takes the reference metadata of everything that depends on it with it.
         NuGetResolver.ApplyWindowsTargetingDefault(msbuildProperties);
+        NuGetResolver.ApplyAndroidDesignTimeDefault(msbuildProperties);
+        NuGetResolver.ApplyOutOfSupportWorkloadsDefault(msbuildProperties);
 
         _restoredLockFiles = await SolutionRestore.RunAsync(path, hasPackagesConfig, msbuildProperties, ct);
 
