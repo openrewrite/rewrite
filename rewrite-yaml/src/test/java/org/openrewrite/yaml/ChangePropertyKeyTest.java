@@ -31,6 +31,67 @@ import static org.openrewrite.yaml.Assertions.yaml;
 class ChangePropertyKeyTest implements RewriteTest {
 
     @Test
+    void preserveParentAndTrailingCommentsBeforeSeveralRootSiblings() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.tracing.export.endpoint", null, null, null)),
+          yaml(
+            """
+              a:
+                old: # enable the profile
+                  endpoint: url
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+
+              z: x # unrelated
+              last: y
+              """,
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+                  # enable the profile
+                  export.endpoint: url
+
+              z: x # unrelated
+              last: y
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentOnRemovedIntermediateParentWhenScopeRemains() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.metrics.export.prometheus", "a.prometheus.metrics.export", null, null, null)),
+          yaml(
+            """
+              a:
+                metrics:
+                  export:
+                    # default backend
+                    prometheus:
+                      enabled: true
+                  tags:
+                    application: test
+              z: x
+              """,
+            """
+              a:
+                metrics:
+                  tags:
+                    application: test
+                # default backend
+                prometheus.metrics.export:
+                  enabled: true
+              z: x
+              """
+          )
+        );
+    }
+
+    @Test
     void separateMovedAncestorCommentsFromPreviousScalar() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "b.endpoint", null, null, null)),

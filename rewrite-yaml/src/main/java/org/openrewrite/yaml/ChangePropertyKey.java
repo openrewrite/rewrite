@@ -271,16 +271,35 @@ public class ChangePropertyKey extends Recipe {
                 if (lineBreak >= 0) {
                     newEntryPrefix = newEntryPrefix.substring(lineBreak > 0 && newEntryPrefix.charAt(lineBreak - 1) == '\r' ? lineBreak - 1 : lineBreak);
                 }
-                // Keep comments from ancestors that disappear with the moved property.
-                Yaml.Mapping.Entry ancestor = scope;
-                while (!hasExcludedValues(entryToReplace) && ancestor != entryToReplace && ancestor.getValue() instanceof Yaml.Mapping &&
-                       ((Yaml.Mapping) ancestor.getValue()).getEntries().size() == 1) {
-                    ancestor = ((Yaml.Mapping) ancestor.getValue()).getEntries().get(0);
-                    if (ancestor.getPrefix().contains("#")) {
-                        if (!newEntryPrefix.contains("\n")) {
-                            newEntryPrefix += "\n";
+                // A shared scope can survive while intermediate ancestors of the moved property
+                // disappear. Preserve comments from exactly the entries that disappear.
+                List<Yaml.Mapping.Entry> path = new ArrayList<>();
+                if (!hasExcludedValues(entryToReplace) && pathToEntry(scope, path)) {
+                    boolean[] removed = new boolean[path.size()];
+                    removed[path.size() - 1] = true;
+                    for (int i = path.size() - 2; i >= 0; i--) {
+                        removed[i] = removed[i + 1] && ((Yaml.Mapping) path.get(i).getValue()).getEntries().size() == 1;
+                    }
+                    if (!removed[0] && newEntryPrefix.contains("#")) {
+                        int lastBreak = newEntryPrefix.lastIndexOf('\n');
+                        newEntryPrefix = lastBreak < 0 ? "" : newEntryPrefix.substring(lastBreak);
+                    }
+                    for (int i = 1; i < path.size(); i++) {
+                        if (!removed[i]) {
+                            continue;
                         }
-                        newEntryPrefix += ancestor.getPrefix().trim() + "\n";
+                        String prefix = path.get(i).getPrefix();
+                        // An inline comment belongs to the parent; standalone comments belong to this entry.
+                        if (!removed[i - 1]) {
+                            int breakAt = prefix.indexOf('\n');
+                            prefix = breakAt < 0 ? "" : prefix.substring(breakAt);
+                        }
+                        if (prefix.contains("#")) {
+                            if (!newEntryPrefix.contains("\n")) {
+                                newEntryPrefix += "\n";
+                            }
+                            newEntryPrefix += prefix.trim() + "\n";
+                        }
                     }
                 }
                 Yaml.Mapping.Entry newEntry = new Yaml.Mapping.Entry(randomId(),
@@ -333,6 +352,22 @@ public class ChangePropertyKey extends Recipe {
             }
 
             return m;
+        }
+
+        private boolean pathToEntry(Yaml.Mapping.Entry entry, List<Yaml.Mapping.Entry> path) {
+            path.add(entry);
+            if (entry == entryToReplace) {
+                return true;
+            }
+            if (entry.getValue() instanceof Yaml.Mapping) {
+                for (Yaml.Mapping.Entry child : ((Yaml.Mapping) entry.getValue()).getEntries()) {
+                    if (pathToEntry(child, path)) {
+                        return true;
+                    }
+                }
+            }
+            path.remove(path.size() - 1);
+            return false;
         }
 
         private Yaml.@Nullable Mapping nestUnderExistingPrefix(Yaml.Mapping mapping, Yaml.Mapping.Entry newEntry) {
