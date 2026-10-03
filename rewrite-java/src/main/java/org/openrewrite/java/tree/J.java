@@ -98,6 +98,13 @@ public interface J extends Tree {
         return StringUtils.trimIndent(print());
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * Object annotated = (@TypeUse String) object;
+     *                     ^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -165,6 +172,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * @Deprecated void oldMethod() {}
+     * ^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * @SuppressWarnings("unchecked") void unchecked() {}
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -269,6 +288,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * int element = values[0];
+     *               ^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -310,6 +336,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * int[] values = {1, 2};
+     * ^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * String[][] grid;
+     * ^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -404,6 +442,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * assert ready;
+     * ^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * assert ready : "not ready";
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -442,6 +492,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * value = first;
+     * ^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -534,6 +591,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * value += second;
+     * ^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -660,6 +724,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * int result = (left + right) * 2;
+     *               ^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * boolean both = ready && enabled;
+     *                ^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -780,6 +856,12 @@ public interface J extends Tree {
      * A block of statements, enclosed in curly braces.
      * <p>
      * To create an empty block, use {@link #createEmptyBlock()}.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * <R> R identity(R item) { return item; }
+     *                        ^^^^^^^^^^^^^^^^
+     * }</pre>
      */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -946,7 +1028,13 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * break;
+     * while (ready) { break; }
+     *                 ^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * done: while (ready) { break done; }
+     *                       ^^^^^^^^^^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -988,11 +1076,24 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * switch(x) {
+     * switch (value) {
      *     case 1:
-     *         doSomething();
+     *     ^^^^^^^
+     *         call();
+     * ^^^^^^^^^^^^^^^
+     *         break;
+     * ^^^^^^^^^^^^^^
+     *     default:
      *         break;
      * }
+     * }</pre>
+     *
+     * <pre>{@code
+     * int chosen = switch (value) {
+     *     case 1 -> 10;
+     *     ^^^^^^^^^^^^^
+     *     default -> 0;
+     * };
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1224,7 +1325,14 @@ public interface J extends Tree {
      * <p>Example:
      * <pre>{@code
      * public class MyClass {
+     * ^^^^^^^^^^^^^^^^^^^^^^
      * }
+     * ^
+     * }</pre>
+     *
+     * <pre>{@code
+     * record Point(int x, int y) {}
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1516,9 +1624,12 @@ public interface J extends Tree {
      * <p>Example:
      * <pre>{@code
      * package com.example;
+     * ^^^^^^^^^^^^^^^^^^^^
      *
      * public class MyClass {
+     * ^^^^^^^^^^^^^^^^^^^^^^
      * }
+     * ^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1737,7 +1848,13 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * continue;
+     * while (ready) { continue; }
+     *                 ^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * again: while (ready) { continue again; }
+     *                        ^^^^^^^^^^^^^^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1780,8 +1897,11 @@ public interface J extends Tree {
      * <p>Example:
      * <pre>{@code
      * do {
-     *     // body
-     * } while (condition);
+     * ^^^^
+     *     call();
+     * ^^^^^^^^^^^
+     * } while (ready);
+     * ^^^^^^^^^^^^^^^
      * }</pre>
      */
     @ToString
@@ -1884,6 +2004,12 @@ public interface J extends Tree {
      * <p>Example:
      * <pre>{@code
      * ;
+     * ^
+     * }</pre>
+     *
+     * <pre>{@code
+     * text.trim();
+     *           ^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1928,10 +2054,13 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * enum Color {
-     *     RED,
-     *     GREEN
-     * }
+     * enum Color { RED, GREEN }
+     *              ^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * enum Status { OK(200), NOT_FOUND(404); Status(int code) {} }
+     *               ^^^^^^^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1974,10 +2103,13 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * enum Color {
-     *     RED,
-     *     GREEN;
-     * }
+     * enum Color { RED, GREEN }
+     *              ^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * enum Status { OK(200), NOT_FOUND(404); Status(int code) {} }
+     *               ^^^^^^^^^^^^^^^^^^^^^^^^
      * }</pre>
      */
     @ToString
@@ -2062,7 +2194,8 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * object.field;
+     * int length = values.length;
+     *              ^^^^^^^^^^^^^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2210,9 +2343,12 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * for (String s : list) {
-     *     // body
+     * for (String name : names) {
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     *     use(name);
+     * ^^^^^^^^^^^^^^
      * }
+     * ^
      * }</pre>
      */
     @ToString
@@ -2392,9 +2528,17 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * for (int i = 0; i < n; i++) {
-     *     // body
+     * for (int index = 0; index < 3; index++) {
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     *     call();
+     * ^^^^^^^^^^^
      * }
+     * ^
+     * }</pre>
+     *
+     * <pre>{@code
+     * for (;;) { break; }
+     * ^^^^^^^^^^^^^^^^^^^
      * }</pre>
      */
     @ToString
@@ -2640,7 +2784,13 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * MyClass variableName;
+     * String text = "hello";
+     * ^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * List<String> names = List.of("first", "second");
+     *              ^^^^^
      * }</pre>
      */
     @Value
@@ -2694,11 +2844,21 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * if (condition) {
-     *     // then
+     * if (ready) {
+     * ^^^^^^^^^^^^
+     *     call();
+     * ^^^^^^^^^^^
      * } else {
-     *     // else
+     * ^^^^^^^^
+     *     use(value);
+     * ^^^^^^^^^^^^^^^
      * }
+     * ^
+     * }</pre>
+     *
+     * <pre>{@code
+     * if (ready) call();
+     * ^^^^^^^^^^^^^^^^^^
      * }</pre>
      */
     @ToString
@@ -2754,6 +2914,19 @@ public interface J extends Tree {
             return new CoordinateBuilder.If(this);
         }
 
+        /**
+         * <p>Example:
+         * <pre>{@code
+         * if (ready) {
+         *     call();
+         * } else {
+         *   ^^^^^^
+         *     use(value);
+         * ^^^^^^^^^^^^^^^
+         * }
+         * ^
+         * }</pre>
+         */
         @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2855,7 +3028,13 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * import java.util.List;
+     * import java.util.*;
+     * ^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * import static java.util.Collections.emptyList;
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3097,7 +3276,13 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * obj instanceof String
+     * boolean string = object instanceof String;
+     *                  ^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * boolean nonempty = object instanceof String textValue && !textValue.isEmpty();
+     *                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3229,8 +3414,13 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * case Point(int x, int y):
-     *     // use x and y
+     * boolean matches = object instanceof Point(int x, int y);
+     *                                     ^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * switch (object) { case Point(int x, int y): use(x); break; default: break; }
+     *                        ^^^^^^^^^^^^^^^^^^^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3325,7 +3515,8 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * Serializable & Closeable
+     * Object intersection = (Runnable & Serializable) object;
+     *                        ^^^^^^^^^^^^^^^^^^^^^^^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3419,8 +3610,8 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * label:
-     *     statement;
+     * again: while (ready) { continue again; }
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3512,7 +3703,17 @@ public interface J extends Tree {
      *
      * <p>Example:
      * <pre>{@code
-     * x -> x.toString()
+     * Function<Object, String> stringify = x -> x.toString();
+     *                                      ^^^^^^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * BinaryOperator<Integer> add = (a, b) -> {
+     *                               ^^^^^^^^^^^
+     *     return a + b;
+     * ^^^^^^^^^^^^^^^^^
+     * };
+     * ^
      * }</pre>
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3640,6 +3841,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * private int value = 1;
+     *                     ^
+     * }</pre>
+     *
+     * <pre>{@code
+     * String text = "hello";
+     *               ^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -3752,6 +3965,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * Supplier<String> supplier = this::toString;
+     *                             ^^^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * Supplier<String> constructor = String::new;
+     *                                ^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3900,6 +4125,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * <R> R identity(R item) { return item; }
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * JavaExamples() { value = 0; }
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4235,6 +4472,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * text.trim();
+     * ^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * List<String> names = List.of("first", "second");
+     *                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4489,6 +4738,14 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * try { if (ready) throw new IOException(); }
+     * catch (IOException | IllegalArgumentException exception) { use(exception); }
+     *        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4575,6 +4832,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * int[] values = {1, 2};
+     *                ^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * int[] sized = new int[3];
+     *               ^^^^^^^^^^
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -4663,6 +4932,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * int element = values[0];
+     *                     ^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * int[] array = new int[] {1, 2};
+     *                      ^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4734,6 +5015,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * Object copy = new Object();
+     *               ^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * Runnable task = new Runnable() { public void run() { call(); } };
+     *                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4989,6 +5282,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * package com.example;
+     * ^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -5028,6 +5328,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * List<String> names = List.of("first", "second");
+     * ^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -5115,6 +5422,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * int result = (left + right) * 2;
+     *              ^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -5213,6 +5527,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * while (ready) { break; }
+     *       ^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * String cast = (String) object;
+     *               ^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -5319,6 +5645,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * private int value = 1;
+     *         ^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * void call() {}
+     * ^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
@@ -5372,6 +5710,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * <R> R identity(R item) { return item; }
+     *                          ^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * void stop() { return; }
+     *               ^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -5407,6 +5757,25 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * switch (value) {
+     * ^^^^^^^^^^^^^^^^
+     *     case 1:
+     * ^^^^^^^^^^^
+     *         call();
+     * ^^^^^^^^^^^^^^^
+     *         break;
+     * ^^^^^^^^^^^^^^
+     *     default:
+     * ^^^^^^^^^^^^
+     *         break;
+     * ^^^^^^^^^^^^^^
+     * }
+     * ^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -5439,6 +5808,24 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * int result = switch (value) { default -> { yield 42; } };
+     *              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * int chosen = switch (value) {
+     *              ^^^^^^^^^^^^^^^^
+     *     case 1 -> 10;
+     * ^^^^^^^^^^^^^^^^^
+     *     default -> 0;
+     * ^^^^^^^^^^^^^^^^^
+     * };
+     * ^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -5477,6 +5864,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * synchronized (object) { call(); }
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -5509,6 +5903,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * int selected = ready ? first : second;
+     *                ^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -5613,6 +6014,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * throw new IllegalStateException();
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -5647,6 +6055,30 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * try {
+     * ^^^^^
+     *     call();
+     * ^^^^^^^^^^^
+     * } finally {
+     * ^^^^^^^^^^^
+     *     call();
+     * ^^^^^^^^^^^
+     * }
+     * ^
+     * }</pre>
+     *
+     * <pre>{@code
+     * try (InputStream input = new ByteArrayInputStream(new byte[0])) {
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     *     input.read();
+     * ^^^^^^^^^^^^^^^^^
+     * }
+     * ^
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -5744,6 +6176,25 @@ public interface J extends Tree {
             }
         }
 
+        /**
+         * <p>Example:
+         * <pre>{@code
+         * try {
+         *     call();
+         * } catch (RuntimeException exception) {
+         *   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+         *     throw exception;
+         * ^^^^^^^^^^^^^^^^^^^^
+         * }
+         * ^
+         * }</pre>
+         *
+         * <pre>{@code
+         * try { if (ready) throw new IOException(); }
+         * catch (IOException | IllegalArgumentException exception) { use(exception); }
+         * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+         * }</pre>
+         */
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
@@ -5812,6 +6263,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * String cast = (String) object;
+     *               ^^^^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * byte narrowed = (byte) value;
+     *                 ^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -5866,6 +6329,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * <R> R identity(R item) { return item; }
+     *  ^
+     * }</pre>
+     *
+     * <pre>{@code
+     * <N extends Number> N numeric(N item) { return item; }
+     *  ^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -6012,6 +6487,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * <R> R identity(R item) { return item; }
+     * ^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * <N extends Number> N numeric(N item) { return item; }
+     * ^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -6087,6 +6574,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * value++;
+     * ^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * ++value;
+     * ^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -6202,6 +6701,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * boolean ready;
+     * ^^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * int first = 1, second = 2;
+     * ^^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor(onConstructor_ = @JsonCreator)
@@ -6325,6 +6836,18 @@ public interface J extends Tree {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
+        /**
+         * <p>Example:
+         * <pre>{@code
+         * boolean ready;
+         *         ^^^^^
+         * }</pre>
+         *
+         * <pre>{@code
+         * int first = 1, second = 2;
+         *     ^^^^^^^^^
+         * }</pre>
+         */
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
@@ -6492,6 +7015,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * while (ready) { break; }
+     * ^^^^^^^^^^^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -6572,6 +7102,18 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * List<? extends Number> numbers;
+     *      ^^^^^^^^^^^^^^^^
+     * }</pre>
+     *
+     * <pre>{@code
+     * List<? super String> destination;
+     *      ^^^^^^^^^^^^^^
+     * }</pre>
+     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -6671,6 +7213,13 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * <p>Example:
+     * <pre>{@code
+     * int result = switch (value) { default -> { yield 42; } };
+     *                                            ^^^^^^^^
+     * }</pre>
+     */
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
