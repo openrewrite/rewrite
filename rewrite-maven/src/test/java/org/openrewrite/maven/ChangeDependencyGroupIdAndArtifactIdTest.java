@@ -2566,7 +2566,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"build", "pluginManagement", "profile", "profilePluginManagement"})
+    @ValueSource(strings = {"build", "pluginManagement", "profile", "profilePluginManagement", "buildAlias", "profileAlias"})
     void preserveVersionPropertyUsedByBuildPlugin(String location) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
@@ -2636,7 +2636,12 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             pom = pom.replace("<plugins>", "<pluginManagement><plugins>")
               .replace("</plugins>", "</plugins></pluginManagement>");
         }
-        if (location.equals("profile") || location.equals("profilePluginManagement")) {
+        if (location.endsWith("Alias")) {
+            pom = pom.replace("</liquibase.version>", "</liquibase.version><plugin.version>${liquibase.version}</plugin.version>")
+              .replace("<artifactId>liquibase-maven-plugin</artifactId>\n                <version>${liquibase.version}</version>",
+                "<artifactId>liquibase-maven-plugin</artifactId>\n                <version>${plugin.version}</version>");
+        }
+        if (location.equals("profile") || location.equals("profilePluginManagement") || location.equals("profileAlias")) {
             pom = pom.replace("<build>", "<profiles><profile><id>migration</id><build>")
               .replace("</build>", "</build></profile></profiles>");
         }

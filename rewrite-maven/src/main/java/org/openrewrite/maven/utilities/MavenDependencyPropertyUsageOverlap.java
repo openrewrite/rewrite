@@ -21,8 +21,12 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
@@ -31,6 +35,7 @@ import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 public class MavenDependencyPropertyUsageOverlap {
+    private static final Pattern PROPERTY_REFERENCE = Pattern.compile("\\$\\{([^}]+)}");
     public static Set<String> filterPropertiesWithOverlapInDependencies(
             Set<String> relevantProperties,
             String groupId,
@@ -42,10 +47,8 @@ public class MavenDependencyPropertyUsageOverlap {
         // resolvedPom being `null` is an indicator of dealing with a remote parent that we can't change
         Set<String> remainingProperties = new HashSet<>(relevantProperties);
         // Pom fields default to emptyList() via @Builder.Default, but deserialization can leave them null
-        if (requestedPom.getDependencyManagement() == null || requestedPom.getDependencies() == null) {
-            return remainingProperties;
-        }
-        for (ManagedDependency md : requestedPom.getDependencyManagement()) {
+        for (ManagedDependency md : requestedPom.getDependencyManagement() == null ?
+                java.util.Collections.<ManagedDependency>emptyList() : requestedPom.getDependencyManagement()) {
             if (remainingProperties.isEmpty()) {
                 break;
             }
@@ -58,7 +61,8 @@ public class MavenDependencyPropertyUsageOverlap {
                 remainingProperties.remove(md.getVersion());
             }
         }
-        for (Dependency d : requestedPom.getDependencies()) {
+        for (Dependency d : requestedPom.getDependencies() == null ?
+                java.util.Collections.<Dependency>emptyList() : requestedPom.getDependencies()) {
             if (remainingProperties.isEmpty()) {
                 break;
             }
@@ -73,27 +77,51 @@ public class MavenDependencyPropertyUsageOverlap {
         // A dependency relocation must not repurpose versions also used by the build.
         // Inspect inactive profiles too: their plugins still need the original version
         // when the profile is activated in a later build.
-        filterPropertiesUsedByPlugins(remainingProperties, requestedPom.getPlugins());
-        filterPropertiesUsedByPlugins(remainingProperties, requestedPom.getPluginManagement());
+        Map<String, String> propertyValues = new HashMap<>();
+        if (resolvedPom != null) {
+            propertyValues.putAll(resolvedPom.getProperties());
+        }
+        if (requestedPom.getProperties() != null) {
+            propertyValues.putAll(requestedPom.getProperties());
+        }
+        filterPropertiesUsedByPlugins(remainingProperties, requestedPom.getPlugins(), propertyValues);
+        filterPropertiesUsedByPlugins(remainingProperties, requestedPom.getPluginManagement(), propertyValues);
         if (requestedPom.getProfiles() != null) {
             for (Profile profile : requestedPom.getProfiles()) {
-                filterPropertiesUsedByPlugins(remainingProperties, profile.getPlugins());
-                filterPropertiesUsedByPlugins(remainingProperties, profile.getPluginManagement());
+                Map<String, String> profileProperties = new HashMap<>(propertyValues);
+                profileProperties.putAll(profile.getProperties());
+                filterPropertiesUsedByPlugins(remainingProperties, profile.getPlugins(), profileProperties);
+                filterPropertiesUsedByPlugins(remainingProperties, profile.getPluginManagement(), profileProperties);
             }
         }
         return remainingProperties;
     }
 
-    private static void filterPropertiesUsedByPlugins(Set<String> properties, @Nullable List<Plugin> plugins) {
+    private static void filterPropertiesUsedByPlugins(Set<String> properties, @Nullable List<Plugin> plugins, Map<String, String> propertyValues) {
         if (plugins == null) {
             return;
         }
         for (Plugin plugin : plugins) {
-            properties.remove(plugin.getVersion());
+            protectReferencedProperties(properties, plugin.getVersion(), propertyValues, new HashSet<>());
             if (plugin.getDependencies() != null) {
                 for (Dependency dependency : plugin.getDependencies()) {
-                    properties.remove(dependency.getVersion());
+                    protectReferencedProperties(properties, dependency.getVersion(), propertyValues, new HashSet<>());
                 }
+            }
+        }
+    }
+
+    private static void protectReferencedProperties(Set<String> properties, @Nullable String value,
+                                                    Map<String, String> propertyValues, Set<String> visited) {
+        if (value == null) {
+            return;
+        }
+        Matcher matcher = PROPERTY_REFERENCE.matcher(value);
+        while (matcher.find()) {
+            String name = matcher.group(1);
+            properties.remove(matcher.group());
+            if (visited.add(name)) {
+                protectReferencedProperties(properties, propertyValues.get(name), propertyValues, visited);
             }
         }
     }
