@@ -485,7 +485,8 @@ def register_codec_with_both_names(
     python_class: type,
     codec,
     factory,
-    sender: Optional[Callable[[Any, Any], None]] = None
+    sender: Optional[Callable[[Any, Any], None]] = None,
+    source_file_type: Optional[str] = None
 ):
     """Register codec with both Java type name and Python class name.
 
@@ -495,12 +496,14 @@ def register_codec_with_both_names(
         codec: Function to deserialize: (before, queue) -> after
         factory: Function to create new instance: () -> instance
         sender: Optional function to serialize: (obj, queue) -> None
+        source_file_type: Restricts the receive codec to trees of this source file type,
+            for a language whose class names collide with another's (e.g. TOML's ``Space``)
     """
     # Register by Java type name (for _new_obj factory lookup)
-    register_receive_codec(java_type, codec, factory)
+    register_receive_codec(java_type, codec, factory, source_file_type)
     # Register by Python class name (for _get_codec lookup)
     python_name = python_class.__qualname__
-    register_receive_codec(python_name, codec, factory)
+    register_receive_codec(python_name, codec, factory, source_file_type)
     # Register reverse mapping for sender
     _python_to_java_type[python_class] = java_type
     # Register send codec if provided

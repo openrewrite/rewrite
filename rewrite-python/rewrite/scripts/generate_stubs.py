@@ -288,7 +288,7 @@ def is_abc_base_class(node: ast.ClassDef) -> bool:
     # Known base types that indicate this is an ABC or generic class
     known_bases = {
         'J', 'Statement', 'Expression', 'TypedTree', 'NameTree', 'TypeTree', 'Loop', 'MethodCall',
-        'ABC', 'Py', 'PyStatement', 'PyExpression',
+        'ABC', 'Py', 'PyStatement', 'PyExpression', 'Toml',
         'Tree', 'SourceFile', 'Generic'  # For rewrite/tree.py classes
     }
 
