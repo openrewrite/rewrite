@@ -636,11 +636,51 @@ public class RewriteRpcServer
     /// the producer until the remote takes the previous page, which bounds what is held to two
     /// pages and lets the remote fetch one while this side fills the next.
     /// </summary>
+    /// <summary>
+    /// The remote failed to receive an object it had asked for. Forgets that it holds the object
+    /// and the refs assigned while sending it, so that the next transfer sends both whole.
+    /// </summary>
+    [JsonRpcMethod("AbortGetObject", UseSingleObjectParameterDeserialization = true)]
+    public async Task<bool> AbortGetObject(AbortGetObjectRequest request)
+    {
+        if (_inProgressGetObject.TryRemove(request.Id, out var pages))
+        {
+            try
+            {
+                // the traversal is waiting to hand over pages nobody will ask for
+                await foreach (var _ in pages.Value.Reader.ReadAllAsync())
+                {
+                }
+            }
+            catch (Exception)
+            {
+                // a transfer that failed by itself has nothing left to hand over
+            }
+        }
+
+        _remoteObjects.TryRemove(request.Id, out _);
+        if (_lastTransfer is { } last && last.Id == request.Id)
+        {
+            _localRefs.RollbackTo(last.RefHighWater);
+        }
+        else
+        {
+            // not the latest transfer, so which refs it assigned is no longer known
+            _localRefs.Clear();
+        }
+        return true;
+    }
+
+    private sealed record Transfer(string Id, int RefHighWater);
+
+    private volatile Transfer? _lastTransfer;
+
     private Channel<List<RpcObjectData>> StartTransfer(string id, object after, string? sourceFileType)
     {
         var pages = Channel.CreateBounded<List<RpcObjectData>>(1);
         var before = _remoteObjects.GetValueOrDefault(id);
         var refHighWater = _localRefs.HighWater;
+        _lastTransfer = new Transfer(id, refHighWater);
 
         // On the thread pool because the drain blocks whenever the channel is full, and the
         // thread that has to drain it is the one serving the next GetObject.
@@ -712,14 +752,39 @@ public class RewriteRpcServer
             if (tree is OpenRewrite.Xml.Xml)
                 new OpenRewrite.Xml.XmlPrinter<int>().Visit((OpenRewrite.Xml.Xml)tree, capture);
             else
-                new CSharpPrinter<int>().Visit(tree, capture);
-            return capture.ToString();
+                new CSharpPrinter<int>().Visit(tree, capture, await GetCursorFromRemoteAsync(request.CursorIds, request.SourceFileType));
+            var printed = capture.ToString();
+            // Java prints a source file that was read with a byte order mark with the mark restored
+            return tree is CompilationUnit { CharsetBomMarked: true } && printed.Length > 0 && printed[0] != '\uFEFF'
+                ? '\uFEFF' + printed
+                : printed;
         }
         catch (Exception ex)
         {
             throw new InvalidOperationException(
                 $"Print: Failed to print tree {request.TreeId} (type: {request.SourceFileType}, treeType: {tree.GetType().Name}): {ex.Message}\n{ex.StackTrace}", ex);
         }
+    }
+
+    private Task<Cursor> GetCursorFromRemoteAsync(List<string>? cursorIds, string? sourceFileType) =>
+        RebuildCursorAsync(cursorIds, async id => await GetObjectFromRemoteAsync(id, sourceFileType));
+
+    /// <summary>
+    /// Rebuilds the cursor a tree is printed or visited under from the ids of its ancestors,
+    /// innermost first.
+    /// </summary>
+    internal static async Task<Cursor> RebuildCursorAsync(IReadOnlyList<string>? cursorIds, Func<string, Task<object>> fetch)
+    {
+        var cursor = new Cursor();
+        for (var i = (cursorIds?.Count ?? 0) - 1; i >= 0; i--)
+        {
+            // only a tree is keyed by its own id; padding and the root have no codec to arrive by
+            if (Guid.TryParse(cursorIds![i], out _))
+            {
+                cursor = new Cursor(cursor, await fetch(cursorIds[i]));
+            }
+        }
+        return cursor;
     }
 
     /// <summary>
@@ -739,13 +804,16 @@ public class RewriteRpcServer
         // The following page is requested before this one is handed to the queue, so the
         // remote serializes it while this side deserializes what it already has.
         Task<List<RpcObjectData>>? nextPage = null;
+        var awaitingPage = false;
         var q = new RpcReceiveQueue(
             _remoteRefs,
             () =>
             {
                 var pending = nextPage;
                 nextPage = null;
+                awaitingPage = true;
                 var page = (pending ?? RequestPage()).GetAwaiter().GetResult();
+                awaitingPage = false;
                 // A page ending in END_OF_OBJECT has no successor; the remote drops its
                 // transfer state when it sends that marker, so asking again would restart
                 // the transfer rather than return nothing.
@@ -793,6 +861,7 @@ public class RewriteRpcServer
             // Reset our tracking of the remote state so the next interaction
             // forces a full object sync (ADD) instead of a delta (CHANGE).
             _remoteObjects.TryRemove(id, out _);
+            q.RollBackRefs();
             var pending = nextPage;
             nextPage = null;
             if (pending != null)
@@ -803,6 +872,20 @@ public class RewriteRpcServer
                 try
                 {
                     pending.GetAwaiter().GetResult();
+                }
+                catch
+                {
+                    // the original failure is the one worth reporting
+                }
+            }
+            if (!awaitingPage)
+            {
+                // The failure is this side's, so the remote still counts the object and the refs it
+                // sent with it as received. A remote without the method is no worse off than before.
+                try
+                {
+                    await _jsonRpc!.InvokeWithParameterObjectAsync<bool>(
+                        "AbortGetObject", new AbortGetObjectRequest { Id = id });
                 }
                 catch
                 {
@@ -1673,6 +1756,7 @@ public class RewriteRpcServer
         // Fetch tree from the remote (Java) process
         CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
+        var cursor = await GetCursorFromRemoteAsync(request.CursorIds, request.SourceFileType);
 
         if (phase != "scan" && phase != "edit")
         {
@@ -1692,7 +1776,7 @@ public class RewriteRpcServer
             visitor = recipe.GetVisitor();
         }
 
-        var result = visitor.Visit(tree, ctx);
+        var result = visitor.Visit(tree, ctx, cursor);
 
         var modified = !ReferenceEquals(tree, result);
         if (result == null)
@@ -1728,6 +1812,7 @@ public class RewriteRpcServer
         var sw = Stopwatch.StartNew();
         CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
+        var cursor = await GetCursorFromRemoteAsync(request.CursorIds, request.SourceFileType);
         var fetchMs = sw.ElapsedMilliseconds;
 
         var ctx = GetOrCreateExecutionContext(request.PId);
@@ -1763,7 +1848,7 @@ public class RewriteRpcServer
             }
 
             var visitStart = sw.ElapsedMilliseconds;
-            var result = visitor.Visit(tree, ctx);
+            var result = visitor.Visit(tree, ctx, cursor);
             visitMs += sw.ElapsedMilliseconds - visitStart;
 
             var modified = !ReferenceEquals(tree, result);
@@ -2352,6 +2437,11 @@ public class GetObjectRequest
     public string? SourceFileType { get; set; }
 }
 
+public class AbortGetObjectRequest
+{
+    public string Id { get; set; } = "";
+}
+
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(Csv), "CSV")]
 [JsonDerivedType(typeof(NoOp), "NOOP")]
@@ -2398,6 +2488,8 @@ public class PrintRequest
     public string? SourcePath { get; set; }
     public string? SourceFileType { get; set; }
     public string? MarkerPrinter { get; set; }
+    [JsonPropertyName("cursor")]
+    public List<string>? CursorIds { get; set; }
 }
 
 public class EvictRequest

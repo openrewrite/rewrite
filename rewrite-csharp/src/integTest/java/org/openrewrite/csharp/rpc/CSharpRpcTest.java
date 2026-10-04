@@ -461,8 +461,8 @@ class CSharpRpcTest implements RewriteTest {
                 null, null, null);
         RecipeMarketplace marketplace = CSharpRewriteRpc.getOrStart().getMarketplace(bundle);
         assertThat(marketplace).isNotNull();
-        // Core C# recipes are registered via CoreCSharpRecipeActivator
-        assertThat(marketplace.getAllRecipes()).isNotEmpty();
+        // the tool ships no recipes of its own, so there are none until a bundle is installed
+        assertThat(marketplace.getAllRecipes()).isEmpty();
     }
 
     // ---- Type attribution tests ----
