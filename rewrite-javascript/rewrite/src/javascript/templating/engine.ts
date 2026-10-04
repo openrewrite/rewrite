@@ -845,9 +845,14 @@ export class TemplateApplier {
             return {...result, id: resultToUse.id};
         }
 
-        // Apply auto-formatting to the result
+        // A recipe can apply a template to a child while its cursor still points at the
+        // owning node (for example, a JSX attribute's literal value). Keep that owner
+        // in the formatting path; dropping it loses the attribute's line indentation.
+        const owner = this.cursor?.value;
+        const parent = isTree(owner) && owner.id !== originalTree.id &&
+            (await treeIds(owner as J)).has(originalTree.id) ? this.cursor : this.cursor?.parent;
         const formatted =
-            await maybeAutoFormat(originalTree, result, null, undefined, this.cursor?.parent);
+            await maybeAutoFormat(originalTree, result, null, undefined, parent);
 
         // Restore the original ID
         return {...formatted, id: resultToUse.id};
