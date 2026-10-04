@@ -39,6 +39,7 @@
  */
 import {describe, type SuiteAPI, test as base} from "vitest";
 import {findTestClasspath, JavaRpcTestServer} from "../rpc/java-rpc-client";
+import {RewriteRpc} from "../rpc/rewrite-rpc";
 
 export {findTestClasspath, JavaRpcTestServer} from "../rpc/java-rpc-client";
 export type {JavaRpcOptions} from "../rpc/java-rpc-client";
@@ -76,6 +77,8 @@ export const testJavaRpc = base.extend<JavaRpcFixtures>({
         {scope: "worker"},
     ],
     javaRpc: async ({_javaRpcServer}, use) => {
+        // any RewriteRpc constructed in this worker since has replaced it as the active connection
+        RewriteRpc.set(_javaRpcServer.rpc);
         await _javaRpcServer.reset();
         await use(_javaRpcServer);
     },
