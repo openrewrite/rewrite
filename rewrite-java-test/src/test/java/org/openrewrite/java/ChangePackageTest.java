@@ -2096,6 +2096,30 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void changePackageInYamlOfHyphenatedProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.springframework.boot.actuate.autoconfigure.security.servlet",
+            "org.springframework.boot.security.autoconfigure.actuate.web.servlet", null)),
+          yaml(
+            """
+              spring:
+                autoconfigure:
+                  exclude:
+                    - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
+              """,
+            """
+              spring:
+                autoconfigure:
+                  exclude:
+                    - org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration
+              """,
+            spec -> spec.path("application-disable-security.yml")
+          )
+        );
+    }
+
+    @Test
     void innerType() {
         rewriteRun(
           spec -> spec.recipes(
