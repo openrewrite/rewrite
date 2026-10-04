@@ -37,6 +37,10 @@ import {
 import {J} from "../../src/java";
 import {withDir} from "tmp-promise";
 import {PrepareRecipe, PrepareRecipeResponse} from "../../src/rpc/request/prepare-recipe";
+import {Print} from "../../src/rpc/request/print";
+import {RpcObjectState} from "../../src/rpc/queue";
+import * as fs from "fs";
+import * as path from "path";
 
 describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
@@ -100,6 +104,35 @@ describe("Rewrite RPC", () => {
         }
     ));
 
+    test("print subtrees whose text depends on what encloses them", () => spec.rewriteRun(
+        {
+            //language=typescript
+            ...typescript("const literal = { a: 1, b: 2 }, cast = <string>literal, first = items?.[0], called = a?.b();"),
+            beforeRecipe: async (cu: JS.CompilationUnit) => {
+                const printed: string[] = [];
+                const withoutCursor: string[] = [];
+                await (new class extends JavaScriptVisitor<any> {
+                    protected async preVisit(tree: J, _: any): Promise<J | undefined> {
+                        const parent = this.cursor.parentTree()?.value?.kind;
+                        if (tree.kind === J.Kind.Block && parent === J.Kind.NewClass ||
+                            tree.kind === J.Kind.ControlParentheses && parent === J.Kind.TypeCast ||
+                            tree.kind === J.Kind.Identifier && (parent === J.Kind.ArrayAccess || parent === J.Kind.MethodInvocation) &&
+                            tree.markers.markers.length > 0) {
+                            printed.push(await client.print(tree, this.cursor.parent!));
+                            client.localObjects.set(tree.id.toString(), tree);
+                            withoutCursor.push(await client.connection.sendRequest(
+                                new rpc.RequestType<Print, string, Error>("Print"), new Print(tree.id, cu.kind)));
+                        }
+                        return tree;
+                    }
+                }).visit(cu, 0);
+                expect(printed).toEqual(["{ a: 1, b: 2 }", "<string>", "items?.", "a"]);
+                expect(withoutCursor).toEqual(["{ a: 1 b: 2 }", "(string)", "items?", "a?"]);
+                return cu;
+            }
+        }
+    ));
+
     test("parse", async () => {
         const sourceFile = (await client.parse([{
             text: "console.info('hello',)",
@@ -108,6 +141,34 @@ describe("Rewrite RPC", () => {
         expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
         expect(sourceFile.sourcePath).toEqual("hello.js");
         return sourceFile;
+    });
+
+    test("parse an input that names a file without giving its text", async () => {
+        await withDir(async dir => {
+            fs.writeFileSync(path.join(dir.path, "hello.ts"), "console.info('hello')");
+            const sourceFile = (await client.parse(
+                [{text: null, sourcePath: path.join(dir.path, "hello.ts")} as any],
+                JS.Kind.CompilationUnit, dir.path))[0];
+            expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
+            expect(sourceFile.sourcePath).toEqual("hello.ts");
+            expect(await client.print(sourceFile)).toEqual("console.info('hello')");
+        }, {unsafeCleanup: true});
+    });
+
+    test("a receive failure surfaces when the peer cannot roll it back, and the refs it sent are kept", async () => {
+        const toPeer = new PassThrough();
+        const fromPeer = new PassThrough();
+        // a peer that predates AbortGetObject answers it with "method not found", and still counts ref 3 as sent
+        const peer = rpc.createMessageConnection(new rpc.StreamMessageReader(toPeer), new rpc.StreamMessageWriter(fromPeer));
+        peer.onRequest("GetObject", (request: { id: string }) => request.id === "1" ?
+            [{state: RpcObjectState.ADD, value: "shared", ref: 3}, {state: RpcObjectState.ADD, ref: 7}, {state: RpcObjectState.END_OF_OBJECT}] :
+            [{state: RpcObjectState.ADD, ref: 3}, {state: RpcObjectState.END_OF_OBJECT}]);
+        peer.listen();
+
+        const receiver = new RewriteRpc(rpc.createMessageConnection(
+            new rpc.StreamMessageReader(fromPeer), new rpc.StreamMessageWriter(toPeer)), {});
+        await expect(receiver.getObject("1")).rejects.toThrow("Expected END_OF_OBJECT but got: ADD");
+        expect(await receiver.getObject("2")).toEqual("shared");
     });
 
     test("parse package.json with PackageJsonParser", async () => {

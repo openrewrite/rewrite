@@ -18,6 +18,11 @@ import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../../reference";
 import {extractSourcePath, withMetrics} from "./metrics";
 
+export class AbortGetObject {
+    constructor(readonly id: string) {
+    }
+}
+
 export class GetObject {
     constructor(private readonly id: string,
                 private readonly sourceFileType?: string) {
@@ -33,6 +38,24 @@ export class GetObject {
         metricsCsv?: string,
     ): void {
         const pendingData = new Map<string, { data: (RpcObjectData | undefined)[], offset: number }>();
+        let latestTransfer: { id: string, refCount: number } | undefined;
+
+        // The receiver could not read a transfer to its end and has dropped what it took from it.
+        connection.onRequest(
+            new rpc.RequestType<AbortGetObject, boolean, Error>("AbortGetObject"),
+            request => {
+                pendingData.delete(request.id);
+                remoteObjects.delete(request.id);
+                if (latestTransfer?.id === request.id) {
+                    localRefs.rollbackTo(latestTransfer.refCount);
+                } else {
+                    // which refs that transfer assigned is no longer known; everything goes out whole again
+                    localRefs.clear();
+                }
+                latestTransfer = undefined;
+                return true;
+            }
+        );
 
         connection.onRequest(
             new rpc.RequestType<GetObject, any, Error>("GetObject"),
@@ -75,6 +98,7 @@ export class GetObject {
                             };
                             pendingData.set(objId, pending);
                             remoteObjects.set(objId, after);
+                            latestTransfer = {id: objId, refCount: savedRefCount};
                         } catch (e) {
                             remoteObjects.delete(objId);
                             localRefs.rollbackTo(savedRefCount);

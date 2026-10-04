@@ -669,4 +669,26 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
             expect(matchCount).toBe(3);
         });
     });
+
+    describe('function decorators', () => {
+        test('a decorator written after the modifiers takes part in the match', async () => {
+            const pat = pattern`export function f() {}`;
+
+            const matches: boolean[] = [];
+
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodDeclaration(method: J.MethodDeclaration, _p: any): Promise<J | undefined> {
+                    matches.push(!!await pat.match(method, this.cursor));
+                    return method;
+                }
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript('export function f() {}\nexport @dec function f() {}')
+            );
+
+            expect(matches).toEqual([true, false]);
+        });
+    });
 });
