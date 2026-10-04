@@ -368,6 +368,12 @@ class PythonVisitor(JavaVisitor[P]):
         value = value.padding.replace(
             expression=self.visit_right_padded(value.padding.expression, p)
         )
+        value = value.padding.replace(
+            debug=self.visit_right_padded(value.padding.debug, p)
+        )
+        value = value.padding.replace(
+            conversion=self.visit_right_padded(value.padding.conversion, p)
+        )
         if value.format is not None:
             value = value.replace(
                 format=self.visit_and_cast(value.format, Expression, p)

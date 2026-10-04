@@ -18,6 +18,7 @@ and the bare-keyword shortcuts that parso emits for ``pass`` / ``break`` etc."""
 import pytest
 
 from rewrite.java import tree as j
+from rewrite.java.support_types import Statement
 from rewrite.python import tree as py
 from rewrite.python._py2_parser_visitor import Py2ParserVisitor
 
@@ -135,3 +136,16 @@ class TestSimpleStmtRegressions:
         cu = Py2ParserVisitor(src, "<test>", "2.7").parse()
         stmt = cu.statements[0]
         assert list(_collect_placeholders(stmt)) == [], src
+
+
+class TestExpressionStatements:
+    @pytest.mark.parametrize("src", [
+        '"""doc"""\n', "x\n", "1\n", "a[0]\n", "a + b\n", "(a)\n", "[1]\n", "`a`\n",
+    ])
+    def test_expression_is_wrapped_as_a_statement(self, src):
+        # the host's model takes nothing but statements where a statement goes
+        assert isinstance(_stmt(src), Statement)
+
+    def test_docstring_in_a_block(self):
+        body = _stmt('def f():\n    """doc"""\n    x\n').body.statements
+        assert all(isinstance(stmt, Statement) for stmt in body)

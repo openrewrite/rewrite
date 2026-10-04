@@ -500,13 +500,15 @@ class FormattedString(Py, Expression, TypedTree):
             def expression(self) -> JRightPadded[Expression]: ...
             @property
             def debug(self) -> Optional[JRightPadded[bool]]: ...
+            @property
+            def conversion(self) -> Optional[JRightPadded[FormattedString.Value.Conversion]]: ...
 
         _id: UUID
         _prefix: Space
         _markers: Markers
         _expression: JRightPadded[Expression]
         _debug: Optional[JRightPadded[bool]]
-        _conversion: Optional[Conversion]
+        _conversion: Optional[JRightPadded[Conversion]]
         _format: Optional[Expression]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 

@@ -15,6 +15,12 @@
  */
 package org.openrewrite.python.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -26,13 +32,13 @@ import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.python.PythonPrinter;
 import org.openrewrite.python.PythonVisitor;
-import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.python.service.PythonAutoFormatService;
 import org.openrewrite.python.service.PythonImportService;
-import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
+import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -537,16 +543,7 @@ public interface Py extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
-                @Override
-                public Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
-                    PythonRewriteRpc rpc = PythonRewriteRpc.getOrStart();
-                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                    stopAfterPreVisit();
-                    return tree;
-                }
-            };
+            return new PythonPrinter<>();
         }
 
         @Override
@@ -1177,12 +1174,25 @@ public interface Py extends J {
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false)
-        @RequiredArgsConstructor
         @AllArgsConstructor(access = AccessLevel.PRIVATE)
         public static final class Value implements Py, Expression, TypedTree {
 
             public enum Conversion {
                 STR, REPR, ASCII
+            }
+
+            @JsonCreator
+            public Value(UUID id, Space prefix, Markers markers, JRightPadded<Expression> expression,
+                         @Nullable JRightPadded<Boolean> debug,
+                         @JsonDeserialize(using = ConversionDeserializer.class) @Nullable JRightPadded<Conversion> conversion,
+                         @Nullable Expression format) {
+                this.id = id;
+                this.prefix = prefix;
+                this.markers = markers;
+                this.expression = expression;
+                this.debug = debug;
+                this.conversion = conversion;
+                this.format = format;
             }
 
             @Nullable
@@ -1224,9 +1234,15 @@ public interface Py extends J {
             }
 
             @Nullable
-            @Getter
-            @With
-            Conversion conversion;
+            JRightPadded<Conversion> conversion;
+
+            public @Nullable Conversion getConversion() {
+                return conversion == null ? null : conversion.getElement();
+            }
+
+            public Value withConversion(@Nullable Conversion conversion) {
+                return getPadding().withConversion(JRightPadded.withElement(this.conversion, conversion));
+            }
 
             @Nullable
             @Getter
@@ -1288,6 +1304,25 @@ public interface Py extends J {
 
                 public Value withDebug(@Nullable JRightPadded<Boolean> debug) {
                     return t.debug == debug ? t : new Value(t.id, t.prefix, t.markers, t.expression, debug, t.conversion, t.format);
+                }
+
+                public @Nullable JRightPadded<Conversion> getConversion() {
+                    return t.conversion;
+                }
+
+                public Value withConversion(@Nullable JRightPadded<Conversion> conversion) {
+                    return t.conversion == conversion ? t : new Value(t.id, t.prefix, t.markers, t.expression, t.debug, conversion, t.format);
+                }
+            }
+
+            static class ConversionDeserializer extends JsonDeserializer<JRightPadded<Conversion>> {
+                @Override
+                public JRightPadded<Conversion> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+                    if (p.hasToken(JsonToken.VALUE_STRING)) {
+                        // an LST written before the conversion kept the space after it
+                        return JRightPadded.build(Conversion.valueOf(p.getText()));
+                    }
+                    return ctxt.readValue(p, ctxt.getTypeFactory().constructParametricType(JRightPadded.class, Conversion.class));
                 }
             }
         }

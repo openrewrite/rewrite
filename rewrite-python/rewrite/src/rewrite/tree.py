@@ -217,7 +217,9 @@ class PrintOutputCapture(Generic[P]):
 @dataclass
 class _DefaultMarkerPrinter(PrintOutputCapture.MarkerPrinter):
     def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
-        return marker.print(cursor, comment_wrapper, False)
+        from .markers import Marker
+        # a marker of a type this side has no class for is held as a plain mapping
+        return marker.print(cursor, comment_wrapper, False) if isinstance(marker, Marker) else ""
 
 
 @dataclass
@@ -234,7 +236,8 @@ class _SearchMarkersOnlyPrinter(PrintOutputCapture.MarkerPrinter):
 class _VerboseMarkerPrinter(PrintOutputCapture.MarkerPrinter):
     """Prints all markers with verbose=True (shows detail instead of message)."""
     def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
-        return marker.print(cursor, comment_wrapper, True)
+        from .markers import Marker
+        return marker.print(cursor, comment_wrapper, True) if isinstance(marker, Marker) else ""
 
 
 @dataclass

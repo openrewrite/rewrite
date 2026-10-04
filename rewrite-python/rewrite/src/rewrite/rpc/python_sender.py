@@ -7,10 +7,12 @@ and type-specific visit methods handling only additional fields.
 from typing import Any, TYPE_CHECKING
 
 from rewrite import Markers
+from rewrite.execution import ExecutionContext
 from rewrite.utils import id_to_int, id_to_str
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
 from rewrite.parser import ParseError
 from rewrite.python import CompilationUnit
+from rewrite.python.support_types import PyComment
 from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
@@ -49,6 +51,9 @@ class PythonRpcSender:
         if before is None:
             # ADD for new object
             value_type = get_java_type_name(type(after)) if hasattr(after, '__class__') else None
+            if value_type is None and isinstance(after, ExecutionContext):
+                # the host builds a context from its type alone, and knows this one
+                value_type = 'org.openrewrite.InMemoryExecutionContext'
             q.put({'state': RpcObjectState.ADD, 'valueType': value_type})
             q._before = None
             self._visit(after, q)
@@ -265,7 +270,7 @@ class PythonRpcSender:
     def _visit_formatted_string_value(self, v: FormattedString.Value, q: 'RpcSendQueue') -> None:
         q.get_and_send(v, lambda x: x.padding.expression, lambda el: self._visit_right_padded(el, q))
         q.get_and_send(v, lambda x: x.padding.debug, lambda el: self._visit_right_padded(el, q))
-        q.get_and_send(v, lambda x: x.conversion)
+        q.get_and_send(v, lambda x: x.padding.conversion, lambda el: self._visit_right_padded(el, q))
         q.get_and_send(v, lambda x: x.format, lambda el: self._visit(el, q))
 
     def _visit_pass(self, pass_: Pass, q: 'RpcSendQueue') -> None:
@@ -377,7 +382,7 @@ class PythonRpcSender:
             AssignmentOperation, Unary, Ternary, Lambda, Empty, Throw,
             Assert, Break, Continue, WhileLoop, ForEachLoop, Switch, Case, Annotation, Import,
             Binary, Parentheses, ControlParentheses, NewArray, Modifier, Yield,
-            ParameterizedType, TypeParameter, TypeParameters
+            ParameterizedType, TypeParameter, TypeParameters, Unknown
         )
 
         # For Java types, we need to handle their specific fields
@@ -471,6 +476,10 @@ class PythonRpcSender:
             self._visit_j_type_parameter(j, q)
         elif isinstance(j, TypeParameters):
             self._visit_j_type_parameters(j, q)
+        elif isinstance(j, Unknown):
+            q.get_and_send(j, lambda x: x.source, lambda el: self._visit(el, q))
+        elif isinstance(j, Unknown.Source):
+            q.get_and_send(j, lambda x: x.text)
 
     def _visit_identifier(self, ident, q: 'RpcSendQueue') -> None:
         # Java Identifier sends: annotations (list), simpleName, type (ref), fieldType (ref)
@@ -1041,6 +1050,8 @@ class PythonRpcSender:
         q.get_and_send(comment, lambda x: x.text)
         q.get_and_send(comment, lambda x: x.suffix)
         q.get_and_send_as_ref(comment, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
+        if isinstance(comment, PyComment):
+            q.get_and_send(comment, lambda x: x.aligned_to_indent)
 
     def _visit_right_padded(self, rp: JRightPadded, q: 'RpcSendQueue') -> None:
         """Visit a JRightPadded wrapper."""

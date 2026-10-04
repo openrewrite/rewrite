@@ -2655,6 +2655,7 @@ def test_field_specifier_assignment_takes_declared_type():
             q: int = field(default=1)
             r: "int" = field(default=2)
             s: Final = field(default=3)
+            t: Missing = field(default=4)
     '''
     cu, tmpdir, client = _parse_with_types({'m.py': src})
     try:
@@ -2679,6 +2680,10 @@ def test_field_specifier_assignment_takes_declared_type():
         bare_final = found[2]
         assert isinstance(bare_final.type, JavaType.Unknown)
         assert isinstance(bare_final.variable.expression.type, JavaType.Unknown)
+
+        # a name that resolves to nothing is unknown too, and has no qualified name to compare
+        unresolved = found[3]
+        assert isinstance(unresolved.type, JavaType.Unknown)
     finally:
         _cleanup_parse(tmpdir, client)
 
