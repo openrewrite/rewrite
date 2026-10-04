@@ -30,7 +30,7 @@ import org.openrewrite.marker.Markers;
  * Java-side visitor for the {@code go.mod} LST, analogous to {@link GolangVisitor}
  * for {@code .go} sources and {@code HclVisitor} for HCL. It traverses the bespoke
  * {@link GoMod} node set (directives, blocks, values) so recipes can inspect and
- * rewrite go.mod entirely in Java; printing still goes through the Go RPC server.
+ * rewrite go.mod entirely in Java.
  */
 @SuppressWarnings("unused")
 public class GoModVisitor<P> extends TreeVisitor<GoModTree, P> {

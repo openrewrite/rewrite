@@ -55,13 +55,25 @@ func (s *GoSender) Visit(t java.Tree, p any) java.Tree {
 		s.sendParseError(pe, p.(*SendQueue))
 		return pe
 	}
-	if gm, ok := t.(*golang.GoMod); ok {
-		sendGoMod(gm, p.(*SendQueue))
-		return gm
-	}
-	if gs, ok := t.(*golang.GoSum); ok {
-		sendGoSum(gs, p.(*SendQueue))
-		return gs
+	switch n := t.(type) {
+	case *golang.GoMod:
+		sendGoMod(n, p.(*SendQueue))
+		return n
+	case *golang.GoModDirective:
+		sendGoModDirective(n, p.(*SendQueue))
+		return n
+	case *golang.GoModBlock:
+		sendGoModBlock(n, p.(*SendQueue))
+		return n
+	case *golang.GoModValue:
+		sendGoModValue(n, p.(*SendQueue))
+		return n
+	case *golang.GoSum:
+		sendGoSum(n, p.(*SendQueue))
+		return n
+	case *golang.GoSumLine:
+		sendGoSumLine(n, p.(*SendQueue))
+		return n
 	}
 	return s.GoVisitor.Visit(t, p)
 }

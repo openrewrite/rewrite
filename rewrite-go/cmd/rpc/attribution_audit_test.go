@@ -118,11 +118,7 @@ func packageAliasesOf(cu *golang.CompilationUnit) map[string]bool {
 			aliases[e.Alias.Element.Name] = true
 			continue
 		}
-		lit, ok := e.Qualid.(*java.Literal)
-		if !ok {
-			continue
-		}
-		path := strings.Trim(lit.Source, "`\"")
+		path := e.Path()
 		// A package's name usually matches the last path segment; a
 		// `/v2` suffix names the major version, not the package.
 		seg := path[strings.LastIndexByte(path, '/')+1:]

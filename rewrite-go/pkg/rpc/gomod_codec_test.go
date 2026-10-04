@@ -82,3 +82,27 @@ func TestGoModRPCPreservesResolutionMarker(t *testing.T) {
 	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries())
 	require.False(t, found.ModulePath != "example.com/foo" || len(found.Requires) != 1, "marker fields not preserved")
 }
+
+// A peer that prints or visits part of a go.mod names that node by id, so the
+// node travels without the file around it.
+func TestGoModNodesRoundTripOnTheirOwn(t *testing.T) {
+	gm, err := parser.ParseGoModFile("go.mod",
+		"module example.com/foo\n\nrequire (\n\tgithub.com/a/b v1.0.0 // indirect\n)\n")
+	require.NoError(t, err)
+	directive := gm.Statements[0].Element.(*golang.GoModDirective)
+	block := gm.Statements[1].Element.(*golang.GoModBlock)
+
+	cases := []struct {
+		node, seed java.Tree
+		printed    string
+	}{
+		{directive, &golang.GoModDirective{}, "module example.com/foo"},
+		{block, &golang.GoModBlock{}, "\nrequire (\n\tgithub.com/a/b v1.0.0 // indirect\n)"},
+		{directive.Values[0], &golang.GoModValue{}, " example.com/foo"},
+	}
+	for _, c := range cases {
+		got, ok := roundTripNode(t, c.node, c.seed).(java.Tree)
+		require.Truef(t, ok, "%T did not come back as a tree", c.node)
+		require.Equal(t, c.printed, printer.PrintWithCursor(got, nil, nil))
+	}
+}

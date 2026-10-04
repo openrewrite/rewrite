@@ -23,14 +23,12 @@ import org.openrewrite.Cursor;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.golang.GoSumPrinter;
 import org.openrewrite.golang.GoSumVisitor;
-import org.openrewrite.golang.rpc.GoRewriteRpc;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.request.Print;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -84,15 +82,7 @@ public class GoSum implements SourceFile, GoSumTree {
 
     @Override
     public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-        return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
-            @Override
-            public @Nullable Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
-                GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
-                p.append(rpc.print(tree, cursor, Print.MarkerPrinter.from(p.getMarkerPrinter())));
-                stopAfterPreVisit();
-                return tree;
-            }
-        };
+        return new GoSumPrinter<>();
     }
 
     // One go.sum entry: `module version[/go.mod] h1:hash`.

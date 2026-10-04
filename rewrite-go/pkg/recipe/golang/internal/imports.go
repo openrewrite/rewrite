@@ -46,27 +46,9 @@ const (
 	Local
 )
 
-// Returns "" when Qualid isn't a Literal (defensive — shouldn't happen
-// for well-formed Go source).
-//
-// The Go parser stores the raw quoted source in Literal.Value (and
-// .Source) — `"fmt"` not `fmt` — so this helper always strips the
-// surrounding quote pair before returning.
+// ImportPath returns the path an import names, without its quotes.
 func ImportPath(imp *java.Import) string {
-	if imp == nil {
-		return ""
-	}
-	lit, ok := imp.Qualid.(*java.Literal)
-	if !ok || lit == nil {
-		return ""
-	}
-	raw := ""
-	if s, ok := lit.Value.(string); ok {
-		raw = s
-	} else {
-		raw = lit.Source
-	}
-	return strings.Trim(raw, `"`+"`")
+	return imp.Path()
 }
 
 // PackageName returns the qualifier used to reference the import: its alias,
@@ -413,7 +395,7 @@ func pkgPathOf(fqn string) string {
 // `<Container.Before>import<element traversal>`. To produce
 // `\n\nimport "fmt"` between `package main` and the first statement,
 // the new Container's Before is `"\n\n"`, the Import's Prefix is empty,
-// and the Qualid Literal carries a leading space (printed as the space
+// and the Qualid carries a leading space (printed as the space
 // between `import` and the path string). The first Statement's existing
 // Prefix supplies the trailing blank line before `func`.
 func AddToBlock(cu *golang.CompilationUnit, imp *java.Import, modulePath string) *golang.CompilationUnit {
@@ -426,18 +408,14 @@ func AddToBlock(cu *golang.CompilationUnit, imp *java.Import, modulePath string)
 			Before: java.MakeSpace(nil, "\n\n"),
 		}
 		// Wire the leading-space convention onto the new import: the
-		// space between `import` and the path lives on the Qualid
-		// literal's Prefix for regular imports. For aliased imports, the
+		// space between `import` and the path lives on the Qualid's
+		// Prefix for regular imports. For aliased imports, the
 		// space after `import` lives on Import.Prefix and the space between
-		// alias and path lives on the literal.
+		// alias and path lives on the Qualid.
 		if imp.Alias != nil {
 			imp.Prefix = java.MakeSpace(nil, " ")
 		} else {
-			if lit, ok := imp.Qualid.(*java.Literal); ok {
-				cloned := *lit
-				cloned.Prefix = java.MakeSpace(nil, " ")
-				imp.Qualid = &cloned
-			}
+			imp.Qualid = withPrefix(imp.Qualid, java.MakeSpace(nil, " "))
 		}
 	}
 	imps := *c.Imports
@@ -524,10 +502,8 @@ func promoteToGrouped(imps *java.Container[*java.Import], elements []java.RightP
 	// indented onto its own line: imp.Prefix="\n\t", Qualid.Prefix="".
 	imp := *rp.Element
 	imp.Prefix = java.MakeSpace(nil, "\n\t")
-	if lit, ok := imp.Qualid.(*java.Literal); ok && imp.Alias == nil {
-		cloned := *lit
-		cloned.Prefix = java.EmptySpace
-		imp.Qualid = &cloned
+	if imp.Alias == nil {
+		imp.Qualid = withPrefix(imp.Qualid, java.EmptySpace)
 	}
 	if block := java.FindMarker[golang.ImportBlock](imp.Markers); block != nil {
 		block.Grouped = true
@@ -731,22 +707,31 @@ func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, 
 	return out
 }
 
+func withPrefix(qualid *java.FieldAccess, prefix java.Space) *java.FieldAccess {
+	if qualid == nil {
+		return nil
+	}
+	cloned := *qualid
+	cloned.Prefix = prefix
+	return &cloned
+}
+
 // NewImport builds an Import LST node for `import [alias] "path"`. Pass
 // alias=nil for a regular import, "_" for a blank import, "." for a dot
 // import, or any identifier name for an aliased import.
 func NewImport(path string, alias *string) *java.Import {
 	imp := &java.Import{
-		ID:     uuid.New(),
-		Qualid: &java.Literal{ID: uuid.New(), Source: `"` + path + `"`, Value: path},
+		ID: uuid.New(),
+		Qualid: &java.FieldAccess{
+			ID:     uuid.New(),
+			Target: &java.Empty{ID: uuid.New()},
+			Name:   java.LeftPadded[*java.Identifier]{Element: &java.Identifier{ID: uuid.New(), Name: path}},
+		},
 	}
 	if alias != nil {
-		if lit, ok := imp.Qualid.(*java.Literal); ok {
-			cloned := *lit
-			cloned.Prefix = java.MakeSpace(nil, " ")
-			imp.Qualid = &cloned
-		}
+		imp.Qualid.Prefix = java.MakeSpace(nil, " ")
+		// the space before an alias is the import's own prefix, as the parser has it
 		imp.Alias = &java.LeftPadded[*java.Identifier]{
-			Before: java.MakeSpace(nil, " "),
 			Element: &java.Identifier{
 				ID:   uuid.New(),
 				Name: *alias,

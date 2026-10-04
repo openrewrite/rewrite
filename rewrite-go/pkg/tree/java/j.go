@@ -16,7 +16,12 @@
 
 package java
 
-import "github.com/google/uuid"
+import (
+	"strconv"
+	"strings"
+
+	"github.com/google/uuid"
+)
 
 type Identifier struct {
 	ID          uuid.UUID
@@ -775,7 +780,7 @@ type ForLoop struct {
 	Prefix  Space
 	Markers Markers
 	Control ForControl
-	Body    *Block
+	Body    RightPadded[Statement] // the block and the space after it
 }
 
 func (*ForLoop) IsTree()      {}
@@ -800,8 +805,8 @@ func (n *ForLoop) WithMarkers(markers Markers) *ForLoop {
 	return &c
 }
 
-func (n *ForLoop) WithBody(body *Block) *ForLoop {
-	if n.Body == body {
+func (n *ForLoop) WithBody(body RightPadded[Statement]) *ForLoop {
+	if RightPaddedEqual(n.Body, body) {
 		return n
 	}
 	c := *n
@@ -848,7 +853,7 @@ type ForEachLoop struct {
 	Prefix  Space
 	Markers Markers
 	Control ForEachControl
-	Body    *Block
+	Body    RightPadded[Statement] // the block and the space after it
 }
 
 func (*ForEachLoop) IsTree()      {}
@@ -873,8 +878,8 @@ func (n *ForEachLoop) WithMarkers(markers Markers) *ForEachLoop {
 	return &c
 }
 
-func (n *ForEachLoop) WithBody(body *Block) *ForEachLoop {
-	if n.Body == body {
+func (n *ForEachLoop) WithBody(body RightPadded[Statement]) *ForEachLoop {
+	if RightPaddedEqual(n.Body, body) {
 		return n
 	}
 	c := *n
@@ -967,8 +972,8 @@ type Case struct {
 	ID          uuid.UUID
 	Prefix      Space
 	Markers     Markers
-	Expressions Container[Expression]    // empty for default case
-	Body        []RightPadded[Statement] // statements after the colon
+	Expressions Container[Expression] // empty for default case
+	Body        Container[Statement]  // Before = space before the colon; the statements after it
 }
 
 func (*Case) IsTree()      {}
@@ -1174,6 +1179,15 @@ func (n *Empty) WithPrefix(prefix Space) *Empty {
 	return &c
 }
 
+func (n *Empty) WithMarkers(markers Markers) *Empty {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 type Unary struct {
 	ID       uuid.UUID
 	Prefix   Space
@@ -1189,15 +1203,9 @@ const (
 	Negate        UnaryOperator = iota + 1 // -
 	Not                                    // !
 	BitwiseNot                             // ^
-	Deref                                  // *
-	AddressOf                              // &
-	Receive                                // <- (channel receive, Go-specific)
 	Positive                               // +
 	PostIncrement                          // ++ (postfix)
 	PostDecrement                          // -- (postfix)
-	Spread                                 // ... (variadic prefix, param declaration)
-	SpreadPostfix                          // ... (variadic postfix, call site)
-	Tilde                                  // ~ (approximate type constraint, Go-specific)
 )
 
 func (op UnaryOperator) String() string {
@@ -1208,24 +1216,12 @@ func (op UnaryOperator) String() string {
 		return "Not"
 	case BitwiseNot:
 		return "Complement"
-	case Deref:
-		return "Not" // Go-specific * dereference, mapped with marker
-	case AddressOf:
-		return "Not" // Go-specific & address-of, mapped with marker
-	case Receive:
-		return "Not" // Go-specific <- receive, mapped with marker
 	case Positive:
 		return "Positive"
 	case PostIncrement:
 		return "PostIncrement"
 	case PostDecrement:
 		return "PostDecrement"
-	case Spread:
-		return "Not" // Go-specific ..., mapped with marker
-	case SpreadPostfix:
-		return "Not" // Go-specific ..., mapped with marker
-	case Tilde:
-		return "Complement" // Go-specific ~, mapped with marker
 	default:
 		return "Negative"
 	}
@@ -1249,18 +1245,10 @@ func ParseUnaryOperator(s string) UnaryOperator {
 		return BitwiseNot
 	case "Not":
 		return Not
-	case "Deref":
-		return Deref
-	case "Spread":
-		return Spread
-	case "SpreadPostfix":
-		return SpreadPostfix
 	case "BitwiseNot":
 		return BitwiseNot
 	case "LogicalNot":
 		return Not
-	case "Receive":
-		return Receive
 	default:
 		return 0 // Unknown operator
 	}
@@ -1725,11 +1713,39 @@ type Import struct {
 	Prefix  Space
 	Markers Markers
 	Alias   *LeftPadded[*Identifier] // nil if no alias
-	Qualid  Expression               // typically *Literal for Go imports
+	// Qualid mirrors J.Import.qualid: its Target is an Empty and its Name the
+	// path as written, without the quotes of an interpreted string.
+	Qualid *FieldAccess
 }
 
 func (*Import) IsTree() {}
 func (*Import) IsJ()    {}
+
+// Path returns the import path that Qualid's name spells.
+func (n *Import) Path() string {
+	if n == nil || n.Qualid == nil || n.Qualid.Name.Element == nil {
+		return ""
+	}
+	name := n.Qualid.Name.Element.Name
+	if strings.HasPrefix(name, "`") {
+		return strings.Trim(name, "`")
+	}
+	if strings.ContainsRune(name, '\\') {
+		if path, err := strconv.Unquote(`"` + name + `"`); err == nil {
+			return path
+		}
+	}
+	return name
+}
+
+// ImportPathSource is the string literal an import path is written as: a raw
+// string is held with its backticks, an interpreted one without its quotes.
+func ImportPathSource(name string) string {
+	if name == "" || strings.HasPrefix(name, "`") {
+		return name
+	}
+	return `"` + name + `"`
+}
 
 func (n *Import) WithPrefix(prefix Space) *Import {
 	if SpaceEqual(n.Prefix, prefix) {

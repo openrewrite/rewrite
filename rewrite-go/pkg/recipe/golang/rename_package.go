@@ -153,19 +153,24 @@ func rewritePath(p, oldPath, newPath string) string {
 	return p
 }
 
-// withImportPath returns a copy of imp with its Qualid Literal source +
-// value updated to the new import path. Preserves Prefix and Markers
-// so the printer keeps the surrounding whitespace.
+// withImportPath returns a copy of imp whose Qualid names the new import
+// path. Preserves Prefix and Markers so the printer keeps the surrounding
+// whitespace.
 func withImportPath(imp *java.Import, newPath string) *java.Import {
 	if imp == nil {
 		return imp
 	}
 	c := *imp
-	if lit, ok := imp.Qualid.(*java.Literal); ok {
-		ln := *lit
-		ln.Value = newPath
-		ln.Source = `"` + newPath + `"`
-		c.Qualid = &ln
+	if qualid := imp.Qualid; qualid != nil && qualid.Name.Element != nil {
+		name := *qualid.Name.Element
+		name.Name = newPath
+		renamed := *qualid
+		if qualid.Type != nil {
+			pkg := &java.JavaTypeClass{Kind: "Class", FullyQualifiedName: newPath}
+			name.Type, renamed.Type = pkg, pkg
+		}
+		renamed.Name.Element = &name
+		c.Qualid = &renamed
 	}
 	return &c
 }
