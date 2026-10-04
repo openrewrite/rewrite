@@ -237,7 +237,7 @@ class VariableDeclarationsTest implements RewriteTest {
                       .isEqualTo("java.lang.String");
                     return multiVariable;
                 }
-            })
+            }.visit(cu, 0))
           )
         );
     }
@@ -258,14 +258,14 @@ class VariableDeclarationsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
-                    assertThat(multiVariable.getMarkers().findFirst(JavaVarKeyword.class)).isPresent();
                     TypeTree typeExpression = multiVariable.getTypeExpression();
                     assertThat(typeExpression).isNotNull();
+                    assertThat(typeExpression.getMarkers().findFirst(JavaVarKeyword.class)).isPresent();
                     assertThat(requireNonNull(TypeUtils.asFullyQualified(typeExpression.getType()))
                       .getFullyQualifiedName()).isEqualTo("java.util.Date");
                     return multiVariable;
                 }
-            })
+            }.visit(cu, 0))
           )
         );
     }
