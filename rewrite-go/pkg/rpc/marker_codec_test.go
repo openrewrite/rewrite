@@ -109,18 +109,14 @@ func TestMarkupWarnMarkerRoundTrip(t *testing.T) {
 	// given
 	message := "Go module resolution was incomplete, so unused-require removal was skipped."
 	detail := "unresolved imports: github.com/cof-primary/go-shared-libraries/gotel"
-	before := java.AddMarkupWarn(java.MakeMarkers(uuid.New(), nil), message, detail)
+	before := java.MarkupWarnDetail(java.MakeMarkers(uuid.New(), nil), message, detail)
 
 	// when
 	after := roundTripMarkers(t, before)
 
 	// then
 	require.Len(t, after.Entries(), 1, "entries")
-	got, ok := after.Entries()[0].(java.GenericMarker)
-	require.Truef(t, ok, "entry is %T, want java.GenericMarker", after.Entries()[0])
-	assert.Equal(t, "org.openrewrite.marker.Markup$Warn", got.JavaType)
-	assert.Equal(t, message, got.Data["message"])
-	assert.Equal(t, detail, got.Data["detail"])
+	assert.Equal(t, before.Entries()[0], after.Entries()[0])
 }
 
 func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
@@ -324,5 +320,40 @@ func TestTrailingCommaMarkerRoundTripKeepsComments(t *testing.T) {
 	}
 	if got.After.Comments()[0].Text != " third" || got.After.Comments()[0].Suffix != "\n\t\t" {
 		t.Errorf("After.Comments[0]: want %#v, got %#v", tc.After.Comments()[0], got.After.Comments()[0])
+	}
+}
+
+func TestChanDirMarkerRoundTrip(t *testing.T) {
+	id := uuid.MustParse("dddddddd-eeee-ffff-0000-111111111111")
+	dir := golang.ChanDirMarker{
+		Ident:  id,
+		Before: java.MakeSpace([]java.Comment{{Multiline: true, Text: " x ", Suffix: " "}}, " "),
+	}
+	before := java.MakeMarkers(uuid.New(), []java.Marker{dir})
+
+	after := roundTripMarkers(t, before)
+	require.Len(t, after.Entries(), 1, "entries")
+	got, ok := after.Entries()[0].(golang.ChanDirMarker)
+	require.Truef(t, ok, "entry is %T, want golang.ChanDirMarker", after.Entries()[0])
+	assert.Equal(t, id, got.Ident)
+	assert.Equal(t, " ", got.Before.Whitespace())
+	require.Len(t, got.Before.Comments(), 1, "Before.Comments")
+	assert.Equal(t, " x ", got.Before.Comments()[0].Text)
+	assert.Equal(t, " ", got.Before.Comments()[0].Suffix)
+}
+
+// Java tells a SearchResult with no description from one whose description is
+// empty, and prints `()` for the latter.
+func TestSearchResultWithoutDescriptionSendsNoDescription(t *testing.T) {
+	var messages []RpcObjectData
+	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
+		messages = append(messages, batch...)
+	}, NewReferenceMap())
+
+	SendMarkersCodec(java.MakeMarkers(uuid.New(), []java.Marker{java.NewSearchResult("")}), sendQ)
+	sendQ.Flush()
+
+	for _, message := range messages {
+		assert.NotEqual(t, "", message.Value)
 	}
 }

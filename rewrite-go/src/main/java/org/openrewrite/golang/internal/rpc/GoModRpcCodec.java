@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.tree.GoMod;
 import org.openrewrite.golang.tree.GoMod.GoModStatement;
+import org.openrewrite.golang.tree.GoModTree;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
@@ -34,7 +35,7 @@ import java.util.UUID;
 import static org.openrewrite.rpc.Reference.asRef;
 
 /**
- * RPC codec for the {@link GoMod} SourceFile. The field order here is the single
+ * RPC codec for a {@link GoMod} and for any one of its nodes. The field order here is the single
  * source of truth shared with the Go-side {@code sendGoMod}/{@code receiveGoMod}
  * (pkg/rpc/gomod_codec.go) — both must agree exactly or the cross-language queue
  * desyncs.
@@ -46,7 +47,7 @@ import static org.openrewrite.rpc.Reference.asRef;
  * {@code RpcCodec}, and the statement/value structure is walked explicitly.
  */
 @Getter
-public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
+public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoModTree> {
 
     @Override
     public String getSourceFileType() {
@@ -54,13 +55,24 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     }
 
     @Override
-    public Class<? extends GoMod> getType() {
-        return GoMod.class;
+    public Class<? extends GoModTree> getType() {
+        return GoModTree.class;
     }
 
+    // A peer that names a node by id, to print or visit it, is sent that node on its own.
     @Override
-    public void rpcSend(GoMod after, RpcSendQueue q) {
+    public void rpcSend(GoModTree after, RpcSendQueue q) {
         GolangSender sender = new GolangSender();
+        if (after instanceof GoMod) {
+            sendGoMod(sender, (GoMod) after, q);
+        } else if (after instanceof GoModStatement) {
+            sendStatement(sender, (GoModStatement) after, q);
+        } else if (after instanceof GoMod.Value) {
+            sendValue(sender, (GoMod.Value) after, q);
+        }
+    }
+
+    private static void sendGoMod(GolangSender sender, GoMod after, RpcSendQueue q) {
         q.getAndSend(after, Tree::getId);
         q.getAndSend(after, GoMod::getPrefix, space -> sender.visitSpace(space, q));
         q.getAndSend(after, mk -> asRef(mk.getMarkers()));
@@ -117,8 +129,19 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     }
 
     @Override
-    public GoMod rpcReceive(GoMod before, RpcReceiveQueue q) {
+    public GoModTree rpcReceive(GoModTree before, RpcReceiveQueue q) {
         GolangReceiver receiver = new GolangReceiver();
+        if (before instanceof GoMod) {
+            return receiveGoMod(receiver, (GoMod) before, q);
+        } else if (before instanceof GoModStatement) {
+            return receiveStatement(receiver, (GoModStatement) before, q);
+        } else if (before instanceof GoMod.Value) {
+            return receiveValue(receiver, (GoMod.Value) before, q);
+        }
+        return before;
+    }
+
+    private static GoMod receiveGoMod(GolangReceiver receiver, GoMod before, RpcReceiveQueue q) {
         GoMod t = before;
         t = t.withId(q.receiveAndGet(t.getId(), UUID::fromString));
         t = t.withPrefix(q.receive(t.getPrefix(), space -> receiver.visitSpace(space, q)));

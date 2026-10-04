@@ -87,7 +87,7 @@ func (v *SpacesVisitor) VisitUnary(u *java.Unary, p any) java.J {
 // side of the operand and never meets its leading space.
 func prefixOperator(op java.UnaryOperator) (string, bool) {
 	switch op {
-	case java.PostIncrement, java.PostDecrement, java.SpreadPostfix:
+	case java.PostIncrement, java.PostDecrement:
 		return "", false
 	}
 	return printer.UnaryOperatorString(op), true

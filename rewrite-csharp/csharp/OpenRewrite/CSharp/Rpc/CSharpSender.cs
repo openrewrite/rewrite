@@ -214,13 +214,11 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     }
 
     // ---- UsingDirective ----
-    // Java protocol: Global (RP<Keyword>?), Static (LP<Keyword>?), Unsafe (LP<Keyword>?),
-    //   Alias (RP<Identifier>?), NamespaceOrType
-    // Nagoya model: Global (RP<bool>), Static (LP<bool>), Alias (RP<Identifier>?), NamespaceOrType
     public override J VisitUsingDirective(UsingDirective ud, RpcSendQueue q)
     {
         q.GetAndSend(ud, u => u.Global, rp => VisitRightPadded(rp, q));
         q.GetAndSend(ud, u => u.Static, lp => VisitLeftPadded(lp, q));
+        q.GetAndSend(ud, u => u.Unsafe, lp => VisitLeftPadded(lp!, q));
         q.GetAndSend(ud, u => u.Alias, rp => VisitRightPadded(rp!, q));
         q.GetAndSend(ud, u => (J)u.NamespaceOrType, el => Visit(el, q));
         return ud;
@@ -418,17 +416,19 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // ---- Interpolation ----
     public override J VisitInterpolation(Interpolation interp, RpcSendQueue q)
     {
-        // Java sends Expression (RP), Alignment (RP), Format (RP)
+        // Java sends Expression (RP), AlignmentBefore (Space), Alignment (RP), FormatBefore (Space), Format (RP)
         // Nagoya has Expression, Alignment (LP?), Format (LP?), After (Space)
         q.GetAndSend(interp,
             i => new JRightPadded<Expression>(i.Expression, i.After, Markers.Empty),
             rp => VisitRightPadded(rp, q));
+        q.GetAndSend(interp, i => i.Alignment?.Before ?? Space.Empty, space => VisitSpace(space, q));
         q.GetAndSend(interp,
             i => i.Alignment != null
                 ? (JRightPadded<Expression>?)new JRightPadded<Expression>(
                     i.Alignment.Element, Space.Empty, Markers.Empty)
                 : null,
             rp => VisitRightPadded(rp!, q));
+        q.GetAndSend(interp, i => i.Format?.Before ?? Space.Empty, space => VisitSpace(space, q));
         q.GetAndSend(interp,
             i => i.Format != null
                 ? (JRightPadded<Expression>?)new JRightPadded<Expression>(
@@ -1115,8 +1115,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
                         q.GetAndSend(c, cm => cm.Multiline);
                         q.GetAndSend(c, cm => cm.Text);
                         q.GetAndSend(c, cm => cm.Suffix);
-                        // C# Comment has no Markers; send empty Markers for protocol compatibility.
-                        q.GetAndSend(c, _ => Reference.AsRef(Markers.Empty));
+                        q.GetAndSend(c, cm => Reference.AsRef(cm is TextComment text ? text.Markers : Markers.Empty));
                     }
                 });
             q.GetAndSend(space, s => s.Whitespace);

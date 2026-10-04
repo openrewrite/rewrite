@@ -30,10 +30,12 @@ import select
 import sys
 import tempfile
 import time
+import tokenize
 import traceback
 import threading
 
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, Iterator, Optional, List, Callable, Set
 from uuid import uuid4
@@ -75,6 +77,8 @@ remote_refs: Dict[int, Any] = {}
 # Refs sent to Java, so a type sent for one source file is cited rather than resent
 # by the next (mirrors RewriteRpc.localRefs).
 local_refs = ReferenceMap()
+# The latest transfer sent, as [object id, ref high-water before it], for AbortGetObject to undo.
+_last_sent: List[Any] = []
 # Per-source-file ref high-water on each side, captured before a file is first visited
 # so handle_evict can roll back exactly the refs that file introduced. Keyed by tree id.
 _ref_checkpoints: Dict[str, int] = {}
@@ -265,6 +269,8 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
     # with no seam to issue against, so there the pages are fetched on demand.
     pending_page = None
     can_prefetch = getattr(send_request, '_java_rpc_original', None) is None
+    # True while a page is being waited for, when a failure is the peer's or the transport's.
+    awaiting_page = False
 
     def pull_batch() -> List[Dict[str, Any]]:
         """Pull the next batch of RpcObjectData from Java.
@@ -278,18 +284,21 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
         after receive() completes (line 474), and we do the same by tracking received_end.
         """
-        nonlocal received_end, pending_page
+        nonlocal received_end, pending_page, awaiting_page
 
         if pending_page is not None:
             page_id, pending_page = pending_page, None
+            awaiting_page = True
             batch = _await_response(page_id, 'GetObject')
         elif received_end:
             return []
         else:
+            awaiting_page = True
             batch = send_request('GetObject', {
                 'id': obj_id,
                 'sourceFileType': source_file_type
             })
+        awaiting_page = False
 
         if not batch:
             received_end = True
@@ -343,6 +352,18 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
             except Exception:
                 pass
             pending_page = None
+        if awaiting_page:
+            # The peer failed to send it, and has dropped the refs it had assigned.
+            q.roll_back_refs()
+        else:
+            # The failure is this side's, so the peer still counts the object and the refs it
+            # sent with it as received. One without the method goes on citing those refs,
+            # which is why they are dropped here only once it has dropped them too.
+            try:
+                if send_request('AbortGetObject', {'id': obj_id}) is True:
+                    q.roll_back_refs()
+            except Exception:
+                pass
         raise
 
     if obj is not None:
@@ -375,20 +396,39 @@ def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=No
                       project_language_level: Optional[str] = None,
                       check_print: bool = True) -> dict:
     """Parse a Python file and return its LST."""
-    # newline='' disables universal-newline translation, so the LST holds the
-    # file's own line endings and prints back byte-identically.
-    with open(path, 'r', encoding='utf-8', newline='') as f:
-        source = f.read()
+    # Decoded from bytes rather than read as text, which keeps the file's own line endings.
+    with open(path, 'rb') as f:
+        raw = f.read()
+    # The encoding the interpreter reads the file in: a coding line names one, and UTF-8 is the default.
+    try:
+        declared, _ = tokenize.detect_encoding(BytesIO(raw).readline)
+    except SyntaxError:
+        # A coding line the interpreter rejects: read as before one was looked for.
+        declared = 'utf-8'
+    charset_name = None
+    if declared in ('utf-8', 'utf-8-sig'):
+        # A byte order mark is left in the text for the parser, which records it.
+        source = raw.decode('utf-8')
+    else:
+        source = raw.decode(declared)
+        try:
+            # Reported to the host only where the bytes depend on it, as a name it may not know.
+            if raw.decode('utf-8') != source:
+                charset_name = declared
+        except UnicodeDecodeError:
+            charset_name = declared
     return parse_python_source(source, path, relative_to, ty_client,
                                language_level=language_level,
                                project_language_level=project_language_level,
-                               check_print=check_print)
+                               check_print=check_print,
+                               charset_name=charset_name)
 
 
 def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None,
                         language_level: Optional[str] = None,
                         project_language_level: Optional[str] = None,
-                        check_print: bool = True) -> dict:
+                        check_print: bool = True,
+                        charset_name: Optional[str] = None) -> dict:
     """Parse Python source code and return its LST.
 
     The parser used depends on the effective language version, resolved in
@@ -443,6 +483,9 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             cu = ParserVisitor(source, path, ty_client).visit(tree)
 
         cu = cu.replace(source_path=source_path, markers=Markers.EMPTY)
+        if charset_name is not None:
+            # what the host writes the file back in
+            cu = cu.replace(charset_name=charset_name)
 
         if check_print:
             printed = PythonPrinter().print(cu)
@@ -1152,6 +1195,7 @@ def handle_get_object(params: dict) -> List[dict]:
         before = remote_objects.get(obj_id)
 
         saved_refs = local_refs.snapshot()
+        _last_sent[:] = [obj_id, saved_refs]
         q = RpcSendQueue(source_file_type, local_refs)
         try:
             result = q.generate(obj, before)
@@ -1170,6 +1214,23 @@ def handle_get_object(params: dict) -> List[dict]:
         source_path = getattr(obj, 'source_path', None)
         logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
         return [{'state': 'END_OF_OBJECT'}]
+
+
+def handle_abort_get_object(params: dict) -> bool:
+    """Handle an AbortGetObject RPC request: undo the transfer of an object that its receiver
+    failed to take. Forgetting that the peer holds it, and the refs assigned while sending it,
+    has both next go out whole instead of as a delta or a bare ref the peer cannot resolve.
+    """
+    obj_id = params.get('id')
+    if obj_id is None:
+        return True
+    remote_objects.pop(obj_id, None)
+    if _last_sent and _last_sent[0] == obj_id:
+        local_refs.rollback_to(_last_sent[1])
+    else:
+        # Not the latest transfer, so which refs it assigned is no longer known.
+        local_refs.clear()
+    return True
 
 
 def _serialize_object_fallback(obj: Any) -> List[dict]:
@@ -1216,10 +1277,11 @@ def handle_print(params: dict) -> str:
         logger.warning(f"Object {obj_id} not found")
         return ""
 
-    # Honor the requested marker printer: FENCED emits the {{uuid}} fences the diff
-    # reader expects; SANITIZED strips markers; DEFAULT/unknown use default rendering.
-    name = params.get('markerPrinter')
-    try:
+    from rewrite.java import J
+    if isinstance(obj, J):
+        # Honor the requested marker printer: FENCED emits the {{uuid}} fences the diff
+        # reader expects; SANITIZED strips markers; DEFAULT/unknown use default rendering.
+        name = params.get('markerPrinter')
         from rewrite.python.printer import PythonPrinter, PrintOutputCapture
         from rewrite.tree import PrintOutputCapture as CorePrintOutputCapture
         marker_printer = {
@@ -1230,13 +1292,10 @@ def handle_print(params: dict) -> str:
         # A FENCED typo would otherwise silently fall back to /*~~>*/ and corrupt the diff.
         if marker_printer is None and name not in (None, 'DEFAULT'):
             logger.warning(f"Unknown markerPrinter '{name}'; using default rendering")
-        printer = PythonPrinter()
-        return printer.print(obj, PrintOutputCapture(marker_printer))
-    except ImportError as e:
-        logger.error(f"Failed to import PythonPrinter: {e}")
-        pass
-    except Exception as e:
-        logger.exception(f"Error printing object: {e}")
+        # The ancestors of a subtree decide some of its syntax, such as `=` over `:=`.
+        cursor_ids = params.get('cursor')
+        cursor = _build_cursor(cursor_ids, source_file_type) if cursor_ids else None
+        return PythonPrinter().print(obj, PrintOutputCapture(marker_printer), cursor)
 
     # Fallback: return stored source if available
     if hasattr(obj, 'source'):
@@ -1263,12 +1322,14 @@ def handle_reset(params: dict) -> bool:
     _ref_checkpoints.clear()
     _local_ref_checkpoints.clear()
     local_refs.clear()
+    _last_sent.clear()
     _hub_tree.clear()
     _hub_served.clear()
     _hub_send_refs.clear()
     _hub_recv_refs.clear()
     _hub_send_checkpoint.clear()
     _hub_recv_checkpoint.clear()
+    _hub_last_served.clear()
     # A half-drained page would resume mid-list for a host that expects to start over.
     _dependency_types_pending.clear()
 
@@ -2511,6 +2572,7 @@ _hub_recv_refs: Dict[str, Dict[int, Any]] = {}  # bundle -> receive ref map (chi
 _hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that child was last served
 _hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
 _hub_recv_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> highest received ref before this file
+_hub_last_served: Dict[str, tuple] = {}     # bundle -> (obj_id, send ref counter before it), its latest transfer
 
 def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
     """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
@@ -2545,9 +2607,27 @@ def _hub_serve_child(bundle: str, obj_id: str, source_file_type: Optional[str]) 
     # Remember where this child's ref numbering stood before this file, so Evict can roll it back
     # in lockstep with the child's own rollback (see _hub_release).
     _hub_send_checkpoint.setdefault((bundle, obj_id), refs.snapshot())
+    _hub_last_served[bundle] = (obj_id, refs.snapshot())
     data = RpcSendQueue(source_file_type, refs).generate(tree, _hub_served.get((bundle, obj_id)))
     _hub_served[(bundle, obj_id)] = tree
     return data
+
+
+def _hub_abort_child(bundle: str, obj_id: Optional[str]) -> bool:
+    """A child failed to take what it was served: forget that it holds the tree, and the refs
+    assigned while serving it, so that it is next served both whole."""
+    if obj_id is None:
+        return True
+    _hub_served.pop((bundle, obj_id), None)
+    refs = _hub_send_refs.get(bundle)
+    if refs is not None:
+        last = _hub_last_served.get(bundle)
+        if last is not None and last[0] == obj_id:
+            refs.rollback_to(last[1])
+        else:
+            # Not the latest transfer, so which refs it assigned is no longer known.
+            refs.clear()
+    return True
 
 
 def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: Optional[str],
@@ -2569,7 +2649,20 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
             return []
         return [d for d in remaining.pop(0) if d.get('state') != 'END_OF_OBJECT']
 
-    edited = RpcReceiveQueue(refs, source_file_type, pull).receive(served, None)
+    q = RpcReceiveQueue(refs, source_file_type, pull)
+    try:
+        edited = q.receive(served, None)
+    except Exception:
+        # The child counts its edit and the refs sent with it as received. Its baseline and
+        # those refs are dropped here only once it has dropped them, as a child without the
+        # method goes on answering against both.
+        try:
+            if children.request(bundle, 'AbortGetObject', {'id': obj_id}) is True:
+                q.roll_back_refs()
+                _hub_served.pop((bundle, obj_id), None)
+        except Exception:
+            pass
+        raise
     if edited is None:
         if not may_delete:
             raise RuntimeError(f"{bundle} reported {obj_id} as modified but no longer holds it")
@@ -2586,6 +2679,7 @@ def _hub_drop_bundle(bundle: str) -> None:
     """Forget everything the hub holds on one bundle's behalf, for when its child is replaced."""
     _hub_send_refs.pop(bundle, None)
     _hub_recv_refs.pop(bundle, None)
+    _hub_last_served.pop(bundle, None)
     for table in (_hub_served, _hub_send_checkpoint, _hub_recv_checkpoint):
         for key in [k for k in table if k[0] == bundle]:
             del table[key]
@@ -2670,6 +2764,9 @@ def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
 def _serve_child_object(method: str, params: dict, bundle: Optional[str] = None) -> Any:
     """A child's upstream callback: GetObject is answered from the facade's tree, the rest relays
     to Java."""
+    if method == 'AbortGetObject' and bundle is not None:
+        # It is the facade that served this child, so relaying would have Java undo a transfer of its own.
+        return _hub_abort_child(bundle, params.get('id'))
     if method != 'GetObject':
         return send_request(method, params)
 
@@ -2748,6 +2845,7 @@ def handle_request(method: str, params: dict) -> Any:
         'ParseProject': handle_parse_project,
         'DependencyTypes': handle_dependency_types,
         'GetObject': handle_get_object,
+        'AbortGetObject': handle_abort_get_object,
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,

@@ -2,12 +2,13 @@ import ast
 import contextlib
 import keyword
 import dataclasses
+import itertools
 import sys
 import token
 from argparse import ArgumentError
-from io import BytesIO
+from io import StringIO
 from pathlib import Path
-from tokenize import tokenize, TokenInfo
+from tokenize import generate_tokens, TokenInfo
 from typing import Optional, TypeVar, cast, Callable, List, Tuple, Dict, Sequence, Union, Iterable, NamedTuple
 
 from rewrite import random_id, Markers
@@ -164,8 +165,11 @@ class ParserVisitor(ast.NodeVisitor):
         # gets \n throughout while the original source keeps the spelling that
         # whitespace extraction reproduces. The row/col scans below step over all three.
         tokenizer_source = source.replace('\r\n', '\n').replace('\r', '\n') if '\r' in source else source
+        # Tokenized as text: given bytes, the tokenizer decodes them in the encoding a coding
+        # line names, which is not the one they would be encoded in here.
+        encoding = TokenInfo(token.ENCODING, 'utf-8', (0, 0), (0, 0), '')
         self._tokens, self._paren_pairs = self._build_tokens(
-            tokenize(BytesIO(tokenizer_source.encode('utf-8')).readline)
+            itertools.chain([encoding], generate_tokens(StringIO(tokenizer_source).readline))
         )
         self._token_idx = 1  # Skip ENCODING token
         self._type_context_depth = 0
@@ -238,11 +242,11 @@ class ParserVisitor(ast.NodeVisitor):
             elif tok.type in (FSTRING_END, TSTRING_END):
                 formatted_string_depth -= 1
 
-            # Track paren pairs
+            # Track paren pairs, and square brackets, which nest with them
             if tok.type == token.OP:
-                if tok.string == '(':
+                if tok.string in ('(', '['):
                     paren_stack.append(len(result))
-                elif tok.string == ')' and paren_stack:
+                elif tok.string in (')', ']') and paren_stack:
                     paren_pairs[paren_stack.pop()] = len(result)
 
             # Update row/col to the token's end position and compute prev_end
@@ -587,8 +591,7 @@ class ParserVisitor(ast.NodeVisitor):
             type_tree = self.__convert_type(node.annotation)
             if self._type_mapping.is_field_specifier_call(node.value):
                 assigned_type = getattr(type_tree, 'type', None)
-                if isinstance(assigned_type, JavaType.FullyQualified) and \
-                        assigned_type.fully_qualified_name in _BARE_QUALIFIERS:
+                if getattr(assigned_type, 'fully_qualified_name', None) in _BARE_QUALIFIERS:
                     # The type is the value's, which ty hides behind its field marker.
                     assigned_type = JavaType.Unknown()
                 if isinstance(target, j.Identifier):
@@ -1179,10 +1182,9 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_ExceptHandler(self, node, is_exception_group: bool = False):
         prefix = self.__source_before('except')
-        # For except*, consume the '*' after 'except' and let __convert_type capture the space after '*'
+        # For except*, the space ahead of the '*' is kept here and the space after it by __convert_type
         if is_exception_group:
-            self.__source_before('*')
-            type_prefix = Space.EMPTY  # Space goes on inner type via __convert_type
+            type_prefix = self.__source_before('*')
         else:
             type_prefix = self.__whitespace()
         except_type = self.__convert_type(node.type) if node.type else j.Empty(random_id(), Space.EMPTY,
@@ -1356,11 +1358,11 @@ class ParserVisitor(ast.NodeVisitor):
     def visit_MatchSequence(self, node):
         prefix = self.__whitespace()
         end_delim = None
-        if self.__at_token('[') and self.__is_own_sequence_delimiter(node, '['):
+        if self.__at_token('[') and self.__is_own_sequence_delimiter(node):
             self.__skip('[')
             kind = py.MatchCase.Pattern.Kind.SEQUENCE_LIST
             end_delim = ']'
-        elif self.__at_token('(') and self.__is_own_sequence_delimiter(node, '('):
+        elif self.__at_token('(') and self.__is_own_sequence_delimiter(node):
             self.__skip('(')
             kind = py.MatchCase.Pattern.Kind.SEQUENCE_TUPLE
             end_delim = ')'
@@ -1371,10 +1373,11 @@ class ParserVisitor(ast.NodeVisitor):
         if node.patterns:
             elements = [self.__pad_list_element(self.__convert_match_pattern(e), last=i == len(node.patterns) - 1,
                                                 end_delim=end_delim) for i, e in enumerate(node.patterns)]
+        elif end_delim:
+            # an empty sequence holds the space between its delimiters
+            elements = [self.__pad_right(
+                j.Empty(random_id(), self.__source_before(end_delim), Markers.EMPTY), Space.EMPTY)]
         else:
-            # Empty sequence - need to consume the closing delimiter
-            if end_delim:
-                self.__source_before(end_delim)
             elements = []
 
         return py.MatchCase(
@@ -1454,7 +1457,7 @@ class ParserVisitor(ast.NodeVisitor):
                     Space.EMPTY,
                     [
                         self.__pad_right(self.__convert(node.keys[i]), self.__source_before(':')),
-                        self.__pad_right(self.__convert(node.patterns[i]), Space.EMPTY),
+                        self.__pad_right(self.__convert_match_pattern(node.patterns[i]), Space.EMPTY),
                     ],
                     Markers.EMPTY
                 ),
@@ -1477,6 +1480,11 @@ class ParserVisitor(ast.NodeVisitor):
                 None
             )
             elements.append(self.__pad_list_element(rest_pattern, last=True, end_delim='}'))
+
+        if not elements:
+            # an empty mapping holds the space between its braces
+            elements.append(self.__pad_right(
+                j.Empty(random_id(), self.__source_before('}'), Markers.EMPTY), Space.EMPTY))
 
         return py.MatchCase(
             random_id(),
@@ -2370,10 +2378,7 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 break
 
-        if isinstance(decorator, (ast.Attribute, ast.Name, ast.Subscript)):
-            name = self.__convert(decorator)
-            args = None
-        elif isinstance(decorator, ast.Call):
+        if isinstance(decorator, ast.Call):
             # If there are extra parentheses around the call, convert the entire call
             # and wrap it, setting args=None since args are part of the wrapped call
             if extra_parens:
@@ -2391,7 +2396,8 @@ class ParserVisitor(ast.NodeVisitor):
                     Markers.EMPTY
                 )
         else:
-            raise NotImplementedError("Unsupported decorator type: " + str(type(decorator)))
+            name = self.__convert(decorator)
+            args = None
 
         # Apply the whitespace after @ to the name when there are no extra parentheses.
         # When extra_parens is non-empty, this is handled differently (prefix is set on the wrapped paren).
@@ -3158,6 +3164,9 @@ class ParserVisitor(ast.NodeVisitor):
         elif isinstance(node, ast.Subscript):
             prefix = self.__whitespace()
             converted_value = self.__convert(node.value)
+            # ParameterizedType.clazz is a NameTree, which a subscripted subscript or a call is not
+            if not isinstance(converted_value, NameTree):
+                converted_value = py.ExpressionTypeTree(random_id(), Space.EMPTY, Markers.EMPTY, converted_value)
             bracket_prefix = self.__source_before('[')
 
             # Determine slice elements. For tuples:
@@ -3846,7 +3855,7 @@ class ParserVisitor(ast.NodeVisitor):
 
                 # debug specifier
                 if tok.type == token.OP and tok.string == '=':
-                    debug = self.__pad_right(True, self.__whitespace('\n'))
+                    debug = self.__pad_right(True, self.__whitespace())
                     tok = self._tokens[self._token_idx]  # get token after whitespace
                 else:
                     debug = None
@@ -3859,7 +3868,9 @@ class ParserVisitor(ast.NodeVisitor):
                         self._token_idx += 1  # advance past '!' (only needed after debug specifier)
                     tok = self._tokens[self._token_idx]  # get conversion char
                     conv = py.FormattedString.Value.Conversion.ASCII if tok.string == 'a' else py.FormattedString.Value.Conversion.STR if tok.string == 's' else py.FormattedString.Value.Conversion.REPR
-                    tok = self._advance_token()  # consume conversion char, get next
+                    self._token_idx += 1  # consume conversion char
+                    conv = self.__pad_right(conv, self.__whitespace())
+                    tok = self._tokens[self._token_idx]  # get token after whitespace
                 else:
                     conv = None
 
@@ -3913,25 +3924,12 @@ class ParserVisitor(ast.NodeVisitor):
             return False
         return self._tokens[self._token_idx].string == s
 
-    def __is_own_sequence_delimiter(self, node, delim: str) -> bool:
-        """Check if the delimiter at the current token belongs to this MatchSequence.
-
-        When the current token is '[' (or '('), it could belong to this
-        sequence or to its first child (e.g., ``[c], _`` vs ``[c, _]``).
-
-        If the first child pattern is itself a MatchSequence, the delimiter
-        might belong to the child.  We disambiguate by peeking at the next
-        token: if it is also a delimiter (``[`` or ``(``), the current one
-        opens this sequence (e.g., ``[[a], b]``); otherwise the current
-        delimiter belongs to the child (e.g., ``[c], _``).
-        """
-        import ast as stdlib_ast
-        if node.patterns and isinstance(node.patterns[0], stdlib_ast.MatchSequence):
-            # The first child is also a sequence — check whether there are
-            # two consecutive delimiters, meaning the outer one is ours.
-            next_idx = self._token_idx + 1
-            if next_idx < len(self._tokens):
-                next_tok = self._tokens[next_idx].string
-                return next_tok in ('[', '(')
-            return False
-        return True
+    def __is_own_sequence_delimiter(self, node) -> bool:
+        """Whether the bracket at the current token is this MatchSequence's own, which is so when
+        its closer is where the sequence ends. Otherwise it opens the first element, as the
+        parenthesis of ``(a, b) as c, d`` does."""
+        close_idx = self._paren_pairs.get(self._token_idx)
+        if close_idx is None:
+            return True
+        end_col = self._byte_offset_to_char_offset(node.end_lineno, node.end_col_offset)
+        return self._tokens[close_idx].end == (node.end_lineno, end_col)

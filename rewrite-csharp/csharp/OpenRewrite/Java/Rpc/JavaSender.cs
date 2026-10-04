@@ -681,8 +681,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
                 q.GetAndSend(c, cm => cm.Multiline);
                 q.GetAndSend(c, cm => cm.Text);
                 q.GetAndSend(c, cm => cm.Suffix);
-                // C# Comment does not have Markers; send empty Markers for protocol compatibility
-                q.GetAndSend(c, _ => Reference.AsRef(Markers.Empty));
+                q.GetAndSend(c, cm => Reference.AsRef(cm is TextComment text ? text.Markers : Markers.Empty));
             });
         q.GetAndSend(space, s => s.Whitespace);
     }

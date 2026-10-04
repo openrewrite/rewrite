@@ -24,6 +24,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
@@ -376,7 +377,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void complexLiteralValueSurvivesRpcBridge() throws Exception {
+    void complexLiteralKeepsOnlyItsSource() throws Exception {
         Path projectDir = tempDir.resolve("complex_literal");
         Files.createDirectories(projectDir);
         Files.writeString(projectDir.resolve("main.py"), "x = 0j\n");
@@ -401,9 +402,9 @@ class ParseProjectIntegTest {
 
         assertThat(literals).hasSize(1);
         assertThat(literals.get(0).getValueSource()).isEqualTo("0j");
-        assertThat(literals.get(0).getValue())
-                .as("complex literal value must survive the RPC bridge, not be dropped to null")
-                .isEqualTo("0j");
+        // no JSON number carries a complex, and no primitive names one
+        assertThat(literals.get(0).getValue()).isNull();
+        assertThat(literals.get(0).getType()).isEqualTo(JavaType.Primitive.None);
     }
 
     private PythonRewriteRpc client() {

@@ -213,5 +213,8 @@ public abstract class Comment(string text, string suffix, bool multiline)
 /// <summary>
 /// A single-line or multi-line text comment.
 /// </summary>
-public sealed class TextComment(string text, string suffix, bool multiline)
-    : Comment(text, suffix, multiline);
+public sealed class TextComment(string text, string suffix, bool multiline, Markers? markers = null)
+    : Comment(text, suffix, multiline)
+{
+    public Markers Markers { get; } = markers ?? Markers.Empty;
+}

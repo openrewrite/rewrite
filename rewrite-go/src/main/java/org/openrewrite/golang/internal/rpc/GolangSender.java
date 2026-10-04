@@ -21,9 +21,13 @@ import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import org.openrewrite.rpc.Reference;
+
+import java.util.Objects;
 
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 import static org.openrewrite.rpc.Reference.asRef;
@@ -43,8 +47,15 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.getAndSend(j, mk -> asRef(mk.getMarkers()));
+        q.getAndSend(j, mk -> asRef(withoutNulls(mk.getMarkers())));
         return j;
+    }
+
+    // An LST stored while ChanDirMarker had no codec holds null in its place, which the engine cannot receive.
+    private static Markers withoutNulls(Markers markers) {
+        return markers.getMarkers().contains(null) ?
+                markers.withMarkers(ListUtils.filter(markers.getMarkers(), Objects::nonNull)) :
+                markers;
     }
 
     @Override
@@ -349,20 +360,6 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
-        }
-
-        @Override
-        public J visitImport(J.Import importStmt, RpcSendQueue q) {
-            q.getAndSend(importStmt, i -> i.getPadding().getStatic(), s -> visitLeftPadded(s, q));
-            // Convert FieldAccess qualid to Literal for Go
-            q.getAndSend(importStmt, i -> {
-                J.FieldAccess fa = i.getQualid();
-                String name = fa.getSimpleName();
-                return new J.Literal(fa.getId(), fa.getPrefix(), fa.getMarkers(),
-                        name, "\"" + name + "\"", null, JavaType.Primitive.String);
-            }, id -> visit(id, q));
-            q.getAndSend(importStmt, i -> i.getPadding().getAlias(), alias -> visitLeftPadded(alias, q));
-            return importStmt;
         }
     }
 }

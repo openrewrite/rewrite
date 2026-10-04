@@ -19,6 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.tree.GoSum;
+import org.openrewrite.golang.tree.GoSumTree;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
@@ -34,7 +35,7 @@ import static org.openrewrite.rpc.Reference.asRef;
 
 // Field order must match the Go-side gosum_codec.go exactly.
 @Getter
-public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSum> {
+public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSumTree> {
 
     @Override
     public String getSourceFileType() {
@@ -42,13 +43,22 @@ public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSum> {
     }
 
     @Override
-    public Class<? extends GoSum> getType() {
-        return GoSum.class;
+    public Class<? extends GoSumTree> getType() {
+        return GoSumTree.class;
     }
 
+    // A peer that names a line by id, to print or visit it, is sent that line on its own.
     @Override
-    public void rpcSend(GoSum after, RpcSendQueue q) {
+    public void rpcSend(GoSumTree after, RpcSendQueue q) {
         GolangSender sender = new GolangSender();
+        if (after instanceof GoSum) {
+            sendGoSum(sender, (GoSum) after, q);
+        } else if (after instanceof GoSum.Line) {
+            sendLine(sender, (GoSum.Line) after, q);
+        }
+    }
+
+    private static void sendGoSum(GolangSender sender, GoSum after, RpcSendQueue q) {
         q.getAndSend(after, Tree::getId);
         q.getAndSend(after, GoSum::getPrefix, space -> sender.visitSpace(space, q));
         q.getAndSend(after, mk -> asRef(mk.getMarkers()));
@@ -80,8 +90,17 @@ public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSum> {
     }
 
     @Override
-    public GoSum rpcReceive(GoSum before, RpcReceiveQueue q) {
+    public GoSumTree rpcReceive(GoSumTree before, RpcReceiveQueue q) {
         GolangReceiver receiver = new GolangReceiver();
+        if (before instanceof GoSum) {
+            return receiveGoSum(receiver, (GoSum) before, q);
+        } else if (before instanceof GoSum.Line) {
+            return receiveLine(receiver, (GoSum.Line) before, q);
+        }
+        return before;
+    }
+
+    private static GoSum receiveGoSum(GolangReceiver receiver, GoSum before, RpcReceiveQueue q) {
         GoSum t = before;
         t = t.withId(q.receiveAndGet(t.getId(), UUID::fromString));
         t = t.withPrefix(q.receive(t.getPrefix(), space -> receiver.visitSpace(space, q)));

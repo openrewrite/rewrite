@@ -1006,14 +1006,17 @@ class FormattedString(Py, Expression, TypedTree):
         def with_debug(self, debug: Optional[bool]) -> FormattedString.Value:
             return self.padding.replace(debug=self._debug.replace(element=debug) if self._debug else None)
 
-        _conversion: Optional[Conversion]
+        _conversion: Optional[JRightPadded[Conversion]]
 
         @property
         def conversion(self) -> Optional[Conversion]:
-            return self._conversion
+            return self._conversion.element if self._conversion else None
 
         def with_conversion(self, conversion: Optional[Conversion]) -> FormattedString.Value:
-            return self if conversion is self._conversion else dataclass_replace(self, _conversion=conversion)
+            if conversion is None:
+                return self.padding.replace(conversion=None)
+            return self.padding.replace(conversion=self._conversion.replace(element=conversion) if self._conversion
+                                        else JRightPadded(conversion, Space.EMPTY, Markers.EMPTY))
 
         _format: Optional[Expression]
 
@@ -1035,6 +1038,10 @@ class FormattedString(Py, Expression, TypedTree):
             @property
             def debug(self) -> Optional[JRightPadded[bool]]:
                 return self._t._debug
+
+            @property
+            def conversion(self) -> Optional[JRightPadded[FormattedString.Value.Conversion]]:
+                return self._t._conversion
 
             def replace(self, **kwargs) -> FormattedString.Value:
                 return replace_if_changed(self._t, **kwargs)

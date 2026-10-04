@@ -24,9 +24,10 @@ import {
     StyleKind,
     TabsAndIndentsStyle,
     WrappingAndBracesStyle,
-    WrappingAndBracesStyleDetailKind
+    WrappingAndBracesStyleDetailKind,
+    prettierStyle
 } from "./style";
-import {Autodetect} from "./autodetect";
+import {Autodetect, autodetect} from "./autodetect";
 import {updateIfChanged} from "../util";
 
 declare module "./tree" {
@@ -37,6 +38,7 @@ declare module "./tree" {
             readonly NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion";
             readonly DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield";
             readonly FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration";
+            readonly Computed: "org.openrewrite.javascript.marker.Computed";
         };
     }
 }
@@ -48,6 +50,7 @@ declare module "./tree" {
     Optional: "org.openrewrite.javascript.marker.Optional",
     NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion",
     FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration",
+    Computed: "org.openrewrite.javascript.marker.Computed",
 } as const;
 
 /**
@@ -81,6 +84,18 @@ export interface FunctionDeclaration extends Marker {
 }
 
 /**
+ * A name written in brackets where the model has room for an identifier only, as the
+ * member of `enum A { ['b'] }` is. The identifier holds the bracketed literal.
+ */
+export interface Computed extends Marker {
+    readonly kind: typeof JS.Markers.Computed;
+    /**
+     * The space before the closing bracket.
+     */
+    readonly suffix: J.Space;
+}
+
+/**
  * Registers an RPC codec for any marker that has a `prefix: J.Space` field.
  */
 function registerPrefixedMarkerCodec<M extends Marker & { prefix: J.Space }>(
@@ -107,11 +122,26 @@ registerPrefixedMarkerCodec<Generator>(JS.Markers.Generator);
 registerPrefixedMarkerCodec<NonNullAssertion>(JS.Markers.NonNullAssertion);
 registerPrefixedMarkerCodec<FunctionDeclaration>(JS.Markers.FunctionDeclaration);
 
+RpcCodecs.registerCodec(JS.Markers.Computed, {
+    async rpcReceive(before: Computed, q: RpcReceiveQueue): Promise<Computed> {
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            suffix: await q.receive(before.suffix),
+        });
+    },
+
+    async rpcSend(after: Computed, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.suffix);
+    }
+});
+
 // Register codec for PrettierStyle (a NamedStyles that contains Prettier configuration)
 // Only serialize the variable fields; constant fields are defined in the interface
 RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
     async rpcReceive(before: PrettierStyle, q: RpcReceiveQueue): Promise<PrettierStyle> {
-        return updateIfChanged(before, {
+        // the fields that never vary are not sent, so a marker first met here does not have them yet
+        return updateIfChanged(before.name ? before : {...prettierStyle(before.id, {}), ...before}, {
             id: await q.receive(before.id),
             config: await q.receive(before.config),
             prettierVersion: await q.receive(before.prettierVersion),
@@ -131,7 +161,7 @@ RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
 // Only serialize the variable fields (id, styles); constant fields are defined in the interface
 RpcCodecs.registerCodec(StyleKind.Autodetect, {
     async rpcReceive(before: Autodetect, q: RpcReceiveQueue): Promise<Autodetect> {
-        return updateIfChanged(before, {
+        return updateIfChanged(before.name ? before : {...autodetect(before.id, []), ...before}, {
             id: await q.receive(before.id),
             styles: (await q.receiveList(before.styles))!,
         });

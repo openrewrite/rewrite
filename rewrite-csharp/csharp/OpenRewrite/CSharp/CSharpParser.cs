@@ -276,7 +276,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var result = Visit(node);
         if (result is Expression expr) return expr;
         if (result is Statement stmt)
-            return new StatementExpression(Tree.RandomId(), Space.Empty, Markers.Empty, stmt);
+            return AsExpression(stmt);
         throw new InvalidOperationException(
             $"Expected Expression or Statement from pattern but got {result?.GetType().Name} " +
             $"[node: {node.GetType().Name}, kind: {node.Kind()}, text: {node}]");
@@ -350,7 +350,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitUsingDirective(usingDirective);
             if (visited is UsingDirective ud)
             {
-                usingDirectives.Add(new JRightPadded<Statement>(ud, Space.Empty, Markers.Empty));
+                usingDirectives.Add(PadStatement(ud));
             }
         }
 
@@ -519,7 +519,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitUsingDirective(usingDirective);
             if (visited is UsingDirective ud)
             {
-                nsUsingDirectives.Add(new JRightPadded<Statement>(ud, Space.Empty, Markers.Empty));
+                nsUsingDirectives.Add(PadStatement(ud));
             }
         }
 
@@ -593,7 +593,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitUsingDirective(usingDirective);
             if (visited is UsingDirective ud)
             {
-                nsUsingDirectives.Add(new JRightPadded<Statement>(ud, Space.Empty, Markers.Empty));
+                nsUsingDirectives.Add(PadStatement(ud));
             }
         }
 
@@ -902,6 +902,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             attributeLists.Add((AttributeList)Visit(attrList)!);
         }
+        var declarationPrefix = ExtractPrefixAfter(node.AttributeLists);
 
         // Parse modifiers
         var modifiers = new List<Modifier>();
@@ -1096,7 +1097,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var classDecl = new ClassDeclaration(
             Tree.RandomId(),
-            attributeLists.Count > 0 ? Space.Empty : prefix,
+            attributeLists.Count > 0 ? declarationPrefix : prefix,
             classMarkers,
             [],
             modifiers,
@@ -1338,6 +1339,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             attributeLists.Add((AttributeList)Visit(attrList)!);
         }
+        var declarationPrefix = ExtractPrefixAfter(node.AttributeLists);
 
         // Parse modifiers
         var modifiers = new List<Modifier>();
@@ -1348,10 +1350,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
-        // Parse return type, hoisting its prefix to MethodDeclaration when attributes exist with no modifiers
-        Space hoistedReturnTypePrefix = Space.Empty;
-        if (attributeLists.Count > 0 && modifiers.Count == 0)
-            hoistedReturnTypePrefix = ExtractPrefix(node.ReturnType);
         var returnType = VisitType(node.ReturnType);
 
         // Parse explicit interface specifier if present (e.g., IFoo.Bar)
@@ -1467,9 +1465,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         if (node.ExpressionBody != null)
             methodMarkers = methodMarkers.Add(new ExpressionBodied(Tree.RandomId()));
 
-        var methodDeclPrefix = attributeLists.Count > 0
-            ? hoistedReturnTypePrefix
-            : explicitInterfaceSpec != null ? Space.Empty : prefix;
+        var memberPrefix = attributeLists.Count > 0 ? declarationPrefix : prefix;
+        var methodDeclPrefix = explicitInterfaceSpec != null ? Space.Empty : memberPrefix;
         var methodDecl = new MethodDeclaration(
             Tree.RandomId(),
             methodDeclPrefix,
@@ -1490,7 +1487,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         Statement result = explicitInterfaceSpec != null
             ? new ExplicitInterfaceMember(
                 Tree.RandomId(),
-                attributeLists.Count > 0 ? Space.Empty : prefix,
+                memberPrefix,
                 Markers.Empty,
                 explicitInterfaceSpec,
                 methodDecl)
@@ -1520,6 +1517,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             attributeLists.Add((AttributeList)Visit(attrList)!);
         }
+        var declarationPrefix = ExtractPrefixAfter(node.AttributeLists);
 
         // Parse modifiers
         var modifiers = new List<Modifier>();
@@ -1621,7 +1619,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var ctorDecl = new MethodDeclaration(
             Tree.RandomId(),
-            attributeLists.Count > 0 ? Space.Empty : prefix,
+            attributeLists.Count > 0 ? declarationPrefix : prefix,
             methodMarkers,
             [],
             modifiers,
@@ -1914,7 +1912,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             {
                 afterSpace = ExtractSpaceBefore(node.ParameterList.CloseBracketToken);
             }
-            Expression paramExpr = new StatementExpression(Tree.RandomId(), Space.Empty, Markers.Empty, paramStatement);
+            Expression paramExpr = AsExpression(paramStatement);
             parameters.Add(new JRightPadded<Expression>(paramExpr, afterSpace, Markers.Empty));
         }
         _cursor = node.ParameterList.CloseBracketToken.Span.End;
@@ -2034,7 +2032,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             {
                 afterSpace = ExtractSpaceBefore(node.ParameterList.CloseParenToken);
             }
-            Expression paramExpr = new StatementExpression(Tree.RandomId(), Space.Empty, Markers.Empty, paramStatement);
+            Expression paramExpr = AsExpression(paramStatement);
             parameters.Add(new JRightPadded<Expression>(paramExpr, afterSpace, Markers.Empty));
         }
         _cursor = node.ParameterList.CloseParenToken.Span.End;
@@ -2160,6 +2158,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             attributeLists.Add((AttributeList)Visit(attrList)!);
         }
+        var declarationPrefix = ExtractPrefixAfter(node.AttributeLists);
 
         // Parse modifiers
         var modifiers = new List<Modifier>();
@@ -2233,7 +2232,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var propertyDecl = new PropertyDeclaration(
             Tree.RandomId(),
-            attributeLists.Count > 0 ? Space.Empty : prefix,
+            attributeLists.Count > 0 ? declarationPrefix : prefix,
             Markers.Empty,
             [],
             modifiers,
@@ -2377,6 +2376,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             attributeLists.Add((AttributeList)Visit(attrList)!);
         }
+        var declarationPrefix = ExtractPrefixAfter(node.AttributeLists);
 
         // Parse modifiers (ref, out, params, etc.)
         var modifiers = new List<Modifier>();
@@ -2387,10 +2387,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
-        // Parse the type, hoisting its prefix to VariableDeclarations when attributes exist with no modifiers
-        Space hoistedTypePrefix = Space.Empty;
-        if (attributeLists.Count > 0 && modifiers.Count == 0 && node.Type != null)
-            hoistedTypePrefix = ExtractPrefix(node.Type);
         TypeTree? typeExpr = null;
         if (node.Type != null)
         {
@@ -2403,7 +2399,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var paramVarType = _typeMapping?.VariableType(node);
         var name = new Identifier(
             Tree.RandomId(),
-            namePrefix,
+            Space.Empty,
             Markers.Empty,
             [],
             node.Identifier.Text,
@@ -2427,7 +2423,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var namedVar = new NamedVariable(
             Tree.RandomId(),
-            Space.Empty,
+            namePrefix,
             Markers.Empty,
             name,
             [],
@@ -2437,7 +2433,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var varDecl = new VariableDeclarations(
             Tree.RandomId(),
-            attributeLists.Count > 0 ? hoistedTypePrefix : prefix,
+            attributeLists.Count > 0 ? declarationPrefix : prefix,
             Markers.Empty,
             [],
             modifiers,
@@ -2914,16 +2910,16 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var namePrefix = ExtractSpaceBefore(varDesignation.Identifier);
             _cursor = varDesignation.Identifier.Span.End;
             var patternVarType = _typeMapping?.VariableType(varDesignation);
-            var name = new Identifier(Tree.RandomId(), namePrefix, Markers.Empty, [], varDesignation.Identifier.Text, patternVarType?.Type, patternVarType);
-            namedVar = new NamedVariable(Tree.RandomId(), Space.Empty, Markers.Empty, name, [], null, patternVarType);
+            var name = new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], varDesignation.Identifier.Text, patternVarType?.Type, patternVarType);
+            namedVar = new NamedVariable(Tree.RandomId(), namePrefix, Markers.Empty, name, [], null, patternVarType);
         }
         else if (node.Designation is DiscardDesignationSyntax discardDesignation)
         {
             // Type pattern with discard: case int _:
             var namePrefix = ExtractSpaceBefore(discardDesignation.UnderscoreToken);
             _cursor = discardDesignation.UnderscoreToken.Span.End;
-            var name = new Identifier(Tree.RandomId(), namePrefix, Markers.Empty, [], "_", null, null);
-            namedVar = new NamedVariable(Tree.RandomId(), Space.Empty, Markers.Empty, name, [], null, null);
+            var name = new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], "_", null, null);
+            namedVar = new NamedVariable(Tree.RandomId(), namePrefix, Markers.Empty, name, [], null, null);
         }
 
         var variables = namedVar != null
@@ -2969,15 +2965,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var namePrefix = ExtractSpaceBefore(varDesignation.Identifier);
             _cursor = varDesignation.Identifier.Span.End;
             var varPatternVarType = _typeMapping?.VariableType(varDesignation);
-            var name = new Identifier(Tree.RandomId(), namePrefix, Markers.Empty, [], varDesignation.Identifier.Text, varPatternVarType?.Type, varPatternVarType);
-            namedVar = new NamedVariable(Tree.RandomId(), Space.Empty, Markers.Empty, name, [], null, varPatternVarType);
+            var name = new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], varDesignation.Identifier.Text, varPatternVarType?.Type, varPatternVarType);
+            namedVar = new NamedVariable(Tree.RandomId(), namePrefix, Markers.Empty, name, [], null, varPatternVarType);
         }
         else if (node.Designation is DiscardDesignationSyntax discardDesignation)
         {
             var namePrefix = ExtractSpaceBefore(discardDesignation.UnderscoreToken);
             _cursor = discardDesignation.UnderscoreToken.Span.End;
-            var name = new Identifier(Tree.RandomId(), namePrefix, Markers.Empty, [], "_", null, null);
-            namedVar = new NamedVariable(Tree.RandomId(), Space.Empty, Markers.Empty, name, [], null, null);
+            var name = new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], "_", null, null);
+            namedVar = new NamedVariable(Tree.RandomId(), namePrefix, Markers.Empty, name, [], null, null);
         }
 
         var variables = namedVar != null
@@ -3077,7 +3073,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var leftJ = Visit(node.Left)!;
         Expression left = leftJ is Expression leftExpr
             ? leftExpr
-            : new StatementExpression(Tree.RandomId(), Space.Empty, Markers.Empty, (Statement)leftJ);
+            : AsExpression((Statement)leftJ);
 
         // Parse the operator — use CsBinary with And/Or which implements Pattern
         var operatorPrefix = ExtractSpaceBefore(node.OperatorToken);
@@ -3093,7 +3089,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var rightJ = Visit(node.Right)!;
         Expression right = rightJ is Expression rightExpr
             ? rightExpr
-            : new StatementExpression(Tree.RandomId(), Space.Empty, Markers.Empty, (Statement)rightJ);
+            : AsExpression((Statement)rightJ);
 
         return new CsBinary(
             Tree.RandomId(),
@@ -3126,7 +3122,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             // Declaration patterns (e.g., "not Type name") produce VariableDeclarations
             // which is a Statement, not an Expression. Wrap in StatementExpression to bridge.
-            patternExpr = new StatementExpression(Tree.RandomId(), Space.Empty, Markers.Empty, stmt);
+            patternExpr = AsExpression(stmt);
         }
         else
         {
@@ -4133,8 +4129,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var namePrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
         var foreachVarType = _typeMapping?.VariableType(node);
-        var name = new Identifier(Tree.RandomId(), namePrefix, Markers.Empty, [], node.Identifier.Text, foreachVarType?.Type, foreachVarType);
-        var namedVar = new NamedVariable(Tree.RandomId(), Space.Empty, Markers.Empty, name, [], null, _typeMapping?.VariableType(node));
+        var name = new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], node.Identifier.Text, foreachVarType?.Type, foreachVarType);
+        var namedVar = new NamedVariable(Tree.RandomId(), namePrefix, Markers.Empty, name, [], null, _typeMapping?.VariableType(node));
         var varDecl = new VariableDeclarations(
             Tree.RandomId(),
             Space.Empty,
@@ -4238,7 +4234,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 IList<JRightPadded<NamedVariable>> variables;
                 if (exName != null)
                 {
-                    variables = [new JRightPadded<NamedVariable>(new NamedVariable(Tree.RandomId(), Space.Empty, Markers.Empty, exName, [], whenInitializer, _typeMapping?.VariableType(catchClause.Declaration!)), Space.Empty, Markers.Empty)];
+                    variables = [new JRightPadded<NamedVariable>(new NamedVariable(Tree.RandomId(), exName.Prefix, Markers.Empty, exName.WithPrefix(Space.Empty), [], whenInitializer, _typeMapping?.VariableType(catchClause.Declaration!)), Space.Empty, Markers.Empty)];
                 }
                 else if (whenInitializer != null)
                 {
@@ -5984,7 +5980,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var typedLambdaParamVarType = _typeMapping?.VariableType(node);
         var name = new Identifier(
             Tree.RandomId(),
-            namePrefix,
+            Space.Empty,
             Markers.Empty,
             [],
             node.Identifier.Text,
@@ -6008,7 +6004,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var namedVar = new NamedVariable(
             Tree.RandomId(),
-            Space.Empty,
+            namePrefix,
             Markers.Empty,
             name,
             [],
@@ -7324,6 +7320,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         for (var i = 0; i < typeParamList.Parameters.Count; i++)
         {
             var param = typeParamList.Parameters[i];
+            var paramPrefix = ExtractPrefix(param);
 
             // Parse attribute lists on type parameter (e.g., [MaybeNull] T)
             var attrLists = new List<AttributeList>();
@@ -7398,7 +7395,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
             var typeParam = new TypeParameter(
                 Tree.RandomId(),
-                Space.Empty,
+                paramPrefix,
                 Markers.Empty,
                 [],    // Annotations
                 [],    // Modifiers
@@ -8079,6 +8076,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             attributeLists.Add((AttributeList)Visit(attrList)!);
         }
+        var declarationPrefix = ExtractPrefixAfter(node.AttributeLists);
 
         // Parse modifiers
         var modifiers = new List<Modifier>();
@@ -8167,7 +8165,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var varDecl = new VariableDeclarations(
             Tree.RandomId(),
-            attributeLists.Count > 0 ? Space.Empty : prefix,
+            attributeLists.Count > 0 ? declarationPrefix : prefix,
             Markers.Empty,
             [],
             modifiers,
@@ -8201,6 +8199,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             attributeLists.Add((AttributeList)Visit(attrList)!);
         }
+        var declarationPrefix = ExtractPrefixAfter(node.AttributeLists);
 
         // Parse modifiers — includes the 'event' keyword
         var modifiers = new List<Modifier>();
@@ -8288,7 +8287,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var varDecl = new VariableDeclarations(
             Tree.RandomId(),
-            attributeLists.Count > 0 ? Space.Empty : prefix,
+            attributeLists.Count > 0 ? declarationPrefix : prefix,
             Markers.Empty,
             [],
             modifiers,
@@ -9646,6 +9645,18 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         return new JRightPadded<ExternAlias>(ea, after, Markers.Empty);
     }
 
+    /// <summary>
+    /// A statement in the place of an expression, which takes over the space before the statement.
+    /// </summary>
+    private static StatementExpression AsExpression(Statement statement) =>
+        new(Tree.RandomId(), statement.Prefix, Markers.Empty, J.SetPrefix(statement, Space.Empty));
+
+    /// <summary>
+    /// The space after attribute lists belongs to the declaration they annotate, not to its first token.
+    /// </summary>
+    private Space ExtractPrefixAfter(SyntaxList<AttributeListSyntax> attributeLists) =>
+        attributeLists.Count > 0 ? ExtractSpaceBefore(attributeLists.Last().GetLastToken().GetNextToken()) : Space.Empty;
+
     private Space ExtractPrefix(SyntaxNode node)
     {
         var start = node.SpanStart;
@@ -9846,7 +9857,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             }
 
             var varDecl = new VariableDeclarations(Tree.RandomId(), declPrefix, Markers.Empty, [], [], typeExpr, null, [], variables);
-            innerExpr = new StatementExpression(Tree.RandomId(), Space.Empty, Markers.Empty, varDecl);
+            innerExpr = AsExpression(varDecl);
         }
         else
         {

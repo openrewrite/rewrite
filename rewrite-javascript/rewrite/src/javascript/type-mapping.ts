@@ -910,6 +910,22 @@ export class JavaScriptTypeMapping {
         return method;
     }
 
+    // A method is declared by one class, which an object literal that spreads a union, for one, is not.
+    private declaringType(type: ts.Type): Type.FullyQualified {
+        const mapped = this.getType(type);
+        switch (mapped.kind) {
+            case Type.Kind.Class:
+            case Type.Kind.Annotation:
+            case Type.Kind.ShallowClass:
+            case Type.Kind.Parameterized:
+                return mapped as Type.FullyQualified;
+            case Type.Kind.Primitive:
+                return this.wrapperType(mapped as Type.Primitive);
+            default:
+                return Type.unknownType as Type.FullyQualified;
+        }
+    }
+
     private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
         if (declaringType === Type.Primitive.String && this.stringWrapperType) {
             return this.getType(this.stringWrapperType) as Type.FullyQualified;
@@ -1184,7 +1200,7 @@ export class JavaScriptTypeMapping {
                         const parent = (symbol as any).parent;
                         if (parent) {
                             const parentType = this.checker.getDeclaredTypeOfSymbol(parent);
-                            declaringType = this.getType(parentType) as Type.FullyQualified;
+                            declaringType = this.declaringType(parentType);
                         } else {
                             declaringType = Type.unknownType as Type.FullyQualified;
                         }
@@ -1220,7 +1236,7 @@ export class JavaScriptTypeMapping {
             const parent = node.parent;
             if (ts.isClassDeclaration(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent)) {
                 const parentType = this.checker.getTypeAtLocation(parent);
-                declaringType = this.getType(parentType) as Type.FullyQualified;
+                declaringType = this.declaringType(parentType);
             } else {
                 declaringType = Type.unknownType as Type.FullyQualified;
             }
@@ -1243,7 +1259,7 @@ export class JavaScriptTypeMapping {
             const parent = node.parent;
             if (ts.isClassDeclaration(parent) || ts.isClassExpression(parent)) {
                 const parentType = this.checker.getTypeAtLocation(parent);
-                declaringType = this.getType(parentType) as Type.FullyQualified;
+                declaringType = this.declaringType(parentType);
             } else {
                 declaringType = Type.unknownType as Type.FullyQualified;
             }

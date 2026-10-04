@@ -874,6 +874,37 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('a method of an object literal that is typed as a union has no union for a declaring type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, _type) => {
+                if (node?.kind === J.Kind.MethodDeclaration && (node as J.MethodDeclaration).name.simpleName === 'method') {
+                    const declaringType = (node as J.MethodDeclaration).methodType?.declaringType;
+                    return `declared by ${declaringType?.kind.replace(/.*\$/, '')}`;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        declare function either(): { a: number } | { b: string };
+                        const spread = {
+                            ...either(),
+                            method(value: string) { return value; }
+                        };
+                    `,
+                    `
+                        declare function either(): { a: number } | { b: string };
+                        const spread = {
+                            ...either(),
+                            /*~~(declared by Unknown)~~>*/method(value: string) { return value; }
+                        };
+                    `
+                )
+            );
+        });
+
         test.skip('should map generic types', async () => {
             // TODO: Implement in Phase 5
             const spec = new RecipeSpec();

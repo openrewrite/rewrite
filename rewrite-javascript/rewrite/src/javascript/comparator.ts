@@ -2634,6 +2634,16 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         );
         if (!this.match) return methodDeclaration;
 
+        // Visit name annotations
+        await this.visitArrayProperty(
+            methodDeclaration,
+            'nameAnnotations',
+            methodDeclaration.nameAnnotations,
+            otherMethodDeclaration.nameAnnotations,
+            async (ann1, ann2) => { await this.visit(ann1, ann2); }
+        );
+        if (!this.match) return methodDeclaration;
+
         // Visit type parameters if present
         if (!!methodDeclaration.typeParameters !== !!otherMethodDeclaration.typeParameters) {
             return this.structuralMismatch('typeParameters');

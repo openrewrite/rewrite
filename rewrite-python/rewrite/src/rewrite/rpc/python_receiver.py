@@ -18,13 +18,15 @@ Python RPC Receiver that mirrors Java's PythonReceiver structure.
 This uses the visitor pattern with pre_visit handling common fields (id, prefix, markers)
 and type-specific visit methods handling only additional fields.
 """
+from dataclasses import fields, is_dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Optional, Type, TypeVar
+from typing import Any, Callable, Optional, Type, TypeVar, get_type_hints
 
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
 from rewrite.python import CompilationUnit
+from rewrite.python.support_types import PyComment
 from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
@@ -175,6 +177,8 @@ class PythonRpcReceiver:
         new_id = q.receive(j._id)  # ty: ignore[unresolved-attribute]  # _id on concrete J subclasses
         new_prefix = q.receive(j.prefix)
         new_markers = q.receive_markers(j.markers)
+        if new_markers is not j.markers and None in new_markers.markers:
+            new_markers = _restore_legacy_spelling(j, new_markers)
 
         return q.apply(j, _id=new_id, _prefix=new_prefix, _markers=new_markers)
 
@@ -284,7 +288,8 @@ class PythonRpcReceiver:
     def _visit_formatted_string_value(self, v: FormattedString.Value, q: RpcReceiveQueue) -> FormattedString.Value:
         expression = q.receive(v.padding.expression)
         debug = q.receive(v.padding.debug)
-        conversion = _to_enum(FormattedString.Value.Conversion)(q.receive(v.conversion))
+        conversion = q.receive(v.padding.conversion, lambda rp: self._receive_right_padded(
+            rp, q, _to_enum(FormattedString.Value.Conversion)))
         format_ = q.receive(v.format)
         return q.apply(v, expression=expression, debug=debug, conversion=conversion, format=format_)
 
@@ -405,7 +410,7 @@ class PythonRpcReceiver:
             AssignmentOperation, Unary, Ternary, Lambda, Empty, Throw,
             Assert, Break, Continue, WhileLoop, ForEachLoop, Switch, Case,
             Annotation, Import, Binary as JBinary, Parentheses, ControlParentheses,
-            NewArray, Modifier, Yield, ParameterizedType, TypeParameter, TypeParameters
+            NewArray, Modifier, Yield, ParameterizedType, TypeParameter, TypeParameters, Unknown
         )
 
         if isinstance(j, Identifier):
@@ -498,6 +503,10 @@ class PythonRpcReceiver:
             return self._visit_j_type_parameter(j, q)
         elif isinstance(j, TypeParameters):
             return self._visit_j_type_parameters(j, q)
+        elif isinstance(j, Unknown):
+            return q.apply(j, source=q.receive(j.source))
+        elif isinstance(j, Unknown.Source):
+            return q.apply(j, text=q.receive(j.text))
 
         return j
 
@@ -874,15 +883,19 @@ class PythonRpcReceiver:
         suffix = q.receive_defined(comment.suffix)
         markers = q.receive_markers(comment.markers)
 
+        if isinstance(comment, PyComment):
+            return PyComment(text, suffix, q.receive_defined(comment.aligned_to_indent), markers)
         return TextComment(multiline, text, suffix, markers)
 
-    def _receive_right_padded(self, rp: JRightPadded, q: RpcReceiveQueue) -> Optional[JRightPadded]:
+    def _receive_right_padded(self, rp: JRightPadded, q: RpcReceiveQueue, element_mapping: Optional[Callable[[Any], Any]] = None) -> Optional[JRightPadded]:
         """Receive a JRightPadded wrapper."""
         if rp is None:
             return None
 
         # Codec registry handles type dispatch automatically
         element = q.receive(rp.element)
+        if element_mapping is not None:
+            element = element_mapping(element)
         after = q.receive_defined(rp.after)
         markers = q.receive_markers(rp.markers)
 
@@ -1251,10 +1264,94 @@ def _send_markup_marker(marker, q):
     q.get_and_send(marker, lambda x: x.detail)
 
 
-def _receive_style(style, q: RpcReceiveQueue):
-    """Codec for receiving Style objects."""
-    # For now, styles are passed through - full deserialization would need more work
-    return style
+def _restore_legacy_spelling(tree: J, markers):
+    """Put back the Python 2 spelling a stored LST lost: while these markers had
+    no codec, the host kept null where the parser had attached one."""
+    from rewrite.java import tree as j
+    from rewrite.python.markers import LegacyNotEqual, RaiseTuple, TupleExceptClause
+
+    if isinstance(tree, j.Throw):
+        spelling = RaiseTuple
+    elif isinstance(tree, j.Try.Catch):
+        spelling = TupleExceptClause
+    elif isinstance(tree, j.Binary):
+        spelling = LegacyNotEqual
+    else:
+        return markers
+    return markers.replace(markers=[spelling(random_id()) if marker is None else marker
+                                    for marker in markers.markers])
+
+
+# Property names the host does not derive from the field name
+_STYLE_PROPERTIES = {'_use_crlf_new_lines': 'useCRLFNewLines'}
+
+
+def _style_property(field_name: str) -> str:
+    head, *rest = field_name.lstrip('_').split('_')
+    return _STYLE_PROPERTIES.get(field_name) or head + ''.join(part.capitalize() for part in rest)
+
+
+def _style_types() -> dict:
+    from rewrite.python import style
+    from rewrite.style import GeneralFormatStyle
+    types = {f'org.openrewrite.python.style.{cls.__name__}': cls for cls in (
+        style.SpacesStyle, style.TabsAndIndentsStyle, style.WrappingAndBracesStyle,
+        style.BlankLinesStyle, style.OtherStyle)}
+    types['org.openrewrite.style.GeneralFormatStyle'] = GeneralFormatStyle
+    return types
+
+
+def _style_from_value(cls, value: dict):
+    hints = get_type_hints(cls)
+    properties = {}
+    for field in fields(cls):
+        property_value = value.get(_style_property(field.name))
+        nested = isinstance(property_value, dict) and is_dataclass(hints[field.name])
+        properties[field.name] = _style_from_value(hints[field.name], property_value) if nested else property_value
+    return cls(**properties)
+
+
+def _style_to_value(style) -> dict:
+    value = {}
+    for field in fields(style):
+        property_value = getattr(style, field.name)
+        value[_style_property(field.name)] = \
+            _style_to_value(property_value) if is_dataclass(property_value) else property_value
+    return value
+
+
+def _named_styles_from_value(cls, value: dict):
+    """Read a set of styles as the host serializes it, having no codec for one."""
+    from rewrite.style import NamedStyles
+
+    types = _style_types()
+    # a style only the host knows is kept as it arrived, to be sent back intact
+    styles = [_style_from_value(types[style['@c']], style)
+              if isinstance(style, dict) and style.get('@c') in types else style
+              for style in value.get('styles') or []]
+    # a subclass has a constructor of its own, which takes no fields
+    named = cls.__new__(cls)
+    NamedStyles.__init__(named, value['id'], value.get('name'), value.get('displayName'),
+                         value.get('description'), set(value.get('tags') or []), styles)
+    return named
+
+
+def _named_styles_to_value(named) -> dict:
+    types = {cls: java_type for java_type, cls in _style_types().items()}
+    styles = []
+    # the host's deserializer wants an object id on each style, and gives the first to the set itself
+    for ref, style in enumerate(named._styles or [], start=2):
+        value = dict(style) if isinstance(style, dict) else {'@c': types[type(style)], **_style_to_value(style)}
+        value['@ref'] = ref
+        styles.append(value)
+    return {
+        'id': id_to_str(named._id),
+        'name': named._name,
+        'displayName': named._display_name,
+        'description': named._description,
+        'tags': sorted(named._tags or []),
+        'styles': styles,
+    }
 
 
 def _receive_java_type_primitive(primitive, q: RpcReceiveQueue):
@@ -1659,6 +1756,12 @@ def _register_support_type_codecs():
         _receive_comment,
         lambda: TextComment(False, '', '', Markers.EMPTY)
     )
+    register_codec_with_both_names(
+        'org.openrewrite.python.tree.PyComment',
+        PyComment,
+        _receive_comment,
+        lambda: PyComment('', '', False, Markers.EMPTY)
+    )
 
 
 def _register_core_marker_codecs():
@@ -1731,15 +1834,17 @@ def _register_markup_marker_codecs():
 
 
 def _register_style_codecs():
-    """Register codecs for style types."""
-    from rewrite.style import GeneralFormatStyle, NamedStyles
-    from rewrite.rpc.receive_queue import register_codec_with_both_names, make_dataclass_factory
+    """Register the sets of styles, which the host sends and reads whole."""
+    from rewrite.python.style import IntelliJ
+    from rewrite.style import NamedStyles
+    from rewrite.rpc.receive_queue import register_value_codec
 
     for cls, java_name in [
-        (GeneralFormatStyle, 'org.openrewrite.style.GeneralFormatStyle'),
         (NamedStyles, 'org.openrewrite.style.NamedStyles'),
+        (IntelliJ, 'org.openrewrite.python.style.IntelliJ'),
     ]:
-        register_codec_with_both_names(java_name, cls, _receive_style, make_dataclass_factory(cls))
+        register_value_codec(java_name, cls, lambda value, c=cls: _named_styles_from_value(c, value),
+                             _named_styles_to_value)
 
 
 def _receive_parse_error(parse_error, q: RpcReceiveQueue):
@@ -1812,7 +1917,8 @@ def _register_python_marker_codecs():
     """Register codecs for Python-specific marker types."""
     from rewrite.python.markers import (
         KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline,
-        PrintSyntax, ExecSyntax
+        PrintSyntax, ExecSyntax,
+        LegacyNotEqual, RaiseTuple, TupleExceptClause,
     )
     from rewrite.rpc.receive_queue import register_codec_with_both_names
     from rewrite.rpc.send_queue import RpcSendQueue
@@ -1944,6 +2050,25 @@ def _register_python_marker_codecs():
         lambda: ExecSyntax(random_id()),
         _send_exec_syntax
     )
+
+    # The Python 2 spellings - each only has id
+    def _receive_legacy_spelling(marker, q: RpcReceiveQueue):
+        new_id = q.receive_defined(marker.id)
+        if new_id is marker.id:
+            return marker
+        return marker.with_id(new_id)
+
+    def _send_legacy_spelling(marker, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
+
+    for py_cls in (LegacyNotEqual, RaiseTuple, TupleExceptClause):
+        register_codec_with_both_names(
+            f'org.openrewrite.python.marker.{py_cls.__name__}',
+            py_cls,
+            _receive_legacy_spelling,
+            lambda c=py_cls: c(random_id()),
+            _send_legacy_spelling
+        )
 
 
 def _register_python_resolution_result_codecs():

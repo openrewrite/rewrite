@@ -29,7 +29,7 @@ import {
     TypeTree,
     VariableDeclarator,
 } from '../java';
-import {DelegatedYield, FunctionDeclaration, Generator, JS, JSX, NonNullAssertion, Optional} from '.';
+import {Computed, DelegatedYield, FunctionDeclaration, Generator, JS, JSX, NonNullAssertion, Optional} from '.';
 import {emptyMarkers, markers, Markers, MarkersKind, ParseExceptionResult, replaceMarkerByKind} from "../markers";
 import {NamedStyles} from "../style";
 import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers, SourcePath} from "../parser";
@@ -47,7 +47,7 @@ import {
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
 import {TsConfigResolver} from "./tsconfig";
-import {create as produce} from "mutative";
+import {castDraft, create as produce} from "mutative";
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
@@ -626,26 +626,13 @@ export class JavaScriptParserVisitor {
 
     private mapModifiers(node: ts.VariableDeclarationList | ts.VariableStatement | ts.ClassDeclaration | ts.PropertyDeclaration
         | ts.FunctionDeclaration | ts.ParameterDeclaration | ts.MethodDeclaration | ts.EnumDeclaration | ts.InterfaceDeclaration
-        | ts.PropertySignature | ts.ConstructorDeclaration | ts.ModuleDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration
-        | ts.ArrowFunction | ts.IndexSignatureDeclaration | ts.TypeAliasDeclaration | ts.ExportDeclaration | ts.ExportAssignment | ts.FunctionExpression
-        | ts.ConstructorTypeNode | ts.TypeParameterDeclaration | ts.ImportDeclaration | ts.ImportEqualsDeclaration
-        | ts.PropertyAssignment | ts.ShorthandPropertyAssignment): J.Modifier[] {
-        if (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) {
-            const modifiers = (node as WithInvalidSyntaxSlots<typeof node>).modifiers;
-            return modifiers ? modifiers.filter(ts.isModifier).map(this.mapModifier) : [];
-        }
-        if (ts.isVariableStatement(node) || ts.isModuleDeclaration(node) || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)
-            || ts.isInterfaceDeclaration(node) || ts.isPropertyDeclaration(node) || ts.isPropertySignature(node) || ts.isParameter(node)
+        | ts.PropertySignature | ts.MethodSignature | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration
+        | ts.ArrowFunction | ts.FunctionExpression | ts.ConstructorTypeNode | ts.TypeParameterDeclaration): J.Modifier[] {
+        if (ts.isVariableStatement(node) || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)
+            || ts.isInterfaceDeclaration(node) || ts.isPropertyDeclaration(node) || ts.isPropertySignature(node) || ts.isMethodSignature(node) || ts.isParameter(node)
             || ts.isMethodDeclaration(node) || ts.isConstructorDeclaration(node) || ts.isArrowFunction(node)
-            || ts.isIndexSignatureDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isExportDeclaration(node)
-            || ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isConstructorTypeNode(node) || ts.isTypeParameterDeclaration(node) || ts.isImportDeclaration(node) || ts.isImportEqualsDeclaration(node)) {
-            return node.modifiers ? node.modifiers?.filter(ts.isModifier).map(this.mapModifier) : [];
-        } else if (ts.isExportAssignment(node)) {
-            const defaultModifier = this.findChildNode(node, ts.SyntaxKind.DefaultKeyword);
-            return [
-                ...node.modifiers ? node.modifiers?.filter(ts.isModifier).map(this.mapModifier) : [],
-                ...defaultModifier && ts.isModifier(defaultModifier) ? [this.mapModifier(defaultModifier)] : []
-            ]
+            || ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isConstructorTypeNode(node) || ts.isTypeParameterDeclaration(node)) {
+            return this.mapKeywordModifiers(node.modifiers);
         } else if (ts.isVariableDeclarationList(node)) {
             let modifier: string | undefined;
             if ((node.flags & ts.NodeFlags.Let) !== 0) {
@@ -665,27 +652,70 @@ export class JavaScriptParserVisitor {
                 annotations: []
             }] : [];
         } else if (ts.isGetAccessorDeclaration(node)) {
-            return (node.modifiers ? node.modifiers?.filter(ts.isModifier).map(this.mapModifier) : []).concat({
+            return this.mapKeywordModifiers(node.modifiers).concat({
                 kind: J.Kind.Modifier,
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.GetKeyword)!),
                 markers: emptyMarkers,
                 keyword: 'get',
                 type: J.ModifierType.LanguageExtension,
-                annotations: []
+                annotations: this.mapTrailingDecorators(node)
             });
         } else if (ts.isSetAccessorDeclaration(node)) {
-            return (node.modifiers ? node.modifiers?.filter(ts.isModifier).map(this.mapModifier) : []).concat({
+            return this.mapKeywordModifiers(node.modifiers).concat({
                 kind: J.Kind.Modifier,
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.SetKeyword)!),
                 markers: emptyMarkers,
                 keyword: 'set',
                 type: J.ModifierType.LanguageExtension,
-                annotations: []
+                annotations: this.mapTrailingDecorators(node)
             });
         }
         throw new Error(`Cannot get modifiers from ${node}`);
+    }
+
+    // A decorator written after a modifier is an annotation of the modifier that follows it.
+    private mapKeywordModifiers(modifiers: readonly ts.ModifierLike[] | undefined): J.Modifier[] {
+        const mapped: J.Modifier[] = [];
+        let decorators: ts.Decorator[] = [];
+        for (const modifier of modifiers ?? []) {
+            if (ts.isDecorator(modifier)) {
+                decorators.push(modifier);
+            } else {
+                const annotations = mapped.length > 0 ? decorators.map(this.convert<J.Annotation>) : [];
+                mapped.push({...this.mapModifier(modifier), annotations});
+                decorators = [];
+            }
+        }
+        return mapped;
+    }
+
+    // For a tree with no annotations of its own: a decorator is an annotation of the modifier written after it.
+    private mapDecoratedModifiers(modifiers: readonly ts.ModifierLike[] | undefined): J.Modifier[] {
+        const mapped: J.Modifier[] = [];
+        let decorators: ts.Decorator[] = [];
+        for (const modifier of modifiers ?? []) {
+            if (ts.isDecorator(modifier)) {
+                decorators.push(modifier);
+            } else {
+                const annotations = decorators.map(this.convert<J.Annotation>);
+                mapped.push({...this.mapModifier(modifier), annotations});
+                decorators = [];
+            }
+        }
+        this.reject(decorators);
+        return mapped;
+    }
+
+    // What the model has no place for is refused in the compiler's words, never left out of the tree.
+    private reject(modifiers: readonly ts.ModifierLike[] | undefined): void {
+        if (!modifiers || modifiers.length === 0) {
+            return;
+        }
+        const {line, character} = this.sourceFile.getLineAndCharacterOfPosition(modifiers[0].getStart(this.sourceFile));
+        const message = ts.isDecorator(modifiers[0]) ? "Decorators are not valid here." : "Modifiers cannot appear here.";
+        throw new SyntaxError(`(${line + 1},${character + 1}): ${message}`);
     }
 
     private mapModifier = (node: ts.Modifier | ts.ModifierLike): J.Modifier => {
@@ -789,7 +819,7 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
                 markers: emptyMarkers,
-                annotations: [],
+                annotations: this.mapTrailingDecorators(node),
                 type: J.ClassDeclaration.Kind.Type.Class
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
@@ -1157,6 +1187,7 @@ export class JavaScriptParserVisitor {
             };
             name = spread;
         }
+        name = this.annotateName(name, this.trailingDecorators(node));
         return {
             kind: J.Kind.VariableDeclarations,
             id: randomId(),
@@ -1181,6 +1212,29 @@ export class JavaScriptParserVisitor {
         };
     }
 
+    // A decorator written after the last modifier of a parameter is an annotation of the name it is written before.
+    private annotateName(name: VariableDeclarator, decorators: ts.Decorator[]): VariableDeclarator {
+        if (decorators.length === 0) {
+            return name;
+        }
+        if (name.kind === J.Kind.Identifier) {
+            const annotations = decorators.map(this.convert<J.Annotation>);
+            return {...name as J.Identifier, annotations} satisfies J.Identifier as J.Identifier;
+        }
+        if (name.kind === JS.Kind.ObjectBindingPattern) {
+            // a pattern prints its annotations after its prefix, so the space before its brace moves behind them
+            const pattern = name as JS.ObjectBindingPattern;
+            return {
+                ...pattern,
+                prefix: emptySpace,
+                leadingAnnotations: decorators.map(this.convert<J.Annotation>),
+                bindings: {...pattern.bindings, before: pattern.prefix}
+            } satisfies JS.ObjectBindingPattern as JS.ObjectBindingPattern;
+        }
+        this.reject(decorators);
+        return name;
+    }
+
     visitDecorator(node: ts.Decorator): J.Annotation | J.Unknown {
         let annotationType: NameTree | TypeTree;
         let _arguments: J.Container<Expression> | undefined = undefined;
@@ -1196,7 +1250,7 @@ export class JavaScriptParserVisitor {
                 prefix: emptySpace,
                 markers: emptyMarkers,
                 clazz: this.convert<J>(node.expression.expression) as Expression,
-                typeArguments: this.mapTypeArguments(this.suffix(node.expression.expression), node.expression.typeArguments)
+                typeArguments: this.mapTypeArguments(this.typeArgumentsPrefix(node.expression, node.expression.typeArguments), node.expression.typeArguments)
             } satisfies JS.ExpressionWithTypeArguments as JS.ExpressionWithTypeArguments;
             _arguments = this.mapCommaSeparatedList(node.expression.getChildren(this.sourceFile).slice(-3))
         } else if (ts.isCallExpression(node.expression)) {
@@ -1310,7 +1364,7 @@ export class JavaScriptParserVisitor {
                 prefix: prefix,
                 markers: emptyMarkers,
                 leadingAnnotations: [], // no decorators allowed
-                modifiers: [], // no modifiers allowed
+                modifiers: this.mapModifiers(node),
                 typeParameters: this.mapTypeParametersAsObject(node),
                 returnTypeExpression: this.mapTypeInfo(node),
                 name: produce(this.convert<ComputedPropertyName>(node.name), draft => {
@@ -1331,7 +1385,7 @@ export class JavaScriptParserVisitor {
             prefix: prefix,
             markers: emptyMarkers,
             leadingAnnotations: [], // no decorators allowed
-            modifiers: [], // no modifiers allowed
+            modifiers: this.mapModifiers(node),
             typeParameters: this.mapTypeParametersAsObject(node),
             returnTypeExpression: this.mapTypeInfo(node),
             nameAnnotations: [],
@@ -1361,6 +1415,7 @@ export class JavaScriptParserVisitor {
         });
 
         if (ts.isComputedPropertyName(node.name)) {
+            this.reject(this.trailingDecorators(node));
             return {
                 kind: JS.Kind.ComputedPropertyMethodDeclaration,
                 id: randomId(),
@@ -1386,7 +1441,7 @@ export class JavaScriptParserVisitor {
             modifiers: this.mapModifiers(node),
             typeParameters: this.mapTypeParametersAsObject(node),
             returnTypeExpression: this.mapTypeInfo(node),
-            nameAnnotations: [],
+            nameAnnotations: this.mapTrailingDecorators(node),
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             dimensionsAfterName: [],
@@ -1430,6 +1485,7 @@ export class JavaScriptParserVisitor {
     }
 
     visitClassStaticBlockDeclaration(node: ts.ClassStaticBlockDeclaration): J.Block {
+        this.reject((node as WithInvalidSyntaxSlots<ts.ClassStaticBlockDeclaration>).modifiers);
         return {
             kind: J.Kind.Block,
             id: randomId(),
@@ -1606,7 +1662,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
+            modifiers: this.mapDecoratedModifiers(node.modifiers),
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node, ts.SyntaxKind.OpenBracketToken)),
             typeExpression: this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(node.type) - 1)), this.convert(node.type)),
             type: this.mapType(node)
@@ -1634,7 +1690,7 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(node),
                 markers: emptyMarkers,
                 class: this.visit(node.typeName),
-                typeParameters: this.mapTypeArguments(this.suffix(node.typeName), node.typeArguments),
+                typeParameters: this.mapTypeArguments(this.typeArgumentsPrefix(node, node.typeArguments), node.typeArguments),
                 type: this.mapType(node)
             }
         }
@@ -1684,7 +1740,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             typeExpression: this.convert(node.exprName),
-            typeArguments: node.typeArguments && this.mapTypeArguments(this.suffix(node.exprName), node.typeArguments),
+            typeArguments: node.typeArguments && this.mapTypeArguments(this.typeArgumentsPrefix(node, node.typeArguments), node.typeArguments),
             type: this.mapType(node)
         }
     }
@@ -2089,7 +2145,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers
             },
             qualifier: node.qualifier && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.DotToken)!), this.visit(node.qualifier)),
-            typeArguments: node.typeArguments && this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments),
+            typeArguments: node.typeArguments && this.mapTypeArguments(this.typeArgumentsPrefix(node, node.typeArguments), node.typeArguments),
             type: this.mapType(node)
         };
     }
@@ -2244,9 +2300,8 @@ export class JavaScriptParserVisitor {
 
     visitCallExpression(node: ts.CallExpression): J.MethodInvocation | JS.FunctionCall {
         const prefix = this.prefix(node);
-        const ltToken = this.findChildNode(node, ts.SyntaxKind.LessThanToken);
-        const typeArguments = node.typeArguments && ltToken
-            ? this.mapTypeArguments(this.prefix(ltToken), node.typeArguments)
+        const typeArguments = node.typeArguments
+            ? this.mapTypeArguments(this.typeArgumentsPrefix(node, node.typeArguments), node.typeArguments)
             : undefined;
 
         let select: J.RightPadded<Expression> | undefined;
@@ -2348,7 +2403,7 @@ export class JavaScriptParserVisitor {
                     }
                     return typeTree;
                 })(),
-                typeParameters: this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments),
+                typeParameters: this.mapTypeArguments(this.typeArgumentsPrefix(node, node.typeArguments), node.typeArguments),
                 type: undefined
             } satisfies J.ParameterizedType as J.ParameterizedType : this.mapTypeTree(node.expression),
             arguments: node.arguments ?
@@ -2369,7 +2424,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            tag: this.rightPadded(this.visit(node.tag), this.suffix(node.tag)),
+            tag: this.rightPadded(this.visit(node.tag), node.typeArguments ? this.typeArgumentsPrefix(node, node.typeArguments) : this.suffix(node.tag)),
             typeArguments: node.typeArguments && this.mapTypeArguments(emptySpace, node.typeArguments),
             templateExpression: this.convert(node.template),
             type: this.mapType(node)
@@ -2838,13 +2893,13 @@ export class JavaScriptParserVisitor {
                 prefix: emptySpace,
                 markers: emptyMarkers,
                 leadingAnnotations: this.mapDecorators(node),
-                modifiers: [],
+                modifiers: this.mapKeywordModifiers(node.modifiers),
                 classKind: {
                     kind: J.Kind.ClassDeclarationKind,
                     id: randomId(),
                     prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
                     markers: emptyMarkers,
-                    annotations: [],
+                    annotations: this.mapTrailingDecorators(node),
                     type: J.ClassDeclaration.Kind.Type.Class
                 },
                 name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
@@ -2885,7 +2940,7 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(node),
                 markers: emptyMarkers,
                 clazz: this.visit(node.expression),
-                typeArguments: this.mapTypeArguments(this.suffix(node.expression), node.typeArguments),
+                typeArguments: this.mapTypeArguments(this.typeArgumentsPrefix(node, node.typeArguments), node.typeArguments),
                 type: this.mapType(node)
             }
         }
@@ -2976,10 +3031,34 @@ export class JavaScriptParserVisitor {
 
     visitVariableStatement(node: ts.VariableStatement): JS.ScopedVariableDeclarations | J.VariableDeclarations {
         const prefix = this.prefix(node);
+        const leading = this.mapDecorators(node);
+        const modifiers = this.mapModifiers(node);
+        const trailing = this.mapTrailingDecorators(node);
         return produce(this.visitVariableDeclarationList(node.declarationList), draft => {
             draft.prefix = prefix;
-            draft.modifiers = this.mapModifiers(node).concat(draft.modifiers);
+            // `const`, `let` or `var` is the modifier that follows them
+            draft.modifiers[0].annotations = castDraft(trailing);
+            draft.modifiers = castDraft(modifiers).concat(draft.modifiers);
+            if (draft.kind === J.Kind.VariableDeclarations) {
+                draft.leadingAnnotations = castDraft(leading);
+            } else if (leading.length > 0) {
+                draft.modifiers[0].annotations = castDraft(leading);
+            }
         });
+    }
+
+    // A loop variable is a statement in the model, which a pattern or an access expression is not.
+    private asStatement(tree: J): Statement {
+        if (isStatement(tree)) {
+            return tree;
+        }
+        return {
+            kind: JS.Kind.ExpressionStatement,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            expression: tree as Expression
+        } satisfies JS.ExpressionStatement as JS.ExpressionStatement;
     }
 
     visitExpressionStatement(node: ts.ExpressionStatement): Statement {
@@ -3152,7 +3231,7 @@ export class JavaScriptParserVisitor {
                             prefix: emptySpace
                         }, this.suffix(node.initializer));
                     } else {
-                        return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
+                        return this.rightPadded(this.asStatement(this.visit(node.initializer)), this.suffix(node.initializer))
                     }
                 })(),
                 iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
@@ -3215,7 +3294,7 @@ export class JavaScriptParserVisitor {
                                 } satisfies JS.ArrayBindingPattern as JS.ArrayBindingPattern,
                             } satisfies JS.ExpressionStatement as JS.ExpressionStatement, this.suffix(node.initializer));
                         } else if (ts.isObjectLiteralExpression(node.initializer)) {
-                            return this.rightPadded({
+                            return this.rightPadded(this.asStatement({
                                 kind: JS.Kind.ObjectBindingPattern,
                                 id: randomId(),
                                 leadingAnnotations: [],
@@ -3230,9 +3309,9 @@ export class JavaScriptParserVisitor {
                                 },
                                 markers: emptyMarkers,
                                 prefix: emptySpace
-                            }, this.suffix(node.initializer))
+                            } satisfies JS.ObjectBindingPattern as JS.ObjectBindingPattern), this.suffix(node.initializer))
                         } else {
-                            return this.rightPadded(this.visit(node.initializer), this.suffix(node.initializer))
+                            return this.rightPadded(this.asStatement(this.visit(node.initializer)), this.suffix(node.initializer))
                         }
                     })(),
                     iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
@@ -3509,8 +3588,8 @@ export class JavaScriptParserVisitor {
                     } satisfies Generator as Generator);
                 }
             }),
-            leadingAnnotations: [],
-            nameAnnotations: [],
+            leadingAnnotations: this.mapDecorators(node),
+            nameAnnotations: this.mapTrailingDecorators(node),
             modifiers: this.mapModifiers(node),
             name: this.mapMethodName(node, methodType) as J.Identifier,
             typeParameters: this.mapTypeParametersAsObject(node),
@@ -3538,14 +3617,14 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            leadingAnnotations: [],
+            leadingAnnotations: this.mapDecorators(node),
             modifiers: this.mapModifiers(node),
             classKind: {
                 kind: J.Kind.ClassDeclarationKind,
                 id: randomId(),
                 prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
                 markers: emptyMarkers,
-                annotations: [],
+                annotations: this.mapTrailingDecorators(node),
                 type: J.ClassDeclaration.Kind.Type.Interface
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
@@ -3575,7 +3654,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
+            modifiers: this.mapDecoratedModifiers(node.modifiers),
             name: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!), this.visit(node.name)),
             typeParameters: node.typeParameters && this.mapTypeParametersAsObject(node),
             initializer: this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!), this.convert(node.type)),
@@ -3589,14 +3668,14 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            leadingAnnotations: [],
+            leadingAnnotations: this.mapDecorators(node),
             modifiers: this.mapModifiers(node),
             classKind: {
                 kind: J.Kind.ClassDeclarationKind,
                 id: randomId(),
                 prefix: node.modifiers ? this.suffix(node.modifiers[node.modifiers.length - 1]) : this.prefix(node),
                 markers: emptyMarkers,
-                annotations: [],
+                annotations: this.mapTrailingDecorators(node),
                 type: J.ClassDeclaration.Kind.Type.Enum
             },
             name: node.name ? this.convert(node.name) : this.mapIdentifier(node, ""),
@@ -3648,7 +3727,7 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: emptySpace,
                 markers: emptyMarkers,
-                modifiers: this.mapModifiers(node),
+                modifiers: this.mapDecoratedModifiers(node.modifiers),
                 keywordType: this.leftPadded(
                     namespaceKeyword ? this.prefix(namespaceKeyword) : emptySpace,
                     keywordType
@@ -3680,7 +3759,7 @@ export class JavaScriptParserVisitor {
                 id: randomId(),
                 prefix: this.prefix(node),
                 markers: emptyMarkers,
-                modifiers: this.mapModifiers(node),
+                modifiers: this.mapDecoratedModifiers(node.modifiers),
                 keywordType: this.leftPadded(
                     namespaceKeyword ? this.prefix(namespaceKeyword) : emptySpace,
                     keywordType
@@ -3757,21 +3836,15 @@ export class JavaScriptParserVisitor {
     }
 
     visitNamespaceExportDeclaration(node: ts.NamespaceExportDeclaration): JS.NamespaceDeclaration {
+        const prefix = this.prefix(node);
+        const written = (node as WithInvalidSyntaxSlots<ts.NamespaceExportDeclaration>).modifiers ?? [];
         return {
             kind: JS.Kind.NamespaceDeclaration,
             id: randomId(),
-            prefix: this.prefix(node),
+            prefix,
             markers: emptyMarkers,
             modifiers: [
-                {
-                    kind: J.Kind.Modifier,
-                    id: randomId(),
-                    prefix: emptySpace,
-                    markers: emptyMarkers,
-                    keyword: 'export',
-                    type: J.ModifierType.LanguageExtension,
-                    annotations: []
-                },
+                ...this.mapDecoratedModifiers([...written, this.findChildNode(node, ts.SyntaxKind.ExportKeyword) as ts.Modifier]),
                 {
                     kind: J.Kind.Modifier,
                     id: randomId(),
@@ -3788,24 +3861,14 @@ export class JavaScriptParserVisitor {
     }
 
     visitImportEqualsDeclaration(node: ts.ImportEqualsDeclaration): JS.Import {
-        let exportModifierSuffix: J.Space | undefined = undefined;
+        // mapped before the prefix, so that what is written first takes the leading whitespace
+        const modifiers = this.mapDecoratedModifiers(node.modifiers);
         return {
             kind: JS.Kind.Import,
             id: randomId(),
-            modifiers: (() => {
-                const exportModifier = node.modifiers?.find(m => m.kind === ts.SyntaxKind.ExportKeyword);
-                exportModifierSuffix = exportModifier && this.suffix(exportModifier);
-                return exportModifier ? [{
-                    kind: J.Kind.Modifier,
-                    id: randomId(),
-                    prefix: this.prefix(exportModifier),
-                    markers: emptyMarkers,
-                    keyword: 'export',
-                    type: J.ModifierType.LanguageExtension,
-                    annotations: []
-                }] : [];
-            })(),
-            prefix: exportModifierSuffix ? exportModifierSuffix : this.prefix(node),
+            prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.ImportKeyword)!),
+            markers: emptyMarkers,
+            modifiers,
             importClause: {
                 kind: JS.Kind.ImportClause,
                 id: randomId(),
@@ -3822,7 +3885,6 @@ export class JavaScriptParserVisitor {
                 name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
                 namedBindings: undefined
             },
-            markers: emptyMarkers,
             moduleSpecifier: undefined,
             attributes: undefined,
             initializer: this.leftPadded(this.suffix(node.name), this.visit(node.moduleReference))
@@ -3835,12 +3897,13 @@ export class JavaScriptParserVisitor {
     }
 
     visitImportDeclaration(node: ts.ImportDeclaration): JS.Import {
+        const modifiers = this.mapDecoratedModifiers(node.modifiers);
         return {
             kind: JS.Kind.Import,
             id: randomId(),
-            prefix: this.prefix(node),
+            prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.ImportKeyword)!),
             markers: emptyMarkers,
-            modifiers: [],
+            modifiers,
             importClause: node.importClause && this.visit(node.importClause),
             moduleSpecifier: this.leftPadded(node.importClause ? this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!) : emptySpace, this.visit(node.moduleSpecifier)),
             attributes: node.attributes && this.visit(node.attributes)
@@ -3928,6 +3991,7 @@ export class JavaScriptParserVisitor {
     }
 
     visitExportAssignment(node: ts.ExportAssignment): JS.ExportAssignment {
+        this.reject(node.modifiers);
         return {
             kind: JS.Kind.ExportAssignment,
             id: randomId(),
@@ -3942,12 +4006,13 @@ export class JavaScriptParserVisitor {
     }
 
     visitExportDeclaration(node: ts.ExportDeclaration): JS.ExportDeclaration {
+        const modifiers = this.mapDecoratedModifiers(node.modifiers);
         return {
             kind: JS.Kind.ExportDeclaration,
             id: randomId(),
-            prefix: this.prefix(node),
+            prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExportKeyword)!),
             markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
+            modifiers,
             typeOnly: this.leftPadded(node.isTypeOnly ? this.prefix(this.findChildNode(node, ts.SyntaxKind.TypeKeyword)!) : emptySpace, node.isTypeOnly),
             exportClause: node.exportClause ? this.visit(node.exportClause) : this.mapIdentifier(this.findChildNode(node, ts.SyntaxKind.AsteriskToken)!, "*"),
             moduleSpecifier: node.moduleSpecifier && this.leftPadded(this.prefix(this.findChildNode(node, ts.SyntaxKind.FromKeyword)!), this.visit(node.moduleSpecifier)),
@@ -4295,7 +4360,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
+            modifiers: this.mapDecoratedModifiers((node as WithInvalidSyntaxSlots<ts.PropertyAssignment>).modifiers),
             name: this.rightPadded(this.visit(node.name), this.suffix(node.name)),
             assigmentToken: JS.PropertyAssignment.Token.Colon,
             initializer: this.visit(node.initializer)
@@ -4308,7 +4373,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            modifiers: this.mapModifiers(node),
+            modifiers: this.mapDecoratedModifiers((node as WithInvalidSyntaxSlots<ts.ShorthandPropertyAssignment>).modifiers),
             name: this.rightPadded(this.visit(node.name), this.suffix(node.name)),
             assigmentToken: JS.PropertyAssignment.Token.Equals,
             initializer: node.objectAssignmentInitializer && this.visit(node.objectAssignmentInitializer)
@@ -4333,7 +4398,11 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             annotations: [],
-            name: node.name ? ts.isStringLiteral(node.name) ? this.mapIdentifier(node.name, node.name.getText()) : this.convert(node.name) : this.mapIdentifier(node, ""),
+            name: node.name ?
+                ts.isStringLiteral(node.name) ? this.mapIdentifier(node.name, node.name.getText()) :
+                    ts.isComputedPropertyName(node.name) ? this.mapComputedEnumMemberName(node.name) :
+                        this.convert(node.name) :
+                this.mapIdentifier(node, ""),
             initializer: node.initializer && {
                 kind: J.Kind.NewClass,
                 id: randomId(),
@@ -4349,6 +4418,18 @@ export class JavaScriptParserVisitor {
                 constructorType: this.mapMethodType(node)
             }
         }
+    }
+
+    // An enum member is named by an identifier in the model, so the brackets go in a marker.
+    private mapComputedEnumMemberName(node: ts.ComputedPropertyName): J.Identifier {
+        return {
+            ...this.mapIdentifier(node.expression, node.expression.getText()),
+            markers: markers({
+                kind: JS.Markers.Computed,
+                id: randomId(),
+                suffix: this.suffix(node.expression)
+            } satisfies Computed as Computed)
+        };
     }
 
     visitBundle(node: ts.Bundle) {
@@ -4604,6 +4685,17 @@ export class JavaScriptParserVisitor {
         return this.mapToContainer(nodes, this.trailingComma(nodes));
     }
 
+    // `<<` is scanned as one token, so a list whose first type argument starts with `<` has no `<` among the children.
+    private typeArgumentsPrefix(node: ts.Node, typeArguments: ts.NodeArray<ts.TypeNode>): J.Space {
+        const lessThan = this.findChildNode(node, ts.SyntaxKind.LessThanToken);
+        if (lessThan) {
+            return this.prefix(lessThan);
+        }
+        const start = typeArguments.pos - 1;
+        const fullStart = node.getChildren(this.sourceFile).map(child => child.getEnd()).filter(end => end <= start).pop() ?? start;
+        return this.prefix({getFullStart: () => fullStart, getStart: () => start} as ts.Node);
+    }
+
     private mapTypeArguments(prefix: J.Space, nodes: readonly ts.Node[]): J.Container<Expression> {
         if (nodes.length === 0) {
             return emptyContainer();
@@ -4706,8 +4798,25 @@ export class JavaScriptParserVisitor {
         }
     }
 
-    private mapDecorators(node: ts.ClassDeclaration | ts.FunctionDeclaration | ts.MethodDeclaration | ts.ConstructorDeclaration | ts.ParameterDeclaration | ts.PropertyDeclaration | ts.SetAccessorDeclaration | ts.GetAccessorDeclaration | ts.ClassExpression): J.Annotation[] {
-        return node.modifiers?.filter(ts.isDecorator)?.map(this.convert<J.Annotation>) ?? [];
+    private mapDecorators(node: { readonly modifiers?: ts.NodeArray<ts.ModifierLike> }): J.Annotation[] {
+        const modifiers = node.modifiers ?? [];
+        const firstKeyword = modifiers.findIndex(ts.isModifier);
+        return modifiers.slice(0, firstKeyword < 0 ? modifiers.length : firstKeyword)
+            .filter(ts.isDecorator).map(this.convert<J.Annotation>);
+    }
+
+    // The decorators between the last modifier and the keyword of the declaration.
+    private mapTrailingDecorators(node: { readonly modifiers?: ts.NodeArray<ts.ModifierLike> }): J.Annotation[] {
+        return this.trailingDecorators(node).map(this.convert<J.Annotation>);
+    }
+
+    private trailingDecorators(node: { readonly modifiers?: ts.NodeArray<ts.ModifierLike> }): ts.Decorator[] {
+        const modifiers = node.modifiers ?? [];
+        let afterKeywords = modifiers.length;
+        while (afterKeywords > 0 && ts.isDecorator(modifiers[afterKeywords - 1])) {
+            afterKeywords--;
+        }
+        return afterKeywords === 0 ? [] : modifiers.slice(afterKeywords).filter(ts.isDecorator);
     }
 
     private mapTypeParametersAsContainer(node: ts.ClassDeclaration | ts.InterfaceDeclaration | ts.ClassExpression): J.Container<J.TypeParameter> | undefined {

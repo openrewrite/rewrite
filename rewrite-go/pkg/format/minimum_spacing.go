@@ -86,7 +86,7 @@ func (v *MinimumViableSpacingVisitor) VisitCase(c *java.Case, p any) java.J {
 		elements[0].Element = separateFrom("case", elements[0].Element)
 		copied.Expressions.Elements = elements
 	}
-	copied.Body = separateStatements(out.Body, false)
+	copied.Body.Elements = separateStatements(out.Body.Elements, false)
 	return &copied
 }
 

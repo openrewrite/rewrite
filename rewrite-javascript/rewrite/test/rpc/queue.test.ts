@@ -3,6 +3,7 @@ import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue, RpcObjectState, Stri
 import type {RpcObjectData} from "../../src/rpc";
 import {JavaScriptParser, JS, sourceFileCache} from "../../src/javascript";
 import {TreePrinters} from "../../src/print";
+import {ExecutionContext} from "../../src/execution";
 
 describe("RPC queues", () => {
 
@@ -45,6 +46,33 @@ describe("RPC queues", () => {
             RpcObjectState.END_OF_OBJECT,
         ]);
         expect(batch[1].value).toEqual([0, -1, -1, 2]);
+    });
+
+    test("null is sent as an absent value, never as an ADD that carries nothing", async () => {
+        const send = (after: any, before: any) =>
+            new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false).generate(after, before);
+
+        expect(await send(null, undefined)).toEqual([
+            {state: RpcObjectState.NO_CHANGE}, {state: RpcObjectState.END_OF_OBJECT}]);
+        expect(await send(null, "before")).toEqual([
+            {state: RpcObjectState.DELETE}, {state: RpcObjectState.END_OF_OBJECT}]);
+        expect((await send("after", null))[0].state).toEqual(RpcObjectState.ADD);
+    });
+
+    test("the execution context is sent under the name Java knows it by", async () => {
+        const batch = await new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false).generate(new ExecutionContext(), undefined);
+        expect(batch[0]).toEqual({state: RpcObjectState.ADD, valueType: "org.openrewrite.InMemoryExecutionContext"});
+    });
+
+    test("an inline value from Java loses the keys its serializer added", async () => {
+        const batch: RpcObjectData[] = [
+            {state: RpcObjectState.ADD, valueType: "org.openrewrite.rpc.RpcMarker", value: {"@c": "org.openrewrite.rpc.RpcMarker", "@ref": 1, id: "1", tool: "example"}},
+            {state: RpcObjectState.ADD, value: null},
+        ];
+        const queue = new RpcReceiveQueue(new Map(), undefined, async () => batch.splice(0), undefined, false);
+
+        expect(await queue.receive(undefined)).toEqual({kind: "org.openrewrite.rpc.RpcMarker", id: "1", tool: "example"});
+        expect(await queue.receive(undefined)).toBeNull();
     });
 
     test("an unchanged list is a single NO_CHANGE", async () => {
