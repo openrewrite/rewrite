@@ -286,7 +286,7 @@ public class SpringBomProperty {
     /**
      * A Kotlin script wraps its statements in a block; a Groovy script holds them directly.
      */
-    private static List<Statement> topLevelStatements(JavaSourceFile cu) {
+    public static List<Statement> topLevelStatements(JavaSourceFile cu) {
         if (cu instanceof K.CompilationUnit) {
             Statement first = ((K.CompilationUnit) cu).getStatements().get(0);
             return first instanceof J.Block ? ((J.Block) first).getStatements() : emptyList();
@@ -294,7 +294,7 @@ public class SpringBomProperty {
         return ((G.CompilationUnit) cu).getStatements();
     }
 
-    private static JavaSourceFile withTopLevelStatements(JavaSourceFile cu, List<Statement> statements) {
+    public static JavaSourceFile withTopLevelStatements(JavaSourceFile cu, List<Statement> statements) {
         if (cu instanceof K.CompilationUnit) {
             K.CompilationUnit k = (K.CompilationUnit) cu;
             return k.withStatements(ListUtils.mapFirst(k.getStatements(), first -> first instanceof J.Block ?
