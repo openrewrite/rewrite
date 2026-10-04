@@ -190,6 +190,30 @@ class RpcReceiveQueueTest {
             .hasMessageContaining("No RPC codec registered on the Java side for 'java.lang.StringBuilder'");
     }
 
+    @Test
+    void rejectsAnAddThatCarriesNothing() {
+        batches.addLast(List.of(new RpcObjectData(RpcObjectData.State.ADD, null, null, null, false)));
+
+        assertThatThrownBy(() -> rq.receive(null))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("no value type, value or ref");
+    }
+
+    @Test
+    void nullMarkerStaysWhereItIsWhenAnotherChanges() {
+        BuildTool buildTool = new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.0");
+        Markers before = Markers.build(Arrays.asList(null, buildTool));
+        Markers after = before.withMarkers(Arrays.asList(null, buildTool.withVersion("8.0")));
+
+        sq.send(after, before, null);
+        Markers received = rq.receive(before);
+
+        assertThat(received.getMarkers()).hasSize(2);
+        assertThat(received.getMarkers().get(0)).isNull();
+        assertThat(received.findFirst(BuildTool.class)).hasValueSatisfying(bt ->
+          assertThat(bt.getVersion()).isEqualTo("8.0"));
+    }
+
     private List<RpcObjectData> encode(List<RpcObjectData> batch) {
         List<RpcObjectData> encoded = new ArrayList<>();
         for (RpcObjectData data : batch) {

@@ -46,7 +46,8 @@ public interface Markup extends Marker {
     @Override
     default String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
         if (verbose) {
-            return commentWrapper.apply("(" + getDetail() + ")");
+            String detail = getDetail();
+            return commentWrapper.apply("(" + (detail == null ? getMessage() : detail) + ")");
         }
         return commentWrapper.apply("(" + getMessage() + ")");
     }
