@@ -28,6 +28,9 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.PathUtils;
 import org.openrewrite.SourceFile;
@@ -38,8 +41,10 @@ import org.openrewrite.marker.SourceSet;
 
 import java.beans.ConstructorProperties;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.function.Function;
 import java.util.jar.JarEntry;
@@ -530,7 +535,7 @@ public class JavaSourceSet implements SourceSet {
                         String entryName = entries.nextElement().getName();
                         if (entryName.endsWith(".class") && !isMetaInfEntry(entryName)) {
                             String s = entryNameToClassName(entryName);
-                            if (isDeclarable(s)) {
+                            if (isInPackage(s, acceptPackage) && isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
                             }
                         }
@@ -541,12 +546,12 @@ public class JavaSourceSet implements SourceSet {
                     @Override
                     public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
                         if (file.getFileName().toString().endsWith(".class")) {
-                            String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
+                            String pathStr = path.relativize(file).toString();
                             if (isMetaInfEntry(pathStr)) {
                                 return java.nio.file.FileVisitResult.CONTINUE;
                             }
                             String s = entryNameToClassName(pathStr);
-                            if ((acceptPackage == null || s.startsWith(acceptPackage)) && isDeclarable(s)) {
+                            if (isInPackage(s, acceptPackage) && isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
                             }
                         }
@@ -571,22 +576,124 @@ public class JavaSourceSet implements SourceSet {
         return normalized.startsWith("META-INF/");
     }
 
+    private static boolean isInPackage(String className, @Nullable String acceptPackage) {
+        return acceptPackage == null || className.startsWith(acceptPackage + ".");
+    }
+
     private static List<JavaType.FullyQualified> getJavaStandardLibraryTypes() {
-        List<JavaType.FullyQualified> javaStandardLibraryTypes = new ArrayList<>();
-        Path toolsJar = Paths.get(System.getProperty("java.home")).resolve("../lib/tools.jar");
-        if (Files.exists(toolsJar)) {
-            javaStandardLibraryTypes.addAll(typesFromPath(toolsJar, "java"));
-        } else {
-            javaStandardLibraryTypes.addAll(typesFromPath(
-                    FileSystems.getFileSystem(URI.create("jrt:/")).getPath("modules", "java.base"),
-                    "java"));
+        List<String> typeNames = JavaStandardLibrary.TYPE_NAMES;
+        List<JavaType.FullyQualified> types = new ArrayList<>(typeNames.size());
+        for (String typeName : typeNames) {
+            types.add(JavaType.ShallowClass.build(typeName));
         }
-        return javaStandardLibraryTypes;
+        return types;
+    }
+
+    /**
+     * The public {@code java.*} types of the running JDK, from {@code rt.jar} on Java 8 and from every
+     * module of the {@code jrt:/} file system on Java 9+. Computed once, as the JDK cannot change while running.
+     */
+    private static class JavaStandardLibrary {
+        static final List<String> TYPE_NAMES = scan();
+
+        private static List<String> scan() {
+            Map<String, Boolean> publicByName = new LinkedHashMap<>();
+            try {
+                Path rtJar = Paths.get(System.getProperty("java.home"), "lib", "rt.jar");
+                if (Files.isRegularFile(rtJar)) {
+                    scanJar(rtJar, publicByName);
+                } else {
+                    try (DirectoryStream<Path> modules = Files.newDirectoryStream(
+                            FileSystems.getFileSystem(URI.create("jrt:/")).getPath("/modules"))) {
+                        for (Path module : modules) {
+                            scanDirectory(module, publicByName);
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                // Partial results better than no results
+            }
+
+            List<String> typeNames = new ArrayList<>(publicByName.size());
+            for (Map.Entry<String, Boolean> entry : publicByName.entrySet()) {
+                if (entry.getValue() && isEnclosedByPublicTypes(entry.getKey(), publicByName)) {
+                    typeNames.add(entry.getKey());
+                }
+            }
+            return typeNames;
+        }
+
+        private static void scanJar(Path jar, Map<String, Boolean> publicByName) throws IOException {
+            try (JarFile jarFile = new JarFile(jar.toFile())) {
+                Enumeration<JarEntry> entries = jarFile.entries();
+                while (entries.hasMoreElements()) {
+                    JarEntry entry = entries.nextElement();
+                    if (entry.getName().endsWith(".class")) {
+                        String className = entryNameToClassName(entry.getName());
+                        if (isInPackage(className, "java") && isDeclarable(className)) {
+                            try (InputStream classFile = jarFile.getInputStream(entry)) {
+                                publicByName.put(className, isPublic(classFile));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void scanDirectory(Path root, Map<String, Boolean> publicByName) throws IOException {
+            Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    if (file.getFileName().toString().endsWith(".class")) {
+                        String className = entryNameToClassName(root.relativize(file).toString());
+                        if (isInPackage(className, "java") && isDeclarable(className)) {
+                            try (InputStream classFile = Files.newInputStream(file)) {
+                                publicByName.put(className, isPublic(classFile));
+                            }
+                        }
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+
+        /**
+         * A nested class's own access flags only say whether it is accessible from its package, so its
+         * declared visibility (e.g. {@code private static class Node}) is read from its InnerClasses entry.
+         */
+        private static boolean isPublic(InputStream classFile) throws IOException {
+            ClassReader classReader;
+            try {
+                classReader = new ClassReader(classFile);
+            } catch (IllegalArgumentException e) {
+                // Class file version newer than this ASM supports; keeping the type beats failing the whole scan
+                return true;
+            }
+            String className = classReader.getClassName();
+            int[] access = {classReader.getAccess()};
+            classReader.accept(new ClassVisitor(Opcodes.ASM9) {
+                @Override
+                public void visitInnerClass(String name, @Nullable String outerName, @Nullable String innerName, int innerAccess) {
+                    if (name.equals(className)) {
+                        access[0] = innerAccess;
+                    }
+                }
+            }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            return (access[0] & Opcodes.ACC_PUBLIC) != 0 && (access[0] & Opcodes.ACC_SYNTHETIC) == 0;
+        }
+
+        private static boolean isEnclosedByPublicTypes(String className, Map<String, Boolean> publicByName) {
+            for (int i = className.indexOf('$'); i != -1; i = className.indexOf('$', i + 1)) {
+                if (!Boolean.TRUE.equals(publicByName.get(className.substring(0, i)))) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     private static String entryNameToClassName(String entryName) {
-        int start = entryName.startsWith("modules/java.base/") ? "modules/java.base/".length() : 0;
-        return entryName.substring(start, entryName.length() - ".class".length())
+        return entryName.substring(0, entryName.length() - ".class".length())
                 .replace('/', '.');
     }
 

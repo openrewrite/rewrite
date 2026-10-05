@@ -16,12 +16,18 @@
 package org.openrewrite.java.marker;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.JavaType;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.function.Function;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toMap;
@@ -38,6 +44,48 @@ class JavaSourceSetTest {
         var typesBySignature = jss.getClasspath().stream().collect(toMap(JavaType.FullyQualified::toString, Function.identity()));
         assertThat(typesBySignature.get("java.lang.Object")).isInstanceOf(JavaType.FullyQualified.class);
         assertThat(typesBySignature.get("java.util.List")).isInstanceOf(JavaType.FullyQualified.class);
+    }
+
+    @Test
+    void javaStandardLibraryTypesFromEveryModule() {
+        var jss = JavaSourceSet.build("main", emptyList());
+        assertThat(jss.getClasspath())
+          .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+          .contains(
+            "java.lang.Object",
+            "java.util.Map$Entry",
+            "java.util.logging.Logger",
+            "java.sql.Connection",
+            "java.beans.PropertyChangeListener"
+          )
+          .allSatisfy(fqn -> assertThat(fqn).startsWith("java."));
+    }
+
+    @Test
+    void javaStandardLibraryTypesAreDeclarable() {
+        var jss = JavaSourceSet.build("main", emptyList());
+        assertThat(jss.getClasspath())
+          .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+          .doesNotContain(
+            "java.util.ImmutableCollections",
+            "java.util.HashMap$Node",
+            "java.lang.package-info"
+          );
+    }
+
+    @Test
+    void typesFromJarRespectAcceptPackage(@TempDir Path tempDir) throws IOException {
+        Path jar = tempDir.resolve("mixed.jar");
+        try (var jos = new JarOutputStream(Files.newOutputStream(jar))) {
+            for (String entry : new String[]{"java/lang/Foo.class", "javax/annotation/Bar.class", "com/sun/tools/javac/Main.class"}) {
+                jos.putNextEntry(new JarEntry(entry));
+                jos.write(new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
+                jos.closeEntry();
+            }
+        }
+        assertThat(JavaSourceSet.typesFromPath(jar, "java"))
+          .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+          .containsExactly("java.lang.Foo");
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1677")
