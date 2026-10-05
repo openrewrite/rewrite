@@ -135,18 +135,8 @@ def extract_property_methods(node: ast.ClassDef) -> List[Tuple[str, str]]:
 
     Returns list of (name, return_type) tuples.
     """
-    properties = []
-    for item in node.body:
-        if isinstance(item, ast.FunctionDef):
-            # Check if it's a property
-            is_property = any(
-                isinstance(d, ast.Name) and d.id == "property"
-                for d in item.decorator_list
-            )
-            if is_property and item.returns:
-                return_type = ast.unparse(item.returns)
-                properties.append((item.name, return_type))
-    return properties
+    return [(item.name, ast.unparse(item.returns)) for item in node.body
+            if isinstance(item, ast.FunctionDef) and _has_decorator(item, "property") and item.returns]
 
 
 def stub_signature(fn: ast.FunctionDef, bound: bool = True) -> str:
@@ -240,23 +230,6 @@ def is_frozen_dataclass(node: ast.ClassDef) -> bool:
 def is_plain_public_class(node: ast.ClassDef) -> bool:
     """Check if a class is public and not a frozen dataclass, whatever its bases."""
     return not is_frozen_dataclass(node) and not node.name.startswith('_')
-
-    # Known base types that indicate this is an ABC or generic class
-    known_bases = {
-        'J', 'Statement', 'Expression', 'TypedTree', 'NameTree', 'TypeTree', 'Loop', 'MethodCall',
-        'ABC', 'Py', 'PyStatement', 'PyExpression',
-        'Tree', 'SourceFile', 'Generic',  # For rewrite/tree.py classes
-        'TreeVisitor',
-    }
-
-    for base in node.bases:
-        if isinstance(base, ast.Name) and base.id in known_bases:
-            return True
-        # Handle Generic[T] style bases
-        if isinstance(base, ast.Subscript) and isinstance(base.value, ast.Name):
-            if base.value.id in known_bases:
-                return True
-    return False
 
 
 def get_class_bases(node: ast.ClassDef) -> str:
@@ -364,7 +337,7 @@ def generate_nested_class_stub(node: ast.ClassDef, indent: str = "") -> List[str
 
 
 def generate_abc_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
-    """Generate stub content for an ABC-like base class."""
+    """Generate stub content for a class that is not a frozen dataclass."""
     lines = []
 
     bases = get_class_bases(node)
@@ -404,11 +377,8 @@ def generate_abc_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
             lines.append(f"{indent}    def {signature}: ...")
         has_content = True
 
-    # Add replace method stub for ABC base classes that explicitly define it
-    # EXCEPT for the root Tree class - its replace(**kwargs) -> Tree signature
-    # conflicts with typed replace() methods in subclasses, and all subclasses
-    # either define their own replace or inherit from a class that does
-    if has_explicit_replace(node) and node.name != 'Tree':
+    # Add a replace stub for classes that explicitly define it
+    if has_explicit_replace(node):
         replace_return_type = get_replace_return_type(node)
         if replace_return_type:
             lines.append(f"{indent}    def replace(self, **kwargs: Any) -> {replace_return_type}: ...")
@@ -533,8 +503,11 @@ def extract_imports(tree: ast.Module, current_package: str = "") -> List[Tuple[s
     nodes = []
     for node in tree.body:
         if isinstance(node, ast.If):
-            type_checking = "TYPE_CHECKING" in ast.unparse(node.test)
-            nodes.extend((child, type_checking) for child in node.body)
+            test = ast.unparse(node.test).replace("typing.", "")
+            body_type_checking = test == "TYPE_CHECKING"
+            else_type_checking = test == "not TYPE_CHECKING"
+            nodes.extend((child, body_type_checking) for child in node.body)
+            nodes.extend((child, else_type_checking) for child in node.orelse)
         else:
             nodes.append((node, False))
 

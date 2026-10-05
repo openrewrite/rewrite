@@ -182,6 +182,11 @@ from .markers import Markers
 
 if TYPE_CHECKING:
     from .visitor import Visitor
+else:
+    from .fallback import Fallback
+
+if not TYPE_CHECKING:
+    from .runtime import Runtime
 
 
 class Tree(ABC):
@@ -192,7 +197,25 @@ class Tree(ABC):
     stub = generate_stubs.generate_stub_content(source)
 
     assert "from .markers import Markers as Markers\n" in stub
+    assert "from .fallback import Fallback as Fallback\n" in stub
+    assert "from .runtime import Runtime as Runtime\n" in stub
 
     assert "from .visitor import Visitor\n" in stub
 
     assert "Printer" not in stub
+
+
+def test_root_tree_stub_declares_replace(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from abc import ABC
+from typing import Self
+
+
+class Tree(ABC):
+    def replace(self, **kwargs) -> Self:
+        return self
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "class Tree(ABC):\n    def replace(self, **kwargs: Any) -> Self: ..." in stub
