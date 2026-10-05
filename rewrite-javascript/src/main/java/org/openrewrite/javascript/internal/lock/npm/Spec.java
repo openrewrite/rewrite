@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 import static org.openrewrite.javascript.internal.lock.npm.UriComponent.decodeURIComponent;
 import static org.openrewrite.javascript.internal.lock.npm.UriComponent.encodeURIComponent;
 
@@ -247,10 +248,10 @@ public final class Spec {
         }
         for (String part : committish.split("::", -1)) {
             if (!part.contains(":")) {
-                if (res.gitRange != null) {
+                if (truthy(res.gitRange)) {
                     throw new InvalidSpecException("cannot override existing semver range with a committish", null);
                 }
-                if (res.gitCommittish != null) {
+                if (truthy(res.gitCommittish)) {
                     throw new InvalidSpecException("cannot override existing committish with a second committish", null);
                 }
                 res.gitCommittish = part;
@@ -260,17 +261,17 @@ public final class Spec {
             String key = nameValue[0];
             String value = nameValue[1];
             if ("semver".equals(key)) {
-                if (res.gitCommittish != null) {
+                if (truthy(res.gitCommittish)) {
                     throw new InvalidSpecException("cannot override existing committish with a semver range", null);
                 }
-                if (res.gitRange != null) {
+                if (truthy(res.gitRange)) {
                     throw new InvalidSpecException("cannot override existing semver range with a second semver range", null);
                 }
                 res.gitRange = decodeURIComponent(value);
                 continue;
             }
             if ("path".equals(key)) {
-                if (res.gitSubdir != null) {
+                if (truthy(res.gitSubdir)) {
                     throw new InvalidSpecException("cannot override existing path with a second path", null);
                 }
                 res.gitSubdir = "/" + value;
@@ -424,7 +425,7 @@ public final class Spec {
 
     private static Spec fromRegistry(Spec res) {
         res.registry = true;
-        String spec = jsTrim(res.rawSpec);
+        String spec = Js.trim(res.rawSpec);
         res.saveSpec = null;
         res.fetchSpec = spec;
         String version = NodeSemver.valid(spec, NodeSemver.Options.LOOSE);
@@ -444,19 +445,6 @@ public final class Spec {
         return res;
     }
 
-    // String.prototype.trim
-    static String jsTrim(String s) {
-        int start = 0;
-        int end = s.length();
-        while (start < end && GitHost.isJsWhitespace(s.charAt(start))) {
-            start++;
-        }
-        while (end > start && GitHost.isJsWhitespace(s.charAt(end - 1))) {
-            end--;
-        }
-        return s.substring(start, end);
-    }
-
     // The errors of validate-npm-package-name 7.0.2; npa only asks validForOldPackages.
     static List<String> validatePackageNameErrors(String name) {
         List<String> errors = new ArrayList<>();
@@ -472,7 +460,7 @@ public final class Spec {
         if (name.startsWith("_")) {
             errors.add("name cannot start with an underscore");
         }
-        if (!jsTrim(name).equals(name)) {
+        if (!Js.trim(name).equals(name)) {
             errors.add("name cannot contain leading or trailing spaces");
         }
         for (String excludedName : new String[]{"node_modules", "favicon.ico"}) {

@@ -32,7 +32,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Parity with Node's path.posix run from {@code /}, as dumped by .lockwork/bin/dump-path-cases.js.
+ * Parity with Node's path.posix run from {@code /}, as dumped by npm-arborist/generate/path-cases.js.
  */
 class PosixPathTest {
 

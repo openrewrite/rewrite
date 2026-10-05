@@ -25,6 +25,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 import static org.openrewrite.semver.NodeSemver.Options.DEFAULT;
 
@@ -102,7 +104,7 @@ public final class OverrideSet {
             if (!other.children.containsKey(key)) {
                 return false;
             }
-            if (!equal(children.get(key).value, other.children.get(key).value)) {
+            if (!Objects.equals(children.get(key).value, other.children.get(key).value)) {
                 return false;
             }
             if (!children.get(key).childrenAreEqual(other.children.get(key))) {
@@ -119,7 +121,7 @@ public final class OverrideSet {
         if (other == null) {
             return false;
         }
-        if (!equal(key, other.key) || !equal(value, other.value)) {
+        if (!Objects.equals(key, other.key) || !Objects.equals(value, other.value)) {
             return false;
         }
         if (!childrenAreEqual(other)) {
@@ -132,13 +134,17 @@ public final class OverrideSet {
     }
 
     public OverrideSet getEdgeRule(Edge edge) {
-        String rawSpec = edge.getRawSpec();
-        return getEdgeRule(edge.getName(), rawSpec.isEmpty() ? edge.getSpec() : rawSpec);
+        return getEdgeRule(edge.getName(), () -> edge.getRawSpec().isEmpty() ? edge.getSpec() : edge.getRawSpec());
     }
 
     public OverrideSet getEdgeRule(String edgeName, String edgeSpec) {
+        return getEdgeRule(edgeName, () -> edgeSpec);
+    }
+
+    // the spec is read only for a rule that compares it: reading an edge's can throw on an unresolvable $reference
+    private OverrideSet getEdgeRule(String edgeName, Supplier<String> edgeSpec) {
         for (OverrideSet rule : getRuleset().values()) {
-            if (!equal(rule.name, edgeName)) {
+            if (!Objects.equals(rule.name, edgeName)) {
                 continue;
             }
 
@@ -146,7 +152,7 @@ public final class OverrideSet {
                 return rule;
             }
 
-            Spec spec = Spec.npa(edgeName + "@" + edgeSpec);
+            Spec spec = Spec.npa(edgeName + "@" + edgeSpec.get());
             if (spec.getType() == Spec.Type.ALIAS) {
                 spec = spec.getSubSpec();
             }
@@ -186,7 +192,7 @@ public final class OverrideSet {
 
     public @Nullable OverrideSet getMatchingRule(@Nullable String nodeName, String version) {
         for (OverrideSet rule : getRuleset().values()) {
-            if (!equal(rule.name, nodeName)) {
+            if (!Objects.equals(rule.name, nodeName)) {
                 continue;
             }
             if (NodeSemver.satisfies(version, rule.keySpec, DEFAULT) || NodeSemver.satisfies(version, rule.value, DEFAULT)) {
@@ -297,9 +303,5 @@ public final class OverrideSet {
             }
         }
         return false;
-    }
-
-    private static boolean equal(@Nullable Object a, @Nullable Object b) {
-        return a == null ? b == null : a.equals(b);
     }
 }

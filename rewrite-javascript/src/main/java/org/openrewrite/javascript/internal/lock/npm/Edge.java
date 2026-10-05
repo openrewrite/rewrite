@@ -24,6 +24,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
+
 /**
  * Port of @npmcli/arborist lib/edge.js (npm 11.17.0).
  */
@@ -236,7 +238,7 @@ public final class Edge {
             Object deps = pkg.get(depType);
             if (deps instanceof Map) {
                 Object spec = ((Map<?, ?>) deps).get(ref);
-                if (Node.truthy(spec)) {
+                if (truthy(spec)) {
                     return String.valueOf(spec);
                 }
             }

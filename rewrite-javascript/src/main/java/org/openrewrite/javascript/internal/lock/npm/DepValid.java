@@ -20,8 +20,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 import static org.openrewrite.semver.NodeSemver.Options.LOOSE;
 
 /**
@@ -47,6 +49,36 @@ final class DepValid {
     }
 
     private DepValid() {
+    }
+
+    private static @Nullable String lockedGitCommittish(Node child, Node requestor) {
+        Shrinkwrap meta = requestor.getRoot().getMeta();
+        Map<String, Object> data = meta == null ? null : meta.getData();
+        Object packages = data == null ? null : data.get("packages");
+        Object lock = packages instanceof Map ? ((Map<?, ?>) packages).get(requestor.getLocation()) : null;
+        if (!(lock instanceof Map)) {
+            return null;
+        }
+        Object spec = null;
+        for (String type : new String[]{"dependencies", "optionalDependencies", "devDependencies", "peerDependencies"}) {
+            Object deps = ((Map<?, ?>) lock).get(type);
+            spec = deps instanceof Map ? ((Map<?, ?>) deps).get(child.getName()) : null;
+            if (truthy(spec)) {
+                break;
+            }
+        }
+        if (!(spec instanceof String) || !truthy(spec)) {
+            return null;
+        }
+        try {
+            Spec parsed = Spec.resolve(child.getName(), (String) spec, requestor.getRealpath());
+            if (parsed.getType() != Spec.Type.GIT) {
+                return null;
+            }
+            return truthy(parsed.getGitCommittish()) ? parsed.getGitCommittish() : "";
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     static boolean depValid(Node child, @Nullable String requested, @Nullable String accept, Node requestor) {
@@ -93,25 +125,32 @@ final class DepValid {
             case ALIAS:
                 return depValid(child, requested.getSubSpec(), requestor);
             case TAG:
-                return Node.truthy(child.getResolved()) && Spec.npa(child.getResolved()).getType() == Spec.Type.REMOTE;
+                return truthy(child.getResolved()) && Spec.npa(child.getResolved()).getType() == Spec.Type.REMOTE;
             case REMOTE:
                 return requested.getFetchSpec() != null && requested.getFetchSpec().equals(child.getResolved());
             case GIT: {
                 Spec resRepo = Spec.npa(child.getResolved() == null ? "" : child.getResolved());
                 GitHost resHost = resRepo.getHosted();
                 GitHost reqHost = requested.getHosted();
-                boolean reqCommit = COMMIT.matcher(requested.getGitCommittish() == null ? "" : requested.getGitCommittish()).matches();
+                String reqCommittish = requested.getGitCommittish() == null ? "" : requested.getGitCommittish();
+                boolean reqCommit = COMMIT.matcher(reqCommittish).matches();
                 GitHost.Opts nc = GitHost.Opts.of(null, !reqCommit);
                 if (resHost == null) {
-                    if (!equal(resRepo.getFetchSpec(), requested.getFetchSpec())) {
+                    if (!Objects.equals(resRepo.getFetchSpec(), requested.getFetchSpec())) {
                         return false;
                     }
                 } else {
-                    if (reqHost == null || !equal(reqHost.ssh(nc), resHost.ssh(nc))) {
+                    if (reqHost == null || !Objects.equals(reqHost.ssh(nc), resHost.ssh(nc))) {
                         return false;
                     }
                 }
-                if (requested.getGitRange() == null || requested.getGitRange().isEmpty()) {
+                if (!truthy(requested.getGitRange())) {
+                    if (!reqCommit) {
+                        String locked = lockedGitCommittish(child, requestor);
+                        if (locked != null && !locked.equals(reqCommittish)) {
+                            return false;
+                        }
+                    }
                     return true;
                 }
                 Object version = child.getPackage().get("version");
@@ -130,24 +169,21 @@ final class DepValid {
         if (requestor.isInstallLinks() && !child.isWorkspace()) {
             return !isLink;
         }
-        return isLink && child.getRealpath() != null && PosixPath.relative(child.getRealpath(), requested.getFetchSpec()).isEmpty();
+        return isLink && child.getRealpath() != null &&
+               PosixPath.relative(child.getRealpath(), requested.getFetchSpec()).isEmpty();
     }
 
     private static boolean tarballValid(Node child, Spec requested) {
         if (child.isLink()) {
             return false;
         }
-        if (Node.truthy(child.getResolved())) {
+        if (truthy(child.getResolved())) {
             return child.getResolved().replace('\\', '/').equals("file:" + requested.getFetchSpec().replace('\\', '/'));
         }
         Object legacyRequested = child.getPackage().get("_requested");
-        if (Node.truthy(legacyRequested) && legacyRequested instanceof Map) {
-            return equal(((Map<?, ?>) legacyRequested).get("saveSpec"), requested.getSaveSpec());
+        if (legacyRequested instanceof Map) {
+            return Objects.equals(((Map<?, ?>) legacyRequested).get("saveSpec"), requested.getSaveSpec());
         }
         return false;
-    }
-
-    private static boolean equal(@Nullable Object a, @Nullable Object b) {
-        return a == null ? b == null : a.equals(b);
     }
 }

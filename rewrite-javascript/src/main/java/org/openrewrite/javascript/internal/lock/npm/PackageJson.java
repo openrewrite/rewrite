@@ -20,6 +20,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
+
 /**
  * Port of the synchronous normalize steps @npmcli/package-json 7 runs for {@code syncNormalize()}
  * ({@code _id}, {@code bundledDependencies}, {@code bundleDependencies}, {@code optionalDedupe},
@@ -34,7 +36,7 @@ final class PackageJson {
     static Map<String, Object> syncNormalize(Map<String, Object> data) {
         Object name = data.get("name");
         Object version = data.get("version");
-        if (Node.truthy(name) && Node.truthy(version)) {
+        if (truthy(name) && truthy(version)) {
             data.put("_id", name + "@" + version);
         }
 
@@ -48,7 +50,8 @@ final class PackageJson {
             data.put("bundleDependencies", new ArrayList<>());
         } else if (Boolean.TRUE.equals(bd)) {
             Object deps = data.get("dependencies");
-            data.put("bundleDependencies", deps instanceof Map ? new ArrayList<>(((Map<String, Object>) deps).keySet()) : new ArrayList<>());
+            data.put("bundleDependencies", deps instanceof Map ?
+                    new ArrayList<>(((Map<String, Object>) deps).keySet()) : new ArrayList<>());
         } else if (bd instanceof Map) {
             data.put("bundleDependencies", new ArrayList<>(((Map<String, Object>) bd).keySet()));
         } else if (!(bd instanceof List) && data.containsKey("bundleDependencies")) {
@@ -57,7 +60,7 @@ final class PackageJson {
 
         Object dependencies = data.get("dependencies");
         Object optionalDependencies = data.get("optionalDependencies");
-        if (Node.truthy(dependencies) && optionalDependencies instanceof Map && dependencies instanceof Map) {
+        if (truthy(dependencies) && optionalDependencies instanceof Map && dependencies instanceof Map) {
             Map<String, Object> prod = (Map<String, Object>) dependencies;
             for (String optional : ((Map<String, Object>) optionalDependencies).keySet()) {
                 prod.remove(optional);

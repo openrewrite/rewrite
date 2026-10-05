@@ -18,6 +18,9 @@ package org.openrewrite.javascript.internal.lock.npm;
 import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashMap;
+import java.util.Objects;
+
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
  * Port of @npmcli/arborist lib/link.js (npm 11.17.0): a symlink to a node elsewhere, such as a
@@ -30,7 +33,7 @@ public class Link extends Node {
         Node target = options.getTarget();
         if (target != null) {
             setTarget(target);
-        } else if (equal(getRealpath(), getRoot().getPath())) {
+        } else if (Objects.equals(getRealpath(), getRoot().getPath())) {
             setTarget(getRoot());
         } else {
             setTarget(new Node(options.toBuilder()

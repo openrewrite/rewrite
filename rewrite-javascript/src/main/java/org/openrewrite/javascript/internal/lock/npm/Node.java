@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -32,10 +33,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 import static org.openrewrite.semver.NodeSemver.Options.DEFAULT;
 
 /**
@@ -93,6 +96,9 @@ public class Node {
         boolean loadOverrides;
 
         @Nullable
+        Shrinkwrap meta;
+
+        @Nullable
         String name;
 
         @Builder.Default
@@ -111,7 +117,8 @@ public class Node {
         boolean peer = true;
 
         /**
-         * The package.json content; anything other than a map is an empty package.
+         * The package.json content, a mutable map the node normalizes in place and keeps as its package;
+         * anything other than a map is an empty package.
          */
         @Nullable
         Object pkg;
@@ -140,15 +147,15 @@ public class Node {
     }
 
     @Getter
-    @Setter
+    @Setter(AccessLevel.PACKAGE)
     private @Nullable String name;
 
     @Getter
-    @Setter
+    @Setter(AccessLevel.PACKAGE)
     private @Nullable String path;
 
     @Getter
-    @Setter
+    @Setter(AccessLevel.PACKAGE)
     private @Nullable String realpath;
 
     private @Nullable String resolved;
@@ -236,6 +243,7 @@ public class Node {
     private @Nullable Node root;
     private @Nullable Map<String, String> workspaces;
     private @Nullable Map<String, Object> explanation;
+    private @Nullable Shrinkwrap meta;
 
     // a link's target, read through getTarget(); the root setter rewires other links' targets directly
     @Nullable
@@ -276,7 +284,8 @@ public class Node {
         setResolved(truthy(options.getResolved()) ? options.getResolved() : null);
         if (!truthy(getResolved())) {
             Object legacyResolved = pkg.get("_resolved");
-            String resolved = legacyResolved instanceof String ? ConsistentResolve.consistentResolve((String) legacyResolved) : null;
+            String resolved = legacyResolved instanceof String ?
+                    ConsistentResolve.consistentResolve((String) legacyResolved) : null;
             if (truthy(resolved) && !(resolved.startsWith("file:") && truthy(pkg.get("_where")))) {
                 setResolved(resolved);
             }
@@ -312,7 +321,11 @@ public class Node {
             }
         }
 
+        setMeta(options.getMeta());
+
         setParent(options.getParent());
+
+        this.fsParent = null;
         setFsParent(options.getFsParent());
 
         if (options.getParent() == null && options.getFsParent() == null) {
@@ -336,6 +349,17 @@ public class Node {
         String parent = PosixPath.basename(PosixPath.dirname(dir));
         String base = PosixPath.basename(dir);
         return parent.startsWith("@") ? parent + "/" + base : base;
+    }
+
+    public @Nullable Shrinkwrap getMeta() {
+        return meta;
+    }
+
+    public void setMeta(@Nullable Shrinkwrap meta) {
+        this.meta = meta;
+        if (meta != null) {
+            meta.add(this);
+        }
     }
 
     public @Nullable Map<String, String> getWorkspaces() {
@@ -389,12 +413,12 @@ public class Node {
         if (!truthy(overrides.getValue())) {
             return false;
         }
-        if (!equal(overrides.getName(), name)) {
+        if (!Objects.equals(overrides.getName(), name)) {
             return false;
         }
         for (Edge edge : edgesIn) {
-            if (edge.getOverrides() != null && equal(edge.getOverrides().getName(), name) &&
-                equal(edge.getOverrides().getValue(), getVersion())) {
+            if (edge.getOverrides() != null && Objects.equals(edge.getOverrides().getName(), name) &&
+                Objects.equals(edge.getOverrides().getValue(), getVersion())) {
                 if (!edge.getOverrides().isEqual(edge.getFrom().getOverrides())) {
                     return true;
                 }
@@ -758,7 +782,7 @@ public class Node {
                 }
             }
 
-            for (Node node : new ArrayList<>(root.inventory.query("realpath", realpath))) {
+            for (Node node : root.inventory.query("realpath", realpath)) {
                 if (node == this) {
                     continue;
                 }
@@ -906,7 +930,7 @@ public class Node {
             fsParent = fsParent.getTarget();
         }
 
-        if (this == fsParent || equal(fsParent.realpath, realpath)) {
+        if (this == fsParent || Objects.equals(fsParent.realpath, realpath)) {
             return;
         }
 
@@ -919,12 +943,12 @@ public class Node {
                 PosixPath.resolve(fsParent.path, PosixPath.relative(oldFsParent.path, path));
         String nmPath = PosixPath.resolve(fsParent.path, "node_modules", name);
 
-        if (equal(newPath, nmPath)) {
+        if (Objects.equals(newPath, nmPath)) {
             setParent(fsParent);
             return;
         }
 
-        boolean pathChange = !equal(newPath, path);
+        boolean pathChange = !Objects.equals(newPath, path);
 
         Node oldParent = this.parent;
         String oldName = name;
@@ -953,10 +977,10 @@ public class Node {
     }
 
     public boolean canReplaceWith(Node node, Collection<String> ignorePeers) {
-        if (!equal(node.name, name)) {
+        if (!Objects.equals(node.name, name)) {
             return false;
         }
-        if (!equal(node.getPackageName(), getPackageName())) {
+        if (!Objects.equals(node.getPackageName(), getPackageName())) {
             return false;
         }
 
@@ -1041,13 +1065,13 @@ public class Node {
     }
 
     public boolean satisfies(Edge requested) {
-        return equal(name, requested.getName()) && requested.satisfiedBy(this);
+        return Objects.equals(name, requested.getName()) && requested.satisfiedBy(this);
     }
 
     public boolean satisfies(String requested) {
         Spec parsed = Spec.npa(requested);
         String name = parsed.getName() != null ? parsed.getName() : this.name;
-        return equal(this.name, name) && satisfies(new Edge(
+        return Objects.equals(this.name, name) && satisfies(new Edge(
                 new Node(options().path(getRoot().realpath).build()),
                 Edge.Type.PROD, name, parsed.getRawSpec()));
     }
@@ -1056,23 +1080,23 @@ public class Node {
         if (node == this) {
             return true;
         }
-        if (!equal(node.name, name)) {
+        if (!Objects.equals(node.name, name)) {
             return false;
         }
         if (isLink()) {
             return node.isLink() && getTarget().matches(node.getTarget());
         }
         if (isProjectRoot() && node.isProjectRoot()) {
-            return equal(path, node.path);
+            return Objects.equals(path, node.path);
         }
         if (truthy(integrity) && truthy(node.integrity)) {
-            return equal(integrity, node.integrity);
+            return Objects.equals(integrity, node.integrity);
         }
         if (truthy(getResolved()) && truthy(node.getResolved())) {
-            return equal(getResolved(), node.getResolved());
+            return Objects.equals(getResolved(), node.getResolved());
         }
         return truthy(getPackageName()) && truthy(node.getPackageName()) &&
-               equal(getPackageName(), node.getPackageName()) &&
+               Objects.equals(getPackageName(), node.getPackageName()) &&
                truthy(getVersion()) && truthy(node.getVersion()) &&
                getVersion().equals(node.getVersion());
     }
@@ -1158,7 +1182,6 @@ public class Node {
         setRoot(parent.getRoot());
     }
 
-    // with no shrinkwrap metadata attached, delisting only touches the root's inventory and tops
     void delistFromMeta() {
         Node root = getRoot();
         if (root.realpath == null || path == null) {
@@ -1166,6 +1189,9 @@ public class Node {
         }
         root.inventory.delete(this);
         root.tops.remove(this);
+        if (root.meta != null) {
+            root.meta.delete(path);
+        }
     }
 
     void changePath(String newPath) {
@@ -1199,6 +1225,9 @@ public class Node {
         Node root = getRoot();
         location = Relpath.relpath(root.realpath, path);
         root.inventory.add(this);
+        if (root.meta != null) {
+            root.meta.add(this);
+        }
     }
 
     /**
@@ -1307,6 +1336,11 @@ public class Node {
             updateOverridesEdgeInAdded(edge.getOverrides());
         }
         edgesIn.add(edge);
+
+        Shrinkwrap meta = getRoot().meta;
+        if (meta != null) {
+            meta.addEdge(edge);
+        }
     }
 
     void reloadNamedEdges(String name) {
@@ -1316,7 +1350,7 @@ public class Node {
     private void reloadNamedEdges(String name, @Nullable String rootLoc) {
         Edge edge = edgesOut.get(name);
         boolean rootLocResolved = edge != null && edge.getTo() != null &&
-                                  equal(edge.getTo().location, rootLoc + "/node_modules/" + edge.getName());
+                                  Objects.equals(edge.getTo().location, rootLoc + "/node_modules/" + edge.getName());
         boolean sameResolved = edge != null && resolve(name) == edge.getTo();
         boolean recheck = rootLocResolved || !sameResolved;
         if (edge != null && recheck) {
@@ -1431,23 +1465,5 @@ public class Node {
     @Override
     public String toString() {
         return getClass().getSimpleName() + "{" + (location != null ? location : path) + " " + getPkgid() + "}";
-    }
-
-    static boolean truthy(@Nullable Object val) {
-        if (val == null || Boolean.FALSE.equals(val)) {
-            return false;
-        }
-        if (val instanceof String) {
-            return !((String) val).isEmpty();
-        }
-        if (val instanceof Number) {
-            double d = ((Number) val).doubleValue();
-            return d != 0 && !Double.isNaN(d);
-        }
-        return true;
-    }
-
-    static boolean equal(@Nullable Object a, @Nullable Object b) {
-        return a == null ? b == null : a.equals(b);
     }
 }

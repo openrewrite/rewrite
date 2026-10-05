@@ -363,6 +363,19 @@ class EdgeTest {
         assertThat(edge.isValid()).isTrue();
     }
 
+    // not an upstream case: arborist 11.17.0 builds this node, and only reading the edge's spec throws
+    @Test
+    void emptySpecUnderAnUnresolvableReferenceOverride() {
+        Node root = node(opts().path("/r").loadOverrides(true).pkg(obj("name", "root", "version", "2.0.0",
+          "dependencies", obj("d", "1", "a", "*"), "overrides", obj("a", "$zz"))));
+        Node d = node(opts().parent(root).name("d")
+          .pkg(obj("name", "d", "version", "1.0.0", "dependencies", obj("a", ""))));
+        assertThat(d.getLocation()).isEqualTo("node_modules/d");
+        Edge a = d.getEdgesOut().get("a");
+        assertThat(a.getOverrides().getValue()).isEqualTo("$zz");
+        assertThatThrownBy(a::getSpec).hasMessage("Unable to resolve reference $zz");
+    }
+
     private static Map.Entry<String, Object> entry(String key, Object value) {
         return new SimpleEntry<>(key, value);
     }

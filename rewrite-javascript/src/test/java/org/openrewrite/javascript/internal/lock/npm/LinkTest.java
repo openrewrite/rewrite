@@ -23,7 +23,8 @@ import java.util.LinkedHashMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.describe;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.assertTree;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.emptyLock;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.link;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.node;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
@@ -32,20 +33,26 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.treeDu
 
 /**
  * Port of @npmcli/arborist test/link.js. The snapshots are compared with arborist's own dump of the
- * same trees; the shrinkwrap metadata upstream attaches is not part of this tree model.
+ * same trees and lock metadata.
  */
 class LinkTest {
 
     @Test
-    void instantiateWithoutProvidingTarget() {
-        node(opts().pkg(obj("name", "root")).path("/home/user/projects/some/kind/of/path"));
+    void instantiate() {
+        Shrinkwrap meta = emptyLock("/home/user/projects/some/kind/of/path");
+        Node root = node(opts().pkg(obj("name", "root")).path("/home/user/projects/some/kind/of/path").meta(meta));
         Link l1 = link(opts().pkg(obj("name", "root")).path("/home/user/some/other/path")
-          .realpath("/home/user/projects/some/kind/of/path"));
-        assertThat(describe(l1)).isEqualTo(treeDump("instantiate without providing target"));
+          .realpath("/home/user/projects/some/kind/of/path").meta(meta));
+        assertTree("instantiate without providing target", l1);
+        assertThat(String.valueOf(meta.getTree() == l1.getTarget()))
+          .isEqualTo(treeDump("instantiate without providing target / tree"));
         assertThat(l1.isLink()).isTrue();
         assertThat(l1.getChildren().size()).isZero();
         l1.getChildren().set("asdf", node(opts().path("/asdf")));
         assertThat(l1.getChildren().size()).as("children still empty after setting value").isZero();
+
+        Link l2 = link(opts().path("/home/user/some/other/path").target(root));
+        assertTree("instantiate with target specified", l2.getRoot());
     }
 
     @Test
@@ -61,13 +68,6 @@ class LinkTest {
         assertThat(resolver.getResolved()).as("link resolved depends on path").isNull();
         resolver.setPath("/x/z/y/a/b/d");
         assertThat(resolver.getResolved()).as("updates when path changes").isEqualTo("file:c");
-    }
-
-    @Test
-    void instantiateWithTargetSpecified() {
-        Node root = node(opts().pkg(obj("name", "root")).path("/home/user/projects/some/kind/of/path"));
-        Link link = link(opts().path("/home/user/some/other/path").target(root));
-        assertThat(describe(link.getRoot())).isEqualTo(treeDump("instantiate with target specified"));
     }
 
     @Test

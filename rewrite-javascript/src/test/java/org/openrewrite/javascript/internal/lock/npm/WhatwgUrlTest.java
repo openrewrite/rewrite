@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Parity with Node's URL (v24.19.0) over the URL shapes npm specs take, as dumped by
- * .lockwork/bin/dump-url-cases.js.
+ * npm-arborist/generate/url-cases.js.
  */
 class WhatwgUrlTest {
 

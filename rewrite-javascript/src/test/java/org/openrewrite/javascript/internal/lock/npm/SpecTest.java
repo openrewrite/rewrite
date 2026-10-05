@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * npm-package-arg 13.0.2's tests: the table rows of test/basic.js, github.js, gitlab.js and
- * bitbucket.js (dumped by .lockwork/bin/dump-npa-tables.js) and basic.js's assertions around them.
+ * bitbucket.js (dumped by npm-arborist/generate/npa-tables.js) and basic.js's assertions around them.
  */
 class SpecTest {
 
@@ -124,6 +124,28 @@ class SpecTest {
             default:
                 throw new IllegalArgumentException("unexpected key " + key);
         }
+    }
+
+    // not an upstream case: npm-package-arg 13.0.2's own answers for an empty first committish segment
+    @Test
+    void emptyCommittishSegment() {
+        Spec ranged = Spec.npa("foo@github:u/r#::semver:^1", "/");
+        assertThat(ranged.getType()).isEqualTo(Spec.Type.GIT);
+        assertThat(ranged.getGitRange()).isEqualTo("^1");
+        assertThat(ranged.getGitCommittish()).isEmpty();
+        assertThat(ranged.getSaveSpec()).isEqualTo("github:u/r#::semver:^1");
+        assertThat(ranged.getFetchSpec()).isNull();
+
+        assertThat(Spec.npa("foo@github:u/r#::a", "/").getGitCommittish()).isEqualTo("a");
+
+        Spec subdir = Spec.npa("foo@github:u/r#::path:sub", "/");
+        assertThat(subdir.getGitCommittish()).isEmpty();
+        assertThat(subdir.getGitSubdir()).isEqualTo("/sub");
+
+        Spec scp = Spec.npa("foo@git+ssh://git@example.com:u/r#::semver:^1", "/");
+        assertThat(scp.getGitRange()).isEqualTo("^1");
+        assertThat(scp.getGitCommittish()).isEmpty();
+        assertThat(scp.getFetchSpec()).isEqualTo("git@example.com:u/r");
     }
 
     @Test

@@ -18,6 +18,8 @@ package org.openrewrite.javascript.internal.lock.npm;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,7 +36,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.arr;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.assertGet;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.assertTree;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.describe;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.emptyLock;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.link;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.node;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
@@ -44,7 +49,7 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.treeDu
 
 /**
  * Port of @npmcli/arborist test/node.js. Upstream snapshots that print whole trees are compared with
- * arborist's own dump of the same sequence (.lockwork/bin/arborist-tree-dumps.js).
+ * arborist's own dump of the same sequence (the tree-dumps fixture), as is the lock metadata a tree carries.
  */
 class NodeTest {
 
@@ -100,15 +105,17 @@ class NodeTest {
         }
     }
 
-    // testing with dep tree, without meta; the "with meta" variant needs the shrinkwrap metadata
-    @Test
-    void testingWithDepTree() {
+    @ParameterizedTest(name = "meta: {0}")
+    @ValueSource(booleans = {false, true})
+    void testingWithDepTree(boolean withMeta) {
+        String at = withMeta ? "with meta: " : "";
+        Shrinkwrap rootMetadata = withMeta ? emptyLock("/home/user/projects/root") : null;
         Node root = node(opts()
           .pkg(obj("name", "root", "bundleDependencies", arr("bundled"),
             "dependencies", obj("prod", "1.x", "bundled", "", "missing", ""),
             "devDependencies", obj("dev", "", "overlap", ""),
             "optionalDependencies", obj("optional", "", "overlap", "", "optMissing", "")))
-          .realpath("/home/user/projects/root").path("/home/user/projects/root")
+          .realpath("/home/user/projects/root").path("/home/user/projects/root").meta(rootMetadata)
           .child(opts()
             .pkg(obj("name", "prod", "version", "1.2.3", "dependencies", obj("meta", ""), "peerDependencies", obj("peer", "")))
             .fsChild(opts().realpath("/home/user/projects/root/node_modules/prod/foo")
@@ -153,10 +160,10 @@ class NodeTest {
         assertThat(root.isRoot()).isTrue();
         assertThat(prod.isRoot()).isFalse();
         assertThat(extraneous.isExtraneous()).isTrue();
-        assertThat(describe(root)).isEqualTo(treeDump("initial load with some deps"));
+        assertTree(at + "initial load with some deps", root);
 
         meta.setParent(root);
-        assertThat(describe(root)).isEqualTo(treeDump("move meta to top level, update stuff"));
+        assertTree(at + "move meta to top level, update stuff", root);
         assertThat(meta.getRoot()).isSameAs(root);
         assertThat(meta.getParent()).isSameAs(root);
         assertThat(root.getInventory().get(meta.getLocation())).isSameAs(meta);
@@ -182,16 +189,16 @@ class NodeTest {
         assertThat(meta.getParent()).isSameAs(root);
         assertThat(root.getChildren().get("meta")).isSameAs(meta);
         assertThat(root.getInventory().get(meta.getLocation())).isSameAs(meta);
-        assertThat(describe(root)).isEqualTo(treeDump("add new meta under prod"));
+        assertTree(at + "add new meta under prod", root);
 
         assertThat(meta.getParent()).as("old meta parent is root before assigning").isSameAs(root);
         newMeta.setParent(root);
         assertThat(meta.getParent()).as("old meta parent removed").isNull();
         assertThat(root.getChildren().get("meta")).isNotSameAs(meta);
-        assertThat(describe(root)).isEqualTo(treeDump("move new meta to top level"));
+        assertTree(at + "move new meta to top level", root);
 
         newMeta.setParent(root);
-        assertThat(describe(root)).isEqualTo(treeDump("move new meta to top level second time (no-op)"));
+        assertTree(at + "move new meta to top level second time (no-op)", root);
         treeCheck(root);
 
         // replacement tests
@@ -221,15 +228,21 @@ class NodeTest {
             "dependencies", obj("prod", "1.x", "bundled", "", "missing", ""),
             "devDependencies", obj("dev", "", "overlap", ""),
             "optionalDependencies", obj("optional", "", "overlap", "", "optMissing", "")))
-          .realpath("/home/user/projects/root").path("/home/user/projects/root"));
+          .realpath("/home/user/projects/root").path("/home/user/projects/root").meta(rootMetadata));
         root.replaceWith(root2);
         assertThat(root2.getRoot()).as("replacing root preserves self-rootedness").isSameAs(root2);
         root.replace(root2);
+        if (withMeta) {
+            assertTree(at + "roots replaced", root);
+        }
 
         Link prodLink = link(opts().pkg(prod.getPackage()).realpath("/some/other/path/entirely")
           .path("/not/where/it/really/is").name("prod"));
         assertThat(prodLink.canReplace(newProd)).as("link can replace node").isTrue();
         prodLink.replace(newProd);
+        if (withMeta) {
+            assertTree(at + "link replaced node", root);
+        }
         assertThat(newProd.getParent()).as("newProd removed from tree").isNull();
         assertThat(newProd.getRoot()).as("newProd removed from tree").isSameAs(newProd);
         assertThat(prodLink.getPath()).as("replaced link").isEqualTo(newProd.getPath());
@@ -240,6 +253,13 @@ class NodeTest {
         assertThat(newProd.canReplace(prodLink)).as("node can replace link").isTrue();
         Node target = prodLink.getTarget();
         newProd.replace(prodLink);
+        if (rootMetadata != null) {
+            assertTree(at + "node replaced link", root);
+            for (String location : root.getInventory().keys()) {
+                assertGet(at + location, rootMetadata, location);
+            }
+            assertThat(rootMetadata.getData()).isEqualTo(NpmTreeSupport.<Object>json(treeDump(at + "final / data")));
+        }
         assertThat(prodLink.getParent()).as("prodLink removed from tree").isNull();
         assertThat(prodLink.getTarget()).as("prodLink lost its target").isNull();
         assertThat(prodLink.getRoot()).as("prodLink removed from tree").isSameAs(prodLink);
@@ -449,19 +469,25 @@ class NodeTest {
         assertThat(linkKid.getPath()).as("child of link target path is realpath").isEqualTo(linkKid.getRealpath());
     }
 
-    // changing root; upstream also attaches shrinkwrap metadata, which these assertions do not read
     @Test
     void changingRoot() {
         Node root = node(opts().pkg(obj("name", "root", "dependencies", obj("a", "", "link", "", "link2", "")))
-          .path("/home/user/projects/root").realpath("/home/user/projects/root"));
+          .path("/home/user/projects/root").realpath("/home/user/projects/root").meta(emptyLock("/home/user/projects/root")));
         Node a = node(opts().pkg(obj("name", "a", "version", "1.2.3")).parent(root).name("a")
           .resolved("https://example.com/a-1.2.3.tgz").integrity("sha512-asdfasdfasdf"));
         Node b = node(opts().pkg(obj("name", "b", "version", "1.2.3")).parent(a).name("b"));
         Node root2 = node(opts().pkg(obj("name", "root2", "dependencies", obj("a", "", "link", "", "link2", "")))
-          .path("/home/user/projects/root2").realpath("/home/user/projects/root2"));
+          .path("/home/user/projects/root2").realpath("/home/user/projects/root2").meta(emptyLock("/home/user/projects/root2")));
         assertThat(a.getRoot()).isSameAs(root);
         assertThat(b.getRoot()).isSameAs(root);
+        assertTree("changing root: before, root", root);
         a.setParent(root2);
+        assertTree("changing root: after, root", root);
+        assertTree("changing root: after, root2", root2);
+        for (String location : root2.getInventory().keys()) {
+            assertGet("changing root: root2 " + location, root2.getMeta(), location);
+        }
+        assertGet("changing root: root node_modules/a", root.getMeta(), "node_modules/a");
         assertThat(a.getRoot()).as("root is set when parent is changed").isSameAs(root2);
         assertThat(b.getRoot()).as("root is set on children when parent is changed").isSameAs(root2);
     }
@@ -529,13 +555,15 @@ class NodeTest {
           .pkg(obj("name", "@a/b/c/d/e"))).inNodeModules()).as("scoped package in node_modules").isEqualTo("/path/to/foo");
     }
 
-    // update metadata when moving between linked top-of-tree parents; the shrinkwrap metadata assertions need its port
     @Test
-    void movingBetweenLinkedTopOfTreeParents() {
-        Node root = node(opts().pkg(obj("name", "root")).path("/home/user/projects/root").realpath("/home/user/projects/root"));
-        Node top1 = node(opts().pkg(obj("name", "top", "version", "1.1.1")).path("/path/to/top1").realpath("/path/to/top1"));
+    void updateMetadataWhenMovingBetweenLinkedTopOfTreeParents() {
+        Node root = node(opts().pkg(obj("name", "root")).path("/home/user/projects/root").realpath("/home/user/projects/root")
+          .meta(emptyLock("/home/user/projects/root")));
+        Node top1 = node(opts().pkg(obj("name", "top", "version", "1.1.1")).path("/path/to/top1").realpath("/path/to/top1")
+          .meta(emptyLock("/path/to/top1")));
         link(opts().name("link1").parent(root).realpath(top1.getPath()).target(top1));
-        Node top2 = node(opts().pkg(obj("name", "top", "version", "1.1.1")).path("/path/to/top2").realpath("/path/to/top2"));
+        Node top2 = node(opts().pkg(obj("name", "top", "version", "1.1.1")).path("/path/to/top2").realpath("/path/to/top2")
+          .meta(emptyLock("/path/to/top2")));
         Link link2 = link(opts().name("link2").parent(root).realpath(top2.getPath()).target(top2));
         Node child = node(opts().parent(top1)
           .pkg(obj("name", "child", "version", "1.2.3", "dependencies", obj("child2", "2")))
@@ -549,7 +577,11 @@ class NodeTest {
         assertThat(child2.getLocation()).isEqualTo("../../../../path/to/top1/node_modules/child/node_modules/child2");
         assertThat(child2.getRoot()).isSameAs(root);
         assertThat(child2.getTop()).isSameAs(top1);
+        assertGet("moving: metadata from root", root.getMeta(), child.getLocation());
+        assertGet("moving: metadata from top1", top1.getMeta(), child.getLocation());
 
+        String oldLocation = child.getLocation();
+        String oldLocation2 = child2.getLocation();
         child.setParent(link2);
         assertThat(child.getTop()).isSameAs(top2);
         assertThat(child.getParent()).as("parent assigned to link target").isSameAs(top2);
@@ -557,6 +589,15 @@ class NodeTest {
         assertThat(child2.getTop()).isSameAs(top2);
         assertThat(child2.getParent()).isSameAs(child);
         assertThat(child2.getLocation()).isEqualTo("../../../../path/to/top2/node_modules/child/node_modules/child2");
+        assertGet("moving: root metadata updated 1", root.getMeta(), child.getLocation());
+        assertGet("moving: root metadata updated 2", root.getMeta(), child2.getLocation());
+        assertGet("moving: old location deleted from root", root.getMeta(), oldLocation);
+        assertGet("moving: old location deleted from top1", top1.getMeta(), oldLocation);
+        assertGet("moving: old location2 deleted from root", root.getMeta(), oldLocation2);
+        assertGet("moving: old location2 deleted from top1", top1.getMeta(), oldLocation2);
+        assertGet("moving: new top metadata updated 1", top2.getMeta(), child.getLocation());
+        assertGet("moving: new top metadata updated 2", top2.getMeta(), child2.getLocation());
+        assertTree("moving: final", root);
     }
 
     @Test

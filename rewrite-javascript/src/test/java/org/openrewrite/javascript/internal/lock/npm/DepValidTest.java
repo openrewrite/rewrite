@@ -147,9 +147,36 @@ class DepValidTest {
           .as("git url with full sha-256 hash mismatch").isFalse();
     }
 
+    // the requestor is a root whose lock metadata holds the recorded entry, attached as a loaded lock is
+    private static Node requestor(String depType, String recordedSpec) {
+        Node requestor = node(opts().path("/some/path"));
+        Shrinkwrap meta = new Shrinkwrap("/some/path");
+        meta.setData(obj("packages", obj("", obj(depType, obj("repo", recordedSpec)))));
+        requestor.setMeta(meta);
+        return requestor;
+    }
+
     @Test
-    void gitNamedRefWithoutLockfileDataFallsBackToTheRepoOnlyCheck() {
+    void gitTagOrBranchChangeDetectedViaLockfileCommittish() {
         Node child = child("repo", "1.0.0", "git+ssh://git@github.com/npm/repo.git#0d7bd85a85fa2571fa532d2fc842ed099b236ad2");
-        assertThat(depValid(child, "npm/repo#v2.0.0", null)).as("without lockfile data, fall back to the repo-only check").isTrue();
+
+        assertThat(DepValid.depValid(child, "npm/repo#v1.0.0", null, requestor("dependencies", "npm/repo#v1.0.0")))
+          .as("unchanged tag is valid").isTrue();
+        assertThat(DepValid.depValid(child, "npm/repo#v2.0.0", null, requestor("dependencies", "npm/repo#v1.0.0")))
+          .as("changed tag must be re-resolved").isFalse();
+        assertThat(DepValid.depValid(child, "npm/repo#other", null, requestor("devDependencies", "npm/repo#main")))
+          .as("changed branch in devDependencies must be re-resolved").isFalse();
+        assertThat(DepValid.depValid(child, "npm/repo#v2.0.0", null, requestor("optionalDependencies", "npm/repo#v1.0.0")))
+          .as("changed tag in optionalDependencies must be re-resolved").isFalse();
+        assertThat(DepValid.depValid(child, "npm/repo#other", null, requestor("peerDependencies", "npm/repo#main")))
+          .as("changed branch in peerDependencies must be re-resolved").isFalse();
+        assertThat(DepValid.depValid(child, "npm/repo#v2.0.0", null, requestor("dependencies", "npm/repo")))
+          .as("lockfile git spec without a committish differs from a named ref").isFalse();
+        assertThat(DepValid.depValid(child, "npm/repo#v2.0.0", null, requestor("dependencies", "^1.0.0")))
+          .as("non-git lockfile spec is ignored, falling back to the repo-only check").isTrue();
+        assertThat(depValid(child, "npm/repo#v2.0.0", null))
+          .as("without lockfile data, fall back to the repo-only check").isTrue();
+        assertThat(DepValid.depValid(child, "npm/repo#v2.0.0", null, requestor("dependencies", "invalid spec with spaces")))
+          .as("unparseable lockfile spec is ignored, falling back to the repo-only check").isTrue();
     }
 }

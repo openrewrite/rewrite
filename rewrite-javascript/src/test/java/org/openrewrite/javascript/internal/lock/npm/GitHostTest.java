@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * hosted-git-info 9.0.3's tests: each host's valid and invalid URL tables (dumped by
- * .lockwork/bin/dump-hosted-git-tables.js), test/invalid.js, test/parse-url.js, and the
+ * npm-arborist/generate/hosted-git-tables.js), test/invalid.js, test/parse-url.js, and the
  * "toString respects defaults" and "string methods" cases for the representations npm resolves
  * with (ssh, sshurl, https, git, shortcut, path).
  */

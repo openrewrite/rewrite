@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 
@@ -27,7 +28,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Builders for package data as arborist's tests write it inline, and a port of
@@ -65,26 +69,97 @@ final class NpmTreeSupport {
         return new Link(options.build());
     }
 
-    private static final Map<String, String> TREE_DUMPS = loadTreeDumps();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, String> loadTreeDumps() {
-        try (InputStream is = NpmTreeSupport.class.getResourceAsStream("/npm-arborist/tree-dumps")) {
-            return new ObjectMapper().readValue(is, Map.class);
+    /**
+     * A fixture under npm-arborist/, written from arborist itself by the script of the same name in its
+     * generate/ directory.
+     */
+    static JsonNode fixture(String name) {
+        try (InputStream is = NpmTreeSupport.class.getResourceAsStream("/npm-arborist/" + name)) {
+            return MAPPER.readTree(is);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     /**
-     * The dump .lockwork/bin/arborist-tree-dumps.js printed from arborist at the named upstream snapshot.
+     * JSON as the maps and lists package data is made of.
+     */
+    @SuppressWarnings("unchecked")
+    static <T> T json(String json) {
+        try {
+            return (T) MAPPER.readValue(json, Object.class);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    static <T> T json(JsonNode json) {
+        return (T) MAPPER.convertValue(json, Object.class);
+    }
+
+    /**
+     * Node options declared as JSON: path, name, pkg, resolved, integrity and children.
+     */
+    static Node.Options.OptionsBuilder opts(JsonNode declared) {
+        Node.Options.OptionsBuilder options = opts();
+        if (declared.has("path")) {
+            options.path(declared.get("path").asText());
+        }
+        if (declared.has("name")) {
+            options.name(declared.get("name").asText());
+        }
+        if (declared.has("pkg")) {
+            options.pkg(json(declared.get("pkg")));
+        }
+        if (declared.has("resolved")) {
+            options.resolved(declared.get("resolved").asText());
+        }
+        if (declared.has("integrity")) {
+            options.integrity(declared.get("integrity").asText());
+        }
+        if (declared.has("children")) {
+            for (JsonNode child : declared.get("children")) {
+                options.child(opts(child).build());
+            }
+        }
+        return options;
+    }
+
+    static Shrinkwrap emptyLock(String path) {
+        Shrinkwrap meta = new Shrinkwrap(path);
+        meta.setData(obj("lockfileVersion", 2, "packages", obj(), "dependencies", obj()));
+        return meta;
+    }
+
+    private static final JsonNode TREE_DUMPS = fixture("tree-dumps");
+
+    /**
+     * What arborist printed at the named point of an upstream test sequence.
      */
     static String treeDump(String snapshot) {
-        String dump = TREE_DUMPS.get(snapshot);
+        JsonNode dump = TREE_DUMPS.get(snapshot);
         if (dump == null) {
             throw new IllegalArgumentException("no arborist dump for " + snapshot);
         }
-        return dump;
+        return dump.asText();
+    }
+
+    /**
+     * Asserts the tree, and the raw lock data of its metadata when it has any, against arborist's.
+     */
+    static void assertTree(String snapshot, Node root) {
+        assertThat(describe(root)).as(snapshot).isEqualTo(treeDump(snapshot));
+        Shrinkwrap meta = root.getMeta();
+        if (meta != null) {
+            assertThat(meta.getData()).as(snapshot + " / data").isEqualTo(json(treeDump(snapshot + " / data")));
+        }
+    }
+
+    static void assertGet(String snapshot, Shrinkwrap meta, String location) {
+        assertThat(meta.get(location)).as(snapshot + " / get").isEqualTo(json(treeDump(snapshot + " / get")));
     }
 
     private static String loc(@Nullable Node n) {
@@ -169,10 +244,10 @@ final class NpmTreeSupport {
                 }
             }
         }
-        if (Node.equal(node.getPath(), root.getPath()) && node != root && !root.isLink()) {
+        if (Objects.equals(node.getPath(), root.getPath()) && node != root && !root.isLink()) {
             throw new AssertionError("node with same path as root: " + at);
         }
-        if (!node.isLink() && !Node.equal(node.getPath(), node.getRealpath())) {
+        if (!node.isLink() && !Objects.equals(node.getPath(), node.getRealpath())) {
             throw new AssertionError("non-link with mismatched path/realpath: " + at);
         }
         check(node.getParent(), root, inventory, seen, node, "parent");

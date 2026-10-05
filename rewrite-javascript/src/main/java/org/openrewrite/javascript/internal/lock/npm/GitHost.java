@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 import static org.openrewrite.javascript.internal.lock.npm.UriComponent.decodeURIComponent;
 
 /**
@@ -98,13 +99,16 @@ final class GitHost {
         PROTOCOL_NAMES.put("git+http:", null);
 
         DEFAULTS.put("ssh", t -> "git@" + t.domain + ":" + t.user + "/" + t.project + ".git" + maybeJoin("#", t.committish));
-        DEFAULTS.put("sshurl", t -> "git+ssh://git@" + t.domain + "/" + t.user + "/" + t.project + ".git" + maybeJoin("#", t.committish));
-        DEFAULTS.put("https", t -> "git+https://" + maybeJoin(t.auth, "@") + t.domain + "/" + t.user + "/" + t.project + ".git" + maybeJoin("#", t.committish));
+        DEFAULTS.put("sshurl", t -> "git+ssh://git@" + t.domain + "/" + t.user + "/" + t.project + ".git" +
+                                    maybeJoin("#", t.committish));
+        DEFAULTS.put("https", t -> "git+https://" + maybeJoin(t.auth, "@") + t.domain + "/" + t.user + "/" + t.project +
+                                   ".git" + maybeJoin("#", t.committish));
         DEFAULTS.put("shortcut", t -> t.type + ":" + t.user + "/" + t.project + maybeJoin("#", t.committish));
         DEFAULTS.put("path", t -> t.user + "/" + t.project + maybeJoin("#", t.committish));
 
         Map<String, Function<Fill, String>> github = new LinkedHashMap<>();
-        github.put("git", t -> "git://" + maybeJoin(t.auth, "@") + t.domain + "/" + t.user + "/" + t.project + ".git" + maybeJoin("#", t.committish));
+        github.put("git", t -> "git://" + maybeJoin(t.auth, "@") + t.domain + "/" + t.user + "/" + t.project + ".git" +
+                               maybeJoin("#", t.committish));
         addHost("github", Arrays.asList("git:", "http:", "git+ssh:", "git+https:", "ssh:", "https:"), "github.com", url -> {
             String[] parts = split(url.getPathname(), 5);
             String user = part(parts, 1);
@@ -408,7 +412,7 @@ final class GitHost {
         int firstColon = arg.indexOf(':');
         int firstSpace = -1;
         for (int i = 0; i < arg.length(); i++) {
-            if (isJsWhitespace(arg.charAt(i))) {
+            if (Js.isWhitespace(arg.charAt(i))) {
                 firstSpace = i;
                 break;
             }
@@ -425,12 +429,6 @@ final class GitHost {
 
         return spaceOnlyAfterHash && hasSlash && doesNotEndWithSlash && doesNotStartWithDot &&
                atOnlyAfterHash && colonOnlyAfterHash && secondSlashOnlyAfterHash;
-    }
-
-    static boolean isJsWhitespace(char c) {
-        return c == '\t' || c == '\n' || c == 0x0B || c == '\f' || c == '\r' || c == ' ' || c == 0xA0 ||
-               c == 0x1680 || (c >= 0x2000 && c <= 0x200A) || c == 0x2028 || c == 0x2029 || c == 0x202F ||
-               c == 0x205F || c == 0x3000 || c == 0xFEFF;
     }
 
     // parse-url.js
@@ -480,10 +478,6 @@ final class GitHost {
     private static String substr(String s, int start, int length) {
         int from = start < 0 ? Math.max(s.length() + start, 0) : Math.min(start, s.length());
         return s.substring(from, Math.min(from + length, s.length()));
-    }
-
-    private static boolean truthy(@Nullable String s) {
-        return s != null && !s.isEmpty();
     }
 
     private static String maybeJoin(@Nullable String... args) {

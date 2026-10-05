@@ -27,13 +27,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
+
 /**
- * Port of @npmcli/arborist lib/inventory.js (npm 11.17.0).
+ * Port of @npmcli/arborist lib/inventory.js (npm 11.17.0). Every view it returns is a snapshot: unlike
+ * a JavaScript Map or Set, a loop over one sees neither the nodes added nor the nodes removed while it runs.
  */
 public final class Inventory {
 
     static final List<String> KEYS = Collections.unmodifiableList(
             Arrays.asList("name", "license", "funding", "realpath", "packageName"));
+
+    // the index key for JavaScript's undefined, which arborist files apart from null
+    private static final Object UNDEFINED = new Object();
 
     private final Map<String, Node> byLocation = new LinkedHashMap<>();
     private final Map<String, Map<@Nullable Object, Set<Node>>> index = new LinkedHashMap<>();
@@ -78,12 +84,14 @@ public final class Inventory {
         byLocation.put(node.getLocation(), node);
         for (Map.Entry<String, Map<@Nullable Object, Set<Node>>> entry : index.entrySet()) {
             String key = entry.getKey();
+            Map<String, Object> pkg = node.getPackage();
             Object val;
-            if ("name".equals(key) || "realpath".equals(key)) {
-                val = property(node, key);
+            if ("name".equals(key)) {
+                val = node.getName();
+            } else if ("realpath".equals(key)) {
+                val = node.getRealpath();
             } else if ("license".equals(key)) {
-                Map<String, Object> pkg = node.getPackage();
-                val = null;
+                val = UNDEFINED;
                 if (truthy(pkg.get("license"))) {
                     val = pkg.get("license");
                 } else if (truthy(pkg.get("licence"))) {
@@ -93,16 +101,16 @@ public final class Inventory {
                 } else if (pkg.get("licences") instanceof List) {
                     val = first((List<?>) pkg.get("licences"));
                 }
-            } else if (truthy(property(node, key))) {
-                val = property(node, key);
+            } else if ("packageName".equals(key) && truthy(node.getPackageName())) {
+                val = node.getPackageName();
             } else {
-                val = node.getPackage().get(key);
+                val = member(pkg, key);
             }
-            if (val instanceof Map) {
+            if (val instanceof Map || val instanceof List) {
                 if ("license".equals(key)) {
-                    val = ((Map<?, ?>) val).get("type");
+                    val = member(val, "type");
                 } else if ("funding".equals(key)) {
-                    val = ((Map<?, ?>) val).get("url");
+                    val = member(val, "url");
                 }
             }
             entry.getValue().computeIfAbsent(val, k -> new LinkedHashSet<>()).add(node);
@@ -117,9 +125,10 @@ public final class Inventory {
         for (Map.Entry<String, Map<@Nullable Object, Set<Node>>> entry : index.entrySet()) {
             String key = entry.getKey();
             Map<@Nullable Object, Set<Node>> map = entry.getValue();
-            boolean onNode = !"license".equals(key) && !"funding".equals(key);
-            Object nodeVal = onNode ? property(node, key) : null;
-            Object val = onNode ? nodeVal : node.getPackage().get(key);
+            Object nodeVal = "name".equals(key) ? node.getName() :
+                    "realpath".equals(key) ? node.getRealpath() :
+                            "packageName".equals(key) ? node.getPackageName() : UNDEFINED;
+            Object val = nodeVal != UNDEFINED ? nodeVal : member(node.getPackage(), key);
             Set<Node> set = map.get(val);
             if (set != null) {
                 set.remove(node);
@@ -130,14 +139,21 @@ public final class Inventory {
         }
     }
 
+    /**
+     * @param val {@code null} asks for the nodes with no value for the key.
+     */
     public Set<Node> query(String key, @Nullable Object val) {
         Map<@Nullable Object, Set<Node>> map = index.get(key);
-        Set<Node> found = map.get(val);
-        return found != null ? found : new LinkedHashSet<>();
+        Set<Node> found = map.get(val == null && map.containsKey(UNDEFINED) ? UNDEFINED : val);
+        return found != null ? new LinkedHashSet<>(found) : new LinkedHashSet<>();
     }
 
     public Set<@Nullable Object> query(String key) {
-        return index.get(key).keySet();
+        Set<@Nullable Object> keys = new LinkedHashSet<>();
+        for (Object val : index.get(key).keySet()) {
+            keys.add(val == UNDEFINED ? null : val);
+        }
+        return keys;
     }
 
     public boolean has(Node node) {
@@ -164,35 +180,11 @@ public final class Inventory {
         return new ArrayList<>(byLocation.entrySet());
     }
 
-    // name and realpath are a node's own fields, packageName a getter; the others come from its package
-    private static @Nullable Object property(Node node, String key) {
-        switch (key) {
-            case "name":
-                return node.getName();
-            case "realpath":
-                return node.getRealpath();
-            case "packageName":
-                return node.getPackageName();
-            default:
-                return null;
-        }
-    }
-
     private static @Nullable Object first(List<?> list) {
-        return list.isEmpty() ? null : list.get(0);
+        return list.isEmpty() ? UNDEFINED : list.get(0);
     }
 
-    private static boolean truthy(@Nullable Object val) {
-        if (val == null || Boolean.FALSE.equals(val)) {
-            return false;
-        }
-        if (val instanceof String) {
-            return !((String) val).isEmpty();
-        }
-        if (val instanceof Number) {
-            double d = ((Number) val).doubleValue();
-            return d != 0 && !Double.isNaN(d);
-        }
-        return true;
+    private static @Nullable Object member(Object object, String key) {
+        return object instanceof Map && ((Map<?, ?>) object).containsKey(key) ? ((Map<?, ?>) object).get(key) : UNDEFINED;
     }
 }
