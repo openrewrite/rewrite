@@ -364,8 +364,15 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     maybeUpdateModel();
                     return t;
                 }
-                boolean isSurvivingNewDependencyTag = isNewDependencyTag && newVersion != null &&
-                        isSurvivorOfRemovedOldDependency(t);
+                Scope survivingScope = isNewDependencyTag ? scopeOfSurvivorOfRemovedOldDependency(t) : null;
+                boolean isSurvivingNewDependencyTag = survivingScope != null && newVersion != null;
+                if (survivingScope != null && survivingScope != scopeOf(t)) {
+                    Xml.Tag scopeTag = t.getChild("scope").orElseThrow(NoSuchElementException::new);
+                    t = (Xml.Tag) (survivingScope == Scope.Compile ?
+                            new RemoveContentVisitor<>(scopeTag, false, true).visitNonNull(t, ctx) :
+                            new ChangeTagValueVisitor<>(scopeTag, survivingScope.name().toLowerCase()).visitNonNull(t, ctx));
+                    maybeUpdateModel();
+                }
                 boolean isPluginDependency = isPluginDependencyTag(oldGroupId, oldArtifactId);
                 boolean isAnnotationProcessorPath = isAnnotationProcessorPathTag(oldGroupId, oldArtifactId);
                 boolean deferUpdate = false;
@@ -456,30 +463,59 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 for (ResolvedDependency rd : existingNewDirectDependencies) {
                     if (Objects.equals(groupId, rd.getGroupId()) &&
                             Objects.equals(artifactId, rd.getArtifactId()) &&
-                            sameClassifierTypeScope(oldTag, rd)) {
+                            sameClassifierAndType(oldTag, rd) &&
+                            widestScope(scopeOf(oldTag), scopeOf(rd)) != null) {
                         return true;
                     }
                 }
                 return false;
             }
 
-            private boolean isSurvivorOfRemovedOldDependency(Xml.Tag newTag) {
+            // Maven requires groupId:artifactId:type:classifier to be unique whatever the scope, so the survivor
+            // takes on the widest scope of the declarations folded into it
+            private @Nullable Scope scopeOfSurvivorOfRemovedOldDependency(Xml.Tag newTag) {
                 String newTagGroupId = newTag.getChildValue("groupId").orElse(null);
                 String newTagArtifactId = newTag.getChildValue("artifactId").orElse(null);
+                Scope survivingScope = null;
                 for (ResolvedDependency rd : existingOldDirectDependencies) {
                     if (Objects.equals(newTagGroupId, renamedGroupId(rd.getGroupId())) &&
                             Objects.equals(newTagArtifactId, renamedArtifactId(rd.getArtifactId())) &&
-                            sameClassifierTypeScope(newTag, rd)) {
-                        return true;
+                            sameClassifierAndType(newTag, rd)) {
+                        Scope widest = widestScope(survivingScope == null ? scopeOf(newTag) : survivingScope, scopeOf(rd));
+                        if (widest != null) {
+                            survivingScope = widest;
+                        }
                     }
                 }
-                return false;
+                return survivingScope;
             }
 
-            private boolean sameClassifierTypeScope(Xml.Tag tag, ResolvedDependency rd) {
+            private boolean sameClassifierAndType(Xml.Tag tag, ResolvedDependency rd) {
                 return Objects.equals(emptyToNull(tag.getChildValue("classifier").orElse(null)), emptyToNull(rd.getClassifier())) &&
-                        tag.getChildValue("type").orElse("jar").equals(rd.getType()) &&
-                        Scope.fromName(tag.getChildValue("scope").orElse(null)) == Scope.fromName(rd.getRequested().getScope());
+                        tag.getChildValue("type").orElse("jar").equals(rd.getType());
+            }
+
+            private Scope scopeOf(Xml.Tag tag) {
+                return Scope.fromName(tag.getChildValue("scope").orElse(null));
+            }
+
+            private Scope scopeOf(ResolvedDependency rd) {
+                return Scope.fromName(rd.getRequested().getScope());
+            }
+
+            private @Nullable Scope widestScope(Scope a, Scope b) {
+                if (a == b) {
+                    return a;
+                }
+                List<Scope> classpathScopes = Arrays.asList(Scope.Compile, Scope.Provided, Scope.Runtime, Scope.Test);
+                if (!classpathScopes.contains(a) || !classpathScopes.contains(b)) {
+                    return null;
+                }
+                if (a == Scope.Test) {
+                    return b;
+                }
+                // provided and runtime only overlap on the test classpath
+                return b == Scope.Test ? a : Scope.Compile;
             }
 
             private @Nullable String renamedGroupId(@Nullable String fallback) {
