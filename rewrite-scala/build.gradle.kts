@@ -30,8 +30,7 @@ dependencies {
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
 
-    // Zinc's util-logging still pins log4j 2.17.1 (as of sbt 2.0.0-M2), so raise it here.
-    // Log4j publishes 3.0.0 betas as releases, hence the 2.x range rather than latest.release.
+    // Not latest.release: log4j publishes 3.0.0 betas as releases
     constraints {
         zinc("org.apache.logging.log4j:log4j-api:2.+") {
             because("CVE-2026-34477, CVE-2026-34479, CVE-2026-49844")
@@ -42,9 +41,7 @@ dependencies {
     }
 }
 
-// Zinc never opens an interactive terminal or REPL, so neither JLine bundle is needed: sbt's JLine 2 fork
-// (CVE-2023-50572) backs util-logging's terminal, and org.jline:jline 3.x (shading the Telnet server of
-// CVE-2026-56740/56741, fixed only in 4.2.1) backs the scala-compiler 2.13 REPL.
+// Zinc never opens the terminal or REPL these back; CVE-2023-50572, CVE-2026-56740, CVE-2026-56741
 configurations.named("zinc") {
     exclude(group = "org.scala-sbt.jline", module = "jline")
     exclude(group = "org.jline", module = "jline")
