@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Marker} from "../markers";
+import {Marker, MarkersKind} from "../markers";
 import {J} from "../java";
 import {JS} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
@@ -29,6 +29,7 @@ import {
 } from "./style";
 import {Autodetect, autodetect} from "./autodetect";
 import {updateIfChanged} from "../util";
+import {NamedStyles, Style} from "../style";
 
 declare module "./tree" {
     namespace JS {
@@ -295,4 +296,45 @@ RpcCodecs.registerCodec(StyleKind.WrappingAndBracesStyle, {
         await q.getAndSend(after, a => a.ifStatement);
         await q.getAndSend(after, a => a.keepWhenReformatting);
     }
+});
+
+const styleDetailKinds = new Set<string>([
+    ...Object.values(SpacesStyleDetailKind),
+    ...Object.values(WrappingAndBracesStyleDetailKind)
+]);
+
+function detailKind(styleKind: string, field: string): string | undefined {
+    const kind = `${styleKind}$${field.charAt(0).toUpperCase()}${field.slice(1)}`;
+    return styleDetailKinds.has(kind) ? kind : undefined;
+}
+
+function styleFromValue(value: any): Style {
+    if (value === null || typeof value !== "object") {
+        return value;
+    }
+    const {"@c": kind, "@ref": _ref, ...fields} = value;
+    for (const [field, detail] of Object.entries(fields)) {
+        const kindOfDetail = detailKind(kind, field);
+        if (kindOfDetail && detail !== null && typeof detail === "object") {
+            fields[field] = {kind: kindOfDetail, ...detail};
+        }
+    }
+    return {kind, ...fields};
+}
+
+function styleToValue({kind, ...fields}: Style & Record<string, any>, ref: number): any {
+    for (const [field, detail] of Object.entries(fields)) {
+        if (detailKind(kind, field) && detail !== null && typeof detail === "object") {
+            const {kind: _kind, ...detailFields} = detail;
+            fields[field] = detailFields;
+        }
+    }
+    return {"@c": kind, "@ref": ref, ...fields};
+}
+
+// A plain NamedStyles has no codec on either side, so it travels in the shape Java's serializer gives it
+RpcCodecs.registerValueCodec(MarkersKind.NamedStyles, {
+    fromValue: (value: NamedStyles): NamedStyles => ({...value, styles: (value.styles ?? []).map(styleFromValue)}),
+    // Java's deserializer wants an object id on each style, and gives the first to the set itself
+    toValue: (after: NamedStyles) => ({...after, styles: after.styles.map((style, i) => styleToValue(style, i + 2))})
 });
