@@ -219,3 +219,71 @@ class Tree(ABC):
     stub = generate_stubs.generate_stub_content(source)
 
     assert "class Tree(ABC):\n    def replace(self, **kwargs: Any) -> Self: ..." in stub
+
+
+def test_dataclass_stub_mirrors_its_declaration(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from dataclasses import dataclass
+from enum import Enum
+
+
+@dataclass
+class Config:
+    x: int
+
+
+class Color(Enum):
+    RED = 0
+
+
+@dataclass(frozen=True)
+class Node:
+    _id: int
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "@dataclass\nclass Config:\n    x: int\n" in stub
+
+    assert "class Color(Enum):\n    RED = ...\n" in stub
+
+    assert "@dataclass(frozen=True)\nclass Node:" in stub
+
+    assert "def replace" not in stub
+
+
+def test_member_stubs_keep_their_decorators(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from abc import ABC, abstractmethod
+from functools import cached_property
+
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+
+    @name.setter
+    def name(self, value: str) -> None: ...
+
+    @cached_property
+    def size(self) -> int:
+        return 0
+
+    @abstractmethod
+    def visit(self, p: int) -> int: ...
+
+    @classmethod
+    def _from_wire(cls, d): ...
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "    @property\n    @abstractmethod\n    def name(self) -> str: ...\n" in stub
+    assert "    @name.setter\n    def name(self, value: str) -> None: ...\n" in stub
+
+    assert "    @property\n    def size(self) -> int: ...\n" in stub
+
+    assert "    @abstractmethod\n    def visit(self, p: int) -> int: ...\n" in stub
+
+    assert "_from_wire" not in stub

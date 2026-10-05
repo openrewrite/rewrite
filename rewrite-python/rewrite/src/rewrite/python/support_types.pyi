@@ -25,7 +25,6 @@ class Py(J):
 class PyComment(Comment):
     _aligned_to_indent: bool
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def aligned_to_indent(self) -> bool: ...
