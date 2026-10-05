@@ -339,8 +339,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
 
   private def mapAppliedType(at: AppliedType, sig: String): JavaType = {
     val baseType = mapType(at.tycon) match {
-      case fq: JavaType.FullyQualified => fq
       case p: JavaType.Parameterized => p.getType
+      case fq: JavaType.FullyQualified => fq
       case _ => return unknown
     }
 

@@ -62,7 +62,8 @@ class ScalaCompilerBridge {
     fresh.setReporter(reporter)
     // Send compiler output to a designated dir so .class files don't pollute cwd.
     if (outputDir != null) {
-      fresh.setSetting(fresh.settings.outputDir, dotty.tools.io.AbstractFile.getDirectory(outputDir, ""))
+      fresh.setSetting(fresh.settings.outputDir,
+        new dotty.tools.io.PlainDirectory(new dotty.tools.io.Directory(Paths.get(outputDir))))
     }
     if (classpath.nonEmpty) {
       fresh.setSetting(fresh.settings.classpath, classpath)
@@ -106,7 +107,7 @@ class ScalaCompilerBridge {
     // on a `fresh` of the same base would have no effect. Only if the retry
     // also fails do we fall back to a bare context, where `with` types fail
     // per-file.
-    val (runOpt, parseContext): (Option[Run], Context) =
+    val (runOpt, parseContext) =
       try {
         val r = (new Compiler()).newRun(using configuredCtx)
         (Some(r), r.runContext)
