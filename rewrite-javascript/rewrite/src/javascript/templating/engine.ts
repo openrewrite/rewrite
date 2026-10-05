@@ -17,7 +17,7 @@ import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
-import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, treeIds, WRAPPER_FUNCTION_NAME} from './utils';
+import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, treeIds, wrapCode} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
@@ -225,27 +225,18 @@ function parseFailureReason(cu: JS.CompilationUnit): string {
  * Not exported from index, so only visible within the templating module.
  */
 export class TemplateEngine {
-    /**
-     * Gets the parsed and extracted template tree (before value substitution).
-     * This is the cacheable part of template processing.
-     *
-     * @param templateParts The string parts of the template
-     * @param parameters The parameters between the string parts
-     * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
-     * @param dependencies NPM dependencies for type attribution
-     * @returns A Promise resolving to the extracted template AST
-     */
     /** The template parsed with its context, which is what gives its code types to attribute against. */
     private static async parseWithContext(
         templateParts: TemplateStringsArray,
         parameters: Parameter[],
         contextStatements: string[],
         dependencies: Record<string, string>,
-        types: string[] | undefined
+        types: string[] | undefined,
+        expression: boolean = false
     ): Promise<JS.CompilationUnit> {
         // A capture's declared type reaches the parse as a declaration, so it belongs with context.
         const preamble = TemplateEngine.parameterPreamble(parameters);
-        const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
+        const templateString = TemplateEngine.buildTemplateString(templateParts, parameters, expression);
         const contextWithPreamble = preamble.length > 0
             ? [...contextStatements, ...preamble]
             : contextStatements;
@@ -283,7 +274,11 @@ export class TemplateEngine {
         dependencies: Record<string, string> = {},
         types?: string[]
     ): Promise<ContextBinding[]> {
-        const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types);
+        // The bindings are the context's alone, so either reading of code opening with `{` serves
+        const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types)
+            .catch(e => opensWithBrace(templateParts) ?
+                TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types, true) :
+                Promise.reject(e));
         // The template's own code is the last statement, so everything ahead of it is context.
         const context = {...cu, statements: cu.statements.slice(0, -1)};
         const attributed = new Set<string>();
@@ -298,20 +293,32 @@ export class TemplateEngine {
             .map(b => ({...b, attributed: attributed.has(b.name)}));
     }
 
+    /**
+     * Gets the parsed and extracted template tree (before value substitution).
+     * This is the cacheable part of template processing.
+     *
+     * @param templateParts The string parts of the template
+     * @param parameters The parameters between the string parts
+     * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
+     * @param dependencies NPM dependencies for type attribution
+     * @param expression Whether to parse the code as an expression
+     * @returns A Promise resolving to the extracted template AST
+     */
     static async getTemplateTree(
         templateParts: TemplateStringsArray,
         parameters: Parameter[],
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {},
-        types?: string[]
+        types?: string[],
+        expression: boolean = false
     ): Promise<J> {
-        const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types);
+        const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types, expression);
 
         // The template code is always the last statement (after context + preamble)
         const lastStatement = cu.statements[cu.statements.length - 1].element;
 
         // Extract from wrapper using shared utility
-        const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, 'Template');
+        const extracted = PlaceholderUtils.extractFromWrapper(lastStatement, 'Template', expression);
 
         return produce(extracted, _ => {});
     }
@@ -473,7 +480,8 @@ export class TemplateEngine {
      */
     private static buildTemplateString(
         templateParts: TemplateStringsArray,
-        parameters: Parameter[]
+        parameters: Parameter[],
+        expression: boolean
     ): string {
         let result = '';
         for (let i = 0; i < templateParts.length; i++) {
@@ -495,7 +503,7 @@ export class TemplateEngine {
 
         // Always wrap in function body - let the parser decide what it is,
         // then we'll extract intelligently based on what was parsed
-        return `function ${WRAPPER_FUNCTION_NAME}() { ${dedentTemplate(result)} }`;
+        return wrapCode(dedentTemplate(result), expression);
     }
 
     /**
@@ -556,6 +564,7 @@ export class TemplateEngine {
      * @param captures The captures between the string parts (can include RawCode)
      * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
+     * @param expression Whether to parse the code as an expression
      * @returns A Promise resolving to the extracted pattern AST
      */
     static async getPatternTree(
@@ -563,7 +572,8 @@ export class TemplateEngine {
         captures: (Capture | Any | RawCode)[],
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {},
-        types?: string[]
+        types?: string[],
+        expression: boolean = false
     ): Promise<J> {
         const preamble = TemplateEngine.capturePreamble(captures);
 
@@ -587,7 +597,7 @@ export class TemplateEngine {
 
         // Always wrap in function body - let the parser decide what it is,
         // then we'll extract intelligently based on what was parsed
-        const templateString = `function ${WRAPPER_FUNCTION_NAME}() { ${result} }`;
+        const templateString = wrapCode(result, expression);
 
         // Add preamble to context statements (so they're skipped during extraction)
         const contextWithPreamble = preamble.length > 0
@@ -612,7 +622,7 @@ export class TemplateEngine {
         const lastStatement = cu.statements[cu.statements.length - 1].element;
 
         // Extract from wrapper using shared utility
-        return PlaceholderUtils.extractFromWrapper(lastStatement, 'Pattern');
+        return PlaceholderUtils.extractFromWrapper(lastStatement, 'Pattern', expression);
     }
 
     /**
@@ -749,6 +759,59 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
             name: visitedName
         });
     }
+
+    /**
+     * Promotes a variadic capture's marker from a shorthand property's name to the property, so
+     * that `{${props}}` matches the object literal's properties as a sequence. A scalar capture
+     * stays on the name, binding the identifier a shorthand property consists of.
+     */
+    protected override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, p: undefined): Promise<J | undefined> {
+        const visited = await super.visitPropertyAssignment(propertyAssignment, p) as JS.PropertyAssignment;
+        const nameMarker = visited.initializer === undefined ? PlaceholderUtils.getCaptureMarker(visited.name) : undefined;
+        if (!nameMarker?.variadicOptions) {
+            return visited;
+        }
+        return updateIfChanged(visited, {
+            name: {
+                ...visited.name,
+                markers: {...visited.name.markers, markers: visited.name.markers.markers.filter(m => m !== nameMarker)}
+            },
+            markers: {
+                ...visited.markers,
+                markers: [...visited.markers.markers, nameMarker]
+            },
+        });
+    }
+}
+
+// FIXME: This is a heuristic to determine if the parent expects a statement child
+function expectsStatement(parentTree: J): boolean {
+    return parentTree.kind === J.Kind.Block ||
+        parentTree.kind === J.Kind.Case ||
+        parentTree.kind === J.Kind.DoWhileLoop ||
+        parentTree.kind === J.Kind.ForEachLoop ||
+        parentTree.kind === J.Kind.ForLoop ||
+        parentTree.kind === J.Kind.If ||
+        parentTree.kind === J.Kind.IfElse ||
+        parentTree.kind === J.Kind.WhileLoop ||
+        parentTree.kind === JS.Kind.CompilationUnit ||
+        parentTree.kind === JS.Kind.ForInLoop;
+}
+
+/** Whether the code opens with `{`, which is a block where a statement goes and an object literal elsewhere. */
+export function opensWithBrace(templateParts: TemplateStringsArray): boolean {
+    return templateParts[0].trimStart().startsWith('{');
+}
+
+/** Whether code opening with `{` that replaces `tree`, which `cursor` points at, is an object literal. */
+export function replacedByObjectLiteral(tree: J, cursor: Cursor): boolean {
+    if (tree.kind === J.Kind.Block) {
+        return false;
+    } else if (!isStatement(tree)) {
+        return true;
+    }
+    const parentTree = cursor.parentTree()?.value;
+    return parentTree !== undefined && !expectsStatement(parentTree);
 }
 
 /**
@@ -863,17 +926,7 @@ export class TemplateApplier {
 
         // Only apply wrapping logic if we have parent context
         if (parentTree) {
-            // FIXME: This is a heuristic to determine if the parent expects a statement child
-            const parentExpectsStatement = parentTree.kind === J.Kind.Block ||
-                parentTree.kind === J.Kind.Case ||
-                parentTree.kind === J.Kind.DoWhileLoop ||
-                parentTree.kind === J.Kind.ForEachLoop ||
-                parentTree.kind === J.Kind.ForLoop ||
-                parentTree.kind === J.Kind.If ||
-                parentTree.kind === J.Kind.IfElse ||
-                parentTree.kind === J.Kind.WhileLoop ||
-                parentTree.kind === JS.Kind.CompilationUnit ||
-                parentTree.kind === JS.Kind.ForInLoop;
+            const parentExpectsStatement = expectsStatement(parentTree);
             const originalIsStatement = isStatement(originalTree);
 
             const resultIsStatement = isStatement(resultToUse);
