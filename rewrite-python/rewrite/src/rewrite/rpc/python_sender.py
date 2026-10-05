@@ -287,7 +287,7 @@ class PythonRpcSender:
     def _visit_comprehension_expression(self, ce: ComprehensionExpression, q: 'RpcSendQueue') -> None:
         q.get_and_send(ce, lambda x: x.kind)
         q.get_and_send(ce, lambda x: x.result, lambda el: self._visit(el, q))
-        q.get_and_send_list(ce, lambda x: ce.clauses,
+        q.get_and_send_list(ce, lambda x: x.clauses,
                            lambda el: id_to_str(el._id),
                            lambda el: self._visit(el, q))
         q.get_and_send(ce, lambda x: x.suffix, lambda space: self._visit_space(space, q))
@@ -300,7 +300,7 @@ class PythonRpcSender:
         q.get_and_send(cc, lambda x: x.padding.async_, lambda el: self._visit_right_padded(el, q))
         q.get_and_send(cc, lambda x: x.iterator_variable, lambda el: self._visit(el, q))
         q.get_and_send(cc, lambda x: x.padding.iterated_list, lambda el: self._visit_left_padded(el, q))
-        q.get_and_send_list(cc, lambda x: cc.conditions,
+        q.get_and_send_list(cc, lambda x: x.conditions,
                            lambda el: id_to_str(el._id),
                            lambda el: self._visit(el, q))
 
