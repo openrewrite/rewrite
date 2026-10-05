@@ -663,16 +663,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
         return left
                 .withBefore(orEmpty(q.receive(left.getBefore(), s -> visitSpace(s, q))))
-                .withElement(q.receive(left.getElement(), t -> {
-                    if (t instanceof J) {
-                        //noinspection unchecked
-                        return (T) visitNonNull((J) t, q);
-                    } else if (t instanceof Space) {
-                        //noinspection unchecked
-                        return (T) visitSpace((Space) t, q);
-                    }
-                    return t;
-                }))
+                .withElement(receivePaddedElement(left.getElement(), q))
                 .withMarkers(orEmpty(q.receive(left.getMarkers())));
     }
 
@@ -684,20 +675,28 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
-        T element = q.receive(right.getElement(), t -> {
+        return right
+                .withElement(receivePaddedElement(right.getElement(), q))
+                .withAfter(orEmpty(q.receive(right.getAfter(), s -> visitSpace(s, q))))
+                .withMarkers(orEmpty(q.receive(right.getMarkers())));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private <T> T receivePaddedElement(@Nullable T before, RpcReceiveQueue q) {
+        if (before instanceof Enum) {
+            return (T) q.receiveAndGet(before, toEnum(((Enum) before).getDeclaringClass()));
+        } else if (before != null && !(before instanceof J) && !(before instanceof Space)) {
+            // a scalar's new value is inlined in the message, which an onChange callback is never shown
+            return q.receive(before);
+        }
+        return q.receive(before, t -> {
             if (t instanceof J) {
-                //noinspection unchecked
                 return (T) visitNonNull((J) t, q);
             } else if (t instanceof Space) {
-                //noinspection unchecked
                 return (T) visitSpace((Space) t, q);
             }
             return t;
         });
-        return right
-                .withElement(element)
-                .withAfter(orEmpty(q.receive(right.getAfter(), s -> visitSpace(s, q))))
-                .withMarkers(orEmpty(q.receive(right.getMarkers())));
     }
 
     private final JavaTypeReceiver javaTypeReceiver = new JavaTypeReceiver();

@@ -10,6 +10,7 @@ import weakref
 from rewrite.utils import replace_if_changed, T
 from enum import Enum
 from pathlib import Path
+from .visitor import PythonVisitor
 from rewrite import Checksum, FileAttributes, SourceFile, TreeVisitor, Markers, Cursor, PrinterFactory
 from rewrite.java import J, JavaType, JContainer, JLeftPadded, JRightPadded, Space, JavaSourceFile, TypeTree, TypedTree, NameTree, Expression, Statement, Block, Identifier, Import, TypeParameter
 from rewrite.python.support_types import Py as Py, P as P
@@ -21,7 +22,6 @@ class Async(Py, Statement):
     _markers: Markers
     _statement: Statement
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -39,7 +39,6 @@ class Shebang(Py, Statement):
     _markers: Markers
     _text: str
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -58,7 +57,6 @@ class Await(Py, Expression):
     _expression: Expression
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -74,16 +72,16 @@ class Await(Py, Expression):
 @dataclass(frozen=True)
 class Binary(Py, Expression, TypedTree):
     class Type(Enum):
-        In: Type
-        Is: Type
-        IsNot: Type
-        NotIn: Type
-        FloorDivision: Type
-        MatrixMultiplication: Type
-        Power: Type
-        StringConcatenation: Type
+        In = ...
+        Is = ...
+        IsNot = ...
+        NotIn = ...
+        FloorDivision = ...
+        MatrixMultiplication = ...
+        Power = ...
+        StringConcatenation = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Binary
 
@@ -102,7 +100,6 @@ class Binary(Py, Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -125,7 +122,7 @@ class Binary(Py, Expression, TypedTree):
 
 @dataclass(frozen=True)
 class ChainedAssignment(Py, Statement, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: ChainedAssignment
 
@@ -142,7 +139,6 @@ class ChainedAssignment(Py, Statement, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -168,7 +164,6 @@ class ExceptionType(Py, TypeTree):
     _exception_group: bool
     _expression: Expression
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -191,7 +186,6 @@ class LiteralType(Py, Expression, TypeTree):
     _literal: Expression
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -212,7 +206,6 @@ class TypeHint(Py, TypeTree):
     _type_tree: Expression
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -227,7 +220,7 @@ class TypeHint(Py, TypeTree):
 
 @dataclass(frozen=True)
 class CompilationUnit(Py, JavaSourceFile, SourceFile):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: CompilationUnit
 
@@ -251,7 +244,6 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
     _eof: Space
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -335,7 +327,7 @@ class StatementExpression(Py, Expression, Statement):
 
 @dataclass(frozen=True)
 class MultiImport(Py, Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: MultiImport
 
@@ -354,7 +346,6 @@ class MultiImport(Py, Statement):
     _names: JContainer[Import]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -373,7 +364,7 @@ class MultiImport(Py, Statement):
 
 @dataclass(frozen=True)
 class KeyValue(Py, Expression, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: KeyValue
 
@@ -390,7 +381,6 @@ class KeyValue(Py, Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -409,7 +399,7 @@ class KeyValue(Py, Expression, TypedTree):
 
 @dataclass(frozen=True)
 class DictLiteral(Py, Expression, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: DictLiteral
 
@@ -425,7 +415,6 @@ class DictLiteral(Py, Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -443,11 +432,11 @@ class DictLiteral(Py, Expression, TypedTree):
 @dataclass(frozen=True)
 class CollectionLiteral(Py, Expression, TypedTree):
     class Kind(Enum):
-        LIST: Kind
-        SET: Kind
-        TUPLE: Kind
+        LIST = ...
+        SET = ...
+        TUPLE = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: CollectionLiteral
 
@@ -464,7 +453,6 @@ class CollectionLiteral(Py, Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -486,11 +474,11 @@ class FormattedString(Py, Expression, TypedTree):
     @dataclass(frozen=True)
     class Value(Py, Expression, TypedTree):
         class Conversion(Enum):
-            STR: Conversion
-            REPR: Conversion
-            ASCII: Conversion
+            STR = ...
+            REPR = ...
+            ASCII = ...
 
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: FormattedString.Value
 
@@ -512,7 +500,6 @@ class FormattedString(Py, Expression, TypedTree):
         _format: Optional[Expression]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def prefix(self) -> Space: ...
@@ -545,7 +532,6 @@ class FormattedString(Py, Expression, TypedTree):
     _parts: List[Expression]
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -566,7 +552,6 @@ class Pass(Py, Statement):
     _prefix: Space
     _markers: Markers
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -577,7 +562,7 @@ class Pass(Py, Statement):
 
 @dataclass(frozen=True)
 class TrailingElseWrapper(Py, Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: TrailingElseWrapper
 
@@ -593,7 +578,6 @@ class TrailingElseWrapper(Py, Statement):
     _else_block: JLeftPadded[Block]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -611,10 +595,10 @@ class TrailingElseWrapper(Py, Statement):
 @dataclass(frozen=True)
 class ComprehensionExpression(Py, Expression):
     class Kind(Enum):
-        LIST: Kind
-        SET: Kind
-        DICT: Kind
-        GENERATOR: Kind
+        LIST = ...
+        SET = ...
+        DICT = ...
+        GENERATOR = ...
 
     @dataclass(frozen=True)
     class Condition(Py):
@@ -623,7 +607,6 @@ class ComprehensionExpression(Py, Expression):
         _markers: Markers
         _expression: Expression
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def prefix(self) -> Space: ...
@@ -640,7 +623,7 @@ class ComprehensionExpression(Py, Expression):
 
     @dataclass(frozen=True)
     class Clause(Py):
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: ComprehensionExpression.Clause
 
@@ -660,7 +643,6 @@ class ComprehensionExpression(Py, Expression):
         _conditions: Optional[List[ComprehensionExpression.Condition]]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def prefix(self) -> Space: ...
@@ -695,7 +677,6 @@ class ComprehensionExpression(Py, Expression):
     _suffix: Space
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -716,7 +697,7 @@ class ComprehensionExpression(Py, Expression):
 
 @dataclass(frozen=True)
 class TypeAlias(Py, Statement, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: TypeAlias
 
@@ -736,7 +717,6 @@ class TypeAlias(Py, Statement, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -763,7 +743,6 @@ class YieldFrom(Py, Expression):
     _expression: Expression
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -778,7 +757,7 @@ class YieldFrom(Py, Expression):
 
 @dataclass(frozen=True)
 class UnionType(Py, Expression, TypeTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: UnionType
 
@@ -794,7 +773,6 @@ class UnionType(Py, Expression, TypeTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -812,10 +790,10 @@ class UnionType(Py, Expression, TypeTree):
 @dataclass(frozen=True)
 class VariableScope(Py, Statement):
     class Kind(Enum):
-        GLOBAL: Kind
-        NONLOCAL: Kind
+        GLOBAL = ...
+        NONLOCAL = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: VariableScope
 
@@ -831,7 +809,6 @@ class VariableScope(Py, Statement):
     _names: List[JRightPadded[Identifier]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -848,7 +825,7 @@ class VariableScope(Py, Statement):
 
 @dataclass(frozen=True)
 class Del(Py, Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Del
 
@@ -863,7 +840,6 @@ class Del(Py, Statement):
     _targets: List[JRightPadded[Expression]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -879,8 +855,8 @@ class Del(Py, Statement):
 @dataclass(frozen=True)
 class SpecialParameter(Py, TypeTree):
     class Kind(Enum):
-        KWARGS: Kind
-        ARGS: Kind
+        KWARGS = ...
+        ARGS = ...
 
     _id: UUID
     _prefix: Space
@@ -889,7 +865,6 @@ class SpecialParameter(Py, TypeTree):
     _type_hint: Optional[TypeHint]
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -907,8 +882,8 @@ class SpecialParameter(Py, TypeTree):
 @dataclass(frozen=True)
 class Star(Py, Expression, TypeTree):
     class Kind(Enum):
-        LIST: Kind
-        DICT: Kind
+        LIST = ...
+        DICT = ...
 
     _id: UUID
     _prefix: Space
@@ -917,7 +892,6 @@ class Star(Py, Expression, TypeTree):
     _expression: Expression
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -934,7 +908,7 @@ class Star(Py, Expression, TypeTree):
 
 @dataclass(frozen=True)
 class NamedArgument(Py, Expression):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: NamedArgument
 
@@ -951,7 +925,6 @@ class NamedArgument(Py, Expression):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -977,7 +950,6 @@ class TypeHintedExpression(Py, Expression):
     _type_hint: TypeHint
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -994,7 +966,7 @@ class TypeHintedExpression(Py, Expression):
 
 @dataclass(frozen=True)
 class ErrorFrom(Py, Expression):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: ErrorFrom
 
@@ -1011,7 +983,6 @@ class ErrorFrom(Py, Expression):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -1030,7 +1001,7 @@ class ErrorFrom(Py, Expression):
 
 @dataclass(frozen=True)
 class MatchCase(Py, Expression):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: MatchCase
 
@@ -1042,24 +1013,24 @@ class MatchCase(Py, Expression):
     @dataclass(frozen=True)
     class Pattern(Py, Expression):
         class Kind(Enum):
-            AS: Kind
-            CAPTURE: Kind
-            CLASS: Kind
-            DOUBLE_STAR: Kind
-            GROUP: Kind
-            KEY_VALUE: Kind
-            KEYWORD: Kind
-            LITERAL: Kind
-            MAPPING: Kind
-            OR: Kind
-            SEQUENCE: Kind
-            SEQUENCE_LIST: Kind
-            SEQUENCE_TUPLE: Kind
-            STAR: Kind
-            VALUE: Kind
-            WILDCARD: Kind
+            AS = ...
+            CAPTURE = ...
+            CLASS = ...
+            DOUBLE_STAR = ...
+            GROUP = ...
+            KEY_VALUE = ...
+            KEYWORD = ...
+            LITERAL = ...
+            MAPPING = ...
+            OR = ...
+            SEQUENCE = ...
+            SEQUENCE_LIST = ...
+            SEQUENCE_TUPLE = ...
+            STAR = ...
+            VALUE = ...
+            WILDCARD = ...
 
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: MatchCase.Pattern
 
@@ -1076,7 +1047,6 @@ class MatchCase(Py, Expression):
         _type: Optional[JavaType]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def prefix(self) -> Space: ...
@@ -1107,7 +1077,6 @@ class MatchCase(Py, Expression):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -1126,7 +1095,7 @@ class MatchCase(Py, Expression):
 
 @dataclass(frozen=True)
 class Slice(Py, Expression, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Slice
 
@@ -1147,7 +1116,6 @@ class Slice(Py, Expression, TypedTree):
     _step: Optional[JRightPadded[Expression]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...

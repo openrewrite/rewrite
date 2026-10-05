@@ -106,3 +106,18 @@ func TestGoModNodesRoundTripOnTheirOwn(t *testing.T) {
 		require.Equal(t, c.printed, printer.PrintWithCursor(got, nil, nil))
 	}
 }
+
+func TestEmptyRequireBlockSendsAnEmptyEntriesList(t *testing.T) {
+	// given
+	gm, err := parser.ParseGoModFile("go.mod", "module example.com/foo\n\nrequire ()\n")
+	require.NoError(t, err)
+
+	// when
+	got := roundTripNode(t, gm, &golang.GoMod{Ident: gm.Ident}).(*golang.GoMod)
+
+	// then
+	block, ok := got.Statements[1].Element.(*golang.GoModBlock)
+	require.True(t, ok)
+	require.NotNil(t, block.Entries)
+	require.Empty(t, block.Entries)
+}

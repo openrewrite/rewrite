@@ -13,10 +13,11 @@ from pathlib import Path
 from rewrite import Checksum, Cursor, FileAttributes, Markers, SourceFile, TreeVisitor
 from rewrite.toml.support_types import Space as Space, Toml as Toml, TomlKey as TomlKey, TomlRightPadded as TomlRightPadded, TomlType as TomlType, TomlValue as TomlValue
 from rewrite.utils import replace_if_changed
+from .visitor import TomlVisitor
 
 @dataclass(frozen=True)
 class Array(Toml):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Array
 
@@ -31,7 +32,6 @@ class Array(Toml):
     _values: List[TomlRightPadded[Toml]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -58,7 +58,6 @@ class Document(Toml, SourceFile):
     _values: List[TomlValue]
     _eof: Space
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def source_path(self) -> Path: ...
@@ -88,7 +87,6 @@ class Empty(Toml):
     _prefix: Space
     _markers: Markers
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -105,7 +103,6 @@ class Identifier(TomlKey):
     _source: str
     _name: str
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -120,7 +117,7 @@ class Identifier(TomlKey):
 
 @dataclass(frozen=True)
 class KeyValue(TomlValue):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: KeyValue
 
@@ -136,7 +133,6 @@ class KeyValue(TomlValue):
     _value: Toml
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -161,7 +157,6 @@ class Literal(Toml):
     _source: str
     _value: Any
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -178,7 +173,7 @@ class Literal(Toml):
 
 @dataclass(frozen=True)
 class Table(TomlValue):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Table
 
@@ -196,7 +191,6 @@ class Table(TomlValue):
     _values: List[TomlRightPadded[Toml]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...

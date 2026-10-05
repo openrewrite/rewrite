@@ -13,10 +13,8 @@ from rewrite import Marker
 class ArrayTable(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
 @dataclass(frozen=True)
 class InlineTable(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...

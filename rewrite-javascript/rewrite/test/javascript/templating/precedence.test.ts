@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {javascript, JavaScriptVisitor, RewriteRule} from "../../../src/javascript";
+import {javascript, JavaScriptVisitor, JS, RewriteRule} from "../../../src/javascript";
 import {capture, pattern, rewrite, template} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
@@ -366,6 +366,38 @@ describe('template precedence', () => {
             return spec.rewriteRun(javascript(
                 `const a = mk(ns?.Cls);`,
                 `const a = new (ns?.Cls)();`));
+        });
+
+        test('a callee of `new` that is not a type tree is wrapped as one, as the parser does', () => {
+            const x = capture();
+            spec.recipe = onCall(rewrite(() => ({
+                before: pattern`mk(${x})`,
+                after: template`new ${x}()`
+            })));
+            const callees: string[] = [];
+            //language=javascript
+            return spec.rewriteRun({
+                ...javascript(
+                    `
+                        const a = mk(factory());
+                        const b = mk(registry[0]);
+                        const c = mk(ns.Cls);
+                    `,
+                    `
+                        const a = new (factory())();
+                        const b = new registry[0]();
+                        const c = new ns.Cls();
+                    `),
+                afterRecipe: async (cu: JS.CompilationUnit) => {
+                    await new class extends JavaScriptVisitor<number> {
+                        protected override async visitNewClass(newClass: J.NewClass, p: number): Promise<J | undefined> {
+                            callees.push(newClass.class!.kind);
+                            return super.visitNewClass(newClass, p);
+                        }
+                    }().visit(cu, 0);
+                    expect(callees).toEqual([JS.Kind.TypeTreeExpression, JS.Kind.TypeTreeExpression, J.Kind.FieldAccess]);
+                }
+            });
         });
 
         test('the tag of a tagged template may not be an optional chain', () => {

@@ -1972,7 +1972,7 @@ class ParserVisitor(ast.NodeVisitor):
         return left.replace(prefix=prefix)  # ty: ignore[unresolved-attribute]  # complex union type
 
     def __convert_binary_operator(self, op) -> Union[JLeftPadded[j.Binary.Type], JLeftPadded[py.Binary.Type]]:
-        operation_map: Dict[type, Tuple[j.Binary.Type, str]] = {
+        operation_map: Dict[type, Tuple[j.Binary.Type | py.Binary.Type, str]] = {
             ast.Add: (j.Binary.Type.Addition, '+'),
             ast.And: (j.Binary.Type.And, 'and'),
             ast.BitAnd: (j.Binary.Type.BitAnd, '&'),
@@ -2422,7 +2422,7 @@ class ParserVisitor(ast.NodeVisitor):
             name = name.replace(prefix=extra_parens[-1][1])  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
 
             # Wrap in extra parentheses (innermost to outermost)
-            wrapped: Expression = name
+            wrapped: J = name
             for i in range(len(extra_parens) - 1, -1, -1):
                 paren_prefix, _ = extra_parens[i]
                 suffix = self.__whitespace()
