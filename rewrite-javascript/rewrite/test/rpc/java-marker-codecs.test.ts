@@ -71,6 +71,7 @@ const samples: { [kind: string]: () => Marker } = {
         styles: [
             {...IntelliJ.TypeScript.spaces(), within: {...IntelliJ.TypeScript.spaces().within, es6ImportExportBraces: true}},
             IntelliJ.TypeScript.wrappingAndBraces(),
+            IntelliJ.TypeScript.blankLines(),
             {...IntelliJ.TypeScript.tabsAndIndents(), indentSize: 2}
         ]
     } as Marker),
@@ -89,7 +90,7 @@ const samples: { [kind: string]: () => Marker } = {
         version: "1.0.0",
         dependencies: {"is-odd": "^3.0.1"}
     }),
-    [StyleKind.Autodetect]: () => autodetect(randomId(), []),
+    [StyleKind.Autodetect]: () => autodetect(randomId(), [IntelliJ.TypeScript.blankLines()]),
     [StyleKind.PrettierStyle]: () => prettierStyle(randomId(), {semi: false}, "3.0.0"),
     [`${StyleKind.PrettierStyle} without a version`]: () => prettierStyle(randomId(), {semi: false}),
     [Yaml.Markers.OmitColon]: () => omitColon(),
