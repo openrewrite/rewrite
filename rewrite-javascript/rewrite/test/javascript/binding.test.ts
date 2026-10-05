@@ -1071,6 +1071,27 @@ describe("maybeRebind", () => {
         expect(bound.name).toBe("Old");
     });
 
+    test("a name a queued rebind claims answers a bind of its target and is taken for anything else", async () => {
+        const spec = new RecipeSpec();
+        const bound: {rebound?: string, target?: string, bound?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member: "a"}, to: {module: "m2", member: "x"}});
+                bound.rebound = maybeRebind(this, {from: {module: "m", member: "b"}, to: {module: "m3", member: "x"}});
+                bound.target = maybeBind(this, {module: "m2", member: "x"});
+                bound.bound = maybeBind(this, {module: "m4", member: "x", onlyIfReferenced: false});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import {a, b} from "m";\n\na(b);`,
+            `import {x as b} from "m3";\nimport {x} from "m2";\nimport {x as x_1} from "m4";\n\nx(b);`
+        ));
+        expect(bound.rebound).toBe("b");
+        expect(bound.target).toBe("x");
+        expect(bound.bound).toBe("x_1");
+    });
+
     test("a name in a namespace of its own — a nearer scope, a label — is left alone", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(rebindOldToNew());
@@ -1417,6 +1438,30 @@ describe("maybeRebind", () => {
         ));
     });
 
+    test("members moved one call at a time out of one statement into one module land in one statement, under its header", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member: "a"}, to: {module: "m2", member: "x"}});
+                maybeRebind(this, {from: {module: "m", member: "b"}, to: {module: "m2", member: "y"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `// header\nimport {a, b} from "m";\n\na(b);`,
+            `// header\nimport {x, y} from "m2";\n\nx(y);`
+        ));
+    });
+
+    test("an import nested in a module declaration is a binding of its own scope, left as it stands", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import {Old} from "m";\ndeclare module "x" {\n    import {Old} from "m";\n}\n\nOld();`,
+            `import {New} from "m2";\ndeclare module "x" {\n    import {Old} from "m";\n}\n\nNew();`
+        ));
+    });
+
     test("the created replacement stays type-only, and the surviving specifier keeps its own formatting", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
@@ -1431,28 +1476,43 @@ describe("maybeRebind", () => {
         ));
     });
 
-    test("a rebind that would change default/named/namespace shape refuses, since the only edit available is in place", async () => {
-        const namedToDefault = new RecipeSpec();
-        const namedToDefaultBound: {name?: string} = {};
-        namedToDefault.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+    test("a rebind that changes default/named/namespace shape replaces the statement, except in a CommonJS file", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                namedToDefaultBound.name = maybeRebind(this, {from: {module: "old", member: "act"}, to: {module: "new", member: "default"}});
+                bound.name = maybeRebind(this, {from: {module: "old", member: "act"}, to: {module: "new", member: "default"}});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
-        await namedToDefault.rewriteRun(typescript(`import {act} from "old";\n\nact();`));
-        expect(namedToDefaultBound.name).toBeUndefined();
+        await spec.rewriteRun(typescript(
+            `// header\nimport {act} from "old";\n\nact();`,
+            `// header\nimport act from "new";\n\nact();`
+        ));
+        expect(bound.name).toBe("act");
 
-        const defaultToNamed = new RecipeSpec();
-        const defaultToNamedBound: {name?: string} = {};
-        defaultToNamed.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+        await spec.rewriteRun({...typescript(`import {act} from "old";\n\nact();`), path: "a.cts"});
+        expect(bound.name).toBeUndefined();
+
+        // The dropped import was the file's only ES module syntax, which leaves it reading as CommonJS.
+        await spec.rewriteRun({...javascript(
+            `import {act} from "old";\nconst fs = require("fs");\n\nact();`,
+            `import act from "new";\n\nconst fs = require("fs");\n\nact();`
+        ), path: "a.js"});
+
+        // `b` gains its only-member status from the sibling move, after both rebinds were queued.
+        const sibling = new RecipeSpec();
+        sibling.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                defaultToNamedBound.name = maybeRebind(this, {from: {module: "old"}, to: {module: "new", member: "act"}});
+                maybeRebind(this, {from: {module: "m", member: "a"}, to: {module: "m2", member: "x"}});
+                maybeRebind(this, {from: {module: "m", member: "b"}, to: {module: "m3"}});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
-        await defaultToNamed.rewriteRun(typescript(`import D from "old";\n\nD();`));
-        expect(defaultToNamedBound.name).toBeUndefined();
+        await sibling.rewriteRun(typescript(
+            `import {a, b} from "m";\n\na(b);`,
+            `import {x} from "m2";\nimport b from "m3";\n\nx(b);`
+        ));
     });
 
     test("a moved specifier's own inline type marker survives even where the clause it left is not type-only", async () => {

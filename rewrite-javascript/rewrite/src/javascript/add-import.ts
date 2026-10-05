@@ -90,6 +90,11 @@ export function bindImport(
     // A queued import binds the module as much as one already in the file, so it answers a later
     // request the same way; a name a merged request never emits would be referenced but not bound.
     for (const v of visitor.afterVisit || []) {
+        if (v instanceof RebindImport && !sideEffectOnly && v.to.module === module &&
+            memberName(v.to.member) === memberName(options.member) &&
+            (options.alias === undefined || options.alias === v.boundName)) {
+            return v.boundName;
+        }
         if (!(v instanceof AddImport) || v.module !== module ||
             v.sideEffectOnly !== sideEffectOnly || v.typeOnly !== typeOnly) {
             continue;
@@ -395,16 +400,17 @@ function importBindings(jsImport: JS.Import): ModuleScopeBinding[] {
 }
 
 /**
- * `names`, plus those pending `AddImport`s on the `afterVisit` queue have claimed. A queued
- * `RemoveImport` does not free one: it removes only what the file leaves unused, and binding a name
- * it keeps is an error, where an unnecessary suffix merely reads oddly.
+ * `names`, plus those pending `AddImport`s and `RebindImport`s on the `afterVisit` queue have
+ * claimed. A queued `RemoveImport` does not free one: it removes only what the file leaves unused,
+ * and binding a name it keeps is an error, where an unnecessary suffix merely reads oddly.
  */
 export function takenNames(names: ReadonlySet<string>, visitor: JavaScriptVisitor<any>): Set<string> {
     const taken = new Set<string>(names);
 
     for (const v of visitor.afterVisit || []) {
-        if (v instanceof AddImport && v.bindingName) {
-            taken.add(v.bindingName);
+        const claimed = claimedName(v);
+        if (claimed) {
+            taken.add(claimed);
         }
     }
 
@@ -413,8 +419,11 @@ export function takenNames(names: ReadonlySet<string>, visitor: JavaScriptVisito
 
 /** As {@link takenNames}, for a caller asking about one name rather than probing repeatedly. */
 export function nameTaken(name: string, names: ReadonlySet<string>, visitor: JavaScriptVisitor<any>): boolean {
-    return names.has(name) ||
-        (visitor.afterVisit || []).some(v => v instanceof AddImport && v.bindingName === name);
+    return names.has(name) || (visitor.afterVisit || []).some(v => claimedName(v) === name);
+}
+
+function claimedName(v: unknown): string | undefined {
+    return v instanceof AddImport ? v.bindingName : v instanceof RebindImport ? v.boundName : undefined;
 }
 
 /**
@@ -972,36 +981,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
             if (statement?.kind === JS.Kind.Import) {
                 const jsImport = statement as JS.Import;
-                const moduleSpecifier = jsImport.moduleSpecifier?.element;
-
-                if (!moduleSpecifier) {
+                if (!acceptsNamedMember(jsImport, this.module, this.typeOnly)) {
                     continue;
                 }
-
-                const moduleName = this.getModuleName(moduleSpecifier);
-
-                // Check if this is an import from our target module
-                if (moduleName !== this.module) {
-                    continue;
-                }
-
-                const importClause = jsImport.importClause;
-                if (!importClause) {
-                    continue;
-                }
-
-                // Only merge into imports with matching typeOnly - don't mix type and value imports
-                if (importClause.typeOnly !== this.typeOnly) {
-                    continue;
-                }
+                const importClause = jsImport.importClause!;
 
                 // Case 1: Existing import has named bindings - merge into them
                 if (importClause.namedBindings) {
-                    // Only merge into NamedImports, not namespace imports
-                    if (importClause.namedBindings.kind !== JS.Kind.NamedImports) {
-                        continue;
-                    }
-
                     // We found a matching import with named bindings - merge into it
                     return formatMergedImport(await this.produceJavaScript(compilationUnit, p, async draft => {
                         const namedImports = importClause.namedBindings as JS.NamedImports;
@@ -1102,7 +1088,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
                 // Case 2: Default import without named bindings - add named bindings
                 // Transform: import React from 'react' -> import React, { useState } from 'react'
-                if (importClause.name && !importClause.namedBindings) {
+                if (importClause.name) {
                     return formatMergedImport(await this.produceJavaScript(compilationUnit, p, async draft => {
                         const newSpecifier = this.createImportSpecifier();
 
@@ -1832,6 +1818,23 @@ function isOnlyMember(jsImport: JS.Import): boolean {
     return (hasDefault ? 1 : 0) + (hasNamespace ? 1 : 0) + namedImportCount(jsImport) === 1;
 }
 
+/** Whether `AddImport` merges a named member of `module` into `jsImport` rather than adding a statement. */
+function acceptsNamedMember(jsImport: JS.Import, module: string, typeOnly: boolean): boolean {
+    const clause = jsImport.importClause;
+    const specifier = jsImport.moduleSpecifier?.element;
+    if (!clause || clause.typeOnly !== typeOnly || specifier?.kind !== J.Kind.Literal ||
+        moduleNameOf(specifier as J.Literal) !== module) {
+        return false;
+    }
+    return clause.namedBindings ? clause.namedBindings.kind === JS.Kind.NamedImports : clause.name !== undefined;
+}
+
+/** Which of an import clause's three slots `member` binds — `import`, `import *`, or `import {}`. */
+export function bindingShape(member: string | undefined): "default" | "namespace" | "named" {
+    const key = memberName(member);
+    return key === undefined ? "default" : key === "*" ? "namespace" : "named";
+}
+
 export interface ExistingImportBinding {
     localName: string;
     onlyMemberOfStatement: boolean;
@@ -1961,11 +1964,44 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
     return {...jsImport, importClause: {...importClause, namedBindings: updatedNamedImports}};
 }
 
+/** `cu` without the statement `id`, its prefix carried onto the next one so a file header survives. */
+function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.CompilationUnit {
+    const formatter = new ElementRemovalFormatter<J>(true);
+    const statements: J.RightPadded<Statement>[] = [];
+    for (const stmt of cu.statements) {
+        if (stmt.element?.id === id) {
+            formatter.markRemoved(stmt.element);
+        } else {
+            const kept = stmt.element && formatter.processKept(stmt.element) as Statement;
+            statements.push(kept === stmt.element ? stmt : {...stmt, element: kept!});
+        }
+    }
+    return {...cu, statements};
+}
+
 /**
- * Moves the binding `from` names to `to`, binding it under `boundName`. In place when the
- * statement that carries it binds nothing else — module and member specifier rewritten there
- * directly; otherwise the old specifier drops and {@link bindImport} queues the replacement.
- * A `boundName` of its own renames the binding, and the file's references to it follow.
+ * Whether moving the only binding of `jsImport` to `to` replaces the statement rather than rewriting
+ * it in place. A different shape needs a different clause, and another import of `to` takes it in.
+ */
+function replacesStatement(
+    cu: JS.CompilationUnit,
+    jsImport: JS.Import,
+    from: {member?: string},
+    to: {module: string; member?: string},
+    typeOnly: boolean
+): boolean {
+    const shape = bindingShape(to.member);
+    return shape !== bindingShape(from.member) || (shape === "named" && cu.statements.some(s =>
+        s.element !== jsImport && s.element?.kind === JS.Kind.Import &&
+        acceptsNamedMember(s.element as JS.Import, to.module, typeOnly)));
+}
+
+const esmStyle = {default: ImportStyle.ES6Default, namespace: ImportStyle.ES6Namespace, named: ImportStyle.ES6Named};
+
+/**
+ * Moves the binding `from` names to `to`, binding it under `boundName`, and the file's references
+ * follow a `boundName` of its own. Whether the statement is rewritten in place or replaced is decided
+ * when this visitor runs, because a sibling rebind may empty the statement first.
  *
  * Not built on `RemoveImport`/`maybeUnbind`: those only drop a binding once nothing references
  * it, but a rebind moves one that is still in use — removal here has to be unconditional.
@@ -1982,6 +2018,9 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
     private transformedInPlace = false;
     private typeOnly = false;
+    private cu?: JS.CompilationUnit;
+    private dropped?: UUID;
+    private droppedQuote?: QuoteChar;
     private readonly movedTypes = new MovedTypes(this.from, this.to);
     /** Identifiers settled as references to the binding, so a parent need not settle it again. */
     private readonly references = new Set<string>();
@@ -1991,14 +2030,21 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
-        const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
+        this.cu = cu;
+        let visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
+        if (this.dropped !== undefined) {
+            visited = withoutStatement(visited, this.dropped);
+        }
         if (!this.transformedInPlace) {
             bindImport(this, {
                 module: this.to.module,
                 member: this.to.member,
                 alias: this.boundName,
                 typeOnly: this.typeOnly,
-                onlyIfReferenced: false
+                onlyIfReferenced: false,
+                quoteStyle: this.droppedQuote,
+                // The binding was an ES import, though the file may no longer read as a module without it.
+                style: esmStyle[bindingShape(this.to.member)]
             });
         }
         return visited;
@@ -2008,9 +2054,11 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         const imp = await super.visitImportDeclaration(jsImport, p) as JS.Import;
 
         const key = memberName(this.from.member);
-        // One call moves one binding, and no two imports bind the same local name, so the name
-        // read from the matched statement is what picks it back out of the file.
-        if (importBinds(imp, this.from.module, this.from.member) !== this.localName) {
+        // One call moves one module-scope binding, and no two of those share a local name, so the
+        // name read from the matched statement is what picks it back out of the file.
+        const cu = this.cu;
+        if (!cu?.statements.some(s => s.element === jsImport) ||
+            importBinds(imp, this.from.module, this.from.member) !== this.localName) {
             return imp;
         }
         // A moved named specifier's own inline `type` marks it type-only even where the clause
@@ -2020,6 +2068,11 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
         if (!isOnlyMember(imp)) {
             return removeBinding(imp, this.from.member);
+        }
+        if (replacesStatement(cu, jsImport, this.from, this.to, this.typeOnly)) {
+            this.dropped = imp.id;
+            this.droppedQuote = quoteOf(imp.moduleSpecifier?.element);
+            return imp;
         }
 
         this.transformedInPlace = true;
