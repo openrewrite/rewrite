@@ -112,7 +112,26 @@ public class PythonRewriteRpc extends RewriteRpc {
     public InstallRecipesResponse installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
-                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath(), null),
+                InstallRecipesResponse.class
+        );
+    }
+
+    /**
+     * Run the recipes of a local package from a venv the caller already built, installing nothing.
+     * <p>
+     * The bundle gets its own child process on that venv, apart from any installed bundle of the same
+     * distribution name, and its recipes take precedence over that bundle's. Every call restarts the
+     * child, so a venv rebuilt in place is picked up. Requires a {@link Builder#recipeInstallDir(Path)}.
+     *
+     * @param recipes Path to the local package directory, which names the distribution and keys the bundle
+     * @param venv    A venv with that package installed
+     * @return Response with installation details
+     */
+    public InstallRecipesResponse installRecipes(File recipes, Path venv) {
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath(), venv.toAbsolutePath().normalize()),
                 InstallRecipesResponse.class
         );
     }

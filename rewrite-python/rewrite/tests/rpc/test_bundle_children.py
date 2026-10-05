@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from rewrite.rpc.bundle_children import BundleChildren
 
 
@@ -257,3 +259,76 @@ def test_install_normalizes_distribution_name_so_spellings_dedup(tmp_path):
     assert ops.created == [tmp_path / "venvs" / "foo_bar"]        # created once, normalized dir
     assert spawned == ["foo_bar"]                                 # one child, spawned once
     assert bc.request("FOO.BAR", "Visit", {}) == {"ran": "Visit"}  # any spelling routes to it
+
+
+def _spawning_children(tmp_path, spawned, replaced=None):
+    """A BundleChildren whose children list one shared recipe, tagged with their attribution."""
+    created, installed = [], []
+
+    def fake_spawn(cmd, upstream=None, exclude_paths=()):
+        origin = (cmd[cmd.index("--attribution-name") + 1] if "--attribution-name" in cmd
+                  else cmd[cmd.index("--child-bundle") + 1])
+        child = _FakeChild([{"descriptor": {"name": "pkg.R"}, "packageName": origin}])
+        child.cmd = cmd
+        spawned.append(child)
+        return child
+
+    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None, spawn=fake_spawn,
+                        venv_ops=_ops_recording(created, installed),
+                        on_child_replaced=(replaced.append if replaced is not None else None))
+    return bc, created, installed
+
+
+def test_attach_runs_the_bundle_on_the_callers_venv_beside_its_published_namesake(tmp_path):
+    spawned = []
+    bc, created, installed = _spawning_children(tmp_path, spawned)
+    bc.install("pkg", "pkg==1.0")
+    published = spawned[-1]
+
+    venv = tmp_path / "prebuilt"
+    _make_venv(venv)
+    rows = bc.attach("pkg", str(venv), attribution_name="/src/pkg")
+    attached = spawned[-1]
+
+    # nothing created or installed for the attached venv, and its child runs on that venv
+    assert created == [tmp_path / "venvs" / "pkg"]
+    assert installed == [tmp_path / "venvs" / "pkg"]
+    assert attached.cmd[0] == str(_fake_venv_python(venv))
+    assert attached.cmd[attached.cmd.index("--child-bundle") + 1] == "pkg"
+    assert rows == [{"descriptor": {"name": "pkg.R"}, "packageName": "/src/pkg"}]
+
+    # the published bundle keeps its child, and each bundle's row is listed for its own reader
+    assert not published.closed
+    assert bc.request("pkg", "Visit", {}) == {"ran": "Visit"}
+    assert published.requests[-1] == ("Visit", {})
+    assert [r["packageName"] for r in bc.marketplace()] == ["pkg", "/src/pkg"]
+
+    # a recipe both bundles define runs from the attached build
+    assert bc.owner("pkg.R") == str(venv)
+    assert bc.resolved_version(str(venv)) == "1.0.0"
+
+
+def test_every_attach_restarts_the_bundles_child(tmp_path):
+    spawned, replaced = [], []
+    bc, _, _ = _spawning_children(tmp_path, spawned, replaced)
+    first, second = tmp_path / "v1", tmp_path / "v2"
+    _make_venv(first)
+    _make_venv(second)
+
+    bc.attach("pkg", str(first), attribution_name="/src/pkg")
+    bc.attach("pkg", str(first), attribution_name="/src/pkg")   # rebuilt in place
+    assert spawned[0].closed and not spawned[1].closed
+    assert replaced == [str(first)]
+
+    bc.attach("pkg", str(second), attribution_name="/src/pkg")  # rebuilt elsewhere
+    assert spawned[1].closed
+    assert bc.owner("pkg.R") == str(second)
+    assert len(bc.marketplace()) == 1
+    with pytest.raises(ValueError):
+        bc.request(str(first), "Visit", {})                      # never respawned on the old venv
+
+
+def test_attach_rejects_a_directory_that_is_not_a_venv(tmp_path):
+    bc, _, _ = _spawning_children(tmp_path, [])
+    with pytest.raises(ValueError, match="not a usable venv"):
+        bc.attach("pkg", str(tmp_path / "missing"), attribution_name="/src/pkg")
