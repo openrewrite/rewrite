@@ -76,3 +76,37 @@ class Node:
     assert "_missing_" not in stub
 
     assert "        def quote(self, doubled: bool) -> str: ..." in stub
+
+
+def test_static_method_stub_keeps_its_decorator_and_defaults(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from abc import ABC
+from dataclasses import dataclass
+from typing import Optional
+
+
+class Markup(ABC):
+    @staticmethod
+    def warn(message: str, detail: Optional[str] = None) -> str:
+        return message
+
+    @staticmethod
+    def _hidden() -> None:
+        pass
+
+
+@dataclass(frozen=True)
+class SearchResult:
+    _description: Optional[str]
+
+    @staticmethod
+    def found(tree: object, *, description: Optional[str] = None) -> object:
+        return tree
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "    @staticmethod\n    def warn(message: str, detail: Optional[str]=...) -> str: ..." in stub
+    assert "_hidden" not in stub
+
+    assert "    @staticmethod\n    def found(tree: object, *, description: Optional[str]=...) -> object: ..." in stub

@@ -28,6 +28,7 @@ files in the rewrite package.
 """
 
 import ast
+import copy
 import keyword
 import sys
 import typing
@@ -172,6 +173,24 @@ def extract_class_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[str,
                 return_type = ast.unparse(item.returns)
                 methods.append((item.name, params, return_type))
     return methods
+
+
+def extract_static_methods(node: ast.ClassDef) -> List[str]:
+    """
+    Extract public @staticmethod methods from a class.
+
+    Returns their stub signatures, like 'found(tree: Any, description: Optional[str]=...) -> Any'.
+    Defaults render as '...' so optional parameters stay optional.
+    """
+    signatures = []
+    for item in node.body:
+        if isinstance(item, ast.FunctionDef) and not item.name.startswith('_') and item.returns:
+            if any(isinstance(d, ast.Name) and d.id == "staticmethod" for d in item.decorator_list):
+                args = copy.deepcopy(item.args)
+                args.defaults = [ast.Constant(...) for _ in args.defaults]
+                args.kw_defaults = [None if d is None else ast.Constant(...) for d in args.kw_defaults]
+                signatures.append(f"{item.name}({ast.unparse(args)}) -> {ast.unparse(item.returns)}")
+    return signatures
 
 
 def extract_regular_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[str, str]], str]]:
@@ -436,8 +455,9 @@ def generate_abc_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
     properties = extract_property_methods(node)
     classmethods = extract_class_methods(node)
     abstract_methods = extract_abstract_methods(node)
+    staticmethods = extract_static_methods(node)
 
-    if methods or properties or classmethods or abstract_methods:
+    if methods or properties or classmethods or abstract_methods or staticmethods:
         for name, return_type in properties:
             lines.append(f"{indent}    @property")
             lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
@@ -448,6 +468,9 @@ def generate_abc_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
                 lines.append(f"{indent}    def {name}(cls, {params_str}) -> {return_type}: ...")
             else:
                 lines.append(f"{indent}    def {name}(cls) -> {return_type}: ...")
+        for signature in staticmethods:
+            lines.append(f"{indent}    @staticmethod")
+            lines.append(f"{indent}    def {signature}: ...")
         for name, params, return_type in abstract_methods:
             if params:
                 params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
@@ -772,6 +795,13 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
                 lines.append(f"{indent}    def {name}(cls, {params_str}) -> {return_type}: ...")
             else:
                 lines.append(f"{indent}    def {name}(cls) -> {return_type}: ...")
+
+    staticmethods = extract_static_methods(node)
+    if staticmethods:
+        lines.append("")
+        for signature in staticmethods:
+            lines.append(f"{indent}    @staticmethod")
+            lines.append(f"{indent}    def {signature}: ...")
 
     # Generate property stubs
     properties = extract_property_methods(node)

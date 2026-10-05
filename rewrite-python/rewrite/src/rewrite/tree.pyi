@@ -77,6 +77,9 @@ class FileAttributes:
 
     def replace(self, **kwargs: Any) -> Self: ...
 
+    @staticmethod
+    def from_path(path: Path) -> Optional[FileAttributes]: ...
+
 @dataclass(frozen=True)
 class Checksum:
     algorithm: str
