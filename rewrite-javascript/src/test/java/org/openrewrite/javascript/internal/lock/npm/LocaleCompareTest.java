@@ -21,12 +21,11 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.fixture;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
 
 /**
- * Parity with {@code Intl.Collator('en').compare} in Node v24.19.0 over ASCII, as dumped by
+ * Parity with {@code Intl.Collator('en').compare} in Node v24.19.0, as dumped by
  * npm-arborist/generate/locale-compare-cases.js.
  */
 class LocaleCompareTest {
@@ -60,7 +59,44 @@ class LocaleCompareTest {
     }
 
     @Test
-    void nonAsciiIsRefused() {
-        assertThatThrownBy(() -> LocaleCompare.en("café", "cafe")).isInstanceOf(IllegalArgumentException.class);
+    void unicodeCharacterOrder() {
+        List<List<Integer>> order = json(CASES.get("unicodeOrder"));
+        String previous = null;
+        for (List<Integer> equal : order) {
+            String first = new String(Character.toChars(equal.get(0)));
+            if (previous != null) {
+                assertThat(Integer.signum(LocaleCompare.en(previous, first)))
+                  .as("U+%04x against U+%04x", previous.codePointAt(0), equal.get(0))
+                  .isEqualTo(-1);
+                assertThat(Integer.signum(LocaleCompare.en(first, previous))).isEqualTo(1);
+            }
+            for (int codePoint : equal) {
+                assertThat(LocaleCompare.en(first, new String(Character.toChars(codePoint))))
+                  .as("U+%04x against U+%04x", equal.get(0), codePoint)
+                  .isEqualTo(0);
+            }
+            previous = first;
+        }
+    }
+
+    @Test
+    void unicodeStrings() {
+        for (JsonNode pair : CASES.get("unicodePairs")) {
+            String a = pair.get(0).asText();
+            String b = pair.get(1).asText();
+            assertThat(Integer.signum(LocaleCompare.en(a, b))).as("%s against %s", pair.get(0), pair.get(1))
+              .isEqualTo(pair.get(2).asInt());
+        }
+    }
+
+    /**
+     * Node answers -1 for both: ICU tells each first string from its normalized form, the second. One has
+     * a combining character from beyond the Basic Multilingual Plane before one of a lower combining
+     * class; in the other a vowel sign from there decomposes into a contraction with the sign before it.
+     */
+    @Test
+    void canonicallyEquivalentStringsAreEqual() {
+        assertThat(LocaleCompare.en("゚ཱ𐍸", "゚ཱ𐍸")).isEqualTo(0);
+        assertThat(LocaleCompare.en("𖄡𖄩", "𖄡𖄩")).isEqualTo(0);
     }
 }

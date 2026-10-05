@@ -15,68 +15,281 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
+
 /**
- * {@code Intl.Collator('en').compare}, which npm sorts with through @isaacs/string-locale-compare, for
- * ASCII strings: whitespace, then punctuation, then digits, then letters, with case only breaking ties.
+ * {@code Intl.Collator('en').compare}, which npm sorts with through @isaacs/string-locale-compare: the
+ * Unicode Collation Algorithm over the CLDR root collation, to its third level, with canonically
+ * equivalent strings equal. The data is CLDR 48 and Unicode 17, as in the ICU of Node 24. ICU itself
+ * tells some unnormalized strings from their normalized forms, where they hold combining characters
+ * from beyond the Basic Multilingual Plane; this does not.
  */
 final class LocaleCompare {
 
-    private static final String PRIMARY_ORDER =
-            "\t\n\u000B\f\r _-,;:!?.'\"()[]{}@*/\\&#%`^+<=>|~$0123456789abcdefghijklmnopqrstuvwxyz";
+    private static final int RANKED_BASE = 0x10000;
+    private static final int UNASSIGNED_BASE = 0x1000000;
+    private static final long COMMON_WEIGHTS = 0x20 << 5 | 0x02;
+    private static final int LONGEST_CONTRACTION = 3;
 
-    // 0 for the control characters collation ignores
-    private static final int[] PRIMARY = new int[128];
-
-    static {
-        for (int i = 0; i < PRIMARY_ORDER.length(); i++) {
-            char c = PRIMARY_ORDER.charAt(i);
-            PRIMARY[c] = i + 1;
-            PRIMARY[Character.toUpperCase(c)] = i + 1;
-        }
-    }
+    private static final int HANGUL_BASE = 0xAC00;
+    private static final int HANGUL_COUNT = 11172;
+    private static final int HANGUL_VOWELS = 21;
+    private static final int HANGUL_TRAILS = 28;
 
     private LocaleCompare() {
     }
 
-    /**
-     * @throws IllegalArgumentException for a character outside ASCII, whose order needs the CLDR tables.
-     */
     static int en(String a, String b) {
-        int primary = compare(a, b, false);
-        return primary != 0 ? primary : compare(a, b, true);
+        long[] x = Data.INSTANCE.elements(a);
+        long[] y = Data.INSTANCE.elements(b);
+        for (int level = 0; level < 3; level++) {
+            int order = compare(x, y, level);
+            if (order != 0) {
+                return order;
+            }
+        }
+        return 0;
     }
 
-    private static int compare(String a, String b, boolean tertiary) {
+    private static int compare(long[] x, long[] y, int level) {
         int i = 0;
         int j = 0;
         while (true) {
-            i = skipIgnorable(a, i);
-            j = skipIgnorable(b, j);
-            if (i == a.length() || j == b.length()) {
-                return i < a.length() ? 1 : j < b.length() ? -1 : 0;
+            long wx = 0;
+            while (wx == 0 && i < x.length) {
+                wx = weight(x[i++], level);
             }
-            char ca = a.charAt(i++);
-            char cb = b.charAt(j++);
-            int d = tertiary ?
-                    Boolean.compare(Character.isUpperCase(ca), Character.isUpperCase(cb)) :
-                    Integer.compare(PRIMARY[ca], PRIMARY[cb]);
-            if (d != 0) {
-                return d;
+            long wy = 0;
+            while (wy == 0 && j < y.length) {
+                wy = weight(y[j++], level);
+            }
+            if (wx != wy || wx == 0) {
+                return Long.compare(wx, wy);
             }
         }
     }
 
-    private static int skipIgnorable(String s, int i) {
-        while (i < s.length()) {
-            char c = s.charAt(i);
-            if (c >= 128) {
-                throw new IllegalArgumentException("Cannot collate the non-ASCII character in \"" + s + "\"");
+    private static long weight(long element, int level) {
+        return level == 0 ? element >>> 16 : level == 1 ? (element >>> 5) & 0x7FF : element & 0x1F;
+    }
+
+    /**
+     * The collation elements of each character and contraction, a primary weight above a secondary and a
+     * tertiary, with the decompositions and combining classes that normalize a string first.
+     */
+    private static final class Data {
+        static final Data INSTANCE = new Data();
+
+        // one element each, and no contraction is of ASCII alone
+        private final long[] ascii = new long[128];
+        private final int[] characters;
+        private final long[][] characterElements;
+        private final Map<String, long[]> contractions = new HashMap<>();
+        private final int[] contractionStarts;
+        private final int[] decomposable;
+        private final int[][] decompositions;
+        private final int[] combining;
+        private final byte[] combiningClasses;
+        private final int[] ideographs;
+        private final int[] ideographRanks;
+
+        private Data() {
+            try (InputStream is = LocaleCompare.class.getResourceAsStream("root-collation.gz");
+                 DataInputStream in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(is)))) {
+                characters = new int[in.readInt()];
+                characterElements = new long[characters.length][];
+                for (int i = 0; i < characters.length; i++) {
+                    characters[i] = in.readInt();
+                    characterElements[i] = readElements(in);
+                    if (characters[i] < ascii.length) {
+                        ascii[characters[i]] = characterElements[i][0];
+                    }
+                }
+                int[] starts = new int[in.readInt()];
+                for (int i = 0; i < starts.length; i++) {
+                    int[] codePoints = readCodePoints(in);
+                    starts[i] = codePoints[0];
+                    contractions.put(new String(codePoints, 0, codePoints.length), readElements(in));
+                }
+                contractionStarts = Arrays.stream(starts).sorted().distinct().toArray();
+                decomposable = new int[in.readInt()];
+                decompositions = new int[decomposable.length][];
+                for (int i = 0; i < decomposable.length; i++) {
+                    decomposable[i] = in.readInt();
+                    decompositions[i] = readCodePoints(in);
+                }
+                combining = new int[in.readInt()];
+                combiningClasses = new byte[combining.length];
+                for (int i = 0; i < combining.length; i++) {
+                    combining[i] = in.readInt();
+                    combiningClasses[i] = in.readByte();
+                }
+                long[] byCodePoint = new long[in.readInt()];
+                int codePoint = 0;
+                for (int rank = 0; rank < byCodePoint.length; rank++) {
+                    codePoint += readDelta(in);
+                    byCodePoint[rank] = (long) codePoint << 32 | rank;
+                }
+                Arrays.sort(byCodePoint);
+                ideographs = new int[byCodePoint.length];
+                ideographRanks = new int[byCodePoint.length];
+                for (int i = 0; i < byCodePoint.length; i++) {
+                    ideographs[i] = (int) (byCodePoint[i] >>> 32);
+                    ideographRanks[i] = (int) byCodePoint[i];
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
             }
-            if (PRIMARY[c] != 0) {
-                break;
-            }
-            i++;
         }
-        return i;
+
+        private static long[] readElements(DataInputStream in) throws IOException {
+            long[] elements = new long[in.readUnsignedByte()];
+            for (int i = 0; i < elements.length; i++) {
+                elements[i] = (long) in.readInt() << 16 | in.readUnsignedShort();
+            }
+            return elements;
+        }
+
+        private static int[] readCodePoints(DataInputStream in) throws IOException {
+            int[] codePoints = new int[in.readUnsignedByte()];
+            for (int i = 0; i < codePoints.length; i++) {
+                codePoints[i] = in.readInt();
+            }
+            return codePoints;
+        }
+
+        private static int readDelta(DataInputStream in) throws IOException {
+            int zigzag = 0;
+            for (int shift = 0; ; shift += 7) {
+                int b = in.readUnsignedByte();
+                zigzag |= (b & 0x7F) << shift;
+                if (b < 0x80) {
+                    return (zigzag >>> 1) ^ -(zigzag & 1);
+                }
+            }
+        }
+
+        long[] elements(String s) {
+            long[] elements = new long[s.length()];
+            for (int i = 0; i < elements.length; i++) {
+                char c = s.charAt(i);
+                if (c >= ascii.length) {
+                    return elements(normalize(s));
+                }
+                elements[i] = ascii[c];
+            }
+            return elements;
+        }
+
+        private long[] elements(int[] codePoints) {
+            long[] elements = new long[codePoints.length + 8];
+            int count = 0;
+            for (int i = 0; i < codePoints.length; ) {
+                long[] matched = null;
+                int matchedLength = 1;
+                if (Arrays.binarySearch(contractionStarts, codePoints[i]) >= 0) {
+                    for (int l = Math.min(LONGEST_CONTRACTION, codePoints.length - i); l > 1 && matched == null; l--) {
+                        matched = contractions.get(new String(codePoints, i, l));
+                        matchedLength = matched == null ? 1 : l;
+                    }
+                    // a later combining mark joins the match unless a mark of its class or a higher one intervenes
+                    int blocking = 0;
+                    for (int k = i + matchedLength; k < codePoints.length; k++) {
+                        int mark = codePoints[k];
+                        int combiningClass = combiningClass(mark);
+                        if (combiningClass == 0) {
+                            break;
+                        }
+                        long[] longer = combiningClass <= blocking ? null : contractions.get(
+                                new String(codePoints, i, matchedLength) + new String(Character.toChars(mark)));
+                        if (longer == null) {
+                            blocking = combiningClass;
+                        } else {
+                            System.arraycopy(codePoints, i + matchedLength, codePoints, i + matchedLength + 1,
+                                    k - i - matchedLength);
+                            codePoints[i + matchedLength++] = mark;
+                            matched = longer;
+                        }
+                    }
+                }
+                if (matched == null) {
+                    matched = character(codePoints[i]);
+                }
+                if (count + matched.length > elements.length) {
+                    elements = Arrays.copyOf(elements, (count + matched.length) * 2);
+                }
+                System.arraycopy(matched, 0, elements, count, matched.length);
+                count += matched.length;
+                i += matchedLength;
+            }
+            return Arrays.copyOf(elements, count);
+        }
+
+        private long[] character(int codePoint) {
+            int listed = Arrays.binarySearch(characters, codePoint);
+            if (listed >= 0) {
+                return characterElements[listed];
+            }
+            int ideograph = Arrays.binarySearch(ideographs, codePoint);
+            long primary = ideograph >= 0 ? RANKED_BASE + ideographRanks[ideograph] : UNASSIGNED_BASE + codePoint;
+            return new long[]{primary << 16 | COMMON_WEIGHTS};
+        }
+
+        private int combiningClass(int codePoint) {
+            if (codePoint < 0x300) {
+                return 0;
+            }
+            int i = Arrays.binarySearch(combining, codePoint);
+            return i < 0 ? 0 : combiningClasses[i] & 0xFF;
+        }
+
+        /**
+         * Normalization form D.
+         */
+        private int[] normalize(String s) {
+            int[] out = new int[s.length() + 8];
+            int count = 0;
+            for (int i = 0; i < s.length(); ) {
+                int codePoint = s.codePointAt(i);
+                i += Character.charCount(codePoint);
+                int syllable = codePoint - HANGUL_BASE;
+                int decomposed = codePoint < 0xC0 ? -1 : Arrays.binarySearch(decomposable, codePoint);
+                int[] parts = decomposed < 0 ? null : decompositions[decomposed];
+                if (count + (parts == null ? 3 : parts.length) > out.length) {
+                    out = Arrays.copyOf(out, out.length * 2 + 16);
+                }
+                if (syllable >= 0 && syllable < HANGUL_COUNT) {
+                    out[count++] = 0x1100 + syllable / (HANGUL_VOWELS * HANGUL_TRAILS);
+                    out[count++] = 0x1161 + syllable % (HANGUL_VOWELS * HANGUL_TRAILS) / HANGUL_TRAILS;
+                    if (syllable % HANGUL_TRAILS != 0) {
+                        out[count++] = 0x11A7 + syllable % HANGUL_TRAILS;
+                    }
+                } else if (parts != null) {
+                    System.arraycopy(parts, 0, out, count, parts.length);
+                    count += parts.length;
+                } else {
+                    out[count++] = codePoint;
+                }
+            }
+            for (int i = 1; i < count; i++) {
+                int mark = out[i];
+                int combiningClass = combiningClass(mark);
+                int j = i;
+                while (combiningClass != 0 && j > 0 && combiningClass(out[j - 1]) > combiningClass) {
+                    out[j] = out[j - 1];
+                    j--;
+                }
+                out[j] = mark;
+            }
+            return Arrays.copyOf(out, count);
+        }
     }
 }
