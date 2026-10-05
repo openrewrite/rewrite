@@ -167,6 +167,9 @@ export abstract class TreeVisitor<T extends Tree, P> {
 
 export function noopVisitor<T extends Tree, P>(): TreeVisitor<T, P> {
     return new class extends TreeVisitor<T, P> {
+        // Duck-typed by PrepareRecipe, since a recipe package may load its own copy of this module.
+        readonly isNoop = true;
+
         async visit<R extends Tree>(tree: Tree): Promise<R | undefined> {
             return tree as unknown as R;
         }

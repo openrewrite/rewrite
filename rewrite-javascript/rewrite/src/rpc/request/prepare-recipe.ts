@@ -226,6 +226,15 @@ export class PrepareRecipe {
     }
 
     private static async visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Promise<Precondition[]> {
+        if ((v as any).isNoop === true) {
+            // A composite's editor visits nothing, but without a gate the host ships it every file in the repository.
+            preconditions.push({
+                op: "not",
+                operands: [{visitorName: "org.openrewrite.rpc.internal.FindTreesOfType", visitorOptions: {type: "org.openrewrite.Tree"}}]
+            });
+            return preconditions;
+        }
+
         let treeType: string | undefined;
 
         // Use dynamic import to defer loading and avoid circular dependencies

@@ -397,6 +397,18 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("a composite with no editor of its own is gated off so the host never ships it a file", async () => {
+        await activateCompositeWithJavaDelegate(serverMarketplace);
+        const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe("org.openrewrite.example.npm.composite-with-java-delegate")
+        );
+        expect(response.editPreconditions).toEqual([{
+            op: "not",
+            operands: [{visitorName: "org.openrewrite.rpc.internal.FindTreesOfType", visitorOptions: {type: "org.openrewrite.Tree"}}]
+        }]);
+    });
+
     test("runRecipeWithCrossModuleRecipeList", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.cross-module-recipe-list");
         await spec.rewriteRun(
