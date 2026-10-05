@@ -19,9 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaVersion;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -93,17 +92,19 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<JavaVersion> acc) {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                cu.getMarkers().findFirst(JavaVersion.class).ifPresent(javaVersion ->
-                    acc.updateAndGet(current -> {
-                        if (current == null || javaVersion.getMajorVersion() < current.getMajorVersion()) {
-                            return javaVersion;
-                        }
-                        return current;
-                    }));
-                return cu;
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    tree.getMarkers().findFirst(JavaVersion.class).ifPresent(javaVersion ->
+                        acc.updateAndGet(current -> {
+                            if (current == null || javaVersion.getMajorVersion() < current.getMajorVersion()) {
+                                return javaVersion;
+                            }
+                            return current;
+                        }));
+                }
+                return tree;
             }
         };
     }
@@ -111,13 +112,21 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicReference<JavaVersion> acc) {
         VersionComparator versionComparator = requireNonNull(Semver.validate(canonicalizeVersion(version), null).getValue());
-        return Preconditions.check(minimumVersionInRange(acc, versionComparator), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(minimumVersionInRange(acc, versionComparator), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                return cu.getMarkers().findFirst(JavaVersion.class)
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile instanceof JavaSourceFile;
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof JavaSourceFile)) {
+                    return tree;
+                }
+                return tree.getMarkers().findFirst(JavaVersion.class)
                         .filter(javaVersion -> acc.get() != null && javaVersion.getMajorVersion() == acc.get().getMajorVersion())
-                        .map(javaVersion -> SearchResult.found(cu, "Java version " + javaVersion.getMajorVersion()))
-                        .orElse(cu);
+                        .map(javaVersion -> SearchResult.found(tree, "Java version " + javaVersion.getMajorVersion()))
+                        .orElse(tree);
             }
         });
     }

@@ -21,6 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.javaVersion;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class HasMinimumJavaVersionTest implements RewriteTest {
 
@@ -207,6 +208,70 @@ class HasMinimumJavaVersionTest implements RewriteTest {
               """,
             spec -> spec.markers(javaVersion(11))
           )
+        );
+    }
+
+    @Test
+    void nonJavaSourcesPassWhenRepositoryMeetsMinimum() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.Singleton
+                - org.openrewrite.java.search.HasMinimumJavaVersion:
+                    version: 17
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: "1"
+                    replace: "2"
+                    plaintextOnly: true
+              """,
+            "org.openrewrite.PreconditionTest"
+          ),
+          java(
+            """
+              class Test {
+              }
+              """,
+            spec -> spec.markers(javaVersion(17))
+          ),
+          text("1", "2")
+        );
+    }
+
+    @Test
+    void nonJavaSourcesBlockedWhenRepositoryBelowMinimum() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.Singleton
+                - org.openrewrite.java.search.HasMinimumJavaVersion:
+                    version: 17
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: "1"
+                    replace: "2"
+                    plaintextOnly: true
+              """,
+            "org.openrewrite.PreconditionTest"
+          ),
+          java(
+            """
+              class Test {
+              }
+              """,
+            spec -> spec.markers(javaVersion(11))
+          ),
+          text("1")
         );
     }
 }
