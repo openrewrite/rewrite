@@ -62,7 +62,7 @@ class ScalaCompilerBridge {
     fresh.setReporter(reporter)
     // Send compiler output to a designated dir so .class files don't pollute cwd.
     if (outputDir != null) {
-      fresh.setSetting(fresh.settings.outputDir, dotty.tools.io.AbstractFile.getDirectory(outputDir))
+      fresh.setSetting(fresh.settings.outputDir, dotty.tools.io.AbstractFile.getDirectory(outputDir, ""))
     }
     if (classpath.nonEmpty) {
       fresh.setSetting(fresh.settings.classpath, classpath)
