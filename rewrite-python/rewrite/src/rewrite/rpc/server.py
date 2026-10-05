@@ -661,11 +661,10 @@ def handle_parse(params: dict) -> List[str]:
         _last_dependency_path = dependency_path
     results = []
 
-    # If no relativeTo provided, try to infer from absolute input paths
-    if not relative_to:
-        relative_to = _infer_project_root(inputs)
+    # Only roots ty: the host's other parsers keep its input paths as given when it
+    # sent no `relativeTo`, so relativizing against an inferred root would desync them.
     if not project_root:
-        project_root = relative_to
+        project_root = relative_to or _infer_project_root(inputs)
 
     # Resolve project-level language version once per request; per-file
     # detection (shebang / magic comment) can still override this inside
