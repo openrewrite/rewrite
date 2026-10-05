@@ -593,8 +593,16 @@ public class TypesInUse {
             MethodEntry[] entries = new MethodEntry[methods.size()];
             int i = 0;
             for (JavaType.Method m : methods) {
+                //noinspection ConstantValue
+                if (m.getDeclaringType() == null) {
+                    // Deserialized LSTs can break the non-null contract; such a method never matches a pinned prefix.
+                    continue;
+                }
                 String fqn = m.getDeclaringType().getFullyQualifiedName();
                 entries[i++] = new MethodEntry(fqn.indexOf('$') < 0 ? fqn : fqn.replace('$', '.'), m);
+            }
+            if (i < entries.length) {
+                entries = Arrays.copyOf(entries, i);
             }
             Arrays.sort(entries, Comparator.comparing(e -> e.key));
             return entries;

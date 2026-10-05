@@ -22,6 +22,8 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.lang.reflect.Field;
+import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
@@ -97,6 +99,30 @@ class TypesInUseTest implements RewriteTest {
                 assertThat(tiu.hasDocReferenceInPackage("org.openrewrite", false)).isFalse();
                 assertThat(tiu.hasDocReferenceInPackage("org.openrewrite", true)).isTrue();
                 assertThat(tiu.hasDocReferenceInPackage("com.other", true)).isFalse();
+            })
+          )
+        );
+    }
+
+    @Test
+    void methodWithoutDeclaringTypeDoesNotBreakMatching() throws Exception {
+        JavaType.Method listAdd = new JavaType.Method(null, 1L, JavaType.ShallowClass.build("java.util.List"), "add",
+          JavaType.Primitive.Boolean, (List<String>) null, null, null, null, null, null);
+        JavaType.Method orphan = new JavaType.Method(null, 1L, null, "add",
+          JavaType.Primitive.Boolean, (List<String>) null, null, null, null, null, null);
+        // A deserialized LST can carry a method whose declaring type is null despite the non-null contract.
+        Field declaringType = JavaType.Method.class.getDeclaredField("declaringType");
+        declaringType.setAccessible(true);
+        declaringType.set(orphan, null);
+
+        rewriteRun(
+          java(
+            "class A {}",
+            spec -> spec.afterRecipe(cu -> {
+                TypesInUse tiu = TypesInUse.of(cu, emptySet(), emptySet(), Set.of(listAdd, orphan), emptySet());
+                assertThat(tiu.hasMethodUse(new MethodMatcher("java.util.List add(..)"))).isTrue();
+                assertThat(tiu.hasMethodUse(new MethodMatcher("java.util.Map put(..)"))).isFalse();
+                assertThat(tiu.hasMethodUse(new MethodMatcher("*..* add(..)"))).isTrue();
             })
           )
         );
