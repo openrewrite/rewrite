@@ -1863,9 +1863,7 @@ class ScalaTreeVisitor(
     
     // Visit the type being instantiated
     val clazz = visitTree(newTree.tpt) match {
-      case typeTree: TypeTree => typeTree.withPrefix(typeSpace)
-      case id: J.Identifier => id.withPrefix(typeSpace)
-      case fieldAccess: J.FieldAccess => fieldAccess.withPrefix(typeSpace)
+      case typeTree: TypeTree => typeTree.withPrefix[TypeTree](typeSpace)
       case _ => throw unmappedException(app)
     }
     
@@ -2053,7 +2051,7 @@ class ScalaTreeVisitor(
 
         // Extract the first parent's class type and constructor arguments (if any).
         // For multi-parent (mixin) Templates, only the first parent may carry args.
-        val (firstClazz, args): (TypeTree, JContainer[Expression]) = parents.headOption match {
+        val (firstClazz, args) = parents.headOption match {
           case None =>
             // `new {}` — no parents at all (anonymous class extending the implicit Object)
             (null, null)
@@ -7998,7 +7996,7 @@ class ScalaTreeVisitor(
 
   /** Build a single for-comprehension enumerator from a dotty tree. */
   private def buildForEnumerator(enumTree: Trees.Tree[?], isLast: Boolean, closeBracketPos: Int): JRightPadded[S.For.Enumerator] = {
-    val (kind, lhsTree, rhsTree, opStr): (S.For.Enumerator.Kind, Trees.Tree[?], Trees.Tree[?], String) = enumTree match {
+    val (kind, lhsTree, rhsTree, opStr) = enumTree match {
       case g: untpd.GenFrom => (S.For.Enumerator.Kind.Generator, g.pat, g.expr, "<-")
       case g: untpd.GenAlias => (S.For.Enumerator.Kind.Assignment, g.pat, g.expr, "=")
       case _ => (S.For.Enumerator.Kind.Guard, null, enumTree, "if")
@@ -8200,7 +8198,7 @@ class ScalaTreeVisitor(
       }
     }
 
-    val (openIdx, openBracket): (Int, Char) = {
+    val (openIdx, openBracket) = {
       var i = cursor
       while (i < source.length && source.charAt(i).isWhitespace) i += 1
       if (i < source.length && source.charAt(i) == '{') {
@@ -8366,7 +8364,6 @@ class ScalaTreeVisitor(
     case _ =>
       visitTree(tpt) match {
         case tt: TypeTree => tt
-        case id: J.Identifier => id
         case _ => null
       }
   }
