@@ -718,51 +718,41 @@ class PythonTypeMapping:
                 if resolved_type_params:
                     class_type._type_parameters = resolved_type_params
 
-            # Populate methods from function/boundMethod members
-            members = descriptor.get('members', [])
-            if members and getattr(class_type, '_methods', None) is None:
-                methods = []
-                for member in members:
-                    member_type_id = member.get('typeId') if isinstance(member, dict) else member
-                    if member_type_id is None:
+            # ty lists each class-body name for both its declaration and its
+            # binding. The first entry that maps to a method or a member claims
+            # the name, so the declaration wins and a name lands in one list.
+            # A method takes the attribute's name because an alias such as
+            # `__rmul__ = __mul__` shares its function's descriptor.
+            methods = []
+            variables = []
+            seen_names = set()
+            for member in descriptor.get('members', []):
+                member_name = member.get('name')
+                member_type_id = member.get('typeId')
+                if not member_name or member_type_id is None or member_name in seen_names:
+                    continue
+                member_desc = self._type_registry.get(member_type_id)
+                if member_desc is None:
+                    continue
+                if member_desc.get('kind') in _FUNCTION_KINDS:
+                    method = self._create_method_from_descriptor(
+                        member_desc, class_type, name=member_name)
+                    if method is None:
                         continue
-                    member_desc = self._type_registry.get(member_type_id)
-                    if member_desc and member_desc.get('kind') in _FUNCTION_KINDS:
-                        method = self._create_method_from_descriptor(member_desc, class_type)
-                        if method:
-                            methods.append(method)
-                class_type._methods = methods if methods else None
-
-            # Populate members (attributes / class & instance variables) from the
-            # non-function members. ty emits a member's *name* on the entry itself
-            # and its *type* via `typeId`; for a field with a default it emits both
-            # the declared type and the default-value literal under the same name,
-            # so de-duplicate by name keeping the first (declared) occurrence. A
-            # member typed as the owning class resolves through the same cycle
-            # guard `_resolve_type` uses for methods, so self-references don't
-            # recurse infinitely.
-            if members and getattr(class_type, '_members', None) is None:
-                variables = []
-                seen_names = set()
-                for member in members:
-                    if not isinstance(member, dict):
-                        continue
-                    member_name = member.get('name')
-                    member_type_id = member.get('typeId')
-                    if not member_name or member_type_id is None or member_name in seen_names:
-                        continue
-                    member_desc = self._type_registry.get(member_type_id)
-                    # Skip function-kinds (handled as methods above) and nested
-                    # classes/modules — only true variables become members.
-                    if member_desc is None or not self._is_variable_descriptor(member_desc):
-                        continue
+                    methods.append(method)
+                elif self._is_variable_descriptor(member_desc):
+                    # A member typed as the owning class resolves through
+                    # `_resolve_type`'s cycle guard.
                     member_type = self._resolve_type(member_type_id)
                     if member_type is None:
                         continue
-                    seen_names.add(member_name)
                     variables.append(JavaType.Variable(
                         _name=member_name, _type=member_type, _owner=class_type))
-                class_type._members = variables if variables else None
+                else:
+                    continue
+                seen_names.add(member_name)
+            class_type._methods = methods or None
+            class_type._members = variables or None
 
             return class_type
 
