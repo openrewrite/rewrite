@@ -3768,6 +3768,45 @@ class TestClassMembers:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    def test_each_class_attribute_is_one_method_or_member_under_its_own_name(self):
+        src = '''
+            from typing import Any, Callable, ParamSpec, TypeVar
+
+            P = ParamSpec('P')
+            R = TypeVar('R')
+
+            def deco(f: Callable[P, R]) -> Callable[P, R]:
+                return f
+
+            def helper(self) -> int:
+                return 1
+
+            class V:
+                def __mul__(self, o: int) -> int:
+                    return o
+                __rmul__ = __mul__
+
+                @deco
+                def wrapped(self) -> int:
+                    return 1
+
+                hook: Any
+                hook = helper
+
+                def go(self) -> None: ...
+
+            V().go()
+        '''
+        cls, mapping, tmpdir, client = self._class_type(src)
+        try:
+            # `@deco` gives `wrapped` a nameless callable descriptor.
+            assert sorted(m._name for m in cls._methods or []) == \
+                ['__mul__', '__rmul__', 'go', 'wrapped']
+            # The `Any` declaration claims the name before the function binding.
+            assert [v._name for v in cls._members or []] == ['hook']
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
     def test_self_typed_member_does_not_hang(self):
         # A member whose declared type is the owning class must resolve without
         # infinitely recursing (the cycle guard already covers methods; members
