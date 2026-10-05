@@ -3859,6 +3859,29 @@ class TestClassMembers:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    def test_self_assigned_attribute_is_a_field_whatever_its_value(self):
+        src = '''
+            import os
+            def f() -> int: return 1
+            class K: ...
+            class C:
+                def __init__(self) -> None:
+                    self.g = f
+                    self.k = K
+                    self.mod = os
+            c = C()
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(src)
+        try:
+            cls = mapping.type(tree.body[-1].targets[0])
+            assert [m._name for m in cls._methods or []] == ['__init__']
+            by_name = {v._name: v._type for v in cls._members or []}
+            assert by_name['g'] == JavaType.Primitive.Int
+            assert by_name['k'].fully_qualified_name == 'test.K'
+            assert by_name['mod'].fully_qualified_name == 'os'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
     def test_fields_are_reachable_through_self(self):
         mapping, tree, tmpdir, client = _make_mapping(self._HOOK)
         try:

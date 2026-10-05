@@ -723,6 +723,8 @@ class PythonTypeMapping:
             # the name, so the declaration wins and a name lands in one list.
             # A method takes the attribute's name because an alias such as
             # `__rmul__ = __mul__` shares its function's descriptor.
+            # An attribute assigned through `self` is a member even when its value
+            # is callable, because Python binds no instance attribute as a method.
             methods = []
             variables = []
             seen_names = set()
@@ -734,28 +736,29 @@ class PythonTypeMapping:
                 member_desc = self._type_registry.get(member_type_id)
                 if member_desc is None:
                     continue
-                if member_desc.get('kind') in _FUNCTION_KINDS:
+                kind = member_desc.get('kind')
+                instance_attribute = member.get('instanceAttribute', False)
+                if kind in _FUNCTION_KINDS and not instance_attribute:
                     method = self._create_method_from_descriptor(
                         member_desc, class_type, name=member_name)
                     if method is None:
                         continue
                     methods.append(method)
-                elif member_desc.get('kind') == 'property':
-                    # A property is a field typed by what its getter returns.
-                    getter_id = member_desc.get('getter')
-                    variables.append(JavaType.Variable(
-                        _name=member_name, _owner=class_type,
-                        _type=(self._resolve_type(getter_id) if getter_id is not None else None) or _UNKNOWN))
-                elif self._is_variable_descriptor(member_desc):
+                else:
+                    if kind == 'property':
+                        # A property is a field typed by what its getter returns.
+                        field_type_id = member_desc.get('getter')
+                    elif instance_attribute or self._is_variable_descriptor(member_desc):
+                        field_type_id = member_type_id
+                    else:
+                        continue
                     # A member typed as the owning class resolves through
                     # `_resolve_type`'s cycle guard.
-                    member_type = self._resolve_type(member_type_id)
+                    member_type = self._resolve_type(field_type_id) if field_type_id is not None else None
                     if member_type is None:
                         continue
                     variables.append(JavaType.Variable(
                         _name=member_name, _type=member_type, _owner=class_type))
-                else:
-                    continue
                 seen_names.add(member_name)
             class_type._methods = methods or None
             class_type._members = variables or None
