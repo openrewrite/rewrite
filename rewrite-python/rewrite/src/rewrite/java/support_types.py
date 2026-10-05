@@ -569,10 +569,11 @@ class JavaType:
             return self._annotations
 
 
-for _nested in vars(JavaType).values():
-    if isinstance(_nested, type) and _JavaTypePlaceholder in _nested.__bases__:
-        _nested.__bases__ = tuple(JavaType if b is _JavaTypePlaceholder else b for b in _nested.__bases__)
-del _nested, _JavaTypePlaceholder
+if not TYPE_CHECKING:
+    for _nested in vars(JavaType).values():
+        if isinstance(_nested, type) and _JavaTypePlaceholder in _nested.__bases__:
+            _nested.__bases__ = tuple(JavaType if b is _JavaTypePlaceholder else b for b in _nested.__bases__)
+    del _nested, _JavaTypePlaceholder
 
 
 T = TypeVar('T')

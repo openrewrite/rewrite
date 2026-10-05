@@ -33,7 +33,7 @@ dev = [
     "tox>=4.0.0",
     "black>=24.0.0",
     "ruff>=0.1.0",
-    "ty==0.0.49",  # Pinned: tests/test_generated_stubs.py asserts its diagnostics
+    "ty==0.0.84",  # Pinned: tests/test_generated_stubs.py asserts its diagnostics
 ]
 publish = [
     "build>=1.0.0",
@@ -84,16 +84,14 @@ include = ["src"]
 
 [tool.ty.rules]
 # Ignored rules (ty limitations with the visitor-pattern architecture).
-# Counts are approximate and reflect ty 0.0.49.
-# - invalid-argument-type: ~770 errors from generic TypeVar / `Self` variance in
+# Counts are approximate and reflect ty 0.0.84.
+# - invalid-argument-type: ~820 errors from generic TypeVar / `Self` variance in
 #   visitor and padding methods (e.g. visit_and_cast's `Type[T]` parameter,
 #   accept_*() narrowing `Self` to the concrete subclass). The `Self` case is
 #   tracked upstream as https://github.com/astral-sh/ty/issues/2255
-# - unresolved-reference: ~340 forward-reference annotations (mostly in the
-#   generated .pyi stubs) naming types not imported into that file/stub. These
-#   are quoted and never evaluated at runtime, so they are harmless; in most
-#   cases ty is correct rather than limited, so there is no single upstream issue
-#   to track. Fixable piecemeal by adding the missing TYPE_CHECKING imports.
+# - unresolved-reference: ~8 nested JavaType kinds naming JavaType as their base
+#   inside its own body. A runtime-only placeholder resolves the name there. The
+#   generated stubs name the real base.
 invalid-argument-type = "ignore"
 unresolved-reference = "ignore"
 
@@ -109,5 +107,5 @@ python_functions = ["test_*"]
 env_list = ["py311", "py312", "py313"]
 
 [tool.tox.env_run_base]
-deps = ["pytest>=8.0.0", "pytest-timeout>=2.0.0", "ty==0.0.49"]
+deps = ["pytest>=8.0.0", "pytest-timeout>=2.0.0", "ty==0.0.84"]
 commands = [["pytest", "tests/", "-v", "--timeout=60"]]
