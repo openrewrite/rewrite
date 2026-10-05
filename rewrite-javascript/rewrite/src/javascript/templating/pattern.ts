@@ -32,6 +32,7 @@ import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WR
 import {opensWithBrace, TemplateEngine} from './engine';
 import {TreePrinters} from '../../print';
 import {JS} from '../index';
+import {JavaScriptSemanticComparatorVisitor} from '../comparator';
 
 
 /**
@@ -719,9 +720,13 @@ class Matcher {
     ) {
         this.cursor = cursor;
         this.debugOptions = debugOptions ?? {};
+        this.lenientTypeMatching = pattern.options.lenientTypeMatching ?? true;
+        this.sameCodeComparator = new JavaScriptSemanticComparatorVisitor(this.lenientTypeMatching);
     }
 
     private readonly cursor: Cursor;
+    private readonly lenientTypeMatching: boolean;
+    private readonly sameCodeComparator: JavaScriptSemanticComparatorVisitor;
 
     /**
      * Checks if the pattern matches the AST node.
@@ -865,8 +870,6 @@ class Matcher {
         // - Kind checking
         // - Deep structural comparison
         // This centralizes all matching logic in one place
-        const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
-
         // Factory pattern: instantiate debug or production comparator
         // Zero cost in production - DebugPatternMatchingComparator is never instantiated
         const matcherCallbacks: MatcherCallbacks = {
@@ -887,8 +890,8 @@ class Matcher {
         };
 
         const comparator = this.debugOptions.enabled
-            ? new DebugPatternMatchingComparator(matcherCallbacks, lenientTypeMatching)
-            : new PatternMatchingComparator(matcherCallbacks, lenientTypeMatching);
+            ? new DebugPatternMatchingComparator(matcherCallbacks, this.lenientTypeMatching)
+            : new PatternMatchingComparator(matcherCallbacks, this.lenientTypeMatching);
         // Pass cursors to allow constraints to navigate to root
         // Pattern cursor is undefined (pattern is the root), target cursor is provided by user
         const result = await comparator.compare(pattern, target, undefined, this.cursor);
@@ -957,7 +960,7 @@ class Matcher {
      * @param wrapper Optional wrapper containing the target (for preserving markers)
      * @returns true if the capture is successful, false otherwise
      */
-    private handleCapture(capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>): boolean {
+    private async handleCapture(capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>): Promise<boolean> {
         const captureName = capture.captureName;
 
         if (!captureName) {
@@ -975,10 +978,29 @@ class Matcher {
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
         if (capturing) {
+            const bound = this.storage.get(captureName);
+            if (bound !== undefined) {
+                return this.bindsSameCode(bound, [target]);
+            }
             // Store wrapper if available (preserves markers), otherwise store element
             this.storage.set(captureName, wrapper ?? target);
         }
 
+        return true;
+    }
+
+    /** A capture named twice in a pattern binds the same code at both places. */
+    private async bindsSameCode(bound: CaptureStorageValue, targets: J[]): Promise<boolean> {
+        const boundElements = (Array.isArray(bound) ? bound : [bound]).map(b =>
+            b.kind === J.Kind.RightPadded ? (b as J.RightPadded<J>).element : b as J);
+        if (boundElements.length !== targets.length) {
+            return false;
+        }
+        for (let i = 0; i < targets.length; i++) {
+            if (!await this.sameCodeComparator.compare(boundElements[i], targets[i])) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -990,7 +1012,7 @@ class Matcher {
      * @param wrappers Optional wrappers to preserve markers
      * @returns true if the capture is successful, false otherwise
      */
-    private handleVariadicCapture(capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]): boolean {
+    private async handleVariadicCapture(capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]): Promise<boolean> {
         const captureName = capture.captureName;
 
         if (!captureName) {
@@ -1008,6 +1030,10 @@ class Matcher {
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
         if (capturing) {
+            const bound = this.storage.get(captureName);
+            if (bound !== undefined) {
+                return this.bindsSameCode(bound, targets);
+            }
             // Store the richest representation: wrappers if available, otherwise elements
             if (wrappers && wrappers.length > 0) {
                 this.storage.set(captureName, wrappers);

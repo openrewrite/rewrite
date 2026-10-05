@@ -19,6 +19,7 @@ import {
     capture,
     JavaScriptParser,
     JavaScriptVisitor,
+    JS,
     pattern,
     rewrite,
     template,
@@ -151,6 +152,24 @@ describe('match extraction', () => {
             //language=typescript
             typescript('const result = 1 + 2;', 'const result = 2 + 1;'),
         );
+    });
+
+    test('a capture named twice matches only where both places hold the same code', async () => {
+        const parser = new JavaScriptParser({sourceFileCache});
+        const parse = async (code: string) => {
+            const statement = ((await parser.parse({text: code, sourcePath: 'test.ts'}).next()).value as JS.CompilationUnit).statements[0].element;
+            return statement.kind === JS.Kind.ExpressionStatement ? (statement as JS.ExpressionStatement).expression : statement;
+        };
+        const r = capture('r');
+        const pat = pattern`${capture('req')}.map(${r} => ${r}.json())`;
+
+        expect(await pat.match(await parse('req.map(res => res.json())'), undefined!)).toBeDefined();
+        expect(await pat.match(await parse('req.map(res => other.json())'), undefined!)).toBeUndefined();
+
+        const args = capture({variadic: true});
+        const variadic = pattern`f(${args}) || g(${args})`;
+        expect(await variadic.match(await parse('f(a, b) || g(a, b)'), undefined!)).toBeDefined();
+        expect(await variadic.match(await parse('f(a) || g(b)'), undefined!)).toBeUndefined();
     });
 
     test('pattern with non-existent dependency fails', async () => {

@@ -54,8 +54,8 @@ export interface MatcherState {
  * Part of Layer 1 (Core Instrumentation).
  */
 export interface MatcherCallbacks {
-    handleCapture: (capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>) => boolean;
-    handleVariadicCapture: (capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]) => boolean;
+    handleCapture: (capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>) => Promise<boolean>;
+    handleVariadicCapture: (capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]) => Promise<boolean>;
     saveState: () => MatcherState;
     restoreState: (state: MatcherState) => void;
 
@@ -175,7 +175,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                     }
                 }
 
-                const success = this.matcher.handleCapture(captureMarker, target, undefined);
+                const success = await this.matcher.handleCapture(captureMarker, target, undefined);
                 if (!success) {
                     const captureName = captureMarker.captureName || 'unnamed';
                     return this.captureConflict(captureName) as R;
@@ -252,7 +252,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 }
 
                 // Handle the capture with the wrapper - use the element for pattern matching
-                const success = this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
+                const success = await this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
                 if (!success) {
                     const captureName = captureMarker.captureName || 'unnamed';
                     return this.captureConflict(captureName);
@@ -693,7 +693,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 const savedState = this.matcher.saveState();
 
                 // Handle the variadic capture
-                const success = this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
+                const success = await this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
                 if (!success) {
                     // Restore state and try next amount
                     this.matcher.restoreState(savedState);
@@ -958,7 +958,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                     this.debug.log('debug', 'constraint', `Constraint passed for capture: ${captureMarker.captureName}`);
                 }
 
-                const success = this.matcher.handleCapture(captureMarker, target, undefined);
+                const success = await this.matcher.handleCapture(captureMarker, target, undefined);
                 if (!success) {
                     return this.abort(j) as R;
                 }
@@ -1055,7 +1055,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                     this.debug.log('debug', 'constraint', `Constraint passed for wrapped capture: ${captureMarker.captureName}`);
                 }
 
-                const success = this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
+                const success = await this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
                 if (!success) {
                     return this.abort(right);
                 }
@@ -1407,7 +1407,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
 
                 const savedState = this.matcher.saveState();
 
-                const success = this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
+                const success = await this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
                 if (!success) {
                     this.matcher.restoreState(savedState);
                     continue;
