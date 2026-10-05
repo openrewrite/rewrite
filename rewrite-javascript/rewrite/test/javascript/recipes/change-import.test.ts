@@ -192,7 +192,7 @@ describe("change-import", () => {
             }, { unsafeCleanup: true });
         });
 
-        test("adds import from target module", async () => {
+        test("merges into an existing import of the target module", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({
                 oldModule: "react-dom/test-utils",
@@ -213,8 +213,7 @@ describe("change-import", () => {
                             act(() => {});
                             `,
                             `
-                            import { useState } from 'react';
-                            import { act } from 'react';
+                            import { act, useState } from 'react';
 
                             const [state, setState] = useState(0);
                             act(() => {});
@@ -577,8 +576,7 @@ describe("change-import", () => {
                             act(() => {});
                             `,
                             `
-                            import { act } from 'react';
-                            import React from 'react';
+                            import React, { act } from 'react';
 
                             const Component = () => <div>Hello</div>;
 

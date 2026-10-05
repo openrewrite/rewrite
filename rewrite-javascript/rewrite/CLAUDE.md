@@ -279,13 +279,14 @@ binding's own declared shape rather than to the module name stays where it is.
 
 ### When `maybeRebind` returns `undefined`
 
-The four above that still apply, plus: nothing binds `from`; `from` or `to` names a member on the
-AMD lane, or `to` an alias there other than the parameter's own name; `to.alias` is not a legal
-identifier, or is a name the file already spells; or the two differ in default/namespace/named
-shape while `from`'s statement binds nothing else. That last one is a layering boundary rather than an oversight — the only edit
-available in place is a rewrite of the existing clause, and changing shape needs whole-statement
-replacement with the header-preserving prefix transfer that `RemoveImport` does over the statement
-list.
+The four above that still apply, plus these:
+
+- nothing binds `from`
+- `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
+  parameter's own name
+- `to.alias` is not a legal identifier, or is a name the file already spells
+- the file binds its modules with `require` and the move would need a new import, because `from`'s
+  statement binds something else too or the two differ in default/namespace/named shape
 
 One call moves one binding. Where a second statement binds the same member under a name of its own,
 it is left as it stands: the name read from the first would bind twice if it were applied to both.
