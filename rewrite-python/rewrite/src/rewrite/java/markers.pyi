@@ -14,14 +14,12 @@ from rewrite.java.support_types import Space as Space
 class Semicolon(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
 @dataclass(frozen=True)
 class TrailingComma(Marker):
     _id: UUID
     _suffix: Space
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def suffix(self) -> Space: ...
@@ -30,4 +28,3 @@ class TrailingComma(Marker):
 class OmitParentheses(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...

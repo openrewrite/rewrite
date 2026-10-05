@@ -17,6 +17,8 @@ for its ``.py``. Type checkers read the stub in preference to the source, so dri
 types while the code runs fine."""
 
 import importlib.util
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -38,6 +40,17 @@ def test_committed_stub_matches_generator(source: Path):
     assert stub.exists() and stub.read_text() == expected, (
         f"{stub.relative_to(PROJECT_ROOT)} is stale; regenerate with: python scripts/generate_stubs.py"
     )
+
+
+def test_stubs_type_check():
+    stubs = sorted(str(p.relative_to(PROJECT_ROOT)) for p in (PROJECT_ROOT / "src").rglob("*.pyi"))
+    result = subprocess.run(
+        [sys.executable, "-m", "ty", "check", "--python", sys.prefix, "--output-format", "concise",
+         # The project ignores these two for its own sources. A stub must pass them.
+         "--error", "unresolved-reference", "--error", "invalid-argument-type", *stubs],
+        cwd=PROJECT_ROOT, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_enum_stub_keeps_public_properties_and_methods(tmp_path: Path):
@@ -72,6 +85,7 @@ class Node:
 ''')
     stub = generate_stubs.generate_stub_content(source)
 
+    assert "    class Kind(Enum):\n        A = ...\n" in stub
     assert "        @property\n        def label(self) -> str: ..." in stub
     assert "_missing_" not in stub
 
@@ -156,3 +170,120 @@ class ParseErrorVisitor(TreeVisitor[Tree, P]):
     assert "    def append(self, text: Optional[str]=...) -> 'PrintOutputCapture': ..." in stub
 
     assert "class ParseErrorVisitor(TreeVisitor[Tree, P]):\n    def is_acceptable(self, source_file: Any, p: P) -> bool: ..." in stub
+
+
+def test_stub_imports_follow_runtime_bindings(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from abc import ABC
+from typing import TYPE_CHECKING
+
+from .markers import Markers
+
+if TYPE_CHECKING:
+    from .visitor import Visitor
+else:
+    from .fallback import Fallback
+
+if not TYPE_CHECKING:
+    from .runtime import Runtime
+
+
+class Tree(ABC):
+    def accept(self, v: Visitor) -> Markers:
+        from .printer import Printer
+        return Printer().print(self)
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "from .markers import Markers as Markers\n" in stub
+    assert "from .fallback import Fallback as Fallback\n" in stub
+    assert "from .runtime import Runtime as Runtime\n" in stub
+
+    assert "from .visitor import Visitor\n" in stub
+
+    assert "Printer" not in stub
+
+
+def test_root_tree_stub_declares_replace(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from abc import ABC
+from typing import Self
+
+
+class Tree(ABC):
+    def replace(self, **kwargs) -> Self:
+        return self
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "class Tree(ABC):\n    def replace(self, **kwargs: Any) -> Self: ..." in stub
+
+
+def test_dataclass_stub_mirrors_its_declaration(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from dataclasses import dataclass
+from enum import Enum
+
+
+@dataclass
+class Config:
+    x: int
+
+
+class Color(Enum):
+    RED = 0
+
+
+@dataclass(frozen=True)
+class Node:
+    _id: int
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "@dataclass\nclass Config:\n    x: int\n" in stub
+
+    assert "class Color(Enum):\n    RED = ...\n" in stub
+
+    assert "@dataclass(frozen=True)\nclass Node:" in stub
+
+    assert "def replace" not in stub
+
+
+def test_member_stubs_keep_their_decorators(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from abc import ABC, abstractmethod
+from functools import cached_property
+
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+
+    @name.setter
+    def name(self, value: str) -> None: ...
+
+    @cached_property
+    def size(self) -> int:
+        return 0
+
+    @abstractmethod
+    def visit(self, p: int) -> int: ...
+
+    @classmethod
+    def _from_wire(cls, d): ...
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "    @property\n    @abstractmethod\n    def name(self) -> str: ...\n" in stub
+    assert "    @name.setter\n    def name(self, value: str) -> None: ...\n" in stub
+
+    assert "    @property\n    def size(self) -> int: ...\n" in stub
+
+    assert "    @abstractmethod\n    def visit(self, p: int) -> int: ...\n" in stub
+
+    assert "_from_wire" not in stub

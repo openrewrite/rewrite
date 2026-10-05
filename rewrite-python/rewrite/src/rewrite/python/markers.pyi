@@ -15,7 +15,6 @@ from rewrite.utils import replace_if_changed
 class KeywordArguments(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     def with_id(self, id_: UUID) -> 'KeywordArguments': ...
 
@@ -23,25 +22,23 @@ class KeywordArguments(Marker):
 class KeywordOnlyArguments(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     def with_id(self, id_: UUID) -> 'KeywordOnlyArguments': ...
 
 @dataclass(frozen=True)
 class Quoted(Marker):
     class Style(Enum):
-        SINGLE: Style
-        DOUBLE: Style
-        TRIPLE_SINGLE: Style
-        TRIPLE_DOUBLE: Style
-        BACKTICK: Style
+        SINGLE = ...
+        DOUBLE = ...
+        TRIPLE_SINGLE = ...
+        TRIPLE_DOUBLE = ...
+        BACKTICK = ...
         @property
         def quote(self) -> str: ...
 
     _id: UUID
     _style: Style
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def style(self) -> Style: ...
@@ -53,7 +50,6 @@ class Quoted(Marker):
 class SuppressNewline(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     def with_id(self, id_: UUID) -> 'SuppressNewline': ...
 
@@ -61,7 +57,6 @@ class SuppressNewline(Marker):
 class LegacyNotEqual(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     def with_id(self, id_: UUID) -> 'LegacyNotEqual': ...
 
@@ -69,7 +64,6 @@ class LegacyNotEqual(Marker):
 class RaiseTuple(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     def with_id(self, id_: UUID) -> 'RaiseTuple': ...
 
@@ -77,7 +71,6 @@ class RaiseTuple(Marker):
 class TupleExceptClause(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     def with_id(self, id_: UUID) -> 'TupleExceptClause': ...
 
@@ -87,7 +80,6 @@ class PrintSyntax(Marker):
     _has_destination: bool
     _trailing_comma: bool
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def has_destination(self) -> bool: ...
@@ -102,18 +94,17 @@ class PrintSyntax(Marker):
 class ExecSyntax(Marker):
     _id: UUID
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     def with_id(self, id_: UUID) -> 'ExecSyntax': ...
 
 @dataclass(frozen=True)
 class PythonResolutionResult(Marker):
     class PackageManager(Enum):
-        Uv: PackageManager
-        Pip: PackageManager
-        Pipenv: PackageManager
-        Poetry: PackageManager
-        Pdm: PackageManager
+        Uv = ...
+        Pip = ...
+        Pipenv = ...
+        Poetry = ...
+        Pdm = ...
 
     @dataclass(frozen=True)
     class SourceIndex:
@@ -121,7 +112,6 @@ class PythonResolutionResult(Marker):
         _url: str
         _default_index: bool
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def name(self) -> str: ...
@@ -141,7 +131,6 @@ class PythonResolutionResult(Marker):
         _source: Optional[str]
         _dependencies: Optional[List[PythonResolutionResult.ResolvedDependency]]
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def name(self) -> str: ...
@@ -165,7 +154,6 @@ class PythonResolutionResult(Marker):
         _marker: Optional[str]
         _resolved: Optional[PythonResolutionResult.ResolvedDependency]
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def name(self) -> str: ...
@@ -202,7 +190,6 @@ class PythonResolutionResult(Marker):
     _package_manager: Optional[PackageManager]
     _source_indexes: Optional[List[SourceIndex]]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def name(self) -> Optional[str]: ...
