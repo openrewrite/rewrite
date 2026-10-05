@@ -181,6 +181,34 @@ def test_conversion():
     RecipeSpec().rewrite_run(python("""a = f'{"foo"!r}'"""))
 
 
+def test_space_after_conversion():
+    # language=python
+    RecipeSpec().rewrite_run(python("""a = f'{"foo"!s  }'"""))
+    # language=python
+    RecipeSpec().rewrite_run(python("""a = f'{1.25!s  :10.10}' f'{x = !r }'"""))
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        a = f"{x!r # which
+          }"
+        b = 1
+        """
+    ))
+
+
+def test_comment_after_debug():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        a = f"{1+2 = # my comment
+          }"
+        b = f'''{x=
+        }'''
+        c = 1
+        """
+    ))
+
+
 def test_conversion_and_format():
     # language=python
     RecipeSpec().rewrite_run(python("""a = f'{"foo"!a:n}'"""))

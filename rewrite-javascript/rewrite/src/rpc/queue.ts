@@ -182,6 +182,13 @@ export class RpcSendQueue {
 
     send<T>(after: T | undefined, before: T | undefined, onChange?: (() => Promise<any>)): Promise<void> {
         return saveTrace(this.trace, async () => {
+            // The peer has a single absent value, and an ADD that carries nothing is not one it can decode.
+            if (after === null) {
+                after = undefined;
+            }
+            if (before === null) {
+                before = undefined;
+            }
             if (before === after) {
                 this.put({state: RpcObjectState.NO_CHANGE});
             } else if (before === undefined || (after !== undefined && this.typesAreDifferent(after, before))) {
@@ -372,10 +379,20 @@ export class StringInternTable {
     }
 }
 
+// Java's serializer names the class and numbers the object inside the value; the kind already says the first.
+function withoutSerializerKeys(value: any): any {
+    if (value === null || typeof value !== "object") {
+        return value;
+    }
+    const {"@c": _class, "@ref": _ref, ...fields} = value;
+    return fields;
+}
+
 export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
     private batchIndex = 0;
     private sinceYield = 0;
+    private recorded: number[] = [];
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly sourceFileType: string | undefined,
@@ -383,6 +400,23 @@ export class RpcReceiveQueue {
                 private readonly logger: rpc.Logger | undefined,
                 private readonly trace: boolean,
                 private readonly internedStrings: StringInternTable = new StringInternTable()) {
+    }
+
+    private record(ref: number, value: any): void {
+        this.refs.set(ref, value);
+        this.recorded.push(ref);
+    }
+
+    /**
+     * Drops the refs this transfer defined, for when it could not be read to its end and the
+     * sender is about to forget them too.
+     * @internal
+     */
+    forgetRefs(): void {
+        for (const ref of this.recorded) {
+            this.refs.delete(ref);
+        }
+        this.recorded = [];
     }
 
     /**
@@ -479,7 +513,7 @@ export class RpcReceiveQueue {
                         // For an object like JavaType that we will mutate in place rather than using
                         // immutable updates because of its cyclic nature, the before instance will ultimately
                         // be the same as the after instance below.
-                        this.refs.set(ref, before);
+                        this.record(ref, before);
                     }
                 }
             // Intentional fall-through...
@@ -492,7 +526,7 @@ export class RpcReceiveQueue {
                     after = await codec.rpcReceive(before, this);
                 } else if (message.value !== undefined) {
                     after = message.valueType ?
-                        {kind: this.internedStrings.internType(message.valueType), ...message.value} :
+                        {kind: this.internedStrings.internType(message.valueType), ...withoutSerializerKeys(message.value)} :
                         typeof message.value === "string" ? this.internedStrings.internValue(message.value) : message.value;
                 } else if (message.state === RpcObjectState.ADD && message.valueType) {
                     throw new Error(
@@ -504,7 +538,7 @@ export class RpcReceiveQueue {
                     after = before;
                 }
                 if (ref !== undefined) {
-                    this.refs.set(ref, after);
+                    this.record(ref, after);
                 }
                 return after;
             default:

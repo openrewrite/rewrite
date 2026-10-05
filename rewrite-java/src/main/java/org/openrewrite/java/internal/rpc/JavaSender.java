@@ -144,6 +144,16 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         return classDecl;
     }
 
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, RpcSendQueue q) {
+        // a class kind has no visit method to be dispatched to when it is sent on its own
+        if (tree instanceof J.ClassDeclaration.Kind) {
+            visitClassDeclarationKind((J.ClassDeclaration.Kind) tree, q);
+            return (J) tree;
+        }
+        return super.visit(tree, q);
+    }
+
     private void visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcSendQueue q) {
         // `preVisit()` is not automatically called in this case
         preVisit(kind, q);
@@ -549,6 +559,18 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitUnknown(J.Unknown unknown, RpcSendQueue q) {
+        q.getAndSend(unknown, J.Unknown::getSource, source -> visit(source, q));
+        return unknown;
+    }
+
+    @Override
+    public J visitUnknownSource(J.Unknown.Source source, RpcSendQueue q) {
+        q.getAndSend(source, J.Unknown.Source::getText);
+        return source;
+    }
+
+    @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, RpcSendQueue q) {
         q.getAndSend(variable, J.VariableDeclarations.NamedVariable::getDeclarator, decl -> visit(decl, q));
         q.getAndSendList(variable, J.VariableDeclarations.NamedVariable::getDimensionsAfterName, l -> l.getElement().toString(), dim -> visitLeftPadded(dim, q));
@@ -594,7 +616,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         if (element instanceof J) {
             q.getAndSend(left, JLeftPadded::getElement, elem -> visit((J) elem, q));
         } else if (element instanceof Space) {
-            q.getAndSend(left, r -> element, space -> visitSpace(getValueNonNull(space), q));
+            q.getAndSend(left, JLeftPadded::getElement, space -> visitSpace(getValueNonNull(space), q));
         } else {
             q.getAndSend(left, JLeftPadded::getElement);
         }
@@ -606,7 +628,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         if (element instanceof J) {
             q.getAndSend(right, JRightPadded::getElement, elem -> visit((J) elem, q));
         } else if (element instanceof Space) {
-            q.getAndSend(right, r -> element, space -> visitSpace(getValueNonNull(space), q));
+            q.getAndSend(right, JRightPadded::getElement, space -> visitSpace(getValueNonNull(space), q));
         } else {
             q.getAndSend(right, JRightPadded::getElement);
         }

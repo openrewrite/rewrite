@@ -58,6 +58,16 @@ func TestGoSumRPCRoundTrip(t *testing.T) {
 	}
 }
 
+func TestGoSumLineRoundTripsOnItsOwn(t *testing.T) {
+	gs, err := parser.ParseGoSumFile("go.sum", "github.com/a/b v1.0.0/go.mod h1:bbbb=\n")
+	require.NoError(t, err)
+
+	got, ok := roundTripNode(t, gs.Lines[0].Element, &golang.GoSumLine{}).(*golang.GoSumLine)
+
+	require.True(t, ok)
+	require.Equal(t, "github.com/a/b v1.0.0/go.mod h1:bbbb=", printer.PrintWithCursor(got, nil, nil))
+}
+
 func TestGoSumRPCPreservesResolutionMarker(t *testing.T) {
 	content := "github.com/x/y v1.2.3 h1:aaaa=\n" +
 		"github.com/x/y v1.2.3/go.mod h1:bbbb=\n"

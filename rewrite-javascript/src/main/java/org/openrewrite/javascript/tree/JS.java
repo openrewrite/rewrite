@@ -26,11 +26,10 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.javascript.JavaScriptPrinter;
 import org.openrewrite.javascript.JavaScriptVisitor;
-import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.service.JavaScriptAutoFormatService;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -183,16 +182,7 @@ public interface JS extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
-                @Override
-                public Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
-                    JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.getOrStart();
-                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                    stopAfterPreVisit();
-                    return tree;
-                }
-            };
+            return new JavaScriptPrinter<>();
         }
 
         @Transient

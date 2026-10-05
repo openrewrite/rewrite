@@ -135,8 +135,7 @@ class SearchResult(Marker):
         return self._description
 
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
-        desc = self._description or ""
-        return comment_wrapper(f"({desc})" if desc else "")
+        return comment_wrapper("" if self._description is None else f"({self._description})")
 
     @staticmethod
     def found(tree: Any, description: Optional[str] = None) -> Any:
@@ -183,7 +182,7 @@ class Markup(Marker, ABC):
         ...
 
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
-        if verbose and self.detail:
+        if verbose and self.detail is not None:
             return comment_wrapper(f"({self.detail})")
         return comment_wrapper(f"({self.message})")
 

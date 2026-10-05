@@ -240,7 +240,10 @@ def register_toml_codecs() -> None:
     register('org.openrewrite.toml.tree.TomlRightPadded', TomlRightPadded,
              lambda rp, q: _receiver.receive_right_padded(rp, q), lambda rp, q: _sender.send_right_padded(rp, q))
 
+    # A marker can sit on a tree of any language, and these names are TOML's alone.
     for marker in (ArrayTable, InlineTable):
-        register(f'org.openrewrite.toml.marker.{marker.__name__}', marker,
-                 lambda m, q: q.apply(m, _id=q.receive(id_to_str(m._id) if m._id is not None else None)),
-                 lambda m, q: q.get_and_send(m, lambda x: id_to_str(x._id)))
+        register_codec_with_both_names(
+            f'org.openrewrite.toml.marker.{marker.__name__}', marker,
+            lambda m, q: q.apply(m, _id=q.receive(id_to_str(m._id) if m._id is not None else None)),
+            make_dataclass_factory(marker),
+            lambda m, q: q.get_and_send(m, lambda x: id_to_str(x._id)))

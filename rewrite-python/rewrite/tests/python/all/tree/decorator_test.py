@@ -1,6 +1,28 @@
 from rewrite.test import RecipeSpec, python
 
 
+def test_any_expression():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        @False or a
+        def f(): pass
+        @d := a
+        def g(): pass
+        @lambda f: a(f)
+        def h(): pass
+        @[..., a, ...][1]
+        def i(): pass
+        @a(a)(a)
+        def j(): pass
+        @a if b else c
+        class C: pass
+        @not a
+        class D: pass
+        """
+    ))
+
+
 def test_function_unqualified():
     # language=python
     RecipeSpec().rewrite_run(python(

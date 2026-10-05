@@ -17,6 +17,7 @@ package org.openrewrite.java.internal.rpc;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -149,6 +150,15 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getPadding().withPermits(q.receive(classDecl.getPadding().getPermits(), p -> visitContainer(p, q)))
                 .withBody(q.receive(classDecl.getBody(), b -> (J.Block) visitNonNull(b, q)))
                 .withType(q.receive(classDecl.getType(), t -> (JavaType.FullyQualified) visitType(t, q)));
+    }
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, RpcReceiveQueue q) {
+        // a class kind has no visit method to be dispatched to when it is sent on its own
+        if (tree instanceof J.ClassDeclaration.Kind) {
+            return visitClassDeclarationKind((J.ClassDeclaration.Kind) tree, q);
+        }
+        return super.visit(tree, q);
     }
 
     private J.ClassDeclaration.Kind visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcReceiveQueue q) {
@@ -567,6 +577,16 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getPadding().withOperator(q.receive(unary.getPadding().getOperator(), op -> visitLeftPadded(op, q, toEnum(J.Unary.Type.class))))
                 .withExpression(q.receive(unary.getExpression(), e -> (Expression) visitNonNull(e, q)))
                 .withType(q.receive(unary.getType(), t -> visitType(t, q)));
+    }
+
+    @Override
+    public J visitUnknown(J.Unknown unknown, RpcReceiveQueue q) {
+        return unknown.withSource(q.receive(unknown.getSource(), s -> (J.Unknown.Source) visitNonNull(s, q)));
+    }
+
+    @Override
+    public J visitUnknownSource(J.Unknown.Source source, RpcReceiveQueue q) {
+        return source.withText(q.receive(source.getText()));
     }
 
     @Override

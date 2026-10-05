@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {Autodetect, capture, javascript, JavaScriptVisitor, JS, pattern, rewrite, Template, template} from "../../../src/javascript";
+import {Autodetect, capture, javascript, JavaScriptVisitor, JS, JSX, tsx, pattern, rewrite, Template, template} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {create as produce} from "mutative";
 import {replaceMarkerByKind} from "../../../src/markers";
@@ -33,6 +33,44 @@ async function withDetectedStyles(cu: JS.CompilationUnit): Promise<JS.Compilatio
 
 describe('template formatting', () => {
     const spec = new RecipeSpec();
+
+    test('anchors a generated callback to a multiline JSX attribute', async () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsxAttribute(attribute: JSX.Attribute, p: any): Promise<J | undefined> {
+                const attr = await super.visitJsxAttribute(attribute, p) as JSX.Attribute;
+                if (attr.value?.element.kind !== J.Kind.Literal) return attr;
+                const literal = attr.value.element as J.Literal;
+                const callback = await template`(node) => { this.input = node; }`.apply(literal, this.cursor);
+                return {...attr, value: {...attr.value, element: {
+                    kind: JS.Kind.JsxEmbeddedExpression,
+                    id: randomId(), prefix: literal.prefix, markers: literal.markers,
+                    expression: {kind: J.Kind.RightPadded, element: callback!, after: literal.prefix, markers: literal.markers}
+                } as JSX.EmbeddedExpression}} as JSX.Attribute;
+            }
+        });
+        await spec.rewriteRun({
+            ...tsx(`
+                function View() {
+                  return (
+                    <input
+                      ref="input"
+                    />
+                  );
+                }
+            `, `
+                function View() {
+                  return (
+                    <input
+                      ref={(node) => {
+                        this.input = node;
+                      }}
+                    />
+                  );
+                }
+            `),
+            beforeRecipe: withDetectedStyles
+        });
+    });
 
     test('generated code Prettier restructures is indented to the width Prettier is configured with', async () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {

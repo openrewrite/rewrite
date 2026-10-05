@@ -47,6 +47,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -179,8 +180,16 @@ public class RewriteRpc {
                 getRecipeObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 getRecipeObject));
-        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects,
-                localRefs, log, () -> traceGetObject.get().isSend()));
+        GetObject.Handler getObject = new GetObject.Handler(batchSize, remoteObjects, localObjects,
+                localRefs, log, () -> traceGetObject.get().isSend());
+        jsonRpc.rpc("GetObject", getObject);
+        jsonRpc.rpc("AbortGetObject", new JsonRpcMethod<AbortGetObject>() {
+            @Override
+            protected Boolean handle(AbortGetObject request) throws Exception {
+                getObject.abort(request.getId());
+                return true;
+            }
+        });
         jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
@@ -241,7 +250,7 @@ public class RewriteRpc {
             return new RecipeLoader(null).load(id, opts);
         }));
         jsonRpc.rpc("Parse", new Parse.Handler(localObjects, () -> parsers));
-        jsonRpc.rpc("Print", new Print.Handler(this::getObject));
+        jsonRpc.rpc("Print", new Print.Handler(this::getObject, this::getCursor));
         jsonRpc.rpc("SetDataTableStore", new SetDataTableStore.Handler(
                 store -> configuredDataTableStore = store));
         jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
@@ -688,6 +697,8 @@ public class RewriteRpc {
         localObjects.put(treeId, tree);
         SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : parent.firstEnclosingOrThrow(SourceFile.class);
         String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(sourceFile.getClass());
+        // The cursor given with a source file holds the source file itself, which has no parent to send.
+        List<String> cursorIds = tree instanceof SourceFile ? null : getCursorIds(parent);
 
         return send(
                 "Print",
@@ -695,7 +706,8 @@ public class RewriteRpc {
                         treeId,
                         sourceFile.getSourcePath(),
                         sourceFileType,
-                        markerPrinter
+                        markerPrinter,
+                        cursorIds
                 ),
                 String.class
         );
@@ -733,12 +745,15 @@ public class RewriteRpc {
 
         GetObject request = new GetObject(id, sourceFileType);
         AtomicReference<CompletableFuture<JsonRpcSuccess>> nextPage = new AtomicReference<>();
+        AtomicBoolean awaitingPage = new AtomicBoolean();
         RpcReceiveQueue q = new RpcReceiveQueue(
                 remoteRefs,
                 () -> {
                     CompletableFuture<JsonRpcSuccess> pending = nextPage.getAndSet(null);
+                    awaitingPage.set(true);
                     GetObjectResponse page = await(pending == null ? request("GetObject", request) : pending,
                             GetObjectResponse.class);
+                    awaitingPage.set(false);
                     // The following page is requested before this one is handed over, so the
                     // remote serializes it while this one is being deserialized. A page ending
                     // in END_OF_OBJECT has no successor, and asking for one would restart the
@@ -769,6 +784,7 @@ public class RewriteRpc {
             // Reset our tracking of the remote state so the next interaction
             // forces a full object sync (ADD) instead of a delta (CHANGE).
             remoteObjects.remove(id);
+            q.rollBackRefs();
             CompletableFuture<JsonRpcSuccess> pending = nextPage.getAndSet(null);
             if (pending != null) {
                 // Awaited rather than abandoned so the remote's serialization of it is
@@ -776,6 +792,14 @@ public class RewriteRpc {
                 // id, so an unawaited one is dropped rather than misdelivered.
                 try {
                     await(pending, GetObjectResponse.class);
+                } catch (Exception ignored) {
+                }
+            }
+            if (!awaitingPage.get()) {
+                // The failure is this side's, so the remote still counts the object and the
+                // refs it sent with it as received. A remote without the method stays that way.
+                try {
+                    send("AbortGetObject", new AbortGetObject(id), Boolean.class);
                 } catch (Exception ignored) {
                 }
             }

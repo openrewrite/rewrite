@@ -102,7 +102,7 @@ class MethodInvocationTest implements RewriteTest {
                         }
                         return super.visitVariable(variable, o);
                     }
-                })
+                }.visit(cu, 0))
           )
         );
     }

@@ -37,6 +37,19 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 class NpmGraphBuilderTest {
 
     @Test
+    void rejectsAnIncompatibleDirectPeerBeforeResolvingItsClosure() {
+        FakeRegistry registry = new FakeRegistry().add("react", "19.0.0", emptyMap());
+        registry.versionsByName.computeIfAbsent("native-renderer", k -> new TreeSet<>()).add("1.0.0");
+        registry.manifests.put("native-renderer@1.0.0", vm("native-renderer", "1.0.0",
+                singletonMap("unavailable-transitive", "1.0.0"), singletonMap("react", "^18.0.0")));
+
+        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
+                new NpmGraphBuilder(registry).build(singletonMap("",
+                        "{\"dependencies\":{\"react\":\"19.0.0\",\"native-renderer\":\"1.0.0\"}}")))
+                .withMessageContaining("peer react@19.0.0 does not satisfy ^18.0.0");
+    }
+
+    @Test
     void resolvesACleanTwoLevelClosure() {
         FakeRegistry registry = new FakeRegistry()
                 .add("a", "1.0.0", singletonMap("b", "^2.0.0"))

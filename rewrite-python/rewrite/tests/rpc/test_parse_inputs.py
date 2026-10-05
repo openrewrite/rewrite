@@ -52,10 +52,56 @@ def test_a_file_keeps_its_own_line_endings(tmp_path, newline):
     assert PythonPrinter().print(_parse(path)) == source
 
 
+@pytest.mark.parametrize("coding, charset, text", [
+    ("latin-1", "iso-8859-1", "été"),
+    ("koi8-r", "koi8-r", "жук"),
+], ids=["latin-1", "koi8-r"])
+def test_a_file_is_read_in_the_encoding_it_declares(tmp_path, coding, charset, text):
+    source = f"# -*- coding: {coding} -*-\nname = '{text}'.upper()  # {text}\n\nvalue = 1\n"
+    path = tmp_path / "declared.py"
+    path.write_bytes(source.encode(coding))
+
+    parsed = _parse(path)
+
+    assert PythonPrinter().print(parsed) == source
+    # the charset the host writes the file back in
+    assert parsed.charset_name == charset
+
+
+def test_an_encoding_the_bytes_do_not_depend_on_is_not_reported(tmp_path):
+    # the host may not know the name, and writes the same bytes without it
+    source = "# -*- coding: cp949 -*-\nvalue = 1\r\n"
+    path = tmp_path / "declared.py"
+    path.write_bytes(source.encode("cp949"))
+
+    parsed = _parse(path)
+
+    assert PythonPrinter().print(parsed) == source
+    assert parsed.charset_name is None
+
+
+@pytest.mark.parametrize("raw", [
+    b"# -*- coding: uft-8 -*-\nvalue = 1\n",
+    b"\xef\xbb\xbf# -*- coding: latin-1 -*-\nvalue = 1\n",
+], ids=["unknown encoding", "byte order mark under another encoding"])
+def test_a_coding_line_the_interpreter_rejects_leaves_the_file_read_as_utf_8(tmp_path, raw):
+    path = tmp_path / "declared.py"
+    path.write_bytes(raw)
+
+    assert PythonPrinter().print(_parse(path)) == raw.decode("utf-8")
+
+
+def test_a_coding_line_in_source_text_has_no_say_in_how_the_text_is_read():
+    source = "# -*- coding: latin-1 -*-\nname = 'é'  # é\nvalue = 1\n"
+    ids = handle_parse({"inputs": [{"text": source, "sourcePath": "declared.py"}]})
+
+    assert PythonPrinter().print(local_objects[ids[0]]) == source
+
+
 def test_every_input_gets_a_slot_whatever_is_wrong_with_it(crlf_file):
-    # Latin-1 bytes that are not valid UTF-8; sources are read as UTF-8.
+    # Latin-1 bytes in a file that declares no encoding, which is then UTF-8.
     undecodable = crlf_file.parent / "latin1.py"
-    undecodable.write_bytes(b"# -*- coding: latin-1 -*-\nx = '\xe9'\n")
+    undecodable.write_bytes(b"x = 1\ny = 2\nz = '\xe9'\n")
 
     ids = handle_parse({"inputs": [{"sourcePath": str(crlf_file)},
                                    {"sourcePath": str(crlf_file.parent / "gone.py")},

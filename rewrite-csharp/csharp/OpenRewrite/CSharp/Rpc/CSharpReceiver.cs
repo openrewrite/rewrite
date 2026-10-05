@@ -223,10 +223,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var global = q.Receive(ud.Global, rp => _delegate.VisitRightPadded(rp, q));
         var @static = q.Receive(ud.Static, lp => _delegate.VisitLeftPadded(lp, q));
+        var @unsafe = q.Receive(ud.Unsafe, lp => _delegate.VisitLeftPadded(lp!, q));
         var alias = q.Receive(ud.Alias, rp => _delegate.VisitRightPadded(rp!, q));
         var namespaceOrType = q.Receive((J)ud.NamespaceOrType, el => (J)VisitNonNull(el, q));
         return ud.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
-            .WithGlobal(global!).WithStatic(@static!).WithAlias(alias).WithNamespaceOrType((TypeTree)namespaceOrType!);
+            .WithGlobal(global!).WithStatic(@static!).WithUnsafe(@unsafe).WithAlias(alias).WithNamespaceOrType((TypeTree)namespaceOrType!);
     }
 
     // ---- PropertyDeclaration ----
@@ -421,19 +422,21 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var expressionRp = q.Receive(
             new JRightPadded<Expression>(interp.Expression, interp.After, Markers.Empty),
             rp => _delegate.VisitRightPadded(rp, q));
+        var alignmentBefore = q.Receive(interp.Alignment?.Before ?? Space.Empty, space => VisitSpace(space, q));
         var alignmentRp = q.Receive(
             interp.Alignment != null
                 ? (JRightPadded<Expression>?)new JRightPadded<Expression>(
                     interp.Alignment.Element, Space.Empty, Markers.Empty)
                 : null,
             rp => _delegate.VisitRightPadded(rp!, q));
+        var formatBefore = q.Receive(interp.Format?.Before ?? Space.Empty, space => VisitSpace(space, q));
         var formatRp = q.Receive(
             interp.Format != null
                 ? (JRightPadded<Expression>?)new JRightPadded<Expression>(
                     interp.Format.Element, Space.Empty, Markers.Empty)
                 : null,
             rp => _delegate.VisitRightPadded(rp!, q));
-        return interp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression(expressionRp!.Element).WithAfter(expressionRp!.After).WithAlignment(alignmentRp != null ? new JLeftPadded<Expression>(Space.Empty, alignmentRp.Element) : null).WithFormat(formatRp != null ? new JLeftPadded<Identifier>(Space.Empty, (Identifier)formatRp.Element) : null);
+        return interp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression(expressionRp!.Element).WithAfter(expressionRp!.After).WithAlignment(alignmentRp != null ? new JLeftPadded<Expression>(alignmentBefore!, alignmentRp.Element) : null).WithFormat(formatRp != null ? new JLeftPadded<Identifier>(formatBefore!, (Identifier)formatRp.Element) : null);
     }
 
     // ---- AwaitExpression ----
@@ -1041,8 +1044,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitOrdering(Ordering ord, RpcReceiveQueue q)
     {
         var expression = q.Receive(ord.ExpressionPadded, rp => _delegate.VisitRightPadded(rp, q));
-        var direction = q.ReceiveAndGet<DirectionKind, object>(
-            ord.Direction ?? default, RpcReceiveQueue.ToEnum<DirectionKind>());
+        // nullable, so that an ordering with no direction keyword stays without one
+        var direction = q.ReceiveAndGet<DirectionKind?, object>(
+            ord.Direction, value => RpcReceiveQueue.ToEnum<DirectionKind>()(value));
         return ord.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressionPadded(expression!).WithDirection(direction);
     }
 
@@ -1127,9 +1131,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
                 var multiline = q.Receive(c.Multiline);
                 var text = q.Receive(c.Text);
                 var suffix = q.Receive(c.Suffix);
-                // C# Comment doesn't have Markers; consume and discard
-                q.Receive<Markers>(Markers.Empty);
-                return new TextComment(text!, suffix!, multiline);
+                var markers = q.Receive((c as TextComment)?.Markers);
+                return new TextComment(text!, suffix!, multiline, markers);
             });
             var whitespace = q.Receive(space.Whitespace);
             return space.WithComments(comments!).WithWhitespace(whitespace!);

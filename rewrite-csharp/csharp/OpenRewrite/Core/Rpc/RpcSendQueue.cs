@@ -351,8 +351,19 @@ public class RpcSendQueue
             return null;
         }
 
-        return ToJavaTypeName(type);
+        if (after is UnknownMarker unknown)
+        {
+            return unknown.JavaType ?? GenericMarker;
+        }
+
+        // a marker Java has no type for still has to arrive there as a marker
+        return ToJavaTypeName(type) ?? (after is Marker and not IRpcCodec ? GenericMarker : null);
     }
+
+    /// <summary>
+    /// The Java type that carries a marker Java has no type of its own for.
+    /// </summary>
+    internal const string GenericMarker = "org.openrewrite.rpc.RpcMarker";
 
     /// <summary>
     /// Maps a C# type to its equivalent Java type name for RPC protocol compatibility.

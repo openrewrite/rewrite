@@ -24,6 +24,7 @@ import (
 
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/rpc"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
@@ -202,4 +203,118 @@ func TestResetCancelsInProgressGetObject(t *testing.T) {
 	s.handleReset()
 	require.Len(t, s.inProgressGetObjects, 0, "in-progress transfers after Reset")
 	require.False(t, len(s.localObjects) != 0 || len(s.remoteObjects) != 0, "Reset did not clear object state")
+}
+
+// receiveWithNoRefs takes a transfer the way a peer does that kept nothing of
+// an earlier one: a bare ref to anything it was not sent here fails.
+func receiveWithNoRefs(t *testing.T, s *server, id string) string {
+	t.Helper()
+	params := getObjectParams(t, id)
+	q := rpc.NewReceiveQueue(make(map[int]any), func() []rpc.RpcObjectData {
+		return getObjectBatchForTest(t, s, params)
+	})
+	receiver := rpc.NewGoReceiver()
+	got := q.Receive(nil, func(v any) any {
+		if tree, ok := v.(java.Tree); ok {
+			return receiver.Visit(tree, q)
+		}
+		return v
+	})
+	require.Equal(t, rpc.EndOfObject, q.Take().State)
+	tree, ok := got.(java.Tree)
+	require.Truef(t, ok, "received object = %T, want java.Tree", got)
+	return printer.Print(tree)
+}
+
+func abortGetObjectParams(t *testing.T, id string) json.RawMessage {
+	t.Helper()
+	params, err := json.Marshal(map[string]string{"id": id})
+	require.NoError(t, err)
+	return params
+}
+
+// The peer failed on a batch while later ones were still to come.
+func TestAbortGetObjectUndoesATransferStillStreaming(t *testing.T) {
+	s, _ := newTestServer(t)
+	s.batchSize = 1
+
+	const id = "tree"
+	const source = "package main\n\nvar x, y int = 1, 2\n"
+	cu, err := goparser.NewGoParser().Parse("main.go", source)
+	require.NoError(t, err)
+	s.localObjects[id] = cu
+	params := getObjectParams(t, id)
+	for i := 0; i < 12; i++ {
+		_ = getObjectBatchForTest(t, s, params)
+	}
+	require.NotZero(t, s.localRefs.Len(), "the batches handed over defined no refs")
+
+	require.True(t, s.handleAbortGetObject(abortGetObjectParams(t, id)))
+
+	require.Empty(t, s.inProgressGetObjects)
+	require.Zero(t, s.localRefs.Len(), "refs the peer never kept")
+	require.Equal(t, source, receiveWithNoRefs(t, s, id))
+}
+
+// The peer failed on the last batch, after this side had counted the object as taken.
+func TestAbortGetObjectUndoesATransferAlreadyHandedOver(t *testing.T) {
+	s, _ := newTestServer(t)
+
+	const id = "tree"
+	const source = "package main\n\nvar x, y int = 1, 2\n"
+	cu, err := goparser.NewGoParser().Parse("main.go", source)
+	require.NoError(t, err)
+	s.localObjects[id] = cu
+	getCompleteObjectForTest(t, s, id)
+	require.Same(t, cu, s.remoteObjects[id])
+
+	require.True(t, s.handleAbortGetObject(abortGetObjectParams(t, id)))
+
+	require.NotContains(t, s.remoteObjects, id)
+	require.Zero(t, s.localRefs.Len(), "refs the peer never kept")
+	// whole again, where without the abort it would be reported as unchanged
+	require.Equal(t, source, receiveWithNoRefs(t, s, id))
+}
+
+// Only the refs of the transfer that failed are forgotten while it is the
+// latest one. After another transfer, which refs it assigned is not known.
+func TestAbortGetObjectKeepsTheRefsOfEarlierTransfers(t *testing.T) {
+	s, _ := newTestServer(t)
+	shared := &java.JavaTypeClass{Kind: "Class", FullyQualifiedName: "example.Shared"}
+	other := &java.JavaTypeClass{Kind: "Class", FullyQualifiedName: "example.Other"}
+	s.localObjects["first"] = &java.Identifier{Name: "first", Type: shared}
+	s.localObjects["second"] = &java.Identifier{Name: "second", Type: other}
+
+	getCompleteObjectForTest(t, s, "first")
+	kept := s.localRefs.Len()
+	getCompleteObjectForTest(t, s, "second")
+	require.Greater(t, s.localRefs.Len(), kept)
+
+	require.True(t, s.handleAbortGetObject(abortGetObjectParams(t, "second")))
+	require.Equal(t, kept, s.localRefs.Len())
+
+	require.True(t, s.handleAbortGetObject(abortGetObjectParams(t, "first")))
+	require.Zero(t, s.localRefs.Len())
+}
+
+func TestAbortGetObjectForAnObjectNeverSentChangesNothing(t *testing.T) {
+	s, _ := newTestServer(t)
+
+	require.True(t, s.handleAbortGetObject(abortGetObjectParams(t, "unknown")))
+	require.True(t, s.handleAbortGetObject(abortGetObjectParams(t, "unknown")))
+}
+
+// Java reads the context without a callback for its fields, so it has to
+// arrive under the type Java knows it by.
+func TestExecutionContextIsSentUnderItsJavaType(t *testing.T) {
+	s, _ := newTestServer(t)
+	s.localObjects["ctx"] = recipe.NewExecutionContext()
+
+	messages := getCompleteObjectForTest(t, s, "ctx")
+
+	require.Len(t, messages, 2)
+	require.Equal(t, rpc.Add, messages[0].State)
+	require.NotNil(t, messages[0].ValueType)
+	require.Equal(t, "org.openrewrite.InMemoryExecutionContext", *messages[0].ValueType)
+	require.Equal(t, rpc.EndOfObject, messages[1].State)
 }

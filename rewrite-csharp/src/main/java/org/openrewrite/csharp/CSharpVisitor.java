@@ -355,14 +355,13 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
     }
 
     public J visitExpressionStatement(Cs.ExpressionStatement expressionStatement, P p) {
-        // Printer delegates prefix to the wrapped expression, so visiting it here would double-count.
+        // The prefix and markers are those of the wrapped expression, which visits them.
         Statement tempStatement = (Statement) visitStatement(expressionStatement, p);
         if (!(tempStatement instanceof Cs.ExpressionStatement))
         {
             return tempStatement;
         }
         expressionStatement = (Cs.ExpressionStatement) tempStatement;
-        expressionStatement = expressionStatement.withMarkers(visitMarkers(expressionStatement.getMarkers(), p));
         JRightPadded<Expression> expr = visitRightPadded(expressionStatement.getPadding().getExpression(), CsRightPadded.Location.EXPRESSION_STATEMENT_EXPRESSION, p);
         if (expr == null) {
             //noinspection DataFlowIssue
@@ -406,7 +405,9 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         interpolation = (Cs.Interpolation) tempExpression;
         interpolation = interpolation.withMarkers(visitMarkers(interpolation.getMarkers(), p));
         interpolation = interpolation.getPadding().withExpression(visitRightPadded(interpolation.getPadding().getExpression(), CsRightPadded.Location.INTERPOLATION_EXPRESSION, p));
+        interpolation = interpolation.withAlignmentBefore(visitSpace(interpolation.getAlignmentBefore(), CsSpace.Location.INTERPOLATION_ALIGNMENT, p));
         interpolation = interpolation.getPadding().withAlignment(visitRightPadded(interpolation.getPadding().getAlignment(), CsRightPadded.Location.INTERPOLATION_ALIGNMENT, p));
+        interpolation = interpolation.withFormatBefore(visitSpace(interpolation.getFormatBefore(), CsSpace.Location.INTERPOLATION_FORMAT, p));
         return interpolation.getPadding().withFormat(visitRightPadded(interpolation.getPadding().getFormat(), CsRightPadded.Location.INTERPOLATION_FORMAT, p));
     }
 
@@ -445,6 +446,7 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         usingDirective = usingDirective.withMarkers(visitMarkers(usingDirective.getMarkers(), p));
         usingDirective = usingDirective.getPadding().withGlobal(visitRightPadded(usingDirective.getPadding().getGlobal(), CsRightPadded.Location.USING_DIRECTIVE_GLOBAL, p));
         usingDirective = usingDirective.getPadding().withStatic(visitLeftPadded(usingDirective.getPadding().getStatic(), CsLeftPadded.Location.USING_DIRECTIVE_STATIC, p));
+        usingDirective = usingDirective.getPadding().withUnsafe(visitLeftPadded(usingDirective.getPadding().getUnsafe(), CsLeftPadded.Location.USING_DIRECTIVE_UNSAFE, p));
         usingDirective = usingDirective.getPadding().withAlias(visitRightPadded(usingDirective.getPadding().getAlias(), CsRightPadded.Location.USING_DIRECTIVE_ALIAS, p));
         return usingDirective.withNamespaceOrType(visitAndCast(usingDirective.getNamespaceOrType(), p));
     }

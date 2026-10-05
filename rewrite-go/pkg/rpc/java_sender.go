@@ -331,9 +331,8 @@ func (s *JavaSender) VisitForLoop(f *java.ForLoop, p any) java.J {
 		ctrl := v.(*java.ForLoop).Control
 		return &ctrl
 	}, func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(f, func(v any) any {
-		return java.RightPadded[java.Statement]{Element: v.(*java.ForLoop).Body, After: java.EmptySpace}
-	}, func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(f, func(v any) any { return v.(*java.ForLoop).Body },
+		func(v any) { sendRightPadded(s, v, q) })
 	return f
 }
 
@@ -378,9 +377,8 @@ func (s *JavaSender) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
 		ctrl := v.(*java.ForEachLoop).Control
 		return &ctrl
 	}, func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(f, func(v any) any {
-		return java.RightPadded[java.Statement]{Element: v.(*java.ForEachLoop).Body, After: java.EmptySpace}
-	}, func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(f, func(v any) any { return v.(*java.ForEachLoop).Body },
+		func(v any) { sendRightPadded(s, v, q) })
 	return f
 }
 
@@ -413,12 +411,8 @@ func (s *JavaSender) VisitCase(c *java.Case, p any) java.J {
 	q.GetAndSend(c, func(v any) any { return v.(*java.Case).Expressions },
 		func(v any) { sendContainer(s, v, q) })
 	// statements (container)
-	q.GetAndSend(c, func(v any) any {
-		body := v.(*java.Case).Body
-		result := make([]java.RightPadded[java.Statement], len(body))
-		copy(result, body)
-		return java.Container[java.Statement]{Elements: result}
-	}, func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(c, func(v any) any { return v.(*java.Case).Body },
+		func(v any) { sendContainer(s, v, q) })
 	// body (right-padded, nil for Go-style case)
 	q.GetAndSend(c, func(_ any) any { return nil }, nil)
 	// guard (nil for Go)

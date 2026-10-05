@@ -361,12 +361,6 @@ func unaryOperator(e java.Expression) (string, bool) {
 			return "!", true
 		case java.BitwiseNot:
 			return "^", true
-		case java.Deref:
-			return "*", true
-		case java.AddressOf:
-			return "&", true
-		case java.Receive:
-			return "<-", true
 		}
 	case *golang.Unary:
 		switch u.Operator.Element {

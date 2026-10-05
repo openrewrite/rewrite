@@ -341,7 +341,9 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitInterpolation(Cs.Interpolation interpolation, RpcSendQueue q) {
         q.getAndSend(interpolation, i -> i.getPadding().getExpression(), el -> visitRightPadded(el, q));
+        q.getAndSend(interpolation, Cs.Interpolation::getAlignmentBefore, space -> visitSpace(space, q));
         q.getAndSend(interpolation, i -> i.getPadding().getAlignment(), el -> visitRightPadded(el, q));
+        q.getAndSend(interpolation, Cs.Interpolation::getFormatBefore, space -> visitSpace(space, q));
         q.getAndSend(interpolation, i -> i.getPadding().getFormat(), el -> visitRightPadded(el, q));
         return interpolation;
     }
@@ -362,6 +364,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     public J visitUsingDirective(Cs.UsingDirective usingDirective, RpcSendQueue q) {
         q.getAndSend(usingDirective, u -> u.getPadding().getGlobal(), el -> visitRightPadded(el, q));
         q.getAndSend(usingDirective, u -> u.getPadding().getStatic(), el -> visitLeftPadded(el, q));
+        q.getAndSend(usingDirective, u -> u.getPadding().getUnsafe(), el -> visitLeftPadded(el, q));
         q.getAndSend(usingDirective, u -> u.getPadding().getAlias(), el -> visitRightPadded(el, q));
         q.getAndSend(usingDirective, Cs.UsingDirective::getNamespaceOrType, el -> visit(el, q));
         return usingDirective;

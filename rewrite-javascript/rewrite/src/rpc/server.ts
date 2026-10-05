@@ -22,6 +22,7 @@ import * as fs from "fs";
 import {Command} from 'commander';
 import {dir} from 'tmp-promise';
 import {DependencyWorkspace} from "../javascript/dependency-workspace";
+import {isMainThread, parentPort, Worker} from "worker_threads";
 
 // Include all languages you want this server to support.
 import "../text";
@@ -29,9 +30,6 @@ import "../json";
 import "../yaml";
 import "../java";
 import "../javascript";
-
-// Not possible to set the stack size when executing from npx for security reasons
-require('v8').setFlagsFromString('--stack-size=8000');
 
 function initPyroscope(logger: rpc.Logger): any {
     // Strip trailing slashes: the SDK builds the ingest URL as `${serverAddress}/ingest`,
@@ -126,8 +124,8 @@ async function main() {
         }
     };
 
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
+    // signals are delivered to the main thread, which passes them on
+    parentPort!.on('message', shutdown);
 
     const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;
     const logger: rpc.Logger = {
@@ -191,4 +189,18 @@ async function main() {
     });
 }
 
-main().catch(console.error);
+if (isMainThread) {
+    // A thread's stack is sized when it starts, and the default is too shallow for the type checker
+    // on long chains of inferred return types, so the server runs on a thread started with more.
+    const server = new Worker(__filename, {
+        argv: process.argv.slice(2),
+        stdin: true,
+        resourceLimits: {stackSizeMb: 8}
+    });
+    process.stdin.pipe(server.stdin!);
+    process.on('SIGINT', () => server.postMessage('SIGINT'));
+    process.on('SIGTERM', () => server.postMessage('SIGTERM'));
+    server.on('exit', code => process.exit(code));
+} else {
+    main().catch(console.error);
+}

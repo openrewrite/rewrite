@@ -19,10 +19,12 @@ from uuid import UUID
 
 import parso
 from parso.python import tree as parso_tree
+from parso.python.tokenize import tokenize
+from parso.utils import parse_version_string, split_lines
 
 from rewrite import random_id, Markers
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, JavaType
-from rewrite.java.support_types import TextComment
+from rewrite.java.support_types import Statement, TextComment
 from rewrite.java import tree as j
 from rewrite.python import tree as py
 from rewrite.python.markers import (
@@ -84,6 +86,19 @@ class Py2ParserVisitor:
             source = source[line_end + len(self._shebang_after):]
 
         self._source_without_bom = source
+
+        # parso reads `<>` as two operators, so it parses the same-width `!=` in its place.
+        self._legacy_not_equal = set()
+        if '<>' in source:
+            lines = split_lines(source, keepends=True)
+            previous = None
+            for token in tokenize(source, parse_version_string(self._version)):
+                if previous is not None and previous.string == '<' and token.string == '>' and not token.prefix:
+                    row, col = previous.start_pos
+                    lines[row - 1] = lines[row - 1][:col] + '!=' + lines[row - 1][col + 2:]
+                    self._legacy_not_equal.add(previous.start_pos)
+                previous = token
+            source = ''.join(lines)
 
         # Parse with parso
         try:
@@ -3035,6 +3050,9 @@ class Py2ParserVisitor:
 
     def _pad_statement(self, stmt: j.J) -> JRightPadded:
         """Wrap a statement in JRightPadded."""
+        # parso collapses an expression statement to its expression, a docstring to a literal
+        if not isinstance(stmt, Statement):
+            stmt = py.ExpressionStatement(random_id(), stmt)
         return JRightPadded(stmt, Space.EMPTY, Markers.EMPTY)
 
     def _trailing_whitespace(self) -> Space:
@@ -3102,12 +3120,8 @@ class Py2ParserVisitor:
             '>=':  (j.Binary, j.Binary.Type.GreaterThanOrEqual),
             '==':  (j.Binary, j.Binary.Type.Equal),
             '!=':  (j.Binary, j.Binary.Type.NotEqual),
-            # Py2 spelling of '!='. parso < 0.8 never emits '<>' as a
-            # token (it pre-rewrites it to '!='), so this entry is
-            # unreachable through the normal fold path; it is kept so
-            # that a future parso upgrade — or source pre-processing
-            # that injects a '<>' operator leaf directly — finds the
-            # marker/printer wiring already in place.
+            # Py2 spelling of '!='. parso has no such token, so the source it
+            # parses spells it '!=' and _fold_binary restores the spelling.
             '<>':  (j.Binary, j.Binary.Type.NotEqual),
             'and': (j.Binary, j.Binary.Type.And),
             'or':  (j.Binary, j.Binary.Type.Or),
@@ -3179,6 +3193,8 @@ class Py2ParserVisitor:
                 return None
 
             op_text = getattr(op_leaf, 'value', None)
+            if getattr(op_leaf, 'start_pos', None) in self._legacy_not_equal:
+                op_text = '<>'
             mapping = bin_map.get(op_text)
             if mapping is None:
                 return None

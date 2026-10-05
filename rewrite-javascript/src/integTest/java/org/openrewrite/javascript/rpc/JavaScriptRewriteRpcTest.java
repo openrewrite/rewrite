@@ -265,9 +265,12 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @Test
     void getRecipes() {
-        installRecipes();
-        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null))
+        // recipes installed from a file belong to the bundle named by that file's absolute path
+        File recipes = installRecipes();
+        assertThat(client().getMarketplace(new RecipeBundle("npm", recipes.getPath(), null, null, null))
           .getAllRecipes()).isNotEmpty();
+        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null))
+          .getAllRecipes()).isEmpty();
     }
 
     @Test
@@ -809,10 +812,11 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
-    private void installRecipes() {
-        var exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
+    private File installRecipes() {
+        var exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js").getAbsoluteFile();
         assertThat(exampleRecipes).exists();
         assertThat(client().installRecipes(exampleRecipes).getRecipesInstalled()).isGreaterThan(0);
+        return exampleRecipes;
     }
 
     private JavaScriptRewriteRpc client() {

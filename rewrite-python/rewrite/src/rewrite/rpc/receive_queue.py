@@ -102,6 +102,8 @@ class RpcReceiveQueue:
         # is added and dropped inside its own frame, so this holds one entry per
         # level of the tree being received rather than one per node.
         self._fresh: Set[int] = set()
+        # Refs this queue recorded, for roll_back_refs.
+        self._received_refs: List[int] = []
 
     def take(self) -> RpcObjectData:
         """Take the next message from the queue, fetching more if needed."""
@@ -195,6 +197,7 @@ class RpcReceiveQueue:
                 if ref is not None:
                     # Store for future references (handles cyclic graphs)
                     self._refs[ref] = before
+                    self._received_refs.append(ref)
 
             # Fall through to CHANGE for field-by-field deserialization
             if not fresh:
@@ -210,6 +213,13 @@ class RpcReceiveQueue:
 
         else:
             raise RuntimeError(f"Unknown state type: {message.state}")
+
+    def roll_back_refs(self) -> None:
+        """Drop the refs received through this queue, for when what it was receiving did not
+        arrive whole. The sender of a failed transfer forgets the refs it assigned in it as well."""
+        for ref in self._received_refs:
+            self._refs.pop(ref, None)
+        self._received_refs.clear()
 
     def apply(self, obj: T, **kwargs) -> T:
         """Give a node the fields just read off the wire.
@@ -238,7 +248,10 @@ class RpcReceiveQueue:
             if codec is not None:
                 after = codec(before, self)
             elif message.value is not None:
-                if message.value_type:
+                reader = _value_readers.get(message.value_type) if message.value_type else None
+                if reader is not None:
+                    after = reader(message.value)
+                elif message.value_type:
                     after = {'kind': message.value_type, **message.value} if isinstance(message.value, dict) else message.value
                 else:
                     after = message.value
@@ -385,6 +398,9 @@ _codec_factories: Dict[str, Dict[str, Callable[[], Any]]] = {}
 _send_codecs: Dict[type, Callable[[Any, Any], None]] = {}
 # Reverse mapping: Python class -> Java type name (used by sender)
 _python_to_java_type: Dict[type, str] = {}
+# Types the host has no codec for, which cross whole as the value of one message
+_value_readers: Dict[str, Callable[[Any], Any]] = {}
+_value_writers: Dict[type, Callable[[Any], Any]] = {}
 
 
 def register_receive_codec(
@@ -452,6 +468,30 @@ def register_send_codec(
         codec: Function to serialize the type: (obj, queue) -> None
     """
     _send_codecs[python_class] = codec
+
+
+def register_value_codec(
+    java_type: str,
+    python_class: type,
+    reader: Callable[[Any], Any],
+    writer: Callable[[Any], Any]
+) -> None:
+    """Register a type that travels as one inline value, in the JSON form the host gives it.
+
+    Args:
+        java_type: Java type name
+        python_class: The Python class
+        reader: Function to build the object from its value: (value) -> obj
+        writer: Function to produce that value: (obj) -> value
+    """
+    _value_readers[java_type] = reader
+    _value_writers[python_class] = writer
+    _python_to_java_type[python_class] = java_type
+
+
+def get_value_writer(obj: Any) -> Optional[Callable[[Any], Any]]:
+    """Get the function that turns an object into its inline value, or None if it has none."""
+    return _value_writers.get(type(obj))
 
 
 def get_send_codec(obj: Any) -> Optional[Callable[[Any, Any], None]]:
