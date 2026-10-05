@@ -285,6 +285,7 @@ def test_attach_runs_the_bundle_on_the_callers_venv_beside_its_published_namesak
     bc, created, installed = _spawning_children(tmp_path, spawned)
     bc.install("pkg", "pkg==1.0")
     published = spawned[-1]
+    bc.install("other", "other")                 # another installed bundle defining pkg.R
 
     venv = tmp_path / "prebuilt"
     _make_venv(venv)
@@ -292,13 +293,13 @@ def test_attach_runs_the_bundle_on_the_callers_venv_beside_its_published_namesak
     attached = spawned[-1]
 
     # nothing created or installed for the attached venv, and its child runs on that venv
-    assert created == [tmp_path / "venvs" / "pkg"]
-    assert installed == [tmp_path / "venvs" / "pkg"]
+    assert created == installed == [tmp_path / "venvs" / "pkg", tmp_path / "venvs" / "other"]
     assert attached.cmd[0] == str(venv_manager.venv_python(venv))
     assert attached.cmd[attached.cmd.index("--child-bundle") + 1] == "pkg"
     assert rows == [{"descriptor": {"name": "pkg.R"}, "packageName": "/src/pkg"}]
 
-    # the published bundle keeps its child, and each bundle's row is listed for its own reader
+    # the published bundle keeps its child. Installed bundles list a shared recipe once, first-wins,
+    # and the attached bundle's row is listed for its own reader.
     assert not published.closed
     assert bc.request("pkg", "Visit", {}) == {"ran": "Visit"}
     assert published.requests[-1] == ("Visit", {})

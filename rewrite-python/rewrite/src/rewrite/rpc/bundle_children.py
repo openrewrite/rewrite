@@ -139,11 +139,13 @@ class BundleChildren:
         self._claim_owners()
 
     def marketplace(self):
-        """Every bundle's rows, one per recipe and origin, so each host-side reader finds its own."""
+        """Installed bundles list a recipe once, first-wins. An attached bundle's rows are always
+        listed, so the host-side reader keyed by its source path finds them."""
         merged, seen = [], set()
-        for rows in self._descriptors.values():
+        for key, rows in self._descriptors.items():
             for row in rows:
-                identity = (row["descriptor"]["name"], row.get("packageName"))
+                name = row["descriptor"]["name"]
+                identity = (name, row.get("packageName")) if key in self._attached else name
                 if identity in seen:
                     continue
                 seen.add(identity)
