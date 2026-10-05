@@ -98,7 +98,7 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
                 if (tree instanceof JavaSourceFile) {
                     tree.getMarkers().findFirst(JavaVersion.class).ifPresent(javaVersion ->
                         acc.updateAndGet(current -> {
-                            if (current == null || javaVersion.getMajorVersion() < current.getMajorVersion()) {
+                            if (current == null || majorVersion(javaVersion) < majorVersion(current)) {
                                 return javaVersion;
                             }
                             return current;
@@ -124,17 +124,20 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
                     return tree;
                 }
                 return tree.getMarkers().findFirst(JavaVersion.class)
-                        .filter(javaVersion -> acc.get() != null && javaVersion.getMajorVersion() == acc.get().getMajorVersion())
-                        .map(javaVersion -> SearchResult.found(tree, "Java version " + javaVersion.getMajorVersion()))
+                        .filter(javaVersion -> acc.get() != null && majorVersion(javaVersion) == majorVersion(acc.get()))
+                        .map(javaVersion -> SearchResult.found(tree, "Java version " + majorVersion(javaVersion)))
                         .orElse(tree);
             }
         });
     }
 
     private boolean minimumVersionInRange(AtomicReference<JavaVersion> acc, VersionComparator versionComparator) {
-        return acc.get() != null && versionComparator.isValid(null, Integer.toString(
-                Boolean.TRUE.equals(checkTargetCompatibility) ?
-                        acc.get().getMajorReleaseVersion() :
-                        acc.get().getMajorVersion()));
+        return acc.get() != null && versionComparator.isValid(null, Integer.toString(majorVersion(acc.get())));
+    }
+
+    private int majorVersion(JavaVersion javaVersion) {
+        return Boolean.TRUE.equals(checkTargetCompatibility) ?
+                javaVersion.getMajorReleaseVersion() :
+                javaVersion.getMajorVersion();
     }
 }

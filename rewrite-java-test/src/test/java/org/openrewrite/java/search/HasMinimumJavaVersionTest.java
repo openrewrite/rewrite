@@ -212,6 +212,52 @@ class HasMinimumJavaVersionTest implements RewriteTest {
     }
 
     @Test
+    void targetCompatibilityUsesLowestTargetVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new HasMinimumJavaVersion("17", true)),
+          java(
+            """
+              class A {
+              }
+              """,
+            spec -> spec.markers(javaVersion(17, 8, 17))
+          ),
+          java(
+            """
+              class B {
+              }
+              """,
+            spec -> spec.markers(javaVersion(17, 11, 11))
+          )
+        );
+    }
+
+    @Test
+    void targetCompatibilityMarksSourcesAtLowestTargetVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new HasMinimumJavaVersion("17", true)),
+          java(
+            """
+              class A {
+              }
+              """,
+            """
+              /*~~(Java version 17)~~>*/class A {
+              }
+              """,
+            spec -> spec.markers(javaVersion(21, 8, 17))
+          ),
+          java(
+            """
+              class B {
+              }
+              """,
+            spec -> spec.markers(javaVersion(21, 11, 21))
+          )
+        );
+    }
+
+    @Test
     void nonJavaSourcesPassWhenRepositoryMeetsMinimum() {
         rewriteRun(
           spec -> spec.recipeFromYaml(
