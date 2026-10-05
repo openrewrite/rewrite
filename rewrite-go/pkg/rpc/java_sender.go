@@ -623,7 +623,7 @@ func (s *JavaSender) VisitParameterizedType(pt *java.ParameterizedType, p any) j
 
 func (s *JavaSender) VisitArrayDimension(ad *java.ArrayDimension, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(ad, func(v any) any { return ad.Index },
+	q.GetAndSend(ad, func(v any) any { return v.(*java.ArrayDimension).Index },
 		func(v any) { sendRightPadded(s, v, q) })
 	return ad
 }
