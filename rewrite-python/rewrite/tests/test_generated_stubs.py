@@ -110,3 +110,49 @@ class SearchResult:
     assert "_hidden" not in stub
 
     assert "    @staticmethod\n    def found(tree: object, *, description: Optional[str]=...) -> object: ..." in stub
+
+
+def test_method_stub_keeps_defaults_and_unannotated_methods(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Optional
+
+
+class Parser(ABC):
+    def reset(self):
+        pass
+
+    @abstractmethod
+    def parse(self, *sources: str, strict: bool = False) -> list:
+        ...
+
+    @classmethod
+    def build(cls, erroneous: Optional[str] = None) -> 'Parser':
+        ...
+
+
+@dataclass(frozen=True)
+class PrintOutputCapture:
+    _out: str
+
+    def append(self, text: Optional[str] = None) -> 'PrintOutputCapture':
+        return self
+
+
+class ParseErrorVisitor(TreeVisitor[Tree, P]):
+    def is_acceptable(self, source_file, p: P) -> bool:
+        return True
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "    def reset(self) -> Any: ..." in stub
+
+    assert "    def parse(self, *sources: str, strict: bool=...) -> list: ..." in stub
+
+    assert "    @classmethod\n    def build(cls, erroneous: Optional[str]=...) -> 'Parser': ..." in stub
+
+    assert "    def append(self, text: Optional[str]=...) -> 'PrintOutputCapture': ..." in stub
+
+    assert "class ParseErrorVisitor(TreeVisitor[Tree, P]):\n    def is_acceptable(self, source_file: Any, p: P) -> bool: ..." in stub

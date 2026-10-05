@@ -149,111 +149,54 @@ def extract_property_methods(node: ast.ClassDef) -> List[Tuple[str, str]]:
     return properties
 
 
-def extract_class_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[str, str]], str]]:
+def stub_signature(fn: ast.FunctionDef, bound: bool = True) -> str:
     """
-    Extract @classmethod methods from a class.
+    Render a method's signature for a stub, like 'found(tree: Any, description: Optional[str]=...) -> Any'.
 
-    Returns list of (name, params, return_type) tuples.
+    Defaults render as '...' so optional parameters stay optional. A missing annotation renders
+    as 'Any', except on the 'self' or 'cls' that a bound method takes first.
     """
-    methods = []
-    for item in node.body:
-        if isinstance(item, ast.FunctionDef):
-            is_classmethod = any(
-                isinstance(d, ast.Name) and d.id == "classmethod"
-                for d in item.decorator_list
-            )
-            if is_classmethod and item.returns:
-                params = []
-                for arg in item.args.args[1:]:  # Skip 'cls'
-                    if arg.annotation:
-                        param_type = ast.unparse(arg.annotation)
-                    else:
-                        param_type = "Any"
-                    params.append((arg.arg, param_type))
-                return_type = ast.unparse(item.returns)
-                methods.append((item.name, params, return_type))
-    return methods
+    args = copy.deepcopy(fn.args)
+    args.defaults = [ast.Constant(...) for _ in args.defaults]
+    args.kw_defaults = [None if d is None else ast.Constant(...) for d in args.kw_defaults]
+    positional = args.posonlyargs + args.args
+    receiver = positional[:1] if bound else []
+    for arg in [*positional, *args.kwonlyargs, args.vararg, args.kwarg]:
+        if arg is not None and arg.annotation is None and arg not in receiver:
+            arg.annotation = ast.Name("Any")
+    returns = ast.unparse(fn.returns) if fn.returns else "Any"
+    return f"{fn.name}({ast.unparse(args)}) -> {returns}"
+
+
+def _has_decorator(item: ast.FunctionDef, *names: str) -> bool:
+    return any(isinstance(d, ast.Name) and d.id in names for d in item.decorator_list)
+
+
+def extract_class_methods(node: ast.ClassDef) -> List[str]:
+    """Extract @classmethod methods from a class, as stub signatures."""
+    return [stub_signature(item) for item in node.body
+            if isinstance(item, ast.FunctionDef) and _has_decorator(item, "classmethod")]
 
 
 def extract_static_methods(node: ast.ClassDef) -> List[str]:
-    """
-    Extract public @staticmethod methods from a class.
-
-    Returns their stub signatures, like 'found(tree: Any, description: Optional[str]=...) -> Any'.
-    Defaults render as '...' so optional parameters stay optional.
-    """
-    signatures = []
-    for item in node.body:
-        if isinstance(item, ast.FunctionDef) and not item.name.startswith('_') and item.returns:
-            if any(isinstance(d, ast.Name) and d.id == "staticmethod" for d in item.decorator_list):
-                args = copy.deepcopy(item.args)
-                args.defaults = [ast.Constant(...) for _ in args.defaults]
-                args.kw_defaults = [None if d is None else ast.Constant(...) for d in args.kw_defaults]
-                signatures.append(f"{item.name}({ast.unparse(args)}) -> {ast.unparse(item.returns)}")
-    return signatures
+    """Extract public @staticmethod methods from a class, as stub signatures."""
+    return [stub_signature(item, bound=False) for item in node.body
+            if isinstance(item, ast.FunctionDef) and not item.name.startswith('_')
+            and _has_decorator(item, "staticmethod")]
 
 
-def extract_regular_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[str, str]], str]]:
-    """
-    Extract regular methods from a class (not __init__, __eq__, etc.).
-
-    Returns list of (name, params, return_type) tuples.
-    """
-    methods = []
-    skip_methods = {'__init__', '__eq__', '__hash__', 'replace'}
-    for item in node.body:
-        if isinstance(item, ast.FunctionDef):
-            if item.name in skip_methods or item.name.startswith('_'):
-                continue
-            # Skip property and classmethod
-            is_special = any(
-                isinstance(d, ast.Name) and d.id in ("property", "classmethod", "staticmethod", "abstractmethod")
-                for d in item.decorator_list
-            )
-            if is_special:
-                continue
-            if item.returns:
-                params = []
-                for arg in item.args.args[1:]:  # Skip 'self'
-                    if arg.annotation:
-                        param_type = ast.unparse(arg.annotation)
-                    else:
-                        param_type = "Any"
-                    params.append((arg.arg, param_type))
-                return_type = ast.unparse(item.returns)
-                methods.append((item.name, params, return_type))
-    return methods
+def extract_regular_methods(node: ast.ClassDef) -> List[str]:
+    """Extract public, undecorated methods from a class (except replace), as stub signatures."""
+    return [stub_signature(item) for item in node.body
+            if isinstance(item, ast.FunctionDef) and not item.name.startswith('_') and item.name != 'replace'
+            and not _has_decorator(item, "property", "classmethod", "staticmethod", "abstractmethod")]
 
 
-def extract_abstract_methods(node: ast.ClassDef) -> List[Tuple[str, List[Tuple[str, str]], str]]:
-    """
-    Extract @abstractmethod methods from a class (excluding properties).
-
-    Returns list of (name, params, return_type) tuples.
-    """
-    methods = []
-    for item in node.body:
-        if isinstance(item, ast.FunctionDef):
-            is_abstract = any(
-                isinstance(d, ast.Name) and d.id == "abstractmethod"
-                for d in item.decorator_list
-            )
-            # Skip if also a property (those are handled by extract_property_methods)
-            is_property = any(
-                isinstance(d, ast.Name) and d.id == "property"
-                for d in item.decorator_list
-            )
-            if is_abstract and not is_property and item.returns:
-                params = []
-                for arg in item.args.args[1:]:  # Skip 'self'
-                    if arg.annotation:
-                        param_type = ast.unparse(arg.annotation)
-                    else:
-                        param_type = "Any"
-                    params.append((arg.arg, param_type))
-                return_type = ast.unparse(item.returns)
-                methods.append((item.name, params, return_type))
-    return methods
+def extract_abstract_methods(node: ast.ClassDef) -> List[str]:
+    """Extract @abstractmethod methods from a class (excluding properties), as stub signatures."""
+    return [stub_signature(item) for item in node.body
+            if isinstance(item, ast.FunctionDef) and _has_decorator(item, "abstractmethod")
+            and not _has_decorator(item, "property")]
 
 
 # `dataclass_transform` aliases for an LST node: a dataclass to a checker, which a
@@ -308,7 +251,8 @@ def is_abc_base_class(node: ast.ClassDef) -> bool:
     known_bases = {
         'J', 'Statement', 'Expression', 'TypedTree', 'NameTree', 'TypeTree', 'Loop', 'MethodCall',
         'ABC', 'Py', 'PyStatement', 'PyExpression',
-        'Tree', 'SourceFile', 'Generic'  # For rewrite/tree.py classes
+        'Tree', 'SourceFile', 'Generic',  # For rewrite/tree.py classes
+        'TreeVisitor',
     }
 
     for base in node.bases:
@@ -352,9 +296,8 @@ def generate_enum_stub(node: ast.ClassDef, indent: str = "") -> List[str]:
         lines.append(f"{indent}    @property")
         lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
 
-    for name, params, return_type in extract_regular_methods(node):
-        params_str = "".join(f", {p[0]}: {p[1]}" for p in params)
-        lines.append(f"{indent}    def {name}(self{params_str}) -> {return_type}: ...")
+    for signature in extract_regular_methods(node):
+        lines.append(f"{indent}    def {signature}: ...")
 
     if len(lines) == 1:
         lines.append(f"{indent}    pass")
@@ -409,12 +352,8 @@ def generate_nested_class_stub(node: ast.ClassDef, indent: str = "") -> List[str
 
         # Extract methods (regular methods skip 'replace', so handle it separately)
         methods = extract_regular_methods(node)
-        for name, params, return_type in methods:
-            if params:
-                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
-                lines.append(f"{indent}    def {name}(self, {params_str}) -> {return_type}: ...")
-            else:
-                lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+        for signature in methods:
+            lines.append(f"{indent}    def {signature}: ...")
             has_content = True
 
         # Handle replace method explicitly with its actual return type
@@ -461,28 +400,14 @@ def generate_abc_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
         for name, return_type in properties:
             lines.append(f"{indent}    @property")
             lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
-        for name, params, return_type in classmethods:
+        for signature in classmethods:
             lines.append(f"{indent}    @classmethod")
-            if params:
-                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
-                lines.append(f"{indent}    def {name}(cls, {params_str}) -> {return_type}: ...")
-            else:
-                lines.append(f"{indent}    def {name}(cls) -> {return_type}: ...")
+            lines.append(f"{indent}    def {signature}: ...")
         for signature in staticmethods:
             lines.append(f"{indent}    @staticmethod")
             lines.append(f"{indent}    def {signature}: ...")
-        for name, params, return_type in abstract_methods:
-            if params:
-                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
-                lines.append(f"{indent}    def {name}(self, {params_str}) -> {return_type}: ...")
-            else:
-                lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
-        for name, params, return_type in methods:
-            if params:
-                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
-                lines.append(f"{indent}    def {name}(self, {params_str}) -> {return_type}: ...")
-            else:
-                lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+        for signature in abstract_methods + methods:
+            lines.append(f"{indent}    def {signature}: ...")
         has_content = True
 
     # Add replace method stub for ABC base classes that explicitly define it
@@ -788,13 +713,9 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
     classmethods = extract_class_methods(node)
     if classmethods:
         lines.append("")
-        for name, params, return_type in classmethods:
+        for signature in classmethods:
             lines.append(f"{indent}    @classmethod")
-            if params:
-                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
-                lines.append(f"{indent}    def {name}(cls, {params_str}) -> {return_type}: ...")
-            else:
-                lines.append(f"{indent}    def {name}(cls) -> {return_type}: ...")
+            lines.append(f"{indent}    def {signature}: ...")
 
     staticmethods = extract_static_methods(node)
     if staticmethods:
@@ -815,12 +736,8 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
     methods = extract_regular_methods(node)
     if methods:
         lines.append("")
-        for name, params, return_type in methods:
-            if params:
-                params_str = ", ".join(f"{p[0]}: {p[1]}" for p in params)
-                lines.append(f"{indent}    def {name}(self, {params_str}) -> {return_type}: ...")
-            else:
-                lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+        for signature in methods:
+            lines.append(f"{indent}    def {signature}: ...")
 
     return lines
 
