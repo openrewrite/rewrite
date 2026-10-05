@@ -47,7 +47,7 @@ class JavaSourceSetTest {
     }
 
     @Test
-    void javaStandardLibraryTypesFromEveryModule() {
+    void publicJavaStandardLibraryTypesFromEveryModule() {
         var jss = JavaSourceSet.build("main", emptyList());
         assertThat(jss.getClasspath())
           .extracting(JavaType.FullyQualified::getFullyQualifiedName)
@@ -58,14 +58,7 @@ class JavaSourceSetTest {
             "java.sql.Connection",
             "java.beans.PropertyChangeListener"
           )
-          .allSatisfy(fqn -> assertThat(fqn).startsWith("java."));
-    }
-
-    @Test
-    void javaStandardLibraryTypesAreDeclarable() {
-        var jss = JavaSourceSet.build("main", emptyList());
-        assertThat(jss.getClasspath())
-          .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+          .allSatisfy(fqn -> assertThat(fqn).startsWith("java."))
           .doesNotContain(
             "java.util.ImmutableCollections",
             "java.util.HashMap$Node",
