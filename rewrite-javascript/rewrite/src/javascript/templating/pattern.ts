@@ -29,7 +29,7 @@ import {
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {DebugPatternMatchingComparator, MatcherCallbacks, MatcherState, PatternMatchingComparator} from './comparator';
 import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
-import {TemplateEngine} from './engine';
+import {opensWithBrace, TemplateEngine} from './engine';
 import {TreePrinters} from '../../print';
 import {JS} from '../index';
 
@@ -130,7 +130,8 @@ export class PatternBuilder {
  */
 export class Pattern {
     private _options: PatternOptions = {};
-    private _cachedAstPattern?: J;
+    /** The pattern tree, keyed by whether its code was parsed as an expression. */
+    private _cachedAstPatterns = new Map<boolean, J>();
     private static nextPatternId = 1;
     private readonly patternId: number;
     private readonly unnamedCaptureMapping = new Map<string, string>();
@@ -202,23 +203,25 @@ export class Pattern {
     configure(options: PatternOptions): Pattern {
         this._options = { ...this._options, ...options };
         // Invalidate cache when configuration changes
-        this._cachedAstPattern = undefined;
+        this._cachedAstPatterns.clear();
         return this;
     }
 
     /**
-     * Gets the AST pattern for this pattern, using two-level caching:
+     * Gets the AST pattern for this pattern, using three-level caching:
      * 1. Instance-level cache (fastest - this pattern instance)
      * 2. Global LRU cache (fast - shared across pattern instances with same code)
      * 3. Compute via TemplateProcessor (slow - parse and process)
      *
+     * @param expression Whether to parse the code as an expression, with statements as the fallback
      * @returns The cached or newly computed pattern AST
      * @internal
      */
-    async getAstPattern(): Promise<J> {
+    async getAstPattern(expression: boolean = false): Promise<J> {
         // Level 1: Instance cache (fastest path)
-        if (this._cachedAstPattern) {
-            return this._cachedAstPattern;
+        const instanceCached = this._cachedAstPatterns.get(expression);
+        if (instanceCached) {
+            return instanceCached;
         }
 
         // Generate cache key for global lookup
@@ -229,7 +232,7 @@ export class Pattern {
                 return `raw:${(c as RawCode).code}`;
             }
             return c.getName();
-        }).join(',');
+        }).join(',') + (expression ? '::expression' : '');
         const cacheKey = generateCacheKey(
             this.templateParts,
             capturesKey,
@@ -244,20 +247,31 @@ export class Pattern {
         let tree = globalAstCache.get(cacheKey);
         if (!tree) {
             // Level 3: Compute via TemplateEngine (slow path)
-            tree = await TemplateEngine.getPatternTree(
-                this.templateParts,
-                this.captures,
-                contextStatements,
-                this._options.dependencies || {},
-                this._options.types
-            );
+            try {
+                tree = await TemplateEngine.getPatternTree(
+                    this.templateParts,
+                    this.captures,
+                    contextStatements,
+                    this._options.dependencies || {},
+                    this._options.types,
+                    expression
+                );
+            } catch (e) {
+                // A block matches only a block, which the statement parse is for
+                if (!expression) {
+                    throw e;
+                }
+                const statementPattern = await this.getAstPattern(false);
+                this._cachedAstPatterns.set(expression, statementPattern);
+                return statementPattern;
+            }
             globalAstCache.set(cacheKey, tree);
         }
 
         // The key names captures but says nothing about their constraints, so two patterns of the
         // same shape share an entry; markers are attached per instance to keep them apart.
         const result = await TemplateEngine.attachCaptureMarkers(tree, this.captures);
-        this._cachedAstPattern = result;
+        this._cachedAstPatterns.set(expression, result);
 
         return result;
     }
@@ -716,7 +730,8 @@ class Matcher {
      */
     async matches(): Promise<boolean> {
         if (!this.patternAst) {
-            this.patternAst = await this.pattern.getAstPattern();
+            this.patternAst = await this.pattern.getAstPattern(
+                opensWithBrace(this.pattern.templateParts) && this.ast.kind !== J.Kind.Block);
         }
 
         return this.matchNode(this.patternAst, this.ast);
