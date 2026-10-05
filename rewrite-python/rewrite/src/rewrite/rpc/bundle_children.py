@@ -13,7 +13,7 @@ from rewrite.rpc.child_connection import ChildConnection, child_command
 
 class BundleChildren:
     def __init__(self, python_executable, venvs_root, upstream, *, spawn=None, venv_ops=None,
-                 on_child_replaced=None):
+                 on_child_replaced=None, log_file=None, trace_rpc_messages=False):
         self._python = python_executable
         self._venvs_root = Path(venvs_root)
         self._upstream = upstream
@@ -27,6 +27,8 @@ class BundleChildren:
         self._versions = {}     # bundle_dist -> resolved version (what pip actually installed)
         self._attribution = {}  # bundle_dist -> attribution name (a local install's supplied path)
         self._data_table_store = None  # cached SetDataTableStore params, broadcast to every child
+        self._log_file = log_file
+        self._trace_rpc_messages = trace_rpc_messages
 
     def _venv_dir(self, bundle_dist: str) -> Path:
         return self._venvs_root / bundle_dist
@@ -35,7 +37,9 @@ class BundleChildren:
         child = self._children.get(bundle_dist)
         if child is None:
             cmd = child_command(self._venv_dir(bundle_dist), bundle_dist,
-                                attribution_name=self._attribution.get(bundle_dist))
+                                attribution_name=self._attribution.get(bundle_dist),
+                                log_file=self._log_file,
+                                trace_rpc_messages=self._trace_rpc_messages)
             child = self._spawn(cmd,
                                 upstream=lambda m, p, b=bundle_dist: self._upstream(m, p, b),
                                 exclude_paths=(str(self._venvs_root),))
