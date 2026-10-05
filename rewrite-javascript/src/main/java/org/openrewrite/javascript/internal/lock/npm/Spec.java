@@ -92,8 +92,9 @@ public final class Spec {
     private @Nullable Spec subSpec;
 
     private Spec(@Nullable String raw, @Nullable String name, @Nullable String rawSpec) {
-        this.raw = raw != null ? raw : name != null && !name.isEmpty() ? name + "@" + (rawSpec == null ? "undefined" : rawSpec) :
-                rawSpec == null ? "" : rawSpec;
+        this.raw = raw != null ? raw :
+                name != null && !name.isEmpty() ? name + "@" + (rawSpec == null ? "undefined" : rawSpec) :
+                        rawSpec == null ? "" : rawSpec;
         this.rawSpec = rawSpec == null ? "" : rawSpec;
         if (name != null && !name.isEmpty()) {
             setName(name);
@@ -168,7 +169,8 @@ public final class Spec {
         return resolve(name, spec, where, null);
     }
 
-    private static Spec resolve(@Nullable String name, @Nullable String spec, @Nullable String where, @Nullable String arg) {
+    private static Spec resolve(@Nullable String name, @Nullable String spec, @Nullable String where,
+                                @Nullable String arg) {
         Spec res = new Spec(arg, name, spec);
         if (where == null || where.isEmpty()) {
             where = PosixPath.CWD;
@@ -252,7 +254,8 @@ public final class Spec {
                     throw new InvalidSpecException("cannot override existing semver range with a committish", null);
                 }
                 if (truthy(res.gitCommittish)) {
-                    throw new InvalidSpecException("cannot override existing committish with a second committish", null);
+                    throw new InvalidSpecException(
+                            "cannot override existing committish with a second committish", null);
                 }
                 res.gitCommittish = part;
                 continue;
@@ -265,7 +268,8 @@ public final class Spec {
                     throw new InvalidSpecException("cannot override existing committish with a semver range", null);
                 }
                 if (truthy(res.gitRange)) {
-                    throw new InvalidSpecException("cannot override existing semver range with a second semver range", null);
+                    throw new InvalidSpecException(
+                            "cannot override existing semver range with a second semver range", null);
                 }
                 res.gitRange = decodeURIComponent(value);
                 continue;
@@ -346,7 +350,8 @@ public final class Spec {
         res.type = Type.GIT;
         res.hosted = hosted;
         res.saveSpec = hosted.toString(GitHost.Opts.of(false, false));
-        res.fetchSpec = "shortcut".equals(hosted.getDefaultRepresentation()) ? null : hosted.toString(GitHost.Opts.NONE);
+        res.fetchSpec = "shortcut".equals(hosted.getDefaultRepresentation()) ?
+                null : hosted.toString(GitHost.Opts.NONE);
         setGitAttrs(res, hosted.getCommittish());
         return res;
     }
@@ -383,7 +388,8 @@ public final class Spec {
                 setGitAttrs(res, parsedUrl.getHash().isEmpty() ? "" : parsedUrl.getHash().substring(1));
                 if ("git+file:".equals(parsedUrl.getProtocol()) &&
                     Pattern.compile("^git\\+file://[a-z]:", Pattern.CASE_INSENSITIVE).matcher(rawSpec).find()) {
-                    res.fetchSpec = "git+file://" + parsedUrl.getHost().toLowerCase(Locale.ROOT) + ":" + parsedUrl.getPathname();
+                    res.fetchSpec = "git+file://" + parsedUrl.getHost().toLowerCase(Locale.ROOT) + ":" +
+                                    parsedUrl.getPathname();
                 } else {
                     parsedUrl.setHash("");
                     res.fetchSpec = parsedUrl.toString();

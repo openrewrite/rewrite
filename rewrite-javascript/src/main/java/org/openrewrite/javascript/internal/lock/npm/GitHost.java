@@ -87,7 +87,8 @@ final class GitHost {
     private static final Map<String, String> BY_SHORTCUT = new LinkedHashMap<>();
     private static final Map<String, String> BY_DOMAIN = new LinkedHashMap<>();
     private static final Map<String, @Nullable String> PROTOCOL_NAMES = new LinkedHashMap<>();
-    private static final List<String> AUTH_PROTOCOLS = Arrays.asList("git+https:", "git:", "http:", "https:", "git+http:");
+    private static final List<String> AUTH_PROTOCOLS =
+            Arrays.asList("git+https:", "git:", "http:", "https:", "git+http:");
 
     static {
         PROTOCOL_NAMES.put("git+ssh:", "sshurl");
@@ -98,7 +99,8 @@ final class GitHost {
         PROTOCOL_NAMES.put("https:", null);
         PROTOCOL_NAMES.put("git+http:", null);
 
-        DEFAULTS.put("ssh", t -> "git@" + t.domain + ":" + t.user + "/" + t.project + ".git" + maybeJoin("#", t.committish));
+        DEFAULTS.put("ssh", t ->
+                "git@" + t.domain + ":" + t.user + "/" + t.project + ".git" + maybeJoin("#", t.committish));
         DEFAULTS.put("sshurl", t -> "git+ssh://git@" + t.domain + "/" + t.user + "/" + t.project + ".git" +
                                     maybeJoin("#", t.committish));
         DEFAULTS.put("https", t -> "git+https://" + maybeJoin(t.auth, "@") + t.domain + "/" + t.user + "/" + t.project +
@@ -109,7 +111,8 @@ final class GitHost {
         Map<String, Function<Fill, String>> github = new LinkedHashMap<>();
         github.put("git", t -> "git://" + maybeJoin(t.auth, "@") + t.domain + "/" + t.user + "/" + t.project + ".git" +
                                maybeJoin("#", t.committish));
-        addHost("github", Arrays.asList("git:", "http:", "git+ssh:", "git+https:", "ssh:", "https:"), "github.com", url -> {
+        List<String> githubProtocols = Arrays.asList("git:", "http:", "git+ssh:", "git+https:", "ssh:", "https:");
+        addHost("github", githubProtocols, "github.com", url -> {
             String[] parts = split(url.getPathname(), 5);
             String user = part(parts, 1);
             String project = part(parts, 2);
@@ -191,7 +194,8 @@ final class GitHost {
         }, gist);
 
         Map<String, Function<Fill, String>> sourcehut = new LinkedHashMap<>();
-        sourcehut.put("https", t -> "https://" + t.domain + "/" + t.user + "/" + t.project + maybeJoin("#", t.committish));
+        sourcehut.put("https", t ->
+                "https://" + t.domain + "/" + t.user + "/" + t.project + maybeJoin("#", t.committish));
         addHost("sourcehut", Arrays.asList("git+ssh:", "https:"), "git.sr.ht", url -> {
             String[] parts = split(url.getPathname(), 4);
             String user = part(parts, 1);
@@ -288,7 +292,8 @@ final class GitHost {
         String defaultRepresentation;
         try {
             if (gitHostShortcut != null) {
-                String pathname = parsed.getPathname().startsWith("/") ? parsed.getPathname().substring(1) : parsed.getPathname();
+                String pathname = parsed.getPathname().startsWith("/") ?
+                        parsed.getPathname().substring(1) : parsed.getPathname();
                 int firstAt = pathname.indexOf('@');
                 if (firstAt > -1) {
                     pathname = pathname.substring(firstAt + 1);
@@ -318,7 +323,8 @@ final class GitHost {
                 if (segments == null) {
                     return null;
                 }
-                user = segments.user == null || segments.user.isEmpty() ? segments.user : decodeURIComponent(segments.user);
+                user = segments.user == null || segments.user.isEmpty() ?
+                        segments.user : decodeURIComponent(segments.user);
                 project = decodeURIComponent(segments.project);
                 committish = segments.committish == null ? "undefined" : decodeURIComponent(segments.committish);
                 String name = PROTOCOL_NAMES.get(parsed.getProtocol());
@@ -337,7 +343,8 @@ final class GitHost {
         }
         Opts options = host.opts.merge(over);
         String committish = Boolean.TRUE.equals(options.noCommittish) ? null : host.committish;
-        String result = template.apply(new Fill(host.type, host.info.domain, host.user, host.auth, host.project, committish));
+        String result = template.apply(
+                new Fill(host.type, host.info.domain, host.user, host.auth, host.project, committish));
         return Boolean.TRUE.equals(options.noGitPlus) && result.startsWith("git+") ? result.substring(4) : result;
     }
 
@@ -424,7 +431,8 @@ final class GitHost {
         boolean colonOnlyAfterHash = firstColon == -1 || (firstHash > -1 && firstColon > firstHash);
         boolean secondSlashOnlyAfterHash = secondSlash == -1 || (firstHash > -1 && secondSlash > firstHash);
         boolean hasSlash = firstSlash > 0;
-        boolean doesNotEndWithSlash = firstHash > -1 ? firstHash == 0 || arg.charAt(firstHash - 1) != '/' : !arg.endsWith("/");
+        boolean doesNotEndWithSlash = firstHash > -1 ?
+                firstHash == 0 || arg.charAt(firstHash - 1) != '/' : !arg.endsWith("/");
         boolean doesNotStartWithDot = !arg.startsWith(".");
 
         return spaceOnlyAfterHash && hasSlash && doesNotEndWithSlash && doesNotStartWithDot &&

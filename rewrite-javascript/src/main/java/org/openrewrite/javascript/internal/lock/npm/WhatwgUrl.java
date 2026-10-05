@@ -527,7 +527,8 @@ final class WhatwgUrl {
                         } else if (isSingleDotSegment(segment) && c != '/' && !(url.isSpecial() && c == '\\')) {
                             url.path.add("");
                         } else if (!isSingleDotSegment(segment)) {
-                            if ("file".equals(url.scheme) && url.path.isEmpty() && isWindowsDriveLetter(segment, false)) {
+                            if ("file".equals(url.scheme) && url.path.isEmpty() &&
+                                isWindowsDriveLetter(segment, false)) {
                                 segment = segment.charAt(0) + ":";
                             }
                             url.path.add(segment);

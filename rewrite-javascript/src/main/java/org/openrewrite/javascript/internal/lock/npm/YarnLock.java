@@ -295,8 +295,9 @@ public final class YarnLock {
             n.put("version", node.getVersion());
         }
         if (truthy(node.getResolved())) {
-            n.put("resolved", ConsistentResolve.consistentResolve(node.getResolved(),
-                    node.isLink() ? PosixPath.dirname(node.getPath()) : node.getPath(), node.getRoot().getPath(), true));
+            String from = node.isLink() ? PosixPath.dirname(node.getPath()) : node.getPath();
+            n.put("resolved",
+                    ConsistentResolve.consistentResolve(node.getResolved(), from, node.getRoot().getPath(), true));
         }
         if (truthy(node.getIntegrity())) {
             n.put("integrity", node.getIntegrity());
@@ -312,8 +313,8 @@ public final class YarnLock {
             throw new IllegalStateException("not a yarn.lock scalar: " + val);
         }
         String s = (String) val;
-        boolean startsWithLetter = !s.isEmpty() &&
-                                   (s.charAt(0) >= 'a' && s.charAt(0) <= 'z' || s.charAt(0) >= 'A' && s.charAt(0) <= 'Z');
+        char first = s.isEmpty() ? 0 : s.charAt(0);
+        boolean startsWithLetter = first >= 'a' && first <= 'z' || first >= 'A' && first <= 'Z';
         if (s.startsWith("true") || s.startsWith("false") || NEEDS_QUOTES.matcher(s).find() || !startsWithLetter) {
             return Js.quote(s);
         }
@@ -348,7 +349,8 @@ public final class YarnLock {
 
         Entry(Collection<String> specs) {
             this.specs = new LinkedHashSet<>(specs);
-            for (String field : new String[]{"resolved", "version", "integrity", "dependencies", "optionalDependencies"}) {
+            String[] written = {"resolved", "version", "integrity", "dependencies", "optionalDependencies"};
+            for (String field : written) {
                 fields.put(field, null);
             }
         }
@@ -387,8 +389,8 @@ public final class YarnLock {
                 Map<String, Object> object = asObject(val);
                 if (object == null) {
                     boolean quoted = !"integrity".equals(prop) && val instanceof String;
-                    sb.append("  ").append(prop).append(' ').append(quoted ? Js.quote((String) val) : String.valueOf(val))
-                            .append('\n');
+                    sb.append("  ").append(prop).append(' ')
+                            .append(quoted ? Js.quote((String) val) : String.valueOf(val)).append('\n');
                 } else if (!object.isEmpty()) {
                     sb.append("  ").append(prop).append(":\n").append(sortKV(object)).append('\n');
                 }
