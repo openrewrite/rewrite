@@ -27,10 +27,11 @@ const Node = npm('@npmcli/arborist/lib/node.js')
 
 const deps = '"dependencies":{"a":"^1.0.0","b":"1"}'
 const overrides = [
-  '{"a":null}', '{"a":5}', '{"a":true}', '{"a":["x"]}', '{"a":[null]}', '{"a":{".":5}}', '{"a":{".":{}}}', '{"a":{".":["2"]}}',
-  '{"a":{".":true}}', '{"a":{".":null}}', '{"a":{".":0}}', '{"a":{".":false,"b":"1"}}', '{"a@1":{".":""}}', '{"a":""}',
-  '{"a":{"b":null}}', '{"b":"1","10":"2.0.0","a":{"2":"x","b":"3","1":"y"},"0":"3"}', '"abc"', '["a"]', '5', 'null', '{}', 'true',
-  '""', '{".":"1"}', '{"a":"$constructor"}', '{"b":"$constructor"}', '{"a":"$b"}', '{"b":"$a"}', '{"a":"$zz"}',
+  '{"a":null}', '{"a":5}', '{"a":true}', '{"a":["x"]}', '{"a":[null]}', '{"a":{".":5}}', '{"a":{".":{}}}',
+  '{"a":{".":["2"]}}', '{"a":{".":true}}', '{"a":{".":null}}', '{"a":{".":0}}', '{"a":{".":false,"b":"1"}}',
+  '{"a@1":{".":""}}', '{"a":""}', '{"a":{"b":null}}', '{"b":"1","10":"2.0.0","a":{"2":"x","b":"3","1":"y"},"0":"3"}',
+  '"abc"', '["a"]', '5', 'null', '{}', 'true', '""', '{".":"1"}', '{"a":"$constructor"}', '{"b":"$constructor"}',
+  '{"a":"$b"}', '{"b":"$a"}', '{"a":"$zz"}',
   '{"a":{".":"$a","a":"1"}}', '{"a":"2.0.0"}', '{"a@^1":"1.0.0"}', '{"b":{".":5}}', '{"d":{"a":{".":5}}}',
 ]
 const packages = [
@@ -59,7 +60,8 @@ const packages = [
   '{"optionalDependencies":{"valueOf":"1"}}',
   '{"devDependencies":{"isPrototypeOf":"1"}}',
   '{"peerDependencies":{"constructor":"1","a":"1"},"peerDependenciesMeta":{"a":{"optional":true}}}',
-  '{"peerDependencies":{"constructor":"1","a":"1"},"peerDependenciesMeta":{"a":{"optional":true}},"acceptDependencies":{"constructor":""}}',
+  '{"peerDependencies":{"constructor":"1","a":"1"},"peerDependenciesMeta":{"a":{"optional":true}},' +
+    '"acceptDependencies":{"constructor":""}}',
   '{"peerDependencies":{"__proto__":"1","a":"1"}}',
   '{"peerDependencies":{"a":"1","0":"2"},"peerDependenciesMeta":"xy"}',
   '{"peerDependencies":{"a":"1","0":"2"},"peerDependenciesMeta":[{"optional":true}]}',
@@ -74,8 +76,8 @@ const packages = [
   '{"dependencies":5,"optionalDependencies":true}',
   '{"devDependencies":[null]}',
   '{"dependencies":{"a":"1"},"optionalDependencies":{"a":null}}',
-  '{"dependencies":{"b":"1","10":"1","a":"1","2":"1"},"devDependencies":{"z":"1","1":"1"},"peerDependencies":{"q":"1","3":"1"},' +
-    '"optionalDependencies":{"y":"1","4":"1"}}',
+  '{"dependencies":{"b":"1","10":"1","a":"1","2":"1"},"devDependencies":{"z":"1","1":"1"},' +
+    '"peerDependencies":{"q":"1","3":"1"},"optionalDependencies":{"y":"1","4":"1"}}',
   '{"dependencies":{"b":"1","4294967295":"1","01":"1","4294967294":"1","1":"1","-1":"1","1.5":"1","0":"1"}}',
   '{"dependencies":{"b":"1","10":"1","a":"1","2":"1"},"bundleDependencies":true}',
   '{"bundleDependencies":true,"dependencies":"ab"}',
@@ -117,15 +119,17 @@ const attempt = fn => {
 }
 const describe = (json, legacyPeerDeps) => {
   const root = new Node({ path: '/r', pkg: JSON.parse(json), loadOverrides: true, legacyPeerDeps })
-  const d = new Node({ parent: root, name: 'd', pkg: { name: 'd', version: '1.0.0', dependencies: { a: '1.x', b: '^1' } } })
+  const dPkg = { name: 'd', version: '1.0.0', dependencies: { a: '1.x', b: '^1' } }
+  const d = new Node({ parent: root, name: 'd', pkg: dPkg })
   const a = new Node({ parent: root, name: 'a', pkg: { name: 'a', version: '1.0.0', dependencies: { b: '1' } } })
   const edges = []
   for (const node of [root, d, a]) {
     for (const edge of node.edgesOut.values()) {
       const spec = attempt(() => edge.spec)
       const stringSpec = typeof spec === 'string'
+      const error = stringSpec || !edge.to ? attempt(() => edge.error) : 'THROW'
       edges.push([node.name, edge.name, edge.type, stringSpec ? spec : 'THROW', edge.rawSpec, edge.accept ?? null,
-        rule(edge.overrides), stringSpec || !edge.to ? attempt(() => edge.error) : 'THROW', edge.to ? edge.to.location : null])
+        rule(edge.overrides), error, edge.to ? edge.to.location : null])
     }
   }
   return {

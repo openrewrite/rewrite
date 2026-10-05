@@ -96,7 +96,7 @@ class LocaleCompareTest {
      */
     @Test
     void canonicallyEquivalentStringsAreEqual() {
-        assertThat(LocaleCompare.en("゚ཱ𐍸", "゚ཱ𐍸")).isEqualTo(0);
-        assertThat(LocaleCompare.en("𖄡𖄩", "𖄡𖄩")).isEqualTo(0);
+        assertThat(LocaleCompare.en("\u0f71\ud800\udf78\u309a", "\u309a\u0f71\ud800\udf78")).isEqualTo(0);
+        assertThat(LocaleCompare.en("\ud818\udd1e\ud818\udd22", "\ud818\udd1e\ud818\udd1e\ud818\udd29")).isEqualTo(0);
     }
 }

@@ -88,7 +88,7 @@ class JsTest {
         assertThat(Js.entries(arr("x", null))).extracting(Map.Entry::getKey).containsExactly("0", "1");
         assertThat(Js.entries(arr("x", null))).extracting(Map.Entry::getValue).containsExactly("x", null);
         assertThat(Js.keys("ab")).containsExactly("0", "1");
-        assertThat(Js.entries("a😀")).extracting(Map.Entry::getValue).containsExactly("a", "\ud83d", "\ude00");
+        assertThat(Js.entries("a\ud83d\ude00")).extracting(Map.Entry::getValue).containsExactly("a", "\ud83d", "\ude00");
         assertThat(Js.keys(5)).isEmpty();
         assertThat(Js.keys(true)).isEmpty();
         assertThat(Js.keys(obj())).isEmpty();

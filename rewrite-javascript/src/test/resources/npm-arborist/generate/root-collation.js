@@ -203,9 +203,10 @@ for (const cp of ranked) {
 }
 
 if (unplaced.size) {
-  throw new Error(`implicit weights for code points the collator does not rank: ${[...unplaced].map(c => c.toString(16))}`)
+  const hex = [...unplaced].map(c => c.toString(16))
+  throw new Error(`implicit weights for code points the collator does not rank: ${hex}`)
 }
 fs.writeFileSync(outFile, zlib.gzipSync(Buffer.concat(chunks), { level: 9 }))
-console.error(`${reachable.length} characters, ${contractions.length} contractions, ${decomposable.length} decompositions, ` +
-  `${combining.length} combining classes, ${ranked.length} ranked ideographs (first unassigned U+${unlisted[tail].toString(16)}), ` +
-  `${fs.statSync(outFile).size} bytes`)
+console.error(`${reachable.length} characters, ${contractions.length} contractions, ` +
+  `${decomposable.length} decompositions, ${combining.length} combining classes, ${ranked.length} ranked ideographs ` +
+  `(first unassigned U+${unlisted[tail].toString(16)}), ${fs.statSync(outFile).size} bytes`)
