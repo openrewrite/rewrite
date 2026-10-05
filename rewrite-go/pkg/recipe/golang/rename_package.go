@@ -87,7 +87,7 @@ func (v *renamePackageVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, 
 		ident := *pkg.Element
 		ident.Name = newName
 		pkg.Element = &ident
-		cu.PackageDecl = &pkg
+		cu = cu.WithPackageDecl(&pkg)
 	}
 
 	// Rewrite import paths. Match `OldPackagePath` exactly OR as a
@@ -96,6 +96,7 @@ func (v *renamePackageVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, 
 	if cu.Imports != nil {
 		imps := *cu.Imports
 		out := make([]java.RightPadded[*java.Import], len(imps.Elements))
+		changed := false
 		for i, rp := range imps.Elements {
 			imp := rp.Element
 			oldPath := internal.ImportPath(imp)
@@ -107,9 +108,12 @@ func (v *renamePackageVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, 
 			imp = withImportPath(imp, newPath)
 			rp.Element = imp
 			out[i] = rp
+			changed = true
 		}
-		imps.Elements = out
-		cu.Imports = &imps
+		if changed {
+			imps.Elements = out
+			cu = cu.WithImports(&imps)
+		}
 	}
 
 	return cu

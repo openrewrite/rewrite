@@ -89,3 +89,16 @@ func TestGoSumRPCPreservesResolutionMarker(t *testing.T) {
 	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries())
 	require.False(t, found.ModulePath != "example.com/foo" || len(found.Requires) != 1, "marker fields not preserved")
 }
+
+func TestEmptyGoSumSendsAnEmptyLinesList(t *testing.T) {
+	// given
+	gs, err := parser.ParseGoSumFile("go.sum", "")
+	require.NoError(t, err)
+
+	// when
+	got := roundTripNode(t, gs, &golang.GoSum{Ident: gs.Ident}).(*golang.GoSum)
+
+	// then
+	require.NotNil(t, got.Lines)
+	require.Empty(t, got.Lines)
+}

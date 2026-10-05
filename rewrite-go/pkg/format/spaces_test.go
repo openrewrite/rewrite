@@ -19,7 +19,11 @@ package format
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 )
 
 func TestUnaryOperandSpacing(t *testing.T) {
@@ -48,4 +52,18 @@ func TestUnaryOperandSpacing(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSpacesVisitorLeavesTheVisitedTreeUntouched(t *testing.T) {
+	// given
+	src := "package main\n\nfunc f() {\n\tx := 0\n\tx=1\n\tx+=2\n\t_ = ! true\n}\n"
+	cu, err := parser.NewGoParser().Parse("t.go", src)
+	require.NoError(t, err)
+
+	// when
+	out := NewSpacesVisitor(nil).Visit(cu, nil)
+
+	// then
+	assert.Equal(t, src, printer.Print(cu))
+	assert.Equal(t, "package main\n\nfunc f() {\n\tx := 0\n\tx = 1\n\tx += 2\n\t_ = !true\n}\n", printer.Print(out))
 }
