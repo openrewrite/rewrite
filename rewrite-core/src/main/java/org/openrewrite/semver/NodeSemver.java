@@ -70,6 +70,23 @@ public class NodeSemver {
     }
 
     /**
+     * {@code satisfies} with the version as JSON package data may hold it, in any type: a falsy value
+     * fails, and a truthy one that is not a string throws the TypeError node-semver raises on it.
+     */
+    public static boolean satisfies(@Nullable Object version, String range, Options options) {
+        if (version instanceof String) {
+            return satisfies((String) version, range, options);
+        }
+        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose);
+        if (r == null || !truthy(version)) {
+            return false;
+        }
+        // Range.test reads version.prerelease once every comparator passed, which only `*` does without a SemVer
+        throw new IllegalArgumentException(r.isAny() ?
+                "Cannot read properties of undefined (reading 'length')" : notAString(version));
+    }
+
+    /**
      * @throws IllegalArgumentException when either range is invalid, as node-semver throws.
      */
     public static boolean intersects(String range1, String range2, Options options) {
@@ -85,11 +102,41 @@ public class NodeSemver {
      * @throws IllegalArgumentException when either version is invalid, as node-semver throws.
      */
     public static int compare(String v1, String v2, Options options) {
-        ParsedVersion a = ParsedVersion.parseNode(v1, options.loose);
-        ParsedVersion b = ParsedVersion.parseNode(v2, options.loose);
-        if (!a.isStrictSemver() || !b.isStrictSemver()) {
-            throw new IllegalArgumentException("Invalid Version: " + (!a.isStrictSemver() ? v1 : v2));
-        }
+        return compare((Object) v1, v2, options);
+    }
+
+    /**
+     * {@code compare} with the versions as JSON package data may hold them, in any type.
+     *
+     * @throws IllegalArgumentException when either version is invalid or not a string, as node-semver throws.
+     */
+    public static int compare(@Nullable Object v1, @Nullable Object v2, Options options) {
+        ParsedVersion a = semver(v1, options);
+        ParsedVersion b = semver(v2, options);
         return a.comparePrecedence(b);
+    }
+
+    private static ParsedVersion semver(@Nullable Object version, Options options) {
+        if (!(version instanceof String)) {
+            throw new IllegalArgumentException(notAString(version));
+        }
+        ParsedVersion v = ParsedVersion.parseNode((String) version, options.loose);
+        if (!v.isStrictSemver()) {
+            throw new IllegalArgumentException("Invalid Version: " + version);
+        }
+        return v;
+    }
+
+    private static String notAString(@Nullable Object version) {
+        String type = version instanceof Number ? "number" : version instanceof Boolean ? "boolean" : "object";
+        return "Invalid version. Must be a string. Got type \"" + type + "\".";
+    }
+
+    private static boolean truthy(@Nullable Object value) {
+        if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            return d != 0 && !Double.isNaN(d);
+        }
+        return value != null && !Boolean.FALSE.equals(value);
     }
 }

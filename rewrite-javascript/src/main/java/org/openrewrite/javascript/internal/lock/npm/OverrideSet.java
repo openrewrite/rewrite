@@ -182,7 +182,7 @@ public final class OverrideSet {
         return getNodeRule(node.getName(), node.getVersion());
     }
 
-    public OverrideSet getNodeRule(@Nullable String nodeName, String version) {
+    public OverrideSet getNodeRule(@Nullable String nodeName, Object version) {
         OverrideSet rule = getMatchingRule(nodeName, version);
         return rule != null ? rule : this;
     }
@@ -191,7 +191,7 @@ public final class OverrideSet {
         return getMatchingRule(node.getName(), node.getVersion());
     }
 
-    public @Nullable OverrideSet getMatchingRule(@Nullable String nodeName, String version) {
+    public @Nullable OverrideSet getMatchingRule(@Nullable String nodeName, Object version) {
         for (OverrideSet rule : getRuleset().values()) {
             if (!Objects.equals(rule.name, nodeName)) {
                 continue;

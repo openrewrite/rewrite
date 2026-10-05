@@ -62,12 +62,12 @@ public class Link extends Node {
     }
 
     @Override
-    public String getVersion() {
+    public Object getVersion() {
         if (target != null) {
             return target.getVersion();
         }
         Object version = pkg.get("version");
-        return truthy(version) ? String.valueOf(version) : "";
+        return truthy(version) ? version : "";
     }
 
     @Override

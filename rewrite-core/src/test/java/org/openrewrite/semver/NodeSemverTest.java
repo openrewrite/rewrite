@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -184,5 +185,46 @@ class NodeSemverTest {
     @MethodSource("equality")
     void equal(String v0, String v1, Options options) {
         assertThat(NodeSemver.compare(v0, v1, options)).isZero();
+    }
+
+    // node-semver test/classes/semver.js "invalid version numbers" and test/functions/parse.js, with what
+    // node-semver 7.8.4 answers for the other types package data can hold
+    @Test
+    void versionThatIsNotAString() {
+        String number = "Invalid version. Must be a string. Got type \"number\".";
+        String object = "Invalid version. Must be a string. Got type \"object\".";
+        String bool = "Invalid version. Must be a string. Got type \"boolean\".";
+        String length = "Cannot read properties of undefined (reading 'length')";
+
+        assertThatThrownBy(() -> NodeSemver.compare(1.2, "1.0.0", Options.DEFAULT)).hasMessage(number);
+        assertThatThrownBy(() -> NodeSemver.compare((Object) null, "1.0.0", Options.DEFAULT)).hasMessage(object);
+        assertThatThrownBy(() -> NodeSemver.compare(new ArrayList<>(), "1.0.0", Options.DEFAULT)).hasMessage(object);
+        assertThatThrownBy(() -> NodeSemver.compare("1.0.0", true, Options.DEFAULT)).hasMessage(bool);
+        assertThatThrownBy(() -> NodeSemver.compare("bad", 2, Options.DEFAULT)).hasMessage("Invalid Version: bad");
+        assertThatThrownBy(() -> NodeSemver.compare(2, "bad", Options.DEFAULT)).hasMessage(number);
+
+        assertThat(NodeSemver.satisfies((Object) 0, "^1.0.0", Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.satisfies((Object) false, "*", Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.satisfies((Object) null, "*", Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.satisfies((Object) Double.NaN, "*", Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.satisfies((Object) "", "*", Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.satisfies((Object) 2, "not a range", Options.DEFAULT)).isFalse();
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, "^2.0.0", Options.DEFAULT)).hasMessage(number);
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, "<0.0.0-0", Options.DEFAULT)).hasMessage(number);
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, "1.x", Options.LOOSE)).hasMessage(number);
+        assertThatThrownBy(() -> NodeSemver.satisfies(new HashMap<>(), "1.x", Options.DEFAULT)).hasMessage(object);
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) true, ">=0.0.0-0", Options.DEFAULT)).hasMessage(bool);
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, ">=0.0.0", Options.INCLUDE_PRERELEASE))
+                .hasMessage(number);
+        // `*` passes without reading the version, then Range.test reads its prerelease
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, "x", Options.DEFAULT)).hasMessage(length);
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, "*", Options.LOOSE)).hasMessage(length);
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) 1e21, "*", Options.DEFAULT)).hasMessage(length);
+        assertThatThrownBy(() -> NodeSemver.satisfies(new ArrayList<>(), "*", Options.DEFAULT)).hasMessage(length);
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) true, ">=0.0.0", Options.DEFAULT)).hasMessage(length);
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, ">=0.0.0-0", Options.INCLUDE_PRERELEASE))
+                .hasMessage(length);
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, ">=1 || x", Options.DEFAULT)).hasMessage(length);
+        assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, "x || 1", Options.DEFAULT)).hasMessage(length);
     }
 }

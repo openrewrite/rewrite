@@ -157,9 +157,7 @@ final class DepValid {
                     }
                     return true;
                 }
-                Object version = child.getPackage().get("version");
-                return version instanceof String &&
-                       NodeSemver.satisfies((String) version, requested.getGitRange(), LOOSE);
+                return NodeSemver.satisfies(child.getPackage().get("version"), requested.getGitRange(), LOOSE);
             }
             default:
                 break;

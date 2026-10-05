@@ -878,7 +878,7 @@ class NodeTest {
     @Test
     void nodeVersion() {
         Node n = node(opts().path("/some/path"));
-        assertThat(n.getVersion()).isEmpty();
+        assertThat(n.getVersion()).isEqualTo("");
         n.getPackage().put("version", "1.2.3");
         assertThat(n.getVersion()).isEqualTo("1.2.3");
     }

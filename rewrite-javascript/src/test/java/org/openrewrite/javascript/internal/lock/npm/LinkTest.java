@@ -173,12 +173,12 @@ class LinkTest {
     @Test
     void linkGetsVersionFromTarget() {
         Link link = link(opts().realpath("/some/real/path").path("/other/path"));
-        assertThat(link.getVersion()).isEmpty();
+        assertThat(link.getVersion()).isEqualTo("");
         link.setTarget(null);
         link.setPackage(obj("name", "bar", "version", "2.3.4"));
         assertThat(link.getVersion()).isEqualTo("2.3.4");
         link.setPackage(obj());
-        assertThat(link.getVersion()).isEmpty();
+        assertThat(link.getVersion()).isEqualTo("");
         node(opts().pkg(obj("name", "foo", "version", "1.2.3")).path("/some/real/path").root(link));
         assertThat(link.getVersion()).isEqualTo("1.2.3");
     }

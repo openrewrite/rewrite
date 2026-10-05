@@ -103,9 +103,9 @@ public final class Shrinkwrap {
                 meta.put(key.startsWith("_") ? key.substring(1) : key, val);
             }
         }
-        String pname = node.getPackageName();
-        if (truthy(pname) && (node.isRoot() || !pname.equals(node.getName()) ||
-                              !pname.equals(Node.nameFromFolder(node.getRealpath())))) {
+        Object pname = node.getPackageName();
+        if (truthy(pname) && (node.isRoot() || !Js.strictEquals(pname, node.getName()) ||
+                              !Js.strictEquals(Node.nameFromFolder(node.getRealpath()), pname))) {
             meta.put("name", pname);
         }
 
@@ -366,7 +366,8 @@ public final class Shrinkwrap {
                                  node.getResolved().equals(pathFixed);
             boolean integrityOk = !truthy(integrity) || !truthy(node.getIntegrity()) ||
                                   node.getIntegrity().equals(integrity);
-            boolean versionOk = !truthy(version) || !truthy(node.getVersion()) || node.getVersion().equals(version);
+            boolean versionOk = !truthy(version) || !truthy(node.getVersion()) ||
+                                Js.strictEquals(version, node.getVersion());
 
             boolean allOk = (truthy(resolved) || truthy(integrity) || truthy(version)) &&
                             resolvedOk && integrityOk && versionOk;
@@ -441,7 +442,7 @@ public final class Shrinkwrap {
     }
 
     private static boolean mismatch(@Nullable Object a, @Nullable Object b) {
-        return truthy(a) && truthy(b) && !a.equals(b);
+        return truthy(a) && truthy(b) && !Js.strictEquals(a, b);
     }
 
     private void updateWaitingNode(String loc) {

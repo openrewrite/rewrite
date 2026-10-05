@@ -166,10 +166,16 @@ public final class Edge {
             return false;
         }
         Object bd = from.getPackage().get("bundleDependencies");
+        if (bd == null) {
+            return false;
+        }
         if (bd instanceof List) {
             return ((List<?>) bd).contains(name);
         }
-        return bd instanceof String && ((String) bd).contains(name);
+        if (bd instanceof String) {
+            return ((String) bd).contains(name);
+        }
+        throw new IllegalArgumentException("this[#from]?.package?.bundleDependencies?.includes is not a function");
     }
 
     public boolean isWorkspace() {

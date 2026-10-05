@@ -267,8 +267,8 @@ public class Node {
 
         String path = options.getPath();
         String realpath = options.getRealpath();
-        String nameSource = truthy(path) ? path : truthy(pkg.get("name")) ? String.valueOf(pkg.get("name")) : realpath;
-        String fromFolder = nameFromFolder(nameSource);
+        Object nameSource = truthy(path) ? path : truthy(pkg.get("name")) ? pkg.get("name") : realpath;
+        String fromFolder = truthy(options.getName()) ? null : nameFromFolder(nameSource);
         this.name = truthy(options.getName()) ? options.getName() :
                 truthy(fromFolder) ? fromFolder :
                         truthy(pkg.get("name")) ? String.valueOf(pkg.get("name")) : null;
@@ -342,12 +342,18 @@ public class Node {
         loadDeps();
     }
 
-    static @Nullable String nameFromFolder(@Nullable String dir) {
+    static @Nullable String nameFromFolder(@Nullable Object dir) {
         if (!truthy(dir)) {
             return null;
         }
-        String parent = PosixPath.basename(PosixPath.dirname(dir));
-        String base = PosixPath.basename(dir);
+        if (!(dir instanceof String)) {
+            String received = dir instanceof Number ? "type number (" + dir + ")" :
+                    dir instanceof Boolean ? "type boolean (" + dir + ")" :
+                            "an instance of " + (dir instanceof List ? "Array" : "Object");
+            throw new IllegalArgumentException("The \"path\" argument must be of type string. Received " + received);
+        }
+        String parent = PosixPath.basename(PosixPath.dirname((String) dir));
+        String base = PosixPath.basename((String) dir);
         return parent.startsWith("@") ? parent + "/" + base : base;
     }
 
@@ -386,14 +392,20 @@ public class Node {
                truthy(s.get("preinstall")) || truthy(s.get("postinstall"));
     }
 
-    public String getVersion() {
+    /**
+     * @return the package's {@code version} as the data holds it, a string unless the manifest is wrong.
+     */
+    public Object getVersion() {
         Object version = pkg.get("version");
-        return truthy(version) ? String.valueOf(version) : "";
+        return truthy(version) ? version : "";
     }
 
-    public @Nullable String getPackageName() {
+    /**
+     * @return the package's {@code name} as the data holds it, a string unless the manifest is wrong.
+     */
+    public @Nullable Object getPackageName() {
         Object name = pkg.get("name");
-        return truthy(name) ? String.valueOf(name) : null;
+        return truthy(name) ? name : null;
     }
 
     public String getPkgid() {
@@ -981,7 +993,7 @@ public class Node {
         if (!Objects.equals(node.name, name)) {
             return false;
         }
-        if (!Objects.equals(node.getPackageName(), getPackageName())) {
+        if (!Js.strictEquals(node.getPackageName(), getPackageName())) {
             return false;
         }
 
@@ -1098,9 +1110,9 @@ public class Node {
             return Objects.equals(getResolved(), node.getResolved());
         }
         return truthy(getPackageName()) && truthy(node.getPackageName()) &&
-               Objects.equals(getPackageName(), node.getPackageName()) &&
+               Js.strictEquals(getPackageName(), node.getPackageName()) &&
                truthy(getVersion()) && truthy(node.getVersion()) &&
-               getVersion().equals(node.getVersion());
+               Js.strictEquals(getVersion(), node.getVersion());
     }
 
     public void replaceWith(Node node) {

@@ -37,11 +37,11 @@ public final class CaseInsensitiveMap<V> {
         return Normalizer.normalize(key, Normalizer.Form.NFKD).toLowerCase(Locale.ROOT);
     }
 
-    public @Nullable V get(@Nullable String key) {
-        if (key == null) {
+    public @Nullable V get(@Nullable Object key) {
+        if (!(key instanceof String)) {
             return null;
         }
-        String normKey = normKey(key);
+        String normKey = normKey((String) key);
         return keys.containsKey(normKey) ? entries.get(keys.get(normKey)) : null;
     }
 
@@ -63,11 +63,11 @@ public final class CaseInsensitiveMap<V> {
         return false;
     }
 
-    public boolean has(@Nullable String key) {
-        if (key == null) {
+    public boolean has(@Nullable Object key) {
+        if (!(key instanceof String)) {
             return false;
         }
-        String normKey = normKey(key);
+        String normKey = normKey((String) key);
         return keys.containsKey(normKey) && entries.containsKey(keys.get(normKey));
     }
 

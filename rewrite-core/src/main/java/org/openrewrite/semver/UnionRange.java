@@ -247,6 +247,11 @@ class UnionRange implements VersionComparator {
         return v.isStrictSemver() && test(v);
     }
 
+    // The `*` range: its one comparator matches without reading the version.
+    boolean isAny() {
+        return set.size() == 1 && set.get(0).size() == 1 && set.get(0).get(0).isAny();
+    }
+
     // node-semver Range.range.
     String range() {
         StringBuilder sb = new StringBuilder();
